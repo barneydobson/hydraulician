@@ -1,0 +1,374 @@
+"use strict";
+/**
+ * sim.js — grid allocation, wall rasterisation, the substep loop, and the
+ * readbacks the overlay needs.
+ *
+ * The domain is a fixed physical rectangle (scene.W × scene.H). The grid is
+ * sized to a cell budget, so changing resolution changes Δx but never the
+ * physics you are looking at, and resizing the window only moves the
+ * letterbox — the simulation carries on untouched.
+ */
+const SIM = (() => {
+
+  const CFL = 0.45;          // acoustic Courant number for the staggered update
+  const UREF = 6.0;          // headroom for advective velocity in the dt estimate
+
+  let gl, quad, rect, points, prog = {};
+  let S = null;              // the live grid
+
+  function init(canvas) {
+    gl = canvas.getContext("webgl2", {
+      alpha: false, antialias: false, depth: false, stencil: false,
+      premultipliedAlpha: false, preserveDrawingBuffer: false,
+    });
+    if (!gl) throw new Error("WebGL2 is required.");
+    if (!gl.getExtension("EXT_color_buffer_float")) {
+      throw new Error("EXT_color_buffer_float is required (float render targets).");
+    }
+    quad = GLH.makeQuad(gl);
+    rect = GLH.makeRect(gl);
+    points = GLH.makePoints(gl);
+    prog.vel  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VEL);
+    prog.vof  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF);
+    prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
+    prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
+    prog.draw = GLH.createProgram(gl, Shaders.VS_RECT, Shaders.FS_DISP);
+    prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    return gl;
+  }
+
+  // ------------------------------------------------------------- geometry
+  /** Stamp a thick straight segment (metres) into the solid mask.
+   *  Ends are BUTT, not round: the endpoints are the true extent of the edge,
+   *  so a gate drawn to y = 0.39 leaves an opening that starts at 0.39. Round
+   *  caps quietly eat half a thickness off every gap, which is fatal when the
+   *  gap is the thing being demonstrated. */
+  function stampSeg(mask, seg, value) {
+    const [x0, y0, x1, y1, th] = seg;
+    const r = Math.max(th, S.dx * 1.7) * 0.5;
+    const i0 = Math.max(0, Math.floor((Math.min(x0, x1) - r) / S.dx));
+    const i1 = Math.min(S.nx - 1, Math.ceil((Math.max(x0, x1) + r) / S.dx));
+    const j0 = Math.max(0, Math.floor((Math.min(y0, y1) - r) / S.dx));
+    const j1 = Math.min(S.ny - 1, Math.ceil((Math.max(y0, y1) + r) / S.dx));
+    const ax = x1 - x0, ay = y1 - y0;
+    const len2 = ax * ax + ay * ay;
+    const dot = len2 < 1e-9;                       // degenerate = a disc
+    for (let j = j0; j <= j1; j++) {
+      const py = (j + 0.5) * S.dx;
+      for (let i = i0; i <= i1; i++) {
+        const px = (i + 0.5) * S.dx;
+        let t = dot ? 0 : ((px - x0) * ax + (py - y0) * ay) / len2;
+        if (!dot && (t < 0 || t > 1)) continue;
+        const dx = px - (x0 + t * ax), dy = py - (y0 + t * ay);
+        if (dx * dx + dy * dy <= r * r) mask[j * S.nx + i] = value;
+      }
+    }
+  }
+
+  /** Rebuild the solid mask from scratch: scene walls, then user edits, then
+   *  the closed edges of the domain. Order matters — the border always wins,
+   *  so no amount of erasing can spring a leak. */
+  function rasterise() {
+    const m = S.mask;
+    m.fill(0);
+    const sc = S.scene;
+    (sc.walls(sc.W, sc.H) || []).forEach((s) => stampSeg(m, s, 255));
+    (sc.valves ? sc.valves(sc.W, sc.H) : []).forEach((s) => stampSeg(m, s, 128));
+    S.segs.forEach((s) => stampSeg(m, s, s[5]));
+    const [oL, oR, oB, oT] = sc.open;
+    for (let j = 0; j < S.ny; j++) {
+      if (!oL) m[j * S.nx] = 255;
+      if (!oR) m[j * S.nx + S.nx - 1] = 255;
+    }
+    for (let i = 0; i < S.nx; i++) {
+      if (!oB) m[i] = 255;
+      if (!oT) m[(S.ny - 1) * S.nx + i] = 255;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, S.solid);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
+
+    S.inletKey = -1;                   // invalidate the cached inlet bed level
+  }
+
+  /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */
+  function addSeg(x0, y0, x1, y1, th, kind) {
+    S.segs.push([x0, y0, x1, y1, th, kind]);
+    rasterise();
+  }
+  function undoSeg() { if (S.segs.length) { S.segs.pop(); rasterise(); } }
+  function clearSegs() { S.segs.length = 0; rasterise(); }
+
+  // ------------------------------------------------------------ allocation
+  function build(scene, budget, keepSegs) {
+    const aspect = scene.W / scene.H;
+    let nx = Math.round(Math.sqrt(budget * aspect));
+    nx = Math.max(96, Math.min(1400, nx));
+    const dx = scene.W / nx;
+    let ny = Math.max(64, Math.min(900, Math.round(scene.H / dx)));
+
+    const segs = keepSegs && S ? S.segs : [];
+    S = {
+      scene, nx, ny, dx, segs,
+      W: nx * dx, H: ny * dx,
+      mask: new Uint8Array(nx * ny),
+      t: 0, frames: 0,
+      p: {                                   // live physics parameters
+        g: scene.g, c: scene.c, cf: scene.cf, cs: scene.cs, nu: scene.nu,
+        slip: scene.slip, bulk: scene.bulk, ca: scene.ca,
+        inflow: Object.assign({}, scene.inflow),
+        tailwater: Object.assign({}, scene.tailwater),
+        wave: Object.assign({}, scene.wave),
+        source: Object.assign({}, scene.source),
+        dyeLine: scene.dyeLine, dyeDecay: 0.02,
+        valveClosed: scene.valveOpen ? 0 : 1,
+      },
+    };
+
+    const F = gl.RGBA32F, RGBA = gl.RGBA, FL = gl.FLOAT;
+    S.U = GLH.createDoubleBuffer(gl, nx, ny, F, RGBA, FL, null);
+    S.F = GLH.createDoubleBuffer(gl, nx, ny, F, RGBA, FL, null);
+    S.solid = GLH.createTexture(gl, nx, ny, gl.R8, gl.RED, gl.UNSIGNED_BYTE, null);
+    S.colTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
+    S.colFbo = GLH.createFBO(gl, S.colTex);
+
+    const pn = 128;
+    S.pn = pn;
+    const pd = new Float32Array(pn * pn * 4);
+    for (let k = 0; k < pn * pn; k++) {
+      pd[k * 4] = Math.random() * S.W;
+      pd[k * 4 + 1] = Math.random() * S.H;
+      pd[k * 4 + 2] = -Math.random() * 6;
+      pd[k * 4 + 3] = Math.random();
+    }
+    S.P = GLH.createDoubleBuffer(gl, pn, pn, F, RGBA, FL, pd);
+
+    S.colBuf = new Float32Array(nx * 4);
+    S.pxBuf = new Float32Array(4);
+
+    rasterise();
+    resetWater();
+    return S;
+  }
+
+  /** Reload the scene's initial water (and clear all momentum). */
+  function resetWater() {
+    const n = S.nx * S.ny, d = new Float32Array(n * 4);
+    const P = { g: Math.abs(S.p.g), c: S.p.c };
+    const w = S.scene.water;
+    for (let j = 0; j < S.ny; j++) {
+      for (let i = 0; i < S.nx; i++) {
+        const k = (j * S.nx + i) * 4;
+        d[k] = Math.max(0, w((i + 0.5) * S.dx, (j + 0.5) * S.dx, P) || 0);
+      }
+    }
+    for (const b of [S.F.a, S.F.b]) {
+      gl.bindTexture(gl.TEXTURE_2D, b.tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, d);
+    }
+    const z = new Float32Array(n * 4);
+    for (const b of [S.U.a, S.U.b]) {
+      gl.bindTexture(gl.TEXTURE_2D, b.tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, z);
+    }
+    S.t = 0;
+  }
+
+  // ------------------------------------------------------------------ step
+  function dt() {
+    const p = S.p;
+    const acoustic = CFL * S.dx / (p.c + UREF);
+    const nuMax = p.nu + (p.cs * S.dx) * (p.cs * S.dx) * 400;
+    const viscous = 0.20 * S.dx * S.dx / Math.max(nuMax, 1e-9);
+    return Math.min(acoustic, viscous);
+  }
+
+  /** Inlet velocity implied by the prescribed unit discharge and the depth
+   *  actually available between the bed and the reservoir level. The bed is
+   *  the highest solid below that level, so a raised channel invert is found
+   *  rather than the domain floor. */
+  function inletVel() {
+    const inf = S.p.inflow;
+    if (S.inletKey !== inf.level) {
+      S.inletKey = inf.level;
+      S.inletBed = 0;
+      const jmax = Math.min(S.ny - 2, Math.max(1, Math.floor(inf.level / S.dx)));
+      for (let j = jmax; j >= 0; j--) {
+        if (S.mask[j * S.nx + 1] >= 64) { S.inletBed = (j + 1) * S.dx; break; }
+      }
+    }
+    if (inf.v !== undefined) return inf.v;          // scenes may pin velocity
+    return (inf.q || 0) / Math.max(inf.level - S.inletBed, S.dx);
+  }
+
+  /** Uniforms shared by the two simulation passes. */
+  function simUniforms(pr, h) {
+    const p = S.p;
+    gl.uniform2f(pr.u("u_res"), S.nx, S.ny);
+    gl.uniform1f(pr.u("u_dx"), S.dx);
+    gl.uniform1f(pr.u("u_dt"), h);
+    gl.uniform1f(pr.u("u_g"), -Math.abs(p.g));
+    gl.uniform1f(pr.u("u_c"), p.c);
+    gl.uniform1f(pr.u("u_c2"), p.c * p.c);
+    gl.uniform1f(pr.u("u_valve"), p.valveClosed);
+    gl.uniform4f(pr.u("u_open"), S.scene.open[0], S.scene.open[1], S.scene.open[2], S.scene.open[3]);
+    gl.uniform4f(pr.u("u_in"), p.inflow.level, inletVel(), p.inflow.on, p.inflow.free || 0);
+    gl.uniform2f(pr.u("u_tw"), p.tailwater.level, p.tailwater.on);
+    gl.uniform1f(pr.u("u_time"), S.t);
+    const s0 = p.source, s1 = p.pour;
+    gl.uniform4f(pr.u("u_src0"), s0.x, s0.y, s0.r, s0.on);
+    gl.uniform4f(pr.u("u_sv0"), s0.vx, s0.vy, 0, 0);   // spout runs clear
+    if (s1) {
+      gl.uniform4f(pr.u("u_src1"), s1.x, s1.y, s1.r, 1);
+      gl.uniform4f(pr.u("u_sv1"), s1.vx, s1.vy, 0, 0.85);
+    } else {
+      gl.uniform4f(pr.u("u_src1"), 0, 0, 0, 0);
+      gl.uniform4f(pr.u("u_sv1"), 0, 0, 0, 0);
+    }
+  }
+
+  function step(nsub) {
+    const p = S.p, h = dt();
+    for (let n = 0; n < nsub; n++) {
+      // --- velocity: advection, viscosity, gravity, friction, ∇p
+      gl.useProgram(prog.vel);
+      GLH.bindTex(gl, prog.vel, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+      simUniforms(prog.vel, h);
+      gl.uniform1f(prog.vel.u("u_nu"), p.nu);
+      gl.uniform1f(prog.vel.u("u_cs"), p.cs);
+      gl.uniform1f(prog.vel.u("u_cf"), p.cf);
+      gl.uniform1f(prog.vel.u("u_slip"), p.slip);
+      gl.uniform1f(prog.vel.u("u_bulk"), p.bulk);
+      gl.uniform4f(prog.vel.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
+        p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
+      GLH.bindTarget(gl, S.U.write.fbo, S.nx, S.ny);
+      quad.draw();
+      S.U.swap();
+
+      // --- volume: conservative limited advection of f (+ dye)
+      gl.useProgram(prog.vof);
+      GLH.bindTex(gl, prog.vof, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+      simUniforms(prog.vof, h);
+      gl.uniform1f(prog.vof.u("u_ca"), p.ca);
+      gl.uniform1f(prog.vof.u("u_dyeDecay"), p.dyeDecay);
+      gl.uniform2f(prog.vof.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
+      GLH.bindTarget(gl, S.F.write.fbo, S.nx, S.ny);
+      quad.draw();
+      S.F.swap();
+
+      S.t += h;
+    }
+    S.frames++;
+    return h * nsub;
+  }
+
+  /** Per-column depth / discharge / bed. The GPU pass is cheap and has to run
+   *  every frame (the display samples it), but the readback is a full pipeline
+   *  sync — at 1200 columns that alone was costing two thirds of the frame.
+   *  Pull it back every `readEvery` frames and reuse the buffer in between. */
+  let readEvery = 3, colTick = 0;
+  function columns(force) {
+    gl.useProgram(prog.col);
+    GLH.bindTex(gl, prog.col, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform2f(prog.col.u("u_res"), S.nx, S.ny);
+    gl.uniform1f(prog.col.u("u_dx"), S.dx);
+    gl.uniform1f(prog.col.u("u_valve"), S.p.valveClosed);
+    GLH.bindTarget(gl, S.colFbo, S.nx, 1);
+    quad.draw();
+    if (force || colTick-- <= 0) {
+      colTick = readEvery - 1;
+      gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, S.colBuf);
+    }
+    return S.colBuf;
+  }
+
+  function advanceParticles(realDt) {
+    gl.useProgram(prog.part);
+    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex],
+      ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform2f(prog.part.u("u_res"), S.nx, S.ny);
+    gl.uniform2f(prog.part.u("u_pres"), S.pn, S.pn);
+    gl.uniform1f(prog.part.u("u_dx"), S.dx);
+    gl.uniform1f(prog.part.u("u_pdt"), realDt);
+    gl.uniform1f(prog.part.u("u_plife"), 6.0);
+    gl.uniform1f(prog.part.u("u_time"), S.t);
+    gl.uniform1f(prog.part.u("u_valve"), S.p.valveClosed);
+    GLH.bindTarget(gl, S.P.write.fbo, S.pn, S.pn);
+    quad.draw();
+    S.P.swap();
+  }
+
+  /** Draw the field into the letterbox rect (NDC), then the particles. */
+  function render(view, opts) {
+    const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
+    GLH.bindTarget(gl, null, cw, ch);
+    gl.clearColor(0.027, 0.035, 0.047, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(prog.draw);
+    GLH.bindTex(gl, prog.draw, [["u_F", S.F.read.tex], ["u_U", S.U.read.tex],
+      ["u_S", S.solid], ["u_C", S.colTex]]);
+    gl.uniform4f(prog.draw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
+    gl.uniform2f(prog.draw.u("u_res"), S.nx, S.ny);
+    gl.uniform2f(prog.draw.u("u_canvas"), view.pxW, view.pxH);
+    gl.uniform1f(prog.draw.u("u_dx"), S.dx);
+    gl.uniform1f(prog.draw.u("u_g"), -Math.abs(S.p.g));
+    gl.uniform1f(prog.draw.u("u_c2"), S.p.c * S.p.c);
+    gl.uniform1f(prog.draw.u("u_valve"), S.p.valveClosed);
+    gl.uniform1f(prog.draw.u("u_time"), S.t);
+    gl.uniform1i(prog.draw.u("u_mode"), opts.mode);
+    gl.uniform1f(prog.draw.u("u_vmax"), opts.vmax);
+    gl.uniform1f(prog.draw.u("u_hmax"), opts.hmax);
+    gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : 0);
+    gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
+    gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);
+    gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
+    rect.draw();
+
+    if (opts.particles) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      gl.useProgram(prog.pdraw);
+      GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex]]);
+      gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
+      gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
+      gl.uniform4f(prog.pdraw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
+      gl.uniform1f(prog.pdraw.u("u_dx"), S.dx);
+      gl.uniform1f(prog.pdraw.u("u_psize"), Math.max(1.5, view.pxW / 420));
+      gl.uniform1f(prog.pdraw.u("u_vmax"), opts.vmax);
+      points.draw(S.pn * S.pn);
+      gl.disable(gl.BLEND);
+    }
+  }
+
+  // -------------------------------------------------------------- readback
+  /** One cell: {f, dye, u, v, p, head}. Used by gauges and the hover readout. */
+  function probe(x, y) {
+    const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
+    const j = Math.max(0, Math.min(S.ny - 1, Math.floor(y / S.dx)));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    const u = S.pxBuf[0], v = S.pxBuf[1], p = S.pxBuf[2];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    const g = Math.abs(S.p.g) || 9.81;
+    return { i, j, f: S.pxBuf[0], u, v, p, head: p / g, speed: Math.hypot(u, v),
+             solid: S.mask[j * S.nx + i] };
+  }
+
+  /** A whole column of velocity — the vertical rake. Returns u(y) at cell centres. */
+  function rake(x, out) {
+    const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
+    const buf = out && out.length >= S.ny * 4 ? out : new Float32Array(S.ny * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+    return { i, buf };
+  }
+
+  const get = () => S;
+  return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
+           step, columns, advanceParticles, render, probe, rake, dt, get, inletVel,
+           stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
+})();

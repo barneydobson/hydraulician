@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Hydraulician — 2D hydraulics in profile</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #070b0f; }
+  body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #dfe8f2; }
+
+  #view, #over { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #view { touch-action: none; cursor: crosshair; }
+  #over { pointer-events: none; }
+
+  .glass {
+    background: rgba(12, 17, 26, 0.60);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  #bar {
+    position: fixed; top: 14px; left: 14px; z-index: 10;
+    display: flex; gap: 6px; padding: 6px; align-items: center; flex-wrap: wrap;
+    max-width: calc(100vw - 28px);
+  }
+  #bar button, #bar select {
+    appearance: none; border: 0; background: transparent; color: inherit;
+    font: inherit; font-size: 13.5px; padding: 8px 11px; border-radius: 10px;
+    cursor: pointer; transition: background .12s, transform .12s; white-space: nowrap;
+  }
+  #bar button:hover { background: rgba(255,255,255,0.10); transform: translateY(-1px); }
+  #bar button.active { background: rgba(77,195,255,0.20); box-shadow: inset 0 0 0 1px rgba(77,195,255,0.55); }
+  #bar select { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.13); font-weight: 600; }
+  #bar .sep { width: 1px; height: 22px; background: rgba(255,255,255,0.13); margin: 0 3px; }
+  #tools { display: flex; gap: 3px; }
+  #tools button { padding: 8px 10px; font-size: 12.5px; }
+
+  #title {
+    position: fixed; top: 14px; right: 14px; z-index: 10;
+    padding: 9px 15px; text-align: right; pointer-events: none;
+  }
+  #title b { font-size: 14.5px; letter-spacing: .02em; }
+  #title span { display: block; font-size: 11px; opacity: .60; }
+  #status {
+    display: block; font: 10.5px ui-monospace, SFMono-Regular, monospace;
+    opacity: .48; margin-top: 4px; font-variant-numeric: tabular-nums;
+  }
+
+  #hint {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 10; padding: 9px 18px; font-size: 13px; opacity: .92;
+    pointer-events: none; text-align: center; max-width: min(640px, 80vw);
+  }
+  #hint b { color: #7fd4ff; }
+
+  #toast {
+    position: fixed; top: 66px; left: 50%; transform: translateX(-50%) translateY(-8px);
+    z-index: 11; padding: 12px 20px; text-align: center; opacity: 0;
+    transition: opacity .35s, transform .35s; pointer-events: none; max-width: min(560px, 90vw);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toastTitle { font-weight: 700; font-size: 14.5px; }
+  #toastSub { font-size: 12.5px; opacity: .72; margin-top: 2px; }
+
+  #panel {
+    position: fixed; top: 66px; left: 14px; z-index: 10; width: 340px;
+    padding: 14px 16px; display: none; max-height: calc(100vh - 96px); overflow: auto;
+  }
+  #panel.open { display: block; }
+  #panel::-webkit-scrollbar { width: 6px; }
+  #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+  #panel h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; opacity: .5; margin: 15px 0 4px; }
+  #panel h3:first-child { margin-top: 0; }
+  #panel label.row { display: flex; align-items: center; gap: 8px; margin: 7px 0 1px; font-size: 13px; }
+  #panel .row .lbl { flex: 1 1 auto; white-space: nowrap; }
+  #panel input[type=range] { width: 138px; flex: 0 0 auto; accent-color: #4dc3ff; }
+  #panel .notes { font: 11px ui-monospace, SFMono-Regular, monospace; opacity: .5; margin: 0 0 6px; min-height: 12px; }
+  #panel .info { flex: 0 0 auto; opacity: .35; cursor: help; font-size: 12px; padding: 2px; user-select: none; }
+  #panel .info:hover { opacity: .9; }
+  #panel select, #panel input[type=checkbox] { accent-color: #4dc3ff; }
+  #panel select {
+    background: rgba(255,255,255,0.08); color: inherit; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 7px; padding: 3px 6px; font: inherit; font-size: 12.5px;
+  }
+
+  #keys {
+    position: fixed; left: 14px; bottom: 14px; z-index: 9; padding: 9px 13px;
+    font-size: 11px; opacity: .8; line-height: 1.85; max-width: 320px;
+  }
+  #keys kbd {
+    background: rgba(255,255,255,0.10); border-radius: 4px; padding: 1px 5px;
+    font: 10.5px ui-monospace, monospace; border: 1px solid rgba(255,255,255,0.12);
+  }
+  @media (max-height: 720px) { #keys { display: none; } }
+</style>
+</head>
+<body>
+
+<canvas id="view"></canvas>
+<canvas id="over"></canvas>
+
+<div id="bar" class="glass">
+  <select id="sceneSel" title="Scene"></select>
+  <div class="sep"></div>
+  <div id="tools"></div>
+  <div class="sep"></div>
+  <button id="valveBtn" title="Open / close every valve (V)">Valve</button>
+  <button id="playBtn" title="Pause (Space)">❚❚ Pause</button>
+  <button id="resetBtn" title="Reload the scene's water (R)">Reset water</button>
+  <button id="clearBtn" title="Remove everything you have drawn (C)">Clear drawing</button>
+  <button id="panelBtn" title="Controls">Controls</button>
+</div>
+
+<div id="title" class="glass">
+  <b id="sceneName">Sandbox</b>
+  <span id="sceneKey">Draw the hydraulics</span>
+  <span id="status"></span>
+</div>
+
+<div id="toast" class="glass">
+  <div id="toastTitle"></div>
+  <div id="toastSub"></div>
+</div>
+
+<div id="panel" class="glass"></div>
+
+<div id="hint" class="glass"></div>
+
+<div id="keys" class="glass">
+  <kbd>left-drag</kbd> draw edge &nbsp; <kbd>right-drag</kbd> pour &nbsp; <kbd>shift</kbd> snap<br>
+  <kbd>1</kbd>–<kbd>5</kbd> tools &nbsp; <kbd>[</kbd> <kbd>]</kbd> brush &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>C</kbd> clear<br>
+  <kbd>V</kbd> valve &nbsp; <kbd>space</kbd> pause &nbsp; <kbd>R</kbd> reset &nbsp; <kbd>G</kbd> field<br>
+  <kbd>P</kbd> particles &nbsp; <kbd>D</kbd> dye &nbsp; <kbd>N</kbd> channel overlay
+</div>
+
+<script src="js/gl.js"></script>
+<script src="js/shaders.js"></script>
+<script src="js/scenes.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/overlay.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -73,10 +73,15 @@ uniform float u_dx, u_dt;
 uniform float u_g;            // signed gravity (m/s², negative = down; 0 = plan view)
 uniform float u_c, u_c2;      // slot celerity and its square
 uniform float u_valve;        // 1 = valves closed (solid), 0 = open
-uniform vec4  u_open;         // L R B T : 1 = open boundary
 uniform vec4  u_in;           // left reservoir: level (m), velocity (m/s), on, free
                               // free = 1 pins the level only and lets the head drive the flow
 uniform vec2  u_tw;           // right tailwater: level (m), on
+uniform vec2  u_inBand;       // y-range the inflow control applies to (bed of the
+                              // connected inlet run → min(level, run top)). Without
+                              // this the Dirichlet floods any cavity under a raised
+                              // bed slab and the prescribed velocity pressurises it
+                              // to the clamp — the steep-scene explosion.
+uniform vec2  u_twBand;       // same for the right tailwater column
 uniform vec4  u_src0, u_src1; // point sources: x, y, radius (m), on
 uniform vec4  u_sv0,  u_sv1;  // source velocity x, y and dye A, dye B
 uniform float u_time;
@@ -111,13 +116,18 @@ float ud3(float m2, float m1, float c0, float p1, float p2, float a, float h){
 }
 
 // Kinematic pressure from the equation of state, plus a bulk-viscosity term
-// that attenuates acoustics (the "wave damping" slider). Clamped at zero:
-// a cell that cannot stay full simply cavitates, which is what really
-// happens downstream of a slammed valve.
+// that attenuates acoustics (the "wave damping" slider). With gravity the
+// EOS is one-sided and clamped at zero: f < 1 IS the free surface, and a
+// cell that cannot stay full simply cavitates, which is what really happens
+// downstream of a slammed valve. In plan view (g = 0) there is no free
+// surface — the fluid fills the plane — so the EOS goes two-sided: a
+// rarefied cell pulls back like a liquid under tension. Without that,
+// every strong vortex core slowly cavitates into a hole.
 float press(float f, float dv){
   float p = u_c2 * max(f - 1.0, 0.0);
+  if (u_g == 0.0) p += u_c2 * min(f - 1.0, 0.0) * smoothstep(0.3, 0.9, f);
   p -= u_bulk * u_c * u_dx * dv * smoothstep(0.90, 1.0, f);
-  return max(p, 0.0);
+  return (u_g == 0.0) ? p : max(p, 0.0);
 }
 
 void main(){
@@ -198,6 +208,21 @@ void main(){
   un *= 1.0 - min(dt * 1.5 * dryU, 1.0);
   vn *= 1.0 - min(dt * 1.5 * dryV, 1.0);
 
+  // --- transport-consistency cap. The VOF donor limiter cannot move mass
+  //     faster than a quarter cell per substep (dx/4dt), but nothing above
+  //     stops the *velocity* in a spray cell from integrating past that —
+  //     gravity keeps pumping while the mass stays put, the two fields
+  //     decouple, and the runaway ends at the ±80 rail where it drags water
+  //     out of any pinned Dirichlet ghost it touches (the tailwater-scene
+  //     explosion). So in partial-fill cells, hold the speed at what the
+  //     volume flux can actually follow; solid water keeps the wide NaN
+  //     guard — pressurised cells (f ≈ 1) never bind the donor cap.
+  float capBase = 0.20 * dx / dt;
+  float capU = mix(capBase, 80.0, smoothstep(0.05, 0.50, fFu));
+  float capV = mix(capBase, 80.0, smoothstep(0.05, 0.50, fFv));
+  un = clamp(un, -capU, capU);
+  vn = clamp(vn, -capV, capV);
+
   // --- prescribed sources
   vec2 pu = vec2(float(i),       float(j) + 0.5) * dx;   // u-node position
   vec2 pv = vec2(float(i) + 0.5, float(j)      ) * dx;   // v-node position
@@ -209,10 +234,25 @@ void main(){
     if (distance(pu, u_src1.xy) < u_src1.z) un = u_sv1.x;
     if (distance(pv, u_src1.xy) < u_src1.z) vn = u_sv1.y;
   }
-  if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) un = (pu.y < u_in.x) ? u_in.y : 0.0;
+  if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) {
+    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
+  }
   if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
     un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker
   }
+
+  // --- open-boundary ring. The outermost cells see a clamped stencil, and
+  //     with a pinned Dirichlet f their momentum update is junk that leaks
+  //     back into the domain through the advection stencil (tE.g / tN.r of
+  //     the last interior column). So: tangential velocity is a zero-gradient
+  //     copy of the interior neighbour, and the exchange face keeps its
+  //     momentum update — that is what lets a level control drive flow
+  //     through the edge — but clamped to the transport limit. Closed edges
+  //     are solid ring cells and are zeroed just below anyway.
+  if (i == 0)          vn = tE.g;
+  if (i == NXY.x - 1) { un = clamp(un, -capBase, capBase); vn = tW.g; }
+  if (j == 0)          un = tN.r;
+  if (j == NXY.y - 1) { vn = clamp(vn, -capBase, capBase); un = tS.r; }
 
   // --- no flux through solids; outermost faces are outside the domain
   if (sC > 0.5 || sW > 0.5) un = 0.0;
@@ -269,12 +309,12 @@ void main(){
     if (gB) s.y = 1; if (gT) s.y = NXY.y - 2;
     vec4 m = TF(s);
     if (gL && u_in.z > 0.5) {               // upstream reservoir
-      m.r = (y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2 : 0.0;
+      m.r = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2 : 0.0;
       m.g = (u_dyeLine.y > 0.5 && fract(u_time / max(u_dyeLine.x, 0.05)) < 0.07) ? 1.0 : 0.0;
       m.b = 0.0;
     }
     if (gR && u_tw.y > 0.5) {               // downstream level control
-      m.r = (y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2 : 0.0;
+      m.r = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2 : 0.0;
     }
     o = m; return;
   }

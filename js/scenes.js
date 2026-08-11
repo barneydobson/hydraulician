@@ -404,7 +404,10 @@ const SCENES = (() => {
       blurb: "Looking down instead of side on: gravity acts out of the plane, so the whole box is water. A submerged jet, a bluff body, and a vortex street.",
       W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 2e-5, slip: 1, bulk: 0.03,
       mode: 4, ca: 0, vmax: 1.6,
-      open: [0, 1, 0, 0],
+      // The left edge must be OPEN: a closed edge stamps the whole ring column
+      // solid, which zeroes the prescribed duct velocity at i = 1 — the scene
+      // walls below close everything except the mouth.
+      open: [1, 1, 0, 0],
       inflow: { level: 99, v: 0.9, on: 1 },
       walls: () => [
         [0.0, 0.0, 0.0, 1.42, 0.10],             // left edge, closed except …

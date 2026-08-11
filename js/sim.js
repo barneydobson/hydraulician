@@ -77,7 +77,7 @@ const SIM = (() => {
     (sc.walls(sc.W, sc.H) || []).forEach((s) => stampSeg(m, s, 255));
     (sc.valves ? sc.valves(sc.W, sc.H) : []).forEach((s) => stampSeg(m, s, 128));
     S.segs.forEach((s) => stampSeg(m, s, s[5]));
-    const [oL, oR, oB, oT] = sc.open;
+    const [oL, oR, oB, oT] = S.p ? S.p.open : sc.open;
     for (let j = 0; j < S.ny; j++) {
       if (!oL) m[j * S.nx] = 255;
       if (!oR) m[j * S.nx + S.nx - 1] = 255;
@@ -90,7 +90,7 @@ const SIM = (() => {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
 
-    S.inletKey = -1;                   // invalidate the cached inlet bed level
+    S.bandKey = null;                  // invalidate the cached control bands
   }
 
   /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */
@@ -118,6 +118,7 @@ const SIM = (() => {
       p: {                                   // live physics parameters
         g: scene.g, c: scene.c, cf: scene.cf, cs: scene.cs, nu: scene.nu,
         slip: scene.slip, bulk: scene.bulk, ca: scene.ca,
+        open: scene.open.slice(),
         inflow: Object.assign({}, scene.inflow),
         tailwater: Object.assign({}, scene.tailwater),
         wave: Object.assign({}, scene.wave),
@@ -185,22 +186,53 @@ const SIM = (() => {
     return Math.min(acoustic, viscous);
   }
 
-  /** Inlet velocity implied by the prescribed unit discharge and the depth
-   *  actually available between the bed and the reservoir level. The bed is
-   *  the highest solid below that level, so a raised channel invert is found
-   *  rather than the domain floor. */
-  function inletVel() {
-    const inf = S.p.inflow;
-    if (S.inletKey !== inf.level) {
-      S.inletKey = inf.level;
-      S.inletBed = 0;
-      const jmax = Math.min(S.ny - 2, Math.max(1, Math.floor(inf.level / S.dx)));
-      for (let j = jmax; j >= 0; j--) {
-        if (S.mask[j * S.nx + 1] >= 64) { S.inletBed = (j + 1) * S.dx; break; }
+  /** The y-range a level control (inflow / tailwater) is allowed to touch:
+   *  the contiguous run of open cells in that grid column which contains the
+   *  control level — or, if the level sits above every run (a plan-view duct
+   *  fed at "level 99"), the topmost run below it. Applying the control to
+   *  the whole column instead floods any cavity under a raised bed slab, and
+   *  a prescribed inlet velocity then pressurises the sealed pocket to the
+   *  clamp — which is exactly how the steep scenes used to explode. */
+  function columnBand(i, level) {
+    const runs = [];
+    let a = -1;
+    for (let j = 1; j < S.ny - 1; j++) {
+      const open = S.mask[j * S.nx + i] < 64;
+      if (open && a < 0) a = j;
+      if (a >= 0 && (!open || j === S.ny - 2)) {
+        runs.push([a, open ? j : j - 1]);
+        a = -1;
       }
     }
+    if (!runs.length) return [0, 0];
+    const lj = level / S.dx;
+    let best = null;
+    for (const r of runs) {
+      if (lj >= r[0] && lj <= r[1] + 1) { best = r; break; }
+      if (r[1] + 1 <= lj) best = r;               // runs ascend: keep the topmost below
+    }
+    if (!best) best = runs[0];
+    return [best[0] * S.dx, (best[1] + 1) * S.dx];
+  }
+
+  function bands() {
+    const p = S.p;
+    const key = p.inflow.level + ":" + p.tailwater.level;
+    if (S.bandKey !== key) {
+      S.bandKey = key;
+      S.inBand = columnBand(1, p.inflow.level);
+      S.twBand = columnBand(S.nx - 2, p.tailwater.level);
+    }
+    return { inB: S.inBand, twB: S.twBand };
+  }
+
+  /** Inlet velocity implied by the prescribed unit discharge and the depth
+   *  actually available between the inlet run's bed and the reservoir level. */
+  function inletVel() {
+    const inf = S.p.inflow;
+    const b = bands().inB;
     if (inf.v !== undefined) return inf.v;          // scenes may pin velocity
-    return (inf.q || 0) / Math.max(inf.level - S.inletBed, S.dx);
+    return (inf.q || 0) / Math.max(Math.min(inf.level, b[1]) - b[0], S.dx);
   }
 
   /** Uniforms shared by the two simulation passes. */
@@ -213,9 +245,11 @@ const SIM = (() => {
     gl.uniform1f(pr.u("u_c"), p.c);
     gl.uniform1f(pr.u("u_c2"), p.c * p.c);
     gl.uniform1f(pr.u("u_valve"), p.valveClosed);
-    gl.uniform4f(pr.u("u_open"), S.scene.open[0], S.scene.open[1], S.scene.open[2], S.scene.open[3]);
     gl.uniform4f(pr.u("u_in"), p.inflow.level, inletVel(), p.inflow.on, p.inflow.free || 0);
     gl.uniform2f(pr.u("u_tw"), p.tailwater.level, p.tailwater.on);
+    const { inB, twB } = bands();
+    gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(p.inflow.level, inB[1]));
+    gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
     gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
     gl.uniform4f(pr.u("u_src0"), s0.x, s0.y, s0.r, s0.on);
@@ -312,7 +346,7 @@ const SIM = (() => {
       ["u_S", S.solid], ["u_C", S.colTex]]);
     gl.uniform4f(prog.draw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
     gl.uniform2f(prog.draw.u("u_res"), S.nx, S.ny);
-    gl.uniform2f(prog.draw.u("u_canvas"), view.pxW, view.pxH);
+    gl.uniform2f(prog.draw.u("u_canvas"), view.w, view.h);   // drawn rect, so zoom keeps px/m honest
     gl.uniform1f(prog.draw.u("u_dx"), S.dx);
     gl.uniform1f(prog.draw.u("u_g"), -Math.abs(S.p.g));
     gl.uniform1f(prog.draw.u("u_c2"), S.p.c * S.p.c);
@@ -369,6 +403,6 @@ const SIM = (() => {
 
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
-           step, columns, advanceParticles, render, probe, rake, dt, get, inletVel,
+           step, columns, advanceParticles, render, probe, rake, dt, get, inletVel, bands,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

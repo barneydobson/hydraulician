@@ -59,9 +59,14 @@ Three guard rails, each bought with an explosion:
   pond slosh reflects off it and, with the momentum update supplying the
   exchange velocity, the reflection pumps — the drowned-jump scenes tore
   themselves apart at t ≈ 40 s. Level-controlled edges therefore get a
-  ten-column relaxation sponge (f nudged to the hydrostatic target, ramped
-  quadratically toward the edge) and a torricellian exchange clamp
-  `sqrt(2gL)+1`. The prescribed inlet plug is likewise feathered over its top
+  relaxation sponge (f nudged to the hydrostatic target) and a torricellian
+  exchange clamp `sqrt(2gL)+1`. Sponge details that matter: the width is
+  scene-tunable in METRES (`spongeIn` / `spongeTw`, default ~10 cells) —
+  a reservoir compartment feeding a pipe needs the whole compartment held
+  (venturi 1.35 m, hammer 5.5 m) or it draws down and the bore cavitates;
+  and the nudge is asymmetric (fill 12·s, drain 2·s²) because deleting wave
+  crests column-by-column against an incoming jet paints standing striations
+  in the pond. The prescribed inlet plug is likewise feathered over its top
   three cells (`inletVel` repays the lost discharge) so its hard top edge
   stops waterfalling ripples into the drawn-down interior surface; submerged
   ducts (level above the whole run) keep the full plug.
@@ -147,11 +152,16 @@ downstream in a steady state; total volume constant while inflow ≠ outflow.
 - Ground must be solid all the way down. A thin slab leaves a sealed void that
   fills through any opening and then drowns the outfall above it.
 - Outer ring: closed edges are stamped solid **last**, so no amount of erasing
-  can spring a leak. Open edges are zero-gradient ghosts, with optional
-  Dirichlet controls (left reservoir level, right tailwater).
-- A subcritical reach needs a real downstream control — tailwater or brink. The
-  zero-gradient outflow is right for supercritical flow and simply ponds a
-  subcritical one.
+  can spring a leak. Edges are tri-state (`open` values): 0 wall, 1 open
+  (zero-gradient ghost), 2 outfall (ghost held empty, so the last column
+  spills over the edge like a brink). Level controls (left reservoir, right
+  tailwater) ride on an open edge and take precedence over outfall.
+- A subcritical reach needs a real downstream control — tailwater, brink or an
+  outfall edge. The zero-gradient outflow is right for supercritical flow and
+  simply ponds a subcritical one: through-flow passes, a still pond sits.
+- The reservoir / tailwater panel toggles are self-configuring: they open
+  their edge and pick sane level/q defaults, so the sandbox can reproduce any
+  scene by hand (that is the acceptance test for control changes).
 
 ## Measured, not assumed
 

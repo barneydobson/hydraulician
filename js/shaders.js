@@ -82,6 +82,8 @@ uniform vec2  u_inBand;       // y-range the inflow control applies to (bed of t
                               // bed slab and the prescribed velocity pressurises it
                               // to the clamp — the steep-scene explosion.
 uniform vec2  u_twBand;       // same for the right tailwater column
+uniform vec2  u_spongeN;      // relaxation-sponge width in columns (inflow, tailwater)
+uniform vec4  u_openMode;     // L R B T : 0 wall, 1 open (zero-gradient), 2 outfall
 uniform vec4  u_src0, u_src1; // point sources: x, y, radius (m), on
 uniform vec4  u_sv0,  u_sv1;  // source velocity x, y and dye A, dye B
 uniform float u_time;
@@ -325,14 +327,23 @@ void main(){
     if (gL) s.x = 1; if (gR) s.x = NXY.x - 2;
     if (gB) s.y = 1; if (gT) s.y = NXY.y - 2;
     vec4 m = TF(s);
-    if (gL && u_in.z > 0.5) {               // upstream reservoir
-      m.r = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2 : 0.0;
-      m.g = (u_dyeLine.y > 0.5 && fract(u_time / max(u_dyeLine.x, 0.05)) < 0.07) ? 1.0 : 0.0;
-      m.b = 0.0;
+    if (gL) {
+      if (u_in.z > 0.5) {                   // upstream reservoir
+        m.r = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2 : 0.0;
+        m.g = (u_dyeLine.y > 0.5 && fract(u_time / max(u_dyeLine.x, 0.05)) < 0.07) ? 1.0 : 0.0;
+        m.b = 0.0;
+      } else if (u_openMode.x > 1.5) m = vec4(0.0);
     }
-    if (gR && u_tw.y > 0.5) {               // downstream level control
-      m.r = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2 : 0.0;
+    if (gR) {
+      if (u_tw.y > 0.5) {                   // downstream level control
+        m.r = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2 : 0.0;
+      } else if (u_openMode.y > 1.5) m = vec4(0.0);
     }
+    // Outfall ghosts are held EMPTY, so ∇p spills the last interior column
+    // over the edge — a brink. A plain open edge is zero-gradient: transparent
+    // to through-flow but it will happily let a still pond sit against it.
+    if (gB && u_openMode.z > 1.5) m = vec4(0.0);
+    if (gT && u_openMode.w > 1.5) m = vec4(0.0);
     o = m; return;
   }
 
@@ -398,21 +409,27 @@ void main(){
   //     a hard impedance step: pond slosh reflects off it, and with the
   //     momentum update supplying the exchange velocity the reflection can
   //     pump (that was the drowned-jump blow-up). Nudging f toward the
-  //     hydrostatic target over the last ~10 columns instead makes the
-  //     boundary a soft bath — same level, no resonator. Mass conservation
-  //     is intentionally given up inside the sponge: it IS the reservoir.
-  const float SPN = 10.0;
-  if (u_tw.y > 0.5 && float(i) > u_res.x - 2.0 - SPN) {
-    float s = (float(i) - (u_res.x - 2.0 - SPN)) / SPN;
+  //     hydrostatic target over a band of columns instead makes the boundary
+  //     a soft bath — same level, no resonator. Mass conservation is
+  //     intentionally given up inside the sponge: it IS the reservoir. The
+  //     width comes from the scene (a reservoir compartment feeding a pipe
+  //     needs the whole compartment held, or it drains and the pipe
+  //     cavitates); the nudge is asymmetric — deficits fill hard, crests
+  //     drain gently — because deleting wave crests column-by-column against
+  //     an incoming jet paints standing striations in the pond.
+  if (u_tw.y > 0.5 && u_spongeN.y > 0.5 && float(i) > u_res.x - 2.0 - u_spongeN.y) {
+    float s = (float(i) - (u_res.x - 2.0 - u_spongeN.y)) / u_spongeN.y;
     float tgt = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2
               : (y >= u_tw.x ? 0.0 : fNew);
-    fNew = mix(fNew, tgt, min(dt * 6.0 * s * s, 1.0));
+    float rate = tgt > fNew ? 12.0 * s : 2.0 * s * s;
+    fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
-  if (u_in.z > 0.5 && u_in.w > 0.5 && float(i) < 1.0 + SPN) {
-    float s = (1.0 + SPN - float(i)) / SPN;
+  if (u_in.z > 0.5 && u_in.w > 0.5 && u_spongeN.x > 0.5 && float(i) < 1.0 + u_spongeN.x) {
+    float s = (1.0 + u_spongeN.x - float(i)) / u_spongeN.x;
     float tgt = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2
               : (y >= u_in.x ? 0.0 : fNew);
-    fNew = mix(fNew, tgt, min(dt * 6.0 * s * s, 1.0));
+    float rate = tgt > fNew ? 12.0 * s : 2.0 * s * s;
+    fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
 
   // --- dye rides along (advective form, first-order upwind is plenty)

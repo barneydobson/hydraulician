@@ -94,6 +94,7 @@ function loadScene(id, keepDrawing) {
   sim = SIM.build(sc, CONFIG.budgets[state.budget], keepDrawing);
   state.mode = sc.mode;
   state.channel = !!sc.chan;
+  state.labels = sc.labels === undefined ? true : !!sc.labels;
   state.gauges.length = 0; state.rakes.length = 0;
   state.tipIdx = 0; state.tipAt = 0;
   state.nsub = 24;
@@ -115,8 +116,18 @@ const CONTROLS = [
     fmt: (v) => "×" + v.toFixed(2) + " real time",
     info: "How much simulated time passes per second of wall clock. Water hammer wants slow motion; backwater curves want fast." },
   { id: "inflowOn", place: "res", type: "check", label: "Upstream reservoir",
-    get: () => sim.p.inflow.on > 0.5, set: (v) => sim.p.inflow.on = v ? 1 : 0,
-    info: "A Dirichlet level + discharge on the left edge — the upstream control." },
+    get: () => sim.p.inflow.on > 0.5,
+    set: (v) => {
+      sim.p.inflow.on = v ? 1 : 0;
+      if (v) {           // make the control self-evident: open its edge, pick sane defaults
+        if (sim.p.open[0] < 1) { sim.p.open[0] = 1; SIM.rasterise(); }
+        if (sim.p.inflow.level <= 0.01) sim.p.inflow.level = 0.55 * sim.H;
+        if (!(sim.p.inflow.q > 0) && !(sim.p.inflow.free > 0.5) && sim.p.inflow.v === undefined) {
+          sim.p.inflow.q = 0.25;
+        }
+      }
+    },
+    info: "Holds a water level on the LEFT edge and feeds the set discharge through it. Ticking it opens the left edge automatically; the ∇ marker shows the level." },
   { id: "inLevel", place: "res", label: "Reservoir level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.inflow.level, set: (v) => sim.p.inflow.level = v,
     fmt: (v) => v.toFixed(2) + " m",
@@ -130,8 +141,15 @@ const CONTROLS = [
     get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
   { id: "twOn", place: "tw", type: "check", label: "Tailwater control",
-    get: () => sim.p.tailwater.on > 0.5, set: (v) => sim.p.tailwater.on = v ? 1 : 0,
-    info: "Holds a fixed level on the right edge — the downstream control that decides M1 vs M2." },
+    get: () => sim.p.tailwater.on > 0.5,
+    set: (v) => {
+      sim.p.tailwater.on = v ? 1 : 0;
+      if (v) {
+        if (sim.p.open[1] < 1) { sim.p.open[1] = 1; SIM.rasterise(); }
+        if (sim.p.tailwater.level <= 0.01) sim.p.tailwater.level = 0.3 * sim.H;
+      }
+    },
+    info: "Holds a fixed level on the RIGHT edge — the downstream control that decides M1 vs M2. Ticking it opens the right edge automatically; the ∇ marker shows the level." },
   { id: "twLevel", place: "tw", label: "Tailwater level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.tailwater.level, set: (v) => sim.p.tailwater.level = v,
     fmt: (v) => v.toFixed(2) + " m" },
@@ -150,17 +168,16 @@ const CONTROLS = [
     fmt: (v) => v.toFixed(2) + " m/s" },
 
   { h: "Boundaries" },
-  { id: "openL", place: "openL", type: "check", label: "Open left edge",
-    get: () => sim.p.open[0] > 0.5, set: (v) => { sim.p.open[0] = v ? 1 : 0; SIM.rasterise(); },
-    info: "Open edges are zero-gradient outflows (water leaves freely); the left one also carries the reservoir control when it is on. Closed edges are walls." },
-  { id: "openR", place: "openR", type: "check", label: "Open right edge",
-    get: () => sim.p.open[1] > 0.5, set: (v) => { sim.p.open[1] = v ? 1 : 0; SIM.rasterise(); },
-    info: "The right edge carries the tailwater control when it is on." },
-  { id: "openB", place: "openB", type: "check", label: "Open bottom edge",
-    get: () => sim.p.open[2] > 0.5, set: (v) => { sim.p.open[2] = v ? 1 : 0; SIM.rasterise(); },
-    info: "An open bottom is a free overfall for anything that reaches it — brinks and outfalls drain here." },
-  { id: "openT", place: "openT", type: "check", label: "Open top edge",
-    get: () => sim.p.open[3] > 0.5, set: (v) => { sim.p.open[3] = v ? 1 : 0; SIM.rasterise(); } },
+  ...[["openL", 0, "Left edge", "carries the reservoir control when it is on"],
+      ["openR", 1, "Right edge", "carries the tailwater control when it is on"],
+      ["openB", 2, "Bottom edge", "an outfall bottom is a free overfall for anything that reaches it"],
+      ["openT", 3, "Top edge", "rarely needs opening"]].map(([id, k, label, extra]) => ({
+    id, place: id, type: "select", label,
+    opts: [["0", "Wall"], ["1", "Open"], ["2", "Outfall"]],
+    get: () => String(sim.p.open[k]),
+    set: (v) => { sim.p.open[k] = +v; SIM.rasterise(); },
+    info: "Wall reflects. Open is zero-gradient: through-flow passes, but a still pond will sit against it. Outfall holds the outside empty, so water reaching the edge pours over it like a brink. This edge " + extra + ".",
+  })),
 
   { h: "Hydraulics" },
   { id: "cel", label: "Slot celerity c", min: 8, max: 400, step: 1, log: true,
@@ -630,7 +647,7 @@ function drawMarkers(ctx) {
   for (const [key, on, pos, dx, dy] of sides) {
     if (!(on > 0.5)) continue;
     const f = flashOf(key);
-    ctx.globalAlpha = 0.30 + 0.6 * f;
+    ctx.globalAlpha = (on > 1.5 ? 0.55 : 0.30) + 0.5 * f;   // outfalls read stronger
     ctx.lineWidth = 1.3 + 1.5 * f;
     for (const t of [0.3, 0.5, 0.7]) {
       const [cx, cy] = pos(t);

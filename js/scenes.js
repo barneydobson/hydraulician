@@ -287,12 +287,13 @@ const SCENES = (() => {
       mode: 3, hmax: 0.45, vmax: 3.0, spinup: 28,
     }), {
       id: "c13", name: "C1 / C3 · critical slope", key: "y_n = y_c",
+      labels: 0,
       blurb: "The knife edge: a slope where the measured normal depth equals critical depth. Zone 2 vanishes, and the depth hugs y_c along the whole reach.",
       tips: ["The slope is tuned so the <i>measured</i> y_n equals y_c — the dashed lines overlap.",
              "Below the gate is C<b>3</b>; behind the weir is C<b>1</b>. There is no zone 2.",
              "The middle of the reach rides Fr ≈ 1: the Froude colours sit right at the white break.",
-             "C profiles are nearly parallel to the bed — the signature of a critical slope.",
-             "Nudge the roughness either way and watch it become mild or steep."] }),
+             "Profile labels are off here by default: on a knife edge the class genuinely flickers between M, C and S. Turn them on in Controls to watch it.",
+             "Nudge the roughness either way and watch it become decisively mild or steep."] }),
 
     // ------------------------------------------- HORIZONTAL  (S₀ = 0, y_n = ∞)
     drop({
@@ -330,6 +331,7 @@ const SCENES = (() => {
       valveOpen: 1, spinup: 14,
       mode: 1, headMax: 42, hmax: 22, vmax: 6,
       open: [1, 1, 0, 0],
+      spongeIn: 5.5,                           // hold the whole reservoir tank
       inflow: { level: 25.0, q: 0, on: 1, free: 1 },
       walls: () => [
         [0.0, 1.0, 58.5, 1.0, 2.0],              // invert — top face at y = 2.0
@@ -352,6 +354,12 @@ const SCENES = (() => {
       W: 10, H: 2.4, c: 60, cf: 0.006, cs: 0.06, bulk: 0.05,
       mode: 1, headMax: 2.6, vmax: 5, spinup: 8,
       open: [1, 1, 0, 0],
+      // The head-driven feed must hold the WHOLE reservoir compartment
+      // (x < 1.5): a narrow sponge cannot supply the pipe's demand, the
+      // reservoir draws down below the tailwater and the bore cavitates.
+      // The outlet needs width too, or the pipe jet blows through it and
+      // the bore never feels the tailwater pressure.
+      spongeIn: 1.35, spongeTw: 0.8,
       inflow: { level: 2.05, q: 0, on: 1, free: 1 },
       tailwater: { level: 1.55, on: 1 },
       // The sloping segments are butt-cut perpendicular to their axes, so at

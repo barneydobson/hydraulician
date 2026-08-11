@@ -263,6 +263,13 @@ const SIM = (() => {
     const { inB, twB } = bands();
     gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(p.inflow.level, inB[1]));
     gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
+    // Sponge widths are physical (metres) so resolution changes keep the
+    // same reservoir; default is ~10 cells.
+    const sc = S.scene;
+    gl.uniform2f(pr.u("u_spongeN"),
+      sc.spongeIn ? Math.round(sc.spongeIn / S.dx) : 10,
+      sc.spongeTw ? Math.round(sc.spongeTw / S.dx) : 10);
+    gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
     gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
     gl.uniform4f(pr.u("u_src0"), s0.x, s0.y, s0.r, s0.on);

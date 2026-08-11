@@ -237,7 +237,9 @@ const OVERLAY = (() => {
           const y2 = ext(A.hRaw, k + win, k + 4 * win, true);
           const q = Math.abs(mean(A.qRaw, i - 2 * win, i));
           const Fr1 = y1 > 1e-4 ? (q / y1) / Math.sqrt(g * y1) : 0;
-          if (Fr1 > 1.1 && y2 > y1) {
+          // 1.35: near-critical undulations (Fr₁ ≈ 1.1–1.3) are transitions,
+          // not jumps — boxing every one buried the critical-slope scene.
+          if (Fr1 > 1.35 && y2 > y1) {
             out.push({
               x0: (i + 0.5) * dx, x1: (k + 0.5) * dx, i, k, y1, y2, Fr1,
               bed: A.bed[i], surf: A.surf[k + win],

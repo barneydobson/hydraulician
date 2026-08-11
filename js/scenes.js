@@ -180,7 +180,10 @@ const SCENES = (() => {
       ],
       tips: ["Left-drag draws a straight edge — build chutes, weirs, pipes.",
              "Right-drag pours a much larger flow wherever you point.",
+             "The <b>Spout</b> tool (4) drags the falling inflow anywhere; its velocity is in Controls.",
+             "<b>Wheel</b> zooms, <b>middle-drag</b> pans, <b>0</b> resets the view.",
              "Hold <b>shift</b> while drawing to snap to 0° / 45° / 90°.",
+             "Controls has everything the scenes use: reservoir, tailwater, open edges, the wave piston.",
              "Close a pipe off completely and the water pressurises: watch the gold sheen."] },
 
     // ------------------------------------------------- MILD  (C_f > 2.8 S₀)

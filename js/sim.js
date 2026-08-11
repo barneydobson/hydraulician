@@ -110,22 +110,32 @@ const SIM = (() => {
     let ny = Math.max(64, Math.min(900, Math.round(scene.H / dx)));
 
     const segs = keepSegs && S ? S.segs : [];
+    // A rebuild that keeps the drawing (a resolution change) keeps the live
+    // parameters too — losing your boundary toggles or valve state because
+    // you asked for more cells would be maddening.
+    const prev = keepSegs && S && S.scene === scene ? S.p : null;
+    const p = prev ? Object.assign({}, prev) : {
+      g: scene.g, c: scene.c, cf: scene.cf, cs: scene.cs, nu: scene.nu,
+      slip: scene.slip, bulk: scene.bulk, ca: scene.ca,
+      open: scene.open.slice(),
+      inflow: Object.assign({}, scene.inflow),
+      tailwater: Object.assign({}, scene.tailwater),
+      wave: Object.assign({}, scene.wave),
+      source: Object.assign({}, scene.source),
+      dyeLine: scene.dyeLine, dyeDecay: 0.02,
+      valveClosed: scene.valveOpen ? 0 : 1,
+    };
+    if (prev) {
+      p.open = prev.open.slice();
+      for (const k of ["inflow", "tailwater", "wave", "source"]) p[k] = Object.assign({}, prev[k]);
+      p.pour = null;
+    }
     S = {
       scene, nx, ny, dx, segs,
       W: nx * dx, H: ny * dx,
       mask: new Uint8Array(nx * ny),
       t: 0, frames: 0,
-      p: {                                   // live physics parameters
-        g: scene.g, c: scene.c, cf: scene.cf, cs: scene.cs, nu: scene.nu,
-        slip: scene.slip, bulk: scene.bulk, ca: scene.ca,
-        open: scene.open.slice(),
-        inflow: Object.assign({}, scene.inflow),
-        tailwater: Object.assign({}, scene.tailwater),
-        wave: Object.assign({}, scene.wave),
-        source: Object.assign({}, scene.source),
-        dyeLine: scene.dyeLine, dyeDecay: 0.02,
-        valveClosed: scene.valveOpen ? 0 : 1,
-      },
+      p,
     };
 
     const F = gl.RGBA32F, RGBA = gl.RGBA, FL = gl.FLOAT;

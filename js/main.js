@@ -18,6 +18,7 @@ const state = {
   gauges: [], rakes: [], gaugeField: "head",
   cursor: [0, 0], inside: false, hover: null,
   drag: null, pour: null,
+  zoom: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false,
   fps: 60, rt: 1, simDt: 0,
   tipIdx: 0, tipAt: 0,
 };
@@ -25,20 +26,41 @@ const state = {
 let canvas, over, octx, view, sim;
 
 // --------------------------------------------------------------- geometry
-function computeView() {
+/** Letterbox rect of the whole domain at zoom 1 — the zoomed view scales
+ *  this rect about the pan centre, so the GPU just draws a bigger rect and
+ *  the screen clips it. */
+function baseRect() {
   const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
+  const ar = sim.W / sim.H;
+  let w = cw, h = cw / ar;
+  if (h > ch) { h = ch; w = ch * ar; }
+  return { cw, ch, w, h, bx: (cw - w) / 2, by: (ch - h) / 2 };
+}
+
+function computeView() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const B = baseRect();
+  const cw = B.cw, ch = B.ch;
   if (canvas.width !== Math.round(cw * dpr)) {
     canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
     over.width = canvas.width; over.height = canvas.height;
     over.style.width = cw + "px"; over.style.height = ch + "px";
   }
-  const S = sim, ar = S.W / S.H;
-  let w = cw, h = cw / ar;
-  if (h > ch) { h = ch; w = ch * ar; }
-  const x = (cw - w) / 2, y = (ch - h) / 2;
+  const S = sim, z = state.zoom;
+  const Wv = S.W / z, Hv = S.H / z;
+  let cx = state.panC ? state.panC[0] : S.W / 2;
+  let cy = state.panC ? state.panC[1] : S.H / 2;
+  cx = Math.min(Math.max(cx, Wv / 2), S.W - Wv / 2);
+  cy = Math.min(Math.max(cy, Hv / 2), S.H - Hv / 2);
+  state.panC = z > 1.001 ? [cx, cy] : null;
+  const w = B.w * z, h = B.h * z;
+  const x = B.bx + B.w / 2 - cx / S.W * w;
+  const y = B.by + B.h / 2 - (1 - cy / S.H) * h;
   view = {
-    x, y, w, h, pxW: cw, pxH: ch, dpr,
+    x, y, w, h, pxW: cw, pxH: ch, dpr, zoom: z,
+    vis: { x: Math.max(x, B.bx), y: Math.max(y, B.by),
+           w: Math.min(x + w, B.bx + B.w) - Math.max(x, B.bx),
+           h: Math.min(y + h, B.by + B.h) - Math.max(y, B.by) },
     ndc: [(x / cw) * 2 - 1, (1 - (y + h) / ch) * 2 - 1,
           ((x + w) / cw) * 2 - 1, (1 - y / ch) * 2 - 1],
     X: (m) => x + m / S.W * w,
@@ -46,6 +68,23 @@ function computeView() {
     toDomain: (px, py) => [(px - x) / w * S.W, (y + h - py) / h * S.H],
   };
 }
+
+/** Zoom about a fixed screen point (px, py), keeping the domain point under
+ *  it stationary. */
+function zoomAt(px, py, factor) {
+  const z1 = Math.min(16, Math.max(1, state.zoom * factor));
+  if (Math.abs(z1 - state.zoom) < 1e-6) return;
+  const [dx0, dy0] = view.toDomain(px, py);
+  const B = baseRect();
+  state.zoom = z1;
+  state.panC = [
+    dx0 + (B.bx + B.w / 2 - px) * sim.W / (B.w * z1),
+    dy0 + (py - B.by - B.h / 2) * sim.H / (B.h * z1),
+  ];
+  computeView();
+}
+
+function resetZoom() { state.zoom = 1; state.panC = null; }
 
 // ------------------------------------------------------------------ scenes
 function loadScene(id, keepDrawing) {
@@ -57,11 +96,14 @@ function loadScene(id, keepDrawing) {
   state.gauges.length = 0; state.rakes.length = 0;
   state.tipIdx = 0; state.tipAt = 0;
   state.nsub = 24;
+  resetZoom();
   computeView();
   syncPanel();
   showToast(sc.name, sc.blurb);
   document.getElementById("sceneName").textContent = sc.name;
   document.getElementById("sceneKey").textContent = sc.key;
+  const sel = document.getElementById("sceneSel");
+  if (sel && sel.value !== sc.id) sel.value = sc.id;
 }
 
 // ------------------------------------------------------------------- panel
@@ -83,6 +125,9 @@ const CONTROLS = [
     fmt: (v) => v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
                 "   y_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m",
     info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth y_c = (q²/g)^⅓ follows directly from it." },
+  { id: "inFree", type: "check", label: "Head-driven inflow",
+    get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
+    info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
   { id: "twOn", type: "check", label: "Tailwater control",
     get: () => sim.p.tailwater.on > 0.5, set: (v) => sim.p.tailwater.on = v ? 1 : 0,
     info: "Holds a fixed level on the right edge — the downstream control that decides M1 vs M2." },
@@ -95,6 +140,26 @@ const CONTROLS = [
   { id: "spoutR", label: "Spout size", min: 0.02, max: 0.4, step: 0.005,
     get: () => sim.p.source.r, set: (v) => sim.p.source.r = v,
     fmt: (v) => (2 * v).toFixed(2) + " m wide" },
+  { id: "spoutVx", label: "Spout velocity →", min: -5, max: 5, step: 0.05,
+    get: () => sim.p.source.vx, set: (v) => sim.p.source.vx = v,
+    fmt: (v) => v.toFixed(2) + " m/s",
+    info: "Horizontal velocity of the water leaving the spout. Use the Spout tool (4) to drag the spout anywhere." },
+  { id: "spoutVy", label: "Spout velocity ↑", min: -6, max: 3, step: 0.05,
+    get: () => sim.p.source.vy, set: (v) => sim.p.source.vy = v,
+    fmt: (v) => v.toFixed(2) + " m/s" },
+
+  { h: "Boundaries" },
+  { id: "openL", type: "check", label: "Open left edge",
+    get: () => sim.p.open[0] > 0.5, set: (v) => { sim.p.open[0] = v ? 1 : 0; SIM.rasterise(); },
+    info: "Open edges are zero-gradient outflows (water leaves freely); the left one also carries the reservoir control when it is on. Closed edges are walls." },
+  { id: "openR", type: "check", label: "Open right edge",
+    get: () => sim.p.open[1] > 0.5, set: (v) => { sim.p.open[1] = v ? 1 : 0; SIM.rasterise(); },
+    info: "The right edge carries the tailwater control when it is on." },
+  { id: "openB", type: "check", label: "Open bottom edge",
+    get: () => sim.p.open[2] > 0.5, set: (v) => { sim.p.open[2] = v ? 1 : 0; SIM.rasterise(); },
+    info: "An open bottom is a free overfall for anything that reaches it — brinks and outfalls drain here." },
+  { id: "openT", type: "check", label: "Open top edge",
+    get: () => sim.p.open[3] > 0.5, set: (v) => { sim.p.open[3] = v ? 1 : 0; SIM.rasterise(); } },
 
   { h: "Hydraulics" },
   { id: "cel", label: "Slot celerity c", min: 8, max: 400, step: 1, log: true,
@@ -116,19 +181,27 @@ const CONTROLS = [
   { id: "slip", type: "check", label: "Free-slip walls",
     get: () => sim.p.slip > 0.5, set: (v) => sim.p.slip = v ? 1 : 0,
     info: "Off = no-slip, which is what builds a boundary layer and a real velocity profile." },
+  { id: "ca", label: "Interface sharpening", min: 0, max: 1.5, step: 0.05,
+    get: () => sim.p.ca, set: (v) => sim.p.ca = v,
+    fmt: (v) => v === 0 ? "off — the surface smears" : "cα " + v.toFixed(2),
+    info: "The interFoam-style compression flux that keeps the free surface a couple of cells thick. Too high and thin jets bead up." },
   { id: "grav", type: "check", label: "Plan view (gravity off)",
     get: () => sim.p.g < 0.5, set: (v) => sim.p.g = v ? 0 : (state.scene.g || 9.81),
     info: "Switches between the vertical profile and looking down on a horizontal plane." },
 
   { h: "Wavemaker" },
   { id: "waveOn", type: "check", label: "Piston on",
-    get: () => sim.p.wave.on > 0.5, set: (v) => sim.p.wave.on = v ? 1 : 0 },
+    get: () => sim.p.wave.on > 0.5, set: (v) => sim.p.wave.on = v ? 1 : 0,
+    info: "An oscillating column of prescribed velocity — the wave flume's paddle. Works in any scene with standing water." },
   { id: "waveA", label: "Amplitude", min: 0.005, max: 0.3, step: 0.005,
     get: () => sim.p.wave.amp, set: (v) => sim.p.wave.amp = v,
     fmt: (v) => v.toFixed(3) + " m stroke" },
   { id: "waveT", label: "Period", min: 0.4, max: 6, step: 0.05,
     get: () => sim.p.wave.period, set: (v) => sim.p.wave.period = v,
     fmt: (v) => v.toFixed(2) + " s" },
+  { id: "waveX", label: "Piston position", min: 0, max: 1, step: 0.01, rel: "W",
+    get: () => sim.p.wave.x, set: (v) => sim.p.wave.x = v,
+    fmt: (v) => v.toFixed(2) + " m from the left" },
 
   { h: "View" },
   { id: "mode", type: "select", label: "Field",
@@ -152,6 +225,9 @@ const CONTROLS = [
     get: () => sim.p.dyeLine, set: (v) => sim.p.dyeLine = v,
     fmt: (v) => v === 0 ? "off" : "every " + v.toFixed(1) + " s",
     info: "Injects a vertical line of dye at the inlet. It shears as it travels — that shape IS the velocity–depth distribution." },
+  { id: "dyeDecay", label: "Dye fade", min: 0, max: 0.3, step: 0.005,
+    get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
+    fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
     opts: [["head", "Piezometric head"], ["depth", "Depth"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
@@ -211,6 +287,7 @@ function syncPanel() {
     else if (c.type === "select") input.value = v;
     else {
       if (c.rel === "H") { c.min = 0; c.max = sim.H; }
+      if (c.rel === "W") { c.min = 0; c.max = sim.W; }
       if (c.log) input.value = Math.round(1000 * Math.log(v / c.min) / Math.log(c.max / c.min));
       else { input.min = c.min; input.max = c.max; input.value = v; }
     }
@@ -234,6 +311,7 @@ const TOOLS = [
   ["wall", "Wall", "Left-drag a straight edge"],
   ["erase", "Erase", "Left-drag to remove"],
   ["valve", "Valve", "Draw a gate you can slam with V"],
+  ["spout", "Spout", "Click or drag to move the falling inflow"],
   ["gauge", "Gauge", "Click to log head / depth"],
   ["rake", "Rake", "Click for a velocity–depth profile"],
 ];
@@ -245,18 +323,47 @@ function snap(x0, y0, x1, y1) {
   return [x0 + r * Math.cos(a), y0 + r * Math.sin(a)];
 }
 
-function pointerPos(e) {
+function pointerPx(e) {
+  // Rect-relative → canvas-client units. The ratio is 1 in a plain browser;
+  // it corrects for any ancestor CSS transform (embedded previews, kiosks).
   const r = canvas.getBoundingClientRect();
-  return view.toDomain(e.clientX - r.left, e.clientY - r.top);
+  const s = r.width > 0 ? canvas.clientWidth / r.width : 1;
+  return [(e.clientX - r.left) * s, (e.clientY - r.top) * s];
+}
+function pointerPos(e) {
+  const p = pointerPx(e);
+  return view.toDomain(p[0], p[1]);
 }
 
+const pointers = new Map();          // active pointers, for pinch zoom
+
 function onDown(e) {
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* synthetic events */ }
+  pointers.set(e.pointerId, pointerPx(e));
   const [x, y] = pointerPos(e);
   state.cursor = [x, y];
+  if (pointers.size === 2) {         // second finger: abandon tools, pinch
+    state.drag = null; state.spoutDrag = false;
+    if (state.pour) { state.pour = null; sim.p.pour = null; }
+    const ps = [...pointers.values()];
+    state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
+    return;
+  }
+  if (e.button === 1) {              // middle-drag pans
+    e.preventDefault();
+    const px = pointerPx(e);
+    state.panDrag = { px, c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
+    return;
+  }
   if (e.button === 2 || e.pointerType === "touch" && e.shiftKey) {
     state.pour = { x, y, r: state.brush * 4, vx: 0, vy: sim.p.g > 0.5 ? -2.0 : 0, lx: x, ly: y };
     sim.p.pour = state.pour;
+    return;
+  }
+  if (state.tool === "spout") {
+    sim.p.source.x = x; sim.p.source.y = y; sim.p.source.on = 1;
+    state.spoutDrag = true;
+    syncPanel();
     return;
   }
   if (state.tool === "gauge") {
@@ -273,9 +380,32 @@ function onDown(e) {
 }
 
 function onMove(e) {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, pointerPx(e));
+  if (state.pinch && pointers.size === 2) {
+    const ps = [...pointers.values()];
+    const d = Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]);
+    if (d > 8 && state.pinch.d > 8) {
+      zoomAt((ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2, d / state.pinch.d);
+    }
+    state.pinch.d = d;
+    return;
+  }
   const [x, y] = pointerPos(e);
   state.cursor = [x, y];
   state.inside = x >= 0 && y >= 0 && x <= sim.W && y <= sim.H;
+  if (state.panDrag) {
+    const px = pointerPx(e), d = state.panDrag;
+    state.panC = [
+      d.c[0] - (px[0] - d.px[0]) * sim.W / view.w,
+      d.c[1] + (px[1] - d.px[1]) * sim.H / view.h,
+    ];
+    computeView();
+    return;
+  }
+  if (state.spoutDrag) {
+    sim.p.source.x = x; sim.p.source.y = y;
+    return;
+  }
   if (state.pour) {
     const dt = 1 / 60;
     state.pour.vx = Math.max(-6, Math.min(6, (x - state.pour.lx) / dt * 0.35));
@@ -292,6 +422,10 @@ function onMove(e) {
 }
 
 function onUp(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) state.pinch = null;
+  state.panDrag = null;
+  state.spoutDrag = false;
   if (state.pour) { state.pour = null; sim.p.pour = null; }
   if (state.drag) {
     const d = state.drag;
@@ -396,12 +530,18 @@ function drawOverlay(A) {
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   ctx.clearRect(0, 0, view.pxW, view.pxH);
   OVERLAY.drawFrame(ctx, view, sim);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(view.vis.x, view.vis.y, view.vis.w, view.vis.h);
+  ctx.clip();
   if (state.channel && sim.p.g > 0.5) {
     OVERLAY.drawChannel(ctx, view, A, sim);
     if (state.labels) OVERLAY.drawProfileLabels(ctx, view, A, sim);
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
   }
   state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
+  drawSpout(ctx);
+  ctx.restore();
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
   const fld = state.gaugeField;
   OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
@@ -415,11 +555,39 @@ function drawOverlay(A) {
   }
 }
 
+/** Nozzle marker for the movable source. */
+function drawSpout(ctx) {
+  const s = sim.p.source;
+  if (!(s.on > 0.5) && state.tool !== "spout") return;
+  const x = view.X(s.x), y = view.Y(s.y);
+  const r = Math.max(5, s.r / sim.W * view.w);
+  ctx.save();
+  ctx.globalAlpha = s.on > 0.5 ? 0.9 : 0.35;
+  ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = 1.6;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.stroke();
+  ctx.setLineDash([]);
+  const sp = Math.hypot(s.vx, s.vy);
+  if (sp > 0.05) {
+    const ax = s.vx / sp, ay = -s.vy / sp, L = r + 12;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x + ax * L, y + ay * L);
+    ctx.moveTo(x + ax * L, y + ay * L);
+    ctx.lineTo(x + ax * L - (ax * 6 - ay * 4), y + ay * L - (ay * 6 + ax * 4));
+    ctx.moveTo(x + ax * L, y + ay * L);
+    ctx.lineTo(x + ax * L - (ax * 6 + ay * 4), y + ay * L - (ay * 6 - ax * 4));
+    ctx.stroke();
+  }
+  if (state.tool === "spout") OVERLAY.chip(ctx, x + r + 6, y - r - 6, "spout", "#7fd4ff");
+  ctx.restore();
+}
+
 function updateStatus() {
   document.getElementById("status").textContent =
     sim.nx + "×" + sim.ny + " · Δx " + (sim.dx * 1000).toFixed(0) + " mm · " +
     "t " + sim.t.toFixed(1) + " s · ×" + state.rt.toFixed(2) + " RT · " +
-    state.fps.toFixed(0) + " fps";
+    state.fps.toFixed(0) + " fps" +
+    (state.zoom > 1.001 ? " · zoom ×" + state.zoom.toFixed(1) : "");
   document.getElementById("n_speed").textContent =
     "×" + state.speed.toFixed(2) + " asked, ×" + state.rt.toFixed(2) + " achieved  " +
     "(Δt " + (state.simDt * 1e3).toFixed(2) + " ms × " + state.nsub + ")";
@@ -495,6 +663,13 @@ function boot() {
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   canvas.addEventListener("pointerleave", () => state.inside = false);
   canvas.addEventListener("pointerenter", () => state.inside = true);
+  canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const [px, py] = pointerPx(e);
+    // pinch-to-zoom trackpads report ctrlKey; give them a stronger response
+    zoomAt(px, py, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)));
+  }, { passive: false });
 
   addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
@@ -508,9 +683,12 @@ function boot() {
     else if (k === "g") { state.mode = (state.mode + 1) % 5; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
-    else if (k >= "1" && k <= "5") { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }
+    else if (k >= "1" && k <= String(TOOLS.length)) { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }
     else if (k === "[") state.brush = Math.max(0.015, state.brush / 1.3);
     else if (k === "]") state.brush = Math.min(0.5, state.brush * 1.3);
+    else if (k === "0") resetZoom();
+    else if (k === "+" || k === "=") zoomAt(view.pxW / 2, view.pxH / 2, 1.3);
+    else if (k === "-") zoomAt(view.pxW / 2, view.pxH / 2, 1 / 1.3);
   });
 
   requestAnimationFrame(frame);
@@ -533,7 +711,7 @@ function toggleValve() {
 // the page is hidden, so headless testing goes through here.
 window.APP = {
   get sim() { return sim; }, get view() { return view; },
-  state, loadScene, SIM, OVERLAY, SCENES, showToast,
+  state, loadScene, SIM, OVERLAY, SCENES, showToast, zoomAt, resetZoom,
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
   frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
   probe: (x, y) => SIM.probe(x, y),

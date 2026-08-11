@@ -28,8 +28,33 @@ The EOS is the whole trick, and it is a **2D Preissmann slot**:
   at celerity `c`. Free-surface ↔ pressurised transitions happen inside the same
   equations, and `c` is the slot width: it sets the water-hammer surge `ΔH = cΔv/g`
   and the time step (`Δt ≈ 0.45Δx/(c+6)`).
+- In plan view (`g = 0`) the EOS goes **two-sided** — `min(f−1, 0)` tension,
+  faded out below `f ≈ 0.3` — because there is no free surface to excuse a
+  rarefied cell: without tension every strong vortex core slowly cavitates
+  into a hole.
 
 No Poisson solve. Two fullscreen passes per substep: `vel` then `vof`.
+
+Three guard rails, each bought with an explosion:
+
+- **Transport-consistency cap.** The VOF donor limiter cannot move mass faster
+  than `Δx/4Δt`, but nothing in the momentum equation knows that: spray cells
+  (`f` small, gravity on, `p = 0`) integrate velocity past what the mass flux
+  can follow, the fields decouple, and the runaway ends at the ±80 NaN rail —
+  where it drags volume out of any pinned Dirichlet ghost it touches. So
+  partial-fill cells clamp their velocity at `0.20 Δx/Δt`, fading to the wide
+  rail as `f → 0.5`. Full (pressurised) cells never bind the donor cap.
+- **Open-boundary ring.** The outermost cells see a clamped stencil and, under
+  a level control, a pinned `f` — their momentum update is junk, and it leaks
+  inward through the advection stencil of the last interior column. Ring cells
+  take the interior neighbour's tangential velocity (zero gradient) and keep
+  only the clamped momentum update on the exchange face.
+- **Control bands.** A level control (reservoir / tailwater) applies only over
+  the contiguous open run of cells in its boundary column that contains the
+  level (`columnBand` in sim.js) — not the whole column. Applied column-wide it
+  floods the sealed cavity under a raised bed slab, and the prescribed inlet
+  velocity then pressurises the pocket to the clamp with no feedback: that was
+  the steep-scene explosion.
 
 ## Architecture
 
@@ -59,10 +84,21 @@ No Poisson solve. Two fullscreen passes per substep: `vel` then `vof`.
 - `js/scenes.js` — `SCENES`. `channel()` builds a prismatic GVF channel from
   (S₀, C_f, q) plus a control; `drop()` builds approach → chute → apron.
 - `js/sim.js` — `SIM`: grid allocation, wall rasterisation, the substep loop,
-  gauge/rake readbacks.
+  `columnBand` control bands, gauge/rake readbacks. Live parameters (`S.p`,
+  including the open-edge flags) survive a resolution rebuild.
 - `js/overlay.js` — `OVERLAY`: the 2D canvas. y_c, y_n, energy grade line,
   surface-profile classification, jump detection, gauge charts, velocity rake.
-- `js/main.js` — boot, panel spec, pointer tools, frame loop, `window.APP`.
+  Screen-anchored furniture (frame, scale bar, legend, label clamps) follows
+  `view.vis` — the visible part of the domain — so it stays on screen zoomed in.
+- `js/main.js` — boot, panel spec, pointer tools (wall / erase / valve / spout /
+  gauge / rake), view transform, frame loop, `window.APP`. The view is the
+  whole-domain letterbox rect scaled about a pan centre: wheel zooms about the
+  cursor, middle-drag pans, pinch works on touch, `0` resets; the GPU just
+  draws the bigger rect and the screen clips it. Every scenario control is live
+  in the panel — reservoir, tailwater (with head-driven mode), spout position
+  (drag with the tool) and velocity, wave piston (incl. position), open edges
+  per side, interface compression, dye lines/fade — so the sandbox can
+  reproduce any scene by hand.
 
 ## State textures
 
@@ -152,7 +188,10 @@ wave is also wide enough to erase the reaches that matter.
 
 - The render loop stops when the page is hidden. Headless testing goes through
   `APP.frames(n)` (drives the whole frame including render), `APP.tick(n)`
-  (physics only), `APP.probe(x,y)`, `APP.volume()`.
+  (physics only), `APP.probe(x,y)`, `APP.volume()`, `APP.zoomAt(px,py,factor)`,
+  `APP.resetZoom()`.
+- A dev browser may serve stale cached JS from `python3 -m http.server`; force
+  it with `fetch(url, {cache:"reload"})` then `location.reload()`.
 - A fast-math shader compiler is entitled to fold away `isnan()` and `x != x`.
   The NaN guards are written as explicit range tests for that reason.
 - `readPixels` from a float FBO must use `RGBA`/`FLOAT`, which is why `U` and `F`

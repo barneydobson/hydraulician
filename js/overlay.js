@@ -316,28 +316,30 @@ const OVERLAY = (() => {
     line(ctx, pc, C.yc, 1.4, [3, 4]);
 
     // legend
-    let ly = V.y + 16;
+    const B = V.vis || V;
+    let ly = B.y + 16;
     [["energy grade line", C.egl], ["normal depth  yₙ", C.yn], ["critical depth  y𝆑", C.yc]]
       .forEach(([t, c], k) => {
         ctx.save();
         ctx.strokeStyle = c; ctx.lineWidth = 1.6;
         ctx.setLineDash(k === 0 ? [1, 3] : k === 1 ? [7, 5] : [3, 4]);
-        ctx.beginPath(); ctx.moveTo(V.x + 12, ly + k * 15); ctx.lineTo(V.x + 40, ly + k * 15);
+        ctx.beginPath(); ctx.moveTo(B.x + 12, ly + k * 15); ctx.lineTo(B.x + 40, ly + k * 15);
         ctx.stroke(); ctx.restore();
         ctx.fillStyle = C.dim;
         ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
         ctx.textBaseline = "middle";
-        ctx.fillText(t.replace("y𝆑", "y_c"), V.x + 46, ly + k * 15 + 1);
+        ctx.fillText(t.replace("y𝆑", "y_c"), B.x + 46, ly + k * 15 + 1);
       });
   }
 
   /** Name each surface-profile reach in place: M1, S2, H3 … */
   function drawProfileLabels(ctx, V, A, sim) {
     const runs = profileRuns(A, sim);
+    const B = V.vis || V;
     runs.forEach((r) => {
       const mid = ((r.a + r.b) >> 1);
       const x = V.X((mid + 0.5) * sim.dx);
-      const y = Math.max(V.y + 14, V.Y(A.surf[mid]) - 26);
+      const y = Math.max(B.y + 14, V.Y(A.surf[mid]) - 26);
       ctx.save();
       ctx.font = "700 13px ui-monospace, SFMono-Regular, monospace";
       const w = ctx.measureText(r.cls).width + 14;
@@ -352,6 +354,7 @@ const OVERLAY = (() => {
 
   /** Bracket each hydraulic jump and show measured vs momentum-predicted y₂. */
   function drawJumps(ctx, V, jumps) {
+    const B = V.vis || V;
     jumps.forEach((J) => {
       const xa = V.X(J.x0), xb = V.X(J.x1);
       const yTop = V.Y(J.surf), yBed = V.Y(J.bed);
@@ -379,8 +382,8 @@ const OVERLAY = (() => {
       rows.forEach((t) => { w = Math.max(w, ctx.measureText(t).width); });
       w += 20;
       const h = rows.length * 15 + 10;
-      let px = Math.min(Math.max((xa + xb) / 2 - w / 2, V.x + 4), V.x + V.w - w - 4);
-      let py = Math.max(V.y + 4, yTop - h - 34);
+      let px = Math.min(Math.max((xa + xb) / 2 - w / 2, B.x + 4), B.x + B.w - w - 4);
+      let py = Math.max(B.y + 4, yTop - h - 34);
       ctx.fillStyle = "rgba(10,14,20,0.88)";
       ctx.strokeStyle = "rgba(255,138,90,0.5)";
       ctx.beginPath(); ctx.roundRect(px, py, w, h, 8); ctx.fill(); ctx.stroke();
@@ -418,6 +421,7 @@ const OVERLAY = (() => {
     }
     if (!rows.length) return;
 
+    const B = V.vis || V;
     ctx.save();
     ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
     let w = 0;
@@ -425,8 +429,8 @@ const OVERLAY = (() => {
     w += 22;
     const hgt = rows.length * 15 + (cls ? 26 : 10);
     let px = V.X(mx) + 18, py = V.Y(my) - hgt - 12;
-    if (px + w > V.x + V.w) px = V.X(mx) - w - 18;
-    if (py < V.y + 6) py = V.Y(my) + 18;
+    if (px + w > B.x + B.w) px = V.X(mx) - w - 18;
+    if (py < B.y + 6) py = V.Y(my) + 18;
     ctx.fillStyle = "rgba(10,14,20,0.86)";
     ctx.strokeStyle = "rgba(255,255,255,0.10)";
     ctx.beginPath(); ctx.roundRect(px, py, w, hgt, 8); ctx.fill(); ctx.stroke();
@@ -545,22 +549,28 @@ const OVERLAY = (() => {
     }
   }
 
-  /** Frame, axes and scale bar. */
+  /** Frame, axes and scale bar — anchored to the VISIBLE part of the domain
+   *  so they stay on screen when the view is zoomed in. */
   function drawFrame(ctx, V, sim) {
+    const B = V.vis || V;
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
-    ctx.strokeRect(V.x + 0.5, V.y + 0.5, V.w - 1, V.h - 1);
+    ctx.strokeRect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1);
     ctx.font = "10px ui-monospace, monospace";
     ctx.fillStyle = C.dim;
-    const bar = Math.max(1, Math.round(sim.W / 6));
+    // 1-2-5 rounding of roughly a sixth of the visible width
+    const target = sim.W * (B.w / V.w) / 6;
+    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(target, 1e-3))));
+    const bar = [1, 2, 5, 10].map((m) => m * mag)
+      .reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a);
     const bw = bar * V.w / sim.W;
-    const bx = V.x + V.w - bw - 14, by = V.y + V.h - 14;
+    const bx = B.x + B.w - bw - 14, by = B.y + B.h - 14;
     ctx.strokeStyle = "rgba(223,232,242,0.75)"; ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(bx, by - 4); ctx.lineTo(bx, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by - 4);
     ctx.stroke();
     ctx.fillStyle = "rgba(223,232,242,0.8)";
-    ctx.fillText(bar + " m", bx + bw / 2 - 10, by - 7);
+    ctx.fillText((bar < 1 ? bar.toFixed(bar < 0.1 ? 2 : 1) : bar) + " m", bx + bw / 2 - 10, by - 7);
     ctx.restore();
   }
 

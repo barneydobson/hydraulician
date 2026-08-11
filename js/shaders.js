@@ -235,7 +235,15 @@ void main(){
     if (distance(pv, u_src1.xy) < u_src1.z) vn = u_sv1.y;
   }
   if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) {
-    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
+    // Feathered plug: a hard velocity step at the waterline waterfalls into
+    // the slightly drawn-down interior surface and sheds ripples forever.
+    // The top three cells taper to zero instead (inletVel() compensates the
+    // lost discharge), so the surface at the inlet can breathe. A submerged
+    // duct (band top below the nominal level, e.g. plan view) keeps the
+    // full plug — there is no free surface there to protect.
+    float taper = (u_inBand.y < u_in.x - 1e-4)
+      ? 1.0 : smoothstep(u_inBand.y, u_inBand.y - 3.0 * u_dx, pu.y);
+    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y * taper : 0.0;
   }
   if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
     un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker
@@ -249,8 +257,17 @@ void main(){
   //     momentum update — that is what lets a level control drive flow
   //     through the edge — but clamped to the transport limit. Closed edges
   //     are solid ring cells and are zeroed just below anyway.
+  // A level-controlled edge gets a *physical* exchange bound as well: nothing
+  // can flow to or from a pond of level L faster than the torricellian
+  // sqrt(2gL). The transport cap alone leaves ~12 m/s of headroom, and the
+  // one-cell Dirichlet can resonate with the pond slosh right up to it —
+  // the drowned-jump scenes used to pump themselves apart at t ≈ 40 s.
+  float gzv = abs(u_g);
+  float capR = (u_tw.y > 0.5) ? sqrt(2.0 * gzv * max(u_tw.x, 0.05)) + 1.0 : capBase;
+  float capL = (u_in.z > 0.5) ? sqrt(2.0 * gzv * max(u_in.x, 0.05)) + 1.0 : capBase;
   if (i == 0)          vn = tE.g;
-  if (i == NXY.x - 1) { un = clamp(un, -capBase, capBase); vn = tW.g; }
+  if (i == 1 && u_in.z > 0.5 && u_in.w > 0.5) un = clamp(un, -capL, capL);
+  if (i == NXY.x - 1) { un = clamp(un, -min(capR, capBase), min(capR, capBase)); vn = tW.g; }
   if (j == 0)          un = tN.r;
   if (j == NXY.y - 1) { vn = clamp(vn, -capBase, capBase); un = tS.r; }
 
@@ -376,6 +393,27 @@ void main(){
   FS = clamp(FS, -lim4 * fC,   lim4 * Fs.r);
   FN = clamp(FN, -lim4 * Fn.r, lim4 * fC);
   float fNew = min(fC - dt * ((FE - FW) + (FN - FS)) / dx, 8.0);
+
+  // --- relaxation sponge at level-controlled edges. A one-cell Dirichlet is
+  //     a hard impedance step: pond slosh reflects off it, and with the
+  //     momentum update supplying the exchange velocity the reflection can
+  //     pump (that was the drowned-jump blow-up). Nudging f toward the
+  //     hydrostatic target over the last ~10 columns instead makes the
+  //     boundary a soft bath — same level, no resonator. Mass conservation
+  //     is intentionally given up inside the sponge: it IS the reservoir.
+  const float SPN = 10.0;
+  if (u_tw.y > 0.5 && float(i) > u_res.x - 2.0 - SPN) {
+    float s = (float(i) - (u_res.x - 2.0 - SPN)) / SPN;
+    float tgt = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2
+              : (y >= u_tw.x ? 0.0 : fNew);
+    fNew = mix(fNew, tgt, min(dt * 6.0 * s * s, 1.0));
+  }
+  if (u_in.z > 0.5 && u_in.w > 0.5 && float(i) < 1.0 + SPN) {
+    float s = (1.0 + SPN - float(i)) / SPN;
+    float tgt = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2
+              : (y >= u_in.x ? 0.0 : fNew);
+    fNew = mix(fNew, tgt, min(dt * 6.0 * s * s, 1.0));
+  }
 
   // --- dye rides along (advective form, first-order upwind is plenty)
   float div = ((uE - uW) + (vN - vS)) / dx;

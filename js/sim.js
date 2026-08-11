@@ -237,12 +237,15 @@ const SIM = (() => {
   }
 
   /** Inlet velocity implied by the prescribed unit discharge and the depth
-   *  actually available between the inlet run's bed and the reservoir level. */
+   *  actually available between the inlet run's bed and the reservoir level.
+   *  The 1.5 Δx offset repays the discharge lost to the shader's 3-cell
+   *  surface taper on the prescribed plug. */
   function inletVel() {
     const inf = S.p.inflow;
     const b = bands().inB;
     if (inf.v !== undefined) return inf.v;          // scenes may pin velocity
-    return (inf.q || 0) / Math.max(Math.min(inf.level, b[1]) - b[0], S.dx);
+    const feather = b[1] < inf.level ? 0 : 1.5 * S.dx;   // none for a submerged duct
+    return (inf.q || 0) / Math.max(Math.min(inf.level, b[1]) - b[0] - feather, S.dx);
   }
 
   /** Uniforms shared by the two simulation passes. */

@@ -251,7 +251,9 @@ const OVERLAY = (() => {
     return out.slice(0, 3);
   }
 
-  /** Contiguous runs of the same surface-profile class, long enough to name. */
+  /** Contiguous runs of the same surface-profile class, long enough to name.
+   *  Same-class runs separated by a short gap (a roll wave, a guard band) are
+   *  merged — otherwise a single M2 apron sprouts a chip every metre. */
   function profileRuns(A, sim) {
     const nx = sim.nx, dx = sim.dx;
     const minRun = Math.max(8, Math.round(0.45 / dx));
@@ -266,7 +268,13 @@ const OVERLAY = (() => {
       }
     }
     if (cls && nx - start >= minRun) runs.push({ cls, a: start, b: nx - 1 });
-    return runs;
+    const merged = [];
+    for (const r of runs) {
+      const last = merged[merged.length - 1];
+      if (last && last.cls === r.cls && r.a - last.b <= 2 * minRun) last.b = r.b;
+      else merged.push({ cls: r.cls, a: r.a, b: r.b });
+    }
+    return merged;
   }
 
   // --------------------------------------------------------------- drawing

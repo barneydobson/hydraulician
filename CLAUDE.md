@@ -55,6 +55,16 @@ Three guard rails, each bought with an explosion:
   floods the sealed cavity under a raised bed slab, and the prescribed inlet
   velocity then pressurises the pocket to the clamp with no feedback: that was
   the steep-scene explosion.
+- **Soft level boundaries.** A one-cell Dirichlet is a hard impedance step:
+  pond slosh reflects off it and, with the momentum update supplying the
+  exchange velocity, the reflection pumps — the drowned-jump scenes tore
+  themselves apart at t ≈ 40 s. Level-controlled edges therefore get a
+  ten-column relaxation sponge (f nudged to the hydrostatic target, ramped
+  quadratically toward the edge) and a torricellian exchange clamp
+  `sqrt(2gL)+1`. The prescribed inlet plug is likewise feathered over its top
+  three cells (`inletVel` repays the lost discharge) so its hard top edge
+  stops waterfalling ripples into the drawn-down interior surface; submerged
+  ducts (level above the whole run) keep the full plug.
 
 ## Architecture
 
@@ -163,7 +173,13 @@ roughness slider.
 Consequences for scene design:
 - Mild vs steep needs S₀ chosen against the *delivered* roughness, not the
   nominal one. The steep scenes run at 1 in 4 with q ≈ 1.2 m²/s to get enough
-  cells per depth.
+  cells per depth. The critical-slope scene is the extreme case: y_n = y_c
+  lands at S₀ ≈ 1 in 9.5 with C_f ≈ 0.02 — found by measuring `ynGlobal`
+  against y_c and iterating, because no closed-form C_f relation survives the
+  wall function + eddy viscosity + bed staircase. A broad-crested weir ponds
+  ~1.5 y_c of head above its crest, so a weir meant to make zone 1 without
+  drowning an upstream gate must be LOW (the old 0.30 m crest turned the whole
+  scene into one M1 pool).
 - Zone-3 reaches on mild/horizontal/adverse beds are short, because the high
   delivered resistance pulls the jump close to the supercritical entry. A gate
   that is even slightly drowned puts a roller directly on its own jet, and the

@@ -142,6 +142,11 @@ const SCENES = (() => {
     const off = (TH / 2) * Math.sqrt(1 + S0 * S0);
     const sr = (o.hi - o.lo) / (o.xb - o.xa);                 // drop face slope
     const offR = (TH / 2) * Math.sqrt(1 + sr * sr);
+    // The face is butt-cut perpendicular to its axis, so started AT the crest
+    // its top corner surfaces ~half a thickness downstream, leaving a notch
+    // in the bed right at the brink. Start it upstream by the corner
+    // recession (overlapping the approach slab, which is harmless).
+    const ext = (TH / 2) * sr / Math.sqrt(1 + sr * sr) * 1.3;
     const twLevel = apron(W) + o.tail;
     const inLevel = o.hi + o.inletDepth;
     return Object.assign({
@@ -155,7 +160,7 @@ const SCENES = (() => {
       tailwater: { level: twLevel, on: 1 },
       walls: () => [
         [-1.0, o.hi - TH / 2, o.xa, o.hi - TH / 2, TH],                       // approach
-        [o.xa, o.hi - offR, o.xb, o.lo - offR, TH],                           // drop face
+        [o.xa - ext, o.hi - offR + ext * sr, o.xb, o.lo - offR, TH],          // drop face
         [o.xb, o.lo - off, W + 1, apron(W + 1) - off, TH],                    // apron
       ],
       water: (x, y, P) => {
@@ -267,18 +272,26 @@ const SCENES = (() => {
              "No jump anywhere: the flow is supercritical before and after, so none is needed.",
              "Erase the gate and redraw it wider than y_n and the same channel runs S2."] }),
 
-    // ------------------------------------------ CRITICAL  (C_f = 2.8 S₀)
+    // ------------------------------------------ CRITICAL  (y_n = y_c)
+    // Tuned against the DELIVERED resistance, not the nominal C_f: at this
+    // depth-to-Δx the wall function + eddy viscosity + bed staircase deliver
+    // far more drag than C_f suggests, so the slope that balances them is
+    // 1 in 9.5 with C_f nearly zero. The weir is low (0.12 m) because a
+    // broad-crested weir ponds ~1.5 y_c of head above its crest — the old
+    // 0.30 m crest drowned the gate and turned the whole reach into one M1
+    // pool.
     Object.assign(channel({
-      W: 12, H: 1.1, bed0: 0.55, S0: 0.03, cf: 0.084, q: 0.25,
+      W: 12, H: 2.0, bed0: 1.45, S0: 0.105, cf: 0.02, q: 0.25,
       inletDepth: 0.36, gate: { x: 2.0, a: 0.15 },
-      weir: { x: 9.6, h: 0.30, w: 0.7 }, xEnd: 10.8,
+      weir: { x: 9.6, h: 0.12, w: 0.7 }, xEnd: 10.8,
       mode: 3, hmax: 0.45, vmax: 3.0, spinup: 28,
     }), {
       id: "c13", name: "C1 / C3 · critical slope", key: "y_n = y_c",
-      blurb: "The knife edge: a slope steep enough that normal depth equals critical depth. Zone 2 vanishes, and the profiles are almost flat.",
-      tips: ["C_f = 2.8 S₀ here, which makes y_n and y_c coincide — the dashed lines overlap.",
+      blurb: "The knife edge: a slope where the measured normal depth equals critical depth. Zone 2 vanishes, and the depth hugs y_c along the whole reach.",
+      tips: ["The slope is tuned so the <i>measured</i> y_n equals y_c — the dashed lines overlap.",
              "Below the gate is C<b>3</b>; behind the weir is C<b>1</b>. There is no zone 2.",
-             "C profiles are nearly horizontal — that is the signature of a critical slope.",
+             "The middle of the reach rides Fr ≈ 1: the Froude colours sit right at the white break.",
+             "C profiles are nearly parallel to the bed — the signature of a critical slope.",
              "Nudge the roughness either way and watch it become mild or steep."] }),
 
     // ------------------------------------------- HORIZONTAL  (S₀ = 0, y_n = ∞)
@@ -341,13 +354,19 @@ const SCENES = (() => {
       open: [1, 1, 0, 0],
       inflow: { level: 2.05, q: 0, on: 1, free: 1 },
       tailwater: { level: 1.55, on: 1 },
+      // The sloping segments are butt-cut perpendicular to their axes, so at
+      // every soffit joint a corner recedes ~0.1 m and leaves a wedge-shaped
+      // notch (a pocket above the pipe, a bump in the bore at the throat
+      // lips). The horizontal neighbours are extended to tuck under/over the
+      // slopes; their faces are collinear with the bore, so the bore itself
+      // is unchanged.
       walls: () => [
         [0.0, 0.36, 10.0, 0.36, 0.72],           // invert, solid to the ground
-        [1.5, 1.77, 3.4, 1.77, 0.72],            // soffit, bore 0.72 → 1.41
+        [1.5, 1.77, 3.5, 1.77, 0.72],            // soffit, bore 0.72 → 1.41
         [3.4, 1.77, 4.5, 1.47, 0.72],            // contraction
-        [4.5, 1.47, 5.5, 1.47, 0.72],            // throat, bore 0.39 m
+        [4.38, 1.47, 5.62, 1.47, 0.72],          // throat, bore 0.39 m
         [5.5, 1.47, 7.4, 1.77, 0.72],            // diffuser
-        [7.4, 1.77, 10.0, 1.77, 0.72],
+        [7.3, 1.77, 10.0, 1.77, 0.72],
         [1.5, 1.41, 1.5, 2.4, 0.12],             // reservoir wall above the pipe
       ],
       water: (x, y, P) => (x < 1.5 || (y > 0.72 && y < 1.41) ? still(2.05, y, P) : 0),

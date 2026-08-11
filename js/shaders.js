@@ -665,7 +665,14 @@ void main(){
     }
   fs /= 16.0;
 
-  vec4 col4 = texelFetch(u_C, ivec2(clamp(g.x, 0.0, u_res.x - 1.0), 0.0), 0);
+  // Linear interpolation between columns — the reduction is per-column, and
+  // sampling it nearest paints hard vertical colour steps wherever the depth
+  // jumps a cell (glaring in the Froude view).
+  float gx = clamp(g.x - 0.5, 0.0, u_res.x - 1.001);
+  int ci = int(gx);
+  vec4 col4 = mix(texelFetch(u_C, ivec2(ci, 0), 0),
+                  texelFetch(u_C, ivec2(min(ci + 1, int(u_res.x) - 1), 0), 0),
+                  gx - float(ci));
   float bed = col4.x, dep = col4.y, surf = col4.w;
 
   // ---- background: a faint metric grid so scale is readable

@@ -19,6 +19,7 @@ const state = {
   cursor: [0, 0], inside: false, hover: null,
   drag: null, pour: null,
   zoom: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false,
+  flashKey: null, flashT: 0,
   fps: 60, rt: 1, simDt: 0,
   tipIdx: 0, tipAt: 0,
 };
@@ -113,52 +114,52 @@ const CONTROLS = [
     get: () => state.speed, set: (v) => state.speed = v,
     fmt: (v) => "×" + v.toFixed(2) + " real time",
     info: "How much simulated time passes per second of wall clock. Water hammer wants slow motion; backwater curves want fast." },
-  { id: "inflowOn", type: "check", label: "Upstream reservoir",
+  { id: "inflowOn", place: "res", type: "check", label: "Upstream reservoir",
     get: () => sim.p.inflow.on > 0.5, set: (v) => sim.p.inflow.on = v ? 1 : 0,
     info: "A Dirichlet level + discharge on the left edge — the upstream control." },
-  { id: "inLevel", label: "Reservoir level", min: 0, max: 1, step: 0.005, rel: "H",
+  { id: "inLevel", place: "res", label: "Reservoir level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.inflow.level, set: (v) => sim.p.inflow.level = v,
     fmt: (v) => v.toFixed(2) + " m",
     info: "Water level held on the left boundary." },
-  { id: "inQ", label: "Inflow q", min: 0, max: 1.2, step: 0.005,
+  { id: "inQ", place: "res", label: "Inflow q", min: 0, max: 1.2, step: 0.005,
     get: () => sim.p.inflow.q, set: (v) => sim.p.inflow.q = v,
     fmt: (v) => v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
                 "   y_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m",
     info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth y_c = (q²/g)^⅓ follows directly from it." },
-  { id: "inFree", type: "check", label: "Head-driven inflow",
+  { id: "inFree", place: "res", type: "check", label: "Head-driven inflow",
     get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
-  { id: "twOn", type: "check", label: "Tailwater control",
+  { id: "twOn", place: "tw", type: "check", label: "Tailwater control",
     get: () => sim.p.tailwater.on > 0.5, set: (v) => sim.p.tailwater.on = v ? 1 : 0,
     info: "Holds a fixed level on the right edge — the downstream control that decides M1 vs M2." },
-  { id: "twLevel", label: "Tailwater level", min: 0, max: 1, step: 0.005, rel: "H",
+  { id: "twLevel", place: "tw", label: "Tailwater level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.tailwater.level, set: (v) => sim.p.tailwater.level = v,
     fmt: (v) => v.toFixed(2) + " m" },
-  { id: "spoutOn", type: "check", label: "Top-left spout",
+  { id: "spoutOn", place: "spout", type: "check", label: "Top-left spout",
     get: () => sim.p.source.on > 0.5, set: (v) => sim.p.source.on = v ? 1 : 0,
     info: "The free-falling inflow in the top-left corner." },
-  { id: "spoutR", label: "Spout size", min: 0.02, max: 0.4, step: 0.005,
+  { id: "spoutR", place: "spout", label: "Spout size", min: 0.02, max: 0.4, step: 0.005,
     get: () => sim.p.source.r, set: (v) => sim.p.source.r = v,
     fmt: (v) => (2 * v).toFixed(2) + " m wide" },
-  { id: "spoutVx", label: "Spout velocity →", min: -5, max: 5, step: 0.05,
+  { id: "spoutVx", place: "spout", label: "Spout velocity →", min: -5, max: 5, step: 0.05,
     get: () => sim.p.source.vx, set: (v) => sim.p.source.vx = v,
     fmt: (v) => v.toFixed(2) + " m/s",
     info: "Horizontal velocity of the water leaving the spout. Use the Spout tool (4) to drag the spout anywhere." },
-  { id: "spoutVy", label: "Spout velocity ↑", min: -6, max: 3, step: 0.05,
+  { id: "spoutVy", place: "spout", label: "Spout velocity ↑", min: -6, max: 3, step: 0.05,
     get: () => sim.p.source.vy, set: (v) => sim.p.source.vy = v,
     fmt: (v) => v.toFixed(2) + " m/s" },
 
   { h: "Boundaries" },
-  { id: "openL", type: "check", label: "Open left edge",
+  { id: "openL", place: "openL", type: "check", label: "Open left edge",
     get: () => sim.p.open[0] > 0.5, set: (v) => { sim.p.open[0] = v ? 1 : 0; SIM.rasterise(); },
     info: "Open edges are zero-gradient outflows (water leaves freely); the left one also carries the reservoir control when it is on. Closed edges are walls." },
-  { id: "openR", type: "check", label: "Open right edge",
+  { id: "openR", place: "openR", type: "check", label: "Open right edge",
     get: () => sim.p.open[1] > 0.5, set: (v) => { sim.p.open[1] = v ? 1 : 0; SIM.rasterise(); },
     info: "The right edge carries the tailwater control when it is on." },
-  { id: "openB", type: "check", label: "Open bottom edge",
+  { id: "openB", place: "openB", type: "check", label: "Open bottom edge",
     get: () => sim.p.open[2] > 0.5, set: (v) => { sim.p.open[2] = v ? 1 : 0; SIM.rasterise(); },
     info: "An open bottom is a free overfall for anything that reaches it — brinks and outfalls drain here." },
-  { id: "openT", type: "check", label: "Open top edge",
+  { id: "openT", place: "openT", type: "check", label: "Open top edge",
     get: () => sim.p.open[3] > 0.5, set: (v) => { sim.p.open[3] = v ? 1 : 0; SIM.rasterise(); } },
 
   { h: "Hydraulics" },
@@ -190,16 +191,16 @@ const CONTROLS = [
     info: "Switches between the vertical profile and looking down on a horizontal plane." },
 
   { h: "Wavemaker" },
-  { id: "waveOn", type: "check", label: "Piston on",
+  { id: "waveOn", place: "piston", type: "check", label: "Piston on",
     get: () => sim.p.wave.on > 0.5, set: (v) => sim.p.wave.on = v ? 1 : 0,
     info: "An oscillating column of prescribed velocity — the wave flume's paddle. Works in any scene with standing water." },
-  { id: "waveA", label: "Amplitude", min: 0.005, max: 0.3, step: 0.005,
+  { id: "waveA", place: "piston", label: "Amplitude", min: 0.005, max: 0.3, step: 0.005,
     get: () => sim.p.wave.amp, set: (v) => sim.p.wave.amp = v,
     fmt: (v) => v.toFixed(3) + " m stroke" },
-  { id: "waveT", label: "Period", min: 0.4, max: 6, step: 0.05,
+  { id: "waveT", place: "piston", label: "Period", min: 0.4, max: 6, step: 0.05,
     get: () => sim.p.wave.period, set: (v) => sim.p.wave.period = v,
     fmt: (v) => v.toFixed(2) + " s" },
-  { id: "waveX", label: "Piston position", min: 0, max: 1, step: 0.01, rel: "W",
+  { id: "waveX", place: "piston", label: "Piston position", min: 0, max: 1, step: 0.01, rel: "W",
     get: () => sim.p.wave.x, set: (v) => sim.p.wave.x = v,
     fmt: (v) => v.toFixed(2) + " m from the left" },
 
@@ -244,14 +245,17 @@ function buildPanel() {
     const row = document.createElement("label"); row.className = "row";
     const lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = c.label;
     row.appendChild(lbl);
+    const touched = () => {
+      if (c.place) { state.flashKey = c.place; state.flashT = performance.now(); }
+    };
     let input;
     if (c.type === "check") {
       input = document.createElement("input"); input.type = "checkbox";
-      input.onchange = () => { c.set(input.checked); syncPanel(); };
+      input.onchange = () => { c.set(input.checked); touched(); syncPanel(); };
     } else if (c.type === "select") {
       input = document.createElement("select");
       c.opts.forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; input.appendChild(o); });
-      input.onchange = () => { c.set(input.value); syncPanel(); };
+      input.onchange = () => { c.set(input.value); touched(); syncPanel(); };
     } else {
       input = document.createElement("input"); input.type = "range";
       input.min = c.log ? 0 : c.min; input.max = c.log ? 1000 : c.max;
@@ -260,7 +264,7 @@ function buildPanel() {
         let v;
         if (c.log) v = c.min * Math.pow(c.max / c.min, +input.value / 1000);
         else v = +input.value;
-        c.set(v); syncPanel();
+        c.set(v); touched(); syncPanel();
       };
     }
     input.id = "c_" + c.id;
@@ -540,6 +544,7 @@ function drawOverlay(A) {
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
   }
   state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
+  drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
@@ -555,15 +560,100 @@ function drawOverlay(A) {
   }
 }
 
+/** How recently a panel control with a placement was touched → 0..1 pulse. */
+function flashOf(key) {
+  if (state.flashKey !== key) return 0;
+  return Math.max(0, 1 - (performance.now() - state.flashT) / 1600);
+}
+
+/** Markers that anchor the panel's abstractions to places on the field:
+ *  the ∇ waterline symbol at each level control, the wave piston column,
+ *  outward chevrons on open edges. Touching the matching slider flashes
+ *  its marker so "which thing is this?" answers itself. */
+function drawMarkers(ctx) {
+  const p = sim.p, V = view;
+  const level = (side, y, label, colour, key) => {
+    const x0 = side === "L" ? V.X(0) : V.X(sim.W);
+    const dir = side === "L" ? 1 : -1;
+    const ypx = V.Y(y);
+    const f = flashOf(key);
+    ctx.save();
+    ctx.globalAlpha = 0.55 + 0.45 * f;
+    ctx.strokeStyle = colour; ctx.lineWidth = 1.4 + 2 * f;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(x0, ypx); ctx.lineTo(x0 + dir * 74, ypx); ctx.stroke();
+    ctx.setLineDash([]);
+    const tx = x0 + dir * 20;
+    ctx.beginPath();                                   // ∇ — the waterline symbol
+    ctx.moveTo(tx - 6, ypx - 10); ctx.lineTo(tx + 6, ypx - 10); ctx.lineTo(tx, ypx - 1);
+    ctx.closePath(); ctx.fillStyle = colour; ctx.fill();
+    OVERLAY.chip(ctx, side === "L" ? x0 + dir * 32 : x0 - 32, ypx - 18,
+      label, colour, side === "R" ? "right" : undefined);
+    ctx.restore();
+  };
+  if (p.inflow.on > 0.5) {
+    level("L", p.inflow.level,
+      "reservoir " + p.inflow.level.toFixed(2) + " m" + (p.inflow.free > 0.5 ? " · head-driven" : ""),
+      "#7fd4ff", "res");
+  }
+  if (p.tailwater.on > 0.5) {
+    level("R", p.tailwater.level, "tailwater " + p.tailwater.level.toFixed(2) + " m", "#5fd08a", "tw");
+  }
+  if (p.wave.on > 0.5) {
+    const x = V.X(p.wave.x), f = flashOf("piston");
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.5 * f;
+    ctx.strokeStyle = "#ffb648"; ctx.lineWidth = 1.4 + 2 * f;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(x, V.Y(0)); ctx.lineTo(x, V.Y(sim.H)); ctx.stroke();
+    ctx.setLineDash([]);
+    const ym = V.Y(sim.H * 0.55);
+    ctx.beginPath();                                   // ↔ stroke arrows
+    ctx.moveTo(x - 14, ym); ctx.lineTo(x + 14, ym);
+    ctx.moveTo(x - 14, ym); ctx.lineTo(x - 8, ym - 4);
+    ctx.moveTo(x - 14, ym); ctx.lineTo(x - 8, ym + 4);
+    ctx.moveTo(x + 14, ym); ctx.lineTo(x + 8, ym - 4);
+    ctx.moveTo(x + 14, ym); ctx.lineTo(x + 8, ym + 4);
+    ctx.stroke();
+    OVERLAY.chip(ctx, x + 8, ym - 16, "piston", "#ffb648");
+    ctx.restore();
+  }
+  // open edges: outward chevrons
+  const sides = [
+    ["openL", p.open[0], (t) => [V.X(0) + 8, V.Y(sim.H * t)], -1, 0],
+    ["openR", p.open[1], (t) => [V.X(sim.W) - 8, V.Y(sim.H * t)], 1, 0],
+    ["openB", p.open[2], (t) => [V.X(sim.W * t), V.Y(0) - 8], 0, 1],
+    ["openT", p.open[3], (t) => [V.X(sim.W * t), V.Y(sim.H) + 8], 0, -1],
+  ];
+  ctx.save();
+  ctx.strokeStyle = "#dfe8f2"; ctx.lineCap = "round";
+  for (const [key, on, pos, dx, dy] of sides) {
+    if (!(on > 0.5)) continue;
+    const f = flashOf(key);
+    ctx.globalAlpha = 0.30 + 0.6 * f;
+    ctx.lineWidth = 1.3 + 1.5 * f;
+    for (const t of [0.3, 0.5, 0.7]) {
+      const [cx, cy] = pos(t);
+      ctx.beginPath();                                 // chevron pointing out
+      ctx.moveTo(cx - dx * 4 - dy * 5, cy - dy * 4 - dx * 5);
+      ctx.lineTo(cx + dx * 4, cy + dy * 4);
+      ctx.lineTo(cx - dx * 4 + dy * 5, cy - dy * 4 + dx * 5);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 /** Nozzle marker for the movable source. */
 function drawSpout(ctx) {
   const s = sim.p.source;
   if (!(s.on > 0.5) && state.tool !== "spout") return;
   const x = view.X(s.x), y = view.Y(s.y);
   const r = Math.max(5, s.r / sim.W * view.w);
+  const fl = flashOf("spout");
   ctx.save();
-  ctx.globalAlpha = s.on > 0.5 ? 0.9 : 0.35;
-  ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = 1.6;
+  ctx.globalAlpha = Math.min(1, (s.on > 0.5 ? 0.9 : 0.35) + 0.4 * fl);
+  ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = 1.6 + 2 * fl;
   ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.stroke();
   ctx.setLineDash([]);

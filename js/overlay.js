@@ -41,10 +41,12 @@ const OVERLAY = (() => {
     return Math.pow(h, 2 / 3) * Math.sqrt(Sf) / Math.abs(V);
   }
 
-  /** Surface-profile class at one column: letter (bed slope) + zone (1/2/3). */
+  /** Surface-profile class at one column: letter (bed slope) + zone (1/2/3).
+   *  The C band is ±5% — y_n is measured off the energy line, and a tighter
+   *  band makes a genuinely critical reach flicker between M and S. */
   function classify(h, yn, yc, S0) {
     let letter;
-    if (S0 > 2e-4) letter = yn > yc * 1.03 ? "M" : (yn < yc * 0.97 ? "S" : "C");
+    if (S0 > 2e-4) letter = yn > yc * 1.05 ? "M" : (yn < yc * 0.95 ? "S" : "C");
     else if (S0 < -2e-4) letter = "A";
     else letter = "H";
     let zone;

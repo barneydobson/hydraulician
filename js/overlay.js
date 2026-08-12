@@ -85,11 +85,14 @@ const OVERLAY = (() => {
     }
     const pv = new Float32Array(nx + 1), pn = new Float32Array(nx + 1);
     for (let i = 0; i < nx; i++) { pv[i + 1] = pv[i] + d[i]; pn[i + 1] = pn[i] + use[i]; }
+    // A tilted-gravity scene draws its bed flat and carries the slope in
+    // gravity instead — add it back, it is the dynamic slope the GVF sees.
+    const tilt = S.scene.tiltS0 || 0;
     const slope = new Float32Array(nx);
     for (let i = 0; i < nx; i++) {
       const lo = Math.max(0, i - win), hi = Math.min(nx - 1, i + win);
       const n = pn[hi] - pn[lo];
-      slope[i] = n > 0 ? (pv[hi] - pv[lo]) / n : 0;
+      slope[i] = (n > 0 ? (pv[hi] - pv[lo]) / n : 0) + tilt;
     }
 
     // Columns beside a cliff — a brink, a weir face, a gate sill — have no
@@ -163,7 +166,9 @@ const OVERLAY = (() => {
     out.n = new Array(nx).fill(NaN);
     for (let i = 0; i < nx; i++) {
       const lo = Math.max(0, i - ew), hi = Math.min(nx - 1, i + ew);
-      const Sf = (Esm[lo] - Esm[hi]) / Math.max((hi - lo) * dx, 1e-9);
+      // + tilt: in a tilted-gravity scene the flat-bed energy line misses the
+      // S0 of work gravity does per metre of run
+      const Sf = (Esm[lo] - Esm[hi]) / Math.max((hi - lo) * dx, 1e-9) + tilt;
       out.Sf[i] = Sf;
       if (ok[i] && out.h[i] > 4 * dx) out.n[i] = manning(out.h[i], out.V[i], Sf);
     }

@@ -135,7 +135,7 @@ const CONTROLS = [
       const d = Math.min(v, b.inB[1]) - b.inB[0];
       return v.toFixed(2) + " m above datum" + (d > 0 ? "  ·  " + d.toFixed(2) + " m deep at the inlet" : "  ·  below the inlet bed!");
     },
-    info: "Minimum pool level on the left boundary, measured from the domain floor (the datum), NOT from the bed. If a downstream control backs water up deeper than this, the reservoir rides up with it rather than choking the backwater." },
+    info: "Water level held on the left boundary, measured from the domain floor (the datum), NOT from the bed. Set it to the level the arriving flow actually wants — a level below a downstream control's backwater will choke the backwater at the inlet." },
   { id: "inQ", place: "res", label: "Inflow q", min: 0, max: 1.2, step: 0.005,
     get: () => sim.p.inflow.q, set: (v) => sim.p.inflow.q = v,
     fmt: (v) => v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
@@ -618,11 +618,8 @@ function drawMarkers(ctx) {
     ctx.restore();
   };
   if (p.inflow.on > 0.5) {
-    const eff = SIM.bands().inEff;
-    level("L", eff,
-      "reservoir " + p.inflow.level.toFixed(2) + " m" +
-      (eff > p.inflow.level + 0.02 ? " · riding backwater at " + eff.toFixed(2) : "") +
-      (p.inflow.free > 0.5 ? " · head-driven" : ""),
+    level("L", p.inflow.level,
+      "reservoir " + p.inflow.level.toFixed(2) + " m" + (p.inflow.free > 0.5 ? " · head-driven" : ""),
       "#7fd4ff", "res");
   }
   if (p.tailwater.on > 0.5) {

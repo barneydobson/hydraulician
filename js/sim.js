@@ -225,55 +225,15 @@ const SIM = (() => {
     return [best[0] * S.dx, (best[1] + 1) * S.dx];
   }
 
-  /** Effective inlet level. The set level is a MINIMUM pool level: a real
-   *  reservoir rides up when a downstream control backs water above it.
-   *  Pinning the surface at the set level instead chops the backwater off at
-   *  the boundary — a permanent artificial drawdown (and ripple source) at
-   *  the inlet. Read the interior surface a few columns in (median, outside
-   *  the ghost's direct influence) and follow it upward. Prescribed-q mode
-   *  only: in head-driven mode the set level IS the control. */
-  function inletLevelEff() {
-    const inf = S.p.inflow;
-    if (!(inf.on > 0.5) || inf.free > 0.5) return inf.level;
-    // Median surface and Froude number a few columns in. Two gates keep this
-    // from feeding on itself: the flow there must be SUBCRITICAL (true
-    // backwater; the pool right behind a steep crest is trans-critical and
-    // is the boundary's own doing), and meaningfully above the set level.
-    const surfs = [], frs = [];
-    for (let i = 5; i <= 11 && i < S.nx; i++) {
-      const h = S.colBuf[i * 4 + 1];
-      if (h > 3 * S.dx) {
-        surfs.push(S.colBuf[i * 4 + 3]);
-        frs.push(Math.abs(S.colBuf[i * 4 + 2]) / h / Math.sqrt(Math.max(S.p.g, 0.01) * h));
-      }
-    }
-    let tgt = inf.level;
-    if (surfs.length >= 4) {
-      surfs.sort((a, b) => a - b);
-      frs.sort((a, b) => a - b);
-      const med = surfs[surfs.length >> 1];
-      if (frs[frs.length >> 1] < 0.8 && med > inf.level + 2 * S.dx) tgt = med;
-    }
-    // Low-pass at ~2/s so wave crests cannot ratchet the pool upward.
-    if (!(S.inEffSm >= inf.level)) S.inEffSm = inf.level;
-    const k = Math.min(2.0 * Math.max(S.t - (S.inEffT || 0), 0), 1);
-    S.inEffSm += (tgt - S.inEffSm) * k;
-    S.inEffT = S.t;
-    return Math.max(inf.level, S.inEffSm);
-  }
-
   function bands() {
     const p = S.p;
-    const eff = inletLevelEff();
-    // half-cell quantisation: the runs only change at cell resolution, and
-    // this is called every substep
-    const key = Math.round(eff / S.dx * 2) + ":" + p.tailwater.level;
+    const key = p.inflow.level + ":" + p.tailwater.level;
     if (S.bandKey !== key) {
       S.bandKey = key;
-      S.inBand = columnBand(1, eff);
+      S.inBand = columnBand(1, p.inflow.level);
       S.twBand = columnBand(S.nx - 2, p.tailwater.level);
     }
-    return { inB: S.inBand, twB: S.twBand, inEff: eff };
+    return { inB: S.inBand, twB: S.twBand };
   }
 
   /** Inlet velocity implied by the prescribed unit discharge and the depth
@@ -282,10 +242,10 @@ const SIM = (() => {
    *  surface taper on the prescribed plug. */
   function inletVel() {
     const inf = S.p.inflow;
-    const { inB: b, inEff: eff } = bands();
+    const b = bands().inB;
     if (inf.v !== undefined) return inf.v;          // scenes may pin velocity
-    const feather = b[1] < eff ? 0 : 1.5 * S.dx;    // none for a submerged duct
-    return (inf.q || 0) / Math.max(Math.min(eff, b[1]) - b[0] - feather, S.dx);
+    const feather = b[1] < inf.level ? 0 : 1.5 * S.dx;   // none for a submerged duct
+    return (inf.q || 0) / Math.max(Math.min(inf.level, b[1]) - b[0] - feather, S.dx);
   }
 
   /** Uniforms shared by the two simulation passes. */
@@ -295,13 +255,14 @@ const SIM = (() => {
     gl.uniform1f(pr.u("u_dx"), S.dx);
     gl.uniform1f(pr.u("u_dt"), h);
     gl.uniform1f(pr.u("u_g"), -Math.abs(p.g));
+    gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(p.g));
     gl.uniform1f(pr.u("u_c"), p.c);
     gl.uniform1f(pr.u("u_c2"), p.c * p.c);
     gl.uniform1f(pr.u("u_valve"), p.valveClosed);
-    const { inB, twB, inEff } = bands();
-    gl.uniform4f(pr.u("u_in"), inEff, inletVel(), p.inflow.on, p.inflow.free || 0);
+    const { inB, twB } = bands();
+    gl.uniform4f(pr.u("u_in"), p.inflow.level, inletVel(), p.inflow.on, p.inflow.free || 0);
     gl.uniform2f(pr.u("u_tw"), p.tailwater.level, p.tailwater.on);
-    gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(inEff, inB[1]));
+    gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(p.inflow.level, inB[1]));
     gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
     // Sponge widths are physical (metres) so resolution changes keep the
     // same reservoir; default is ~10 cells.

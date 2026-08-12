@@ -71,10 +71,24 @@ Three guard rails, each bought with an explosion:
   stops waterfalling ripples into the drawn-down interior surface; submerged
   ducts (level above the whole run) keep the full plug. Levels are
   ELEVATIONS above the domain floor (the datum), not depths over the bed —
-  the panel prints both. In prescribed-q mode the reservoir level is a
-  MINIMUM pool level (`inletLevelEff`): if a downstream control backs water
-  up deeper than it, the inlet rides the backwater instead of pinning the
-  surface down and choking it at the boundary.
+  the panel prints both. The inlet pins the surface AT its level, so a scene
+  must set the level the arriving profile actually wants (m1's inletDepth is
+  the MEASURED weir backwater at the inlet, not y_n): pinned lower, the
+  boundary chokes the backwater and shed ripples for ever. An adaptive
+  "ride the backwater" inlet was tried and reverted — it hunts (visibly on
+  M2) and can self-feed at steep crests; so was a pressure-feedback rating
+  on the plug — it neither hurt nor helped.
+- **Tilted gravity for uniform mild slopes** (`tiltS0`, per scene; `channel`
+  option `tilt`). A 1-in-68 bed rasterises to a one-cell step every ~0.9 m,
+  and at M2's working depth (~20 steps per depth) that staircase excites
+  standing waves over the whole reach that no boundary treatment damps —
+  m1 hides them only by running deep. The m2 scene draws its bed FLAT
+  (grid-aligned, no steps) and tilts gravity by S₀ instead: `u_gx` in the
+  vel pass, and the overlay adds `tiltS0` back into both the bed slope and
+  S_f (the flat-bed energy line misses the S₀ of work gravity does per
+  metre). Only for small S₀ — the still-water surface visibly tilts at
+  chute angles. The residual near-brink undulations on m2 are near-critical
+  wave amplification, not the staircase.
 
 ## Architecture
 

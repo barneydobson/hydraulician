@@ -71,6 +71,10 @@ uniform sampler2D u_U, u_F, u_S;
 uniform vec2  u_res;          // NX, NY
 uniform float u_dx, u_dt;
 uniform float u_g;            // signed gravity (m/s², negative = down; 0 = plan view)
+uniform float u_gx;           // downstream gravity component: a scene with a
+                              // uniform mild slope draws its bed FLAT (grid-
+                              // aligned, so no rasterisation staircase to
+                              // excite waves) and tilts gravity by S0 instead
 uniform float u_c, u_c2;      // slot celerity and its square
 uniform float u_valve;        // 1 = valves closed (solid), 0 = open
 uniform vec4  u_in;           // left reservoir: level (m), velocity (m/s), on, free
@@ -182,6 +186,7 @@ void main(){
   // --- gravity, only where there is water to pull on
   float fFu = max(fC, fW), fFv = max(fC, fS);
   vn += dt * u_g * smoothstep(0.0, 0.05, fFv);
+  un += dt * u_gx * smoothstep(0.0, 0.05, fFu);
 
   // --- bed friction: a wall function applied in the cells touching a solid,
   //     integrated implicitly so any roughness is stable
@@ -427,14 +432,18 @@ void main(){
     float rate = tgt > fNew ? 8.0 * s * s : 2.0 * s * s;
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
-  // Head-driven inflow side: this sponge IS the supply, so it fills with a
+  // Inflow side. Head-driven: this sponge IS the supply, so it fills with a
   // linear ramp — a reservoir compartment held only at its outer columns
-  // draws down and starves the pipe.
-  if (u_in.z > 0.5 && u_in.w > 0.5 && u_spongeN.x > 0.5 && float(i) < 1.0 + u_spongeN.x) {
+  // draws down and starves the pipe. Prescribed-q: the sponge's job is only
+  // to absorb the reach seiche (the pinned inlet is otherwise a perfect
+  // long-wave reflector, and M2 breathed at the inlet–brink round-trip
+  // period for ever), so it keeps the gentle quadratic ramp.
+  if (u_in.z > 0.5 && u_spongeN.x > 0.5 && float(i) < 1.0 + u_spongeN.x) {
     float s = (1.0 + u_spongeN.x - float(i)) / u_spongeN.x;
     float tgt = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2
               : (y >= u_in.x ? 0.0 : fNew);
-    float rate = tgt > fNew ? 12.0 * s : 2.0 * s * s;
+    float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * s : 2.0 * s * s)
+                                : (tgt > fNew ? 8.0 * s * s : 2.0 * s * s);
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
 

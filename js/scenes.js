@@ -66,14 +66,20 @@ const SCENES = (() => {
   const TH = 1.4;                          // bed thickness — reaches below y=0
 
   function channel(o) {
-    const W = o.W, H = o.H, S0 = o.S0, xEnd = o.xEnd === undefined ? W : o.xEnd;
+    const W = o.W, H = o.H, xEnd = o.xEnd === undefined ? W : o.xEnd;
+    // tilt: draw the bed FLAT (grid-aligned, so there is no rasterisation
+    // staircase to excite waves) and tilt gravity by S0 instead. Only for
+    // uniform mild slopes — at 1:68 the still-water surface tilt (0.8°) is
+    // invisible, and the GVF maths is identical in the tilted frame.
+    const S0g = o.tilt ? 0 : o.S0;                           // geometric slope
+    const S0 = o.S0;                                         // dynamic slope
     const xB = o.xBreak === undefined ? xEnd : o.xBreak;     // break in grade
-    const S0b = o.S0b === undefined ? S0 : o.S0b;
+    const S0b = o.S0b === undefined ? S0g : o.S0b;
     const bedTop = (x) => {
       const t = Math.min(Math.max(x, 0), xEnd);
-      return t <= xB ? o.bed0 - S0 * t : o.bed0 - S0 * xB - S0b * (t - xB);
+      return t <= xB ? o.bed0 - S0g * t : o.bed0 - S0g * xB - S0b * (t - xB);
     };
-    const off = (TH / 2) * Math.sqrt(1 + S0 * S0);
+    const off = (TH / 2) * Math.sqrt(1 + S0g * S0g);
     const offB = (TH / 2) * Math.sqrt(1 + S0b * S0b);
     const outBed = bedTop(xEnd);
     const inLevel = o.bed0 + o.inletDepth;
@@ -88,8 +94,8 @@ const SCENES = (() => {
     const x0 = -1.0, e = xEnd >= W - 1e-6 ? 1.0 : 0;
     const walls = () => {
       const w = xB >= xEnd
-        ? [[x0, o.bed0 - off - S0 * x0, xEnd + e, outBed - off - S0 * e, TH]]
-        : [[x0, o.bed0 - off - S0 * x0, xB, bedTop(xB) - off, TH],
+        ? [[x0, o.bed0 - off - S0g * x0, xEnd + e, outBed - off - S0g * e, TH]]
+        : [[x0, o.bed0 - off - S0g * x0, xB, bedTop(xB) - off, TH],
            [xB, bedTop(xB) - offB, xEnd + e, outBed - offB - S0b * e, TH]];
       if (o.gate) w.push([o.gate.x, bedTop(o.gate.x) + o.gate.a, o.gate.x, H, 0.05]);
       if (o.weir) {
@@ -123,6 +129,7 @@ const SCENES = (() => {
       hmax: o.hmax || 0.5, vmax: o.vmax || 2.5,
       spinup: o.spinup || 25, dyeLine: o.dyeLine || 0,
       open: [1, 1, xEnd < W - 1e-6 ? 1 : 0, 0],
+      tiltS0: o.tilt ? S0 : 0,
       inflow: { level: inLevel, q: o.free ? 0 : o.q, on: 1, free: o.free ? 1 : 0 },
       tailwater: o.tail === undefined ? { level: 0, on: 0 } : { level: twLevel, on: 1 },
       walls, water,
@@ -193,9 +200,14 @@ const SCENES = (() => {
 
     // ------------------------------------------------- MILD  (C_f > 2.8 S₀)
     // S₀ = 1 in 68, C_f = 0.125  →  y_n ≈ 0.27 m against y_c ≈ 0.19 m.
+    // inletDepth is the MEASURED backwater depth arriving from the weir
+    // (the M1 curve does not decay to y_n within this reach). The inlet
+    // level must meet the profile: pinned lower, the boundary chokes the
+    // backwater and sheds ripples; the level is an elevation above the
+    // datum, bed0 + inletDepth.
     Object.assign(channel({
       W: 16, H: 1.05, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
-      inletDepth: 0.26, weir: { x: 13.4, h: 0.42, w: 0.7 }, xEnd: 14.6,
+      inletDepth: 0.54, weir: { x: 13.4, h: 0.42, w: 0.7 }, xEnd: 14.6,
       mode: 0, hmax: 0.55, vmax: 2.0, spinup: 30, dyeLine: 0.9,
     }), {
       id: "m1", name: "M1 · backwater behind a weir", key: "Mild, zone 1",
@@ -205,9 +217,12 @@ const SCENES = (() => {
              "Backwater length scales as y_n/S₀. Drop the roughness and it stretches.",
              "Erase the weir and the same channel relaxes towards M2."] }),
 
+    // tilt: flat bed + tilted gravity, because at M2's working depth the
+    // rasterised bed staircase excites standing waves the demo cannot absorb
+    // (m1 runs deep enough to hide the same steps).
     Object.assign(channel({
       W: 16, H: 0.95, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
-      inletDepth: 0.26, xEnd: 13.6,
+      inletDepth: 0.26, xEnd: 13.6, tilt: true,
       hmax: 0.45, vmax: 2.0, spinup: 25, dyeLine: 1.2,
     }), {
       id: "m2", name: "M2 · drawdown to a free overfall", key: "Mild, zone 2",

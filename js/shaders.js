@@ -417,13 +417,19 @@ void main(){
   //     cavitates); the nudge is asymmetric — deficits fill hard, crests
   //     drain gently — because deleting wave crests column-by-column against
   //     an incoming jet paints standing striations in the pond.
+  // Tailwater side: de-resonance only, so the quadratic ramp keeps the
+  // sponge's reach shallow — a linear fill this side amplified the drowned
+  // jump's surges instead of absorbing them.
   if (u_tw.y > 0.5 && u_spongeN.y > 0.5 && float(i) > u_res.x - 2.0 - u_spongeN.y) {
     float s = (float(i) - (u_res.x - 2.0 - u_spongeN.y)) / u_spongeN.y;
     float tgt = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2
               : (y >= u_tw.x ? 0.0 : fNew);
-    float rate = tgt > fNew ? 12.0 * s : 2.0 * s * s;
+    float rate = tgt > fNew ? 8.0 * s * s : 2.0 * s * s;
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
+  // Head-driven inflow side: this sponge IS the supply, so it fills with a
+  // linear ramp — a reservoir compartment held only at its outer columns
+  // draws down and starves the pipe.
   if (u_in.z > 0.5 && u_in.w > 0.5 && u_spongeN.x > 0.5 && float(i) < 1.0 + u_spongeN.x) {
     float s = (1.0 + u_spongeN.x - float(i)) / u_spongeN.x;
     float tgt = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2

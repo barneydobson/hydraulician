@@ -359,7 +359,7 @@ const SCENES = (() => {
       // reservoir draws down below the tailwater and the bore cavitates.
       // The outlet needs width too, or the pipe jet blows through it and
       // the bore never feels the tailwater pressure.
-      spongeIn: 1.35, spongeTw: 0.8,
+      spongeIn: 1.35, spongeTw: 1.5,
       inflow: { level: 2.05, q: 0, on: 1, free: 1 },
       tailwater: { level: 1.55, on: 1 },
       // The sloping segments are butt-cut perpendicular to their axes, so at

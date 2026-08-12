@@ -69,7 +69,12 @@ Three guard rails, each bought with an explosion:
   in the pond. The prescribed inlet plug is likewise feathered over its top
   three cells (`inletVel` repays the lost discharge) so its hard top edge
   stops waterfalling ripples into the drawn-down interior surface; submerged
-  ducts (level above the whole run) keep the full plug.
+  ducts (level above the whole run) keep the full plug. Levels are
+  ELEVATIONS above the domain floor (the datum), not depths over the bed —
+  the panel prints both. In prescribed-q mode the reservoir level is a
+  MINIMUM pool level (`inletLevelEff`): if a downstream control backs water
+  up deeper than it, the inlet rides the backwater instead of pinning the
+  surface down and choking it at the boundary.
 
 ## Architecture
 

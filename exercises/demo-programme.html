@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydraulician — the 30-demo programme</title>
+<style>
+  :root {
+    --bg: #f4f7f9;
+    --panel: #ffffff;
+    --panel2: #eef3f6;
+    --ink: #17242f;
+    --dim: #55697a;
+    --line: rgba(23, 36, 47, 0.14);
+    --line-soft: rgba(23, 36, 47, 0.08);
+    --cyan: #0d76ad;
+    --amber: #a86a0e;
+    --green: #1f7a4d;
+    --rose: #b23a52;
+    --chip-green-bg: rgba(31, 122, 77, 0.10);
+    --chip-amber-bg: rgba(168, 106, 14, 0.10);
+    --chip-rose-bg: rgba(178, 58, 82, 0.10);
+    --chip-cyan-bg: rgba(13, 118, 173, 0.10);
+    --eq-bg: #eef3f6;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --serif: Charter, "Bitstream Charter", Cambria, Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0f16; --panel: #101823; --panel2: #16202d; --ink: #dfe8f2; --dim: #93a4b5;
+      --line: rgba(223, 232, 242, 0.16); --line-soft: rgba(223, 232, 242, 0.08);
+      --cyan: #7fd4ff; --amber: #ffb648; --green: #5fd08a; --rose: #ff8fa3;
+      --chip-green-bg: rgba(95, 208, 138, 0.12); --chip-amber-bg: rgba(255, 182, 72, 0.12);
+      --chip-rose-bg: rgba(255, 143, 163, 0.12); --chip-cyan-bg: rgba(127, 212, 255, 0.12);
+      --eq-bg: #131c28;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0f16; --panel: #101823; --panel2: #16202d; --ink: #dfe8f2; --dim: #93a4b5;
+    --line: rgba(223, 232, 242, 0.16); --line-soft: rgba(223, 232, 242, 0.08);
+    --cyan: #7fd4ff; --amber: #ffb648; --green: #5fd08a; --rose: #ff8fa3;
+    --chip-green-bg: rgba(95, 208, 138, 0.12); --chip-amber-bg: rgba(255, 182, 72, 0.12);
+    --chip-rose-bg: rgba(255, 143, 163, 0.12); --chip-cyan-bg: rgba(127, 212, 255, 0.12);
+    --eq-bg: #131c28;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--serif); font-size: 16px; line-height: 1.55; margin: 0; padding: 2.5rem 1.25rem 5rem; }
+  .wrap { max-width: 62rem; margin: 0 auto; }
+  h1, h2, h3 { font-family: var(--sans); text-wrap: balance; }
+  h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.015em; margin: 0.2rem 0 0.4rem; }
+  h2 { font-size: 1.3rem; font-weight: 700; margin: 0 0 0.7rem; }
+  h3 { font-size: 1.02rem; font-weight: 700; margin: 0; }
+  p { max-width: 72ch; }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+  .subtitle { color: var(--dim); font-size: 1.02rem; max-width: 74ch; }
+  .part { margin-top: 2.8rem; border-top: 2px solid var(--line); padding-top: 1rem; }
+  .part > .eyebrow { color: var(--cyan); }
+  .hours { color: var(--dim); font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.06em; }
+
+  .demo { background: var(--panel); border: 1px solid var(--line-soft); border-left: 3px solid var(--green); border-radius: 8px; padding: 0.85rem 1.1rem 0.9rem; margin: 0.8rem 0; font-size: 0.93rem; }
+  .demo.explore { border-left-color: var(--cyan); }
+  .demo.backup { border-left-color: var(--amber); }
+  .demo-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 0.7rem; margin-bottom: 0.35rem; }
+  .id { font-family: var(--mono); font-weight: 700; font-size: 0.8rem; color: var(--dim); }
+  .chip { font-family: var(--mono); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.09em; padding: 0.18rem 0.5rem; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+  .c-submit { color: var(--green); background: var(--chip-green-bg); border-color: var(--green); }
+  .c-explore { color: var(--cyan); background: var(--chip-cyan-bg); border-color: var(--cyan); }
+  .c-backup { color: var(--amber); background: var(--chip-amber-bg); border-color: var(--amber); }
+  .c-prep { color: var(--rose); background: var(--chip-rose-bg); border-color: var(--rose); }
+  .demo dl { margin: 0.25rem 0 0; display: grid; grid-template-columns: 5.2rem 1fr; gap: 0.18rem 0.7rem; }
+  .demo dt { font-family: var(--mono); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); padding-top: 0.18rem; }
+  .demo dd { margin: 0; max-width: 90ch; }
+  .demo .eqi, .eqi { font-family: var(--mono); font-size: 0.85em; }
+  .refs { font-family: var(--mono); font-size: 0.78rem; color: var(--cyan); }
+
+  .tablewrap { overflow-x: auto; margin: 0.7rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+  th { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); text-align: left; font-weight: 600; padding: 0.4rem 0.7rem 0.4rem 0; border-bottom: 1px solid var(--line); }
+  td { padding: 0.42rem 0.7rem 0.42rem 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  .callout { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.25rem; margin: 1.2rem 0; }
+  .callout h2 { margin-top: 0.1rem; }
+  code, .kbd { font-family: var(--mono); font-size: 0.85em; background: var(--eq-bg); border-radius: 4px; padding: 0.08em 0.35em; }
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.3rem 0; }
+  .foot { margin-top: 3rem; color: var(--dim); font-size: 0.85rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+  .rig { background: var(--panel2); border-radius: 8px; padding: 0.6rem 0.9rem; margin: 0.5rem 0; font-size: 0.9rem; }
+  .rig b { font-family: var(--mono); font-size: 0.78rem; color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<p class="eyebrow">hydraulician · demo programme rev 1 · 13 Aug 2026 · companion to the feasibility sheet</p>
+<h1>The 30-demo programme</h1>
+<p class="subtitle">Thirty core demos across sixteen taught topics at roughly one per contact hour, plus ten backups. Twenty-six of the thirty end with each student submitting a number on Blackboard — designed as the engagement metric. Equation references are to your own lists: <span class="refs">H/U/Q/D/N/W</span> = 4A15 index, <span class="refs">#n</span> = 3A11 reference.</p>
+
+<div class="callout">
+<h2>How the engagement metric works</h2>
+<ul>
+<li><b>Personalised parameters.</b> Each submit-demo assigns the student a parameter from their student number (e.g. <span class="eqi">q = 0.20 + 0.03·d</span> where d = last digit). The solver is deterministic: same parameter → same steady answer, so any submission can be spot-checked by re-running it. Copying a neighbour's number produces a mismatch with your own digit — the cheap fraud is self-marking.</li>
+<li><b>Marking engagement, not accuracy.</b> A generous tolerance band (say ±15% of the re-run value, or simply "a number was submitted in the window") scores the credit. The pooled plot the class builds is the pedagogical payoff, and outliers are discussion material, not lost marks.</li>
+<li><b>Mechanics.</b> One Blackboard test per hour, 1–2 numeric fields, open only during the slot. 26/30 core demos produce numbers (87% — comfortably past the 50% you need); the 4 exploratory demos can log a screenshot upload or nothing at all.</li>
+<li><b>Standing rules</b> (put them on every worksheet): everyone on the same <b>Resolution: Medium</b>; wait out the spin-up countdown; keep the tab visible (the sim pauses when hidden); after changing q, re-check any tailwater against y<sub>c</sub> = (q²/g)<sup>⅓</sup> (printed on the q slider) and keep it ≥ 1.3 y<sub>c</sub>.</li>
+<li><b>Prep flags.</b> Demos marked <span class="chip c-prep">DRY-RUN</span> are sandbox builds or parameter choices I have not verified numerically — run them once before class. Scenes with verified numbers (hammer, h23, flumes, jet, venturi) carry no flag.</li>
+</ul>
+</div>
+
+<div class="callout">
+<h2>Hour budget and the honest reductions</h2>
+<div class="tablewrap"><table>
+<tr><th>Topic</th><th>Hours</th><th>Core demos</th><th>Submit</th><th>Notes</th></tr>
+<tr><td>Dimensional analysis</td><td>2–3</td><td>DA-1 · DA-2 · DA-3</td><td>2/3</td><td></td></tr>
+<tr><td>Hydropower</td><td>1–2</td><td>HP-1 · HP-2</td><td>1/2</td><td>Machines out; penstock hydraulics (H22–H26) carries the topic</td></tr>
+<tr><td>Natural channels &amp; sediment</td><td>3–4</td><td>NC-1 · NC-2 · NC-3</td><td>3/3</td><td><b>Reduced 4 → 3</b>: sediment motion itself is not simulable; the entraining stress is</td></tr>
+<tr><td>Quasi-steady flow</td><td>2</td><td>QS-1 · QS-2</td><td>2/2</td><td></td></tr>
+<tr><td>Unsteady flow</td><td>2–3</td><td>UN-1 · UN-2 · UN-3</td><td>3/3</td><td>The strongest topic in the tool</td></tr>
+<tr><td>Wave theory</td><td>2–3</td><td>WV-1 · WV-2 · WV-3</td><td>3/3</td><td></td></tr>
+<tr><td>Momentum</td><td>1.5</td><td>MO-1 · MO-2</td><td>1/2</td><td></td></tr>
+<tr><td>Friction</td><td>1</td><td>FR-1</td><td>1/1</td><td></td></tr>
+<tr><td>Local losses</td><td>1.5</td><td>LL-1 · LL-2</td><td>2/2</td><td></td></tr>
+<tr><td>Pumps</td><td>1.5</td><td>PU-1</td><td>1/1</td><td><b>Reduced 1.5 → 1</b>: pump machines out; system-side only</td></tr>
+<tr><td>Weirs</td><td>1</td><td>WE-1</td><td>1/1</td><td>V-notch (Q11, #109) unavailable — 3D</td></tr>
+<tr><td>Uniform flow</td><td>1</td><td>UF-1</td><td>1/1</td><td></td></tr>
+<tr><td>Froude &amp; broad-crested weir</td><td>1.5</td><td>FB-1 · FB-2</td><td>2/2</td><td></td></tr>
+<tr><td>Hydraulic jump</td><td>1</td><td>HJ-1</td><td>1/1</td><td></td></tr>
+<tr><td>Gradually varied flow</td><td>1.5</td><td>GV-1 · GV-2</td><td>1/2</td><td></td></tr>
+<tr><td>CSOs</td><td>1</td><td>CS-1</td><td>1/1</td><td></td></tr>
+<tr><td><b>Total</b></td><td><b>~24.5–31.5</b></td><td><b>30</b></td><td><b>26</b></td><td>+ 10 backups (7 of them submit-capable)</td></tr>
+</table></div>
+</div>
+
+<div class="callout">
+<h2>Three standard rigs (built once, reused)</h2>
+<p>Drawn geometry cannot yet be saved, so the reused rigs are recipes. Build each once in front of the class (60–90 s of drawing) or have students build from the card — the drawing is itself part of the engagement.</p>
+<div class="rig"><b>RIG-A · THE DUCT</b> — Sandbox. A horizontal pressurised pipe: invert slab from x = 1.5 to 9 with top face at y = 2.0; soffit slab from x = 1.5 to 9 leaving a 0.40 m bore; reservoir wall above the pipe mouth at x = 1.5. Reservoir ON, head-driven, level per exercise. Used by FR-1, LL-1, LL-2, PU-1, B7, B10.</div>
+<div class="rig"><b>RIG-B · THE CHANNEL</b> — Sandbox. A flat bed slab (top face y = 0.5) across the domain, reservoir feeding q on the left, tailwater or a drawn control on the right. Used by WE-1, FB-1, MO-1, and any weir/gate variant.</div>
+<div class="rig"><b>RIG-C · TWIN TANKS</b> — Sandbox. Two open tanks with solid floors joined by a short pipe at the base; widths per exercise. Used by QS-2, DA-2, B9 (three tanks).</div>
+</div>
+
+<!-- ==================================================== TOPICS -->
+
+<section class="part">
+<p class="eyebrow">Dimensional analysis <span class="hours">· 2–3 h · 3 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">DA-1</span><h3>The scale ladder</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">D1, D13, D22–D23, D15</span> · Froude scaling and the π-collapse</dd>
+<dt>Rig</dt><dd>RIG-B with a broad-crested weir block; class split into thirds building it at λ = 1, ½, ¼ (all lengths scaled, q scaled by λ<sup>1.5</sup> from a personalised base q).</dd>
+<dt>Submit</dt><dd>(λ, q, H over crest) — three numbers.</dd>
+<dt>Payoff</dt><dd>Raw plot: three separate q–H curves. Replotted as C<sub>d</sub> = q/(√g·H<sup>1.5</sup>) against H/P: one curve. The collapse <em>is</em> Buckingham. Keep the 2D caveat on a slide: per-metre q scales λ<sup>1.5</sup>, and the λ missing from the 3D λ<sup>2.5</sup> is exactly the width the slice doesn't have (D23).</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">DA-2</span><h3>Time scales as √λ</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">D2, D23</span> (λ<sub>t</sub> = √λ) · <span class="refs">Q3</span> supplies the stopwatch</dd>
+<dt>Rig</dt><dd>RIG-C, one tank with a base orifice, built at the student's assigned λ (tank width, head and orifice gap all scaled).</dd>
+<dt>Submit</dt><dd>Time for the level to fall between two marked scaled depths (gauge trace).</dd>
+<dt>Payoff</dt><dd>Pooled t vs λ on log axes: slope ½. The λ = ¼ builds drain in half the time of λ = 1 — kinematic similarity measured with a stopwatch.</dd>
+</dl>
+</div>
+
+<div class="demo explore">
+<div class="demo-head"><span class="id">DA-3</span><h3>Scale effects, live</h3><span class="chip c-explore">EXPLORATORY</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">D3–D5, D14</span> · why Re and We cannot follow Froude</dd>
+<dt>Run</dt><dd>Re-examine DA-1's pooled plot: the λ = ¼ points droop at low H (relatively thicker interface, stronger damping — the "viscous" scale effect). Then the numerical twin: reload your rig at Low vs Ultra Resolution and watch C<sub>d</sub> shift — grid resolution behaves exactly like model scale, which is the honest version of "small models lie".</dd>
+<dt>Submit</dt><dd>Nothing — discussion. (Optionally: your C<sub>d</sub> at both resolutions.)</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Hydropower <span class="hours">· 1–2 h · 2 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">HP-1</span><h3>Maximum power transmission: h<sub>f</sub> = H/3</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">H2, H22–H26</span> · <span class="eqi">P = ρgQ(H − kQ²)</span>, peak where a third of the head is friction</dd>
+<dt>Rig</dt><dd><code>?scene=hammer</code> (49 m penstock under ~21 m head) with C<sub>f</sub> raised to a prescribed value so friction matters; each student redraws the nozzle plate to their assigned gap (0.1–1.2 m).</dd>
+<dt>Submit</dt><dd>(gap, q, jet velocity from the probe).</dd>
+<dt>Payoff</dt><dd>Instructor computes P = ½ρqv² and h<sub>f</sub> = H − v²/2g per point; the pooled P–Q curve rises, peaks, falls — and at the peak, h<sub>f</sub>/H reads ≈ ⅓ (H24). Dry-run to choose the C<sub>f</sub> that puts the optimum mid-range of the gap assignments.</dd>
+</dl>
+</div>
+
+<div class="demo explore">
+<div class="demo-head"><span class="id">HP-2</span><h3>The Pelton principle without the wheel</h3><span class="chip c-explore">EXPLORATORY</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">H9–H14, #7</span> · F = ρQΔv on a vane; <span class="refs">H11</span> jet velocity C<sub>v</sub>√(2gH)</dd>
+<dt>Run</dt><dd>Spout jet onto a drawn flat plate, then a deep V-splitter approximating θ → 165°. Probe the stagnation head (≈ v²/2g), watch the momentum-flux display mode, compute F = ρqv vs ρqv(1 − cos θ) on the board. Velocity triangles and u/v₁ = ½ stay on slides — the sim supplies the physical intuition for ρQΔv<sub>w</sub>, which is the part students don't believe from chalk.</dd>
+<dt>Submit</dt><dd>Nothing — the wheel itself is out of the tool's reach (no rotating bodies).</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Natural channels &amp; sediment transport <span class="hours">· 3–4 h · 3 demos (reduced: no sediment motion)</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">NC-1</span><h3>Slope-area method: estimate the mystery discharge</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">N7, N9–N10</span> · conveyance, fall over a reach, velocity-head correction · <span class="refs">N2, #117</span></dd>
+<dt>Rig</dt><dd><code>?scene=m1</code> with the panel hidden or q unannounced (instructor sets a personalised q per student beforehand, or one shared mystery value).</dd>
+<dt>Run</dt><dd>Two gauges give surface levels 8 m apart (piezometric head = surface); cursor gives depth and the delivered n. Compute K = h<sup>5/3</sup>/n per metre, Q̂ = K√(F/L), then one velocity-head iteration (N10).</dd>
+<dt>Submit</dt><dd>Q̂ — then the panel is revealed. The gauge-vs-flowmeter tension every river gauger lives with.</dd>
+<dt>Expect</dt><dd>Within ±20% — and the discussion of <em>why</em> it misses (backwater means S<sub>f</sub> ≠ S₀ on an M1) is the actual lecture.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">NC-2</span><h3>Is α really 1?</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">N6, #44–46, #49–50</span> · energy and momentum coefficients</dd>
+<dt>Rig</dt><dd>Any flowing channel scene; each student a personalised station x (and optionally free-slip toggled for contrast).</dd>
+<dt>Run</dt><dd>Rake at your station. The chip prints u<sub>max</sub>, depth-average V and their ratio; read 4–5 profile points off the drawn curve (or <code>APP.SIM.rake</code>) and integrate α = Σu³Δy / (V³h) by mid-ordinate.</dd>
+<dt>Submit</dt><dd>Your α (or, minimal version, the printed u<sub>max</sub>/V ratio).</dd>
+<dt>Expect</dt><dd>α ≈ 1.05–1.2 in uniform reaches, spiking downstream of gates — the histogram is the day "assume α = 1" becomes a judged approximation (N6's compound-channel &gt;2 case stays on slides: no lateral dimension).</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">NC-3</span><h3>Bed shear and the riprap size</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">N11–N13</span> · τ₀ = ρgRS, Shields 0.056, D<sub>min</sub> · <span class="refs">#113</span></dd>
+<dt>Rig</dt><dd><code>?scene=m2</code> (or s2 for a violent contrast), personalised q.</dd>
+<dt>Run</dt><dd>Cursor prints h and S<sub>f</sub>: τ₀ = ρg·h·S<sub>f</sub> is a <em>measurement</em>. Then N13 on paper: D<sub>min</sub> = τ₀/[0.056(ρ<sub>s</sub> − ρ)g] with ρ<sub>s</sub> = 2650.</dd>
+<dt>Submit</dt><dd>(τ₀, D<sub>min</sub>). Worked anchor: m2's defaults give τ₀ ≈ 50 N/m² → D<sub>min</sub> ≈ 55 mm — coarse gravel.</dd>
+<dt>Expect</dt><dd>Pooled D<sub>min</sub> vs q on the steep scene spans sand → boulders. Honest framing on the worksheet: the stress side is simulated, the grains are not — this is the design calculation done on measured hydraulics.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Quasi-steady flow <span class="hours">· 2 h · 2 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">QS-1</span><h3>Predict the drain, then run it</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">Q1–Q3, #102</span> · falling head through an orifice</dd>
+<dt>Rig</dt><dd><code>?scene=jet</code>; after spin-up, switch the spout OFF.</dd>
+<dt>Run</dt><dd>Before touching anything: compute the time for the surface to fall between two prescribed levels using Q3 and the C<sub>d</sub> from the scene's measured C<sub>v</sub> ≈ 0.97 (C<sub>c</sub> from the vena contracta discussion). Commit the prediction. Then drain and time it on the gauge trace (slow the speed slider for readability).</dd>
+<dt>Submit</dt><dd>Two numbers: predicted t and measured t. Scoring engagement on the pair rewards doing the calculation, not nailing it.</dd>
+<dt>Expect</dt><dd>The √h linearisation (√h vs t straight) is the homework follow-up.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">QS-2</span><h3>Two reservoirs finding a level</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">Q6–Q8</span> · coupled tanks, the A₁A₂/(A₁+A₂) grouping · dry dock <span class="refs">Q13–Q14</span> is the same rig narrated differently</dd>
+<dt>Rig</dt><dd>RIG-C; tank 1 width fixed at 2 m, tank 2 width personalised (0.5–3 m), initial level difference 1.5 m.</dd>
+<dt>Run</dt><dd>Gauge each tank; release (erase the plug or open the drawn valve with <span class="kbd">V</span>); time the level difference halving.</dd>
+<dt>Submit</dt><dd>(width A₂, t<sub>½</sub>).</dd>
+<dt>Payoff</dt><dd>Pooled t<sub>½</sub> against A₁A₂/(A₁+A₂): a straight line — the equivalent-area group emerges from the class data before it is derived (Q8).</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Unsteady flow <span class="hours">· 2–3 h · 3 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">UN-1</span><h3>The class discovers the celerity</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">U11, U17–U18, U21, #53</span> · Joukowsky Δp = ρcΔu</dd>
+<dt>Rig</dt><dd><code>?scene=hammer</code> (validated: peak −5% of Joukowsky, period 3.0 s vs 4L/c = 2.8 s). Each student redraws the nozzle plate to a personalised gap → their own steady v₀.</dd>
+<dt>Run</dt><dd>Probe the pipe velocity, drop a gauge mid-pipe, slam <span class="kbd">V</span>, read the head jump off the square-wave trace.</dd>
+<dt>Submit</dt><dd>(v₀, ΔH).</dd>
+<dt>Payoff</dt><dd>Pooled ΔH vs Δv through the origin; slope × g = c ≈ 70 m/s. The class has measured the celerity of this water. <em>Then</em> reveal that c is a slider — the one experiment no physical lab can offer — and let them re-run at c = 140 to watch their own point double.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">UN-2</span><h3>Flow establishment: the asymptotic start</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">U1–U7</span> · inertia head; <span class="eqi">u_max = √(2gH/k)</span>; <span class="eqi">t = (l·u_max/2gH)·ln[(u_max+u)/(u_max−u)]</span></dd>
+<dt>Rig</dt><dd>Hammer scene, valve CLOSED, water reset (<span class="kbd">R</span>), gauges set to plot speed, speed slider ~×0.05.</dd>
+<dt>Run</dt><dd>Open the valve; the speed trace rises asymptotically. Read u<sub>max</sub> and the time to reach 90% of it.</dd>
+<dt>Submit</dt><dd>(u<sub>max</sub>, t<sub>90</sub>). Check: U6 gives t<sub>90</sub> = 2.94·(l·u<sub>max</sub>/2gH) ≈ 1 s at the defaults — hence the slow motion.</dd>
+<dt>Payoff</dt><dd>Personalised variant: each student a different reservoir level → pooled t<sub>90</sub> against l·u<sub>max</sub>/2gH is a line of slope ln 19. The time "constant" the derivation promises, measured.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">UN-3</span><h3>Surge tank: measure y<sub>max</sub> against the ODE</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">U23–U29</span> · the module's surge-tank ODE and trial-solved upsurge</dd>
+<dt>Rig</dt><dd>Hammer scene + one drawn open standpipe (width per student, 0.5–2 m) teed into the pipe just upstream of the valve, tall enough to contain the surge.</dd>
+<dt>Run</dt><dd>Establish flow, slam <span class="kbd">V</span>, gauge the standpipe: the mass oscillation is the whole trace — upsurge, downsurge, friction decay.</dd>
+<dt>Submit</dt><dd>(standpipe width b<sub>s</sub>, measured y<sub>max</sub>, measured period).</dd>
+<dt>Expect</dt><dd>Period near 2π√(l·b<sub>s</sub>/(g·b<sub>p</sub>)) — b<sub>s</sub> = 1 m on the 3 m bore gives ≈ 8 s. y<sub>max</sub> sits below the frictionless bound v₀√(l·b<sub>p</sub>/(g·b<sub>s</sub>)); the gap IS the ku² term, and integrating U28/U29 to explain it quantitatively is the follow-up problem sheet.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Wave theory <span class="hours">· 2–3 h · 3 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">WV-1</span><h3>Dispersion, one period each</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">W1–W2, W8–W11</span> · σ² = gk·tanh kh; L₀ = 1.56T²; c = √(gh)</dd>
+<dt>Rig</dt><dd><code>?scene=wavedeep</code>, personalised period 0.6–1.6 s. Second cohort on <code>?scene=waveshallow</code> at 3–6 s.</dd>
+<dt>Run</dt><dd>Let the train establish, pause (<span class="kbd">space</span>), measure L crest-to-crest against the scale bar over several wavelengths.</dd>
+<dt>Submit</dt><dd>(T, L, which flume).</dd>
+<dt>Payoff</dt><dd>Deep points land on L = 1.56T² (W10); shallow points on L = T√(gh) (W11); the intermediate stragglers need the full tanh — one plot, the whole dispersion relation, class-built.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">WV-2</span><h3>The buried wave gauge</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">W5, W7</span> kernel · pressure attenuation cosh k(h+z)/cosh kh</dd>
+<dt>Rig</dt><dd><code>?scene=wave</code> (kh ≈ 0.7); half the class repeats in <code>?scene=wavedeep</code> (kh ≈ 3.7).</dd>
+<dt>Run</dt><dd>Two gauges on one vertical: near-surface and at the bed. Read the peak-to-peak head oscillation of each trace.</dd>
+<dt>Submit</dt><dd>Amplitude ratio bed/surface.</dd>
+<dt>Expect</dt><dd>≈ 1/cosh(kh): 0.8 in the intermediate flume, ≈ 0.05 in the deep one — the deep bed gauge is blind. This is precisely why seabed pressure recorders have a depth/period limit, and the class has just measured the limit.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">WV-3</span><h3>Reflection coefficient of a steep "sea wall"</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">W21</span> · K<sub>refl</sub> = H<sub>r</sub>/H<sub>i</sub>; sea walls 0.7–1.0, beaches 0.05–0.2</dd>
+<dt>Rig</dt><dd><code>?scene=wavesurge</code> — the 1:1.4 beach reflects strongly and builds a partial standing wave.</dd>
+<dt>Run</dt><dd>Slide a gauge along the flume to find the largest (antinode) and smallest (node) depth oscillation amplitudes a<sub>max</sub>, a<sub>min</sub>.</dd>
+<dt>Submit</dt><dd>K<sub>refl</sub> = (a<sub>max</sub> − a<sub>min</sub>)/(a<sub>max</sub> + a<sub>min</sub>).</dd>
+<dt>Expect</dt><dd>High (0.6–0.9) — a sea wall. Contrast run on the 1:10 spilling beach gives a low value: the class has measured why revetments are built gentle and dissipative when reflection is the enemy.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Momentum <span class="hours">· 1.5 h · 2 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">MO-1</span><h3>Sluice gate: thrust and C<sub>d</sub> from the control volume</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#144–146</span> · F<sub>R</sub> = ρQ(V₁−V₂) + ½ρg(y₁²−y₂²); Q = C<sub>d</sub>ab√(2gy₀) · <span class="refs">#7–12</span></dd>
+<dt>Rig</dt><dd>RIG-B with a drawn vertical gate, opening a personalised.</dd>
+<dt>Run</dt><dd>Measure y₀ upstream, y₁ downstream (hover), q (panel). Compute both the discharge coefficient and the CV thrust per metre.</dd>
+<dt>Submit</dt><dd>(C<sub>d</sub>, F<sub>R</sub>).</dd>
+<dt>Payoff</dt><dd>C<sub>d</sub> clusters near 0.6 across every opening — a constant nobody put in. The thrust curve vs opening sets up the "why not hydrostatics?" trap: compare with ½ρg(y₀−a)² and let the mismatch teach the momentum equation's job.</dd>
+</dl>
+</div>
+
+<div class="demo explore">
+<div class="demo-head"><span class="id">MO-2</span><h3>Jet on a plate, jet on a vane</h3><span class="chip c-explore">EXPLORATORY</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#7–9, H9–H10</span> · F = ρQV(1 − cos θ)</dd>
+<dt>Run</dt><dd>Spout jet against a flat plate: probe the stagnation point (head ≈ v²/2g), switch to the momentum-flux display, then redraw the plate as 45°, 90°, deep-V deflectors and watch the turning of the flux field. The force is computed, not read — which is the honest shape of every momentum exam question.</dd>
+<dt>Submit</dt><dd>Nothing (or optionally the stagnation head vs v²/2g ratio).</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Friction <span class="hours">· 1 h · 1 demo</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">FR-1</span><h3>The friction law without the Moody chart</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#18–19, #25, #40, D17–D18</span> · h<sub>f</sub> = λ(L/D)V²/2g; S<sub>f</sub> from the HGL</dd>
+<dt>Rig</dt><dd>RIG-A, head-driven reservoir, level personalised (spread ~1.5 m across the class). Two gauges 6 m apart on the bore.</dd>
+<dt>Run</dt><dd>Steady flow; read V (probe mid-bore) and the head drop between gauges.</dd>
+<dt>Submit</dt><dd>(V, h<sub>f</sub> over the 6 m).</dd>
+<dt>Payoff</dt><dd>Pooled log h<sub>f</sub> vs log V: slope 2.0 ± . The intercept is <em>this pipe's</em> λ — deliberately not Colebrook's, because the delivered resistance is the grid's (that honesty is the second half of the hour: why real networks are calibrated, D18 as the chart's origin story).</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Local losses <span class="hours">· 1.5 h · 2 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">LL-1</span><h3>Borda–Carnot at a sudden expansion</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#27–31</span> · h<sub>L</sub> = (V₁−V₂)²/2g; k<sub>L</sub> = (1 − A₁/A₂)²</dd>
+<dt>Rig</dt><dd>RIG-A with the bore stepping 0.4 → 1.0 m at mid-length; gauges just up- and downstream of the step; personalised driving head.</dd>
+<dt>Run</dt><dd>Measure V₁ (probe), the pressure recovery between the gauges, and compare the ideal recovery (V₁²−V₂²)/2g against the measured one.</dd>
+<dt>Submit</dt><dd>(measured h<sub>L</sub>, (V₁−V₂)²/2g). The vorticity display shows where the loss lives — the trapped eddy in the corner.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">LL-2</span><h3>Find the throttle</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#34, #38–41</span> · h<sub>L</sub> = k<sub>L</sub>V²/2g read off an HGL kink</dd>
+<dt>Rig</dt><dd>RIG-A in pairs: partner A draws a partial obstruction somewhere along the covered bore (zoomed out, it is invisible); partner B gets four gauges.</dd>
+<dt>Run</dt><dd>B walks the gauges along the pipe, draws the HGL, locates the step, sizes k<sub>L</sub> from ΔH/(V²/2g).</dd>
+<dt>Submit</dt><dd>(x-position of the fault, k<sub>L</sub>) — every pair's answer is unique, which makes this the most copy-proof submission in the programme. It is also, exactly, how a half-shut valve is found in a real main.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Pumps <span class="hours">· 1.5 h · 1 demo (machines out of reach)</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">PU-1</span><h3>System curve measured, operating point kept honest</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#67–69</span> · H<sub>system</sub> = H<sub>s</sub> + KQ²; operating point H<sub>pump</sub>(Q) = H<sub>system</sub>(Q)</dd>
+<dt>Rig</dt><dd>RIG-A rearranged as a rising main: sump low left, delivery tank 1.5 m higher; the spout is the pump, its velocity (→ Q) personalised; gauge at the "pump flange".</dd>
+<dt>Run</dt><dd>Steady state; read delivery head.</dd>
+<dt>Submit</dt><dd>(Q, H).</dd>
+<dt>Payoff</dt><dd>Pooled points fit H<sub>s</sub> + KQ² — the class measured a system curve. Hand out a manufacturer-style pump curve on paper; everyone finds the intersection graphically; one nominated student then imposes that exact Q live and the flange gauge lands on the predicted head in front of the room. NPSH and affinity stay on slides (<span class="refs">#70–78</span>): no sub-atmospheric suction exists in the tool, and saying so crisply is worth two minutes.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Weirs <span class="hours">· 1 h · 1 demo</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">WE-1</span><h3>Rating a sharp-crested weir, one point each</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#103–108</span> · Q = C<sub>d</sub>·⅔·√(2g)·b·H<sup>3/2</sup>; Rehbock for comparison</dd>
+<dt>Rig</dt><dd>RIG-B with a thin drawn plate (crest well above the bed), personalised q.</dd>
+<dt>Run</dt><dd>Steady; gauge the upstream level, subtract crest elevation → H.</dd>
+<dt>Submit</dt><dd>(q, H).</dd>
+<dt>Payoff</dt><dd>Pooled log-log slope 1.5; intercept → C<sub>d</sub>, checked against Rehbock 0.602 + 0.083·H/P (#108). Note for the sheet: the V-notch derivation (#109, Q11) stays a paper exercise — a notch is 3D — and the nappe here is always ventilated (passive air), which is why no clinging-nappe hysteresis appears.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Uniform flow <span class="hours">· 1 h · 1 demo</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">UF-1</span><h3>Normal depth scales as q<sup>3/5</sup></h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#115–118, N2</span> · y<sub>n</sub> = (qn/√S₀)<sup>3/5</sup></dd>
+<dt>Rig</dt><dd><code>?scene=s2</code> (settles in ~22 s; the S2 profile approaches y<sub>n</sub> from above), personalised q 0.8–1.6.</dd>
+<dt>Run</dt><dd>After settling, read the measured y<sub>n</sub> at the cursor (the overlay's green line — remember it is measured off the energy line, not assumed).</dd>
+<dt>Submit</dt><dd>(q, y<sub>n</sub>).</dd>
+<dt>Payoff</dt><dd>Pooled log y<sub>n</sub> vs log q: slope 3/5 — Manning's exponent, extracted by the class from a channel whose n nobody typed in. Back-calculating that n (#117) from any single point is the natural second submission.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Froude &amp; broad-crested weir <span class="hours">· 1.5 h · 2 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">FB-1</span><h3>The hump that chokes</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#125–129, #131–132</span> · E<sub>s1</sub> = E<sub>s2</sub> + Δz; choking when Δz &gt; E₁ − E<sub>c</sub></dd>
+<dt>Rig</dt><dd>RIG-B flowing subcritical (tailwater set), personalised q. Students draw a low bed hump and raise it in increments (undo <span class="kbd">Z</span>, redraw taller).</dd>
+<dt>Run</dt><dd>Watch the surface dip over the hump grow until, at some height, the upstream level jumps and the crest goes critical — the Froude display snapping to the white break on the crest is the moment.</dd>
+<dt>Submit</dt><dd>Your choking height Δz<sub>c</sub>, alongside the predicted E₁ − 1.5y<sub>c</sub>.</dd>
+<dt>Payoff</dt><dd>The single most instructive specific-energy exercise there is, and it cannot be done in a real flume in ten minutes.</dd>
+</dl>
+</div>
+
+<div class="demo">
+<div class="demo-head"><span class="id">FB-2</span><h3>Critical depth three ways</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#128–129, #131–134</span> and the list's own y<sub>brink</sub> ≈ 0.7y<sub>c</sub> note · broad-crested Q = 1.705·C<sub>d</sub>·b·h<sup>3/2</sup></dd>
+<dt>Rig</dt><dd><code>?scene=m2</code> (brink) and a broad-crested block from FB-1's rig; personalised q.</dd>
+<dt>Run</dt><dd>(1) y<sub>c</sub> = (q²/g)<sup>⅓</sup> from the panel's printed value; (2) depth ON the broad crest (should ride y<sub>c</sub>); (3) depth at the brink lip (should read ≈ 0.7y<sub>c</sub>, with critical sitting 3–4 y<sub>c</sub> upstream).</dd>
+<dt>Submit</dt><dd>Three depths. Reconciling why (3) is low — curvature at the lip breaks the hydrostatic assumption — is the discussion that separates a formula from an understanding.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Hydraulic jump <span class="hours">· 1 h · 1 demo</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">HJ-1</span><h3>Bélanger from a room full of flumes</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#137–143</span> · conjugate depths and ΔE = (y₂−y₁)³/4y₁y₂</dd>
+<dt>Rig</dt><dd><code>?scene=h23</code> (validated: measured y₂ within −5% of Bélanger at the shipped q), personalised q 0.3–0.7 <em>with the tailwater rule applied</em>: set tail ≥ 1.3·(q²/g)<sup>⅓</sup> — the worksheet carries a small q → tailwater table.</dd>
+<dt>Run</dt><dd>The jump box prints Fr₁, y₁, y₂, the momentum prediction and ΔE, live.</dd>
+<dt>Submit</dt><dd>(Fr₁, y₂/y₁).</dd>
+<dt>Payoff</dt><dd>The class's points trace the Bélanger curve. Optional coda for the last ten minutes: three volunteers rerun on <code>?scene=s1</code> and their points fall visibly <em>below</em> the curve — the horizontal-bed assumption failing on a 1-in-4 slope, discovered rather than announced.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">Gradually varied flow <span class="hours">· 1.5 h · 2 demos</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">GV-1</span><h3>The class digitises the backwater curve</h3><span class="chip c-submit">SUBMIT</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#150–151, #159</span> · dy/dx = (S₀−S<sub>f</sub>)/(1−Fr²); direct step; S<sub>f</sub> = n²V²/R<sup>4/3</sup></dd>
+<dt>Rig</dt><dd><code>?scene=m1</code> (M1 behind the weir; settles ~30 s). Each student is assigned one station x = 1, 2, … 13 m.</dd>
+<dt>Run</dt><dd>Hover at your station; read the surface elevation (and, once, the delivered n printed at the cursor).</dd>
+<dt>Submit</dt><dd>(x, surface elevation).</dd>
+<dt>Payoff</dt><dd>The submissions <em>are</em> the measured profile — the class is the plotter. Overlay the direct-step curve computed upstream from the weir with the measured n: agreement to a few cm except within ~0.5 m of the weir face, where the 1D hydrostatic assumption honestly fails. A validation study, compressed into one lecture.</dd>
+</dl>
+</div>
+
+<div class="demo explore">
+<div class="demo-head"><span class="id">GV-2</span><h3>Profile safari</h3><span class="chip c-explore">EXPLORATORY</span></div>
+<dl>
+<dt>Refs</dt><dd><span class="refs">#150</span> sign analysis · the M/S/C/H/A × 1/2/3 taxonomy</dd>
+<dt>Run</dt><dd>Sandbox, labels ON, score card in hand: produce and screenshot as many distinct correctly-labelled profile classes as possible in 20 minutes (A2 and anything C are the rare spawns; the overlay chips are the evidence). Forces exactly the exam's classification reasoning, disguised as a game. Screenshot upload doubles as the engagement record if wanted.</dd>
+</dl>
+</div>
+</section>
+
+<section class="part">
+<p class="eyebrow">CSOs <span class="hours">· 1 h · 1 demo</span></p>
+
+<div class="demo">
+<div class="demo-head"><span class="id">CS-1</span><h3>Setting the overflow: when does your chamber spill?</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<dl>
+<dt>Refs</dt><dd>Orifice + weir laws in tandem (<span class="refs">#102, #107</span>) — the CSO chamber is both at once</dd>
+<dt>Rig</dt><dd>Sandbox long-section from a recipe card: inflow left; chamber; low-level throttle gap (personalised, 0.05–0.20 m) discharging to the draining floor ("to treatment"); high crest at a fixed level spilling toward the right edge ("to the river").</dd>
+<dt>Run</dt><dd>Ramp the inflow q slowly upward; watch the chamber-level gauge; log the q at which the crest first spills.</dd>
+<dt>Submit</dt><dd>(throttle gap, q<sub>spill</sub>).</dd>
+<dt>Payoff</dt><dd>The pooled curve q<sub>spill</sub> vs gap is the orifice law — the class has built the design chart for setting a CSO at n × DWF. Last five minutes: pre-charge the pipe with dye (right-drag pour = the overnight foul load) and rerun the storm — the first water over the weir is the dirty water. First flush, visible.</dd>
+</dl>
+</div>
+</section>
+
+<!-- ==================================================== BACKUPS -->
+<section class="part">
+<p class="eyebrow">The backup ten</p>
+<p class="subtitle">Slot in where an hour runs long, a demo misfires, or a cohort wants more. Seven produce submittable numbers.</p>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B1</span><h3>T = 4L/c with your own valve</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">U17–U18</span></dd><dt>Run</dt><dd>Hammer scene; each student draws their valve at a different x, slams it, reads the square-wave period. Pooled (L, T): slope 4/c. Pairs with UN-1 in a long unsteady block.</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B2</span><h3>The flexible pipe, via the c slider</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">U14–U16</span></dd><dt>Run</dt><dd>One closure at c = 140, one at c = 70, same v₀; submit the two ΔH. Ratio = c ratio: the "thin-walled steel vs plastic main" design lesson as an experiment.</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B3</span><h3>Dam break: the moving jump</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">#120–123, #147–149</span></dd><dt>Run</dt><dd><code>?scene=dambreak</code>; time the negative wave (vs √(gh₀)) and the bore front between two stations by pausing. The surge equations' moving frame, watched from the lab frame.</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B4</span><h3>Orbital decay, measured off the trails</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">W5–W7</span></dd><dt>Run</dt><dd>Deep flume tracers: read horizontal and vertical trail extents at surface, mid-depth, bed (validated: vertical motion dies 244×; near-bed horizontal 0.37 of surface vs 0.44 theoretical). Submit your surface/bed vertical ratio.</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B5</span><h3>Iribarren map jigsaw</h3><span class="chip c-backup">BACKUP</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">W19–W20</span></dd><dt>Run</dt><dd>Each pair one (stroke, period, beach) cell across both beach scenes; report breaker behaviour. Assembled on a ξ axis the class reproduces the spilling/surging banding — with an honest gap where plunging should be (the overturning tongue is thinner than the interface can hold).</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B6</span><h3>Ursell number: when Airy stops being enough</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">W26</span></dd><dt>Run</dt><dd>Shallow flume: measure H, L, h → submit U<sub>r</sub> = HL²/h³. Then look: flat troughs, peaked crests — the wave already telling you it has outgrown linear theory.</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B7</span><h3>Venturi meter rating</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">#14–16</span></dd><dt>Run</dt><dd><code>?scene=venturi</code> (throat verified at −4% of ideal); gauges on barrel and throat; personalised reservoir level; submit (q, Δh). Pooled: q vs √Δh straight; intercept argues C<sub>d</sub> &lt; 1.</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B8</span><h3>Three orifices, three coefficients</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">#17, #33, #101–102, Q2</span></dd><dt>Run</dt><dd>Jet tank: sharp edge, bellmouth, Borda re-entrant (the scene's own tip). Submit your measured C<sub>c</sub>; clusters near 0.61 / ~1.0 / 0.5, the last provable in ten lines of momentum.</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B9</span><h3>Three reservoirs, one junction</h3><span class="chip c-backup">BACKUP</span><span class="chip c-submit">SUBMIT</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">#81–83</span></dd><dt>Run</dt><dd>RIG-C extended to three tanks piped to a junction; personalised middle-tank level; submit the junction head and flow directions. The pooled Q<sub>B</sub>–z<sub>B</sub> plot crosses zero at the classic supplier→customer flip. (Networks aren't on this year's hour list — file under enrichment.)</dd></dl></div>
+
+<div class="demo backup"><div class="demo-head"><span class="id">B10</span><h3>Lift the crest until the pipe gives up</h3><span class="chip c-backup">BACKUP</span></div>
+<dl><dt>Refs</dt><dd><span class="refs">#42–43</span></dd><dt>Run</dt><dd>RIG-A with a raised mid-length crest, redrawn higher in steps: flow separates when the crest meets the HGL — the sim's floor is 0 gauge, so the criterion appears in its purest geometric form, and the "real water buys you another 10 m of atmosphere, down to vapour pressure" correction becomes memorable rather than a footnote.</dd></dl></div>
+</section>
+
+<p class="foot">Companion to the feasibility sheet (same conversation), which carries the full per-topic equation coverage, the five hard limits, and the equation-list cross-check. Refs: <span class="refs">H/U/Q/D/N/W</span> = <code>hydraulics-equation-index.md</code> (4A15) · <span class="refs">#n</span> = <code>equations-reference.md</code> (3A11). Verified anchors quoted from the project's own headless measurements (hammer −5%, h23 conjugate −5%, orbital decay 244×, venturi −4%, C<sub>v</sub> 0.97). Demos flagged DRY-RUN are sandbox builds or untested parameter ranges — run each once before its lecture; everything else rides on shipped, validated scenes.</p>
+
+</div>
+
+</body>
+</html>

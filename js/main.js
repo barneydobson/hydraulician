@@ -3,10 +3,16 @@
  * main.js — boot, UI, pointer tools and the frame loop.
  */
 const CONFIG = {
-  budgets: { Low: 45000, Medium: 95000, High: 175000 },
+  // Roughly ×2 a step. The top two are deliberately past the point where the
+  // sim keeps up with real time — Δx is what buys you sharp jets, thin nappes
+  // and waves that survive their own interface, and that is worth the wait.
+  // Note the spin-up countdowns run flat out, so at Ultra a 90 s spin-up
+  // (m2, c13) is a genuinely long wait before the scene settles.
+  budgets: { Low: 45000, Medium: 95000, High: 175000, "Very high": 350000, Ultra: 700000 },
   defaultBudget: "Medium",
   frameBudgetMs: 15,          // sim time we are willing to spend per frame
   histMax: 900,
+  tracerPath: 260,            // points of orbit history kept per tracer
   gaugeColours: ["#7fd4ff", "#ffb648", "#5fd08a", "#ff8fa3"],
 };
 
@@ -15,10 +21,10 @@ const state = {
   tool: "wall", brush: 0.055,
   mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
-  gauges: [], rakes: [], gaugeField: "head",
+  gauges: [], rakes: [], gaugeField: "head", tracers: null, tracerN: 9,
   cursor: [0, 0], inside: false, hover: null,
   drag: null, pour: null,
-  zoom: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false,
+  zoom: 1, vex: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false, vexDrag: null,
   flashKey: null, flashT: 0,
   fps: 60, rt: 1, simDt: 0,
   tipIdx: 0, tipAt: 0,
@@ -30,9 +36,15 @@ let canvas, over, octx, view, sim;
 /** Letterbox rect of the whole domain at zoom 1 — the zoomed view scales
  *  this rect about the pan centre, so the GPU just draws a bigger rect and
  *  the screen clips it. */
+/** `state.vex` is VERTICAL EXAGGERATION — the drawn rect is stretched
+ *  vertically by this factor. A 12 m × 1.5 m flume has an aspect of 8, so in
+ *  a normal window it letterboxes to a strip a couple of hundred pixels tall
+ *  and a 0.1 m wave is a few pixels. Every hydraulics long-section is drawn
+ *  exaggerated for exactly this reason; the scale bar and the ∇ markers stay
+ *  honest because they follow the same rect. */
 function baseRect() {
   const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
-  const ar = sim.W / sim.H;
+  const ar = sim.W / (sim.H * state.vex);
   let w = cw, h = cw / ar;
   if (h > ch) { h = ch; w = ch * ar; }
   return { cw, ch, w, h, bx: (cw - w) / 2, by: (ch - h) / 2 };
@@ -85,7 +97,7 @@ function zoomAt(px, py, factor) {
   computeView();
 }
 
-function resetZoom() { state.zoom = 1; state.panC = null; }
+function resetZoom() { state.zoom = 1; state.panC = null; state.vex = 1; }
 
 // ------------------------------------------------------------------ scenes
 function loadScene(id, keepDrawing) {
@@ -95,10 +107,20 @@ function loadScene(id, keepDrawing) {
   state.mode = sc.mode;
   state.channel = !!sc.chan;
   state.labels = sc.labels === undefined ? true : !!sc.labels;
-  state.gauges.length = 0; state.rakes.length = 0;
+  // A scene whose whole subject is the particle motion should not open with
+  // the particles switched off and a tip asking you to find the key.
+  if (sc.particles !== undefined) state.particles = !!sc.particles;
+  state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.tipIdx = 0; state.tipAt = 0;
   state.nsub = 24;
   resetZoom();
+  // A scene may open zoomed on the thing it is about. The wave flumes need
+  // it: a 12 m flume letterboxes to a strip a couple of hundred pixels tall,
+  // and a 100 mm orbit in that is about one pixel. `0` still resets.
+  if (sc.view) {
+    if (sc.view.vex) state.vex = sc.view.vex;
+    if (sc.view.zoom) { state.zoom = sc.view.zoom; state.panC = [sc.view.cx, sc.view.cy]; }
+  }
   computeView();
   syncPanel();
   showToast(sc.name, sc.blurb);
@@ -230,9 +252,34 @@ const CONTROLS = [
     get: () => sim.p.wave.x, set: (v) => sim.p.wave.x = v,
     fmt: (v) => v.toFixed(2) + " m from the left" },
 
+  { h: "Orbit tracers" },
+  { id: "tracerOn", type: "check", label: "Show orbit tracers",
+    get: () => !!state.tracers,
+    set: (v) => { if (v) seedTracers(state.tracers ? state.tracers.x : bestTracerX());
+                  else state.tracers = null; },
+    info: "A column of massless tracers that remember where they have been. The PATH is the point — a bare dot going round a 30 mm circle is invisible. Pick the <b>Tracers</b> tool (7) and click anywhere in the water to move the column; click dry ground to clear it." },
+  { id: "tracerX", label: "Column position", min: 0, max: 1, step: 0.005, rel: "W",
+    get: () => (state.tracers ? state.tracers.x : bestTracerX()),
+    set: (v) => seedTracers(v),
+    fmt: (v) => v.toFixed(2) + " m from the left" },
+  { id: "tracerN", label: "Tracers in the column", min: 3, max: 24, step: 1,
+    get: () => state.tracerN,
+    set: (v) => { state.tracerN = Math.round(v); if (state.tracers) seedTracers(state.tracers.x); },
+    fmt: (v) => Math.round(v) + " from bed to surface" },
+  { id: "tracerTrail", label: "Trail length", min: 0.5, max: 20, step: 0.1,
+    get: () => (state.tracers ? state.tracers.trail : 3),
+    set: (v) => { if (state.tracers) state.tracers.trail = v; },
+    fmt: (v) => v.toFixed(1) + " s of history",
+    info: "How much history each tracer keeps. About two or three wave periods shows the loops clearly; much longer and the mean drift smears them into streaks." },
+
   { h: "View" },
+  { id: "vex", label: "Vertical exaggeration", min: 1, max: 12, step: 0.1,
+    get: () => state.vex, set: (v) => { state.vex = v; computeView(); },
+    fmt: (v) => (v < 1.05 ? "true scale (1 : 1)" : "× " + v.toFixed(1) + " vertical"),
+    info: "Stretches the view vertically. A 12 m × 1.5 m flume is a thin strip at true scale, so a 0.1 m wave is a few pixels — every long-section in hydraulics is drawn exaggerated for the same reason. You can also drag the empty band above or below the domain." },
   { id: "mode", type: "select", label: "Field",
-    opts: [["0", "Water"], ["1", "Pressure head"], ["2", "Speed"], ["3", "Froude number"], ["4", "Vorticity"]],
+    opts: [["0", "Water"], ["1", "Pressure head"], ["2", "Speed"], ["3", "Froude number"],
+           ["4", "Vorticity"], ["5", "Momentum flux"]],
     get: () => String(state.mode), set: (v) => state.mode = +v },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
@@ -259,7 +306,8 @@ const CONTROLS = [
     opts: [["head", "Piezometric head"], ["depth", "Depth"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "budget", type: "select", label: "Resolution",
-    opts: [["Low", "Low"], ["Medium", "Medium"], ["High", "High"]],
+    opts: [["Low", "Low"], ["Medium", "Medium"], ["High", "High"],
+           ["Very high", "Very high"], ["Ultra", "Ultra"]],
     get: () => state.budget,
     set: (v) => { state.budget = v; sim = SIM.build(state.scene, CONFIG.budgets[v], true); computeView(); } },
 ];
@@ -344,6 +392,7 @@ const TOOLS = [
   ["spout", "Spout", "Click or drag to move the falling inflow"],
   ["gauge", "Gauge", "Click to log head / depth"],
   ["rake", "Rake", "Click for a velocity–depth profile"],
+  ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
 ];
 
 function snap(x0, y0, x1, y1) {
@@ -385,6 +434,17 @@ function onDown(e) {
     state.panDrag = { px, c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
     return;
   }
+  // Drag in the empty letterbox band above or below the domain to stretch it
+  // vertically. That band is dead space — nothing to draw on — so grabbing it
+  // is unambiguous, and it is the natural place to reach for when a long flat
+  // flume is squashed into a strip.
+  {
+    const B = baseRect(), py = pointerPx(e)[1];
+    if (state.zoom < 1.001 && (py < B.by - 2 || py > B.by + B.h + 2)) {
+      state.vexDrag = { py, vex: state.vex, mid: B.by + B.h / 2 };
+      return;
+    }
+  }
   if (e.button === 2 || e.pointerType === "touch" && e.shiftKey) {
     state.pour = { x, y, r: state.brush * 4, vx: 0, vy: sim.p.g > 0.5 ? -2.0 : 0, lx: x, ly: y };
     sim.p.pour = state.pour;
@@ -406,6 +466,13 @@ function onDown(e) {
     state.rakes.push({ x, buf: null });
     return;
   }
+  if (state.tool === "tracer") {
+    // Click anywhere in the water to hang a fresh column of tracers there;
+    // click on dry ground to clear them.
+    seedTracers(x);
+    syncPanel();
+    return;
+  }
   state.drag = { x0: x, y0: y, x1: x, y1: y };
 }
 
@@ -418,6 +485,15 @@ function onMove(e) {
       zoomAt((ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2, d / state.pinch.d);
     }
     state.pinch.d = d;
+    return;
+  }
+  if (state.vexDrag) {
+    // Pull away from the middle to stretch, toward it to squash.
+    const d = state.vexDrag, py = pointerPx(e)[1];
+    const r0 = Math.max(Math.abs(d.py - d.mid), 8);
+    const r1 = Math.max(Math.abs(py - d.mid), 8);
+    state.vex = Math.max(1, Math.min(12, d.vex * (r1 / r0)));
+    computeView();
     return;
   }
   const [x, y] = pointerPos(e);
@@ -456,6 +532,7 @@ function onUp(e) {
   if (pointers.size < 2) state.pinch = null;
   state.panDrag = null;
   state.spoutDrag = false;
+  if (state.vexDrag) { state.vexDrag = null; syncPanel(); return; }
   if (state.pour) { state.pour = null; sim.p.pour = null; }
   if (state.drag) {
     const d = state.drag;
@@ -514,6 +591,10 @@ function tickFrame(realDt) {
   const analysis = OVERLAY.analyse(sim, col);
   sampleGauges(analysis);
   sampleRakes();
+  advanceTracers(simAdvanced);
+  // Scenes whose subject is the orbital motion seed their own tracer rake as
+  // soon as there is enough water to hang it in.
+  if (!state.tracers && state.scene.tracerX && sim.t > 0.5) seedTracers(state.scene.tracerX);
 
   const cur = state.inside ? state.cursor : [-99, -99];
   SIM.render(view, {
@@ -555,6 +636,83 @@ function sampleRakes() {
   state.rakes.forEach((rk) => { const r = SIM.rake(rk.x, rk.buf); rk.buf = r.buf; rk.i = r.i; });
 }
 
+// ------------------------------------------------------------- orbit tracers
+/** A column of massless tracers that remember where they have been.
+ *
+ *  A single dot going round a 30 mm circle is invisible; the PATH is the whole
+ *  point, which is why the GPU particle cloud never showed orbital motion no
+ *  matter how long you stared at it. These are deliberately few (one vertical
+ *  rake), advected on the CPU from a single strip readback — probing them one
+ *  at a time would be a pipeline stall each — and drawn as fading polylines.
+ *
+ *  Seeded from just under the trough down to just above the bed, so the
+ *  shrinking of the orbits with depth is read straight off the picture. */
+/** Deepest wet column — a sane default place to hang a tracer rake, since
+ *  a fixed fraction of the domain lands on dry ground in half the scenes. */
+function bestTracerX() {
+  const col = SIM.columns(true);
+  let bi = -1, bd = 0;
+  for (let i = 2; i < sim.nx - 2; i++) {
+    if (col[i * 4 + 1] > bd) { bd = col[i * 4 + 1]; bi = i; }
+  }
+  return bi < 0 ? sim.W * 0.5 : (bi + 0.5) * sim.dx;
+}
+
+function seedTracers(x) {
+  const col = SIM.columns(true);
+  const i = Math.max(0, Math.min(sim.nx - 1, Math.round(x / sim.dx)));
+  const bed = col[i * 4], surf = bed + col[i * 4 + 1];
+  // Too little water to hang a column in — treat the click as "clear".
+  if (surf - bed < 6 * sim.dx) { state.tracers = null; return; }
+  // Span the FULL depth, bed to surface. The insets are a cell and a half,
+  // not a fraction of the depth: at the bed the no-slip wall makes the very
+  // first cell useless, and a tracer seeded right at the still surface spends
+  // half of every wave period in a dry cell, where the velocity is bled away.
+  const n = state.tracerN, d = surf - bed;
+  const lo = bed + Math.max(1.2 * sim.dx, 0.015 * d);
+  const hi = surf - Math.max(1.5 * sim.dx, 0.03 * d);
+  state.tracers = { x, buf: null, list: [],
+    // Trail length in SECONDS, not points: about two and a half orbits, so
+    // each loop is legible and the small failure of the loops to close —
+    // Stokes drift — is visible rather than smeared into a long streak. Over
+    // seven periods the near-bed undertow alone drew a 280 mm horizontal
+    // smudge that hid a 17 mm orbit completely.
+    trail: state.scene.trailSeconds || 2.5 * (sim.p.wave.period || 1.2) };
+  for (let k = 0; k < n; k++) {
+    const y = lo + (hi - lo) * (k / (n - 1));
+    state.tracers.list.push({ x, y, x0: x, y0: y, path: [] });
+  }
+}
+
+/** Advect the tracers by the sim time that just elapsed, RK2. */
+function advanceTracers(dtSim) {
+  const T = state.tracers;
+  if (!T || !T.list.length || dtSim <= 0) return;
+  let x0 = Infinity, x1 = -Infinity;
+  T.list.forEach((t) => { x0 = Math.min(x0, t.x); x1 = Math.max(x1, t.x); });
+  const pad = 6 * sim.dx;
+  const P = SIM.patch(x0 - pad, x1 + pad, T.buf);
+  T.buf = P.buf;
+  // Sub-step: an orbit is a rotation, and one big explicit step spirals out.
+  const nsub = Math.max(1, Math.min(8, Math.ceil(dtSim / 0.02)));
+  const h = dtSim / nsub;
+  for (const t of T.list) {
+    for (let s = 0; s < nsub; s++) {
+      const a = SIM.patchVel(P, t.x, t.y);
+      const b = SIM.patchVel(P, t.x + a[0] * h, t.y + a[1] * h);
+      t.x += 0.5 * (a[0] + b[0]) * h;
+      t.y += 0.5 * (a[1] + b[1]) * h;
+    }
+    t.x = Math.max(sim.dx, Math.min(sim.W - sim.dx, t.x));
+    t.y = Math.max(sim.dx, Math.min(sim.H - sim.dx, t.y));
+    // A tracer that has drifted right out of its rake is no longer showing
+    // the orbit at the station it was seeded at, so put it back.
+    if (Math.abs(t.x - t.x0) > 0.9) { t.x = t.x0; t.y = t.y0; t.path.length = 0; }
+    t.path.push(t.x, t.y, sim.t);
+    while (t.path.length > 6 && sim.t - t.path[2] > T.trail) t.path.splice(0, 3);
+  }
+}
+
 function drawOverlay(A) {
   const ctx = octx;
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
@@ -570,6 +728,7 @@ function drawOverlay(A) {
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
   }
   state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
+  if (state.tracers) OVERLAY.drawTracers(ctx, view, state.tracers);
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -766,6 +925,14 @@ function boot() {
   document.getElementById("panelBtn").onclick = (e) => {
     document.getElementById("panel").classList.toggle("open");
     e.currentTarget.classList.toggle("active");
+    document.getElementById("about").classList.remove("open");   // they overlap
+    document.getElementById("aboutBtn").classList.remove("active");
+  };
+  document.getElementById("aboutBtn").onclick = (e) => {
+    document.getElementById("about").classList.toggle("open");
+    e.currentTarget.classList.toggle("active");
+    document.getElementById("panel").classList.remove("open");
+    document.getElementById("panelBtn").classList.remove("active");
   };
   document.getElementById("playBtn").onclick = () => togglePause();
   document.getElementById("valveBtn").onclick = () => toggleValve();
@@ -796,7 +963,7 @@ function boot() {
     else if (k === "c") SIM.clearSegs();
     else if (k === "r") { SIM.resetWater(); state.gauges.forEach((g) => g.hist.length = 0); }
     else if (k === "p") { state.particles = !state.particles; syncPanel(); }
-    else if (k === "g") { state.mode = (state.mode + 1) % 5; syncPanel(); }
+    else if (k === "g") { state.mode = (state.mode + 1) % 6; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k >= "1" && k <= String(TOOLS.length)) { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }

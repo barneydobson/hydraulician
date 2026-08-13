@@ -734,14 +734,32 @@ void main(){
   } else if (u_mode == 2) {
     water = turbo(length(U.rg) / max(u_vmax, 0.01));
   } else if (u_mode == 3) {
-    float fr = length(U.rg) / sqrt(max(abs(u_g) * dep, 1e-4));
+    // STREAMWISE velocity, not the 2D speed magnitude. A Froude number is
+    // u/√(gh) — the vertical component is not part of it, and including it
+    // paints vertical warm streaks down every plunging wave face: measured on
+    // a23's apron, |v| exceeds |u| in 30% of wet cells and |u,v| triples the
+    // cells that render supercritical (1.5% against 0.5%). Because the ramp
+    // below is diverging about Fr = 1, that reads as violent banding even
+    // where the reach is comfortably subcritical. The depth is per-column so
+    // it cannot cause this; measured column-to-column jitter is under 5%.
+    float fr = abs(U.r) / sqrt(max(abs(u_g) * dep, 1e-4));
     water = divg(0.5 * clamp(fr, 0.0, 2.0));
-  } else {
+  } else if (u_mode == 4) {
     ivec2 gi = ivec2(clamp(g, vec2(1.0), u_res - vec2(2.0)));
     float dvdx = texelFetch(u_U, gi + ivec2(1,0), 0).g - texelFetch(u_U, gi - ivec2(1,0), 0).g;
     float dudy = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;
     float w = (dvdx - dudy) / (2.0 * u_dx);
     water = divg(0.5 + 0.5 * clamp(w / 40.0, -1.0, 1.0));
+  } else {
+    // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
+    // display pass runs once per FRAME, not once per substep — it is the two
+    // simulation passes that cost, and this adds nothing to them. Signed by
+    // the streamwise direction so a returning roller or an undertow reads
+    // opposite to the flow that drives it, which is the thing worth seeing:
+    // where the momentum actually goes in a jump or under a breaker.
+    float sp = length(U.rg);
+    float mom = f * U.r * sp;
+    water = divg(0.5 + 0.5 * clamp(mom / max(u_vmax * u_vmax * 0.5, 0.01), -1.0, 1.0));
   }
   c = mix(c, water, wet);
 

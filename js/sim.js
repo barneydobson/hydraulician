@@ -104,10 +104,16 @@ const SIM = (() => {
   // ------------------------------------------------------------ allocation
   function build(scene, budget, keepSegs) {
     const aspect = scene.W / scene.H;
+    // The hard cap is the driver's texture limit, not a number picked here.
+    // A fixed 1400 silently swallowed the top resolutions on exactly the
+    // scenes that need them: m2 is 16 m × 0.95 m, so at Ultra it asks for
+    // nx ≈ 3400 and used to get 1400 — the flumes would have ignored two
+    // whole steps of the slider.
+    const lim = Math.min(8192, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096);
     let nx = Math.round(Math.sqrt(budget * aspect));
-    nx = Math.max(96, Math.min(1400, nx));
+    nx = Math.max(96, Math.min(lim, nx));
     const dx = scene.W / nx;
-    let ny = Math.max(64, Math.min(900, Math.round(scene.H / dx)));
+    let ny = Math.max(64, Math.min(lim, Math.round(scene.H / dx)));
 
     const segs = keepSegs && S ? S.segs : [];
     // A rebuild that keeps the drawing (a resolution change) keeps the live
@@ -347,7 +353,10 @@ const SIM = (() => {
     gl.uniform2f(prog.part.u("u_pres"), S.pn, S.pn);
     gl.uniform1f(prog.part.u("u_dx"), S.dx);
     gl.uniform1f(prog.part.u("u_pdt"), realDt);
-    gl.uniform1f(prog.part.u("u_plife"), 6.0);
+    // Particle lifetime is per scene: a tracer has to outlive a wave period
+    // or it respawns before it has drawn a single orbit, which is the whole
+    // point of the long-wave flume (T = 4 s against the 6 s default).
+    gl.uniform1f(prog.part.u("u_plife"), S.scene.plife || 6.0);
     gl.uniform1f(prog.part.u("u_time"), S.t);
     gl.uniform1f(prog.part.u("u_valve"), S.p.valveClosed);
     GLH.bindTarget(gl, S.P.write.fbo, S.pn, S.pn);
@@ -422,8 +431,40 @@ const SIM = (() => {
     return { i, buf };
   }
 
+  /** A rectangular strip of the velocity field, pulled back in ONE readPixels
+   *  so a handful of CPU-side tracers can be advected without a sync each.
+   *  Probing them individually would be one pipeline stall per tracer. */
+  function patch(x0, x1, out) {
+    const a = Math.max(0, Math.min(S.nx - 1, Math.floor(x0 / S.dx)));
+    const b = Math.max(a + 1, Math.min(S.nx, Math.ceil(x1 / S.dx)));
+    const w = b - a;
+    const buf = out && out.length >= w * S.ny * 4 ? out : new Float32Array(w * S.ny * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+    return { i0: a, w, ny: S.ny, dx: S.dx, buf };
+  }
+
+  /** Bilinear (u, v) at a point, from a patch. u lives on x-faces, v on
+   *  y-faces, so each is offset half a cell from the centre. */
+  function patchVel(p, x, y) {
+    const gx = x / p.dx - p.i0, gy = y / p.dx;
+    const sx = Math.max(0, Math.min(p.w - 1.001, gx));
+    const sy = Math.max(0, Math.min(p.ny - 1.001, gy - 0.5));
+    const i = Math.floor(sx), j = Math.floor(sy), fx = sx - i, fy = sy - j;
+    const at = (ii, jj, c) => p.buf[((jj * p.w) + Math.min(ii, p.w - 1)) * 4 + c];
+    const u = (at(i, j, 0) * (1 - fx) + at(i + 1, j, 0) * fx) * (1 - fy)
+            + (at(i, j + 1, 0) * (1 - fx) + at(i + 1, j + 1, 0) * fx) * fy;
+    const tx = Math.max(0, Math.min(p.w - 1.001, gx - 0.5));
+    const ty = Math.max(0, Math.min(p.ny - 1.001, gy));
+    const i2 = Math.floor(tx), j2 = Math.floor(ty), gxf = tx - i2, gyf = ty - j2;
+    const v = (at(i2, j2, 1) * (1 - gxf) + at(i2 + 1, j2, 1) * gxf) * (1 - gyf)
+            + (at(i2, j2 + 1, 1) * (1 - gxf) + at(i2 + 1, j2 + 1, 1) * gxf) * gyf;
+    return [u, v];
+  }
+
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
-           step, columns, advanceParticles, render, probe, rake, dt, get, inletVel, bands,
+           step, columns, advanceParticles, render, probe, rake, patch, patchVel,
+           dt, get, inletVel, bands,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

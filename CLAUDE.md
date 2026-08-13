@@ -78,6 +78,30 @@ Three guard rails, each bought with an explosion:
   "ride the backwater" inlet was tried and reverted — it hunts (visibly on
   M2) and can self-feed at steep crests; so was a pressure-feedback rating
   on the plug — it neither hurt nor helped.
+- **A tailwater must stand clear of critical depth.** Re-check it every time
+  `q` changes, because `y_c = (q²/g)^⅓` moves with it. A subcritical level
+  control set AT y_c is degenerate: the outlet chokes at critical, the reach
+  stops taking its depth from the control, and the one-cell Dirichlet argues
+  with the flow it is supposed to be setting. h23 shipped with `tail` = 0.170
+  against y_c = 0.170 and a23 with 0.160 against 0.170 — one exactly on the
+  knife edge, one *below* a depth the outlet cannot hold. Lifting h23 to
+  1.5 y_c alone halved its drift and took the flutter from 19% to 12%.
+  1.3 y_c is a safe target, but it is a floor to clear, not a value to aim
+  at: how far above y_c you can go is set by what the reach has to read.
+  Raising m3 from 1.08 to 1.3 y_c lifted its apron above y_n and turned the
+  M2 the scene is about into M1, so m3 deliberately runs at the margin
+  (measured steady there) while h23 and a23 sit at 1.3 and 1.5.
+- **Outfall edges (`open` = 2) are for brinks, not for ponds.** The ghost is
+  held permanently empty, so the exchange face sees the full hydrostatic
+  `c²(f−1)` of the interior with nothing opposing it. Against a thin,
+  near-critical sheet at a lip that is exactly right. Against standing water
+  it is an unbounded gradient: measured, the face saturates at the transport
+  cap (0.20 Δx/Δt ≈ 12 m/s), empties the last column faster than the donor
+  limiter can refill it, and then reverses — the tail columns run dry and
+  report NEGATIVE q while the reach behind them floods. m3 and a23 both
+  ponded to ~1.1 m mean depth this way. No scene uses mode 2; the sandbox
+  floor drains on mode 1 (zero-gradient), which mirrors the interior and so
+  bleeds at the free-fall rate instead.
 - **Tilted gravity for uniform mild slopes** (`tiltS0`, per scene; `channel`
   option `tilt`). A 1-in-68 bed rasterises to a one-cell step every ~0.9 m,
   and at M2's working depth (~20 steps per depth) that staircase excites
@@ -168,6 +192,18 @@ downstream in a steady state; total volume constant while inflow ≠ outflow.
   thickness off every gap, which is fatal when the gap is the demonstration.
   Consequence: a *sloping* slab is cut perpendicular to its axis, so it must be
   started from outside the domain or its upstream top corner is missing.
+- A slab drawn PAST the domain edge must have its endpoint extrapolated, not
+  clamped. `drop()`'s apron ran to `W + 1` while its elevation function
+  clamped at `W`, which flattened the drawn slope by (W−xb)/(W+1−xb): a23's
+  adverse apron came out at −0.0233 instead of −0.030 (22% shallow) and m3's
+  at 0.0136 instead of 0.0147. It is not cosmetic — S₀ is what the whole GVF
+  classification is measured against, and with the wrong bed a23's domain
+  volume swung ±15% on a ~60 s cycle that never settled.
+- A scene's bed must stay above y = 0 for the whole modelled reach. s3 ran a
+  1-in-4 bed from 1.40 out to x = 6.4, where the slab is 0.2 m BELOW the
+  domain floor — so the last 0.8 m was water sliding on the floor, draining
+  out of the open bottom edge (q fell 1.20 → 0.98 along it) and being named
+  H3 by the overlay. Shorten the domain instead (`W: 5.6` = 1.40/0.25).
 - Ground must be solid all the way down. A thin slab leaves a sealed void that
   fills through any opening and then drowns the outfall above it.
 - Outer ring: closed edges are stamped solid **last**, so no amount of erasing
@@ -228,6 +264,99 @@ wave is also wide enough to erase the reaches that matter.
 - **Torricelli** (`jet`): efflux 5.62 m/s against √(2gh) = 5.8 m/s (Cv ≈ 0.97).
 - **Venturi**: nozzle jet 19.4 m/s against √(2gH) = 20.3 m/s.
 - **Mass balance** (`m2`): q = 0.251 in, 0.215–0.261 out, total volume steady.
+- **Conjugate depth** (`h23`, after the retune to q = 0.5): Fr₁ = 2.24,
+  y₁ = 0.162 m, y₂ = 0.416 m against ½y₁(√(1+8Fr₁²) − 1) = 0.438 m, −5%. At
+  the old q = 0.22 the same measurement read +65% — the jump was submerged,
+  not free, so the number the scene invites you to check was meaningless.
+  On a STEEP bed expect the measured y₂ to sit well under the prediction
+  (s1: −39%): the horizontal-bed momentum balance has no weight component,
+  and s1's bed falls 1 in 4.
+
+Every scene has been run headless to t = 120 s and measured for steadiness
+(d h/dt), temporal flutter, surface waviness and discharge continuity. The
+steady scenes hold their profile to <1%/s with volume flat to a fraction of
+a percent; m1's median surface curvature is 0.003% of its mean depth. The
+exceptions are honest physics, not drift: the 1-in-4 chutes (s1, s2, s3)
+carry roll waves at Fr ≈ 2, and s1's roller sloshes because a 1.6 m pool is
+far shorter than the ~6 y₂ a jump of that size wants.
+
+**Residual surface waves are not all the same problem — localise them before
+tuning anything.** Record the per-column temporal standard deviation of the
+surface elevation over a long window and read it as a function of x; where it
+is largest tells you the source, and the two sources want opposite fixes:
+
+- *Largest at the inlet, decaying downstream* → the reservoir level is pinned
+  away from what the arriving profile wants. m2 stood 37 mm at x = 1.3 m with
+  its level held 0.15 m under the depth the flow was actually running at;
+  matching the level halved it to 17 mm.
+- *Small at the inlet and GROWING downstream* → local amplification, and no
+  boundary setting will touch it. c13 grows 18 mm → 48 mm along its reach
+  because Fr ≈ 1 makes (1 − Fr²) vanish. m2 does the same, mildly, into its
+  brink (22 → 31 mm) — near-critical amplification at the overfall.
+
+So m2's waves were half boundary (fixed) and half brink (intrinsic); c13's
+are entirely intrinsic. Neither is solver drift.
+
+**The Froude view is the only display mode built from two different fields**,
+so it is the only one that can show structure the flow does not have. Water,
+head, speed and vorticity are per-cell; Froude divides a per-cell velocity by
+the per-column depth from the reduction. When something looks banded there and
+nowhere else, work through it in this order:
+
+1. *Is the depth to blame?* Usually not — measure it. On a23's apron the
+   column-to-column jitter is under 5% with no dropouts, and the display
+   already lerps between columns.
+2. *Is it the numerator?* This was the real one. `length(U.rg)` includes the
+   VERTICAL velocity, and |v| exceeds |u| in 30% of wet cells inside a
+   breaking roller, so every plunging wave face rendered as a vertical warm
+   streak. Fr is u/√(gh); use `abs(U.r)`. Measured on the apron, cells reading
+   supercritical fell from 1.5% to 0.1% and warm cells from 4.9% to 1.6%,
+   while the genuinely supercritical chute was untouched (73% → 71%).
+3. *Is it the ramp?* `divg` is diverging about Fr = 1 by design, so it is far
+   more sensitive near critical than `turbo` is anywhere. Ordinary turbulent
+   fluctuation therefore reads as banding in the Froude view and as nothing at
+   all in the speed view — that contrast is a clue about the colour map, not
+   evidence of a numerical artifact.
+
+Neither the rasterised bed staircase nor any "column-wise" solver structure is
+involved; the solver is fully 2D and its velocity field is smooth.
+
+**Surface waves are damped by RESOLUTION, not by any parameter.** In the
+flumes, zeroing the bulk viscosity, the Smagorinsky term, the bed friction or
+the interface compression each moves the decay almost not at all (H at 6 m
+stays 0.02–0.03 m in every case); tripling the paddle stroke takes the height
+arriving at the beach from 0.014 m — exactly one cell, i.e. no wave — to
+0.065 m. A wave has to be tall enough in CELLS to survive an interface that is
+itself ~2 cells thick. Consequences:
+
+- Short waves are the worst case, because steepness caps H at ~0.14 L. The
+  deep-water flume (L = 1.26 m) loses H = 0.36 → 0.07 m over 3 m, so its
+  orbits must be read near the paddle. Long waves are nearly free: the
+  shallow-water flume holds 0.123 → 0.121 m over 5 m and then *shoals* to
+  0.152 m on the beach.
+- Do not "fix" that by shrinking the tank. Halving the deep flume to W = 6
+  improved Δx but put the beach 3 m from the paddle: the reflection built a
+  standing wave (H = 0.49 m at x = 1) and the orbit decay collapsed from 244×
+  to 16×. Reverted.
+- **Plunging breakers are out of reach.** The Iribarren number on the 1 : 3.4
+  beach is ξ ≈ 1.3, squarely in the plunging band, so the *conditions* are
+  right — but an overturning tongue is thinner than the interface can hold.
+  Measured trapped air under the crest never exceeds 7 mm, i.e. half a cell:
+  the breaks are spilling, and no parameter set changes that.
+
+Orbital motion itself is right, and worth trusting: at h/L = 0.23 the measured
+horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from
+`cosh k(z+h)/sinh kh`, and the vertical component vanishes at the bed as it
+should. In the deep flume the vertical falls 244× and the horizontal 3.2×.
+When measuring this, fit the Fourier component AT THE PADDLE FREQUENCY — a
+raw standard deviation picks up the flume's own seiche, which is depth-uniform
+and made deep water look like it had no decay at all.
+
+**Speed.** m2 is the heaviest scene in the set: 1265 × 75 cells at
+Δt = 2.0e-4 needs ~4900 substeps per second of simulated time, ~0.23 ms each,
+so it runs at roughly 0.9× real time and there is no bug to find. `analyse`
+costs 0.5 ms per frame against that — well under a percent. If a scene feels
+slow, check `state.rt` in the status bar before suspecting the overlay.
 
 ## Gotchas
 
@@ -245,4 +374,20 @@ wave is also wide enough to erase the reaches that matter.
   **dropped**, not clipped: a rasterisation step is exactly one cell and must be
   kept (clipping it reads the slope ~40% low), while a brink is tens of cells
   and must be excluded entirely.
+- Only classify water that is **standing on something**. The ±0.12 m guard
+  either side of a cliff is not enough on its own: past a brink the falling
+  sheet keeps producing a "bed" (wherever the water happens to reach) and a
+  depth, so m2 grew a confident M3 label over 2 m of waterfall, c13 the same
+  and s3 an H3. Those columns were also feeding the y_n median. The test that
+  works is the solid mask — a channel column has a wall directly under its
+  lowest wet cell, a nappe does not (`analyse` checks `mask[jb−1]`).
+- `spinup` is a MEASURED settle time, not a guess: the last moment the 10 s
+  running-mean depth profile is still more than ~3% of mean depth away from
+  its final shape. Measure it over a long run, because the answer is not
+  intuitive — m1 arrives in 25 s but m2, at the same slope and discharge,
+  takes 85 s (a drawdown has to propagate the length of the reach several
+  times). Scenes whose flutter is genuine — the steep chutes' roll waves,
+  s1's roller — never fall below tolerance at all; for those the mean profile
+  is there almost at once and only the fluctuation remains, so a short
+  spin-up is the honest setting.
 - Keep dependency-free and classic-script; no modules, no bundlers, no fetch.

@@ -23,6 +23,25 @@
  *  · A subcritical reach needs a real downstream control — a tailwater level
  *    or a brink. The open boundary is zero-gradient, which is correct for
  *    supercritical outflow but simply ponds a subcritical one.
+ *  · A tailwater level must stand clear of critical depth — tail ≥ 1.3 y_c,
+ *    rechecked whenever q moves, since y_c = (q²/g)^⅓. Set AT y_c the outlet
+ *    chokes and the one-cell Dirichlet argues with the flow it should be
+ *    setting; set below it, it is asking for a depth the outlet cannot hold.
+ *
+ * `spinup` is the MEASURED time for the depth profile to stop moving (the
+ * last moment a 10 s running mean is still >3% of mean depth from its final
+ * shape), taken from headless 120 s runs. It is not guessable:
+ *
+ *     venturi  7    hammer  7    h23 15    m3 17    s2 17    m1 25
+ *     jet     54    m2     85    c13 91
+ *
+ * m1 and m2 are the same slope, roughness and discharge and differ by 3×,
+ * because a drawdown has to propagate the length of the reach several times
+ * over. Scenes whose unsteadiness is genuine — the 1-in-4 chutes' roll waves,
+ * s1's roller — have no measurable transient at all: the mean profile is
+ * there almost at once and only the fluctuation remains, so they keep a short
+ * spin-up. The wave flume, dam break, plan view and sandbox have none by
+ * design: watching them develop from t = 0 is the point.
  */
 const SCENES = (() => {
 
@@ -145,7 +164,12 @@ const SCENES = (() => {
    *  with air above it. */
   function drop(o) {
     const W = o.W, H = o.H, S0 = o.S0 || 0;
-    const apron = (x) => o.lo - S0 * (Math.min(Math.max(x, o.xb), W) - o.xb);
+    // No upper clamp: the apron slab is drawn to W + 1 (a butt end inside the
+    // domain would leave the last column short), and clamping the elevation at
+    // W while extending the segment past it flattens the drawn slope by
+    // (W − xb)/(W + 1 − xb) — 22% on a23's adverse apron. Inside the domain
+    // this is the same function it always was.
+    const apron = (x) => o.lo - S0 * (Math.max(x, o.xb) - o.xb);
     const off = (TH / 2) * Math.sqrt(1 + S0 * S0);
     const sr = (o.hi - o.lo) / (o.xb - o.xa);                 // drop face slope
     const offR = (TH / 2) * Math.sqrt(1 + sr * sr);
@@ -179,16 +203,89 @@ const SCENES = (() => {
     }, o.extra || {});
   }
 
+  /** Piston wavemaker over a flat bed and a 1 : 3.4 beach. One geometry,
+   *  0.74 m of still water; the scenes below differ only in the paddle's
+   *  stroke and period, because h/L is what decides the regime:
+   *
+   *    T = 0.9 s → L = 1.26 m, h/L = 0.59   deep         orbits die with depth
+   *    T = 1.5 s → L = 3.16 m, h/L = 0.23   intermediate shoals and breaks
+   *    T = 4.0 s → L = 10.4 m, h/L = 0.07   shallow      orbits reach the bed
+   *
+   *  STROKE IS NOT COSMETIC. These waves are damped numerically, not
+   *  physically: measured, zeroing the bulk viscosity, the Smagorinsky term,
+   *  the bed friction or the interface compression each moves the decay
+   *  almost not at all (H at 6 m stays 0.02–0.03 m in every case), while
+   *  tripling the stroke lifts the height ARRIVING AT THE BEACH from 0.014 m
+   *  — one cell, i.e. no wave at all — to 0.065 m. A wave has to be tall
+   *  enough in CELLS to survive an interface that is itself ~2 cells thick.
+   *  The old 0.055 m stroke never got a measurable wave to the beach, so this
+   *  scene's own "watch them shoal and break" never actually happened. */
+  function flume(o) {
+    // Still water of depth (lev − bed) over a flat bed, then a beach of slope
+    // `slope` from `xb`. The beach must break the surface inside the domain:
+    // slope · (W − xb) > lev − bed.
+    //
+    // BEACH SLOPE IS THE SURF ZONE. Breaking starts where H ≈ 0.78 h, so the
+    // surf zone is about h_break/slope wide — on the old 1 : 3.4 beach that
+    // was ~0.15 m, a couple of cells, which is why nothing appeared to happen
+    // at the shoreline. At 1 : 20 the same wave breaks metres offshore and
+    // spills the whole way in. Slope also sets the breaker TYPE through the
+    // Iribarren number ξ = tanβ / √(H₀/L₀): ξ < 0.5 spilling, 0.5–3.3
+    // plunging, > 3.3 surging.
+    const W = o.W, H = o.H, lev = o.lev, bed = o.bed, xb = o.xb, S = o.slope;
+    const TH = 2.0, off = (TH / 2) * Math.sqrt(1 + S * S);
+    return {
+      group: "Jets & waves",
+      W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+      mode: 0, hmax: lev * 1.5, vmax: o.vmax || 1.4,
+      open: [0, 0, 0, 0],
+      wave: { amp: o.amp, period: o.period, on: 1, x: 0.30 },
+      particles: o.particles,          // orbits are the subject in some of these
+      plife: o.plife || 6,             // must outlast a period to draw one orbit
+      tracerX: o.tracerX,              // seed an orbit rake here
+      trailSeconds: o.trail,
+      view: o.view,                    // open zoomed on what the scene is about
+      spinup: o.spinup || 0,
+      walls: () => [
+        [0.0, bed - 0.40, xb, bed - 0.40, 0.80],                     // flat bed
+        [xb, bed - off, W + 0.4, bed + S * (W + 0.4 - xb) - off, TH],  // beach
+      ],
+      water: (x, y, P) => (y > bed && y < lev && x < xb + (y - bed) / S
+                            ? still(lev, y, P) : 0),
+      id: o.id, name: o.name, key: o.key, blurb: o.blurb, tips: o.tips,
+    };
+  }
+
   const list = [
 
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",
       blurb: "Water falls in at the top left. Left-drag to draw edges and route it; right-drag for a big flow.",
       W: 9, H: 5, c: 22, cf: 0.02, hmax: 1.2, vmax: 5,
-      open: [0, 0, 0, 0],
+      // The floor drains. Sealed, the box simply fills: the spout puts in
+      // ~0.39 m²/s and after two minutes the water has risen to the spout
+      // itself (72% full) and drowned both ledges, so the sandbox settles
+      // into a still block instead of a flow you can route. Only water that
+      // reaches the domain floor leaves — a tank you draw yourself still
+      // holds, because you drew its bed.
+      // Mode 1 (zero-gradient), not 2 (outfall): an outfall ghost is held
+      // EMPTY, which under standing water is an unopposed hydrostatic
+      // gradient — the exchange face saturates at the transport cap
+      // (0.20 Δx/Δt) and drags a reverse flow in behind it. That is fine at
+      // a brink, where the sheet is thin and already near critical, and
+      // wrong under a pool. Mode 1 mirrors the interior, so the floor
+      // bleeds at the free-fall rate instead.
+      open: [0, 0, 1, 0],
       source: { on: 1, x: 0.55, y: 4.55, r: 0.14, vx: 1.1, vy: -1.4 },
+      // The second ledge starts at 3.4, not 4.2. Water leaves the first at
+      // (3.2, 2.9) doing ~2.3 m/s and lands 0.50 m on at x ≈ 3.70, so a ledge
+      // beginning at 4.2 is never touched — with the floor draining, the
+      // whole right-hand half of the box stayed bone dry. It only looked like
+      // a cascade before because the sealed box flooded up to meet it. The
+      // extra 0.3 m upstream of the landing point is there to catch the
+      // backward splash, which otherwise spills off the leading edge.
       walls: () => [
         [0.9, 3.4, 3.2, 2.9, 0.08],
-        [4.2, 2.6, 7.0, 2.1, 0.08],
+        [3.4, 2.55, 6.8, 2.0, 0.08],
       ],
       tips: ["Left-drag draws a straight edge — build chutes, weirs, pipes.",
              "Right-drag pours a much larger flow wherever you point.",
@@ -220,10 +317,22 @@ const SCENES = (() => {
     // tilt: flat bed + tilted gravity, because at M2's working depth the
     // rasterised bed staircase excites standing waves the demo cannot absorb
     // (m1 runs deep enough to hide the same steps).
+    // inletDepth is the depth the arriving profile actually wants — here the
+    // measured y_n (0.36), since an M2 leaves normal depth and draws down to
+    // the brink. Pin it lower and the inlet chokes and sheds ripples for ever:
+    // measured surface fluctuation over t = 60–110 s at x = 1.3 m was 37 mm
+    // with the level held at 0.205 (the flow was standing at 0.354 regardless)
+    // against 17 mm once it was let up to 0.35. It also stops the class
+    // flickering M1 / M2 / M1 along a reach that should read M2 end to end —
+    // one run now, 0 → 13.5 m.
+    //   The 0.205 figure came from an earlier y_n measurement of 0.215 that
+    // was itself wrong: the free-fall columns past the brink were still in the
+    // y_n median (see the mask guard in overlay.analyse). With them excluded
+    // y_n measures 0.36, and the inlet has to follow.
     Object.assign(channel({
       W: 16, H: 0.95, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
-      inletDepth: 0.26, xEnd: 13.6, tilt: true,
-      hmax: 0.45, vmax: 2.0, spinup: 25, dyeLine: 1.2,
+      inletDepth: 0.35, xEnd: 13.6, tilt: true,
+      hmax: 0.45, vmax: 2.0, spinup: 90, dyeLine: 1.2,
     }), {
       id: "m2", name: "M2 · drawdown to a free overfall", key: "Mild, zone 2",
       blurb: "The same mild channel ending in a brink. The surface is drawn down through critical depth at the lip — the M2 curve.",
@@ -243,14 +352,19 @@ const SCENES = (() => {
       blurb: "A chute delivers a supercritical sheet onto a mild bed. It cannot stay there: a hydraulic jump takes it back to subcritical, and the apron beyond runs M2.",
       W: 16, H: 1.7, hi: 0.85, lo: 0.35, xa: 1.5, xb: 4.0, S0: 0.0147,
       cf: 0.010, cs: 0.06, q: 0.25, inletDepth: 0.30, tail: 0.20,
-      hmax: 0.5, vmax: 4, spinup: 30,
+      hmax: 0.5, vmax: 4, spinup: 22,   // measured: profile arrives by 17 s
       tips: ["Supercritical on the chute, subcritical on the apron — the jump is the only way across.",
              "The jump box compares the measured y₂ against ½y₁(√(1+8Fr₁²) − 1).",
              "Past the jump the depth sits between y_n and y_c: that reach is M<b>2</b>.",
              "Raise the tailwater and the jump marches upstream onto the chute."] }),
 
     // ------------------------------------------------ STEEP  (C_f < 2.8 S₀)
-    // S₀ = 1 in 4, C_f = 0.010  →  y_n ≈ 0.08 m against y_c ≈ 0.114 m.
+    // S₀ = 1 in 4 at q = 1.2 m²/s. Against the MEASURED resistance that is
+    // y_n ≈ 0.32 m under y_c = 0.53 m, i.e. Fr ≈ 2.1 at normal depth — steep,
+    // and deep enough (≈ 24 cells) that the delivered n stays near 0.03.
+    // Every steep scene keeps its bed above y = 0 for the whole modelled
+    // reach: where the slab sinks below the domain floor the water runs on
+    // the floor instead, which is not the channel the scene is describing.
     Object.assign(channel({
       W: 7, H: 2.8, bed0: 1.90, S0: 0.25, cf: 0.010, cs: 0.08, q: 1.2,
       inletDepth: 0.52, tail: 0.90, start: 0.30,
@@ -275,9 +389,16 @@ const SCENES = (() => {
              "Both y_c and y_n are drawn; note that y_n is the <i>lower</i> one here.",
              "Nothing downstream can influence this reach — it is supercritical throughout."] }),
 
+    // W = 5.6 is not arbitrary: at S₀ = 1 in 4 a bed starting at 1.40 reaches
+    // y = 0 exactly there. Run the reach any further (it used to go to 6.4)
+    // and the slab is below the domain floor, so the last 0.8 m was water
+    // sliding on the floor and draining out of the open bottom edge — the
+    // discharge fell from 1.20 to 0.98 along it and the overlay named the
+    // strip H3. bed0 cannot simply be raised instead: the gate pool already
+    // stands at bed0 + 1.40 = 2.80 in a 3.0 m domain.
     Object.assign(channel({
-      W: 7, H: 3.0, bed0: 1.40, S0: 0.25, cf: 0.010, cs: 0.08, q: 1.2,
-      inletDepth: 1.40, gate: { x: 1.2, a: 0.35 }, xEnd: 6.4, start: 0.28,
+      W: 5.6, H: 3.0, bed0: 1.40, S0: 0.25, cf: 0.010, cs: 0.08, q: 1.2,
+      inletDepth: 1.40, gate: { x: 1.2, a: 0.35 }, start: 0.28,
       hmax: 0.7, vmax: 6, spinup: 26,
     }), {
       id: "s3", name: "S3 · gate on a steep bed", key: "Steep, zone 3",
@@ -291,18 +412,41 @@ const SCENES = (() => {
     // Tuned against the DELIVERED resistance, not the nominal C_f: at this
     // depth-to-Δx the wall function + eddy viscosity + bed staircase deliver
     // far more drag than C_f suggests, so the slope that balances them is
-    // 1 in 9.5 with C_f nearly zero. The weir is low (0.12 m) because a
+    // 1 in 8.5 with C_f nearly zero. The weir is low (0.12 m) because a
     // broad-crested weir ponds ~1.5 y_c of head above its crest — the old
     // 0.30 m crest drowned the gate and turned the whole reach into one M1
     // pool.
+    // 1 in 9.5 measured y_n = 0.205 against y_c = 0.192 — 7% high, which is
+    // outside classify()'s ±5% C band, so the "critical" scene reported M.
+    // y_n ∝ S₀^−⅓, so closing a 7% gap wants ~23% more slope; steepening
+    // also thins the flow, which raises the delivered roughness and pushes
+    // back, so this is deliberately short of that at 1 in 8.5.
     Object.assign(channel({
-      W: 12, H: 2.0, bed0: 1.45, S0: 0.105, cf: 0.02, q: 0.25,
+      W: 12, H: 2.0, bed0: 1.45, S0: 0.118, cf: 0.02, q: 0.25,
       inletDepth: 0.36, gate: { x: 2.0, a: 0.15 },
       weir: { x: 9.6, h: 0.12, w: 0.7 }, xEnd: 10.8,
-      mode: 3, hmax: 0.45, vmax: 3.0, spinup: 28,
+      // 95 s, measured. A near-critical reach filling a weir pool is the
+      // slowest thing in the set — at 28 s the countdown finished while the
+      // profile was still a long way from its final shape.
+      mode: 3, hmax: 0.45, vmax: 3.0, spinup: 95,
     }), {
       id: "c13", name: "C1 / C3 · critical slope", key: "y_n = y_c",
       labels: 0,
+      // This scene is WAVY and cannot be made otherwise: at Fr ≈ 1 the
+      // (1 − Fr²) in dy/dx = (S₀ − S_f)/(1 − Fr²) vanishes, so every
+      // disturbance is amplified instead of decaying. Measured over
+      // t = 65–115 s, the surface starts quiet just below the gate (18 mm at
+      // x = 3.2) and GROWS along the reach to 48 mm — a quarter of the local
+      // depth — by x = 6. That growth is local, not inherited from a boundary.
+      // A channel at critical slope is the least stable configuration in
+      // open-channel hydraulics, which is exactly why it is a knife-edge
+      // demonstration; do not go hunting for a boundary setting to cure it.
+      //   inletDepth stays at 0.36 even though the inlet is pinned ~0.09 m
+      // above what the pool wants. Lowering it does quieten the pool a lot
+      // (28 → 1 mm at x = 0.4 at 0.27), but the gate pool then collapses to
+      // 0.147 m — under the gate's own 0.15 m opening, so the gate stops
+      // controlling, the C3 reach goes with it, and y_n/y_c falls to 0.905,
+      // outside the ±5% C band the whole scene is calibrated on.
       blurb: "The knife edge: a slope where the measured normal depth equals critical depth. Zone 2 vanishes, and the depth hugs y_c along the whole reach.",
       tips: ["The slope is tuned so the <i>measured</i> y_n equals y_c — the dashed lines overlap.",
              "Below the gate is C<b>3</b>; behind the weir is C<b>1</b>. There is no zone 2.",
@@ -314,9 +458,24 @@ const SCENES = (() => {
     drop({
       id: "h23", name: "Hydraulic jump on a level apron", key: "Chute → jump → H2",
       blurb: "A chute onto a flat apron: supercritical sheet, hydraulic jump, then an H2 drawdown to the tailwater. The clearest look at a jump in the set.",
+      // q = 0.5, not 0.22, and the tailwater sits at 1.3 y_c rather than
+      // exactly ON y_c. Two separate faults were being fixed:
+      //  · tail 0.17 WAS y_c (0.170) to three figures. A subcritical level
+      //    control cannot stand at critical depth — the outlet chokes and the
+      //    one-cell Dirichlet fights the flow it is supposed to be setting.
+      //    Just lifting it to 1.5 y_c cut the drift by half and the temporal
+      //    flutter from 19% to 12%.
+      //  · at q = 0.22 the apron ran ~12 cells deep, where the delivered
+      //    roughness is enormous, so its backwater climbed 0.19 m over 3.5 m
+      //    and drowned the jump back onto the chute: measured y₂ came out 65%
+      //    ABOVE the conjugate depth, which is the one number this scene asks
+      //    you to check. Deeper flow is the lever (not C_f — see s2, where
+      //    15× the roughness moved y_n by 7%). At q = 0.5 the apron runs ~37
+      //    cells deep, the jump stands free on the apron, and y₂ = 0.416 m
+      //    against a predicted 0.438 — within 5%.
       W: 7.5, H: 1.6, hi: 0.80, lo: 0.15, xa: 1.0, xb: 4.0, S0: 0,
-      cf: 0.008, cs: 0.06, q: 0.22, inletDepth: 0.28, tail: 0.17,
-      hmax: 0.45, vmax: 4, spinup: 26,
+      cf: 0.008, cs: 0.06, q: 0.5, inletDepth: 0.34, tail: 0.38,
+      hmax: 0.65, vmax: 4, spinup: 20,   // measured: profile arrives by 15 s
       tips: ["A horizontal bed has no normal depth — y_n is infinite, so there is no zone 1.",
              "The chute runs S2/S3; past the jump the level apron runs H<b>2</b>.",
              "The jump box reports y₁, y₂ and Fr₁ — check y₂/y₁ = ½(√(1+8Fr₁²) − 1).",
@@ -327,8 +486,14 @@ const SCENES = (() => {
     drop({
       id: "a23", name: "A2 · adverse apron", key: "Uphill",
       blurb: "The apron rises downstream. Gravity now opposes the flow, there is no normal depth, and only zones 2 and 3 exist.",
+      // tail 0.16 was BELOW critical depth (y_c = 0.170) — a level control
+      // asking for a depth the outlet cannot hold, so it choked at critical
+      // and the Dirichlet argued with it. 1.53 y_c is a real control.
+      // The other half of this scene's cure was the apron() slope bug above:
+      // the drawn adverse slope was −0.0233 instead of −0.030, and with it
+      // the domain volume swung ±15% on a ~60 s cycle that never settled.
       W: 7.5, H: 1.7, hi: 0.85, lo: 0.12, xa: 1.0, xb: 4.0, S0: -0.03,
-      cf: 0.008, cs: 0.06, q: 0.22, inletDepth: 0.28, tail: 0.16,
+      cf: 0.008, cs: 0.06, q: 0.22, inletDepth: 0.28, tail: 0.26,
       hmax: 0.45, vmax: 4, spinup: 26,
       tips: ["The apron climbs, so S₀ is negative and uniform flow is impossible — no y_n.",
              "Past the jump, running uphill against gravity, the apron is A<b>2</b>.",
@@ -343,7 +508,7 @@ const SCENES = (() => {
       group: "Pressure & transients",
       blurb: "A reservoir feeding a full pipe through a nozzle. Slam the valve and the pressure wave runs back and forth at the slot celerity.",
       W: 60, H: 30, c: 70, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
-      valveOpen: 1, spinup: 14,
+      valveOpen: 1, spinup: 10,   // measured: bore established by 7 s
       mode: 1, headMax: 42, hmax: 22, vmax: 6,
       open: [1, 1, 0, 0],
       spongeIn: 5.5,                           // hold the whole reservoir tank
@@ -414,6 +579,11 @@ const SCENES = (() => {
     { id: "jet", name: "Orifice jet", key: "Torricelli", group: "Jets & waves",
       blurb: "A tank with a hole in its wall. Efflux velocity is √(2gh) and the free jet is a ballistic parabola — the vena contracta shows at the lip.",
       W: 6, H: 3.4, c: 26, cf: 0.004, cs: 0.10, mode: 2, vmax: 7, hmax: 2.6,
+      // The tank starts brim-full at the lip but the orifice discharges faster
+      // than the spout supplies, so it draws down for ~55 s before efflux and
+      // inflow balance. With no countdown at all, the headline measurement —
+      // is the jet doing √(2gh)? — was being read off a decaying head.
+      spinup: 55,
       open: [0, 1, 1, 0],
       walls: () => [
         [0.30, 0.30, 0.30, 2.70, 0.10],          // overflow lip holds the head steady
@@ -428,22 +598,73 @@ const SCENES = (() => {
              "Turn the spout off and watch the jet decay as the tank empties.",
              "Draw a short lip outside the hole to make a Borda mouthpiece."] },
 
-    { id: "wave", name: "Wave flume", key: "Linear waves", group: "Jets & waves",
-      blurb: "A piston wavemaker on still water with a beach. Watch celerity, shoaling and orbital motion — turn particles on for the orbits.",
-      W: 12, H: 1.5, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
-      mode: 0, hmax: 1.1, vmax: 1.2,
-      open: [0, 0, 0, 0],
-      wave: { amp: 0.055, period: 1.5, on: 1, x: 0.30 },
-      walls: () => [
-        [0.0, -0.14, 8.2, -0.14, 0.80],          // flat bed, top at 0.26
-        [8.2, -0.74, 11.9, 0.36, 2.00],          // beach, 1 : 3.4
-      ],
-      water: (x, y, P) => (y > 0.26 && y < 1.00 && x < 8.2 + (y - 0.26) * 3.36
-                            ? still(1.00, y, P) : 0),
-      tips: ["Turn <b>particles</b> on: circular orbits in deep water, flat ellipses at the bed.",
-             "Celerity is c = √(g/k · tanh kh) — time a crest across the 1 m grid.",
-             "Shorten the period until the orbits stop reaching the bed: deep water.",
-             "Watch the waves shoal and steepen up the beach, then break."] },
+    // ------------------------------------------------------- wave flumes
+    // One flume, three parameter sets — see `flume()` above for why the
+    // stroke matters as much as the period.
+    // Beach toe at 1.2, right off the paddle, at 1 : 10. Both numbers are
+    // measured, not chosen for looks. These waves lose ~63% of their height
+    // per wavelength to the discretisation, and shoaling on a beach only
+    // amplifies as h^-¼, so on anything gentle the damping wins and the wave
+    // dies BEFORE it can break: at 1 : 20 the ratio H/h sat at 0.35–0.45 the
+    // whole way in and never reached the 0.78 that breaks it. Shortening the
+    // beach (1 : 10 spans 3.5 m, not 7) lets shoaling get ahead — measured
+    // H/h now climbs 0.46 → 0.49 → 0.60 → 0.81 → 1.49 and breaks at x = 4.0.
+    // The surf zone is 0.7 m: small, but real, and five times what the
+    // original 1 : 3.4 beach managed.
+    flume({
+      id: "wave", name: "Wave flume · shoaling & breaking", key: "Spilling, ξ ≈ 0.4",
+      W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 1.2, slope: 0.10,
+      amp: 0.18, period: 1.5, particles: 1, spinup: 25,
+      view: { zoom: 2.2, cx: 3.2, cy: 0.42, vex: 2.2 },
+      blurb: "Waves running onto a 1-in-10 beach. They steepen as the water shallows until the height is comparable with the depth, and then they break.",
+      tips: ["Watch H/h climb up the slope: measured 0.46 at the toe, 0.60, 0.81, then breaking at x ≈ 4.0 m.",
+             "A wave breaks when its height reaches roughly 0.78 of the local depth. That is the whole of the breaking criterion.",
+             "Iribarren ξ = tanβ/√(H₀/L₀) ≈ 0.4 — the <b>spilling</b> band, where the crest crumbles down the face.",
+             "A GENTLER beach does not work here, and that is honest: these waves damp ~63% per wavelength, so over a 7 m beach they die before they can break.",
+             "Load the <b>surging</b> flume for the other end of the Iribarren scale."] }),
+
+    // The other end of the Iribarren scale: steep beach, long wave. Same
+    // water, so the only thing that changed is the slope and the period.
+    flume({
+      id: "wavesurge", name: "Wave flume · surging breakers", key: "Steep beach, ξ ≈ 8",
+      W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 8.0, slope: 0.70,
+      amp: 0.14, period: 3.0, particles: 1, spinup: 25,
+      view: { zoom: 1.9, cx: 9.2, cy: 0.45, vex: 2.0 },
+      blurb: "The same water against a steep 1-in-1.4 beach, driven by a long wave. It does not spill: the front surges up the slope as a whole and runs back down.",
+      tips: ["Iribarren ξ ≈ 8, far into the <b>surging</b> band (> 3.3) — no whitewater, just run-up and run-down.",
+             "The reflected wave runs back out and meets the next one; that is why a steep beach makes a choppy tank.",
+             "Compare with the <b>spilling</b> flume — same depth, same stroke, only the slope and period differ.",
+             "This is why sea walls are built steep to reflect and beaches are gentle to dissipate."] }),
+
+    flume({
+      id: "wavedeep", name: "Wave flume · deep-water orbits", key: "h/L = 0.59",
+      W: 12, H: 1.5, lev: 1.00, bed: 0.26, xb: 8.2, slope: 0.297,
+      tracerX: 5.84, spinup: 20, view: { zoom: 1.9, cx: 5.84, cy: 0.66, vex: 1.6 },
+      // Full-length tank on purpose. Halving it to W = 6 (to fill the view,
+      // since a 1.26 m wave dies within ~3 m) backfired: the same stroke in a
+      // short tank with the beach only 3 m away builds a standing wave —
+      // H reached 0.49 m at x = 1 — and the vertical profile stopped being
+      // monotonic, so the orbit decay fell from 250× to 16×. The orbits are
+      // read in the first few metres; the quiet water beyond is the price.
+      amp: 0.20, period: 0.9, particles: 1, plife: 9,
+      blurb: "A short, fast wave in water deeper than half its length. The orbits are circles at the surface that shrink to nothing well above the bed — the classic deep-water picture.",
+      tips: ["The bright trails ARE the orbits — a bare dot moving 30 mm is invisible, the path is the whole point. The red dot is where each tracer is right now.",
+             "Measured trail extents at this station: 58 × 1 mm at the bed against 58 × 67 mm at the surface — the VERTICAL motion dies out 67×.",
+             "So the near-bed trail is a flat horizontal line: water there slides back and forth and never rises.",
+             "The horizontal length stays ~58 mm all the way down because most of it is the return current, not orbit — a closed flume must send the water back somehow.",
+             "h/L = 0.59. Deep water is h/L > 0.5, where the bed stops being felt at all. Press <b>0</b> to zoom out."] }),
+
+    flume({
+      id: "waveshallow", name: "Wave flume · shallow-water waves", key: "h/L = 0.05",
+      W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 4.0, slope: 0.05,
+      amp: 0.10, period: 4.0, plife: 14, trail: 9,
+      tracerX: 2.0, spinup: 30, view: { zoom: 1.9, cx: 2.0, cy: 0.44, vex: 2.2 },
+      blurb: "A wave seven metres from crest to crest in 0.35 m of water. The whole depth moves together, the wave travels at √(gh), and it barely damps at all.",
+      tips: ["The trails are flat back-and-forth ellipses, the SAME size top to bottom — that is what 'shallow water' means.",
+             "Because every depth moves alike, one depth-averaged velocity describes the flow. That is the assumption every shallow-water model is built on.",
+             "Contrast the <b>deep-water</b> flume, where the motion has died out entirely before you reach the bed.",
+             "Long waves barely damp: measured 0.123 m at 2 m and 0.121 m at 7 m in the deeper tank.",
+             "This is the tsunami and tidal end of the spectrum. Press <b>0</b> to zoom out."] }),
 
     { id: "plan", name: "Plan view — jet & wake", key: "Gravity off", group: "Jets & waves",
       blurb: "Looking down instead of side on: gravity acts out of the plane, so the whole box is water. A submerged jet, a bluff body, and a vortex street.",

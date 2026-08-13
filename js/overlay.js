@@ -105,6 +105,18 @@ const OVERLAY = (() => {
         for (let k = Math.max(0, i - guard); k <= Math.min(nx - 1, i + guard); k++) ok[k] = 0;
       }
     }
+
+    // A surface profile describes water standing ON A BED. Past a brink the
+    // sheet is in free fall and the reduction's "bed" is merely wherever the
+    // falling water happens to reach — so the guard band above, which only
+    // clears a fixed distance either side of the lip, still left a confident
+    // M3 hanging over the whole waterfall (and fed those columns into the y_n
+    // median). The discriminator is the solid mask: a channel column has a
+    // wall directly under its lowest wet cell, a falling nappe does not.
+    for (let i = 0; i < nx; i++) {
+      const jb = Math.round(col[i * 4] / dx);
+      if (jb < 1 || S.mask[(jb - 1) * nx + i] < 64) ok[i] = 0;
+    }
     out.ok = ok;
 
     // Depth and discharge get a running mean before anything is derived from
@@ -470,6 +482,43 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** Orbit tracers: each one's path, fading from its oldest point to its
+   *  newest, with the live particle on the head. Drawn brightest at the
+   *  surface and dimmest at the bed so the shrinking of the orbits with depth
+   *  reads at a glance — that shrinkage is the whole of linear wave theory in
+   *  one picture, and a bare dot cannot show it. */
+  function drawTracers(ctx, V, T) {
+    if (!T || !T.list.length) return;
+    ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    T.list.forEach((t, k) => {
+      const p = t.path;
+      if (p.length < 6) return;
+      const warm = 1 - k / Math.max(T.list.length - 1, 1);   // 0 top … 1 bottom
+      const hue = 190 + 30 * warm;
+      // The trail is drawn in segments so it can fade along its length.
+      const n = p.length / 3;                       // triples: x, y, t
+      for (let i = 1; i < n; i++) {
+        const a = i / n;
+        ctx.strokeStyle = `hsla(${hue}, 95%, ${76 - 18 * warm}%, ${0.10 + 0.80 * a * a})`;
+        ctx.lineWidth = 1.1 + 2.0 * a;
+        ctx.beginPath();
+        ctx.moveTo(V.X(p[(i - 1) * 3]), V.Y(p[(i - 1) * 3 + 1]));
+        ctx.lineTo(V.X(p[i * 3]), V.Y(p[i * 3 + 1]));
+        ctx.stroke();
+      }
+      // seed point: where this tracer started, so drift is visible too
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.beginPath(); ctx.arc(V.X(t.x0), V.Y(t.y0), 1.6, 0, 7); ctx.fill();
+      // WHERE IT IS NOW, in red. The trail says where it has been; at high
+      // resolution the sim crawls and without a hard marker you cannot tell
+      // which end of the loop is the live one.
+      ctx.fillStyle = "#ff3b3b";
+      ctx.beginPath(); ctx.arc(V.X(t.x), V.Y(t.y), 1.9, 0, 7); ctx.fill();
+    });
+    ctx.restore();
+  }
+
   /** Vertical velocity rake: u(y) drawn against the water column it sits in. */
   function drawRake(ctx, V, sim, rk, A) {
     const { i, buf } = rk;
@@ -593,5 +642,5 @@ const OVERLAY = (() => {
 
   return { analyse, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
-           drawGaugeMarks, drawGaugeCharts, drawFrame, chip, fmt };
+           drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, chip, fmt };
 })();

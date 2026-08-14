@@ -76,24 +76,44 @@ session that runs short, a rig that will not behave, or a keener class.
 
 ## Method
 
-The solver is **barotropic weakly-compressible Navier–Stokes in the vertical
-plane**, on a staggered (MAC) grid, with the cell fill fraction `f` doing
-double duty as the density:
+**What it solves.** The Navier–Stokes equations, which say two things: water is
+neither created nor destroyed, and a blob of water speeds up or slows down
+because of pressure differences, gravity, and friction. In the vertical plane
+that is:
 
 ```
-∂f/∂t + ∇·(f u) = 0                    exact, flux form
-∂u/∂t + (u·∇)u  = −∇p/ρ + g + ∇·(ν∇u) − C_f|u|u/Δ
+mass:      ∂f/∂t + ∇·(f u) = 0
+momentum:  ∂u/∂t + (u·∇)u  = −∇p/ρ + g + ∇·(ν∇u) − C_f|u|u/Δ
+```
+
+`u` is velocity, `p` pressure, `g` gravity, `ν` viscosity, and `f` is how full
+a cell is — which here also stands in for density. Reading the momentum
+equation left to right: the flow accelerates, gets carried along by itself,
+and is pushed by pressure, pulled by gravity, smeared by viscosity and dragged
+by the bed.
+
+**The simplification, and why.** Water is normally treated as incompressible.
+That is accurate, but it makes pressure a whole-domain problem: every single
+step you must solve one big system of equations spanning the entire grid (a
+Poisson solve) to find the pressure that keeps the water from squashing — and
+on top of that you need a separate scheme to track where the surface is. This
+solver skips both. It lets the water be very slightly squashable, so pressure
+follows straight from how full a cell is, by one line of arithmetic:
+
+```
 p/ρ = c² max(f − 1, 0)                 equation of state
 ```
 
-That equation of state is the whole trick, and it is a **2D Preissmann slot**.
-Where a cell is not full, `f < 1`, the pressure is zero and the water falls
-freely — that *is* the free surface, and no interface has to be reconstructed
-to get the boundary condition right. Where a cell is over-full, `f > 1`, the
-water has been compressed and pressure propagates at celerity `c`. So
-free-surface flow and pressurised pipe flow are the same equations, a channel
-that surcharges into a pipe (or a pipe that drains back into a channel) needs
-no special case, and `c` — the slot width — is a slider.
+with `c` the speed at which pressure travels. Nothing global is solved; each
+cell reads its own pressure off its own fullness.
+
+That one line is the whole trick, and it is a **2D Preissmann slot**. A cell
+that is not full (`f < 1`) has zero pressure, so its water simply falls — and
+that *is* the free surface, with no interface to reconstruct. A cell that is
+over-full (`f > 1`) has been compressed, so pressure builds and travels at
+`c`. Open channels and pressurised pipes therefore run on the same equations:
+a sewer that surcharges, or a pipe that drains back to part-full, needs no
+special case, and `c` — the slot width — is a slider you can drag.
 
 The assumptions are worth knowing before you trust a number. It is a **2D
 slice**: discharges are per metre of width, and "areas" are gap heights.
@@ -108,7 +128,9 @@ eddy viscosity, and the result is that normal depth and Manning's `n` are
 derived from the friction slider. There is **no surface tension**, and air is
 a **passive void** with no pressure of its own — nothing pneumatic works, and
 breakers spill rather than plunge because an overturning tongue is thinner
-than the ~2-cell interface can hold. Numerically there is **no pressure
+than the ~2-cell interface can hold. Numerically, everything lives on a
+**staggered (MAC) grid** — velocities on cell faces, pressure and fill at cell
+centres — and, thanks to the equation of state above, there is **no pressure
 Poisson solve**: two fullscreen GPU passes per substep, `vel` (3rd-order
 upwind advection, Smagorinsky eddy viscosity, wall-aware Laplacian, implicit
 bed friction, then `∇p` from the EOS) and `vof` (van Leer-limited flux-form

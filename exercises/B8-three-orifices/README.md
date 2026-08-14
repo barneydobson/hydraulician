@@ -3,6 +3,30 @@
 **Demo id:** B8  **Scene:** `?scene=jet`  **Refs:** #17, #33, #101–102, Q2
 **Type:** BACKUP, SUBMIT-capable
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B8**.
+3. Type the last digit of your student number into the card. It prints **your
+   lip type** (d mod 3): sharp is the scene's own edge, bellmouth and Borda
+   are drawn on.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (55 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **lip type** and **C_c**.
+
+If your lecturer gives you a link: **`?ex=B8`** (e.g.
+`http://localhost:8124/?ex=B8`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 A tank with a hole in its wall does not discharge through the hole's own
 area — the jet necks down to a **vena contracta** first. `C_c` (contraction
 coefficient) is that necking ratio, and its value depends entirely on the
@@ -55,7 +79,12 @@ tank-side entry shape changes).
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `http://<host>:8124/?scene=jet`
 
@@ -89,8 +118,10 @@ scene default — nothing is drawn for "sharp".
 
 **Three orifices, three coefficients — submit two things**
 
-1. Open **`http://<host>:8124/?scene=jet`**. Leave the tab visible.
-2. Confirm **Resolution: Medium** (the default).
+1. Open the app, press **`E`** and pick **B8** (or open **`?ex=B8`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand. Leave the tab visible.
+2. Confirm **Resolution: Medium** (the picker sets this).
 3. **Your lip type.** Take the **last digit of your student number**, `d`,
    and compute `d mod 3`:
 
@@ -116,7 +147,7 @@ scene default — nothing is drawn for "sharp".
    - `lip_type` (sharp / bellmouth / borda)
    - `Cc` (2 d.p.)
 
-**Standing rules.** Resolution: Medium · wait the full 55 s spin-up (this
+**Standing rules.** Resolution: Medium (the picker sets this) · wait the full 55 s spin-up (this
 scene's own measured figure, longer than most) · keep the tab visible.
 
 **What you should be able to say afterwards:** a hole is not its own area —

@@ -4,6 +4,32 @@
 **Rig** RIG-A (this folder is also the rig's first build — see `rig.js`)
 **Submit** three numbers · **Personalised** reservoir level from the student number
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **FR-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   reservoir level** — you set it, and you place the two gauges (x = 4.0 and
+   8.5 m).
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (22 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **level**, **H₁**, **H₂** and
+   **V**.
+
+If your lecturer gives you a link: **`?ex=FR-1`** (e.g.
+`http://localhost:8124/?ex=FR-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Every student drives the *same* pipe at a *different* head, reads the velocity
 and the head drop between two gauges, and submits them. Pooled on log–log axes
 the class draws the pipe's own resistance law in one line — no chart, no
@@ -32,7 +58,12 @@ head, gauge 2 ≈ 2.53 m; the difference is h_f.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 ### Link
 
@@ -85,7 +116,8 @@ view — the whole 9 × 5 m box is on screen).
 6. **Gauge** tool: one click at (4.0, 2.2), one at (8.5, 2.2) — mid-height in the
    pipe, near the left third and near the right end.
 
-`rig.js` in this folder is the same thing as a console paste
+`rig.js` in this folder is what the picker applies, and the same thing as a
+console paste
 (`RIGA.build()`), and is what the numbers in §5 were taken from. It is the
 canonical RIG-A card: LL-1, LL-2, PU-1, B7 and B10 should start from it.
 
@@ -117,8 +149,9 @@ pressurised duct. Known display quirk, harmless.)
 > speed. Between us we will measure the law that connects head loss to velocity —
 > the thing the Moody chart is a picture of — without using the chart.
 >
-> **1. Open** `http://localhost:8124/` and set **Resolution: Medium** in
-> `Controls`. Press `0` to fit the whole box on screen.
+> **1. Open the exercise.** Press `E` and pick **FR-1** (or open `?ex=FR-1`)
+> — it loads the sandbox at **Resolution: Medium** and draws the rig, so
+> step 2 is only for building it by hand. Press `0` to fit the whole box on screen.
 >
 > **2. Build the pipe** (your lecturer will demo this; ~90 seconds):
 > - Hold `]` until the brush stops growing. With **Erase**, wipe out the two grey
@@ -172,7 +205,7 @@ pressurised duct. Known display quirk, harmless.)
 > `Head` colour map is showing you fading along the pipe.
 >
 > ---
-> *Standing rules: Resolution **Medium**; wait out the spin-up; keep the tab
+> *Standing rules: Resolution **Medium** (the picker sets this); wait out the spin-up; keep the tab
 > visible; if you change anything else, change it back. Your digit is checked
 > against your submission — the solver is deterministic, so a neighbour's numbers
 > will not match your digit.*

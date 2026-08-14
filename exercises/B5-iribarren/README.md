@@ -4,6 +4,30 @@
 (1-in-1.4 "sea wall") **Refs:** W19–W20 · `ξ = tanβ/√(H₀/L₀)` · spilling
 ξ < 0.5, plunging 0.5–3.3, surging > 3.3
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B5**.
+3. No digit on this one: your pair is assigned a **cell** (scene, period,
+   amplitude) from the grid. The card lists them; you set the period and
+   amplitude.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (40 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **cell**, **ξ**, **behaviour**
+   and **surf width**.
+
+If your lecturer gives you a link: **`?ex=B5`** (e.g.
+`http://localhost:8124/?ex=B5`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Each pair is handed one point on the Iribarren map: a beach, a period and a
 stroke. They read off what the wave actually does — spills, surges, or dies
 before it gets there — and how wide the surf zone is. Pooled on a log-ξ
@@ -106,7 +130,12 @@ which visibly overtops). Rows in §2's grid that sit above ~35% are flagged.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Links to put on the slide:**
 `http://<host>:8124/?scene=wave` and `http://<host>:8124/?scene=wavesurge`
@@ -180,9 +209,10 @@ discussion and submission.
 1. Find your pair number in the grid above (or ask your lecturer which row
    is yours). It tells you a **scene** (`wave` or `wavesurge`), a
    **period T** and an **amplitude**.
-2. Open **`http://<host>:8124/?scene=<your scene>`**. Leave the tab
-   visible — the sim pauses when hidden. Open **Controls → Resolution:
-   Medium** (default, check it).
+2. Open the app, press **`E`** and pick **B5** (or open **`?ex=B5`**) — it
+   loads the scene, Resolution and all. Leave the tab visible — the sim pauses
+   when hidden. Open **Controls → Resolution: Medium** (the picker sets this —
+   check it anyway).
 3. Under **Controls → Wavemaker**: tick **Piston on**, set **Period** to
    your T, set **Amplitude** to your value.
 4. **Wait.** Watch the on-screen spin-up countdown finish, then keep
@@ -206,7 +236,7 @@ discussion and submission.
 7. **Submit on Blackboard:** `(cell id = your pair number, ξ from the grid,
    behaviour, surf width or "N/A")`.
 
-**Standing rules.** Resolution: Medium · keep the tab visible · wait the
+**Standing rules.** Resolution: Medium (the picker sets this) · keep the tab visible · wait the
 full 15–20 s past spin-up before judging · if you genuinely can't tell
 spilling from surging, "dies" is a legitimate third answer, not a cop-out —
 see Robustness below.

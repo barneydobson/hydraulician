@@ -4,6 +4,31 @@
 original rig was `m1`, preserved in **Appendix A** below)  **Refs:** N7,
 N9–N10 — conveyance, fall over a reach, velocity-head correction · N2, #117
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **NC-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   gauge window** (x₀ = 5.0 + 0.5·(d mod 8) m); you drop the gauges at x₀ and
+   x₀+7. Keep the Controls panel shut — it holds the answer.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (32 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **Q̂ (m²/s)**, **window x₀**
+   and **F (mm)**.
+
+If your lecturer gives you a link: **`?ex=NC-1`** (e.g.
+`http://localhost:8124/?ex=NC-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 > **VERDICT: READY.** The first NC-1 pass rigged this demo on `m1`'s
 > backwater weir pool and measured a fatal problem: the water-surface fall
 > over ANY available gauge window was 0.04–1.2 mm — below the solver's own
@@ -43,7 +68,12 @@ it can be read at all.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=m3`
 
@@ -106,7 +136,8 @@ opens Controls still gets the right trace on the gauge charts.
 
 **Slope-area method — submit one number**
 
-1. Open **`http://<host>:8124/?scene=m3`**. Leave the tab visible — the
+1. Open the app, press **`E`** and pick **NC-1** (or open **`?ex=NC-1`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible — the
    simulation pauses when the tab is hidden. **Do not click "Controls."**
 2. Wait for the *"establishing steady flow…"* countdown to finish (22 s).
 3. **Your window.** Take the **last digit of your student number**, `d`:
@@ -193,7 +224,7 @@ correction always subtracts a little); on `m1`'s backwater, depth
 can predict which way the N10 step will move your answer just by noting
 whether your window's depth is rising or falling downstream.
 
-**Standing rules.** Resolution: Medium (default, unchanged) · wait out the
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out the
 spin-up countdown · keep the tab visible · **do not open Controls before
 submitting** · read every trace for 20–30 s, not 10.
 

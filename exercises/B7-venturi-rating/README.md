@@ -3,6 +3,29 @@
 **Demo id:** B7  **Scene:** `?scene=venturi`  **Refs:** #14–16  **Type:** BACKUP,
 SUBMIT-capable
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B7**.
+3. Type the last digit of your student number into the card. It prints **your
+   reservoir level** — you set it, and you place the barrel and throat gauges
+   at the same height.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (15 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **q** and **Δh**.
+
+If your lecturer gives you a link: **`?ex=B7`** (e.g.
+`http://localhost:8124/?ex=B7`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 A venturi meter infers discharge from a pressure drop. Every student reads two
 piezometric heads off a fixed pair of gauges (barrel, throat) at their own
 personalised reservoir level, and submits `(q, Δh)`. Pooled, `q` vs `√Δh` is a
@@ -100,7 +123,12 @@ on this figure and stands on its own measurement.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `http://<host>:8124/?scene=venturi`
 
@@ -136,10 +164,13 @@ headless via the runner).
 
 **Venturi meter rating — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=venturi`**. Leave the tab visible.
-2. Open **Controls** → confirm **Resolution: Medium** (the default).
+1. Open the app, press **`E`** and pick **B7** (or open **`?ex=B7`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible.
+2. Open **Controls** → confirm **Resolution: Medium** (the picker sets this).
 3. Wait for the spin-up countdown to finish (~8 s).
-4. Drop two gauges (or paste `rig.js`): one on the **barrel**
+4. Drop two gauges yourself — where you measure is part of the exercise, so
+   the picker does not place them (fallback for a lecturer demo: paste
+   `rig.js`). One on the **barrel**
    (`x ≈ 2.4 m`, anywhere in the straight run before the taper), one on the
    **throat** (`x ≈ 5.0 m`, the narrow flat section). Put both at the **same
    height**, about a third of the way up the barrel bore — this is what
@@ -176,7 +207,7 @@ headless via the runner).
    - `dHead` = barrel gauge head − throat gauge head (3 d.p.)
    - (also record your `d` and `level` — checkable by re-running)
 
-**Standing rules.** Resolution: Medium · wait out the spin-up countdown ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out the spin-up countdown ·
 keep the tab visible · wait ≥15 s after changing the level before reading ·
 read the gauge cards promptly after pausing (their 900-sample history is
 overwritten by the live render loop within seconds of pausing, per

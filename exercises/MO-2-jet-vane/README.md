@@ -3,6 +3,30 @@
 **Demo id:** MO-2  **Rig:** Sandbox (no `?scene=`, see `rig.js`)  **Refs:**
 #7–9, H9–H10 — `F = ρQV(1 − cos θ)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **MO-2**.
+3. No digit on this one: everyone reads the same jet rig.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (5 s of sim time) and counts it down.
+5. Do the task printed on the card. The submission (a stagnation ratio) is
+   optional.
+
+If your lecturer gives you a link: **`?ex=MO-2`** (e.g.
+`http://localhost:8124/?ex=MO-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 A spout fires a free jet across open air onto a drawn plate. Probe the
 stagnation point and watch it read `v²/2g`; switch to the momentum-flux
 display and redraw the plate as a 45°, 90° and deep-V deflector, watching the
@@ -17,14 +41,20 @@ this same rig as the Pelton-bucket story; the two share one rig family
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **No `?scene=` link** — this rig is built by hand (or by `rig.js`) in the
 **Sandbox** (`http://<host>:8124/`, no query string). There is no personalised
 parameter and no mandatory submission (see §4).
 
 **Build it:** open the Sandbox, **Resolution: Medium**, then either draw the
-rig by hand (§2 below) or paste `rig.js` into the console and run:
+rig by hand (§2 below) or — fallback, since the picker applies it — paste
+`rig.js` into the console and run:
 
 ```js
 JETRIG.build();        // spout + erase the sandbox's own default ledges
@@ -65,7 +95,8 @@ solver.
 
 **Building it by hand** (≈1.5 min, 1 erase + spout placement):
 
-1. Open the **Sandbox**, **Resolution: Medium**, press `0` to fit.
+1. Open the **Sandbox** — press `E` and pick **MO-2** (or open `?ex=MO-2`) for
+   the same starting point at **Resolution: Medium** — and press `0` to fit.
 2. **Erase** (max brush): one stroke `(0,2.7)→(9,2.7)` — wipes the sandbox's
    own two default ledges, which cross this footprint.
 3. Select the **Spout** tool, drag the spout to **(0.70, 2.50)**. In

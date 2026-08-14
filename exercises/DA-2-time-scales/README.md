@@ -8,6 +8,33 @@ required reading before touching this one).
 an orifice, derived and verified in
 [QS-1](../QS-1-drain-predict/README.md)).
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **DA-2**.
+3. Type the last digit of your student number into the card. It prints **your
+   scale λ** (d mod 4) with its tank width and orifice, and your h_start and
+   h_stop.
+4. Work through the card's **4 numbered steps** in order — this rig needs a
+   sequence, and nothing does it for you.
+5. Let it settle after every change you make — the card gives this demo's
+   settle time (5 s of sim time) and counts it down.
+6. Do the task printed on the card, then submit **λ** and **t_fall**.
+
+If your lecturer gives you a link: **`?ex=DA-2`** (e.g.
+`http://localhost:8124/?ex=DA-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 One open tank stands on the domain floor with an orifice cut through a thin
 plate at its base. Each student builds it at **their own scale** λ — tank
 width, initial head and orifice gap all shrink together — fills it, releases
@@ -21,7 +48,12 @@ not asserted from a slide.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Scene** `http://localhost:8124/index.html?scene=sandbox` — everything is
 drawn. Resolution **Medium** (414 × 230 cells, Δx = 21.7 mm — same grid as
@@ -143,7 +175,9 @@ release/time 10–22 s sim ≈ 30–80 s of simulated time, ~2 min of drawing,
 | 0.50 | x = 2.25 | `]` ×3 | 0.90 m | 0.30 m |
 | 0.25 | x = 1.125 | `]` ×2 | 0.45 m | 0.15 m |
 
-1. Open **`?scene=sandbox`**. Set **Resolution: Medium**.
+1. Open the app, press **`E`** and pick **DA-2** (or open **`?ex=DA-2`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand.
 2. **Erase** the two grey ledges the sandbox starts with (Erase tool, two
    strokes each, as in the RIG-C card). Nothing should be left hanging in
    the box.
@@ -179,7 +213,7 @@ release/time 10–22 s sim ≈ 30–80 s of simulated time, ~2 min of drawing,
    - **t_fall = t1 − t0**, in seconds.
 9. Submit on Blackboard: **λ** (or your digit) and **t_fall** in seconds.
 
-*Standing rules: Resolution **Medium**; keep the tab visible (the sim pauses
+*Standing rules: Resolution **Medium** (the picker sets this); keep the tab visible (the sim pauses
 when hidden); time with the status-bar clock `t`, never a wristwatch — your
 laptop may not run at ×1 real time and the sim clock is the physics.*
 

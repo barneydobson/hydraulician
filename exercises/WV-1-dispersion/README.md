@@ -4,6 +4,29 @@
 `?scene=waveshallow` (second cohort)  **Refs:** W1–W2, W8–W11 ·
 `σ² = gk·tanh kh` · `L₀ = 1.56T²` · `c = √(gh)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **WV-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   period and stroke** — you set both on the wavemaker.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (40 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **T**, **L** and **flume**.
+
+If your lecturer gives you a link: **`?ex=WV-1`** (e.g.
+`http://localhost:8124/?ex=WV-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student sets their own wave period on a wavemaker flume, lets the train
 run out, and reads one wavelength off the scale bar. Pooled on one axis, the
 short periods land on the deep-water line, the long periods land on the
@@ -13,7 +36,12 @@ equation by hand.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Links to put on the slide:**
 `http://<host>:8124/?scene=wavedeep` (main cohort, T = 0.6–1.6 s)
@@ -105,8 +133,9 @@ submissions (deep + shallow).
 
 **Wave dispersion — submit three numbers**
 
-1. Open **`http://<host>:8124/?scene=wavedeep`**. Leave the tab visible.
-2. Open **Controls → Resolution: Medium** (default, check it).
+1. Open the app, press **`E`** and pick **WV-1** (or open **`?ex=WV-1`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible.
+2. Open **Controls → Resolution: Medium** (the picker sets this — check it anyway).
 3. **Your period.** Take the **last digit of your student number**, `d`, and
    look it up:
 
@@ -151,7 +180,7 @@ wave is long enough that you may need to **zoom out** (press **0**) to see a
 full crest-to-crest span; the second crest may sit out over the start of the
 beach slope, which is fine. Submit `(T, L, "shallow")`.
 
-**Standing rules.** Resolution: Medium · keep the tab visible · measure near
+**Standing rules.** Resolution: Medium (the picker sets this) · keep the tab visible · measure near
 the paddle on wavedeep, zoom out if needed on waveshallow · if you only see
 one crest, use the "same crest, one period later" trick in step 6.
 

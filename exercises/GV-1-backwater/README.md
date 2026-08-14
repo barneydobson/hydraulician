@@ -3,6 +3,31 @@
 **Demo id:** GV-1  **Scene:** `?scene=m1`  **Refs:** #150–151, #159 —
 `dy/dx = (S₀ − S_f)/(1 − Fr²)`, direct step, `S_f = n²V²/R^(4/3)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **GV-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   station** (x = 1 + d m). Nothing to set: your digit says where to stand,
+   not what to change.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (30 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **x (m)** and **surface
+   elevation (m, 3 d.p.)**.
+
+If your lecturer gives you a link: **`?ex=GV-1`** (e.g.
+`http://localhost:8124/?ex=GV-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student hovers at their own assigned chainage on the same settled M1
 backwater (a mild channel ponded behind a weir) and reads one number: the
 surface elevation. Nobody changes any parameter — m1's inflow is a pinned
@@ -17,7 +42,12 @@ run by the room.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=m1`
 
@@ -58,9 +88,10 @@ the one hard rule for this demo.
 
 **The backwater curve — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=m1`**. Leave the tab visible — the
+1. Open the app, press **`E`** and pick **GV-1** (or open **`?ex=GV-1`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible — the
    simulation pauses when the tab is hidden.
-2. Open **Controls** → confirm **Resolution: Medium** (the default; do not
+2. Open **Controls** → confirm **Resolution: Medium** (the picker sets this; do not
    change it) and confirm you have **not** touched Inflow q or the
    Reservoir level — everyone runs the identical backwater.
 3. Wait for the *"establishing steady flow…"* countdown to finish (30 s).
@@ -133,7 +164,7 @@ the one hard rule for this demo.
    - `elevation` = your computed surface elevation (m), to 3 decimals
    - (also record your `d` — checkable by re-running)
 
-**Standing rules.** Resolution: Medium · wait out the spin-up countdown ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out the spin-up countdown ·
 keep the tab visible, the sim pauses when hidden · do **not** touch Inflow q
 or the Reservoir level — this demo's personalisation is station, not
 parameter.

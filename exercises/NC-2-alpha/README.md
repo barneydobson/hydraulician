@@ -3,6 +3,29 @@
 **Demo id:** NC-2  **Scene:** `?scene=s2`  **Refs:** N6, #44–46, #49–50 —
 energy and momentum coefficients, `α = Σu³ΔA / (V³A)`, `β = Σu²ΔA / (V²A)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **NC-2**.
+3. Type the last digit of your student number into the card. It prints **your
+   station** (x = 1.5 + 0.5·(d mod 8) m); you drop the velocity rake there.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (45 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **u_max/V** and **α**.
+
+If your lecturer gives you a link: **`?ex=NC-2`** (e.g.
+`http://localhost:8124/?ex=NC-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student drops a velocity rake into the same steep chute, at their own
 station, and reads a shear profile the depth-averaged solver never shows
 anywhere else in this app: a curve of `u` against depth, bulging out near
@@ -67,7 +90,12 @@ this is a wide margin, not a tight one).
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=s2`
 
@@ -164,9 +192,10 @@ built the verification data in §5, not a substitute for the worksheet.
 
 **Is α really 1? — submit 2 numbers, 3 if you have time**
 
-1. Open **`http://<host>:8124/?scene=s2`**. Leave the tab visible — the
+1. Open the app, press **`E`** and pick **NC-2** (or open **`?ex=NC-2`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible — the
    simulation pauses when hidden.
-2. Confirm **Resolution: Medium** in Controls (the default — don't change
+2. Confirm **Resolution: Medium** in Controls (the picker sets this — don't change
    it, and don't touch **Inflow q** either: this demo personalises by
    *station*, not discharge).
 3. Wait for the *"establishing steady flow…"* countdown (22 s).
@@ -208,7 +237,7 @@ built the verification data in §5, not a substitute for the worksheet.
     - `alpha` — your own 4–5 point mid-ordinate calculation (step 7).
     - *(bonus)* the free-slip `ratio` from step 9.
 
-**Standing rules.** Resolution: Medium · wait out the spin-up countdown ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out the spin-up countdown ·
 keep the tab visible · **do not change Inflow q** · read the chip after
 watching for 15–20 s and pausing, never off the first frame you see ·
 untick Free-slip walls again once you've read it.

@@ -3,6 +3,30 @@
 **Demo id** HP-1 · **Topic** Hydropower · **Scene** `?scene=hammer` ·
 **Submit** (gap, q, v) · **Refs** H2, H22–H26 — P = ρgQ(H − kQ²)
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **HP-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   nozzle gap** (d mod 5) — you draw it. No physics slider moves in this demo.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (50 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **gap**, **q** and **v**.
+
+If your lecturer gives you a link: **`?ex=HP-1`** (e.g.
+`http://localhost:8124/?ex=HP-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Every student gets their own nozzle on the same 49 m penstock, measures the
 discharge it passes and the velocity of the jet it throws, and submits three
 numbers. Pooled, the class's jet power **rises, peaks and falls**, and at the
@@ -24,7 +48,12 @@ theoretical ⅓ = 0.333**.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `index.html?scene=hammer`
 
@@ -149,8 +178,8 @@ the class will think somebody copied.
 > **Your nozzle gap** = look up the last digit of your student number in the
 > table above (d mod 5). Write it down now.
 >
-> **1 · Open the scene.** `index.html?scene=hammer`. Open **Controls**, set
-> **Resolution: Medium**. Change nothing else — every slider stays where it is.
+> **1 · Open the exercise.** Press `E` and pick **HP-1** (or open
+> `?ex=HP-1`) — it loads the scene at **Resolution: Medium**. Change nothing else — every slider stays where it is.
 >
 > **2 · Take the old nozzle out.** The nozzle plate is the vertical bar at the
 > far right of the pipe, just past the green valve. Scroll to zoom in on it
@@ -199,7 +228,7 @@ the class will think somebody copied.
 > guess, before the pooled plot goes up, whether your nozzle is too big or too
 > small.
 >
-> *Standing rules: Resolution **Medium**; keep the tab visible (the sim pauses
+> *Standing rules: Resolution **Medium** (the picker sets this); keep the tab visible (the sim pauses
 > when the page is hidden); `0` resets the view, `Z` undoes one stroke, `C`
 > clears everything you have drawn and puts the scene's own nozzle back. You
 > never touch a physics slider in this demo — if you have moved one, reload the

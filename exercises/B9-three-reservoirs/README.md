@@ -3,6 +3,33 @@
 **Demo id** B9 · **Topic** Pipe networks (enrichment) · **Rig** RIG-C, extended
 to three tanks · **Refs** #81–83
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B9**.
+3. Type the last digit of your student number into the card. It prints **the
+   level you pour tank B to** (z_B(0) = 1.30 + 0.16·d m) — you pour it
+   yourself, by right-drag.
+4. Work through the card's **4 numbered steps** in order — this rig needs a
+   sequence, and nothing does it for you.
+5. Let it settle after every change you make — the card gives this demo's
+   settle time (20 s of sim time) and counts it down.
+6. Do the task printed on the card, then submit **z_B(0)**, **sign of Q_B**
+   and **junction head**.
+
+If your lecturer gives you a link: **`?ex=B9`** (e.g.
+`http://localhost:8124/?ex=B9`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Three reservoirs, three pipes, one junction — the textbook problem where you
 are given three tank levels and have to find the one head, and the three
 flows, that satisfy continuity at the node. On paper it needs an iterative
@@ -26,7 +53,12 @@ this call and what it costs.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Scene** `http://localhost:8124/index.html?scene=sandbox` — everything is drawn.
 
@@ -127,7 +159,9 @@ This band brackets the level the other two reservoirs settle to between them
 (measured at ≈ 1.68–1.70 m) — some of you will see B fill, some will see it
 drain, and that split is the class's result.
 
-1. Open **`?scene=sandbox`**. Set **Resolution: Medium**.
+1. Open the app, press **`E`** and pick **B9** (or open **`?ex=B9`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand.
 2. **Erase** the two grey ledges (Erase tool, two strokes each).
 3. In **Controls**: **Top-left spout OFF**; **Left edge → Open**,
    **Upstream reservoir ON**, level **3.20**; **Right edge → Open**,
@@ -164,7 +198,7 @@ drain, and that split is the class's result.
     the **junction gauge's reading** at that same moment (your measured
     junction head).
 
-*Standing rules: Resolution **Medium**; keep the tab visible; C_s = 0.40 is
+*Standing rules: Resolution **Medium** (the picker sets this); keep the tab visible; C_s = 0.40 is
 load-bearing here (it is the pipes' roughness, not a cosmetic slider).*
 
 ---

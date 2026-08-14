@@ -8,12 +8,36 @@ where geometry/instruments are drawn. Statuses and measured caveats:
 _director-status.md. Interface proposals, programme-text amendments and the
 measurement watch-outs every worksheet leans on: CHANGES-NEEDED.md.
 
-**Standing rules (every worksheet carries them):** everyone on Resolution
-Medium · wait out the spin-up · median-of-the-wobble reads, never one frame ·
-after changing q, re-check any tailwater ≥ 1.3·y_c · pause-and-read promptly
-(the chart buffer keeps moving).
+## Running an exercise
 
-| ID | Demo | Folder | Runs on | Students submit |
+Open the app, press **`E`** (or click **`Exercises ▾`** in the top bar) and
+pick the demo by the **ID** in the table below. Direct link for a slide:
+**`?ex=<ID>`** — e.g. `http://localhost:8124/?ex=HJ-1`. Every id in the ID
+column is its own `?ex=` id; there is no second naming scheme.
+
+Picking a demo puts the whole class at the same starting point: the scene,
+**Resolution: Medium** (automatic — no student has to set it) and, where the
+demo has one, the drawn rig plus the handful of settings without which the rig
+is not a working rig. The card labels those as already set.
+
+It does **not** fill in the rest. Type your student-number's last digit into
+the card and it prints *your* parameter — a discharge, a level, a period, a
+station, a gap to draw — which you then set, place or draw yourself. Coupled
+values the worksheet asks you to derive (HJ-1's tailwater off the y_c rule,
+WE-1's q→level pairing), instrument positions and staged sequences stay in the
+student's hands: getting them wrong and seeing why is the exercise. `↻ Reset
+to this exercise` on the card restores the starting point.
+
+Each folder's README opens with a "How to start (30 seconds)" block; the old
+prose setup is kept below it as *Manual setup (fallback, or for building it
+yourself)* — still the record of every constant.
+
+**Standing rules (every worksheet carries them):** everyone on Resolution
+Medium (the picker sets this) · wait out the spin-up · median-of-the-wobble
+reads, never one frame · after changing q, re-check any tailwater ≥ 1.3·y_c ·
+pause-and-read promptly (the chart buffer keeps moving).
+
+| ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|
 | DA-1 | The scale ladder | DA-1-scale-ladder/ | RIG-B weir ×3 scales | (λ, q, H) |
 | DA-2 | Time scales as √λ | DA-2-time-scales/ | RIG-C tank ×λ | (λ, t between marks) |

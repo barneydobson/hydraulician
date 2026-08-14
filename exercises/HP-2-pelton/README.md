@@ -3,6 +3,30 @@
 **Demo id:** HP-2  **Rig:** Sandbox (no `?scene=`, see `rig.js`)  **Refs:**
 H9–H14, #7 — `F = ρQΔv` on a vane; H11 jet velocity `C_v√(2gH)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **HP-2**.
+3. No digit on this one: it is a lecturer demo on the shared jet rig.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (5 s of sim time) and counts it down.
+5. Do the task printed on the card. Nothing is submitted — the arithmetic goes
+   on the board.
+
+If your lecturer gives you a link: **`?ex=HP-2`** (e.g.
+`http://localhost:8124/?ex=HP-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 A spout fires a free jet across open air onto a drawn flat plate, then a
 deep, narrow V-splitter approximating `θ → 165°` — as close as this tool
 gets to a Pelton bucket without an actual rotating wheel (there is none:
@@ -22,7 +46,12 @@ README §2–3, cross-referenced rather than repeated here).
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **No `?scene=` link** — built in the **Sandbox**
 (`http://<host>:8124/`, no query string), Resolution **Medium**. No

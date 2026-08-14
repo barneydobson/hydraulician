@@ -4,6 +4,29 @@
 **Submit** (u_max, t_90) · **Refs** U1–U7 — inertia head;
 `u_max = √(2gH/k)`; `t = (l·u_max/2gH)·ln[(u_max+u)/(u_max−u)]`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **UN-2**.
+3. Type the last digit of your student number into the card. It prints **your
+   reservoir level** — you set it, and you place the gauge mid-pipe.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (10 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **u_max** and **t_90**.
+
+If your lecturer gives you a link: **`?ex=UN-2`** (e.g.
+`http://localhost:8124/?ex=UN-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 A student starts from nothing: valve shut, pipe full, water dead still. They
 open the valve and watch the speed trace claw its way up to a plateau — not
 instantly, because 49 m of water has inertia. Read where it settles (u_max)
@@ -22,7 +45,12 @@ overshoot, not on a monotone climb.**
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `http://<host>:8124/?scene=hammer` — no rig to draw; every student
 uses the scene's own nozzle unmodified. Only the reservoir level changes.
@@ -112,8 +140,9 @@ rather than pretending otherwise.
 
 **Flow establishment — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=hammer`**. Leave the tab visible.
-2. Open **Controls**. Check **Resolution: Medium** (the default).
+1. Open the app, press **`E`** and pick **UN-2** (or open **`?ex=UN-2`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible.
+2. Open **Controls**. Check **Resolution: Medium** (the picker sets this).
 3. Set **Wave damping** to **0.30** (default is 0.03 — turn it up, it stops a
    later step from ringing).
 4. **Shut the valve.** The scene boots with it open and flowing — press **V**
@@ -164,7 +193,7 @@ memory. At ×0.20 the window is 3 s — enough to hold the whole thing at once.
 filling — with a frozen, repeated value — while paused, so don't sit on
 pause for long before reading.)
 
-**Standing rules.** Resolution: Medium · wave damping 0.30 · wait out the
+**Standing rules.** Resolution: Medium (the picker sets this) · wave damping 0.30 · wait out the
 settle before opening the valve · keep the tab visible · watch continuously
 for a few seconds after opening before you pause to read.
 

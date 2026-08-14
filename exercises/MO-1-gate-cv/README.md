@@ -3,6 +3,32 @@
 **Demo id:** MO-1  **Scene:** `?scene=sandbox` + **RIG-B** with a drawn vertical
 gate  **Refs:** #144–146 — F_R = ρQ(V₁−V₂) + ½ρg(y₁²−y₂²); #7–12 — Q = C_d·a·b·√(2gy₀)
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **MO-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   gate opening**, which you draw, and the **reservoir level** that goes with
+   it, which you set.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (70 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **a**, **y₀**, **y₁**, **C_d**
+   and **F_R**.
+
+If your lecturer gives you a link: **`?ex=MO-1`** (e.g.
+`http://localhost:8124/?ex=MO-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 *(Note on symbols: the refs' momentum formula labels upstream "1" and
 downstream "2"; the refs' orifice formula labels upstream head "y₀". This
 sheet follows the Run instruction's own notation — **y₀ = upstream, y₁ =
@@ -22,14 +48,20 @@ closing that gap *is* the momentum equation's job.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link for the slide:** `http://<host>:8124/?scene=sandbox`
 
 **RIG-B must be drawn** — a flat bed carried a short distance past a drawn
 vertical gate, THEN TRUNCATED, with the floor beyond falling to an Open
-bottom edge. This folder's `rig.js` is the reusable build card; paste it into
-the dev console and call
+bottom edge. This folder's `rig.js` is the reusable build card — the picker
+applies it for you; to build it by hand instead, paste it into the dev
+console and call
 
 ```js
 MOGATE.build({ a: 0.1522, q: 0.33, level: 1.2103 })   // bare rig, one opening
@@ -200,9 +232,11 @@ demo is.
 
 **Sluice gate — control-volume thrust and C_d — submit up to five numbers**
 
-1. Open **`http://<host>:8124/?scene=sandbox`**. Keep the tab visible — the
+1. Open the app, press **`E`** and pick **MO-1** (or open **`?ex=MO-1`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand. Keep the tab visible — the
    simulation pauses when it is hidden.
-2. **Controls → Resolution: Medium** (the default; check it). Status bar
+2. **Controls → Resolution: Medium** (the picker sets this — check it anyway). Status bar
    should read `414×230 · Δx 22 mm`.
 
 ### Build the rig
@@ -286,7 +320,7 @@ zoomed.
 15. **Submit on Blackboard:** your digit `d`, `a` (m), `y0` (m), `y1` (m),
     your computed **C_d**, your computed **F_R** (N/m).
 
-**Standing rules.** Resolution: Medium · wait for `t = 70 s` before reading ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait for `t = 70 s` before reading ·
 keep the tab visible · `q` is 0.330 for everyone, only your opening and its
 paired reservoir level change.
 

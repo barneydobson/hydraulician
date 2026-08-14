@@ -4,6 +4,30 @@
 **Rig** RIG-A + a hidden partial obstruction (this folder's `rig.js` extends FR-1's RIG-A card)
 **Submit** two numbers, in pairs · **Personalised** by partner A's own (position, severity) choice, not a student digit
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **LL-2**.
+3. No digit on this one: partner A draws the hidden throttle. The card prints
+   the rule for where it may go and how big it may be.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (20 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **x_found** and **k_L**.
+
+If your lecturer gives you a link: **`?ex=LL-2`** (e.g.
+`http://localhost:8124/?ex=LL-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Partner A draws a short obstruction somewhere inside the covered pipe from FR-1 —
 invisible once you zoom back out to the whole box. Partner B never sees where
 it went. B's only tool is four gauges: walk them along the pipe, plot the
@@ -38,7 +62,12 @@ plainly visible at this zoom. That contrast between these two screenshots
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 ### Link
 
@@ -132,8 +161,9 @@ the stroke missed the invert and needs redrawing.
 > a utility does to find a half-shut valve in a real main from two pressure
 > readings.
 >
-> **1. Both of you: open** `http://localhost:8124/`, set **Resolution:
-> Medium**, press `0` to fit the box on screen.
+> **1. Both of you: press** `E` **and pick LL-2** (or open `?ex=LL-2`) —
+> it loads the sandbox at **Resolution: Medium** and draws RIG-A, so step 2
+> is only for building it by hand. Press `0` to fit the box on screen.
 >
 > **2. Build RIG-A together** (lecturer demo first, ~2 min): erase the two
 > sandbox ledges; draw the invert (floor), the soffit (roof, leaving a
@@ -196,7 +226,7 @@ the stroke missed the invert and needs redrawing.
 > your final bracket) and your **k_L**.
 >
 > ---
-> *Standing rules: Resolution **Medium**; wait out each 20 s read; keep the
+> *Standing rules: Resolution **Medium** (the picker sets this); wait out each 20 s read; keep the
 > tab visible; every gauge at y = 2.35, no exceptions; stay at the `0`-reset
 > zoom while hunting — do not zoom in speculatively scanning for a visual
 > tell, use the heads. Your fault is unique to your pair — a copied answer

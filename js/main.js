@@ -384,13 +384,24 @@ const PICKER = (() => {
  *  unusable: this turns "HJ-1" into a set-up simulation and a card telling you
  *  what to read off it.
  *
+ *  WHAT IT DOES AND DOES NOT SET. It gives every student the same STARTING
+ *  POINT — the scene, Resolution Medium, the captured rig, and only the
+ *  plumbing a README documents as load-bearing (`rigParams`) plus the display
+ *  settings the demo is meant to be read on (`viewParams`). It does NOT set the
+ *  student's own work: the personalised parameter, the coupled value the
+ *  worksheet makes them derive, where the gauges go, or the staged sequence.
+ *  Those are PRINTED on the card and left for them to do — including getting
+ *  them wrong, which is where the learning is. Everything that IS applied is
+ *  listed on the card under "already set for you", so nothing is silently
+ *  magic.
+ *
  *  Two optional data files, both plain classic scripts:
  *    js/exercises.js       `const EXERCISES = [...]`      — the list
  *    js/exercises-rigs.js  `const EXERCISE_RIGS = {...}`  — the drawn geometry
  *  Either may be absent. Without the list the menu says so and nothing else
- *  changes; without the rig pack an exercise still loads its scene, its
- *  settings and its digit rule, and the card says to draw the rig from the
- *  README. Nothing here knows an exercise id.
+ *  changes; without the rig pack an exercise still loads its scene and its
+ *  settings, and the card says to draw the rig from the README. Nothing here
+ *  knows an exercise id.
  *
  *  Scene loading goes through `switchScene` — the same path the scene menu
  *  takes — so an exercise pick is exactly a fresh `?scene=` boot plus the
@@ -450,7 +461,12 @@ const EX = (() => {
   // ------------------------------------------------- the personalised digit
   /** `value = base + step·d`, or a per-digit `table` where the measured rule
    *  is not linear (HJ-1's tailwater steps to 1.5·y_c at d = 6 and 9), with an
-   *  optional `mod` for "d mod N" rules. `also` carries coupled controls. */
+   *  optional `mod` for "d mod N" rules. `also` carries the coupled values the
+   *  worksheet makes the student derive.
+   *
+   *  These are DISPLAYED, never applied. The one thing a digit does write is
+   *  `rigTable` — which captured drawing loads — because DA-1's λ = ¼ weir is a
+   *  different rig, not a different number. */
   function rules(ex) {
     if (!ex || !ex.digit) return [];
     return [ex.digit].concat(ex.digit.also || []);
@@ -471,8 +487,24 @@ const EX = (() => {
   }
   function ruleLabel(r) {
     if (r.label) return r.label;
-    const c = CONTROLS.find((x) => x.id === r.control);
-    return c ? c.label : r.control;
+    return ctlLabel(r.control) || r.control;
+  }
+  /** The name of the panel row a value has to be set on, so the card can say
+   *  "set it on the Inflow q slider" rather than setting it. */
+  function ctlLabel(id) {
+    const c = CONTROLS.find((x) => x.id === id);
+    return c ? c.label : id;
+  }
+  /** A control value as the panel would name it: an option's own text for a
+   *  select, on/off for a checkbox, the number otherwise. */
+  function ctlText(id, v) {
+    const c = CONTROLS.find((x) => x.id === id);
+    if (c && c.type === "select" && c.opts) {
+      const o = c.opts.find((x) => String(x[0]) === String(v));
+      if (o) return o[1];
+    }
+    if (c && c.type === "check") return v ? "on" : "off";
+    return fmtVal(v);
   }
   /** Two decimals at least, so a rule that lands on 1.00 does not print "1"
    *  next to a slider reading 1.000; more where the rule itself is finer. */
@@ -497,9 +529,14 @@ const EX = (() => {
     else c.set(+v);
     return true;
   }
-  function applyParams(p) {
-    const miss = [];
-    if (!p) return miss;
+  /** The applied half of an exercise: `rigParams` (the plumbing that makes it
+   *  a working rig) then `viewParams` (how it is meant to be looked at). Key
+   *  ORDER inside each is honoured, because ticking a level control opens its
+   *  own edge — which is why the edges are written first. Nothing else about an
+   *  exercise is applied: `studentParams`, the digit's values and the
+   *  instrument stations are the student's own work and are only printed. */
+  function applyParams(ex) {
+    const miss = [], p = (ex && ex.rigParams) || {}, v = (ex && ex.viewParams) || {};
     // Resolution first: it rebuilds the grid, and every other control is a
     // live parameter that survives the rebuild. Skipped when it is already
     // what the exercise wants — a rebuild for nothing costs the drawn rig a
@@ -510,27 +547,46 @@ const EX = (() => {
       if (k === "budget") return;
       if (!setControl(k, p[k])) miss.push(k);
     });
+    Object.keys(v).forEach((k) => { if (!setControl(k, v[k])) miss.push(k); });
     syncPanel();
     return miss;
   }
-  /** Instruments an exercise needs but the panel cannot express: a gauge is a
-   *  pointer tool, so a demo that lives on a shipped scene (B6's two depth
-   *  gauges, B7's barrel/throat pair) has nowhere else to put them. Rigs carry
-   *  their own, so this is only used where `rig` is null. */
-  function applyInstruments(ex) {
-    (ex.gauges || []).forEach(([x, y]) => {
-      if (state.gauges.length >= 4) state.gauges.shift();
-      state.gauges.push({ x, y, hist: [], log: [], id: ++state.gaugeSeq,
-                          colour: CONFIG.gaugeColours[state.gauges.length % 4] });
+  /** The controls the STUDENT owns: the digit's own rules and `studentParams`,
+   *  minus anything the exercise also declares load-bearing (a value in
+   *  `rigParams` is the bench's, whatever else names it). */
+  function studentControls(ex) {
+    const app = Object.assign({}, ex.rigParams || {}, ex.viewParams || {}), ids = [];
+    rules(ex).forEach((r) => {
+      if (r.control && app[r.control] === undefined) ids.push(r.control);
     });
-    (ex.rakes || []).forEach((x) => {
-      if (state.rakes.length >= 2) state.rakes.shift();
-      state.rakes.push({ x, buf: null });
+    (ex.studentParams || []).forEach((p) => {
+      if (p.control && app[p.control] === undefined) ids.push(p.control);
     });
+    return ids.filter((v, i, a) => a.indexOf(v) === i);
   }
-  function applyDigit(ex, d) {
-    rules(ex).forEach((r) => { if (r.control) setControl(r.control, ruleValue(r, d)); });
+  /** THE SAME STARTING POINT FOR ALL TEN DIGITS. A rig payload carries whatever
+   *  panel state the capture happened to have, and those captures were taken at
+   *  a reference row — MO-1's snapshot sits on level 1.2103, which IS the
+   *  d = 5/6/7 answer, and FR-1's 3.30 is d = 0's. Left alone, three students in
+   *  ten would boot with their own parameter already dialled in and seven would
+   *  not: not one starting point but two, and the picker silently doing one
+   *  student's work. So every student-owned control is put back to the value it
+   *  had on a fresh boot of this scene, read before the rig landed. Anything a
+   *  rig genuinely needs to function belongs in `rigParams`, where it is applied
+   *  after this and listed on the card. */
+  function resetStudentControls(fresh) {
+    Object.keys(fresh).forEach((id) => setControl(id, fresh[id]));
     syncPanel();
+  }
+  /** Instruments are NOT placed. Choosing where to measure is part of every one
+   *  of these exercises — B1's entire failure mode is a gauge at the wrong
+   *  station, and NC-1's window IS the personalisation — so the card prints the
+   *  station rule and the picker clears whatever a rig payload carried. */
+  function clearInstruments() {
+    GINSP.closeAll();
+    state.gauges.length = 0;
+    state.rakes.length = 0;
+    state.gaugeT = -1;
   }
   /** A rig payload may be the rig object itself, an encoded `#rig=` code, a
    *  share URL, or raw JSON — RIG reads all of them. Async because the deflate
@@ -555,6 +611,14 @@ const EX = (() => {
       note = "scene \"" + ex.scene + "\" is not in this build — loaded the sandbox instead";
       switchScene("sandbox");
     }
+    // Read the SCENE's own value for every student-owned control now, on a
+    // fresh boot, before the rig or anything else can move it. See
+    // `resetStudentControls`.
+    const fresh = {};
+    studentControls(ex).forEach((id) => {
+      const c = CONTROLS.find((x) => x.id === id);
+      if (c && c.get) fresh[id] = c.get();
+    });
     // The digit is settled BEFORE the rig, because a variant rig (DA-1's three
     // scales, B8's three lips) is chosen by it.
     let d0 = o.digit;
@@ -565,26 +629,30 @@ const EX = (() => {
     // fault is 2–3 cells of an 18-cell bore), so a rig rasterised at another
     // Δx is quietly a different rig. Every payload was captured at Medium and
     // the programme's standing rule is Medium anyway.
-    if (ex.params && ex.params.budget && ex.params.budget !== state.budget) {
-      setControl("budget", ex.params.budget);
-    }
+    const bud = ex.rigParams && ex.rigParams.budget;
+    if (bud && bud !== state.budget) setControl("budget", bud);
     const done = () => {
-      const miss = applyParams(ex.params);
+      const miss = applyParams(ex);
       if (miss.length) note += (note ? " · " : "") + "unknown control" +
         (miss.length > 1 ? "s" : "") + ": " + miss.join(", ");
+      // A rig payload carries the gauges and the panel state the capture
+      // happened to have; the student places their own instruments and sets
+      // their own values, from an identical bench whatever their digit.
+      clearInstruments();
+      resetStudentControls(fresh);
       const d = d0;
       digit = (d === null || d === undefined || d === "") ? null : (+d | 0);
-      if (digit !== null) { memo[ex.id] = digit; lastDigit = digit; applyDigit(ex, digit); }
-      applyInstruments(ex);
+      if (digit !== null) { memo[ex.id] = digit; lastDigit = digit; }
       cur = ex;
       arm(ex.settle || 0, ex.id);
       syncURLEx(ex.id);
       card.show();
       syncPanel();
       showToast(ex.id + " · " + ex.title,
-        needsRig(ex) && !rig ? "Scene and settings applied — the rig is not in this build, draw it from the README."
-                             : "Scene, settings" + (rig ? ", rig" : "") +
-                               (digit !== null ? " and digit " + digit : "") + " applied.");
+        needsRig(ex) && !rig
+          ? "Starting point set — the rig is not in this build, draw it from the README."
+          : "Starting point set: scene, Resolution " + state.budget + (rig ? ", rig" : "") +
+            ". Your own values are on the card.");
     };
     if (rig) {
       // Applying a rig may be asynchronous (RIG decodes deflated codes), so
@@ -602,7 +670,12 @@ const EX = (() => {
     return true;
   }
 
-  /** Re-apply everything: the recovery path when a rig has been broken. */
+  /** Back to the COMMON STARTING POINT — scene, Resolution, rig, the
+   *  load-bearing settings — and nothing else. The recovery path when a rig has
+   *  been drawn over. It deliberately does not restore the student's own
+   *  settings: those were never applied, and re-applying them here would make
+   *  the button a way to have the exercise done for you. The digit is kept,
+   *  because it is who you are, not a setting. */
   function reset() { if (cur) pick(cur.id, { digit: digit }); }
 
   function setDigit(d) {
@@ -616,12 +689,9 @@ const EX = (() => {
     if (cur.rigTable && rigKey(cur, nd) !== rigKey(cur, digit)) { pick(cur.id, { digit: nd }); return; }
     digit = nd;
     memo[cur.id] = digit; lastDigit = digit;
-    applyDigit(cur, digit);
-    // The flow has to find its new depth: the worksheets all say "after
-    // changing q, let it re-settle". Same countdown, shorter.
-    arm(Math.min(cur.settle || 0, 15), cur.id + " · digit " + digit);
+    // Nothing on the panel moves: the card now shows YOUR numbers and you set
+    // them. So there is nothing to re-settle either, until you do.
     card.refresh();
-    syncPanel();
   }
 
   // ------------------------------------------------------------ countdown
@@ -840,15 +910,20 @@ const EX = (() => {
             '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
                    'title="The last digit of your student number">' +
             '<span class="exval"></span></div>' +
+          '<div class="exyours"></div>' +
           '<div class="exdraw"></div>' +
-          '<div class="exsettle"></div>' +
+          '<details class="exset"><summary></summary><div class="exsetl"></div></details>' +
           '<div class="extask"></div>' +
+          '<div class="exalso"></div>' +
           '<ol class="exsteps"></ol>' +
           '<div class="exsub"></div>' +
+          '<div class="exsettle"></div>' +
           '<div class="exwarn"></div>' +
           '<div class="exnote"></div>' +
           '<div class="exfoot">' +
-            '<button class="exb" data-a="reset">↻ Reset to this exercise</button>' +
+            '<button class="exb" data-a="reset" title="Scene, Resolution, the rig and the ' +
+                   'load-bearing settings only. Your own values are not restored — they were ' +
+                   'never set for you.">↻ Reset to the starting point</button>' +
             '<a class="exlink" target="_blank" rel="noopener"></a>' +
           '</div>' +
         '</div>';
@@ -886,9 +961,11 @@ const EX = (() => {
         has ? ((cur.digit && cur.digit.label) ? cur.digit.label.replace(/\s*\(.*\)$/, "") + " — last digit d" : "last digit d")
             : "last digit d";
       box.querySelector(".exval").textContent =
-        has ? (digit === null ? "enter d to personalise" : "your " + digitSummary(cur, digit))
+        has ? (digit === null ? "enter d for your numbers" : "your " + digitSummary(cur, digit))
             : (digit === null ? "enter d, then read the rule below"
                               : "d = " + digit + " — your value is in the rule below, not on a slider");
+      yours();
+      already();
       // Where the personalised thing is a STROKE, the digit field alone is a
       // lie: print what has to be drawn and how.
       const dn = drawNote(cur), dw = box.querySelector(".exdraw");
@@ -905,6 +982,18 @@ const EX = (() => {
         dw.style.display = "block";
       } else dw.style.display = "none";
       box.querySelector(".extask").textContent = cur.task || "";
+      // Six demos SPAN two scenes (WV-1's second cohort, NC-3's m2 anchor,
+      // HJ-1's s1 coda…). `?ex=` boots one of them, so the card has to say
+      // which the other is and when to go there — it never switches by itself.
+      const al = box.querySelector(".exalso"), sc = cur.secondScene;
+      if (sc) {
+        al.textContent = "";
+        const b = document.createElement("b");
+        b.textContent = sc.scene ? "second scene — " + sc.scene + ": " : "second run: ";
+        al.appendChild(b);
+        al.appendChild(document.createTextNode(sc.when || ""));
+        al.style.display = "block";
+      } else al.style.display = "none";
       // Staged rigs: a snapshot cannot hold "fill it, THEN shut the valve".
       const st = box.querySelector(".exsteps");
       st.textContent = "";
@@ -932,8 +1021,8 @@ const EX = (() => {
         b.textContent = missing ? "Draw the rig from the card in the README. " : "Note. ";
         w.appendChild(b);
         w.appendChild(document.createTextNode(
-          missing ? "Everything else — scene, settings" + (digit !== null ? ", your digit" : "") +
-                    " — is already applied." + (note ? " (" + note + ")" : "")
+          missing ? "The scene and the load-bearing settings are applied; the geometry is not." +
+                    (note ? " (" + note + ")" : "")
                   : note));
         w.style.display = "block";
       } else w.style.display = "none";
@@ -945,6 +1034,96 @@ const EX = (() => {
       a.href = "exercises/" + cur.folder + "/README.md";
       a.textContent = "full brief: exercises/" + cur.folder + "/README.md";
       tick();
+    }
+    // ---- one row: "q = 0.51 m²/s → Inflow q", with the rule underneath
+    function row(host, name, val, where, rule) {
+      const d = document.createElement("div"); d.className = "exrow";
+      const b = document.createElement("b");
+      b.textContent = name + (val ? " = " + val : "");
+      d.appendChild(b);
+      if (where) {
+        const s = document.createElement("span"); s.className = "exwhere";
+        s.textContent = where;
+        d.appendChild(s);
+      }
+      if (rule) {
+        const i = document.createElement("i"); i.textContent = rule;
+        d.appendChild(i);
+      }
+      host.appendChild(d);
+      return d;
+    }
+    /** YOUR VALUES — everything the student has to set or place. Printed, never
+     *  applied: the digit's own parameter and the coupled values it pairs with,
+     *  any staged control the sequence asks for, and where the instruments go.
+     *  A wrong tailwater here gives a drowned jump, which is the lesson. */
+    function yours() {
+      const y = box.querySelector(".exyours");
+      y.textContent = "";
+      const rs = rules(cur), sp = cur.studentParams || [], ins = cur.instruments || [];
+      if (!rs.length && !sp.length && !ins.length) { y.style.display = "none"; return; }
+      const h = document.createElement("div"); h.className = "exh";
+      h.textContent = "Your values — set these yourself";
+      y.appendChild(h);
+      rs.forEach((r) => {
+        row(y, ruleLabel(r),
+            digit === null ? "" : fmtVal(ruleValue(r, digit)) + (r.unit ? " " + r.unit : ""),
+            r.control ? "→ " + ctlLabel(r.control) : "",
+            r.rule || "");
+      });
+      if (rs.length && digit === null) {
+        const i = document.createElement("i"); i.className = "exhint";
+        i.textContent = "enter your last digit above and this block fills in with your numbers.";
+        y.appendChild(i);
+      }
+      sp.forEach((p) => {
+        row(y, p.label || ctlLabel(p.control),
+            p.value === undefined ? "" : ctlText(p.control, p.value) + (p.unit ? " " + p.unit : ""),
+            p.control ? "→ " + ctlLabel(p.control) : "", p.rule || "");
+      });
+      ins.forEach((n) => {
+        row(y, n.tool === "rake" ? "rake (tool 6)" : "gauge (tool 5)", "",
+            n.where ? "→ " + n.where : "", n.why || "");
+      });
+      y.style.display = "block";
+    }
+    /** ALREADY SET FOR YOU — the common starting point, itemised so that no
+     *  applied value is invisible. Collapsed by default; it is a receipt, not
+     *  an instruction. */
+    function already() {
+      const det = box.querySelector(".exset"), sum = det.querySelector("summary");
+      const list = det.querySelector(".exsetl");
+      list.textContent = "";
+      const items = [];
+      items.push(["scene", (state.scene ? state.scene.name : cur.scene) + " (?scene=" + cur.scene + ")"]);
+      items.push(["Resolution", state.budget]);
+      if (needsRig(cur)) {
+        items.push(["rig", hasRig(cur)
+          ? "the captured drawing — " + (sim && sim.segs ? sim.segs.length : 0) + " stroke" +
+            ((sim && sim.segs && sim.segs.length === 1) ? "" : "s")
+          : "NOT in this build — draw it from the README"]);
+      }
+      const p = cur.rigParams || {}, why = cur.rigWhy || {};
+      Object.keys(p).forEach((k) => {
+        if (k === "budget") return;
+        items.push([ctlLabel(k), ctlText(k, p[k]), why[k]]);
+      });
+      const v = cur.viewParams || {};
+      const vs = Object.keys(v).map((k) => ctlLabel(k) + " " + ctlText(k, v[k]));
+      if (vs.length) items.push(["view", vs.join(", "), why.view]);
+      items.forEach(([k, val, w]) => {
+        const d = document.createElement("div");
+        const b = document.createElement("b"); b.textContent = k;
+        d.appendChild(b);
+        d.appendChild(document.createTextNode(" " + val));
+        // A load-bearing value nobody can guess the reason for is mysterious,
+        // and mysterious is how it gets "tidied up" by the next reader.
+        if (w) { const i = document.createElement("i"); i.textContent = w; d.appendChild(i); }
+        list.appendChild(d);
+      });
+      sum.textContent = "Already set for you — " + items.length + " item" +
+                        (items.length === 1 ? "" : "s") + " (the same for everyone)";
+      det.style.display = "block";
     }
     /** The live line: the countdown while it settles, then "ready". */
     function tick() {
@@ -959,7 +1138,10 @@ const EX = (() => {
       } else {
         s.className = "exsettle ready";
         s.textContent = "settled at t = " + (settleTo || cur.settle).toFixed(0) +
-                        " s · reading now (t = " + sim.t.toFixed(0) + " s)";
+                        " s · reading now (t = " + sim.t.toFixed(0) + " s)" +
+                        (rules(cur).length || (cur.studentParams || []).length
+                          ? " — after you set your own values, give it that long again"
+                          : "");
       }
     }
     return { show, hide, shown, refresh, tick, get el() { return box; } };
@@ -1037,7 +1219,7 @@ const CONTROLS = [
       }
     },
     fmt: () => EX.statusLine(),
-    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one loads its scene exactly as the Scene menu would, applies the panel settings its verification record was measured at, draws its rig if the rig pack is in this build, and opens a card with the task, what to submit and the personalised-parameter rule. Type the last digit of your student number into the card and the personalised values are set for you. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
+    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a card with the task, what to submit, and the values you have to set yourself. Type the last digit of your student number into the card and it prints YOUR numbers and the station rules for your gauges; it does not move the sliders or drop the gauges, because choosing and setting them is the exercise. Everything that was applied is itemised on the card under \"already set for you\". <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
 
   { h: "Flow" },
   { id: "speed", label: "Speed", min: 0.02, max: 3, step: 0.01, log: true,

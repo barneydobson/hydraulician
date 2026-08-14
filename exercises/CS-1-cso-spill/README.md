@@ -4,6 +4,34 @@
 **Refs:** #102 (orifice) and #107 (weir) — *in tandem*, because a CSO chamber is
 both at once.
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **CS-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   throttle width** (r = d mod 4 → 2/4/6/8 cells) and the brush presses that
+   cut it — you cut it.
+4. Work through the card's **4 numbered steps** in order — this rig needs a
+   sequence, and nothing does it for you.
+5. Let it settle after every change you make — the card gives this demo's
+   settle time (20 s of sim time) and counts it down.
+6. Do the task printed on the card, then submit **gap (cells)** and
+   **q_spill**.
+
+If your lecturer gives you a link: **`?ex=CS-1`** (e.g.
+`http://localhost:8124/?ex=CS-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 A combined sewer arrives from the left and drops into a chamber. At the base of
 the chamber a small throttle passes flow **to treatment**; a metre above it a
 weir crest spills **to the river**. In dry weather the throttle takes everything
@@ -22,7 +50,12 @@ outlier, which is the point of the bottom panel of the chart.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link for the slide:** `http://<host>:8124/?scene=sandbox`
 
@@ -84,9 +117,12 @@ Your chamber has a small pipe at the bottom going **to treatment** and a weir at
 the top going **to the river**. Your job is to find the storm flow at which your
 chamber first spills.
 
-1. Open **`http://<host>:8124/?scene=sandbox`**. Keep the tab visible — the
+1. Open the app, press **`E`** and pick **CS-1** (or open **`?ex=CS-1`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand. Keep the tab visible — the
    simulation pauses when it is hidden.
-2. **Controls → Resolution: Medium**. The status bar should read
+2. **Controls → Resolution: Medium** (the picker sets this). The status bar
+   should read
    `414×230 · Δx 22 mm`.
 
 ### Build RIG-D (six strokes, ~2½ min)
@@ -176,7 +212,7 @@ stroke horizontal or vertical. `Z` undoes the last stroke.
     - `q_spill` = the sewer discharge at first spill (3 d.p.)
     - (also record your `d` and the number of `]` presses you used)
 
-**Standing rules.** Resolution: Medium · keep the tab visible, the sim pauses
+**Standing rules.** Resolution: Medium (the picker sets this) · keep the tab visible, the sim pauses
 when hidden · time everything on the status-bar clock `t`, never a wristwatch ·
 read the gauge as a *typical* value over several seconds, never a single frame —
 a chamber with a plunging inflow slops by ±60 mm.

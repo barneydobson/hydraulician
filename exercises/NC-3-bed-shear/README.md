@@ -3,6 +3,30 @@
 **Demo id:** NC-3  **Scenes:** `?scene=s2` (personalised sweep) + `?scene=m2`
 (fixed anchor)  **Refs:** N11–N13 — τ₀ = ρgRS, Shields 0.056, D_min · #113
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **NC-3**.
+3. Type the last digit of your student number into the card. It prints **your
+   q** — set it on **Inflow q** yourself.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (26 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **τ₀ (N/m²)** and **D_min
+   (mm)**.
+
+If your lecturer gives you a link: **`?ex=NC-3`** (e.g.
+`http://localhost:8124/?ex=NC-3`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 > **STATUS: MEASURED**, via `exercises/_runner/runner.py` (dedicated visible
 > Chrome, hardware GL, CDP). One structural change from the programme spec,
 > made for the reason the brief invited: the "**pooled D_min vs q on the
@@ -28,7 +52,12 @@ bed slope alone moved the answer by a factor of ~14.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Links to put on the slide:** `http://<host>:8124/?scene=s2` (Part A, every
 student) and `http://<host>:8124/?scene=m2` (Part B, every student, same
@@ -96,9 +125,10 @@ wrong in a way that changes the qualitative answer.
 
 **Part A — your own steep chute**
 
-1. Open **`http://<host>:8124/?scene=s2`**. Leave the tab visible — the
+1. Open the app, press **`E`** and pick **NC-3** (or open **`?ex=NC-3`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible — the
    simulation pauses when the tab is hidden.
-2. Open **Controls** → confirm **Resolution: Medium** (the default).
+2. Open **Controls** → confirm **Resolution: Medium** (the picker sets this).
 3. **Your discharge.** Take the **last digit of your student number**, `d`:
 
    > **q = 0.80 + 0.04 · d**   (m²/s)
@@ -160,7 +190,7 @@ wrong in a way that changes the qualitative answer.
     if you are off by much more, check you hovered mid-reach, not near the
     brink (see the lecturer's note on why that matters).
 
-**Standing rules.** Resolution: Medium · wait out each spin-up countdown ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out each spin-up countdown ·
 keep the tab visible, the sim pauses when hidden · **m2's q is fixed — do not
 personalise it** · read the median of ~10 s of wobble, never a single instant.
 

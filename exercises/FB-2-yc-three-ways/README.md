@@ -5,6 +5,32 @@
 the reading list's own y_brink ≈ 0.7 y_c note · broad-crested weir
 `Q = 1.705·C_d·b·h^(3/2)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **FB-2**.
+3. Type the last digit of your student number into the card. It prints **your
+   q** and the paired **reservoir level** (digit 9 runs the digit-8 row) — you
+   set both.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (55 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **q**, **y_c**, **y_crest**
+   and **y_brink**.
+
+If your lecturer gives you a link: **`?ex=FB-2`** (e.g.
+`http://localhost:8124/?ex=FB-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Every student builds the SAME two-stroke rig — a flat approach bed, a raised
 flat-topped crest block, and nothing past it but the draining floor — and
 runs it at their own discharge. One rig, three readings, no scene change and
@@ -24,12 +50,18 @@ numbers a laptop measured, all traceable to the same `q`.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link for the slide:** `http://<host>:8124/?scene=sandbox`
 
-**The rig must be drawn** (or built with `rig.js` — paste it into the dev
-console with the sandbox scene loaded, then):
+**The rig must be drawn** — the picker does that for you. To build it by hand
+instead, draw it (§3) or paste `rig.js` into the dev console with the sandbox
+scene loaded, then:
 
 ```js
 FB2.build(0.35)        // bare rig at q = 0.35 (also sets the reservoir)
@@ -132,9 +164,11 @@ expectation.
 
 **Critical depth three ways — submit three numbers**
 
-1. Open **`http://<host>:8124/?scene=sandbox`**. Keep the tab visible — the
+1. Open the app, press **`E`** and pick **FB-2** (or open **`?ex=FB-2`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand. Keep the tab visible — the
    simulation pauses when hidden.
-2. **Controls → Resolution: Medium** (the default; check it). Status bar
+2. **Controls → Resolution: Medium** (the picker sets this — check it anyway). Status bar
    should read `414×230 · Δx 22 mm`.
 
 ### Build the rig (four strokes, ~90 s)
@@ -219,7 +253,7 @@ snap a stroke horizontal or vertical.
     - `y_crest` (reading 2, 3 d.p., from the gauge)
     - `y_brink` (reading 3, 3 d.p., from the hover box)
 
-**Standing rules.** Resolution: Medium · wait for `t ≈ 55` s before reading
+**Standing rules.** Resolution: Medium (the picker sets this) · wait for `t ≈ 55` s before reading
 · keep the tab visible, the sim pauses when hidden · the reservoir level
 must match your `q` — they are paired, not independent.
 

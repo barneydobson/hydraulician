@@ -3,6 +3,30 @@
 **Demo id:** HJ-1  **Scene:** `?scene=h23`  **Refs:** #137–143 — conjugate
 depths, `y₂/y₁ = ½(√(1+8Fr₁²) − 1)`, and `ΔE = (y₂−y₁)³ / 4y₁y₂`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **HJ-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   q** and the **tailwater** the y_c rule pairs with it — you set both on the
+   panel.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (35 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **Fr₁** and **y₂/y₁**.
+
+If your lecturer gives you a link: **`?ex=HJ-1`** (e.g.
+`http://localhost:8124/?ex=HJ-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 > **STATUS: REMEASURED FOR REAL.** A second pass drove the live solver
 > through `exercises/_runner/runner.py` (a dedicated visible Chrome over CDP,
 > not the agent browser pane) and replaced every projected number below with
@@ -23,7 +47,12 @@ announced.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=h23`
 
@@ -58,9 +87,10 @@ approach onto a flat apron at 0.15 m, 7.5 m × 1.6 m domain, `c` = 22 m/s,
 
 **Hydraulic jump — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=h23`**. Leave the tab visible — the
+1. Open the app, press **`E`** and pick **HJ-1** (or open **`?ex=HJ-1`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible — the
    simulation pauses when the tab is hidden.
-2. Open **Controls** → **Resolution: Medium** (this is the default; check it).
+2. Open **Controls** → **Resolution: Medium** (the picker sets this — check it anyway).
 3. Wait for the *"establishing steady flow…"* countdown to finish (20 s). Do
    not touch anything while it runs.
 4. **Your discharge.** Take the **last digit of your student number**, `d`:
@@ -110,7 +140,7 @@ approach onto a flat apron at 0.15 m, 7.5 m × 1.6 m domain, `c` = 22 m/s,
    - `y2_over_y1` = `y₂ ÷ y₁` from the box (2 d.p.)
    - (also record your `d` and `q` — the answer is checkable against them)
 
-**Standing rules.** Resolution: Medium · wait out the spin-up countdown · keep
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out the spin-up countdown · keep
 the tab visible, the sim pauses when hidden · **after changing q, re-check the
 tailwater** — `y_c = (q²/g)^⅓` moves with q and is printed on the q slider.
 

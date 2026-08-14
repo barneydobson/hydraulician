@@ -3,6 +3,30 @@
 **Demo id** UN-1 · **Topic** Unsteady flow · **Scene** `?scene=hammer` ·
 **Submit** (v₀, ΔH) · **Refs** U11, U17–U18, U21, #53 — Joukowsky Δp = ρcΔu
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **UN-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   nozzle gap** (0.14 × (1 + d mod 6) m) — you erase the shipped plate and
+   draw it, then put a gauge mid-pipe.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (15 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **v₀** and **ΔH**.
+
+If your lecturer gives you a link: **`?ex=UN-1`** (e.g.
+`http://localhost:8124/?ex=UN-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student gets their own nozzle, and therefore their own steady pipe
 velocity. They slam the valve, read the head rise off the square wave, and
 submit the pair. Pooled, the thirty points lie on a straight line **through the
@@ -18,7 +42,12 @@ and **139.8 m/s against 140 (−0.1%)** for the coda.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `index.html?scene=hammer` — no rig to pre-build; the scene ships with
 the nozzle plate the students will modify.
@@ -102,8 +131,8 @@ Two consequences worth saying out loud:
 > **Your nozzle gap = 0.14 × (1 + (d mod 6)) metres**, where **d** is the last
 > digit of your student number. Write it down now.
 >
-> **1 · Open the scene.** `index.html?scene=hammer`. Open **Controls** and set
-> **Resolution: Medium**. Wait out the "establishing steady flow" countdown.
+> **1 · Open the exercise.** Press `E` and pick **UN-1** (or open
+> `?ex=UN-1`) — it loads the scene at **Resolution: Medium**. Wait out the "establishing steady flow" countdown.
 >
 > **2 · Zoom to the nozzle.** The nozzle plate is the vertical bar at the right
 > hand end of the pipe, just past the green valve. Put the cursor on it and
@@ -166,7 +195,7 @@ Two consequences worth saying out loud:
 > repeats of the square wave. That period is 4L/c, and it is the subject of the
 > next demo.
 >
-> *Standing rules: Resolution **Medium**; wait out the spin-up countdown; keep
+> *Standing rules: Resolution **Medium** (the picker sets this); wait out the spin-up countdown; keep
 > the tab visible (the sim pauses when the page is hidden); press `0` if the
 > view gets lost.*
 

@@ -6,6 +6,33 @@ inherit.
 **Refs** Q6–Q8 (coupled tanks and the `A₁A₂/(A₁+A₂)` grouping); Q13–Q14 (dry
 dock) is the same rig narrated differently.
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **QS-2**.
+3. Type the last digit of your student number into the card. It prints **your
+   tank-2 width** (A₂ = 0.50 + 0.25·d m), which you move the far wall to, and
+   your target level h*.
+4. Work through the card's **4 numbered steps** in order — this rig needs a
+   sequence, and nothing does it for you.
+5. Let it settle after every change you make — the card gives this demo's
+   settle time (5 s of sim time) and counts it down.
+6. Do the task printed on the card, then submit **A₂** and **t_½**.
+
+If your lecturer gives you a link: **`?ex=QS-2`** (e.g.
+`http://localhost:8124/?ex=QS-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Two open tanks stand side by side on a solid floor, joined by a pipe at the
 base with a valve in it. One tank starts 1.5 m higher than the other. Release
 the valve and the levels chase each other to a common level — the tall one
@@ -19,7 +46,12 @@ anyone writes the ODE down.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Scene** `http://localhost:8124/index.html?scene=sandbox` — everything is drawn.
 
@@ -83,7 +115,9 @@ the difference has halved:
 | A₂ (m) | 0.50 | 0.75 | 1.00 | 1.25 | 1.50 | 1.75 | 2.00 | 2.25 | 2.50 | 2.75 |
 | h\* (m) | 1.849 | 1.794 | 1.748 | 1.710 | 1.677 | 1.648 | 1.623 | 1.601 | 1.581 | 1.564 |
 
-1. Open **`?scene=sandbox`**. Set **Resolution: Medium**.
+1. Open the app, press **`E`** and pick **QS-2** (or open **`?ex=QS-2`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand.
 2. **Erase** the two grey ledges the sandbox starts with (Erase tool, two
    strokes each). Nothing should be left hanging in the box.
 3. In **Controls**: **Top-left spout OFF**; **Left / Right / Bottom / Top edge
@@ -119,7 +153,7 @@ the difference has halved:
 10. Submit on Blackboard: **A₂** (the width you can measure against the 1 m
     grid, not the one you aimed for) and **t_½** in seconds.
 
-*Standing rules: Resolution **Medium**; keep the tab visible (the sim pauses
+*Standing rules: Resolution **Medium** (the picker sets this); keep the tab visible (the sim pauses
 when it is hidden); time with the status-bar clock `t`, never a wristwatch —
 your laptop may not run at ×1 real time and the sim clock is the physics.*
 

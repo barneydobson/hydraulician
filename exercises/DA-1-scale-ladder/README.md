@@ -3,6 +3,31 @@
 **Demo id:** DA-1  **Scene:** `?scene=sandbox` + **RIG-B** with a broad-crested
 weir block  **Refs:** D1, D13, D22–D23, D15 · Froude scaling and the π-collapse
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **DA-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   λ third** (d mod 3) with the geometry that goes with it, and **your q and
+   reservoir level** — you set those two.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (55 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **λ**, **q** and **H**.
+
+If your lecturer gives you a link: **`?ex=DA-1`** (e.g.
+`http://localhost:8124/?ex=DA-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 The class splits into thirds and builds *the same weir at three sizes* — full
 scale, half scale and quarter scale, every length scaled by λ and the discharge
 by λ^1.5. Each student reads one number: the head `H` standing over their crest.
@@ -23,12 +48,17 @@ residual is DA-3's opening exhibit.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link for the slide:** `http://<host>:8124/?scene=sandbox`
 
-`rig.js` is the reusable card — paste it into the dev console with the sandbox
-loaded, then `DA1.build(0.25, 0.90)` (λ, base q) or `DA1.student(5)` for one
+`rig.js` is the reusable card, and the picker applies it for you. To build it
+by hand instead, paste it into the dev console with the sandbox loaded, then `DA1.build(0.25, 0.90)` (λ, base q) or `DA1.student(5)` for one
 whole student run. Students draw by hand in ~90 s (§3).
 
 ### 2.1 · The cell arithmetic that fixes everything else
@@ -179,9 +209,11 @@ it full size, a third at half size, a third at quarter size — every length
 scaled, and the discharge scaled by λ^1.5. Your job is to measure the head
 standing over your crest.
 
-1. Open **`http://<host>:8124/?scene=sandbox`**. Keep the tab visible — the
+1. Open the app, press **`E`** and pick **DA-1** (or open **`?ex=DA-1`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand. Keep the tab visible — the
    simulation pauses when it is hidden.
-2. **Controls → Resolution: Medium** (the default; check it). The status bar
+2. **Controls → Resolution: Medium** (the picker sets this — check it anyway). The status bar
    should read `414×230 · Δx 22 mm`.
 
 ### Your third and your numbers
@@ -274,7 +306,7 @@ The background grid is **1 m** squares and the scale bar is bottom right. Hold
     - `H` = head over the crest (3 d.p.)
     - (also record your `d` and `P`)
 
-**Standing rules.** Resolution: Medium · wait out your settle time · keep the
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out your settle time · keep the
 tab visible, the sim pauses when hidden · **q and reservoir level are a pair** —
 set both from your row, every time.
 

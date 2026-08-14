@@ -3,6 +3,29 @@
 **Demo id:** UF-1  **Scene:** `?scene=s2`  **Refs:** #115–118, N2 —
 `y_n = (qn/√S₀)^(3/5)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **UF-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   q** — set it on **Inflow q** yourself.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (26 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **q** and **y_n**.
+
+If your lecturer gives you a link: **`?ex=UF-1`** (e.g.
+`http://localhost:8124/?ex=UF-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student runs the same steep chute at their own personalised discharge,
 reads one number — the overlay's measured normal depth `y_n` — off the green
 dashed line (or the cursor hover box), and posts `(q, y_n)`. Pooled on
@@ -15,7 +38,12 @@ class that this "constant" clusters tightly even though nobody entered it.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=s2`
 
@@ -64,9 +92,10 @@ close to 1. The worksheet below carries no tailwater step, unlike HJ-1/h23.
 
 **Normal depth — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=s2`**. Leave the tab visible — the
+1. Open the app, press **`E`** and pick **UF-1** (or open **`?ex=UF-1`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible — the
    simulation pauses when the tab is hidden.
-2. Open **Controls** → confirm **Resolution: Medium** (the default).
+2. Open **Controls** → confirm **Resolution: Medium** (the picker sets this).
 3. **Your discharge.** Take the **last digit of your student number**, `d`:
 
    > **q = 0.80 + 0.04 · d**   (m²/s)
@@ -110,7 +139,7 @@ close to 1. The worksheet below carries no tailwater step, unlike HJ-1/h23.
      `n = y_n^(5/3) · √S₀ / q` with `S₀ = 0.25` (printed as "1 : 4" in the
      box) — compare it to the `n = …` the box printed live at your cursor.
 
-**Standing rules.** Resolution: Medium · wait out the spin-up countdown ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out the spin-up countdown ·
 keep the tab visible, the sim pauses when hidden · **no tailwater step for
 this scene** — s2 is supercritical throughout, so unlike the jump/backwater
 demos there is no downstream control to re-check after changing q.

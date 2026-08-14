@@ -4,6 +4,29 @@
 **Refs:** #120–123 (unsteady/characteristics), #147–149 (surge / moving
 hydraulic jump) — `equations-reference.md`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B3**.
+3. Type the last digit of your student number into the card. It prints **your
+   station pair** (x₁ = 3.0 + 0.5·d m, x₂ = x₁ + 1.5 m) — where you watch, not
+   what you change.
+4. No settle wait: the card starts you at t = 0, with the dam still standing.
+5. Do the task printed on the card, then submit **x₁**, **x₂**, **v_negwave**
+   and **v_bore**.
+
+If your lecturer gives you a link: **`?ex=B3`** (e.g.
+`http://localhost:8124/?ex=B3`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 A column of water is released instantly. Two fronts run away from the gate
 in opposite directions: a **negative wave** climbs back into the reservoir
 at (nominally) `√(g h₀)`, and a **bore** — a moving hydraulic jump — steepens
@@ -14,7 +37,12 @@ than see.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=dambreak`
 
@@ -204,8 +232,9 @@ vs. position along the whole reach.
 
 **Dam break — submit two speeds**
 
-1. Open **`http://<host>:8124/?scene=dambreak`**. Leave the tab visible.
-2. Open **Controls** → check **Resolution: Medium** (default) and set
+1. Open the app, press **`E`** and pick **B3** (or open **`?ex=B3`**) — it
+   loads the scene at **Resolution: Medium**. Leave the tab visible.
+2. Open **Controls** → check **Resolution: Medium** (the picker sets this) and set
    **Speed → ×0.15**. Ignore the Reservoir/Tailwater panel controls — this
    scene does not use them.
 3. **(Optional but recommended) Drop three position markers.** Select the
@@ -257,7 +286,7 @@ vs. position along the whole reach.
    - `v_negwave` (m/s, 2 d.p.)
    - `v_bore` (m/s, 2 d.p.)
 
-**Standing rules.** Resolution: Medium · Speed ×0.15 · keep the tab visible
+**Standing rules.** Resolution: Medium (the picker sets this) · Speed ×0.15 · keep the tab visible
 · if a pause is fumbled, press R and try again (each run costs ≈13
 real-seconds, so a retry is cheap).
 

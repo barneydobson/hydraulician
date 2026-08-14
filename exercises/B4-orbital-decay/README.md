@@ -3,6 +3,29 @@
 **Demo id:** B4 **Scene:** `?scene=wavedeep` **Refs:** W5–W7 · orbital velocity
 `cosh k(z+h)/sinh kh` (horizontal), `sinh k(z+h)/sinh kh` (vertical)
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B4**.
+3. Type the last digit of your student number into the card. It prints **your
+   period and stroke** — you set both on the wavemaker.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (40 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **T** and **surface/bed
+   ratio**.
+
+If your lecturer gives you a link: **`?ex=B4`** (e.g.
+`http://localhost:8124/?ex=B4`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student drops a column of orbit tracers into the deep-water flume,
 zooms in until the trails stop being invisible, and reads off how much
 smaller the loop is near the bed than at the surface. The vertical motion
@@ -96,7 +119,12 @@ parameter change before recording starts.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=wavedeep`
 
@@ -141,9 +169,10 @@ the expected, honest result.)
 
 **Orbital decay — submit one number**
 
-1. Open **`http://<host>:8124/?scene=wavedeep`**. Leave the tab visible.
-   Open **Controls → Resolution: Medium** (default, check it). Wait out the
-   spin-up countdown (20 s).
+1. Open the app, press **`E`** and pick **B4** (or open **`?ex=B4`**) — it
+   loads the scene, Resolution and all. Leave the tab visible. Open **Controls
+   → Resolution: Medium** (the picker sets this — check it anyway). Wait out
+   the spin-up countdown (20 s).
 2. **Your period.** Take the last digit of your student number, `d`:
 
    | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
@@ -176,7 +205,7 @@ the expected, honest result.)
    what height you can and note "flat" alongside your number.
 8. **Submit on Blackboard:** `(T, ratio)`.
 
-**Standing rules.** Resolution: Medium · keep the tab visible · zoom until
+**Standing rules.** Resolution: Medium (the picker sets this) · keep the tab visible · zoom until
 the loops are clearly bigger than a few pixels, THEN raise vertical
 exaggeration · read the vertical (not horizontal) extent for your ratio —
 the bed's horizontal smear looks big even where its vertical motion has

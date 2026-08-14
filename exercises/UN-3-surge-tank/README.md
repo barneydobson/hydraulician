@@ -4,6 +4,31 @@
 standpipe · **Submit** (b_s, y_max, T) · **Refs** U23–U29 — the surge-tank ODE
 and its trial-solved upsurge
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **UN-3**.
+3. Type the last digit of your student number into the card. It prints **your
+   standpipe width** (b_s = 0.70 + 0.14·d m) — you draw it, and you submit the
+   width the grid actually delivered.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (60 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **b_s**, **y_max** and **T**.
+
+If your lecturer gives you a link: **`?ex=UN-3`** (e.g.
+`http://localhost:8124/?ex=UN-3`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Every student tees their own standpipe into the penstock just upstream of the
 valve, establishes the flow, and slams the valve. The pipe's momentum has
 nowhere to go but up the shaft, and what follows is a **mass oscillation** —
@@ -21,7 +46,12 @@ frictionless bound**, with the gap closing as the shaft widens.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `index.html?scene=hammer`. There is a rig to build — three strokes —
 and **two panel settings that must be changed from the scene defaults**.
@@ -162,8 +192,9 @@ reduction.
 > digit of your student number. Read your row off the table in §2 — you need
 > **x_left** and **x_right** as well.
 >
-> **1 · Open the scene.** `index.html?scene=hammer`. Open **Controls** and set
-> **Resolution: Medium**.
+> **1 · Open the exercise.** Press `E` and pick **UN-3** (or open
+> `?ex=UN-3`) — it loads the scene at **Resolution: Medium**, with the
+> standpipe still yours to draw.
 >
 > **2 · Two panel settings.** Set **Reservoir level** to **12.0 m** and
 > **Gauges plot** to **Depth**. Leave everything else — in particular leave
@@ -235,7 +266,7 @@ reduction.
 > 3-second spikes ±6 m tall. That is the water hammer from UN-1, still there,
 > riding on top. Why does the *level* not show it?
 >
-> *Standing rules: Resolution **Medium**; reservoir 12.0 m; wave damping 0.03;
+> *Standing rules: Resolution **Medium** (the picker sets this); reservoir 12.0 m; wave damping 0.03;
 > wait the full 60 s settle; keep the tab visible (the sim pauses when hidden);
 > press `0` if the view gets lost.*
 

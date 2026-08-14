@@ -3,6 +3,30 @@
 **Demo id:** QS-1  **Scene:** `?scene=jet`  **Refs:** Q1–Q3, #102 — falling
 head through an orifice, `t = (2A / C_d·a·√2g)·(√h₁ − √h₂)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **QS-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   pair of levels** to time between. Do the hand prediction before you run
+   anything.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (55 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **t_pred** and **t_meas**.
+
+If your lecturer gives you a link: **`?ex=QS-1`** (e.g.
+`http://localhost:8124/?ex=QS-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student times the *same* tank draining through the *same* hole — but
 each is handed a different pair of levels to time between, so each computes
 and reads a different number. Before anyone touches the app they do the
@@ -17,7 +41,12 @@ against their own stopwatch before a wheel was turned.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `index.html?scene=jet` — no rig to draw. The stock tank, orifice
 and spout are used exactly as shipped; students only use the panel (spout
@@ -115,8 +144,10 @@ screen.
 
 **Falling head through an orifice — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=jet`**. Leave the tab visible — the sim
-   pauses when hidden. Open **Controls** → confirm **Resolution: Medium**.
+1. Open the app, press **`E`** and pick **QS-1** (or open **`?ex=QS-1`**) — it
+   loads the scene, Resolution and all. Leave the tab visible — the sim pauses
+   when hidden. Open **Controls** → confirm **Resolution: Medium** (the picker
+   sets this).
 2. Wait out the **"establishing steady flow…"** countdown (55 s). Don't
    touch anything while it runs — the tank is drawing down under the spout
    and needs the full countdown to reach its working level.
@@ -166,7 +197,7 @@ screen.
 9. **Submit on Blackboard:** your **t_predicted** (from §2, computed before
    you ran anything) and your **t_measured**, both in seconds to 2 d.p.
 
-**Standing rules.** Resolution: Medium · wait out the spin-up countdown ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait out the spin-up countdown ·
 keep the tab visible · do the prediction before you touch the spout switch.
 
 **What you should be able to say afterwards:** the falling-head formula

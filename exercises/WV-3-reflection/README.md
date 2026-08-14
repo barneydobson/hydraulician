@@ -5,6 +5,30 @@ all students) and `?scene=wave` (1:10 dissipative beach, the contrast run)
 **Refs:** W21 · `K_refl = H_r/H_i = (a_max − a_min)/(a_max + a_min)` · sea
 walls 0.7–1.0, beaches 0.05–0.2
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **WV-3**.
+3. Type the last digit of your student number into the card. It prints **your
+   period and stroke** — you set both, then slide one gauge along the flat run
+   yourself.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (45 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **T** and **K_refl**.
+
+If your lecturer gives you a link: **`?ex=WV-3`** (e.g.
+`http://localhost:8124/?ex=WV-3`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student slides a wave gauge along a flume standing against a steep,
 smooth 1:1.4 slope and reads the biggest (antinode) and smallest (node)
 depth-oscillation swing the reflected wave leaves in its partial standing
@@ -77,7 +101,12 @@ whether it stays wet. This is the height used throughout.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Links to put on the slide:**
 `http://<host>:8124/?scene=wavesurge` (all students, main measurement)
@@ -141,9 +170,10 @@ the zone in ~10–15 stops — comes to **≈4–6 minutes** including the secon
 
 **Reflection off a steep sea wall — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=wavesurge`**. Leave the tab visible —
-   the sim pauses when hidden. Open **Controls → Resolution: Medium**
-   (default, check it).
+1. Open the app, press **`E`** and pick **WV-3** (or open **`?ex=WV-3`**) — it
+   loads the scene, Resolution and all. Leave the tab visible — the sim pauses
+   when hidden. Open **Controls → Resolution: Medium** (the picker sets this —
+   check it anyway).
 2. **Your period.** Take the last digit of your student number, `d`, and
    look it up:
 
@@ -196,7 +226,7 @@ result**: there isn't enough reflected wave here to build a standing
 pattern, so `a_max` and `a_min` come out close together and `K_refl` is
 low. Submit `(T, K_refl, "wave")`.
 
-**Standing rules.** Resolution: Medium · keep the tab visible · on
+**Standing rules.** Resolution: Medium (the picker sets this) · keep the tab visible · on
 `wavesurge`, wait to t≈45s (not just past the spin-up countdown) before
 measuring · read the gauge chart promptly, it only remembers ~15 s ·
 Gauges plot field: Depth.

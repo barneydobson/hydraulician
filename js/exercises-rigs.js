@@ -633,7 +633,7 @@ const EXERCISE_RIGS = {
    one thing. `how` is lifted from the exercise's own worksheet. */
 const EXERCISE_RIG_NOTES = {
   "UN-1": {
-    control: "nozzle gap g = the personalised ladder rung (5 rungs, 0.28-0.84 m; the flow area is quantised to ONE cell at Medium)",
+    control: "nozzle gap g = 0.14 x (1 + (d mod 6)) metres — the verified SIX-rung ladder, 0.14-0.84 m (the flow area is quantised to ONE cell at Medium)",
     how: "Erase the scene's plate with the brush widened four `]` presses, then with the Wall tool and Shift held draw two vertical pieces at the same station: lower half from the pipe floor (y = 2.0) up to y = 3.5 - gap/2, upper half from y = 3.5 + gap/2 up to the pipe roof (y = 5.0).",
   },
   "LL-2": {

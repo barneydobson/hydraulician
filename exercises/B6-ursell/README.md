@@ -2,6 +2,29 @@
 
 **Demo id:** B6 **Scene:** `?scene=waveshallow` **Refs:** W26 · `U_r = HL²/h³`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B6**.
+3. Type the last digit of your student number into the card. It prints **your
+   period and stroke** — you set both, and you place the two depth gauges.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (42 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **T**, **H**, **L**, **U_r**
+   and **crest vs trough**.
+
+If your lecturer gives you a link: **`?ex=B6`** (e.g.
+`http://localhost:8124/?ex=B6`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student raises a long, shallow wave, measures its height, wavelength
 and still-water depth, and computes the Ursell number. Nobody has to be told
 the wave has stopped being sinusoidal — the class can just look at it: the
@@ -82,7 +105,12 @@ its noise-dominated `wavedeep` bed points from its own headline number.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link to put on the slide:** `http://<host>:8124/?scene=waveshallow`
 
@@ -124,9 +152,10 @@ points.)
 
 **The Ursell number — submit three numbers**
 
-1. Open **`http://<host>:8124/?scene=waveshallow`**. Leave the tab visible.
-   Open **Controls → Resolution: Medium** (default, check it). Wait out the
-   spin-up countdown (30 s).
+1. Open the app, press **`E`** and pick **B6** (or open **`?ex=B6`**) — it
+   loads the scene, Resolution and all. Leave the tab visible. Open **Controls
+   → Resolution: Medium** (the picker sets this — check it anyway). Wait out
+   the spin-up countdown (30 s).
 2. **Your period.** Take the last digit of your student number, `d`:
 
    | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
@@ -161,7 +190,7 @@ points.)
    trough falls below it, about the same, or the other way round?
 8. **Submit on Blackboard:** `(T, H, L, U_r, crest-vs-trough impression)`.
 
-**Standing rules.** Resolution: Medium · keep the tab visible · read H as a
+**Standing rules.** Resolution: Medium (the picker sets this) · keep the tab visible · read H as a
 *typical* swing over several cycles, not the single biggest one you can
 find · `h = 0.348 m` for everyone, don't re-derive it from a wavy trace.
 

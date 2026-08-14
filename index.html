@@ -330,6 +330,43 @@
     font: 11.5px ui-monospace, SFMono-Regular, monospace; color: #7fd4ff;
     flex: 1 1 auto; text-align: right; user-select: text;
   }
+  .excard .exyours {
+    font-size: 11.5px; line-height: 1.35; padding: 6px 9px; border-radius: 8px;
+    background: rgba(95,208,138,0.10); border: 1px solid rgba(95,208,138,0.35);
+    user-select: text; display: flex; flex-direction: column; gap: 5px;
+  }
+  .excard .exyours .exh {
+    font: 700 9.5px ui-monospace, monospace; letter-spacing: .06em;
+    text-transform: uppercase; color: #9fe4b0; opacity: .9;
+  }
+  .excard .exrow b { font: 700 11.5px ui-monospace, monospace; color: #9fe4b0; }
+  .excard .exrow .exwhere { opacity: .7; margin-left: 6px; font-size: 11px; }
+  .excard .exrow i { display: block; font-style: normal; opacity: .62; font-size: 11px; }
+  .excard .exyours .exhint { font-style: normal; opacity: .6; font-size: 11px; }
+  .excard .exset { font-size: 11px; user-select: text; }
+  .excard .exset > summary {
+    cursor: pointer; opacity: .62; list-style: none;
+    font: 10px ui-monospace, monospace; letter-spacing: .03em; padding: 2px 0;
+  }
+  .excard .exset > summary::before { content: "▸ "; }
+  .excard .exset[open] > summary::before { content: "▾ "; }
+  .excard .exset > summary:hover { opacity: .95; }
+  .excard .exsetl {
+    display: flex; flex-direction: column; gap: 2px; padding: 5px 8px; margin-top: 3px;
+    background: rgba(255,255,255,0.05); border-radius: 7px; opacity: .75;
+    font: 10.5px ui-monospace, monospace;
+  }
+  .excard .exsetl b { color: #cfe0ee; opacity: .85; font-weight: 700; }
+  .excard .exsetl i {
+    display: block; font-style: normal; opacity: .75; padding-left: 9px;
+    font: 10px system-ui, sans-serif; line-height: 1.35;
+  }
+  .excard .exalso {
+    font-size: 11.5px; line-height: 1.4; padding: 6px 9px; border-radius: 8px;
+    background: rgba(160,140,255,0.10); border: 1px solid rgba(160,140,255,0.35);
+    user-select: text;
+  }
+  .excard .exalso b { color: #bfb0ff; }
   .excard .extask { font-size: 12.5px; line-height: 1.45; user-select: text; }
   .excard .exsub {
     font: 11px ui-monospace, monospace; letter-spacing: .02em;

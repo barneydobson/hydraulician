@@ -4,6 +4,31 @@
 and `?scene=wavedeep` (deep water, even digits) **Refs:** W5, W7 kernel ·
 pressure attenuation `cosh k(h+z) / cosh kh`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **WV-2**.
+3. Type the last digit of your student number into the card. It prints **your
+   period and stroke** — you set both, and you place two gauges on one
+   vertical near the paddle.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (20 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **T** and **bed/surface
+   ratio**.
+
+If your lecturer gives you a link: **`?ex=WV-2`** (e.g.
+`http://localhost:8124/?ex=WV-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student drops two pressure gauges on one vertical near the paddle —
 one just off the floor, one just under the surface — and reads the ratio of
 their oscillation amplitudes. Linear theory says that ratio should collapse
@@ -30,7 +55,12 @@ app-level fix).
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Links to put on the slide:**
 `http://<host>:8124/?scene=wave` (all students)
@@ -137,9 +167,10 @@ submission**, comfortably inside a 10-minute slot even for both flumes.
 
 **The buried wave gauge — submit one or two numbers**
 
-1. Open **`http://<host>:8124/?scene=wave`**. Leave the tab visible — the
-   sim pauses when the tab is hidden. Open **Controls → Resolution: Medium**
-   (default, check it). Wait out the spin-up countdown.
+1. Open the app, press **`E`** and pick **WV-2** (or open **`?ex=WV-2`**) — it
+   loads the scene, Resolution and all. Leave the tab visible — the sim pauses
+   when the tab is hidden. Open **Controls → Resolution: Medium** (the picker
+   sets this — check it anyway). Wait out the spin-up countdown.
 2. **Your period.** Take the last digit of your student number, `d`:
 
    | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
@@ -188,7 +219,7 @@ water this deep, for a wave this short, would be reading exactly this kind
 of noise-swamped signal — that IS the depth/period limit the demo is about,
 discovered from the reading side rather than the theory side.
 
-**Standing rules.** Resolution: Medium · keep the tab visible · settle
+**Standing rules.** Resolution: Medium (the picker sets this) · keep the tab visible · settle
 15–20 s before reading · if your surface gauge ever flat-lines, it left the
 water — nudge it down and re-settle.
 

@@ -4,6 +4,32 @@
 **Rig** RIG-A + a step (this folder's `rig.js` extends FR-1's RIG-A card)
 **Submit** two numbers · **Personalised** driving head from the student number
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **LL-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   reservoir level** — you set it, and you place both gauges (gauge 2 low in
+   the pipe, y = 2.10).
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (20 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **h_L**, **Borda–Carnot**,
+   **V₁**, **V₂**, **H₁** and **H₂**.
+
+If your lecturer gives you a link: **`?ex=LL-1`** (e.g.
+`http://localhost:8124/?ex=LL-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Every student drives the *same* pipe, which suddenly steps from a 0.40 m bore
 to a wider one part-way along, at a *different* reservoir head. Two gauges — one
 just before the step, one well past it — let each student measure the velocity
@@ -33,7 +59,12 @@ because it goes into spinning up that recirculation instead.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 ### Link
 
@@ -87,7 +118,8 @@ continuous roof:
 7. **Gauge** tool: click at (3.40, 2.20), then at (7.60, 2.10) — the second
    one **low in the pipe, close to the floor**, not mid-height.
 
-`rig.js` in this folder is the console-paste equivalent
+`rig.js` in this folder is what the picker applies, and the console-paste
+equivalent
 (`RIGA.build()` geometry helpers + `LL1.build({...})`), extended from FR-1's
 card with the step and the two gauges baked in.
 
@@ -118,8 +150,9 @@ should read **0.80 m**; in the narrow bore, **0.39 m**.
 > loses to the eddy that forms in the corner, and compare it with the
 > textbook Borda–Carnot prediction.
 >
-> **1. Open** `http://localhost:8124/`, set **Resolution: Medium**, press
-> `0` to fit the box on screen.
+> **1. Open the exercise.** Press `E` and pick **LL-1** (or open `?ex=LL-1`)
+> — it loads the sandbox at **Resolution: Medium** and draws the rig, so
+> step 2 is only for building it by hand. Press `0` to fit the box on screen.
 >
 > **2. Build the rig** (lecturer demo first, ~2.5 minutes): erase the two
 > sandbox ledges; draw the invert (floor) the *full length* of the pipe;
@@ -180,7 +213,7 @@ should read **0.80 m**; in the narrow bore, **0.39 m**.
 > prediction**, plus V₁, V₂, H₁, H₂, level for the record.
 >
 > ---
-> *Standing rules: Resolution **Medium**; wait out the spin-up; keep the tab
+> *Standing rules: Resolution **Medium** (the picker sets this); wait out the spin-up; keep the tab
 > visible; if you change anything else, change it back. Your digit is
 > checked against your submission.*
 

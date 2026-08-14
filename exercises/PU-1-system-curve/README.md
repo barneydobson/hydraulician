@@ -3,6 +3,32 @@
 **Demo id:** PU-1  **Rig:** Sandbox (no `?scene=`)  **Refs:** #67–69 —
 `H_system = H_s + KQ²`; operating point `H_pump(Q) = H_system(Q)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **PU-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   spout velocity** — you set it, after the shared priming steps.
+4. Work through the card's **4 numbered steps** in order — this rig needs a
+   sequence, and nothing does it for you.
+5. Let it settle after every change you make — the card gives this demo's
+   settle time (10 s of sim time) and counts it down.
+6. Do the task printed on the card, then submit **Q** and **H**.
+
+If your lecturer gives you a link: **`?ex=PU-1`** (e.g.
+`http://localhost:8124/?ex=PU-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Every student turns their own rising main's pump up or down, reads the head
 it takes at the discharge flange, and submits `(Q, H)`. Pooled, the class's
 points trace the system's own resistance curve — nobody fitted a formula,
@@ -15,7 +41,12 @@ is itself worth two minutes of class time (§6).
 
 ---
 
-## 1 · The rig
+## 1 · Manual setup (fallback, or for building it yourself) — the rig
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 A **rising main**, not RIG-A's horizontal duct: an open **sump** low on the
 left, a **spout acting as the pump** inside a short horizontal "flange"
@@ -99,7 +130,8 @@ read **0.39 m** (matches RIG-A's own 18-cell bore). Hover in the high run
 (around x=5.2, y=2.2) — same, **0.39 m**. `SIM.mask` at (3.55, 1.5) should be
 solid (the cap) and at (3.8, 1.5) open (the riser interior).
 
-`rig.js` in this folder (`PU1.build()`) is the exact console-paste
+`rig.js` in this folder (`PU1.build()`) is what the picker applies, and the
+exact console-paste
 equivalent, and is what every number below was measured from.
 
 ### Priming (the step every RIG-A-family worker after this one needs)
@@ -212,8 +244,9 @@ the range) — "well below to well above," as specified.
 > formula, just measurement — and then use it to predict where a real pump
 > would settle.
 >
-> **1. Open** `http://<host>:8124/` (Sandbox, no `?scene=`) and set
-> **Resolution: Medium**. Press `0` to fit the box on screen.
+> **1. Open the exercise.** Press `E` and pick **PU-1** (or open `?ex=PU-1`)
+> — it loads the sandbox at **Resolution: Medium** and draws the rig, so
+> step 2 is only for building it by hand. Press `0` to fit the box on screen.
 >
 > **2. Build the rig** (lecturer demo first, ≈2.5 min): erase the sandbox's
 > two ledges; draw the floor (sump+low-run+riser); the low-run soffit
@@ -262,7 +295,7 @@ the range) — "well below to well above," as specified.
 > **8. Submit on Blackboard:** your `d`, `Q`, `H`.
 >
 > ---
-> *Standing rules: Resolution **Medium**; keep the tab visible (the sim
+> *Standing rules: Resolution **Medium** (the picker sets this); keep the tab visible (the sim
 > pauses when hidden); do the shared priming step (§4 above) before your own
 > digit, every time; if you change anything else, change it back.*
 

@@ -4,6 +4,32 @@
 **Refs:** #125–129, #131–132 — specific energy `E_s1 = E_s2 + Δz`; choking
 when `Δz > E₁ − E_c`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **FB-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   q** (digit 9 runs the digit-8 row) — set it on **Inflow q** yourself. The
+   hump is yours to draw later.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (60 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **q**, **y₁**, **Δz_pred**,
+   **Δz_c** and **Δz_pred* (re-timed)**.
+
+If your lecturer gives you a link: **`?ex=FB-1`** (e.g.
+`http://localhost:8124/?ex=FB-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Every student builds the same flat-bed channel (RIG-B) with a real tailwater
 holding it comfortably subcritical, runs it at their own discharge, and draws
 a bed hump at mid-reach. They commit a **prediction** — `Δz_pred = E₁ − 1.5y_c`
@@ -37,7 +63,12 @@ explains it.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link for the slide:** `http://<host>:8124/?scene=sandbox`
 
@@ -110,9 +141,11 @@ centred window under-read the true peak by a wide margin).
 
 **The hump that chokes — commit a prediction, then test it**
 
-1. Open **`http://<host>:8124/?scene=sandbox`**. Keep the tab visible — the
+1. Open the app, press **`E`** and pick **FB-1** (or open **`?ex=FB-1`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand. Keep the tab visible — the
    simulation pauses when it is hidden.
-2. **Controls → Resolution: Medium** (the default; check it). The status bar
+2. **Controls → Resolution: Medium** (the picker sets this — check it anyway). The status bar
    should read `414×230 · Δx 22 mm`.
 
 ### Build the rig (six strokes, ~100 s)
@@ -222,7 +255,7 @@ a stroke horizontal or vertical.
     - `y₁*`, `Δz_pred*` (3 d.p. each, from step 14)
     - (also record your `d`)
 
-**Standing rules.** Resolution: Medium · wait for the pool to fill (t ≈ 60 s)
+**Standing rules.** Resolution: Medium (the picker sets this) · wait for the pool to fill (t ≈ 60 s)
 before measuring `y₁` · keep the tab visible, the sim pauses when hidden ·
 **commit `Δz_pred` before you raise the hump** — that order is the whole
 point of the exercise · jot `y₁` at every climb step so step 14's re-timed

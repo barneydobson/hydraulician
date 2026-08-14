@@ -3,6 +3,31 @@
 **Demo id:** WE-1  **Scene:** `?scene=sandbox` + **RIG-B**  **Refs:** #103–108 —
 `Q = C_d · ⅔ · √(2g) · b · H^(3/2)`, Rehbock `C_d = 0.602 + 0.083 H/P` (#108)
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **WE-1**.
+3. Type the last digit of your student number into the card. It prints **your
+   q** and the **reservoir level** paired with it — you set both, and the
+   pairing is load-bearing.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (60 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **q** and **H**.
+
+If your lecturer gives you a link: **`?ex=WE-1`** (e.g.
+`http://localhost:8124/?ex=WE-1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 Everyone builds the same weir — a flat bed with a thin plate standing 0.50 m
 proud of it — runs it at their own discharge, and reads **one** number: the
 depth of the approach pool. Subtract the crest height and you have `H`. Ten
@@ -17,7 +42,12 @@ Rehbock itself over this range of heads and it predicts **1.569**.
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link for the slide:** `http://<host>:8124/?scene=sandbox`
 
@@ -70,9 +100,11 @@ the nappe by construction.
 
 **Rating a sharp-crested weir — submit two numbers**
 
-1. Open **`http://<host>:8124/?scene=sandbox`**. Keep the tab visible — the
+1. Open the app, press **`E`** and pick **WE-1** (or open **`?ex=WE-1`**) — it
+   loads the scene at **Resolution: Medium** and draws the rig, so the build
+   steps below are only for building it by hand. Keep the tab visible — the
    simulation pauses when it is hidden.
-2. **Controls → Resolution: Medium** (the default; check it). The status bar
+2. **Controls → Resolution: Medium** (the picker sets this — check it anyway). The status bar
    should read `414×230 · Δx 22 mm`.
 
 ### Build the rig (five strokes, ~90 s)
@@ -161,7 +193,7 @@ The background grid is **1 m** squares and the scale bar is bottom right. Hold
     - `H` = head over the crest (3 d.p.)
     - (also record your `d` and the reservoir level you used)
 
-**Standing rules.** Resolution: Medium · wait for the pool to fill (t = 60 s) ·
+**Standing rules.** Resolution: Medium (the picker sets this) · wait for the pool to fill (t = 60 s) ·
 keep the tab visible, the sim pauses when hidden · set the reservoir level from
 the table **every time you change q** — the two go together.
 

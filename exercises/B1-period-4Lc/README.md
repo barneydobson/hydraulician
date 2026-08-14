@@ -3,6 +3,29 @@
 **Demo id** B1 · **Topic** Unsteady flow (backup) · **Scene** `?scene=hammer` ·
 **Submit** (x_d, T) · **Refs** U17–U18 — the water-hammer period, T = 4L/c
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B1**.
+3. Type the last digit of your student number into the card. It prints **your
+   valve station** (x_d = 12 + 4·d m) — you draw the valve there and gauge 3 m
+   upstream of it.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (13 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **x_d** and **T**.
+
+If your lecturer gives you a link: **`?ex=B1`** (e.g.
+`http://localhost:8124/?ex=B1`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student draws their OWN valve at their own personalised station along
 the 49 m penstock, slams it, and reads the period of the resulting square
 wave off a gauge. Pooled, (L, T) — acoustic length against period — lies on
@@ -18,7 +41,12 @@ reported intercept equivalent to a 3.4 m offset — see §1 and §5.**
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `index.html?scene=hammer` — **no rig to pre-build.** Unlike UN-1,
 nothing needs to be erased: the scene's own valve (at x = 55) stays exactly
@@ -109,8 +137,8 @@ reach's dynamics into the reading, if the seal were imperfect.
 > **Your valve station: x_d = 12 + 4·d metres**, where **d** is the last
 > digit of your student number. Write down your x_d now.
 >
-> **1 · Open the scene.** `index.html?scene=hammer`. Open **Controls**,
-> confirm **Resolution: Medium**. Wait out the "establishing steady flow"
+> **1 · Open the exercise.** Press `E` and pick **B1** (or open
+> `?ex=B1`) — it loads the scene at **Resolution: Medium**. Wait out the "establishing steady flow"
 > countdown (≈13 s) — leave the scene's own nozzle and valve exactly as
 > they are.
 >
@@ -158,7 +186,7 @@ reach's dynamics into the reading, if the seal were imperfect.
 >
 > **9 · Submit on Blackboard:** your **x_d** (m) and your **T** (s, 2 d.p.).
 >
-> *Standing rules: Resolution **Medium**; wait out the spin-up countdown;
+> *Standing rules: Resolution **Medium** (the picker sets this); wait out the spin-up countdown;
 > keep the tab visible (the sim pauses when hidden); `0` resets the view if
 > you get lost; leave the scene's own nozzle and valve untouched.*
 

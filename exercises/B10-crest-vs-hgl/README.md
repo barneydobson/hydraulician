@@ -3,6 +3,30 @@
 **Demo id** B10 · **Refs** #42–43 · **Rig** RIG-A (FR-1's duct) + a raised
 mid-length crest · **Submit-capable** yes (2 numbers)
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B10**.
+3. Type the last digit of your student number into the card. It prints **your
+   reservoir level** (d mod 6) — set it on **Reservoir level** yourself.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (12 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **level**, **z_sep** and
+   **hgl_crest**.
+
+If your lecturer gives you a link: **`?ex=B10`** (e.g.
+`http://localhost:8124/?ex=B10`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 A horizontal pressurised pipe is fed from a reservoir. Take a stretch of it in
 the middle and carry it over a hill — invert and soffit lifted together, bore
 unchanged, a pipe going over a rise. Nothing happens. Lift it again. Nothing
@@ -19,12 +43,18 @@ memorable part of the slide instead of a footnote.
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link.** `http://localhost:8124/?scene=sandbox` (or the deployed equivalent).
 The sandbox is the only scene with an empty box to build RIG-A in.
 
-**Rig.** Paste `rig.js` into the dev console, then
+**Rig.** The picker draws it. To build it yourself instead, paste `rig.js`
+into the dev console, then
 
 ```js
 B10.build({level: 3.95})   // RIG-A + panel, no crest yet
@@ -105,8 +135,10 @@ eating the discharge — measured in §6.6.)
 
 ### Steps
 
-1. Open the link. Paste `rig.js` into the dev console (Lecturer will show
-   this once).
+1. Press `E` and pick **B10** (or open `?ex=B10`) — it loads the sandbox at
+   **Resolution: Medium** and draws the rig. (Fallback, if the rig pack is
+   missing: paste `rig.js` into the dev console — the lecturer will show this
+   once.)
 2. `B10.build({level: <your level>})`. Check the printout says
    `sealed: true`, `boreCells: 18`, `tw: 2.5`.
 3. **Flat pipe first.** `B10.crest(2.40)` (no hump). Let it settle ~20 s of
@@ -170,7 +202,7 @@ first, at least as far as the coarse phase, or the point is lost.
 
 ### Standing rules
 
-Resolution **Medium** for everyone. Wait out the spin-up. **Keep the tab
+Resolution **Medium** (the picker sets this) for everyone. Wait out the spin-up. **Keep the tab
 visible** — the sim pauses when it is hidden. Tailwater stays at 2.50 m; it
 must lie inside the bore band (2.40, 2.69) or the pipe stops behaving like a
 pipe. If you change the reservoir level, re-settle before reading anything.

@@ -4,6 +4,29 @@
 **Refs:** #150 sign analysis — the M/S/C/H/A × 1/2/3 gradually-varied-flow
 taxonomy
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **GV-2**.
+3. No digit on this one — every rig is drawn by hand, and that is the
+   personalisation.
+4. Nothing to settle — the sandbox starts dry. Start drawing.
+5. Play the task printed on the card, then submit your **score**, the
+   **classes claimed** and **one screenshot each**.
+
+If your lecturer gives you a link: **`?ex=GV-2`** (e.g.
+`http://localhost:8124/?ex=GV-2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 A timed game, not a measurement exercise. Sandbox, labels ON, score card in
 hand: in 20 minutes, draw as many DISTINCT, correctly-labelled surface-profile
 classes as you can and screenshot the overlay's own orange chip as proof. It
@@ -49,7 +72,12 @@ by `drawProfileLabels`) is the whole game:
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link for the slide:** `http://<host>:8124/?scene=sandbox`
 
@@ -60,7 +88,9 @@ rebuild exactly what this safari measured (see §7 for the full list). Do not
 hand `rig.js` to students — two identical rigs would be two identical
 screenshots (see §4 "Anti-copying").
 
-**Standing rules (same panel state for everyone):**
+**Standing rules (same panel state for everyone):** picking GV-2 in the
+Exercises menu applies this panel state, Resolution included — the table is
+the record of what it set.
 
 | what | value | why |
 |---|---|---|
@@ -85,9 +115,11 @@ up) + the rest split between the S-family and a stretch attempt at A2 or C.
 
 **Profile safari — bag as many classes as you can in 20 minutes**
 
-1. Open `http://<host>:8124/?scene=sandbox`. **Controls → Resolution:
-   Medium**, **Open-channel overlay: ON**, **Profile labels: ON**. Leave the
-   tab visible — the sim pauses when hidden.
+1. Open the app, press **`E`** and pick **GV-2** (or open **`?ex=GV-2`**) — it
+   loads the empty sandbox at **Resolution: Medium** with **Open-channel
+   overlay: ON** and **Profile labels: ON**. Check those two in **Controls**
+   before you start; without them no chip ever appears. Leave the tab visible
+   — the sim pauses when hidden.
 2. You have **13 possible chips**: M1, M2, M3, S1, S2, S3, C1, C2, C3, H2, H3,
    A2, A3. Draw geometry (walls, gates, weirs — `1`/`2`/`[`/`]` to set the
    brush, shift-drag to snap), turn on the reservoir and/or tailwater in the

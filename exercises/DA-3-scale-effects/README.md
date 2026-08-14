@@ -4,6 +4,32 @@
 DA-2's RIG-C orifice (same sandbox) — no rig of its own  **Refs:** D3–D5, D14
 · why Reynolds and Weber cannot follow Froude
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick
+   **DA-3**.
+3. Type the last digit of your student number into the card. It prints **your
+   resolution** (even → Low, odd → High) and the q and level of your own DA-1
+   λ third — you set those, then change only the Resolution.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (55 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **λ**, **q**, **resolution**
+   and **C_d**.
+
+If your lecturer gives you a link: **`?ex=DA-3`** (e.g.
+`http://localhost:8124/?ex=DA-3`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, the rig geometry, and the few settings without which
+the rig is not a working rig — the card labels those as already set. Your own
+values, your instruments and the order you do things in are yours to get
+right. If your build ships without the rig pack the card says so; then draw it
+by hand from *Manual setup* below.
+
+---
+
 DA-1 pooled thirty raw numbers into one `C_d(H/P)` curve and found a small,
 honest, λ-ordered residual living underneath it. DA-3 does two things with
 that residual: puts it back on screen (re-examine the pooled plot, point at
@@ -59,11 +85,17 @@ Grid delivered on the sandbox scene (`W×H` = 9 m × 5 m), every resolution:
 
 ---
 
-## 2 · Lecturer setup (before class)
+## 2 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `http://<host>:8124/?scene=sandbox`. Nothing to draw ahead of
 time — the live moment reuses whichever rig is already on screen from DA-1
-or DA-2's own slot; if running DA-3 standalone, paste DA-1's `rig.js` (or
+or DA-2's own slot; if running DA-3 standalone, pick `?ex=DA-3` (it rebuilds
+your own λ third), or paste DA-1's `rig.js` (or
 DA-2's) as usual, then this folder's `rig.js` on top only if you want the
 resolution-sweep helpers used to produce §5 (`DA3.runDA1`, `DA3.runDA2`) —
 students never need it, they just use the Resolution dropdown.
@@ -148,6 +180,11 @@ already built stays on screen.
 *(Medium is excluded — you already measured that. Very high/Ultra are
 excluded — DA-1's weir does not reliably settle there, §1/§5.3; nobody
 should be sent to a broken reload mid-lecture.)*
+
+**Starting from a cold page?** Press `E` and pick **DA-3** (or open
+`?ex=DA-3`): it rebuilds your own DA-1 λ third at **Resolution: Medium**,
+and you set the q and level the card prints. If your DA-1 rig is still on
+screen, keep it — that is the better run.
 
 1. With your DA-1 rig still drawn and your λ/q/level still set from that
    slot: **Controls → Resolution →** your assigned value from the rule

@@ -4,6 +4,29 @@
 **Submit** (ΔH₇₀, ΔH₁₄₀) · **Refs** U14–U16 — pipe elasticity and the
 water-hammer celerity, `c = √(K/ρ) / √(1 + KD/Ee)`
 
+## How to start (30 seconds)
+
+1. Open the app — **`http://localhost:8124/`** on the lecturer's server, or
+   double-click `index.html`.
+2. Press **`E`** (or click **`Exercises ▾`** in the top bar) and pick **B2**.
+3. Type the last digit of your student number into the card. It prints **your
+   nozzle gap** — the same one you drew for UN-1, and you draw it again.
+   Celerity is not personalised: everyone runs c = 70, then 140.
+4. Let it settle after every change you make — the card gives this demo's
+   settle time (13 s of sim time) and counts it down.
+5. Do the task printed on the card, then submit **ΔH₇₀** and **ΔH₁₄₀**.
+
+If your lecturer gives you a link: **`?ex=B2`** (e.g.
+`http://localhost:8124/?ex=B2`).
+
+The picker gives everyone the same starting point and no more: the scene,
+**Resolution: Medium**, and the few settings the scene itself needs — the card
+labels those as already set. Your own values, your instruments and the order
+you do things in are yours to get right. *Manual setup* below is the record of
+every constant.
+
+---
+
 Every student reuses their OWN nozzle from UN-1 — same gap, same v₀ — and
 closes it twice: once at the slider's default celerity (70 m/s), once at
 double that (140 m/s). Joukowsky says ΔH = (c/g)Δv, so with the SAME Δv the
@@ -21,7 +44,12 @@ one (see §1 and §5).**
 
 ---
 
-## 1 · Lecturer setup (before class)
+## 1 · Manual setup (fallback, or for building it yourself)
+
+*The picker puts you at the same starting point as everyone else — scene,
+Resolution Medium and the rig. This section is the record of every constant
+behind that, and the build to follow if you are demonstrating it by hand or
+the rig pack is missing.*
 
 **Link:** `index.html?scene=hammer` — no rig to pre-build beyond UN-1's own
 nozzle redraw (reused verbatim). If your class already ran UN-1, students
@@ -105,8 +133,8 @@ what that demo already had you do.
 >
 > *(If you already ran UN-1: your gap is the same number — skip to step 3.)*
 >
-> **1 · Open the scene.** `index.html?scene=hammer`. Open **Controls**, set
-> **Resolution: Medium**, wait out the spin-up countdown.
+> **1 · Open the exercise.** Press `E` and pick **B2** (or open
+> `?ex=B2`) — it loads the scene at **Resolution: Medium**; wait out the spin-up countdown.
 >
 > **2 · Draw your nozzle** (skip if already done for UN-1). Zoom to the
 > nozzle plate (right end of the pipe, just past the green valve, ~8×).
@@ -158,7 +186,7 @@ what that demo already had you do.
 > close to 2, re-read §9 — the commonest mistake is pausing too late on the
 > second, shorter plateau.
 >
-> *Standing rules: Resolution **Medium**; wait out the spin-up countdown
+> *Standing rules: Resolution **Medium** (the picker sets this); wait out the spin-up countdown
 > (twice, once per celerity); keep the tab visible; re-open the valve (`V`)
 > and reset the water (`R`) before the SECOND closure — skipping either
 > leaves the pipe shut, or still ringing from the first slam.*

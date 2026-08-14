@@ -616,13 +616,20 @@ const OVERLAY = (() => {
     });
   }
 
-  /** Stacked time-series cards, bottom right. */
+  /** Stacked time-series cards, bottom right.
+   *
+   *  Returns the screen rect of every card it actually drew (bottom-up order
+   *  is the loop's, each entry `{k, x, y, w, h}` with `k` the gauge index) so
+   *  the DOM can hang an affordance on a card without duplicating the layout
+   *  arithmetic. Drawing is unchanged — the stack breaks at the same place. */
   function drawGaugeCharts(ctx, V, gauges, field, label, unit) {
-    if (!gauges.length) return;
+    const rects = [];
+    if (!gauges.length) return rects;
     const W = Math.min(330, V.pxW * 0.32), H = 82, pad = 10;
     let y = V.pxH - pad - H;
     for (let k = gauges.length - 1; k >= 0; k--) {
       const gg = gauges[k], x = V.pxW - pad - W;
+      rects.push({ k, x, y, w: W, h: H });
       const hist = gg.hist;
       ctx.save();
       ctx.fillStyle = "rgba(12,17,26,0.80)";
@@ -653,6 +660,7 @@ const OVERLAY = (() => {
       y -= H + 8;
       if (y < V.pxH * 0.35) break;
     }
+    return rects;
   }
 
   /** Frame, axes and scale bar — anchored to the VISIBLE part of the domain

@@ -104,6 +104,85 @@
     border-radius: 7px; padding: 3px 6px; font: inherit; font-size: 12.5px;
   }
 
+  #panel .btnrow { display: flex; gap: 4px; flex: 0 0 auto; }
+  #panel .btnrow button {
+    appearance: none; background: rgba(255,255,255,0.07); color: inherit;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
+    font: 600 11.5px ui-monospace, SFMono-Regular, monospace;
+    padding: 3px 8px; cursor: pointer;
+  }
+  #panel .btnrow button:hover:not(:disabled) { background: rgba(77,195,255,0.20); }
+  #panel .btnrow button:disabled { opacity: .35; cursor: default; }
+
+  /* ------------------------------------------------ gauge inspector windows */
+  .gcardBtn {
+    position: fixed; z-index: 12; width: 19px; height: 19px; padding: 0;
+    appearance: none; cursor: pointer; color: #dfe8f2;
+    background: rgba(12,17,26,0.85); border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 6px; font: 11px/17px ui-monospace, monospace; text-align: center;
+  }
+  .gcardBtn:hover { background: rgba(77,195,255,0.30); }
+
+  .ginsp {
+    position: fixed; z-index: 21; width: 400px;
+    font-size: 12px; user-select: none; touch-action: none;
+  }
+  .ginsp-h {
+    display: flex; align-items: center; gap: 7px; padding: 8px 10px;
+    cursor: move; border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .ginsp-dot { width: 9px; height: 9px; border-radius: 50%; background: #7fd4ff; flex: 0 0 auto; }
+  .ginsp-h b { font-size: 12.5px; letter-spacing: .01em; white-space: nowrap; }
+  .ginsp-pos { font: 10.5px ui-monospace, SFMono-Regular, monospace; opacity: .58;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ginsp-grow { flex: 1 1 auto; }
+  .ginsp-x {
+    appearance: none; border: 0; background: transparent; color: inherit;
+    font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 6px; cursor: pointer;
+  }
+  .ginsp-x:hover { background: rgba(255,255,255,0.12); }
+
+  .ginsp-vals { display: flex; gap: 6px; padding: 8px 10px 2px; }
+  .ginsp-vals div {
+    flex: 1 1 0; padding: 4px 6px; border-radius: 7px;
+    background: rgba(255,255,255,0.04); border: 1px solid transparent;
+  }
+  .ginsp-vals div.on { border-color: rgba(77,195,255,0.40); background: rgba(77,195,255,0.10); }
+  .ginsp-vals span { font: 10px ui-monospace, monospace; opacity: .55; }
+  .ginsp-vals b { display: block; font: 700 12.5px ui-monospace, monospace;
+    font-variant-numeric: tabular-nums; margin: 1px 0; user-select: text; }
+  .ginsp-vals i { display: block; font-style: normal; font-size: 9.5px; opacity: .42; line-height: 1.25; }
+
+  .ginsp-tabs { display: flex; gap: 4px; padding: 7px 10px 6px; }
+  .ginsp-tabs button {
+    appearance: none; background: rgba(255,255,255,0.06); color: inherit;
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 999px;
+    font: 600 10.5px ui-monospace, monospace; padding: 2px 10px; cursor: pointer;
+  }
+  .ginsp-tabs button.on { background: rgba(77,195,255,0.22); border-color: rgba(77,195,255,0.55); }
+
+  .ginsp-c {
+    display: block; width: calc(100% - 20px); height: 158px; margin: 0 10px;
+    cursor: crosshair; touch-action: none;
+  }
+
+  .ginsp-foot { display: flex; align-items: center; gap: 6px; padding: 8px 10px 2px; }
+  .ginsp-b {
+    appearance: none; background: rgba(255,255,255,0.07); color: inherit;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
+    font: 600 11px system-ui, sans-serif; padding: 4px 9px; cursor: pointer;
+    white-space: nowrap; flex: 0 0 auto;
+  }
+  .ginsp-b:hover { background: rgba(77,195,255,0.20); }
+  .ginsp-span {
+    margin-left: auto; text-align: right; font: 10px ui-monospace, monospace;
+    opacity: .5; font-variant-numeric: tabular-nums; user-select: text;
+  }
+  .ginsp-span.frozen { color: #ffb648; opacity: .8; }
+  .ginsp-cap { padding: 6px 10px 10px; font-size: 10px; line-height: 1.4; opacity: .42; }
+  .ginsp-cap b { opacity: .85; }
+  @media (max-width: 560px) { .ginsp { width: calc(100vw - 20px); } }
+
   #keys {
     position: fixed; left: 14px; bottom: 14px; z-index: 9; padding: 9px 13px;
     font-size: 11px; opacity: .8; line-height: 1.85; max-width: 320px;

@@ -1,0 +1,16 @@
+student,digit,flume,T_s,amp_m,kh,h_m,z_bed_m,z_surf_m,ratio_dft,ratio_p2p_naive,ratio_theory_actual,ratio_theory_ideal,note
+S001,0,wave,1.10,0.055,1.344,0.3528,0.0228,0.2698,0.8133,1.1612,0.6366,0.4882,
+S002,1,wave,1.10,0.055,1.344,0.3528,0.0228,0.2698,0.8133,1.1612,0.6366,0.4882,shares d0 period (rule ceiling on distinct clean T)
+S003,2,wave,1.20,0.055,1.188,0.3528,0.0228,0.2698,0.7043,0.9903,0.6956,0.5578,
+S004,3,wave,1.30,0.060,1.066,0.3528,0.0228,0.2698,0.7899,0.8936,0.7418,0.6157,
+S005,4,wave,1.40,0.060,0.968,0.3528,0.0228,0.2698,0.8863,0.7299,0.7785,0.6637,
+S006,5,wave,1.50,0.060,0.888,0.3528,0.0228,0.2698,0.8622,0.8250,0.8080,0.7037,anchor row: scene default period T=1.5s
+S007,6,wave,1.65,0.060,0.791,0.3528,0.0228,0.2698,0.8290,0.9366,0.8423,0.7521,
+S008,7,wave,1.85,0.065,0.692,0.3528,0.0228,0.2698,0.8923,0.9498,0.8755,0.8005,
+S009,8,wave,2.10,0.070,0.600,0.3528,0.0228,0.2698,0.9425,0.8555,0.9040,0.8437,longest wave-flume period: wetness robustness case
+S010,9,wave,2.10,0.070,0.600,0.3528,0.0228,0.2698,0.9425,0.8555,0.9040,0.8437,shares d8 period (slider/safety ceiling)
+S011,0,wavedeep,0.60,0.05,8.255,0.7385,0.0285,0.5185,1.9918,1.9566,0.0064,0.0005,NOISE-DOMINATED: shortest-period robustness case, bed DFT amplitude 0.0487 m vs theory 0.0002 m
+S013,2,wavedeep,0.75,0.08,5.284,0.7385,0.0285,0.5185,1.8815,1.8466,0.0500,0.0101,NOISE-DOMINATED: bed DFT amplitude 0.0353 m vs theory 0.0009 m
+S015,4,wavedeep,0.90,0.11,3.674,0.7385,0.0285,0.5185,8.0994,1.4846,0.1523,0.0507,NOISE-DOMINATED anchor row (scene default period T=0.9s): bed DFT amplitude 0.0451 m vs theory 0.0008 m; repeat runs of this exact setup gave ratio 1.1-8.1
+S017,6,wavedeep,1.05,0.15,2.719,0.7385,0.0285,0.5185,1.3732,2.4547,0.2916,0.1313,NOISE-DOMINATED: bed DFT amplitude 0.0370 m vs theory 0.0079 m
+S019,8,wavedeep,1.20,0.19,2.124,0.7385,0.0285,0.5185,1.1224,1.6685,0.4300,0.2358,NOISE-DOMINATED: bed DFT amplitude 0.0423 m vs theory 0.0162 m

@@ -1,0 +1,16 @@
+student,digit,scene,flume,h_m,T_s,L_measured_m,L_theory_tanh_m,err_pct,stroke_amp_m,note
+sim01,0,wavedeep,deep,0.74,0.60,0.545,0.562,-3.0,0.049,measured (crest-tracking, back-half fit)
+sim02,1,wavedeep,deep,0.74,0.75,1.105,0.878,25.8,0.076,measured (crest-tracking, back-half fit)
+sim03,2,wavedeep,deep,0.74,0.90,1.396,1.263,10.5,0.110,measured (crest-tracking, back-half fit)
+sim04,3,wavedeep,deep,0.74,1.05,2.067,1.707,21.1,0.148,measured (two-probe phase lag)
+sim05,4,wavedeep,deep,0.74,1.20,2.272,2.185,3.9,0.190,measured (two-probe phase lag)
+sim06,5,wavedeep,deep,0.74,1.35,2.855,2.675,6.7,0.233,measured (two-probe phase lag)
+sim07,6,wavedeep,deep,0.74,1.50,3.189,3.161,0.9,0.275,measured (two-probe phase lag)
+sim08,7,wavedeep,deep,0.74,1.60,3.836,3.480,10.2,0.300,measured (two-probe phase lag)
+sim09,0,waveshallow,shallow,0.35,3.00,5.577,5.414,3.0,0.250,measured (two-probe phase lag)
+sim10,2,waveshallow,shallow,0.35,3.60,6.053,6.550,-7.6,0.280,measured (two-probe phase lag)
+sim11,5,waveshallow,shallow,0.35,4.50,6.637,8.242,-19.5,0.300,measured; probe window reaches into the shoal, biases L low
+sim12,9,waveshallow,shallow,0.35,6.00,9.311,11.045,-15.7,0.300,measured; probe window reaches into the shoal, biases L low
+sim13,,waveshallow,shallow,0.35,1.60,2.742,2.692,1.9,0.200,bonus point below the assigned 3-6s range
+sim14,,waveshallow,shallow,0.35,2.00,3.679,3.488,5.5,0.200,bonus point below the assigned 3-6s range
+sim15,,waveshallow,shallow,0.35,2.40,4.577,4.265,7.3,0.250,bonus point below the assigned 3-6s range

@@ -1,0 +1,21 @@
+student,digit,scene,series,T_s,amp_m,L_theory_m,c_ms,Krefl,method,node_spacing_m,node_spacing_theory_m,aMax_m,aMin_m,note
+s01,0,wavesurge,surging,1.80,0.080,3.086,1.715,0.659,envelope_dft,,1.543,0.0342,0.0070,
+s02,1,wavesurge,surging,1.80,0.080,3.086,1.715,0.659,envelope_dft,,1.543,0.0342,0.0070,digit shares d=0's period -- expected match
+s03,2,wavesurge,surging,2.40,0.110,4.256,1.773,0.759,envelope_dft,2.10,2.128,0.0528,0.0072,
+s04,3,wavesurge,surging,2.40,0.110,4.256,1.773,0.759,envelope_dft,2.10,2.128,0.0528,0.0072,digit shares d=2's period -- expected match
+s05,4,wavesurge,surging,3.00,0.140,5.401,1.800,0.825,envelope_dft,2.70,2.701,0.0632,0.0061,scene default T/amp
+s06,5,wavesurge,surging,3.00,0.140,5.401,1.800,0.896,envelope_dft,,2.701,0.0645,0.0035,repeat run ~70s later; same T/amp as d=4; genuine measurement flutter not a copy
+s07,6,wavesurge,surging,3.60,0.169,6.534,1.815,0.846,envelope_dft,3.15,3.267,0.0479,0.0040,
+s08,7,wavesurge,surging,3.60,0.169,6.534,1.815,0.846,envelope_dft,3.15,3.267,0.0479,0.0040,digit shares d=6's period -- expected match
+s09,8,wavesurge,surging,4.20,0.199,7.661,1.822,0.850,envelope_dft,3.90,3.830,0.0719,0.0058,
+s10,9,wavesurge,surging,4.20,0.199,7.661,1.822,0.850,envelope_dft,3.90,3.830,0.0719,0.0058,digit shares d=8's period -- expected match
+s01,0,wave,spilling,1.10,0.055,1.643,1.494,0.337,two_probe,,,0.0220,,d mod 3 == 0; higher than textbook 0.05-0.2 (see README -- short/steep here)
+s02,1,wave,spilling,1.50,0.060,2.484,1.656,0.073,two_probe,,,0.0312,,d mod 3 == 1
+s03,2,wave,spilling,2.10,0.070,3.675,1.750,0.039,two_probe,,,0.0312,,d mod 3 == 2
+s04,3,wave,spilling,1.10,0.055,1.643,1.494,0.337,two_probe,,,0.0220,,d mod 3 == 0
+s05,4,wave,spilling,1.50,0.060,2.484,1.656,0.073,two_probe,,,0.0312,,d mod 3 == 1
+s06,5,wave,spilling,2.10,0.070,3.675,1.750,0.039,two_probe,,,0.0312,,d mod 3 == 2
+s07,6,wave,spilling,1.10,0.055,1.643,1.494,0.337,two_probe,,,0.0220,,d mod 3 == 0
+s08,7,wave,spilling,1.50,0.060,2.484,1.656,0.073,two_probe,,,0.0312,,d mod 3 == 1
+s09,8,wave,spilling,2.10,0.070,3.675,1.750,0.039,two_probe,,,0.0312,,d mod 3 == 2
+s10,9,wave,spilling,1.10,0.055,1.643,1.494,0.337,two_probe,,,0.0220,,d mod 3 == 0

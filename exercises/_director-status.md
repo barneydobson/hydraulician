@@ -60,6 +60,25 @@ done-NOT-FEASIBLE / redo.
 | B9 | B9-three-reservoirs | RIG-C ×3, dynamic version | sonnet | done-READY-CAVEATS | quasi-steady ruled out on evidence; junction head 1.68 m ±6 mm; zero-crossing +53–70% (opening transient, taught); continuity 7.9%; sign flip in-band |
 | B10 | B10-crest-vs-hgl | RIG-A + raised crest | opus (redo) | done-READY-CAVEATS | 1:1 slope 1.134 R²0.990 +1.2 cells (cause measured); soffit datum closed; pocket hysteresis (read going up); d mod 6 rule; inherited-rig bugs fixed |
 
+## Code-change campaign (maintainer-authorised, 2026-08-14)
+
+Applying the low-risk P-list + the maintainer's new gauge-UI request.
+Serialised where main.js is shared; solver numerics untouchable throughout.
+
+| Wave | Worker | Scope | Files | State |
+|------|--------|-------|-------|-------|
+| 1 | UIFIX (opus) | P1, P3-display, P4, P5, P6, P9, P10, P11-reset | overlay.js, main.js | done → acbe904 |
+| 1 | LEAKFIX (opus) | P12 texture leak (resources only) | sim.js, gl.js | done → 018ca6a |
+| 2 | GAUGE (opus) | draggable gauge inspector + pause-freeze + CSV (maintainer request) | main.js, overlay.js, index.html | done → 25c2906 |
+| 3 | RIGSHARE (opus) | P13 save/share rigs (JSON + deflate URL hash) | main.js, index.html | done → a25db85 |
+
+All four waves verified against shipped-demo regression gates; campaign
+complete 2026-08-14.
+
+Deferred with reasons (stay proposals): P2 (default-view change collides
+with WV-1/B4 worksheet assumptions), P7 (averaged probe mode — not small),
+P8 (V-key semantics would break shipped hammer worksheets).
+
 ## Decisions log
 
 - 2026-08-13: pilot = HJ-1 on Opus (existing validated scene; exercises the

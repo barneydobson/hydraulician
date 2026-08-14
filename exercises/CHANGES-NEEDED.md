@@ -20,7 +20,29 @@ with its expected impact on other demos.
   Programme text: change NC-1's rig line from ?scene=m1 to ?scene=m3 with
   window rule x₀ = 5.0 + 0.5·(d mod 8), windows 7 m.
 
-## 2 · Interface / panel change proposals (under review)
+## 2a · APPLIED (maintainer-authorised, 2026-08-14) — commits 018ca6a,
+## acbe904, 25c2906, a25db85
+
+P1 (pressurised hover gated on capped column + f), P3 display variant
+(delivered level printed), P4 (q cap → 2.0), P5 (cursor coords + surface
+elevation), P6 (numbers never gated by the ok-flag), P9 (delivered q in
+head-driven mode), P10 (edge auto-restore), P11 reset variant (EMAs
+cleared on re-rasterise), P12 (rebuild texture/FBO leak fixed, 125-cycle
+soak), P13 (rig save/share: #rig= deflate links + JSON, panel Rig
+section), plus the maintainer-requested GAUGE INSPECTOR (draggable
+per-gauge history windows, pause-freeze, 20k-sample store behind
+byte-identical corner cards, CSV export). Per-item evidence:
+exercises/_code-changes/. Follow-up option now unlocked: the 40 demo
+READMEs' recipe cards can each gain a one-click #rig= URL (not yet done —
+would need a re-verification pass per rig).
+
+Consequences worth noting: UF-1/DA-1 worksheets still use their trimmed
+q ranges (valid, conservative) — widening them under the new 2.0 cap
+needs re-measurement first. P11's reset lives in a main.js wrapper;
+folding it into SIM.rasterise is a suggested tidy-up.
+
+## 2 · Interface / panel change proposals (still open, deferred with
+## reasons)
 
 - **[P1, from UN-1] Suppress the free-surface hover block inside pressurised
   pipes.** The hover readout currently labels a full pipe "H2 profile" and

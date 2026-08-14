@@ -40,12 +40,20 @@
   #tools { display: flex; gap: 3px; }
   #tools button { padding: 8px 10px; font-size: 12.5px; }
 
+  /* The title box IS the scene picker's affordance — click it to choose.
+     `#status` inside it stays selectable-looking but the whole box is one
+     button, so the hit target is large and unmissable. */
   #title {
     position: fixed; top: 14px; right: 14px; z-index: 10;
-    padding: 9px 15px; text-align: right; pointer-events: none;
+    padding: 9px 15px; text-align: right; cursor: pointer;
+    transition: background .12s, border-color .12s;
   }
+  #title:hover, #title.open { background: rgba(20, 30, 44, 0.72); border-color: rgba(77,195,255,0.45); }
+  #title:hover .caret, #title.open .caret { color: #7fd4ff; opacity: 1; }
+  #title:focus-visible { outline: 2px solid rgba(77,195,255,0.7); outline-offset: 2px; }
   #title b { font-size: 14.5px; letter-spacing: .02em; }
-  #title span { display: block; font-size: 11px; opacity: .60; }
+  #title .caret { display: inline; font-size: 10px; opacity: .5; margin-left: 6px; vertical-align: 1px; }
+  #title span:not(.caret) { display: block; font-size: 11px; opacity: .60; }
   #status {
     display: block; font: 10.5px ui-monospace, SFMono-Regular, monospace;
     opacity: .48; margin-top: 4px; font-variant-numeric: tabular-nums;
@@ -208,6 +216,73 @@
   .ginsp-cap b { opacity: .85; }
   @media (max-width: 560px) { .ginsp { width: calc(100vw - 20px); } }
 
+  /* ------------------------------------------------------------ scene picker */
+  /* One menu, three entry points (the title box, the bar button, the panel
+     row). It is built from the SCENES registry every time it opens, so a
+     scene added to js/scenes.js appears here with no further edit. */
+  #scenemenu {
+    position: fixed; z-index: 30; width: 390px; max-width: calc(100vw - 24px);
+    padding: 7px; display: none; max-height: calc(100vh - 96px); overflow: auto;
+  }
+  #scenemenu.open { display: block; }
+  #scenemenu::-webkit-scrollbar { width: 6px; }
+  #scenemenu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+  #scenemenu .smh {
+    display: flex; align-items: baseline; gap: 8px; padding: 5px 9px 7px;
+    border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 3px;
+  }
+  #scenemenu .smh b { font-size: 12.5px; letter-spacing: .01em; }
+  #scenemenu .smh i {
+    font-style: normal; margin-left: auto; opacity: .45;
+    font: 10.5px ui-monospace, SFMono-Regular, monospace;
+  }
+  #scenemenu .smg {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em;
+    opacity: .45; padding: 10px 9px 3px;
+  }
+  #scenemenu .smi {
+    display: block; width: 100%; text-align: left; appearance: none;
+    background: transparent; color: inherit; font: inherit;
+    border: 1px solid transparent; border-radius: 9px;
+    padding: 6px 9px 7px; cursor: pointer; transition: background .1s;
+  }
+  #scenemenu .smi:hover, #scenemenu .smi.hi { background: rgba(255,255,255,0.08); }
+  #scenemenu .smi.on {
+    background: rgba(77,195,255,0.16); border-color: rgba(77,195,255,0.45);
+  }
+  #scenemenu .smi b { font-size: 13px; font-weight: 600; }
+  #scenemenu .smi em {
+    font-style: normal; margin-left: 7px; opacity: .45;
+    font: 10px ui-monospace, SFMono-Regular, monospace;
+  }
+  #scenemenu .smi .tag {
+    float: right; font: 9.5px ui-monospace, monospace; letter-spacing: .06em;
+    text-transform: uppercase; opacity: .75; color: #7fd4ff; margin-top: 3px;
+  }
+  #scenemenu .smi p { font-size: 11.5px; line-height: 1.35; opacity: .60; margin: 2px 0 0; }
+  #scenemenu .smwarn {
+    margin: 4px 2px 2px; padding: 8px 10px; border-radius: 9px;
+    background: rgba(255,182,72,0.12); border: 1px solid rgba(255,182,72,0.45);
+    font-size: 11.5px; line-height: 1.4;
+  }
+  #scenemenu .smwarn b { color: #ffb648; }
+  #scenemenu .smwarn .r { display: flex; gap: 5px; margin-top: 7px; }
+  #scenemenu .smwarn button {
+    appearance: none; background: rgba(255,255,255,0.07); color: inherit;
+    border: 1px solid rgba(255,255,255,0.20); border-radius: 7px;
+    font: 600 11px system-ui, sans-serif; padding: 4px 10px; cursor: pointer;
+  }
+  #scenemenu .smwarn button:hover { background: rgba(255,255,255,0.16); }
+  #scenemenu .smwarn button.go { border-color: rgba(255,182,72,0.6); color: #ffd9a0; }
+  #panel .scenebtn {
+    appearance: none; background: rgba(255,255,255,0.07); color: inherit;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
+    font: 600 11.5px ui-monospace, SFMono-Regular, monospace;
+    padding: 3px 9px; cursor: pointer; max-width: 190px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  #panel .scenebtn:hover { background: rgba(77,195,255,0.20); }
+
   #keys {
     position: fixed; left: 14px; bottom: 14px; z-index: 9; padding: 9px 13px;
     font-size: 11px; opacity: .8; line-height: 1.85; max-width: 320px;
@@ -225,7 +300,7 @@
 <canvas id="over"></canvas>
 
 <div id="bar" class="glass">
-  <select id="sceneSel" title="Scene"></select>
+  <button id="sceneBtn" title="Choose a scene (S)">Scenes ▾</button>
   <div class="sep"></div>
   <div id="tools"></div>
   <div class="sep"></div>
@@ -237,11 +312,13 @@
   <button id="aboutBtn" title="What the solver is actually doing">About</button>
 </div>
 
-<div id="title" class="glass">
-  <b id="sceneName">Sandbox</b>
+<div id="title" class="glass" role="button" tabindex="0" title="Choose a scene (S)">
+  <b id="sceneName">Sandbox</b><span class="caret">▾</span>
   <span id="sceneKey">Draw the hydraulics</span>
   <span id="status"></span>
 </div>
+
+<div id="scenemenu" class="glass" role="menu" aria-label="Scenes"></div>
 
 <div id="toast" class="glass">
   <div id="toastTitle"></div>
@@ -314,7 +391,8 @@ p/&rho; = c&sup2; max(f &minus; 1, 0)</pre>
   <kbd>wheel</kbd> zoom &nbsp; <kbd>middle-drag</kbd> pan &nbsp; <kbd>0</kbd> reset view<br>
   <kbd>1</kbd>–<kbd>6</kbd> tools &nbsp; <kbd>[</kbd> <kbd>]</kbd> brush &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>C</kbd> clear<br>
   <kbd>V</kbd> valve &nbsp; <kbd>space</kbd> pause &nbsp; <kbd>R</kbd> reset &nbsp; <kbd>G</kbd> field<br>
-  <kbd>P</kbd> particles &nbsp; <kbd>D</kbd> dye &nbsp; <kbd>N</kbd> channel overlay
+  <kbd>P</kbd> particles &nbsp; <kbd>D</kbd> dye &nbsp; <kbd>N</kbd> channel overlay<br>
+  <kbd>S</kbd> scenes
 </div>
 
 <script src="js/gl.js"></script>

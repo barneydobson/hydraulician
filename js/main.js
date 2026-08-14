@@ -135,12 +135,267 @@ function loadScene(id, keepDrawing) {
   showToast(sc.name, sc.blurb);
   document.getElementById("sceneName").textContent = sc.name;
   document.getElementById("sceneKey").textContent = sc.key;
-  const sel = document.getElementById("sceneSel");
-  if (sel && sel.value !== sc.id) sel.value = sc.id;
+  PICKER.refresh();
 }
+
+/** Load a scene from the UI — the picker, the bar button, the panel row.
+ *
+ *  `loadScene` rebuilds everything the SCENE owns (grid, params, segments,
+ *  gauges, view, mode/overlay flags). What it does not touch is the handful of
+ *  session knobs that a fresh `?scene=<id>` boot would never have inherited,
+ *  and those are reset here so that switching in place lands on exactly the
+ *  state the URL would have produced. They are set BEFORE the load so a scene
+ *  that pins one of them (`sc.particles`) still wins.
+ *
+ *  Deliberately NOT reset — these are workspace preferences with no scene
+ *  meaning, and a fresh boot cannot preserve them only because it cannot know
+ *  them: the resolution budget, the pointer tool and its brush size, and
+ *  whether the Controls / About panels are open.
+ *
+ *  Why in place rather than `location.href = "?scene=" + id`: the WebGL
+ *  context, the six compiled programs and the panel DOM all survive, so the
+ *  switch is immediate; and `loadScene` is already the path `#rig=` links and
+ *  every worksheet `rig.js` take, so it is the better-tested one. The address
+ *  bar is rewritten to match anyway (and a stale `#rig=` dropped), so a reload
+ *  lands where you are looking. */
+function switchScene(id) {
+  if (!SCENES.byId[id]) return false;
+  state.speed = 1.0;
+  state.dye = true;
+  state.jumps = true;
+  state.particles = false;            // scenes that want them set `sc.particles`
+  state.gaugeField = "head";
+  state.tracerN = 9;
+  GINSP.closeAll();
+  if (state.paused) togglePause();    // via the toggle, so the button label follows
+  // The valve button's highlight is only ever set by `toggleValve`, so a fresh
+  // boot never has it lit whatever the scene's `valveOpen` says.
+  document.getElementById("valveBtn").classList.remove("active");
+  loadScene(id, false);
+  // `loadScene` resets the tip cycle but not the line itself, so without this
+  // the previous scene's tip sits there for the first nine seconds.
+  document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
+  syncURL(id);
+  return true;
+}
+
+/** Keep the address bar honest: `?scene=<id>` for what is loaded, and NO
+ *  `#rig=` — a rig that has been switched away from must not come back on a
+ *  reload, which is the least surprising reading of "I left that scene".
+ *  Share writes its own link back into the bar when you next press it.
+ *  `replaceState` throws on `file://` (opaque origin); the picker works there
+ *  regardless, the URL simply does not follow. */
+function syncURL(id) {
+  try {
+    const u = new URL(location.href);
+    u.hash = "";
+    u.searchParams.set("scene", id);
+    history.replaceState(null, "", u.pathname + u.search);
+  } catch (_) { /* file:// refuses — harmless */ }
+}
+
+// ----------------------------------------------------------- scene picker
+/** The menu behind the title box, the bar's "Scenes ▾" button, the panel's
+ *  Scene row and the S key — one menu, four ways in.
+ *
+ *  It is generated from `SCENES.list` every time it opens and knows no scene
+ *  id, name or grouping of its own: a scene added to js/scenes.js appears here
+ *  with its registry name, its `key` subtitle and its `blurb`, filed under its
+ *  own `group`. Groups are collected in first-seen (registry) order, so the
+ *  menu reads in the order the teaching set was written.
+ *
+ *  Drawn work is protected INLINE rather than with `confirm()`: a native dialog
+ *  cannot be screenshotted for a worksheet, cannot be styled, and on a touch
+ *  board lands wherever the OS puts it. Clicking a scene while something is
+ *  drawn expands a warning under that row instead — naming the count, pointing
+ *  at Rig → Share link, and offering "Discard and load" / "Cancel". A second
+ *  click on the same row is also a confirmation. */
+const PICKER = (() => {
+  let el = null, anchor = null, pending = null, hi = -1;
+
+  const menu = () => (el || (el = document.getElementById("scenemenu")));
+  const isOpen = () => !!(el && el.classList.contains("open"));
+  const titleEl = () => document.getElementById("title");
+
+  /** Registry order, grouped by the registry's own `group` field. */
+  function grouped() {
+    const order = [], by = new Map();
+    SCENES.list.forEach((s) => {
+      const g = s.group || "Other";
+      if (!by.has(g)) { by.set(g, []); order.push(g); }
+      by.get(g).push(s);
+    });
+    return order.map((g) => [g, by.get(g)]);
+  }
+
+  function render() {
+    const m = menu();
+    m.textContent = "";
+    const head = document.createElement("div");
+    head.className = "smh";
+    const hb = document.createElement("b"); hb.textContent = "Scenes";
+    const hi2 = document.createElement("i");
+    hi2.textContent = SCENES.list.length + " · Esc closes";
+    head.appendChild(hb); head.appendChild(hi2);
+    m.appendChild(head);
+
+    grouped().forEach(([g, list]) => {
+      const h = document.createElement("div");
+      h.className = "smg"; h.textContent = g;
+      m.appendChild(h);
+      list.forEach((s) => {
+        const cur = !!(state.scene && s.id === state.scene.id);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "smi" + (cur ? " on" : "");
+        b.dataset.id = s.id;
+        b.setAttribute("role", "menuitem");
+        b.title = "?scene=" + s.id;
+        if (cur) {
+          const tag = document.createElement("span");     // floated: first child
+          tag.className = "tag"; tag.textContent = "current";
+          b.appendChild(tag);
+        }
+        const nm = document.createElement("b"); nm.textContent = s.name;
+        const ky = document.createElement("em"); ky.textContent = s.key || s.id;
+        const bl = document.createElement("p"); bl.textContent = s.blurb || "";
+        b.appendChild(nm); b.appendChild(ky); b.appendChild(bl);
+        b.onclick = () => choose(s.id);
+        m.appendChild(b);
+        if (pending === s.id) m.appendChild(warning(s));
+      });
+    });
+  }
+
+  /** The inline "this drops your drawing" step. */
+  function warning(s) {
+    const n = sim && sim.segs ? sim.segs.length : 0, gn = state.gauges.length;
+    const w = document.createElement("div");
+    w.className = "smwarn";
+    const p = document.createElement("div");
+    const b1 = document.createElement("b"); b1.textContent = "Loading drops your drawing.";
+    p.appendChild(b1);
+    p.appendChild(document.createTextNode(
+      " " + s.name + " starts clean, so the " + n + " segment" + (n === 1 ? "" : "s") +
+      " you have drawn" + (gn ? " and " + gn + " gauge" + (gn === 1 ? "" : "s") : "") +
+      " will be gone. Save it first with Controls → Rig → ⇪ Share link " +
+      "(or ⤓ Export JSON): the link rebuilds this rig exactly."));
+    const r = document.createElement("div"); r.className = "r";
+    const go = document.createElement("button");
+    go.className = "go"; go.textContent = "Discard and load";
+    go.onclick = (e) => { e.stopPropagation(); load(s.id); };
+    const no = document.createElement("button");
+    no.className = "no"; no.textContent = "Cancel";
+    no.onclick = (e) => { e.stopPropagation(); pending = null; render(); place(); };
+    r.appendChild(go); r.appendChild(no);
+    w.appendChild(p); w.appendChild(r);
+    return w;
+  }
+
+  /** A row was clicked. The current scene is a no-op — nobody should be able to
+   *  bin a settled run by clicking the thing they are already looking at. */
+  function choose(id) {
+    if (state.scene && id === state.scene.id) { close(); return; }
+    if (sim && sim.segs && sim.segs.length && pending !== id) {
+      pending = id; render(); place();
+      const w = menu().querySelector(".smwarn");
+      if (w && w.scrollIntoView) w.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    load(id);
+  }
+  function load(id) { pending = null; close(); switchScene(id); }
+
+  /** Under the element that opened it, right-aligned to it, clamped on screen. */
+  function place() {
+    const m = menu();
+    const a = anchor && anchor.isConnected ? anchor : titleEl();
+    const r = a.getBoundingClientRect();
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + "px";
+    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
+  }
+
+  function open(a) {
+    anchor = a || titleEl();
+    pending = null; hi = -1;
+    render();
+    menu().classList.add("open");
+    place();
+    titleEl().classList.add("open");
+    const btn = document.getElementById("sceneBtn");
+    if (btn) btn.classList.add("active");
+    const on = menu().querySelector(".smi.on");
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
+  }
+  function close() {
+    if (el) el.classList.remove("open");
+    pending = null; hi = -1;
+    titleEl().classList.remove("open");
+    const btn = document.getElementById("sceneBtn");
+    if (btn) btn.classList.remove("active");
+  }
+  function toggle(a) { if (isOpen()) close(); else open(a); }
+  /** Keep an open menu honest when the scene changes under it. */
+  function refresh() { if (isOpen()) { render(); place(); } }
+
+  /** Every key while the menu is open comes here, so none of them reach the
+   *  global shortcuts — C (clear drawing) with a menu open would be a
+   *  spectacular way to lose a rig. */
+  function key(e) {
+    const list = [...menu().querySelectorAll(".smi")];
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!list.length) return;
+      const d = e.key === "ArrowDown" ? 1 : list.length - 1;
+      hi = hi < 0 ? (e.key === "ArrowDown" ? 0 : list.length - 1) : (hi + d) % list.length;
+      list.forEach((b, i) => b.classList.toggle("hi", i === hi));
+      if (list[hi].scrollIntoView) list[hi].scrollIntoView({ block: "nearest" });
+      return;
+    }
+    if (e.key === "Enter" || e.key === " ") {
+      const act = document.activeElement;
+      const b = (hi >= 0 && list[hi]) ||
+        (act && act.classList && act.classList.contains("smi") ? act : null);
+      if (b) { e.preventDefault(); choose(b.dataset.id); }
+    }
+  }
+
+  /** Click-away. In capture, so a dismissing click on the canvas dismisses
+   *  ONLY — it does not also start drawing a wall. */
+  function onDown(e) {
+    if (!isOpen()) return;
+    if (menu().contains(e.target)) return;
+    if (anchor && anchor.contains && anchor.contains(e.target)) return;  // its own toggle
+    close();
+    if (e.target === canvas) { e.preventDefault(); e.stopPropagation(); }
+  }
+
+  return { open, close, toggle, isOpen, refresh, key, onDown, render,
+           choose, place, get pending() { return pending; } };
+})();
 
 // ------------------------------------------------------------------- panel
 const CONTROLS = [
+  { h: "Scene" },
+  { id: "scene", type: "buttons", label: "Scene",
+    // A "buttons" row rebuilds itself on every sync, which is exactly what a
+    // label showing the live scene name needs.
+    sync: (el) => {
+      el.textContent = "";
+      const b = document.createElement("button");
+      b.className = "scenebtn";
+      b.textContent = (state.scene ? state.scene.name : "—") + "  ▾";
+      b.title = "Choose a scene";
+      b.onclick = () => { b.blur(); PICKER.toggle(b); };
+      el.appendChild(b);
+    },
+    fmt: () => state.scene
+      ? "?scene=" + state.scene.id + "  ·  " + state.scene.key
+      : "",
+    info: "Every scene in the set, with a line on what it shows. The title box in the corner opens the same menu, as does <b>S</b>. Loading one is exactly a fresh <code>?scene=</code> boot: fresh grid, scene defaults, gauges cleared, spin-up from t = 0 — so anything you have drawn goes, and the menu says so before it does. Your resolution and the tool in your hand are kept." },
+
   { h: "Flow" },
   { id: "speed", label: "Speed", min: 0.02, max: 3, step: 0.01, log: true,
     get: () => state.speed, set: (v) => state.speed = v,
@@ -1780,18 +2035,20 @@ function boot() {
     SIM[k] = (...a) => { const r = f(...a); OVERLAY.resetEstimates(sim); return r; };
   });
 
-  const sel = document.getElementById("sceneSel");
-  const groups = {};
-  SCENES.list.forEach((s) => {
-    if (!groups[s.group]) {
-      groups[s.group] = document.createElement("optgroup");
-      groups[s.group].label = s.group;
-      sel.appendChild(groups[s.group]);
-    }
-    const o = document.createElement("option"); o.value = s.id; o.textContent = s.name;
-    groups[s.group].appendChild(o);
+  // The scene menu (see PICKER). Four ways in: the title box in the corner,
+  // the bar button, the panel's Scene row, and the S key below.
+  const title = document.getElementById("title");
+  title.onclick = (e) => PICKER.toggle(e.currentTarget);
+  title.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault(); e.stopPropagation();          // not the global Space = pause
+    PICKER.toggle(title);
   });
-  sel.onchange = () => loadScene(sel.value, false);
+  document.getElementById("sceneBtn").onclick = (e) => {
+    const b = e.currentTarget; b.blur(); PICKER.toggle(b);
+  };
+  window.addEventListener("pointerdown", PICKER.onDown, true);
+  addEventListener("resize", () => { if (PICKER.isOpen()) PICKER.place(); });
 
   const tb = document.getElementById("tools");
   TOOLS.forEach(([id, label, tip]) => {
@@ -1815,7 +2072,6 @@ function boot() {
   // countdown runs against the RIG's geometry and not the base scene's.
   const rigCode = RIG.hashCode();
   if (rigCode) RIG.load(rigCode).catch(() => { /* reported in the panel + a toast */ });
-  sel.value = state.scene.id;
   syncTools();
   document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
 
@@ -1853,8 +2109,12 @@ function boot() {
 
   addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    // An open menu owns the keyboard: Esc/arrows/Enter are its own, and every
+    // other shortcut is swallowed rather than fired behind it.
+    if (PICKER.isOpen()) { PICKER.key(e); return; }
     const k = e.key.toLowerCase();
     if (k === " ") { e.preventDefault(); togglePause(); }
+    else if (k === "s") PICKER.open(document.getElementById("title"));
     else if (k === "v") toggleValve();
     else if (k === "z") SIM.undoSeg();
     else if (k === "c") SIM.clearSegs();
@@ -1892,6 +2152,8 @@ function toggleValve() {
 window.APP = {
   get sim() { return sim; }, get view() { return view; },
   state, loadScene, SIM, OVERLAY, SCENES, showToast, zoomAt, resetZoom,
+  switchScene,                             // load a scene as a fresh ?scene= boot would
+  PICKER,                                  // the scene menu
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)
   inspect: (k) => GINSP.show(k || 0),

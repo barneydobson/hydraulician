@@ -69,6 +69,17 @@ const GLH = (() => {
       get read() { return this.a; },
       get write() { return this.b; },
       swap() { const t = this.a; this.a = this.b; this.b = t; },
+      /** Hand both halves back to the driver. A rebuild allocates a whole new
+       *  pair, so the outgoing one has to be released or the driver keeps it
+       *  for ever — see SIM.build's `release`. */
+      dispose() {
+        for (const s of [this.a, this.b]) {
+          if (!s) continue;
+          gl.deleteFramebuffer(s.fbo);
+          gl.deleteTexture(s.tex);
+        }
+        this.a = null; this.b = null;
+      },
     };
   }
 

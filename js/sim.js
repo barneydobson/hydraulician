@@ -102,6 +102,25 @@ const SIM = (() => {
   function clearSegs() { S.segs.length = 0; rasterise(); }
 
   // ------------------------------------------------------------ allocation
+  /** Hand a superseded grid's GL objects back to the driver.
+   *  `build` allocates a complete new set every time it is called — 8 textures
+   *  and 7 framebuffers, four of them full nx×ny RGBA32F — and nothing else
+   *  ever frees them, so before this a resolution flick stranded the whole
+   *  outgoing grid (~45 MB of VRAM per rebuild on m2 at Ultra, measured). A
+   *  few flicks exhausted the driver and the next createFBO threw
+   *  "Framebuffer incomplete: 0x8cdd" — with the tab, not the sim, at fault.
+   *  Only GL handles go: `segs` and the live parameters `S.p` are plain JS and
+   *  `build` has already copied them across by the time this runs. */
+  function release(g) {
+    if (!g || g === S) return;                 // never free the live grid
+    for (const b of [g.U, g.F, g.P]) if (b && b.dispose) b.dispose();
+    if (g.colFbo) gl.deleteFramebuffer(g.colFbo);
+    if (g.solid) gl.deleteTexture(g.solid);
+    if (g.colTex) gl.deleteTexture(g.colTex);
+    g.U = null; g.F = null; g.P = null;
+    g.solid = null; g.colTex = null; g.colFbo = null;
+  }
+
   function build(scene, budget, keepSegs) {
     const aspect = scene.W / scene.H;
     // The hard cap is the driver's texture limit, not a number picked here.
@@ -136,6 +155,7 @@ const SIM = (() => {
       for (const k of ["inflow", "tailwater", "wave", "source"]) p[k] = Object.assign({}, prev[k]);
       p.pour = null;
     }
+    const old = S;                  // everything CPU-side has been read off it
     S = {
       scene, nx, ny, dx, segs,
       W: nx * dx, H: ny * dx,
@@ -143,6 +163,7 @@ const SIM = (() => {
       t: 0, frames: 0,
       p,
     };
+    release(old);                   // free BEFORE allocating: lower peak VRAM
 
     const F = gl.RGBA32F, RGBA = gl.RGBA, FL = gl.FLOAT;
     S.U = GLH.createDoubleBuffer(gl, nx, ny, F, RGBA, FL, null);

@@ -1,0 +1,16 @@
+pair,cell_id,scene,T_s,amp_m,H0_m,L0_m,xi0,behaviour,surf_width_m,note
+1,wave-T0.70-A0.035,wave,0.7,0.035,0.0299,0.765,0.506,dies,,"fixed-probe xi0 (dx=0.20; original dx=0.40 was near-degenerate, Krefl>1 artifact); profile confirms no break (maxH/h_DFT=0.17)"
+2,wave-T0.90-A0.045,wave,0.9,0.045,0.0149,1.265,0.921,dies,,"no break detected (maxH/h_DFT=0.16); classical formula says nominal-plunging, sim just too small to break"
+3,wave-T1.10-A0.055,wave,1.1,0.055,0.0351,1.889,0.734,dies,,no break detected (maxH/h_DFT=0.17); same story as row 2
+4,wave-T1.50-A0.060,wave,1.5,0.06,0.0652,3.513,0.734,spilling,1.38,clean spilling front confirmed visually; breakOnset x=3.3
+5,wave-T2.10-A0.070,wave,2.1,0.07,0.063,6.885,1.046,spilling,1.68,"best exemplar -- clear foamy/broken surface, shots/01; breakOnset x=3.0"
+6,wave-T3.00-A0.055,wave,3.0,0.055,0.0317,14.052,2.106,spilling,1.28,breakOnset x=3.4
+7,wave-T4.00-A0.045,wave,4.0,0.045,0.0178,24.981,3.749,spilling (marginal),,"faint whitecap texture only (shots/05), well short of row 4-6's break; automatic detector's x=4.2 rejected -- h there is 48 mm, close enough to the shoreline (4.68 m) that the ratio denominator is collapsing, not a real front"
+8,wave-T5.00-A0.035,wave,5.0,0.035,0.0092,39.033,6.529,dies,,"no break detected; H0=9.2mm, below the ~2-cell (22mm) floor"
+9,wave-T6.00-A0.030,wave,6.0,0.03,0.0084,56.207,8.192,dies,,"flat, motionless surface confirmed visually (shots/02); H0=8.4mm; automatic x=4.2 breakOnset rejected, same near-shoreline artifact as row 7"
+10,wavesurge-T0.80-A0.060,wavesurge,0.8,0.06,0.0296,0.999,4.066,dies (weak),,"no break; H0=29.6mm, near the 2-cell floor for this scene's Δx; two-probe Krefl_nearpaddle read high (0.78) -- flagged low-confidence, dx/L=0.41 close to the reliability limit"
+11,wavesurge-T1.40-A0.130,wavesurge,1.4,0.13,0.1033,3.06,3.81,surging,,"clean coherent front, no foam"
+12,wavesurge-T1.40-A0.173,wavesurge,1.4,0.173,0.1334,3.06,3.353,surging,,"KEY cell: xi0=3.35, essentially ON the classical 3.3 boundary from above (paddle ratio 48%, near the safe ceiling) -- still visibly clean surging, no foam (shots/04); automatic breakOnset x=0.5 rejected as a near-paddle artifact"
+13,wavesurge-T1.80-A0.080,wavesurge,1.8,0.08,0.0813,5.059,5.521,surging,,"automatic breakOnset x=8.3 rejected -- h=68mm there, shoreline denominator artifact, not a real front"
+14,wavesurge-T3.00-A0.140,wavesurge,3.0,0.14,0.1026,14.052,8.191,surging,,"scene's own shipped default; canonical exemplar, shots/03; automatic breakOnset x=8.2 rejected, same artifact"
+15,wavesurge-T4.20-A0.199,wavesurge,4.2,0.199,0.0832,27.542,12.733,surging,,deepest into surging tested

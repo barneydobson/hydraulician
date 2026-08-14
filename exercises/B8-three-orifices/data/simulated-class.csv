@@ -1,0 +1,11 @@
+student,digit,lip,Cc,Cv,Cd,jet_thickness_m,opening_height_m,surface_level_m,efflux_speed_ms,vena_station_x,source
+sim01,0,sharp,0.611,1.023,0.625,0.0733,0.12,2.913,5.645,2.41,measured
+sim02,1,bellmouth,0.856,0.813,0.696,0.1027,0.12,3.250,4.953,2.41,measured
+sim03,2,borda,0.611,0.972,0.594,0.0733,0.12,3.250,5.918,2.44,measured
+sim04,3,sharp,0.611,1.023,0.625,0.0733,0.12,2.913,5.645,2.41,measured
+sim05,4,bellmouth,0.856,0.813,0.696,0.1027,0.12,3.250,4.953,2.41,measured
+sim06,5,borda,0.611,0.972,0.594,0.0733,0.12,3.250,5.918,2.44,measured
+sim07,6,sharp,0.611,1.023,0.625,0.0733,0.12,2.913,5.645,2.41,measured
+sim08,7,bellmouth,0.856,0.813,0.696,0.1027,0.12,3.250,4.953,2.41,measured
+sim09,8,borda,0.611,0.972,0.594,0.0733,0.12,3.250,5.918,2.44,measured
+sim10,9,sharp,0.611,1.023,0.625,0.0733,0.12,2.913,5.645,2.41,measured

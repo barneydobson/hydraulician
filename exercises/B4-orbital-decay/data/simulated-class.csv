@@ -1,0 +1,9 @@
+student,digit,scene,T_s,amp_m,kh,station_x_m,vratio_submitted_naive,vratio_dft,vratio_theory,hratio_submitted_naive,hratio_dft,hratio_theory,bed_ampY_theory_um,bed_noise_floor_um,note
+sim00,0,wavedeep,0.6,0.05,8.2554,5.84,148.21,85.89,9775.03,1.0217,1.0122,0.0006,0.075,20.479,bed signal below noise floor
+sim01,1,wavedeep,0.75,0.08,5.2837,5.84,67.88,63.9,797.4,0.3667,0.1224,0.0107,0.571,11.181,bed signal below noise floor
+sim02,2,wavedeep,0.9,0.11,3.6738,5.84,123.41,15.53,210.84,1.6704,1.8718,0.0578,2.097,30.405,bed signal below noise floor
+sim03,3,wavedeep,1.05,0.15,2.7192,5.84,99.56,39.63,121.56,1.9345,2.8737,0.1342,12.482,51.321,bed signal below noise floor
+sim04,4,wavedeep,1.2,0.19,2.1237,5.84,39.73,31.01,85.63,1.1968,0.4148,0.239,33.791,110.147,bed signal below noise floor
+sim05,5,wavedeep,1.35,0.23,1.7354,5.84,54.33,57.46,70.02,0.5181,0.4702,0.3456,205.717,263.821,bed signal below noise floor
+sim06,6,wavedeep,1.5,0.28,1.4687,5.84,17.18,32.86,61.9,0.924,1.0464,0.4415,611.131,1144.648,bed signal below noise floor
+sim07,7,wavedeep,1.6,0.3,1.334,5.84,35.84,38.07,52.81,0.3302,0.5403,0.5361,915.75,1277.389,bed signal below noise floor

@@ -5,7 +5,8 @@ channel with the mouse and watch free-surface Navier–Stokes run through it —
 written almost entirely by Claude (the solver, the scenes, the 40-demo teaching
 pack and the tooling), with the maintainer directing and reviewing.
 
-<https://barneydobson.github.io/hydraulician/> (live once the repository is public)
+**Try it:** <https://barneydobson.github.io/hydraulician/> — runs in the
+browser, nothing to install (live once the repository is public).
 
 **Contents** — [Summary](#summary) · [Exercises](#exercises) ·
 [Method](#method) · [Developer](#developer) ·
@@ -26,28 +27,28 @@ result, then use a real model to get a number.
 
 ## Exercises
 
-Click a picture to open that exercise in the hosted app, set up and ready.
-Click the id for its brief in the repository. Full programme:
-[`exercises/INDEX.md`](exercises/INDEX.md).
+Click a picture or an id to open that exercise in the app, set up and ready.
+Written briefs, data and plots for each one are in
+[`exercises/`](exercises/INDEX.md).
 
 |  |  |  |  |
 |---|---|---|---|
-| [<img src="docs/thumbs/DA-1.jpg" alt="DA-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-1)<br>**[DA-1](exercises/DA-1-scale-ladder/)** · scale ladder | [<img src="docs/thumbs/DA-2.jpg" alt="DA-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-2)<br>**[DA-2](exercises/DA-2-time-scales/)** · time scales | [<img src="docs/thumbs/DA-3.jpg" alt="DA-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-3)<br>**[DA-3](exercises/DA-3-scale-effects/)** · scale effects | [<img src="docs/thumbs/HP-1.jpg" alt="HP-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=HP-1)<br>**[HP-1](exercises/HP-1-penstock-power/)** · penstock power |
-| [<img src="docs/thumbs/HP-2.jpg" alt="HP-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=HP-2)<br>**[HP-2](exercises/HP-2-pelton/)** · Pelton jet | [<img src="docs/thumbs/NC-1.jpg" alt="NC-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-1)<br>**[NC-1](exercises/NC-1-slope-area/)** · slope–area gauging | [<img src="docs/thumbs/NC-2.jpg" alt="NC-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-2)<br>**[NC-2](exercises/NC-2-alpha/)** · energy coefficient α | [<img src="docs/thumbs/NC-3.jpg" alt="NC-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-3)<br>**[NC-3](exercises/NC-3-bed-shear/)** · bed shear |
-| [<img src="docs/thumbs/QS-1.jpg" alt="QS-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=QS-1)<br>**[QS-1](exercises/QS-1-drain-predict/)** · tank draining | [<img src="docs/thumbs/QS-2.jpg" alt="QS-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=QS-2)<br>**[QS-2](exercises/QS-2-twin-tanks/)** · two reservoirs | [<img src="docs/thumbs/UN-1.jpg" alt="UN-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-1)<br>**[UN-1](exercises/UN-1-celerity/)** · celerity | [<img src="docs/thumbs/UN-2.jpg" alt="UN-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-2)<br>**[UN-2](exercises/UN-2-establishment/)** · flow establishment |
-| [<img src="docs/thumbs/UN-3.jpg" alt="UN-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-3)<br>**[UN-3](exercises/UN-3-surge-tank/)** · surge tank | [<img src="docs/thumbs/WV-1.jpg" alt="WV-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-1)<br>**[WV-1](exercises/WV-1-dispersion/)** · dispersion | [<img src="docs/thumbs/WV-2.jpg" alt="WV-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-2)<br>**[WV-2](exercises/WV-2-buried-gauge/)** · pressure under waves | [<img src="docs/thumbs/WV-3.jpg" alt="WV-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-3)<br>**[WV-3](exercises/WV-3-reflection/)** · wave reflection |
-| [<img src="docs/thumbs/MO-1.jpg" alt="MO-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=MO-1)<br>**[MO-1](exercises/MO-1-gate-cv/)** · sluice gate | [<img src="docs/thumbs/MO-2.jpg" alt="MO-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=MO-2)<br>**[MO-2](exercises/MO-2-jet-vane/)** · jet on a vane | [<img src="docs/thumbs/FR-1.jpg" alt="FR-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=FR-1)<br>**[FR-1](exercises/FR-1-friction-law/)** · pipe friction | [<img src="docs/thumbs/LL-1.jpg" alt="LL-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=LL-1)<br>**[LL-1](exercises/LL-1-borda-carnot/)** · sudden expansion |
-| [<img src="docs/thumbs/LL-2.jpg" alt="LL-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=LL-2)<br>**[LL-2](exercises/LL-2-find-throttle/)** · hidden throttle | [<img src="docs/thumbs/PU-1.jpg" alt="PU-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=PU-1)<br>**[PU-1](exercises/PU-1-system-curve/)** · system curve | [<img src="docs/thumbs/WE-1.jpg" alt="WE-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=WE-1)<br>**[WE-1](exercises/WE-1-sharp-weir/)** · sharp-crested weir | [<img src="docs/thumbs/UF-1.jpg" alt="UF-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=UF-1)<br>**[UF-1](exercises/UF-1-normal-depth/)** · normal depth |
-| [<img src="docs/thumbs/FB-1.jpg" alt="FB-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=FB-1)<br>**[FB-1](exercises/FB-1-choking-hump/)** · choked hump | [<img src="docs/thumbs/FB-2.jpg" alt="FB-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=FB-2)<br>**[FB-2](exercises/FB-2-yc-three-ways/)** · critical depth | [<img src="docs/thumbs/HJ-1.jpg" alt="HJ-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=HJ-1)<br>**[HJ-1](exercises/HJ-1-belanger/)** · hydraulic jump | [<img src="docs/thumbs/GV-1.jpg" alt="GV-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=GV-1)<br>**[GV-1](exercises/GV-1-backwater/)** · backwater profile |
-| [<img src="docs/thumbs/GV-2.jpg" alt="GV-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=GV-2)<br>**[GV-2](exercises/GV-2-profile-safari/)** · profile classification | [<img src="docs/thumbs/CS-1.jpg" alt="CS-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=CS-1)<br>**[CS-1](exercises/CS-1-cso-spill/)** · CSO chamber |   |   |
+| [<img src="docs/thumbs/DA-1.jpg" alt="DA-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-1)<br>**[DA-1](https://barneydobson.github.io/hydraulician/?ex=DA-1)** · scale ladder | [<img src="docs/thumbs/DA-2.jpg" alt="DA-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-2)<br>**[DA-2](https://barneydobson.github.io/hydraulician/?ex=DA-2)** · time scales | [<img src="docs/thumbs/DA-3.jpg" alt="DA-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-3)<br>**[DA-3](https://barneydobson.github.io/hydraulician/?ex=DA-3)** · scale effects | [<img src="docs/thumbs/HP-1.jpg" alt="HP-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=HP-1)<br>**[HP-1](https://barneydobson.github.io/hydraulician/?ex=HP-1)** · penstock power |
+| [<img src="docs/thumbs/HP-2.jpg" alt="HP-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=HP-2)<br>**[HP-2](https://barneydobson.github.io/hydraulician/?ex=HP-2)** · Pelton jet | [<img src="docs/thumbs/NC-1.jpg" alt="NC-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-1)<br>**[NC-1](https://barneydobson.github.io/hydraulician/?ex=NC-1)** · slope–area gauging | [<img src="docs/thumbs/NC-2.jpg" alt="NC-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-2)<br>**[NC-2](https://barneydobson.github.io/hydraulician/?ex=NC-2)** · energy coefficient α | [<img src="docs/thumbs/NC-3.jpg" alt="NC-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-3)<br>**[NC-3](https://barneydobson.github.io/hydraulician/?ex=NC-3)** · bed shear |
+| [<img src="docs/thumbs/QS-1.jpg" alt="QS-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=QS-1)<br>**[QS-1](https://barneydobson.github.io/hydraulician/?ex=QS-1)** · tank draining | [<img src="docs/thumbs/QS-2.jpg" alt="QS-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=QS-2)<br>**[QS-2](https://barneydobson.github.io/hydraulician/?ex=QS-2)** · two reservoirs | [<img src="docs/thumbs/UN-1.jpg" alt="UN-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-1)<br>**[UN-1](https://barneydobson.github.io/hydraulician/?ex=UN-1)** · celerity | [<img src="docs/thumbs/UN-2.jpg" alt="UN-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-2)<br>**[UN-2](https://barneydobson.github.io/hydraulician/?ex=UN-2)** · flow establishment |
+| [<img src="docs/thumbs/UN-3.jpg" alt="UN-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-3)<br>**[UN-3](https://barneydobson.github.io/hydraulician/?ex=UN-3)** · surge tank | [<img src="docs/thumbs/WV-1.jpg" alt="WV-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-1)<br>**[WV-1](https://barneydobson.github.io/hydraulician/?ex=WV-1)** · dispersion | [<img src="docs/thumbs/WV-2.jpg" alt="WV-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-2)<br>**[WV-2](https://barneydobson.github.io/hydraulician/?ex=WV-2)** · pressure under waves | [<img src="docs/thumbs/WV-3.jpg" alt="WV-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-3)<br>**[WV-3](https://barneydobson.github.io/hydraulician/?ex=WV-3)** · wave reflection |
+| [<img src="docs/thumbs/MO-1.jpg" alt="MO-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=MO-1)<br>**[MO-1](https://barneydobson.github.io/hydraulician/?ex=MO-1)** · sluice gate | [<img src="docs/thumbs/MO-2.jpg" alt="MO-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=MO-2)<br>**[MO-2](https://barneydobson.github.io/hydraulician/?ex=MO-2)** · jet on a vane | [<img src="docs/thumbs/FR-1.jpg" alt="FR-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=FR-1)<br>**[FR-1](https://barneydobson.github.io/hydraulician/?ex=FR-1)** · pipe friction | [<img src="docs/thumbs/LL-1.jpg" alt="LL-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=LL-1)<br>**[LL-1](https://barneydobson.github.io/hydraulician/?ex=LL-1)** · sudden expansion |
+| [<img src="docs/thumbs/LL-2.jpg" alt="LL-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=LL-2)<br>**[LL-2](https://barneydobson.github.io/hydraulician/?ex=LL-2)** · hidden throttle | [<img src="docs/thumbs/PU-1.jpg" alt="PU-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=PU-1)<br>**[PU-1](https://barneydobson.github.io/hydraulician/?ex=PU-1)** · system curve | [<img src="docs/thumbs/WE-1.jpg" alt="WE-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=WE-1)<br>**[WE-1](https://barneydobson.github.io/hydraulician/?ex=WE-1)** · sharp-crested weir | [<img src="docs/thumbs/UF-1.jpg" alt="UF-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=UF-1)<br>**[UF-1](https://barneydobson.github.io/hydraulician/?ex=UF-1)** · normal depth |
+| [<img src="docs/thumbs/FB-1.jpg" alt="FB-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=FB-1)<br>**[FB-1](https://barneydobson.github.io/hydraulician/?ex=FB-1)** · choked hump | [<img src="docs/thumbs/FB-2.jpg" alt="FB-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=FB-2)<br>**[FB-2](https://barneydobson.github.io/hydraulician/?ex=FB-2)** · critical depth | [<img src="docs/thumbs/HJ-1.jpg" alt="HJ-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=HJ-1)<br>**[HJ-1](https://barneydobson.github.io/hydraulician/?ex=HJ-1)** · hydraulic jump | [<img src="docs/thumbs/GV-1.jpg" alt="GV-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=GV-1)<br>**[GV-1](https://barneydobson.github.io/hydraulician/?ex=GV-1)** · backwater profile |
+| [<img src="docs/thumbs/GV-2.jpg" alt="GV-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=GV-2)<br>**[GV-2](https://barneydobson.github.io/hydraulician/?ex=GV-2)** · profile classification | [<img src="docs/thumbs/CS-1.jpg" alt="CS-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=CS-1)<br>**[CS-1](https://barneydobson.github.io/hydraulician/?ex=CS-1)** · CSO chamber |   |   |
 
 **Backups (B1–B10).** Spares, for a session with time left over.
 
 |  |  |  |  |
 |---|---|---|---|
-| [<img src="docs/thumbs/B1.jpg" alt="B1" width="220">](https://barneydobson.github.io/hydraulician/?ex=B1)<br>**[B1](exercises/B1-period-4Lc/)** · reflection period | [<img src="docs/thumbs/B2.jpg" alt="B2" width="220">](https://barneydobson.github.io/hydraulician/?ex=B2)<br>**[B2](exercises/B2-flexible-pipe/)** · celerity and surge | [<img src="docs/thumbs/B3.jpg" alt="B3" width="220">](https://barneydobson.github.io/hydraulician/?ex=B3)<br>**[B3](exercises/B3-dambreak/)** · dam break | [<img src="docs/thumbs/B4.jpg" alt="B4" width="220">](https://barneydobson.github.io/hydraulician/?ex=B4)<br>**[B4](exercises/B4-orbital-decay/)** · wave orbits |
-| [<img src="docs/thumbs/B5.jpg" alt="B5" width="220">](https://barneydobson.github.io/hydraulician/?ex=B5)<br>**[B5](exercises/B5-iribarren/)** · breaker types | [<img src="docs/thumbs/B6.jpg" alt="B6" width="220">](https://barneydobson.github.io/hydraulician/?ex=B6)<br>**[B6](exercises/B6-ursell/)** · Ursell number | [<img src="docs/thumbs/B7.jpg" alt="B7" width="220">](https://barneydobson.github.io/hydraulician/?ex=B7)<br>**[B7](exercises/B7-venturi-rating/)** · venturi meter | [<img src="docs/thumbs/B8.jpg" alt="B8" width="220">](https://barneydobson.github.io/hydraulician/?ex=B8)<br>**[B8](exercises/B8-three-orifices/)** · orifice coefficients |
-| [<img src="docs/thumbs/B9.jpg" alt="B9" width="220">](https://barneydobson.github.io/hydraulician/?ex=B9)<br>**[B9](exercises/B9-three-reservoirs/)** · three reservoirs | [<img src="docs/thumbs/B10.jpg" alt="B10" width="220">](https://barneydobson.github.io/hydraulician/?ex=B10)<br>**[B10](exercises/B10-crest-vs-hgl/)** · pipe crest and HGL |   |   |
+| [<img src="docs/thumbs/B1.jpg" alt="B1" width="220">](https://barneydobson.github.io/hydraulician/?ex=B1)<br>**[B1](https://barneydobson.github.io/hydraulician/?ex=B1)** · reflection period | [<img src="docs/thumbs/B2.jpg" alt="B2" width="220">](https://barneydobson.github.io/hydraulician/?ex=B2)<br>**[B2](https://barneydobson.github.io/hydraulician/?ex=B2)** · celerity and surge | [<img src="docs/thumbs/B3.jpg" alt="B3" width="220">](https://barneydobson.github.io/hydraulician/?ex=B3)<br>**[B3](https://barneydobson.github.io/hydraulician/?ex=B3)** · dam break | [<img src="docs/thumbs/B4.jpg" alt="B4" width="220">](https://barneydobson.github.io/hydraulician/?ex=B4)<br>**[B4](https://barneydobson.github.io/hydraulician/?ex=B4)** · wave orbits |
+| [<img src="docs/thumbs/B5.jpg" alt="B5" width="220">](https://barneydobson.github.io/hydraulician/?ex=B5)<br>**[B5](https://barneydobson.github.io/hydraulician/?ex=B5)** · breaker types | [<img src="docs/thumbs/B6.jpg" alt="B6" width="220">](https://barneydobson.github.io/hydraulician/?ex=B6)<br>**[B6](https://barneydobson.github.io/hydraulician/?ex=B6)** · Ursell number | [<img src="docs/thumbs/B7.jpg" alt="B7" width="220">](https://barneydobson.github.io/hydraulician/?ex=B7)<br>**[B7](https://barneydobson.github.io/hydraulician/?ex=B7)** · venturi meter | [<img src="docs/thumbs/B8.jpg" alt="B8" width="220">](https://barneydobson.github.io/hydraulician/?ex=B8)<br>**[B8](https://barneydobson.github.io/hydraulician/?ex=B8)** · orifice coefficients |
+| [<img src="docs/thumbs/B9.jpg" alt="B9" width="220">](https://barneydobson.github.io/hydraulician/?ex=B9)<br>**[B9](https://barneydobson.github.io/hydraulician/?ex=B9)** · three reservoirs | [<img src="docs/thumbs/B10.jpg" alt="B10" width="220">](https://barneydobson.github.io/hydraulician/?ex=B10)<br>**[B10](https://barneydobson.github.io/hydraulician/?ex=B10)** · pipe crest and HGL |   |   |
 
 ## Method
 
@@ -55,14 +56,18 @@ The solver integrates the Navier–Stokes equations in the vertical plane: mass
 is conserved, and fluid accelerates under pressure, gravity, viscosity and bed
 drag.
 
-$$\frac{\partial f}{\partial t} + \nabla\cdot(f\,\mathbf{u}) = 0$$
+```math
+\frac{\partial f}{\partial t} + \nabla \cdot (f \mathbf{u}) = 0
+```
 
-$$\frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u}\cdot\nabla)\,\mathbf{u}
-= -\frac{\nabla p}{\rho} + \mathbf{g} + \nabla\cdot(\nu\nabla\mathbf{u})
-- \frac{C_f\,|\mathbf{u}|\,\mathbf{u}}{\Delta}$$
+```math
+\frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u} \cdot \nabla) \mathbf{u}
+= -\frac{\nabla p}{\rho} + \mathbf{g} + \nabla \cdot (\nu \nabla \mathbf{u})
+- \frac{C_f |\mathbf{u}| \mathbf{u}}{\Delta}
+```
 
-Here $\mathbf{u}$ is velocity, $p$ pressure, $\nu$ viscosity, $C_f$ a bed
-friction coefficient, and $f$ the fraction of a cell occupied by water, which
+Here `u` is velocity, `p` pressure, `ν` viscosity, `C_f` a bed
+friction coefficient, and `f` the fraction of a cell occupied by water, which
 also serves as the density.
 
 The simplification is in how pressure is obtained. Treating water as
@@ -71,23 +76,25 @@ solve over the whole grid, and the free surface needs a separate interface
 scheme. Instead the water is made slightly compressible, so pressure follows
 from the local fill fraction alone:
 
-$$\frac{p}{\rho} = c^{2}\,\max(f - 1,\ 0)$$
+```math
+\frac{p}{\rho} = c^{2} \max(f - 1, 0)
+```
 
-with $c$ the speed at which pressure signals travel. A cell below capacity
-($f<1$) carries no pressure and its water falls under gravity, which is the
+with `c` the speed at which pressure signals travel. A cell below capacity
+(`f<1`) carries no pressure and its water falls under gravity, which is the
 free surface condition without tracking an interface; a cell above capacity
-($f>1$) is compressed and pressurised. Open-channel and pressurised flow are
+(`f>1`) is compressed and pressurised. Open-channel and pressurised flow are
 therefore the same equations, surcharge and drain-down need no special case,
-and $c$ is exposed as a control. This is a two-dimensional Preissmann slot,
+and `c` is exposed as a control. This is a two-dimensional Preissmann slot,
 the same device used for surcharge in sewer models.
 
 Consequences. Discharges are per metre of width. The celerity is
 chosen rather than physical (8–400 m/s against ~1200 m/s in steel pipe), since
-the step scales as $\Delta t \approx 0.45\,\Delta x/(c+6)$; the scalings
-$\Delta H = c\,\Delta v/g$ and period $4L/c$ hold regardless. Resistance is
-delivered by the mesh, the wall treatment and the eddy viscosity, so $h_f
-\propto V^2$ holds but Manning's $n$ is a property of the grid and is measured
-from the computed energy line, $S_f = -\mathrm{d}E/\mathrm{d}x$, rather than
+the step scales as `Δt ≈ 0.45 Δx/(c+6)`; the scalings
+`ΔH = c Δv/g` and period `4L/c` hold regardless. Resistance is
+delivered by the mesh, the wall treatment and the eddy viscosity, so
+`h_f ∝ V²` holds but Manning's `n` is a property of the grid and is measured
+from the computed energy line, `S_f = -dE/dx`, rather than
 set. There is no surface tension, and voids carry no pressure, so nothing
 pneumatic is represented and breakers spill rather than plunge.
 
@@ -96,14 +103,14 @@ fill at centres, with no Poisson solve. Two full-screen GPU passes per
 substep: velocity (third-order upwind advection, Smagorinsky eddy viscosity,
 wall-aware Laplacian, implicit bed friction, then the pressure gradient from
 the equation of state) and volume-of-fluid (van Leer-limited flux-form
-advection of $f$ with an interface-compression term and a donor-cell
+advection of `f` with an interface-compression term and a donor-cell
 positivity limiter, which conserves volume to machine precision). Three
 cheaper passes handle the per-column reduction, particles and display. WebGL2,
 no dependencies, no build step, a few thousand substeps per second.
 
 Headless checks: water hammer peaks at 39.0 m against Joukowsky 41.1 m (−5%),
-period 3.0 s against $4L/c$ = 2.8 s; orifice efflux 5.62 m/s against
-$\sqrt{2gh}$ = 5.8 m/s ($C_v \approx 0.97$); venturi throat 19.4 m/s against
+period 3.0 s against `4L/c` = 2.8 s; orifice efflux 5.62 m/s against
+`√(2gh)` = 5.8 m/s (`C_v ≈ 0.97`); venturi throat 19.4 m/s against
 20.3; conjugate depth 5% under Bélanger; a 14 m flume passes q = 0.251 m²/s in
 against 0.215–0.261 out with volume flat. Every scene has been run to
 t = 120 s and checked for steadiness, flutter and discharge continuity.

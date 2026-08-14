@@ -1,0 +1,40 @@
+name: Deploy to GitHub Pages
+
+# The app is static (no build step, no dependencies), so "deploy" is just
+# uploading the repo as-is. Runs on every push to main; also runnable by hand
+# from the Actions tab. Nothing here fails the build if Pages is off — while
+# the repo is private on a free plan the enable step simply cannot run, and
+# the job is skipped rather than red.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never cancel a deploy midway; queue instead.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        # Turns Pages on itself the first time this runs against a repo where
+        # it is available, so going public is the only manual step.
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -10,7 +10,17 @@ WebGL2, zero dependencies, no build step. Serve the folder and open `index.html`
 python3 -m http.server 8124
 ```
 
-Then <http://localhost:8124>. `?scene=hammer` boots straight into a scene.
+Then <http://localhost:8124>. `?scene=hammer` boots straight into a scene, and
+`?ex=HJ-1` boots straight into a set-up teaching exercise (press `S` for the
+scene list, `E` for the exercises).
+
+**Hosted:** once this repo is public, the app also serves from GitHub Pages at
+<https://barneydobson.github.io/hydraulician/> — the deploy runs itself on every
+push to `main` (`.github/workflows/pages.yml`). Nothing to build; it publishes
+the folder as-is, so scene and exercise links work the same there:
+`https://barneydobson.github.io/hydraulician/?ex=HJ-1`. Two things to do once:
+make the repo public, and (if the first run has not done it for you) set
+**Settings → Pages → Source = GitHub Actions**.
 
 ---
 

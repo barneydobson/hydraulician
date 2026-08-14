@@ -1,0 +1,5 @@
+student,minutes,score,classes,source
+safari-worker,45,16,"M1,M2,M3,S1,S2,S3,H2,H3,A2",measured
+sim-A,20,5,"M1,M2,H2,H3",simulated
+sim-B,20,9,"M1,M2,M3,H2,H3,S2",simulated
+sim-C,20,13,"M1,M2,M3,S1,S2,S3,H2,H3",simulated

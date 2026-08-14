@@ -1,0 +1,14 @@
+student,digit,kind,x_m,n_points,h_m,chip_umax,chip_V,chip_ratio,alpha_student5,alpha_student4,alpha_full_verify,source
+sim01,0,uniform,1.5,29,0.3859,4.3271,3.2936,1.3138,1.1259,1.0988,1.2916,measured
+sim02,1,uniform,2.0,27,0.3593,4.6614,3.4858,1.3373,1.2116,1.1320,1.2762,measured
+sim03,2,uniform,2.5,26,0.3460,4.8916,3.4324,1.4251,1.2311,1.2100,1.3788,measured
+sim04,3,uniform,3.0,25,0.3327,5.1123,3.5790,1.4284,1.2948,1.2279,1.4262,measured
+sim05,4,uniform,3.5,24,0.3194,5.4332,3.7406,1.4525,1.3605,1.2638,1.4597,measured
+sim06,5,uniform,4.0,25,0.3327,5.4354,3.7337,1.4558,1.4223,1.2762,1.5157,measured
+sim07,6,uniform,4.5,22,0.2928,5.8063,4.0040,1.4501,1.3537,1.3466,1.5657,measured
+sim08,7,uniform,5.0,22,0.2928,6.0373,4.1036,1.4712,1.3663,1.2631,1.4455,measured
+sim09,8,uniform,1.5,29,0.3859,4.3782,3.2940,1.3291,1.1576,1.0997,1.3124,measured
+sim10,9,uniform,2.0,26,0.3460,4.6048,3.4774,1.3242,1.1949,1.1867,1.3490,measured
+class_freeslip,,freeslip,3.5,24,0.3194,5.4454,3.7536,1.4507,1.2952,,1.4369,measured
+class_gatewake_vena,,gatewake_vena,5.6304,7,0.1522,,,1.5035,,,1.7846,measured
+class_gatewake_wake,,gatewake_wake,6.0,8,0.1739,,,1.8238,,,2.2992,measured

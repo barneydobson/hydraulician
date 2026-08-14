@@ -1,0 +1,21 @@
+# HJ-1 pooled class data. MEASURED with exercises/_runner/runner.py against a
+# live WebGL context (not the agent browser pane). See README.md Appendix A
+# for the run protocol (settle time, median-window sampling) and per-row notes.
+# Rule: q = 0.42 + 0.03*d  (d = last digit of student number, 0-9)
+# Tailwater: apron (0.15 m) + 1.3*y_c, except d=6 and d=9 which needed 1.5*y_c
+# to damp the pumping oscillation CLAUDE.md documents for drowned-adjacent
+# tailwaters (see Appendix A).
+student,digit,scene,q,tail,y1,y2,Fr1,y2_over_y1,dE,source
+S00,0,h23,0.42,0.490,0.168,0.394,2.40,2.35,0.065,measured
+S01,1,h23,0.45,0.507,0.168,0.436,2.05,2.60,0.082,measured
+S02,2,h23,0.48,0.522,0.190,0.444,1.82,2.34,0.044,measured
+S03,3,h23,0.51,0.538,0.184,0.481,2.08,2.61,0.081,measured
+S04,4,h23,0.54,0.553,0.217,0.455,1.76,2.10,0.045,measured
+S05,5,h23,0.57,0.567,0.202,0.516,2.00,2.55,0.079,measured
+S06,6,h23,0.60,0.648,0.211,0.521,1.85,2.47,0.059,measured
+S07,7,h23,0.63,0.596,0.202,0.517,2.06,2.56,0.075,measured
+S08,8,h23,0.66,0.610,0.207,0.539,2.32,2.60,0.096,measured
+S09,9,h23,0.69,0.700,0.236,0.611,2.00,2.59,0.084,measured
+V1,-,s1,1.20,0.95,0.244,0.791,3.40,3.24,0.247,measured-coda
+V2,-,s1,1.20,1.00,0.257,0.725,2.97,2.82,0.224,measured-coda
+V3,-,s1,1.20,1.05,0.266,0.761,3.20,2.86,0.196,measured-coda

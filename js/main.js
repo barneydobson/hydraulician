@@ -317,6 +317,7 @@ const PICKER = (() => {
   }
 
   function open(a) {
+    EX.close();                 // the two menus are alternatives, not a stack
     anchor = a || titleEl();
     pending = null; hi = -1;
     render();
@@ -376,6 +377,625 @@ const PICKER = (() => {
            choose, place, get pending() { return pending; } };
 })();
 
+// ------------------------------------------------------- exercise picker
+/** The teaching pack, in the UI. Forty demos live in `exercises/`, and each
+ *  one is a scene PLUS a set of panel settings PLUS (often) a drawn rig, so
+ *  far described only in prose in its README. In a lecture hall that is
+ *  unusable: this turns "HJ-1" into a set-up simulation and a card telling you
+ *  what to read off it.
+ *
+ *  Two optional data files, both plain classic scripts:
+ *    js/exercises.js       `const EXERCISES = [...]`      — the list
+ *    js/exercises-rigs.js  `const EXERCISE_RIGS = {...}`  — the drawn geometry
+ *  Either may be absent. Without the list the menu says so and nothing else
+ *  changes; without the rig pack an exercise still loads its scene, its
+ *  settings and its digit rule, and the card says to draw the rig from the
+ *  README. Nothing here knows an exercise id.
+ *
+ *  Scene loading goes through `switchScene` — the same path the scene menu
+ *  takes — so an exercise pick is exactly a fresh `?scene=` boot plus the
+ *  settings, and the drawn-work warning is the same one, in the same words. */
+const EX = (() => {
+  let el = null, anchor = null, pending = null, hi = -1, filter = "";
+  let cur = null;              // the exercise the card is showing
+  let digit = null;            // the digit applied to it (null = none entered)
+  const memo = {};             // exercise id -> digit, sticky for the session
+  let lastDigit = null;        // ...and the last digit entered anywhere
+  const cardPos = {};          // "card" -> [left, top], so a re-pick lands home
+  let settleTo = 0, settleWhat = "";
+  let note = "";               // rig / unknown-control trouble, shown on the card
+  let ready = Promise.resolve();  // resolves when the last pick has fully applied
+
+  // ------------------------------------------------------------ the data
+  function all() {
+    return (typeof EXERCISES !== "undefined" && Array.isArray(EXERCISES)) ? EXERCISES : [];
+  }
+  function byId(id) { return all().find((e) => e.id === id) || null; }
+  /** The rig pack is consumed defensively: absent file, absent key and a
+   *  payload in any of the shapes RIG understands all end somewhere sane. */
+  /** Some rigs come in variants the digit chooses between — DA-1 is the same
+   *  weir at three scales, B8 three different orifice lips — so the key is a
+   *  per-digit `rigTable` where one exists. With no digit yet, the d = 0 rig
+   *  is the one that matches the d = 0 settings in `params`. */
+  function rigKey(ex, d) {
+    if (ex.rigTable && ex.rigTable.length) {
+      const n = ex.rigTable.length;
+      const dd = (d === null || d === undefined) ? 0 : ((d % n) + n) % n;
+      return ex.rigTable[dd];
+    }
+    return ex.rig;
+  }
+  function rigFor(ex, d) {
+    if (!ex || !ex.rig) return null;
+    if (typeof EXERCISE_RIGS === "undefined" || !EXERCISE_RIGS) return null;
+    // The pack is written by hand, so accept the obvious spellings of a key
+    // rather than failing the whole exercise over a hyphen.
+    const k = rigKey(ex, d === undefined ? digit : d);
+    const keys = [k, ex.rig, ex.id, String(ex.id).replace(/-/g, ""), ex.folder];
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i] && EXERCISE_RIGS[keys[i]]) return EXERCISE_RIGS[keys[i]];
+    }
+    return null;
+  }
+  function needsRig(ex) { return !!(ex && ex.rig); }
+  function hasRig(ex, d) { return !!rigFor(ex, d); }
+  /** Six demos personalise by something the student has to DRAW — a nozzle
+   *  gap, a tank width, a crest height. The rig pack ships the "how" for each,
+   *  and the card prints it where the digit field would otherwise be enough. */
+  function drawNote(ex) {
+    if (!ex || typeof EXERCISE_RIG_NOTES === "undefined" || !EXERCISE_RIG_NOTES) return null;
+    return EXERCISE_RIG_NOTES[ex.id] || null;
+  }
+
+  // ------------------------------------------------- the personalised digit
+  /** `value = base + step·d`, or a per-digit `table` where the measured rule
+   *  is not linear (HJ-1's tailwater steps to 1.5·y_c at d = 6 and 9), with an
+   *  optional `mod` for "d mod N" rules. `also` carries coupled controls. */
+  function rules(ex) {
+    if (!ex || !ex.digit) return [];
+    return [ex.digit].concat(ex.digit.also || []);
+  }
+  function ruleValue(r, d) {
+    const n = r.mod || (r.table ? r.table.length : 0);
+    const dd = n ? ((d % n) + n) % n : d;
+    let v = (r.table && r.table.length) ? r.table[dd % r.table.length]
+                                        : (r.base || 0) + (r.step || 0) * dd;
+    if (typeof v === "number") {
+      if (r.min !== undefined) v = Math.max(r.min, v);
+      if (r.max !== undefined) v = Math.min(r.max, v);
+      // 0.42 + 0.03·3 is 0.5100000000000001 in binary, and that is what the
+      // panel would print. The rules are quoted to at most 3 decimals.
+      v = Math.round(v * 1e4) / 1e4;
+    }
+    return v;
+  }
+  function ruleLabel(r) {
+    if (r.label) return r.label;
+    const c = CONTROLS.find((x) => x.id === r.control);
+    return c ? c.label : r.control;
+  }
+  /** Two decimals at least, so a rule that lands on 1.00 does not print "1"
+   *  next to a slider reading 1.000; more where the rule itself is finer. */
+  function fmtVal(v) {
+    if (typeof v !== "number") return String(v);
+    const s = String(+v.toFixed(4));
+    const dp = (s.split(".")[1] || "").length;
+    return v.toFixed(Math.max(2, Math.min(4, dp)));
+  }
+  /** The card's "your q = 0.51 m²/s · tailwater 0.538 m" line. */
+  function digitSummary(ex, d) {
+    return rules(ex).map((r) =>
+      ruleLabel(r) + " = " + fmtVal(ruleValue(r, d)) + (r.unit ? " " + r.unit : "")).join("  ·  ");
+  }
+
+  // ------------------------------------------------------------- applying
+  function setControl(id, v) {
+    const c = CONTROLS.find((x) => x.id === id);
+    if (!c || !c.set) return false;
+    if (c.type === "check") c.set(!!v);
+    else if (c.type === "select") c.set(String(v));
+    else c.set(+v);
+    return true;
+  }
+  function applyParams(p) {
+    const miss = [];
+    if (!p) return miss;
+    // Resolution first: it rebuilds the grid, and every other control is a
+    // live parameter that survives the rebuild. Skipped when it is already
+    // what the exercise wants — a rebuild for nothing costs the drawn rig a
+    // re-rasterisation and the run its clock.
+    if (p.budget !== undefined && p.budget !== state.budget &&
+        !setControl("budget", p.budget)) miss.push("budget");
+    Object.keys(p).forEach((k) => {
+      if (k === "budget") return;
+      if (!setControl(k, p[k])) miss.push(k);
+    });
+    syncPanel();
+    return miss;
+  }
+  /** Instruments an exercise needs but the panel cannot express: a gauge is a
+   *  pointer tool, so a demo that lives on a shipped scene (B6's two depth
+   *  gauges, B7's barrel/throat pair) has nowhere else to put them. Rigs carry
+   *  their own, so this is only used where `rig` is null. */
+  function applyInstruments(ex) {
+    (ex.gauges || []).forEach(([x, y]) => {
+      if (state.gauges.length >= 4) state.gauges.shift();
+      state.gauges.push({ x, y, hist: [], log: [], id: ++state.gaugeSeq,
+                          colour: CONFIG.gaugeColours[state.gauges.length % 4] });
+    });
+    (ex.rakes || []).forEach((x) => {
+      if (state.rakes.length >= 2) state.rakes.shift();
+      state.rakes.push({ x, buf: null });
+    });
+  }
+  function applyDigit(ex, d) {
+    rules(ex).forEach((r) => { if (r.control) setControl(r.control, ruleValue(r, d)); });
+    syncPanel();
+  }
+  /** A rig payload may be the rig object itself, an encoded `#rig=` code, a
+   *  share URL, or raw JSON — RIG reads all of them. Async because the deflate
+   *  branch is. */
+  function applyRig(payload) {
+    return Promise.resolve().then(() => {
+      let p = payload;
+      if (p && typeof p === "object" && !p.segs && (p.rig || p.data)) p = p.rig || p.data;
+      if (typeof p === "string") return RIG.load(p);
+      if (p && typeof p === "object") return RIG.apply(p);
+      throw new Error("unrecognised rig payload");
+    });
+  }
+
+  /** Load an exercise: scene, rig, settings, digit, countdown, card. */
+  function pick(id, opts) {
+    const ex = byId(id);
+    if (!ex) return false;
+    const o = opts || {};
+    note = "";
+    if (!switchScene(ex.scene)) {
+      note = "scene \"" + ex.scene + "\" is not in this build — loaded the sandbox instead";
+      switchScene("sandbox");
+    }
+    // The digit is settled BEFORE the rig, because a variant rig (DA-1's three
+    // scales, B8's three lips) is chosen by it.
+    let d0 = o.digit;
+    if (d0 === undefined) d0 = (memo[ex.id] !== undefined ? memo[ex.id] : lastDigit);
+    const rig = rigFor(ex, (d0 === null || d0 === undefined || d0 === "") ? null : (+d0 | 0));
+    // Resolution BEFORE the rig, never after. Several payloads are
+    // cell-quantised (DA-1's weir dimensions are whole cells at Medium, LL-2's
+    // fault is 2–3 cells of an 18-cell bore), so a rig rasterised at another
+    // Δx is quietly a different rig. Every payload was captured at Medium and
+    // the programme's standing rule is Medium anyway.
+    if (ex.params && ex.params.budget && ex.params.budget !== state.budget) {
+      setControl("budget", ex.params.budget);
+    }
+    const done = () => {
+      const miss = applyParams(ex.params);
+      if (miss.length) note += (note ? " · " : "") + "unknown control" +
+        (miss.length > 1 ? "s" : "") + ": " + miss.join(", ");
+      const d = d0;
+      digit = (d === null || d === undefined || d === "") ? null : (+d | 0);
+      if (digit !== null) { memo[ex.id] = digit; lastDigit = digit; applyDigit(ex, digit); }
+      applyInstruments(ex);
+      cur = ex;
+      arm(ex.settle || 0, ex.id);
+      syncURLEx(ex.id);
+      card.show();
+      syncPanel();
+      showToast(ex.id + " · " + ex.title,
+        needsRig(ex) && !rig ? "Scene and settings applied — the rig is not in this build, draw it from the README."
+                             : "Scene, settings" + (rig ? ", rig" : "") +
+                               (digit !== null ? " and digit " + digit : "") + " applied.");
+    };
+    if (rig) {
+      // Applying a rig may be asynchronous (RIG decodes deflated codes), so
+      // the settings land a microtask later. `EX.ready` is the handle for
+      // anything that must wait — headless tests, mostly.
+      ready = applyRig(rig).then(done, (err) => {
+        note = "rig did not load (" + (err && err.message || err) + ") — draw it from the README";
+        done();
+      });
+      return true;
+    }
+    if (needsRig(ex)) note = "no rig pack in this build";
+    done();
+    ready = Promise.resolve();
+    return true;
+  }
+
+  /** Re-apply everything: the recovery path when a rig has been broken. */
+  function reset() { if (cur) pick(cur.id, { digit: digit }); }
+
+  function setDigit(d) {
+    if (!cur) return;
+    if (d === null || d === "" || d === undefined || isNaN(+d)) {
+      digit = null; delete memo[cur.id]; card.refresh(); return;
+    }
+    const nd = Math.max(0, Math.min(9, +d | 0));
+    // A variant rig is chosen by the digit, so changing it is a re-setup, not
+    // a slider move: DA-1's λ = ¼ weir is a different drawing, not a number.
+    if (cur.rigTable && rigKey(cur, nd) !== rigKey(cur, digit)) { pick(cur.id, { digit: nd }); return; }
+    digit = nd;
+    memo[cur.id] = digit; lastDigit = digit;
+    applyDigit(cur, digit);
+    // The flow has to find its new depth: the worksheets all say "after
+    // changing q, let it re-settle". Same countdown, shorter.
+    arm(Math.min(cur.settle || 0, 15), cur.id + " · digit " + digit);
+    card.refresh();
+    syncPanel();
+  }
+
+  // ------------------------------------------------------------ countdown
+  /** The settle wait runs the solver FLAT OUT, exactly as a scene's own
+   *  `spinup` does — nobody in a lecture should sit through 50 s of real time
+   *  before they are allowed to read a number. */
+  function arm(secs, what) {
+    settleTo = secs > 0 ? sim.t + secs : 0;
+    settleWhat = what || "";
+  }
+  function settleTarget() { return (settleTo && sim.t < settleTo) ? settleTo : 0; }
+  function settleHint() {
+    return "settling " + settleWhat + "… <b>" + Math.max(0, settleTo - sim.t).toFixed(1) +
+           " s</b> to go";
+  }
+
+  // ----------------------------------------------------------------- menu
+  const menu = () => (el || (el = document.getElementById("exmenu")));
+  const isOpen = () => !!(el && el.classList.contains("open"));
+
+  function grouped() {
+    const order = [], by = new Map(), f = filter.trim().toLowerCase();
+    all().forEach((e) => {
+      if (f && !((e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
+                  (e.submit || []).join(" ")).toLowerCase().includes(f))) return;
+      const g = e.topic || "Other";
+      if (!by.has(g)) { by.set(g, []); order.push(g); }
+      by.get(g).push(e);
+    });
+    return order.map((g) => [g, by.get(g)]);
+  }
+
+  function render() {
+    const m = menu();
+    m.textContent = "";
+    const head = document.createElement("div");
+    head.className = "smh";
+    const hb = document.createElement("b"); hb.textContent = "Exercises";
+    const hi2 = document.createElement("i");
+    hi2.textContent = all().length ? all().length + " · Esc closes" : "none loaded";
+    head.appendChild(hb); head.appendChild(hi2);
+    m.appendChild(head);
+
+    if (!all().length) {
+      const n = document.createElement("div");
+      n.className = "smnone";
+      n.textContent = "js/exercises.js is not loaded — the teaching pack is optional data, " +
+        "and everything else works without it.";
+      m.appendChild(n);
+      return;
+    }
+
+    const f = document.createElement("input");
+    f.className = "smf"; f.type = "search"; f.value = filter;
+    f.placeholder = "filter — id, title, topic, scene";
+    f.oninput = () => { filter = f.value; hi = -1; const s = f.selectionStart; render(); place();
+                        const g = menu().querySelector(".smf"); if (g) { g.focus(); g.setSelectionRange(s, s); } };
+    f.onkeydown = (e) => key(e);
+    m.appendChild(f);
+
+    const groups = grouped();
+    if (!groups.length) {
+      const n = document.createElement("div");
+      n.className = "smnone"; n.textContent = "nothing matches “" + filter + "”.";
+      m.appendChild(n);
+      return;
+    }
+    groups.forEach(([g, list]) => {
+      const h = document.createElement("div");
+      h.className = "smg"; h.textContent = g;
+      m.appendChild(h);
+      list.forEach((e) => {
+        const on = !!(cur && cur.id === e.id);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "smi" + (on ? " on" : "");
+        b.dataset.id = e.id;
+        b.setAttribute("role", "menuitem");
+        b.title = "exercises/" + e.folder + "/README.md";
+        if (needsRig(e)) {
+          const t = document.createElement("span");
+          t.className = "rigtag";
+          t.textContent = hasRig(e) ? "rig ✓" : "rig: draw it";
+          t.style.color = hasRig(e) ? "#5fd08a" : "#ffb648";
+          b.appendChild(t);
+        }
+        const idc = document.createElement("span"); idc.className = "eid"; idc.textContent = e.id;
+        const nm = document.createElement("b"); nm.textContent = e.title;
+        const bl = document.createElement("p");
+        bl.textContent = ((e.submit && e.submit.length) ? "measure " + e.submit.join(", ") + "  ·  "
+                                                        : "") +
+          "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
+        b.appendChild(idc); b.appendChild(nm); b.appendChild(bl);
+        b.onclick = () => choose(e.id);
+        m.appendChild(b);
+        if (pending === e.id) m.appendChild(warning(e));
+      });
+    });
+  }
+
+  /** The scene menu's warning, in the same words and the same amber block —
+   *  an exercise pick reloads the scene, so it costs a drawing just the same. */
+  function warning(e) {
+    const n = sim && sim.segs ? sim.segs.length : 0, gn = state.gauges.length;
+    const w = document.createElement("div");
+    w.className = "smwarn";
+    const p = document.createElement("div");
+    const b1 = document.createElement("b"); b1.textContent = "Loading drops your drawing.";
+    p.appendChild(b1);
+    p.appendChild(document.createTextNode(
+      " " + e.id + " sets up " + e.scene + " from scratch, so the " + n + " segment" +
+      (n === 1 ? "" : "s") + " you have drawn" +
+      (gn ? " and " + gn + " gauge" + (gn === 1 ? "" : "s") : "") +
+      " will be gone. Save it first with Controls → Rig → ⇪ Share link."));
+    const r = document.createElement("div"); r.className = "r";
+    const go = document.createElement("button");
+    go.className = "go"; go.textContent = "Discard and set up";
+    go.onclick = (ev) => { ev.stopPropagation(); load(e.id); };
+    const no = document.createElement("button");
+    no.className = "no"; no.textContent = "Cancel";
+    no.onclick = (ev) => { ev.stopPropagation(); pending = null; render(); place(); };
+    r.appendChild(go); r.appendChild(no);
+    w.appendChild(p); w.appendChild(r);
+    return w;
+  }
+
+  function choose(id) {
+    if (sim && sim.segs && sim.segs.length && pending !== id) {
+      pending = id; render(); place();
+      const w = menu().querySelector(".smwarn");
+      if (w && w.scrollIntoView) w.scrollIntoView({ block: "nearest" });
+      return;
+    }
+    load(id);
+  }
+  function load(id) { pending = null; close(); pick(id); }
+
+  function place() {
+    const m = menu();
+    const a = anchor && anchor.isConnected ? anchor : document.getElementById("exBtn");
+    const r = a.getBoundingClientRect();
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
+    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
+  }
+  function open(a) {
+    PICKER.close();
+    anchor = a || document.getElementById("exBtn");
+    pending = null; hi = -1;
+    render();
+    menu().classList.add("open");
+    place();
+    const btn = document.getElementById("exBtn");
+    if (btn) btn.classList.add("active");
+    const f = menu().querySelector(".smf");
+    if (f) f.focus();
+    const on = menu().querySelector(".smi.on");
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
+  }
+  function close() {
+    if (el) el.classList.remove("open");
+    pending = null; hi = -1;
+    const btn = document.getElementById("exBtn");
+    if (btn) btn.classList.remove("active");
+  }
+  function toggle(a) { if (isOpen()) close(); else open(a); }
+  function refresh() { if (isOpen()) { render(); place(); } }
+
+  /** The menu owns the keyboard while it is open (the filter box has focus,
+   *  so the global shortcuts would not fire anyway — but arrows and Enter
+   *  have to work from inside it). */
+  function key(e) {
+    const list = [...menu().querySelectorAll(".smi")];
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!list.length) return;
+      const d = e.key === "ArrowDown" ? 1 : list.length - 1;
+      hi = hi < 0 ? (e.key === "ArrowDown" ? 0 : list.length - 1) : (hi + d) % list.length;
+      list.forEach((b, i) => b.classList.toggle("hi", i === hi));
+      if (list[hi].scrollIntoView) list[hi].scrollIntoView({ block: "nearest" });
+      return;
+    }
+    if (e.key === "Enter") {
+      const act = document.activeElement;
+      const b = (hi >= 0 && list[hi]) ||
+        (act && act.classList && act.classList.contains("smi") ? act : null) || list[0];
+      if (b) { e.preventDefault(); choose(b.dataset.id); }
+    }
+  }
+  function onDown(e) {
+    if (!isOpen()) return;
+    if (menu().contains(e.target)) return;
+    if (anchor && anchor.contains && anchor.contains(e.target)) return;
+    close();
+    if (e.target === canvas) { e.preventDefault(); e.stopPropagation(); }
+  }
+
+  // ----------------------------------------------------------------- card
+  /** A small draggable panel, built to match the gauge inspector (same glass,
+   *  same header drag through `dragWindow`). It is the worksheet: what to set,
+   *  what to read, what to submit, and the link to the full brief. */
+  const card = (() => {
+    let box = null, digitEl = null;
+    function build() {
+      if (box) return box;
+      box = document.createElement("div");
+      box.className = "excard glass";
+      box.innerHTML =
+        '<div class="excard-h">' +
+          '<span class="eid"></span><b></b><span class="grow"></span>' +
+          '<button class="excard-x" title="Close">×</button>' +
+        '</div>' +
+        '<div class="excard-body">' +
+          '<div class="exd"><label>student no. last digit</label>' +
+            '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
+                   'title="The last digit of your student number">' +
+            '<span class="exval"></span></div>' +
+          '<div class="exdraw"></div>' +
+          '<div class="exsettle"></div>' +
+          '<div class="extask"></div>' +
+          '<ol class="exsteps"></ol>' +
+          '<div class="exsub"></div>' +
+          '<div class="exwarn"></div>' +
+          '<div class="exnote"></div>' +
+          '<div class="exfoot">' +
+            '<button class="exb" data-a="reset">↻ Reset to this exercise</button>' +
+            '<a class="exlink" target="_blank" rel="noopener"></a>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(box);
+      digitEl = box.querySelector(".exd input");
+      digitEl.oninput = () => setDigit(digitEl.value);
+      // The card is a window, not the canvas: its keystrokes are its own.
+      digitEl.onkeydown = (e) => e.stopPropagation();
+      box.querySelector(".excard-x").onclick = (e) => { e.currentTarget.blur(); hide(); };
+      box.querySelector('[data-a="reset"]').onclick = (e) => { e.currentTarget.blur(); reset(); };
+      dragWindow(box, box.querySelector(".excard-h"), (L, T) => { cardPos.card = [L, T]; });
+      return box;
+    }
+    function show() {
+      build();
+      const p = cardPos.card || [Math.max(8, innerWidth - 386), 100];
+      box.style.left = p[0] + "px"; box.style.top = p[1] + "px";
+      box.style.display = "block";
+      refresh();
+      // A digit already in hand applies to the new exercise too; an empty
+      // field means "not yet personalised", which is a legitimate state.
+      digitEl.value = digit === null ? "" : String(digit);
+    }
+    function hide() { if (box) box.style.display = "none"; }
+    function shown() { return !!(box && box.style.display !== "none"); }
+    function refresh() {
+      if (!box || !cur) return;
+      box.querySelector(".eid").textContent = cur.id;
+      const t = box.querySelector(".excard-h b");
+      t.textContent = cur.title; t.title = cur.title;
+      const row = box.querySelector(".exd");
+      const has = rules(cur).length > 0;
+      row.style.display = (has || cur.digitNote) ? "flex" : "none";
+      box.querySelector(".exd label").textContent =
+        has ? ((cur.digit && cur.digit.label) ? cur.digit.label.replace(/\s*\(.*\)$/, "") + " — last digit d" : "last digit d")
+            : "last digit d";
+      box.querySelector(".exval").textContent =
+        has ? (digit === null ? "enter d to personalise" : "your " + digitSummary(cur, digit))
+            : (digit === null ? "enter d, then read the rule below"
+                              : "d = " + digit + " — your value is in the rule below, not on a slider");
+      // Where the personalised thing is a STROKE, the digit field alone is a
+      // lie: print what has to be drawn and how.
+      const dn = drawNote(cur), dw = box.querySelector(".exdraw");
+      if (dn) {
+        dw.innerHTML = "";
+        const b = document.createElement("b"); b.textContent = "you draw this: ";
+        dw.appendChild(b);
+        dw.appendChild(document.createTextNode(dn.control || ""));
+        if (dn.how) {
+          const p = document.createElement("i");
+          p.textContent = dn.how;
+          dw.appendChild(p);
+        }
+        dw.style.display = "block";
+      } else dw.style.display = "none";
+      box.querySelector(".extask").textContent = cur.task || "";
+      // Staged rigs: a snapshot cannot hold "fill it, THEN shut the valve".
+      const st = box.querySelector(".exsteps");
+      st.textContent = "";
+      (cur.setup || []).forEach((s) => {
+        const li = document.createElement("li"); li.textContent = s; st.appendChild(li);
+      });
+      st.style.display = (cur.setup && cur.setup.length) ? "block" : "none";
+      const sub = box.querySelector(".exsub");
+      const bits = [];
+      if (cur.submit && cur.submit.length) bits.push("submit: " + cur.submit.join(", "));
+      if (cur.digitNote) bits.push(cur.digitNote);
+      sub.innerHTML = "";
+      if (bits.length) {
+        const b = document.createElement("b"); b.textContent = bits[0];
+        sub.appendChild(b);
+        if (bits[1]) { sub.appendChild(document.createElement("br"));
+                       sub.appendChild(document.createTextNode(bits[1])); }
+        sub.style.display = "block";
+      } else sub.style.display = "none";
+      const w = box.querySelector(".exwarn");
+      const missing = needsRig(cur) && !hasRig(cur);
+      if (missing || note) {
+        w.innerHTML = "";
+        const b = document.createElement("b");
+        b.textContent = missing ? "Draw the rig from the card in the README. " : "Note. ";
+        w.appendChild(b);
+        w.appendChild(document.createTextNode(
+          missing ? "Everything else — scene, settings" + (digit !== null ? ", your digit" : "") +
+                    " — is already applied." + (note ? " (" + note + ")" : "")
+                  : note));
+        w.style.display = "block";
+      } else w.style.display = "none";
+      box.querySelector(".exnote").textContent = (cur.notes || "") +
+        (needsRig(cur) && hasRig(cur)
+          ? "  ·  The rig was captured at Resolution Medium and its dimensions are whole cells — changing Resolution redraws it slightly differently."
+          : "");
+      const a = box.querySelector(".exlink");
+      a.href = "exercises/" + cur.folder + "/README.md";
+      a.textContent = "full brief: exercises/" + cur.folder + "/README.md";
+      tick();
+    }
+    /** The live line: the countdown while it settles, then "ready". */
+    function tick() {
+      if (!box || box.style.display === "none" || !cur) return;
+      const s = box.querySelector(".exsettle");
+      if (!cur.settle) { s.style.display = "none"; return; }
+      s.style.display = "block";
+      if (settleTo && sim.t < settleTo) {
+        s.className = "exsettle";
+        s.textContent = "settling — " + (settleTo - sim.t).toFixed(1) + " s of sim time to go " +
+                        "(running flat out)";
+      } else {
+        s.className = "exsettle ready";
+        s.textContent = "settled at t = " + (settleTo || cur.settle).toFixed(0) +
+                        " s · reading now (t = " + sim.t.toFixed(0) + " s)";
+      }
+    }
+    return { show, hide, shown, refresh, tick, get el() { return box; } };
+  })();
+
+  function tick() { card.tick(); }
+  function statusLine() {
+    if (!all().length) return "js/exercises.js not loaded";
+    if (!cur) return all().length + " demos from the teaching pack · " +
+      all().filter((e) => needsRig(e)).length + " need a drawn rig";
+    return cur.id + " · " + (digit === null ? "no digit set" : "digit " + digit) +
+      (needsRig(cur) && !hasRig(cur) ? " · rig NOT loaded" : "");
+  }
+
+  return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
+           pick, reset, setDigit, all, byId, rules, ruleValue, digitSummary,
+           settleTarget, settleHint, tick, statusLine, card,
+           needsRig, hasRig, rigFor, drawNote,
+           get ready() { return ready; },
+           get current() { return cur; }, get digit() { return digit; },
+           get pending() { return pending; } };
+})();
+
+/** `?ex=<id>` for what is set up. The exercise owns the address bar while it
+ *  is loaded (its scene is implied), and `#rig=` is dropped for the same
+ *  reason `switchScene` drops it. */
+function syncURLEx(id) {
+  try {
+    const u = new URL(location.href);
+    u.hash = "";
+    u.searchParams.delete("scene");
+    u.searchParams.set("ex", id);
+    history.replaceState(null, "", u.pathname + u.search);
+  } catch (_) { /* file:// refuses — harmless */ }
+}
+
 // ------------------------------------------------------------------- panel
 const CONTROLS = [
   { h: "Scene" },
@@ -395,6 +1015,29 @@ const CONTROLS = [
       ? "?scene=" + state.scene.id + "  ·  " + state.scene.key
       : "",
     info: "Every scene in the set, with a line on what it shows. The title box in the corner opens the same menu, as does <b>S</b>. Loading one is exactly a fresh <code>?scene=</code> boot: fresh grid, scene defaults, gauges cleared, spin-up from t = 0 — so anything you have drawn goes, and the menu says so before it does. Your resolution and the tool in your hand are kept." },
+
+  { id: "exercise", type: "buttons", label: "Exercise",
+    // Like the Scene row above: rebuilt on every sync, so the button always
+    // names whatever is loaded.
+    sync: (el) => {
+      el.textContent = "";
+      const b = document.createElement("button");
+      b.className = "scenebtn";
+      const c = EX.current;
+      b.textContent = (c ? c.id + " · " + c.title : "Pick an exercise") + "  ▾";
+      b.title = "Set up one of the teaching demos";
+      b.onclick = () => { b.blur(); EX.toggle(b); };
+      el.appendChild(b);
+      if (c) {
+        const k = document.createElement("button");
+        k.textContent = "card";
+        k.title = "Show the exercise card again";
+        k.onclick = () => { k.blur(); EX.card.show(); };
+        el.appendChild(k);
+      }
+    },
+    fmt: () => EX.statusLine(),
+    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one loads its scene exactly as the Scene menu would, applies the panel settings its verification record was measured at, draws its rig if the rig pack is in this build, and opens a card with the task, what to submit and the personalised-parameter rule. Type the last digit of your student number into the card and the personalised values are set for you. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
 
   { h: "Flow" },
   { id: "speed", label: "Speed", min: 0.02, max: 3, step: 0.01, log: true,
@@ -907,15 +1550,22 @@ function tickFrame(realDt) {
     // Scenes with a `spinup` run flat out until the flow has established —
     // nobody should have to sit through fifteen seconds of a pipe filling
     // before they are allowed to slam the valve.
-    const warming = sim.t < (state.scene.spinup || 0);
+    // An exercise's settle time is the scene's spin-up rule applied to a
+    // measured number from that demo's verification record — HP-1 needs 50 s
+    // where its scene asks for 10 — so it warms flat out in exactly the same
+    // way. It is a sim-clock target, so the speed slider does not lengthen it.
+    const exWarm = EX.settleTarget();
+    const warmTo = Math.max(state.scene.spinup || 0, exWarm);
+    const warming = sim.t < warmTo;
     let want = warming ? state.nsubMax : Math.round(state.speed * realDt / h);
     want = Math.max(1, Math.min(state.nsubMax, want));
     simAdvanced = SIM.step(want);
     state.nsub = want;
     if (warming) {
-      document.getElementById("hint").innerHTML =
-        "establishing steady flow… <b>" + sim.t.toFixed(1) + " / " +
-        state.scene.spinup.toFixed(0) + " s</b>";
+      document.getElementById("hint").innerHTML = exWarm > 0
+        ? EX.settleHint()
+        : "establishing steady flow… <b>" + sim.t.toFixed(1) + " / " +
+          state.scene.spinup.toFixed(0) + " s</b>";
       state.tipAt = 9.5;   // pop the first tip the moment spin-up finishes
     }
   }
@@ -946,6 +1596,7 @@ function tickFrame(realDt) {
   });
 
   drawOverlay(analysis);
+  EX.tick();                    // the card's settle countdown, when one is open
 
   fpsAcc += realDt; fpsN++;
   if (fpsAcc > 0.5) {
@@ -1286,6 +1937,31 @@ function cycleTips(dt) {
   }
 }
 
+/** Header-drag for a floating window, shared by the gauge inspector and the
+ *  exercise card so the two behave and clamp identically: never off the left
+ *  or top, never further right than its own width, and never past the bottom
+ *  by more than its header. `onPlace` gets the new position so the window can
+ *  remember where it was put. */
+function dragWindow(el, handle, onPlace) {
+  let d = null;
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.target.closest && e.target.closest("button, input, a")) return;
+    e.preventDefault();
+    try { handle.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
+    d = { dx: e.clientX - el.offsetLeft, dy: e.clientY - el.offsetTop };
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!d) return;
+    const L = Math.max(0, Math.min(innerWidth - el.offsetWidth, e.clientX - d.dx));
+    const T = Math.max(0, Math.min(innerHeight - 40, e.clientY - d.dy));
+    el.style.left = L + "px"; el.style.top = T + "px";
+    if (onPlace) onPlace(L, T);
+  });
+  const end = () => { d = null; };
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+}
+
 // -------------------------------------------------------- gauge inspector
 /** A draggable DOM window per gauge: identity, live values, and the WHOLE
  *  stored history on a chart you can pan and zoom.
@@ -1356,24 +2032,8 @@ const GINSP = (() => {
       el.style.zIndex = String(22 + open.length);
     }, true);
 
-    // ---- header drag
-    const hd = el.querySelector(".ginsp-h");
-    hd.addEventListener("pointerdown", (e) => {
-      if (e.target.classList.contains("ginsp-x")) return;
-      e.preventDefault();
-      try { hd.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
-      o.drag = { dx: e.clientX - el.offsetLeft, dy: e.clientY - el.offsetTop };
-    });
-    hd.addEventListener("pointermove", (e) => {
-      if (!o.drag) return;
-      const L = Math.max(0, Math.min(innerWidth - el.offsetWidth, e.clientX - o.drag.dx));
-      const T = Math.max(0, Math.min(innerHeight - 40, e.clientY - o.drag.dy));
-      el.style.left = L + "px"; el.style.top = T + "px";
-      posMemo[g.id] = [L, T];
-    });
-    const endDrag = () => { o.drag = null; };
-    hd.addEventListener("pointerup", endDrag);
-    hd.addEventListener("pointercancel", endDrag);
+    // ---- header drag (shared with the exercise card — see `dragWindow`)
+    dragWindow(el, el.querySelector(".ginsp-h"), (L, T) => { posMemo[g.id] = [L, T]; });
     el.querySelector(".ginsp-x").onclick = (e) => { e.currentTarget.blur(); hide(o); };
 
     // ---- value rows (built once; only the numbers are rewritten per frame)
@@ -2050,6 +2710,14 @@ function boot() {
   window.addEventListener("pointerdown", PICKER.onDown, true);
   addEventListener("resize", () => { if (PICKER.isOpen()) PICKER.place(); });
 
+  // The exercise menu (see EX). Three ways in: the bar button, the panel's
+  // Exercise row and the E key below; `?ex=<id>` boots straight into one.
+  document.getElementById("exBtn").onclick = (e) => {
+    const b = e.currentTarget; b.blur(); EX.toggle(b);
+  };
+  window.addEventListener("pointerdown", EX.onDown, true);
+  addEventListener("resize", () => { if (EX.isOpen()) EX.place(); });
+
   const tb = document.getElementById("tools");
   TOOLS.forEach(([id, label, tip]) => {
     const b = document.createElement("button");
@@ -2063,15 +2731,30 @@ function boot() {
   window.syncTools = syncTools;
 
   buildPanel();
-  loadScene(new URLSearchParams(location.search).get("scene") || "sandbox", false);
+  const q = new URLSearchParams(location.search);
+  loadScene(q.get("scene") || "sandbox", false);
+  // Read the rig code BEFORE the exercise rewrites the address bar — setting
+  // one up drops the hash exactly as a scene switch does.
+  const rigCode = RIG.hashCode();
+  // `?ex=<id>` is the lecturer's slide link: it sets the whole demo up, scene
+  // included, so it runs INSTEAD of `?scene=` (which has already loaded, and
+  // is what you are left on if the id is unknown to this build).
+  const exId = q.get("ex");
+  if (exId && !EX.pick(exId)) showToast("Unknown exercise", "\"" + exId +
+    "\" is not in this build's teaching pack — loaded the scene instead.");
   // A `#rig=` link carries its own base scene, so it wins over `?scene=` —
   // but `?scene=` is loaded first anyway, so a link that fails to decode
   // leaves you on the scene you asked for rather than on a blank page.
   // Decoding may be asynchronous (deflate), hence the promise: the rig lands
   // within a frame or two, and `apply` ends with a reset, so the spin-up
   // countdown runs against the RIG's geometry and not the base scene's.
-  const rigCode = RIG.hashCode();
-  if (rigCode) RIG.load(rigCode).catch(() => { /* reported in the panel + a toast */ });
+  // …and apply it LAST, after the exercise has finished landing (a rig-bearing
+  // exercise applies asynchronously). `#rig=` still wins over everything: an
+  // `?ex=…#rig=…` link is "this exercise, with my own rig on it".
+  if (rigCode) {
+    EX.ready.then(() => RIG.load(rigCode))
+            .catch(() => { /* reported in the panel + a toast */ });
+  }
   syncTools();
   document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
 
@@ -2112,9 +2795,11 @@ function boot() {
     // An open menu owns the keyboard: Esc/arrows/Enter are its own, and every
     // other shortcut is swallowed rather than fired behind it.
     if (PICKER.isOpen()) { PICKER.key(e); return; }
+    if (EX.isOpen()) { EX.key(e); return; }
     const k = e.key.toLowerCase();
     if (k === " ") { e.preventDefault(); togglePause(); }
     else if (k === "s") PICKER.open(document.getElementById("title"));
+    else if (k === "e") EX.open(document.getElementById("exBtn"));
     else if (k === "v") toggleValve();
     else if (k === "z") SIM.undoSeg();
     else if (k === "c") SIM.clearSegs();
@@ -2154,6 +2839,8 @@ window.APP = {
   state, loadScene, SIM, OVERLAY, SCENES, showToast, zoomAt, resetZoom,
   switchScene,                             // load a scene as a fresh ?scene= boot would
   PICKER,                                  // the scene menu
+  EX,                                      // the exercise picker (see ?ex=<id>)
+  pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)
   inspect: (k) => GINSP.show(k || 0),

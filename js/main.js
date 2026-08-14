@@ -22,6 +22,7 @@ const state = {
   mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   gauges: [], rakes: [], gaugeField: "head", tracers: null, tracerN: 9,
+  deliv: null,                // measured inlet discharge / level, for the panel
   cursor: [0, 0], inside: false, hover: null,
   drag: null, pour: null,
   zoom: 1, vex: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false, vexDrag: null,
@@ -111,6 +112,7 @@ function loadScene(id, keepDrawing) {
   // the particles switched off and a tip asking you to find the key.
   if (sc.particles !== undefined) state.particles = !!sc.particles;
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
+  state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
   state.nsub = 24;
   resetZoom();
@@ -142,27 +144,44 @@ const CONTROLS = [
     set: (v) => {
       sim.p.inflow.on = v ? 1 : 0;
       if (v) {           // make the control self-evident: open its edge, pick sane defaults
-        if (sim.p.open[0] < 1) { sim.p.open[0] = 1; SIM.rasterise(); }
+        if (sim.p.open[0] < 1) { sim.p.open[0] = 1; sim.p.autoL = 1; SIM.rasterise(); }
         if (sim.p.inflow.level <= 0.01) sim.p.inflow.level = 0.55 * sim.H;
         if (!(sim.p.inflow.q > 0) && !(sim.p.inflow.free > 0.5) && sim.p.inflow.v === undefined) {
           sim.p.inflow.q = 0.25;
         }
+      } else if (sim.p.autoL) {
+        // An edge this toggle opened, it closes again. Leaving it open is a
+        // silent leak — a tank filled from the reservoir and then switched to
+        // a drain test quietly bleeds out of the boundary it forgot about.
+        sim.p.autoL = 0; sim.p.open[0] = 0; SIM.rasterise();
       }
     },
-    info: "Holds a water level on the LEFT edge and feeds the set discharge through it. Ticking it opens the left edge automatically; the ∇ marker shows the level." },
+    info: "Holds a water level on the LEFT edge and feeds the set discharge through it. Ticking it opens the left edge automatically (and closes it again when unticked, unless you set that edge yourself); the ∇ marker shows the level." },
   { id: "inLevel", place: "res", label: "Reservoir level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.inflow.level, set: (v) => sim.p.inflow.level = v,
     fmt: (v) => {
-      const b = SIM.bands();
+      const b = SIM.bands(), D = state.deliv;
       const d = Math.min(v, b.inB[1]) - b.inB[0];
-      return v.toFixed(2) + " m above datum" + (d > 0 ? "  ·  " + d.toFixed(2) + " m deep at the inlet" : "  ·  below the inlet bed!");
+      return v.toFixed(2) + " m above datum" +
+        (d > 0 ? "  ·  " + d.toFixed(2) + " m deep at the inlet" : "  ·  below the inlet bed!") +
+        (D ? "  ·  delivering " + D.level.toFixed(2) + " m" : "");
     },
-    info: "Water level held on the left boundary, measured from the domain floor (the datum), NOT from the bed. Set it to the level the arriving flow actually wants — a level below a downstream control's backwater will choke the backwater at the inlet." },
-  { id: "inQ", place: "res", label: "Inflow q", min: 0, max: 1.2, step: 0.005,
+    info: "Water level held on the left boundary, measured from the domain floor (the datum), NOT from the bed. Set it to the level the arriving flow actually wants — a level below a downstream control's backwater will choke the backwater at the inlet. The DELIVERED level is measured just clear of the relaxation sponge and sits below the slider by however much head the sponge is giving up." },
+  { id: "inQ", place: "res", label: "Inflow q", min: 0, max: 2.0, step: 0.005,
     get: () => sim.p.inflow.q, set: (v) => sim.p.inflow.q = v,
-    fmt: (v) => v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
-                "   y_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m",
-    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth y_c = (q²/g)^⅓ follows directly from it." },
+    fmt: (v) => {
+      // Under head-driven inflow the slider is not the discharge — nothing
+      // writes it back from the solver — so print what the inlet is actually
+      // delivering instead, and take y_c from that.
+      const D = state.deliv;
+      if (sim.p.inflow.free > 0.5) {
+        return "head-driven  ·  q → " + (D ? D.q.toFixed(3) : "—") + " m²/s delivered" +
+               (D ? "   y_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
+      }
+      return v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
+             "   y_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m";
+    },
+    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth y_c = (q²/g)^⅓ follows directly from it. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
   { id: "inFree", place: "res", type: "check", label: "Head-driven inflow",
     get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
@@ -171,11 +190,13 @@ const CONTROLS = [
     set: (v) => {
       sim.p.tailwater.on = v ? 1 : 0;
       if (v) {
-        if (sim.p.open[1] < 1) { sim.p.open[1] = 1; SIM.rasterise(); }
+        if (sim.p.open[1] < 1) { sim.p.open[1] = 1; sim.p.autoR = 1; SIM.rasterise(); }
         if (sim.p.tailwater.level <= 0.01) sim.p.tailwater.level = 0.3 * sim.H;
+      } else if (sim.p.autoR) {
+        sim.p.autoR = 0; sim.p.open[1] = 0; SIM.rasterise();
       }
     },
-    info: "Holds a fixed level on the RIGHT edge — the downstream control that decides M1 vs M2. Ticking it opens the right edge automatically; the ∇ marker shows the level." },
+    info: "Holds a fixed level on the RIGHT edge — the downstream control that decides M1 vs M2. Ticking it opens the right edge automatically (and closes it again when unticked, unless you set that edge yourself); the ∇ marker shows the level." },
   { id: "twLevel", place: "tw", label: "Tailwater level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.tailwater.level, set: (v) => sim.p.tailwater.level = v,
     fmt: (v) => {
@@ -206,7 +227,9 @@ const CONTROLS = [
     id, place: id, type: "select", label,
     opts: [["0", "Wall"], ["1", "Open"], ["2", "Outfall"]],
     get: () => String(sim.p.open[k]),
-    set: (v) => { sim.p.open[k] = +v; SIM.rasterise(); },
+    // Setting an edge by hand hands it back to you: the level control that
+    // opened it no longer owns it and will not close it behind itself.
+    set: (v) => { sim.p.open[k] = +v; if (k < 2) sim.p[k ? "autoR" : "autoL"] = 0; SIM.rasterise(); },
     info: "Wall reflects. Open is zero-gradient: through-flow passes, but a still pond will sit against it. Outfall holds the outside empty, so water reaching the edge pours over it like a brink. This edge " + extra + ".",
   })),
 
@@ -591,6 +614,7 @@ function tickFrame(realDt) {
   const analysis = OVERLAY.analyse(sim, col);
   sampleGauges(analysis);
   sampleRakes();
+  sampleInlet(analysis);
   advanceTracers(simAdvanced);
   // Scenes whose subject is the orbital motion seed their own tracer rake as
   // soon as there is enough water to hang it in.
@@ -634,6 +658,30 @@ function sampleGauges(A) {
 }
 function sampleRakes() {
   state.rakes.forEach((rk) => { const r = SIM.rake(rk.x, rk.buf); rk.buf = r.buf; rk.i = r.i; });
+}
+
+/** What the reservoir is actually DELIVERING.
+ *
+ *  Neither reservoir number on the panel is a measurement: `inflow.q` is a
+ *  set-point the solver ignores entirely under head-driven inflow (nothing
+ *  writes it back), and the level is a target the relaxation sponge gives up
+ *  a decimetre or three of. Both are read back here from the column reduction
+ *  just clear of the sponge — the first columns the boundary treatment is no
+ *  longer nudging — so the panel can print them alongside the settings. */
+function sampleInlet(A) {
+  if (!(sim.p.inflow.on > 0.5)) { state.deliv = null; return; }
+  const sp = state.scene.spongeIn ? Math.round(state.scene.spongeIn / sim.dx) : 10;
+  const i0 = Math.max(2, Math.min(sim.nx - 12, sp + 2)), i1 = Math.min(sim.nx - 2, i0 + 9);
+  let q = 0, s = 0, n = 0;
+  for (let i = i0; i <= i1; i++) {
+    if (!(A.onBed[i] && A.h[i] > 3 * sim.dx)) continue;
+    q += A.q[i]; s += A.bed[i] + A.h[i]; n++;
+  }
+  if (!n) { state.deliv = null; return; }
+  q /= n; s /= n;
+  const d = state.deliv || (state.deliv = { q, level: s });
+  d.q += 0.05 * (q - d.q);              // A.q/A.h already carry a 10 %/frame
+  d.level += 0.05 * (s - d.level);      // EMA; this is the display's own settle
 }
 
 // ------------------------------------------------------------- orbit tracers
@@ -866,6 +914,14 @@ function updateStatus() {
   document.getElementById("n_speed").textContent =
     "×" + state.speed.toFixed(2) + " asked, ×" + state.rt.toFixed(2) + " achieved  " +
     "(Δt " + (state.simDt * 1e3).toFixed(2) + " ms × " + state.nsub + ")";
+  // The delivered numbers move on their own, so their notes are refreshed on
+  // this cadence rather than only when a slider is touched.
+  if (state.deliv) { refreshNote("inQ"); refreshNote("inLevel"); }
+}
+
+function refreshNote(id) {
+  const c = CONTROLS.find((k) => k.id === id), n = document.getElementById("n_" + id);
+  if (c && n && c.fmt) n.textContent = c.fmt(c.get());
 }
 
 function cycleTips(dt) {
@@ -890,6 +946,16 @@ function boot() {
       "<b>" + err.message + "</b> — try a desktop browser with WebGL2.";
     return;
   }
+
+  // A rig that is redrawn is a different domain, so the classification's
+  // running estimates must not survive the redraw — a stale domain-wide y_n
+  // is what made a drowned gate on a 1-in-4 bed read "M1". Every path that
+  // re-rasterises the walls goes through one of these; a resolution change or
+  // a scene load builds a fresh grid and starts clean anyway.
+  ["rasterise", "addSeg", "undoSeg", "clearSegs"].forEach((k) => {
+    const f = SIM[k];
+    SIM[k] = (...a) => { const r = f(...a); OVERLAY.resetEstimates(sim); return r; };
+  });
 
   const sel = document.getElementById("sceneSel");
   const groups = {};

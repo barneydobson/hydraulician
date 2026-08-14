@@ -113,11 +113,18 @@ const OVERLAY = (() => {
     // M3 hanging over the whole waterfall (and fed those columns into the y_n
     // median). The discriminator is the solid mask: a channel column has a
     // wall directly under its lowest wet cell, a falling nappe does not.
+    // That test is also the honest answer to "is there water here at all?",
+    // so it is kept separately: the guard band above must silence the profile
+    // CLASS near a control, but depth and discharge are still measurable
+    // there and the readout has no business hiding them.
+    const onBed = new Uint8Array(nx);
     for (let i = 0; i < nx; i++) {
       const jb = Math.round(col[i * 4] / dx);
-      if (jb < 1 || S.mask[(jb - 1) * nx + i] < 64) ok[i] = 0;
+      onBed[i] = jb >= 1 && S.mask[(jb - 1) * nx + i] >= 64 ? 1 : 0;
+      if (!onBed[i]) ok[i] = 0;
     }
     out.ok = ok;
+    out.onBed = onBed;
 
     // Depth and discharge get a running mean before anything is derived from
     // them. Without it the free surface's own ripples — and the roll waves a
@@ -217,6 +224,20 @@ const OVERLAY = (() => {
     out.ynGlobal = anyYn ? sumYn / anyYn : NaN;
 
     return out;
+  }
+
+  /** Forget the running estimates — the per-column depth/discharge time
+   *  averages and the domain-wide normal-depth constant.
+   *
+   *  `_ynK` is ONE number for the whole domain, EMA'd over time and only fed
+   *  by columns whose S_f sits in a sane band, so a redrawn rig inherits the
+   *  old rig's normal depth for as long as the new one fails to produce
+   *  candidates: a drowned gate on a 1-in-4 bed read "M1" that way, because
+   *  the local y_c collapsed with the local q while the global y_n did not.
+   *  Anything that re-rasterises the walls calls this. */
+  function resetEstimates(sim) {
+    if (!sim) return;
+    sim._ynK = NaN; sim._hA = null; sim._qA = null;
   }
 
   /** Locate hydraulic jumps: Fr crosses 1 downwards and the depth jumps up.
@@ -428,20 +449,39 @@ const OVERLAY = (() => {
 
   /** Profile label + hydraulics numbers at the cursor column. */
   function drawCursorReadout(ctx, V, A, sim, mx, my, probe) {
-    const g = Math.abs(sim.p.g) || 9.81;
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(mx / sim.dx)));
     const h = A.h[i], yc = A.yc[i], yn = A.yn[i], S0 = A.S0[i];
-    const cls = A.ok[i] && h > 3 * sim.dx ? classify(h, yn, yc, S0) : "";
+    // Numbers wherever there is water standing on something; the CLASS only
+    // where the classification is trustworthy (A.ok also clears a guard band
+    // either side of every cliff, which used to blank the whole box at a
+    // perfectly measurable station next to a weir).
+    const wet = A.onBed[i] && h > 3 * sim.dx;
+    // Inside a pressurised conduit there is no free surface to have a profile:
+    // the column's "surface" is the soffit and y_c / y_n / S_f are fiction (a
+    // full pipe read "H2 profile"). Fill fraction alone does not say so — any
+    // submerged cell carries hydrostatic f > 1 — so the test is a water body
+    // that reaches its lid AND a cell that is genuinely over-full.
+    const js = Math.round(A.surf[i] / sim.dx);
+    const capped = js > 0 && js < sim.ny && sim.mask[js * sim.nx + i] >= 64;
+    const press = !!probe && probe.f > 1.002 && capped;
+    const cls = wet && A.ok[i] && !press ? classify(h, yn, yc, S0) : "";
     const rows = [];
-    if (A.ok[i] && h > 3 * sim.dx) {
+    rows.push(["x, y", fmt(mx, 2) + ", " + fmt(my, 2) + " m"]);
+    if (wet) {
       rows.push(["depth h", fmt(h, 3) + " m"]);
+      if (!press) rows.push(["surface", fmt(A.bed[i] + h, 3) + " m above datum"]);
       rows.push(["q", fmt(A.q[i], 3) + " m²/s"]);
       rows.push(["V", fmt(A.V[i], 2) + " m/s"]);
+    }
+    if (wet && !press) {
       rows.push(["Fr", fmt(A.Fr[i], 2) + (A.Fr[i] > 1 ? "  supercritical" : "  subcritical")]);
       rows.push(["y_c", fmt(yc, 3) + " m"]);
       if (isFinite(yn)) rows.push(["y_n", fmt(yn, 3) + " m  (measured)"]);
       rows.push(["S₀", (S0 >= 0 ? "1 : " + fmt(1 / Math.max(S0, 1e-9), 0) : "adverse")]);
-      if (A.Sf[i] > 0) rows.push(["S_f", "1 : " + fmt(1 / A.Sf[i], 0) + "   n = " + fmt(A.n[i], 3)]);
+      // n is only computed where the classification is trustworthy, so a
+      // guard-band station prints the slope alone rather than "n = NaN".
+      if (A.Sf[i] > 0) rows.push(["S_f", "1 : " + fmt(1 / A.Sf[i], 0) +
+        (isFinite(A.n[i]) ? "   n = " + fmt(A.n[i], 3) : "")]);
     }
     if (probe) {
       rows.push(["u, v", fmt(probe.u, 2) + ", " + fmt(probe.v, 2) + " m/s"]);
@@ -640,7 +680,7 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
-  return { analyse, classify, manning, findJumps, profileRuns,
+  return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, chip, fmt };
 })();

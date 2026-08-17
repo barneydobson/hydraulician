@@ -1,9 +1,9 @@
-# hydraulician
+# 🌊 hydraulician
+
+*hydraulician is a work in progress, however, contributions via GitHub issues are welcome.*
 
 **Interactive 2D hydraulics in the vertical plane, in your browser** — draw a
-channel with the mouse and watch free-surface Navier–Stokes run through it —
-written almost entirely by Claude (the solver, the scenes, the 40-demo teaching
-pack and the tooling), with the maintainer directing and reviewing.
+channel with the mouse and watch free-surface Navier–Stokes run through it.
 
 **Try it:** <https://barneydobson.github.io/hydraulician/> — runs in the
 browser, nothing to install (live once the repository is public).

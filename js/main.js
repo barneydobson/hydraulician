@@ -392,8 +392,7 @@ const PICKER = (() => {
  *  worksheet makes them derive, where the gauges go, or the staged sequence.
  *  Those are PRINTED on the card and left for them to do — including getting
  *  them wrong, which is where the learning is. Everything that IS applied is
- *  listed on the card under "already set for you", so nothing is silently
- *  magic.
+ *  listed on the card under "already set", so nothing is silently magic.
  *
  *  Two optional data files, both plain classic scripts:
  *    js/exercises.js       `const EXERCISES = [...]`      — the list
@@ -450,13 +449,6 @@ const EX = (() => {
   }
   function needsRig(ex) { return !!(ex && ex.rig); }
   function hasRig(ex, d) { return !!rigFor(ex, d); }
-  /** Six demos personalise by something the student has to DRAW — a nozzle
-   *  gap, a tank width, a crest height. The rig pack ships the "how" for each,
-   *  and the card prints it where the digit field would otherwise be enough. */
-  function drawNote(ex) {
-    if (!ex || typeof EXERCISE_RIG_NOTES === "undefined" || !EXERCISE_RIG_NOTES) return null;
-    return EXERCISE_RIG_NOTES[ex.id] || null;
-  }
 
   // ------------------------------------------------- the personalised digit
   /** `value = base + step·d`, or a per-digit `table` where the measured rule
@@ -514,10 +506,23 @@ const EX = (() => {
     const dp = (s.split(".")[1] || "").length;
     return v.toFixed(Math.max(2, Math.min(4, dp)));
   }
-  /** The card's "your q = 0.51 m²/s · tailwater 0.538 m" line. */
+  /** The panel row a value has to be set on, named the way the panel looks:
+   *  "Inflow q slider", "Tailwater control tickbox". Only the first value gets
+   *  it — once you know the card is naming panel rows, the rest are findable. */
+  function ctlWhere(id) {
+    const c = CONTROLS.find((x) => x.id === id);
+    if (!c) return "";
+    if (c.type === "check") return c.label + " tickbox";
+    if (c.type === "select") return c.label + " menu";
+    return c.label + (c.min !== undefined ? " slider" : "");
+  }
+  /** The card's "your q = 0.51 m²/s (Inflow q slider) · tailwater 0.538 m". */
   function digitSummary(ex, d) {
-    return rules(ex).map((r) =>
-      ruleLabel(r) + " = " + fmtVal(ruleValue(r, d)) + (r.unit ? " " + r.unit : "")).join("  ·  ");
+    return rules(ex).map((r, i) => {
+      const w = (i === 0 && r.control) ? ctlWhere(r.control) : "";
+      return ruleLabel(r) + " = " + fmtVal(ruleValue(r, d)) + (r.unit ? " " + r.unit : "") +
+             (w ? " (" + w + ")" : "");
+    }).join("  ·  ");
   }
 
   // ------------------------------------------------------------- applying
@@ -716,7 +721,7 @@ const EX = (() => {
     const order = [], by = new Map(), f = filter.trim().toLowerCase();
     all().forEach((e) => {
       if (f && !((e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
-                  (e.submit || []).join(" ")).toLowerCase().includes(f))) return;
+                  (e.start || "")).toLowerCase().includes(f))) return;
       const g = e.topic || "Other";
       if (!by.has(g)) { by.set(g, []); order.push(g); }
       by.get(g).push(e);
@@ -781,8 +786,7 @@ const EX = (() => {
         const idc = document.createElement("span"); idc.className = "eid"; idc.textContent = e.id;
         const nm = document.createElement("b"); nm.textContent = e.title;
         const bl = document.createElement("p");
-        bl.textContent = ((e.submit && e.submit.length) ? "measure " + e.submit.join(", ") + "  ·  "
-                                                        : "") +
+        bl.textContent = (e.start ? e.start + "  ·  " : "") +
           "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
         b.appendChild(idc); b.appendChild(nm); b.appendChild(bl);
         b.onclick = () => choose(e.id);
@@ -892,8 +896,16 @@ const EX = (() => {
 
   // ----------------------------------------------------------------- card
   /** A small draggable panel, built to match the gauge inspector (same glass,
-   *  same header drag through `dragWindow`). It is the worksheet: what to set,
-   *  what to read, what to submit, and the link to the full brief. */
+   *  same header drag through `dragWindow`).
+   *
+   *  DELIBERATELY TERSE, in one neutral style. Somebody reads this over a
+   *  neighbour's shoulder in a lecture where the lecturer is already saying
+   *  what to do: the id, your own numbers, one line on what is on the bench,
+   *  one or two on what to do and what to read, a collapsed receipt of what was
+   *  applied, and the link to the full brief. Everything else — why a rule is
+   *  what it is, the flutter cautions, the procedure for a drawn
+   *  personalisation, what gets handed in — lives in the README. Adding a
+   *  coloured block here has been tried and was thrown out. */
   const card = (() => {
     let box = null, digitEl = null;
     function build() {
@@ -906,21 +918,20 @@ const EX = (() => {
           '<button class="excard-x" title="Close">×</button>' +
         '</div>' +
         '<div class="excard-body">' +
-          '<div class="exd"><label>student no. last digit</label>' +
+          '<div class="exd"><label>student number ends in</label>' +
             '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
                    'title="The last digit of your student number">' +
             '<span class="exval"></span></div>' +
-          '<div class="exyours"></div>' +
-          '<div class="exdraw"></div>' +
-          '<details class="exset"><summary></summary><div class="exsetl"></div></details>' +
-          '<div class="extask"></div>' +
-          '<div class="exalso"></div>' +
+          '<div class="exline exrule"></div>' +
+          '<div class="exline exstart"></div>' +
+          '<div class="exline extask"></div>' +
           '<ol class="exsteps"></ol>' +
-          '<div class="exsub"></div>' +
-          '<div class="exsettle"></div>' +
-          '<div class="exwarn"></div>' +
-          '<div class="exnote"></div>' +
+          '<div class="exline exstations"></div>' +
+          '<div class="exline exalso"></div>' +
+          '<div class="exline exmiss"></div>' +
+          '<details class="exset"><summary>Already set</summary><div class="exsetl"></div></details>' +
           '<div class="exfoot">' +
+            '<span class="exsettle"></span>' +
             '<button class="exb" data-a="reset" title="Scene, Resolution, the rig and the ' +
                    'load-bearing settings only. Your own values are not restored — they were ' +
                    'never set for you.">↻ Reset to the starting point</button>' +
@@ -954,46 +965,19 @@ const EX = (() => {
       box.querySelector(".eid").textContent = cur.id;
       const t = box.querySelector(".excard-h b");
       t.textContent = cur.title; t.title = cur.title;
-      const row = box.querySelector(".exd");
       const has = rules(cur).length > 0;
-      row.style.display = (has || cur.digitNote) ? "flex" : "none";
-      box.querySelector(".exd label").textContent =
-        has ? ((cur.digit && cur.digit.label) ? cur.digit.label.replace(/\s*\(.*\)$/, "") + " — last digit d" : "last digit d")
-            : "last digit d";
+      box.querySelector(".exd").style.display = (has || cur.digitNote) ? "flex" : "none";
+      // Your own numbers, inline: "your q = 0.51 m²/s (Inflow q slider) ·
+      // tailwater 0.538 m". Printed the instant the digit is typed, and still
+      // not applied to anything.
       box.querySelector(".exval").textContent =
-        has ? (digit === null ? "enter d for your numbers" : "your " + digitSummary(cur, digit))
-            : (digit === null ? "enter d, then read the rule below"
-                              : "d = " + digit + " — your value is in the rule below, not on a slider");
-      yours();
-      already();
-      // Where the personalised thing is a STROKE, the digit field alone is a
-      // lie: print what has to be drawn and how.
-      const dn = drawNote(cur), dw = box.querySelector(".exdraw");
-      if (dn) {
-        dw.innerHTML = "";
-        const b = document.createElement("b"); b.textContent = "you draw this: ";
-        dw.appendChild(b);
-        dw.appendChild(document.createTextNode(dn.control || ""));
-        if (dn.how) {
-          const p = document.createElement("i");
-          p.textContent = dn.how;
-          dw.appendChild(p);
-        }
-        dw.style.display = "block";
-      } else dw.style.display = "none";
-      box.querySelector(".extask").textContent = cur.task || "";
-      // Six demos SPAN two scenes (WV-1's second cohort, NC-3's m2 anchor,
-      // HJ-1's s1 coda…). `?ex=` boots one of them, so the card has to say
-      // which the other is and when to go there — it never switches by itself.
-      const al = box.querySelector(".exalso"), sc = cur.secondScene;
-      if (sc) {
-        al.textContent = "";
-        const b = document.createElement("b");
-        b.textContent = sc.scene ? "second scene — " + sc.scene + ": " : "second run: ";
-        al.appendChild(b);
-        al.appendChild(document.createTextNode(sc.when || ""));
-        al.style.display = "block";
-      } else al.style.display = "none";
+        !has ? "" : (digit === null ? "type it in for your numbers"
+                                    : "your " + digitSummary(cur, digit));
+      // Where the personalised thing is a stroke or a station there is no value
+      // to print, so the rule itself is the instruction.
+      line(box.querySelector(".exrule"), "", cur.digitNote || "");
+      line(box.querySelector(".exstart"), "Start:", cur.start || "");
+      line(box.querySelector(".extask"), "Do:", cur.task || "");
       // Staged rigs: a snapshot cannot hold "fill it, THEN shut the valve".
       const st = box.querySelector(".exsteps");
       st.textContent = "";
@@ -1001,95 +985,54 @@ const EX = (() => {
         const li = document.createElement("li"); li.textContent = s; st.appendChild(li);
       });
       st.style.display = (cur.setup && cur.setup.length) ? "block" : "none";
-      const sub = box.querySelector(".exsub");
-      const bits = [];
-      if (cur.submit && cur.submit.length) bits.push("submit: " + cur.submit.join(", "));
-      if (cur.digitNote) bits.push(cur.digitNote);
-      sub.innerHTML = "";
-      if (bits.length) {
-        const b = document.createElement("b"); b.textContent = bits[0];
-        sub.appendChild(b);
-        if (bits[1]) { sub.appendChild(document.createElement("br"));
-                       sub.appendChild(document.createTextNode(bits[1])); }
-        sub.style.display = "block";
-      } else sub.style.display = "none";
-      const w = box.querySelector(".exwarn");
+      line(box.querySelector(".exstations"), stationLabel(), stations());
+      // Six demos SPAN two scenes (WV-1's second cohort, NC-3's m2 anchor,
+      // HJ-1's s1 coda…). `?ex=` boots one of them, so the card has to say
+      // which the other is and when to go there — it never switches by itself.
+      line(box.querySelector(".exalso"), "Also:", cur.secondScene ? cur.secondScene.when : "");
       const missing = needsRig(cur) && !hasRig(cur);
-      if (missing || note) {
-        w.innerHTML = "";
-        const b = document.createElement("b");
-        b.textContent = missing ? "Draw the rig from the card in the README. " : "Note. ";
-        w.appendChild(b);
-        w.appendChild(document.createTextNode(
-          missing ? "The scene and the load-bearing settings are applied; the geometry is not." +
-                    (note ? " (" + note + ")" : "")
-                  : note));
-        w.style.display = "block";
-      } else w.style.display = "none";
-      box.querySelector(".exnote").textContent = (cur.notes || "") +
-        (needsRig(cur) && hasRig(cur)
-          ? "  ·  The rig was captured at Resolution Medium and its dimensions are whole cells — changing Resolution redraws it slightly differently."
-          : "");
+      line(box.querySelector(".exmiss"), "",
+           missing ? "The rig pack is not in this build — draw the rig from the brief." +
+                     (note ? " (" + note + ")" : "")
+                   : (note || ""));
+      already();
       const a = box.querySelector(".exlink");
       a.href = "exercises/" + cur.folder + "/README.md";
-      a.textContent = "full brief: exercises/" + cur.folder + "/README.md";
+      a.textContent = "exercises/" + cur.folder + "/README.md";
       tick();
     }
-    // ---- one row: "q = 0.51 m²/s → Inflow q", with the rule underneath
-    function row(host, name, val, where, rule) {
-      const d = document.createElement("div"); d.className = "exrow";
-      const b = document.createElement("b");
-      b.textContent = name + (val ? " = " + val : "");
-      d.appendChild(b);
-      if (where) {
-        const s = document.createElement("span"); s.className = "exwhere";
-        s.textContent = where;
-        d.appendChild(s);
+    /** One plain line: a bold lead-in and the sentence. No line has a colour, a
+     *  border or a background of its own — that is the point of the card. */
+    function line(el, label, text) {
+      el.textContent = "";
+      if (!text) { el.style.display = "none"; return; }
+      if (label) {
+        const b = document.createElement("b"); b.textContent = label + " ";
+        el.appendChild(b);
       }
-      if (rule) {
-        const i = document.createElement("i"); i.textContent = rule;
-        d.appendChild(i);
-      }
-      host.appendChild(d);
-      return d;
+      el.appendChild(document.createTextNode(text));
+      el.style.display = "block";
     }
-    /** YOUR VALUES — everything the student has to set or place. Printed, never
-     *  applied: the digit's own parameter and the coupled values it pairs with,
-     *  any staged control the sequence asks for, and where the instruments go.
-     *  A wrong tailwater here gives a drowned jump, which is the lesson. */
-    function yours() {
-      const y = box.querySelector(".exyours");
-      y.textContent = "";
-      const rs = rules(cur), sp = cur.studentParams || [], ins = cur.instruments || [];
-      if (!rs.length && !sp.length && !ins.length) { y.style.display = "none"; return; }
-      const h = document.createElement("div"); h.className = "exh";
-      h.textContent = "Your values — set these yourself";
-      y.appendChild(h);
-      rs.forEach((r) => {
-        row(y, ruleLabel(r),
-            digit === null ? "" : fmtVal(ruleValue(r, digit)) + (r.unit ? " " + r.unit : ""),
-            r.control ? "→ " + ctlLabel(r.control) : "",
-            r.rule || "");
-      });
-      if (rs.length && digit === null) {
-        const i = document.createElement("i"); i.className = "exhint";
-        i.textContent = "enter your last digit above and this block fills in with your numbers.";
-        y.appendChild(i);
-      }
-      sp.forEach((p) => {
-        row(y, p.label || ctlLabel(p.control),
-            p.value === undefined ? "" : ctlText(p.control, p.value) + (p.unit ? " " + p.unit : ""),
-            p.control ? "→ " + ctlLabel(p.control) : "", p.rule || "");
-      });
-      ins.forEach((n) => {
-        row(y, n.tool === "rake" ? "rake (tool 6)" : "gauge (tool 5)", "",
-            n.where ? "→ " + n.where : "", n.why || "");
-      });
-      y.style.display = "block";
+    /** Where the instruments GO. The picker places none of them — choosing the
+     *  station is part of every one of these demos — so this is the one thing
+     *  from `instruments` the card still needs to say. The reason each station
+     *  is where it is stays in the brief. */
+    function stations() {
+      const ins = cur.instruments || [];
+      return ins.map((n) => n.where).filter(Boolean).join("  ·  ");
     }
-    /** ALREADY SET FOR YOU — the common starting point, itemised so that no
-     *  applied value is invisible. Collapsed by default; it is a receipt, not
-     *  an instruction. */
+    function stationLabel() {
+      const ins = cur.instruments || [];
+      if (!ins.length) return "";
+      const rake = ins.some((n) => n.tool === "rake"), g = ins.some((n) => n.tool !== "rake");
+      if (rake && !g) return ins.length > 1 ? "Rakes:" : "Rake:";
+      if (rake && g) return "Instruments:";
+      return ins.length > 1 ? "Gauges:" : "Gauge:";
+    }
+    /** ALREADY SET — the common starting point, itemised so that no applied
+     *  value is invisible. Collapsed by default; it is a receipt, not an
+     *  instruction, and it says neither how many items it holds nor that they
+     *  are the same for everyone (they always are). */
     function already() {
       const det = box.querySelector(".exset"), sum = det.querySelector("summary");
       const list = det.querySelector(".exsetl");
@@ -1121,27 +1064,19 @@ const EX = (() => {
         if (w) { const i = document.createElement("i"); i.textContent = w; d.appendChild(i); }
         list.appendChild(d);
       });
-      sum.textContent = "Already set for you — " + items.length + " item" +
-                        (items.length === 1 ? "" : "s") + " (the same for everyone)";
+      sum.textContent = "Already set";
       det.style.display = "block";
     }
-    /** The live line: the countdown while it settles, then "ready". */
+    /** The countdown while it settles, and nothing at all once it has: a card
+     *  that keeps announcing it is ready is a card nobody reads. */
     function tick() {
       if (!box || box.style.display === "none" || !cur) return;
       const s = box.querySelector(".exsettle");
-      if (!cur.settle) { s.style.display = "none"; return; }
-      s.style.display = "block";
-      if (settleTo && sim.t < settleTo) {
-        s.className = "exsettle";
-        s.textContent = "settling — " + (settleTo - sim.t).toFixed(1) + " s of sim time to go " +
-                        "(running flat out)";
+      if (cur.settle && settleTo && sim.t < settleTo) {
+        s.textContent = "settling — " + Math.max(0, settleTo - sim.t).toFixed(0) + " s";
+        s.style.display = "inline";
       } else {
-        s.className = "exsettle ready";
-        s.textContent = "settled at t = " + (settleTo || cur.settle).toFixed(0) +
-                        " s · reading now (t = " + sim.t.toFixed(0) + " s)" +
-                        (rules(cur).length || (cur.studentParams || []).length
-                          ? " — after you set your own values, give it that long again"
-                          : "");
+        s.textContent = ""; s.style.display = "none";
       }
     }
     return { show, hide, shown, refresh, tick, get el() { return box; } };
@@ -1159,7 +1094,7 @@ const EX = (() => {
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
            pick, reset, setDigit, all, byId, rules, ruleValue, digitSummary,
            settleTarget, settleHint, tick, statusLine, card,
-           needsRig, hasRig, rigFor, drawNote,
+           needsRig, hasRig, rigFor,
            get ready() { return ready; },
            get current() { return cur; }, get digit() { return digit; },
            get pending() { return pending; } };
@@ -1219,7 +1154,7 @@ const CONTROLS = [
       }
     },
     fmt: () => EX.statusLine(),
-    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a card with the task, what to submit, and the values you have to set yourself. Type the last digit of your student number into the card and it prints YOUR numbers and the station rules for your gauges; it does not move the sliders or drop the gauges, because choosing and setting them is the exercise. Everything that was applied is itemised on the card under \"already set for you\". <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
+    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. Type the last digit of your student number into the card and it prints YOUR numbers; it does not move the sliders or drop the gauges, because choosing and setting them is the exercise. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
 
   { h: "Flow" },
   { id: "speed", label: "Speed", min: 0.02, max: 3, step: 0.01, log: true,

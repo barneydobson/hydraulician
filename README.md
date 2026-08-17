@@ -27,6 +27,8 @@ result, then use a real model to get a number.
 
 ## Exercises
 
+*Note, I have not checked the exercises yet!*
+
 Click a picture or an id to open that exercise in the app, set up and ready.
 Written briefs, data and plots for each one are in
 [`exercises/`](exercises/INDEX.md).

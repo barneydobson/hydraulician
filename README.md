@@ -238,3 +238,5 @@ Credit: inspired by [hydraulics-fun](https://github.com/barneydobson/hydraulics-
 (plan-view shallow water, the sibling project) and by Pavel Dobryakov's
 [WebGL-Fluid-Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation),
 which is where the "one fullscreen pass per physics step" style comes from.
+
+**License:** [GPL-3.0](LICENSE).

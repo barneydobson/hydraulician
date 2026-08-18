@@ -192,11 +192,17 @@ change, and UI changes that have been costed but not made — in
 for changes already made (the exercise picker, the gauge inspector and CSV,
 rig save/share) in `exercises/_code-changes/`.
 
-**Deploying.** `.github/workflows/pages.yml` publishes the repository as-is to
-GitHub Pages on every push to `main` — no build, and `.nojekyll` stops Jekyll
-touching the folders. It turns Pages on by itself the first time it can run, so
-making the repository public is the only manual step; if the first run has not
-done it for you, set **Settings → Pages → Source = GitHub Actions**.
+**Deploying.** `.github/workflows/pages.yml` publishes the repository to
+GitHub Pages on every push to `main`. The app itself has no build step —
+`index.html` and `js/` are copied through verbatim — but the workflow runs
+Jekyll (`_config.yml`) so every markdown brief renders as a web page: an
+exercise README is readable at its folder's URL, e.g.
+[`…/exercises/HP-1-penstock-power/`](https://barneydobson.github.io/hydraulician/exercises/HP-1-penstock-power/).
+Underscore-prefixed folders (`exercises/_runner`, `_code-changes`, the
+per-exercise `_archive`) stay repo-only. The workflow turns Pages on by
+itself the first time it can run, so making the repository public is the only
+manual step; if the first run has not done it for you, set
+**Settings → Pages → Source = GitHub Actions**.
 
 ---
 
@@ -214,7 +220,7 @@ Water enters at the top left by default; everything else is drawn.
 | **Z** / **C** | undo edge / clear drawing |
 | **V** | open / slam every valve |
 | **space** / **R** | pause / reload the scene's water |
-| **G** / **P** / **D** / **N** | cycle the field · particles · dye · channel overlay |
+| **G** / **P** / **D** / **N** / **M** | cycle the field · particles · dye · channel overlay · ruler |
 | **S** / **E** | scene list · exercise list |
 
 Further limits, beyond those in [Summary](#summary):

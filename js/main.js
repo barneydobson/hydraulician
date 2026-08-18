@@ -24,6 +24,8 @@ const state = {
   scene: null, budget: CONFIG.defaultBudget,
   tool: "wall", brush: 0.055,
   mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
+  ruler: true,                // metre ticks on the view edges — a workspace preference
+
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   gauges: [], rakes: [], gaugeField: "head", tracers: null, tracerN: 9,
   gaugeT: -1,                 // sim time of the last gauge sample — see sampleGauges
@@ -516,13 +518,25 @@ const EX = (() => {
     if (c.type === "select") return c.label + " menu";
     return c.label + (c.min !== undefined ? " slider" : "");
   }
-  /** The card's "your q = 0.51 m²/s (Inflow q slider) · tailwater 0.538 m". */
+  /** "q = 0.51 m²/s (Inflow q slider) · tailwater 0.538 m" — the rules
+   *  evaluated at a digit. No longer printed on the card (the card prints the
+   *  RULES and the student does the arithmetic); kept for scripts and tests. */
   function digitSummary(ex, d) {
     return rules(ex).map((r, i) => {
       const w = (i === 0 && r.control) ? ctlWhere(r.control) : "";
       return ruleLabel(r) + " = " + fmtVal(ruleValue(r, d)) + (r.unit ? " " + r.unit : "") +
              (w ? " (" + w + ")" : "");
     }).join("  ·  ");
+  }
+  /** The card's personalised rules as sentences to act on, values NOT filled
+   *  in: "q (m²/s): q = 0.42 + 0.03·d · Inflow q slider". The tables the
+   *  longer rules lean on stay in the brief, where the lecturer put them. */
+  function ruleLines(ex) {
+    return rules(ex).map((r, i) => {
+      const w = (i === 0 && r.control) ? ctlWhere(r.control) : "";
+      return ruleLabel(r) + (r.unit ? " (" + r.unit + ")" : "") + ": " +
+             (r.rule || "see the brief") + (w ? "  ·  " + w : "");
+    });
   }
 
   // ------------------------------------------------------------- applying
@@ -907,7 +921,7 @@ const EX = (() => {
    *  personalisation, what gets handed in — lives in the README. Adding a
    *  coloured block here has been tried and was thrown out. */
   const card = (() => {
-    let box = null, digitEl = null;
+    let box = null, digitEl = null, pill = null;
     function build() {
       if (box) return box;
       box = document.createElement("div");
@@ -915,9 +929,11 @@ const EX = (() => {
       box.innerHTML =
         '<div class="excard-h">' +
           '<span class="eid"></span><b></b><span class="grow"></span>' +
+          '<button class="excard-x" data-a="min" title="Minimise">–</button>' +
           '<button class="excard-x" title="Close">×</button>' +
         '</div>' +
         '<div class="excard-body">' +
+          '<div class="exline exyours"></div>' +
           '<div class="exd"><label>student number ends in</label>' +
             '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
                    'title="The last digit of your student number">' +
@@ -925,6 +941,7 @@ const EX = (() => {
           '<div class="exline exrule"></div>' +
           '<div class="exline exstart"></div>' +
           '<div class="exline extask"></div>' +
+          '<div class="exline exnote"></div>' +
           '<ol class="exsteps"></ol>' +
           '<div class="exline exstations"></div>' +
           '<div class="exline exalso"></div>' +
@@ -943,13 +960,22 @@ const EX = (() => {
       digitEl.oninput = () => setDigit(digitEl.value);
       // The card is a window, not the canvas: its keystrokes are its own.
       digitEl.onkeydown = (e) => e.stopPropagation();
-      box.querySelector(".excard-x").onclick = (e) => { e.currentTarget.blur(); hide(); };
+      box.querySelector(".excard-x:not([data-a])").onclick = (e) => { e.currentTarget.blur(); hide(); };
+      box.querySelector('[data-a="min"]').onclick = (e) => { e.currentTarget.blur(); mini(); };
       box.querySelector('[data-a="reset"]').onclick = (e) => { e.currentTarget.blur(); reset(); };
       dragWindow(box, box.querySelector(".excard-h"), (L, T) => { cardPos.card = [L, T]; });
+      // Minimised, the card is a pill carrying the exercise id at the card's
+      // own position — one click brings the brief back.
+      pill = document.createElement("div");
+      pill.className = "minpill glass";
+      pill.title = "Restore the exercise card";
+      pill.onclick = () => show();
+      document.body.appendChild(pill);
       return box;
     }
     function show() {
       build();
+      pill.classList.remove("show");
       const p = cardPos.card || [Math.max(8, innerWidth - 386), 100];
       box.style.left = p[0] + "px"; box.style.top = p[1] + "px";
       box.style.display = "block";
@@ -958,26 +984,42 @@ const EX = (() => {
       // field means "not yet personalised", which is a legitimate state.
       digitEl.value = digit === null ? "" : String(digit);
     }
-    function hide() { if (box) box.style.display = "none"; }
+    function mini() {
+      if (!box || box.style.display === "none") return;
+      pill.textContent = "▸ " + (cur ? cur.id : "exercise");
+      pill.style.left = box.offsetLeft + "px";
+      pill.style.top = box.offsetTop + "px";
+      box.style.display = "none";
+      pill.classList.add("show");
+    }
+    function hide() {
+      if (box) box.style.display = "none";
+      if (pill) pill.classList.remove("show");
+    }
     function shown() { return !!(box && box.style.display !== "none"); }
     function refresh() {
       if (!box || !cur) return;
       box.querySelector(".eid").textContent = cur.id;
       const t = box.querySelector(".excard-h b");
       t.textContent = cur.title; t.title = cur.title;
-      const has = rules(cur).length > 0;
-      box.querySelector(".exd").style.display = (has || cur.digitNote) ? "flex" : "none";
-      // Your own numbers, inline: "your q = 0.51 m²/s (Inflow q slider) ·
-      // tailwater 0.538 m". Printed the instant the digit is typed, and still
-      // not applied to anything.
+      // The personalised rules are PRINTED, never computed: d is the last
+      // digit of the student number, the lecturer owns explaining it, and
+      // doing the arithmetic is the student's own first step. (An input that
+      // computed "your numbers" here was removed on lecturer feedback.)
+      line(box.querySelector(".exyours"), "Yours (d = last digit of your student number):",
+           ruleLines(cur).join("\n"));
+      // The one thing a digit still DOES is pick which captured drawing loads
+      // (DA-1's λ = ¼ weir is a different rig, not a different number), so the
+      // input survives only on those cards.
+      box.querySelector(".exd").style.display = cur.rigTable ? "flex" : "none";
       box.querySelector(".exval").textContent =
-        !has ? "" : (digit === null ? "type it in for your numbers"
-                                    : "your " + digitSummary(cur, digit));
+        cur.rigTable ? "picks which captured drawing loads" : "";
       // Where the personalised thing is a stroke or a station there is no value
       // to print, so the rule itself is the instruction.
       line(box.querySelector(".exrule"), "", cur.digitNote || "");
       line(box.querySelector(".exstart"), "Start:", cur.start || "");
       line(box.querySelector(".extask"), "Do:", cur.task || "");
+      line(box.querySelector(".exnote"), "Note:", cur.note || "");
       // Staged rigs: a snapshot cannot hold "fill it, THEN shut the valve".
       const st = box.querySelector(".exsteps");
       st.textContent = "";
@@ -997,8 +1039,12 @@ const EX = (() => {
                    : (note || ""));
       already();
       const a = box.querySelector(".exlink");
-      a.href = "exercises/" + cur.folder + "/README.md";
-      a.textContent = "exercises/" + cur.folder + "/README.md";
+      // On the Pages build Jekyll renders README.md as the folder's page and
+      // does not serve the raw .md; everywhere else the file itself is right.
+      const brief = "exercises/" + cur.folder +
+        (/\.github\.io$/i.test(location.hostname) ? "/" : "/README.md");
+      a.href = brief;
+      a.textContent = brief;
       tick();
     }
     /** One plain line: a bold lead-in and the sentence. No line has a colour, a
@@ -1087,7 +1133,9 @@ const EX = (() => {
     if (!all().length) return "js/exercises.js not loaded";
     if (!cur) return all().length + " demos from the teaching pack · " +
       all().filter((e) => needsRig(e)).length + " need a drawn rig";
-    return cur.id + " · " + (digit === null ? "no digit set" : "digit " + digit) +
+    return cur.id +
+      (cur.rigTable ? " · " + (digit === null ? "digit not set — the d = 0 drawing is loaded"
+                                              : "digit " + digit) : "") +
       (needsRig(cur) && !hasRig(cur) ? " · rig NOT loaded" : "");
   }
 
@@ -1154,7 +1202,7 @@ const CONTROLS = [
       }
     },
     fmt: () => EX.statusLine(),
-    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. Type the last digit of your student number into the card and it prints YOUR numbers; it does not move the sliders or drop the gauges, because choosing and setting them is the exercise. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
+    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. The card prints the RULE for your own parameter (d is your student number's last digit — your lecturer explains it); working it out and setting it is yours, because the picker never moves a slider or drops a gauge. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
 
   { h: "Flow" },
   { id: "speed", label: "Speed", min: 0.02, max: 3, step: 0.01, log: true,
@@ -1326,6 +1374,9 @@ const CONTROLS = [
     opts: [["0", "Water"], ["1", "Pressure head"], ["2", "Speed"], ["3", "Froude number"],
            ["4", "Vorticity"], ["5", "Momentum flux"]],
     get: () => String(state.mode), set: (v) => state.mode = +v },
+  { id: "ruler", type: "check", label: "Ruler",
+    get: () => state.ruler, set: (v) => state.ruler = v,
+    info: "Metre ticks along the bottom and left edges of the view, with faint grid lines at the major ticks. They follow the zoom, so drawn geometry can be placed at a stated station — \"the plate goes at x = 8.0 m\" — without counting scale bars. M toggles it." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth y_c, normal depth y_n and the energy grade line, computed per column from the live depth and unit discharge." },
@@ -1480,6 +1531,59 @@ function showToast(title, sub) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 5200);
 }
+
+// -------------------------------------------------------- minimisable boxes
+/** Collapse any fixed UI box to a small pill and back. Each box gets a "–" in
+ *  a corner; the pill sits at the box's own anchor so nothing moves, it just
+ *  gets out of the way of the water. Session state only — a reload restores
+ *  the full chrome, which is the least surprising thing for a lecture
+ *  machine. */
+const MINI = (() => {
+  const items = {};
+  /** opts: { corner: "corner"|"cornerL"|"inline", pill: {css}, label }
+   *  "inline" prepends the button as the box's FIRST flex child — the bar's
+   *  right end wraps under the title box on a narrow window, so the left end
+   *  is the only spot nothing can cover. */
+  function add(id, el, opts) {
+    const o = opts || {};
+    const btn = document.createElement("button");
+    btn.className = "minbtn" + (o.corner === "inline" ? "" : " " + (o.corner || "corner"));
+    btn.title = "Minimise"; btn.textContent = "–";
+    btn.onclick = (e) => { e.stopPropagation(); btn.blur(); set(id, true); };
+    if (o.corner === "inline") el.insertBefore(btn, el.firstChild);
+    else el.appendChild(btn);
+    const pill = document.createElement("div");
+    pill.className = "minpill glass";
+    pill.textContent = o.label || "▸";
+    pill.title = "Restore";
+    Object.assign(pill.style, o.pill || {});
+    pill.onclick = () => set(id, false);
+    document.body.appendChild(pill);
+    items[id] = { el, pill, btn, label: o.label || "▸", min: false };
+  }
+  function set(id, min) {
+    const it = items[id];
+    if (!it) return;
+    it.min = min;
+    it.el.style.display = min ? "none" : "";
+    it.pill.classList.toggle("show", min);
+  }
+  function isMin(id) { return !!(items[id] && items[id].min); }
+  /** A live element to anchor a menu on: the box, or its pill when minimised. */
+  function anchor(id) {
+    const it = items[id];
+    return it && it.min ? it.pill : (it ? it.el : null);
+  }
+  /** Let a pill carry a live word or two (the settle countdown, mostly).
+   *  Called per frame, so it only touches the DOM on an actual change. */
+  function pillText(id, txt) {
+    const it = items[id];
+    if (!it) return;
+    const t = txt || it.label;
+    if (it.pill.textContent !== t) it.pill.textContent = t;
+  }
+  return { add, set, isMin, anchor, pillText };
+})();
 
 // ------------------------------------------------------------------ tools
 const TOOLS = [
@@ -1683,7 +1787,12 @@ function tickFrame(realDt) {
         ? EX.settleHint()
         : "establishing steady flow… <b>" + sim.t.toFixed(1) + " / " +
           state.scene.spinup.toFixed(0) + " s</b>";
+      // A minimised tips pill still shows the countdown — reading a number
+      // before the flow has settled is the classic worksheet mistake.
+      MINI.pillText("hint", "▸ " + Math.max(0, warmTo - sim.t).toFixed(0) + " s");
       state.tipAt = 9.5;   // pop the first tip the moment spin-up finishes
+    } else {
+      MINI.pillText("hint", "");
     }
   }
   const col = SIM.columns();
@@ -1884,6 +1993,7 @@ function drawOverlay(A) {
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   ctx.clearRect(0, 0, view.pxW, view.pxH);
   OVERLAY.drawFrame(ctx, view, sim);
+  if (state.ruler) OVERLAY.drawRuler(ctx, view, sim);
   ctx.save();
   ctx.beginPath();
   ctx.rect(view.vis.x, view.vis.y, view.vis.w, view.vis.h);
@@ -2875,17 +2985,45 @@ function boot() {
   syncTools();
   document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
 
-  document.getElementById("panelBtn").onclick = (e) => {
-    document.getElementById("panel").classList.toggle("open");
-    e.currentTarget.classList.toggle("active");
-    document.getElementById("about").classList.remove("open");   // they overlap
-    document.getElementById("aboutBtn").classList.remove("active");
+  const setPanel = (open) => {
+    document.getElementById("panel").classList.toggle("open", open);
+    document.getElementById("panelBtn").classList.toggle("active", open);
+    if (open) { setAbout(false); }                               // they overlap
   };
-  document.getElementById("aboutBtn").onclick = (e) => {
-    document.getElementById("about").classList.toggle("open");
-    e.currentTarget.classList.toggle("active");
-    document.getElementById("panel").classList.remove("open");
-    document.getElementById("panelBtn").classList.remove("active");
+  const setAbout = (open) => {
+    document.getElementById("about").classList.toggle("open", open);
+    document.getElementById("aboutBtn").classList.toggle("active", open);
+    if (open) {
+      document.getElementById("panel").classList.remove("open");
+      document.getElementById("panelBtn").classList.remove("active");
+    }
+  };
+  document.getElementById("panelBtn").onclick = () =>
+    setPanel(!document.getElementById("panel").classList.contains("open"));
+  document.getElementById("aboutBtn").onclick = () =>
+    setAbout(!document.getElementById("about").classList.contains("open"));
+
+  // Every floating box minimises (see MINI): the bar, the title/status box,
+  // the tips line and the key list collapse to pills at their own anchors;
+  // Controls and About just close — their bar buttons are the way back in —
+  // and an announcement toast dismisses on click.
+  MINI.add("bar", document.getElementById("bar"),
+    { corner: "inline", label: "☰", pill: { top: "14px", left: "14px" } });
+  MINI.add("title", document.getElementById("title"),
+    { corner: "cornerL", label: "▸ status", pill: { top: "14px", right: "14px" } });
+  MINI.add("hint", document.getElementById("hint"),
+    { label: "▸ tips", pill: { bottom: "18px", left: "50%", transform: "translateX(-50%)" } });
+  MINI.add("keys", document.getElementById("keys"),
+    { label: "▸ keys", pill: { bottom: "14px", left: "14px" } });
+  [["panel", setPanel], ["about", setAbout]].forEach(([id, close]) => {
+    const b = document.createElement("button");
+    b.className = "minbtn corner"; b.title = "Minimise"; b.textContent = "–";
+    b.onclick = () => close(false);
+    document.getElementById(id).appendChild(b);
+  });
+  document.getElementById("toast").onclick = () => {
+    clearTimeout(toastTimer);
+    document.getElementById("toast").classList.remove("show");
   };
   document.getElementById("playBtn").onclick = () => togglePause();
   document.getElementById("valveBtn").onclick = () => toggleValve();
@@ -2915,8 +3053,9 @@ function boot() {
     if (EX.isOpen()) { EX.key(e); return; }
     const k = e.key.toLowerCase();
     if (k === " ") { e.preventDefault(); togglePause(); }
-    else if (k === "s") PICKER.open(document.getElementById("title"));
-    else if (k === "e") EX.open(document.getElementById("exBtn"));
+    else if (k === "s") PICKER.open(MINI.anchor("title") || document.getElementById("title"));
+    else if (k === "e") EX.open(MINI.isMin("bar") ? MINI.anchor("bar")
+                                                  : document.getElementById("exBtn"));
     else if (k === "v") toggleValve();
     else if (k === "z") SIM.undoSeg();
     else if (k === "c") SIM.clearSegs();
@@ -2925,6 +3064,7 @@ function boot() {
     else if (k === "g") { state.mode = (state.mode + 1) % 6; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
+    else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
     else if (k >= "1" && k <= String(TOOLS.length)) { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }
     else if (k === "[") state.brush = Math.max(0.015, state.brush / 1.3);
     else if (k === "]") state.brush = Math.min(0.5, state.brush * 1.3);

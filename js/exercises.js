@@ -47,8 +47,11 @@
  *                  `table` where the measured rule is not linear, `mod: N` for
  *                  "d mod N" rules, `also: [...]` for the coupled values the
  *                  worksheet makes them derive, `rule` for the sentence that
- *                  says WHY (HJ-1's 1.3·y_c). The card prints "your q = 0.51 —
- *                  set it on the Inflow q slider"; the slider is not written.
+ *                  says WHY (HJ-1's 1.3·y_c). The card prints the RULE and the
+ *                  panel row it goes on — "q (m²/s): q = 0.42 + 0.03·d" — and
+ *                  the student does the arithmetic; d is their student
+ *                  number's last digit and the lecturer owns explaining it.
+ *                  Nothing is computed or written for them.
  *
  * The exception: `rigTable` picks WHICH captured drawing loads, because DA-1's
  * λ = ¼ weir is a different rig, not a different number, and nobody is going to
@@ -75,6 +78,9 @@
  *            "a chute onto a level apron, with a tailwater control".
  *   task     ONE or two short lines on what to do, INCLUDING what to read off
  *            the screen at the end of it.
+ *   note     one sentence for the thing on screen that is NOT part of the
+ *            exercise but will get asked about anyway (HP-1's scene valve).
+ *            Rare on purpose.
  *   settle   sim-seconds to wait, from the demo's verification record. The
  *            picker runs the solver flat out for this long, exactly as a
  *            scene's own `spinup` does, so it is not a wall-clock wait.
@@ -475,8 +481,9 @@ const EXERCISES = [
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2" },
     digitNote: "your nozzle gap is DRAWN: gap = 0.42 / 0.70 / 0.84 / 0.97 / 1.10 m by d mod 5",
-    start: "a 60 m penstock from a high reservoir, nozzle not yet cut",
-    task: "Draw the fixed 0.70 m throttle at x = 8.0 m and your own nozzle at x = 56.5 m, then hover mid-pipe for q and read the jet core speed in the Speed view at x ≈ 57 m.",
+    start: "a 49 m penstock from a high reservoir, throttled at x = 8 m, with a 0.84 m nozzle at x = 56.5 m",
+    task: "Erase the nozzle plate at x = 56.5 m and redraw it at YOUR gap (two pieces about y = 3.5, ruler on), press R and wait out the 50 s, then hover mid-pipe for q and read the jet core speed in the Speed view at x ≈ 57 m.",
+    note: "The green bar at x = 55 m is the scene's valve — it belongs to the water-hammer demos, not to this rig. Leave it open; if the pipe suddenly stops flowing you have pressed V and slammed it (press V again).",
     settle: 50,
   },
   {

@@ -559,7 +559,10 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
-  /** Vertical velocity rake: u(y) drawn against the water column it sits in. */
+  /** Vertical velocity rake: u(y) drawn against the water column it sits in.
+   *  The profile is also INTEGRATED over the column — q = ∫u dy — so the rake
+   *  is a flow measurement, not just a shape: the discharge it reports can be
+   *  checked against the hover readout's flux-based q at the same station. */
   function drawRake(ctx, V, sim, rk, A) {
     const { i, buf } = rk;
     const x0 = V.X((i + 0.5) * sim.dx);
@@ -572,6 +575,14 @@ const OVERLAY = (() => {
       umax = Math.max(umax, Math.abs(u)); sum += u; cnt++;
     }
     const Vbar = cnt ? sum / cnt : 0;
+    // ∫u dy over the wet column. Displayed through the same 0.10-per-frame
+    // EMA the hover readout's q gets — on a roll-wave chute the instantaneous
+    // integral swings ±50% and the worksheets' standing rule is a
+    // median-of-the-wobble read, not a lucky frame. The drawn profile itself
+    // stays live; pausing lets the EMA converge to the paused instant.
+    const qNow = sum * sim.dx;
+    rk.qE = rk.qE === undefined ? qNow : rk.qE + 0.10 * (qNow - rk.qE);
+    const q = rk.qE;
     const scale = Math.min(V.w * 0.13, 110) / umax;
 
     ctx.save();
@@ -595,6 +606,8 @@ const OVERLAY = (() => {
     ctx.moveTo(x0 + Vbar * scale, V.Y(bed)); ctx.lineTo(x0 + Vbar * scale, V.Y(surf));
     ctx.strokeStyle = "rgba(255,217,138,0.35)"; ctx.lineWidth = 1; ctx.stroke();
 
+    chip(ctx, x0 + 6, V.Y(surf) - 32,
+      "q = ∫u dy = " + fmt(q, 3) + " m²/s", "#7fd4ff");
     chip(ctx, x0 + 6, V.Y(surf) - 14,
       "u_max " + fmt(umax, 2) + "  V " + fmt(Vbar, 2) + "  ratio " + fmt(umax / Math.max(Vbar, 1e-3), 2),
       "#ffd98a");
@@ -688,7 +701,71 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** Edge rulers in metres: ticks along the bottom (x stations) and left
+   *  (elevations above the datum) of the VISIBLE domain, with faint grid
+   *  lines at the major ticks. They follow zoom and pan, so a drawn plate
+   *  lands at a stated station — the worksheets say "x = 8.0 m", and counting
+   *  scale bars is not a measurement. Vertical exaggeration is already inside
+   *  V.Y, so the y ruler stays honest when the view is stretched. */
+  function drawRuler(ctx, V, sim) {
+    const B = V.vis || V;
+    const x0 = V.toDomain(B.x, 0)[0], x1 = V.toDomain(B.x + B.w, 0)[0];
+    const y0 = V.toDomain(0, B.y + B.h)[1], y1 = V.toDomain(0, B.y)[1];
+    // 1-2-5 major step aiming at ~90 px between labels; minors at a fifth.
+    const pick = (span, px) => {
+      const t = span * 90 / Math.max(px, 1);
+      const mag = Math.pow(10, Math.floor(Math.log10(Math.max(t, 1e-4))));
+      return [1, 2, 5, 10].map((m) => m * mag)
+        .reduce((a, b) => Math.abs(b - t) < Math.abs(a - t) ? b : a);
+    };
+    const sx = pick(x1 - x0, B.w), sy = pick(y1 - y0, B.h);
+    const dec = (s) => (s < 0.995 ? (s < 0.0995 ? 2 : 1) : 0);
+    ctx.save();
+    ctx.font = "10px ui-monospace, SFMono-Regular, monospace";
+    ctx.lineWidth = 1;
+
+    // Bottom edge — x. Integer-stepped in minor units so the loop cannot
+    // drift; a major is every fifth minor.
+    const yb = B.y + B.h;
+    for (let k = Math.ceil(x0 / (sx / 5) - 1e-6); k * sx / 5 <= x1 + 1e-6; k++) {
+      const x = k * sx / 5, px = V.X(x);
+      const major = ((k % 5) + 5) % 5 === 0;
+      if (major) {
+        ctx.strokeStyle = "rgba(223,232,242,0.07)";       // grid line
+        ctx.beginPath(); ctx.moveTo(px, B.y); ctx.lineTo(px, yb); ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(223,232,242," + (major ? "0.6" : "0.3") + ")";
+      ctx.beginPath(); ctx.moveTo(px, yb); ctx.lineTo(px, yb - (major ? 9 : 5)); ctx.stroke();
+      // Labels stay clear of the scale bar in the bottom-right corner.
+      if (major && px < B.x + B.w - 120 && px > B.x + 4) {
+        ctx.fillStyle = "rgba(223,232,242,0.6)";
+        ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+        ctx.fillText(x.toFixed(dec(sx)), px, yb - 13);
+      }
+    }
+
+    // Left edge — y, elevation above the domain floor (the datum the level
+    // controls and the hover readout use).
+    for (let k = Math.ceil(y0 / (sy / 5) - 1e-6); k * sy / 5 <= y1 + 1e-6; k++) {
+      const y = k * sy / 5, py = V.Y(y);
+      const major = ((k % 5) + 5) % 5 === 0;
+      if (major) {
+        ctx.strokeStyle = "rgba(223,232,242,0.07)";
+        ctx.beginPath(); ctx.moveTo(B.x, py); ctx.lineTo(B.x + B.w, py); ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(223,232,242," + (major ? "0.6" : "0.3") + ")";
+      ctx.beginPath(); ctx.moveTo(B.x, py); ctx.lineTo(B.x + (major ? 9 : 5), py); ctx.stroke();
+      if (major && py > B.y + 10 && py < yb - 18) {
+        ctx.fillStyle = "rgba(223,232,242,0.6)";
+        ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        ctx.fillText(y.toFixed(dec(sy)), B.x + 12, py);
+      }
+    }
+    ctx.restore();
+  }
+
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
-           drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, chip, fmt };
+           drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
+           chip, fmt };
 })();

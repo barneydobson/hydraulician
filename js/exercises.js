@@ -126,7 +126,7 @@ const EXERCISES = [
     viewParams: { channel: true, labels: true },
     digitNote: "your station: x = 1 + d metres",
     start: "the settled backwater pool behind a weir — nothing to set",
-    task: "Hover at your own station and read the depth off the profile box; the worksheet card turns it into a surface elevation.",
+    task: "Hover at your own station and read the surface elevation straight off the hover box (the \"surface … above datum\" row).",
     settle: 30,
   },
   {
@@ -243,7 +243,7 @@ const EXERCISES = [
       { tool: "gauge", where: "x = 2.5 m, y = 0.75 m", why: "the upstream depth y₁ the prediction is built on" },
     ],
     start: "a level reach held at both ends, and a hump to grow at x = 4.5 m",
-    task: "Read y₁ at the gauge and commit a prediction Δz = E₁ − 1.5·y_c. Then grow a 1 m flat-topped hump at x = 4.5 m in ~7 steps, re-settling each time, until the crest chokes.",
+    task: "Read y₁ at the gauge and commit a prediction Δz = E₁ − 1.5·y_c. Then grow a 1 m flat-topped hump at x = 4.5 m in ~7 steps, jotting y₁ at each and re-settling, until the crest chokes — the y₁ from the LAST pre-choke step redoes the prediction as Δz_pred*.",
     settle: 60,
   },
   {
@@ -318,8 +318,8 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "x = 3.5 m, y ≈ 0.65 m", why: "the upstream pool — reads y₀" },
     ],
-    start: "a pool behind a vertical sluice gate you draw yourself",
-    task: "Draw your own gate opening, set your reservoir level, then read y₀ at the gauge and y₁ by hovering the vena at x = 5.630 m, and work out C_d and the gate thrust.",
+    start: "a pool behind a drawn sluice gate — its opening is yours to adjust",
+    task: "Redraw the gate opening to your own row, set your reservoir level, then read y₀ at the gauge and y₁ by hovering the vena at x = 5.630 m, and work out C_d and the gate thrust.",
     settle: 70,
   },
   {
@@ -560,8 +560,8 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, y ≈ 6 m", why: "the mass oscillation — y_max is its first crest minus h₀" },
     ],
-    start: "the penstock, with a nozzle, tee and standpipe to build",
-    task: "Fit the nozzle, punch the tee, build your standpipe and gauge the shaft, then slam the valve and read y_max (first crest minus h₀) and the crest-to-crest period T off the Depth trace.",
+    start: "the penstock with nozzle, tee and standpipe already built — the shaft width is yours",
+    task: "Redraw the standpipe shaft to your own width and gauge it, then slam the valve and read y_max (first crest minus h₀) and the crest-to-crest period T off the Depth trace.",
     settle: 60,
   },
   {
@@ -577,7 +577,7 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "x = x_d − 3 (three metres upstream of YOUR OWN valve), y ≈ 3.5 m", why: "read near the reservoir instead and the sponge smears the trace" },
     ],
-    start: "the 60 m pipe with the shipped valve for you to replace",
+    start: "the 60 m pipe — you add a valve at your own station and leave the shipped one alone",
     task: "Draw your own valve, check it seals, gauge 3 m upstream of it, then slam it and pause on four consecutive peaks: T is the median of the three gaps.",
     settle: 13,
   },
@@ -612,7 +612,7 @@ const EXERCISES = [
     rigParams: { budget: "Medium" },
     viewParams: { speed: 0.15 },
     digitNote: "your bore stations: x₁ = 3.0 + 0.5·d m and x₂ = x₁ + 1.5 m; the negative wave is read at x = 1.0 m by everyone",
-    start: "a full reservoir behind a dam, dry bed downstream",
+    start: "a full reservoir behind a dam, a shallow STILL tailrace downstream — wet on purpose, the bore needs it",
     task: "Pull the dam and time the surface at x = 1.0 m dropping clearly below its still-water mark, then reset and time the bore front between your own x₁ and x₂.",
     settle: 0,
   },
@@ -699,7 +699,7 @@ const EXERCISES = [
     rigParams: { budget: "Medium" },
     digitNote: "your lip: d mod 3 gives 0 sharp edge (draw nothing), 1 bellmouth, 2 Borda re-entrant",
     start: "a tank draining through a sharp-edged orifice",
-    task: "Draw your assigned lip, then zoom into the wall exit and read C_c as the narrowest jet core divided by the opening height (station x = 2.41 m, or 2.44 m for the Borda tube).",
+    task: "Your digit loads its lip already drawn — check it against your row, then zoom into the wall exit and read C_c as the narrowest jet core divided by the opening height (station x = 2.41 m, or 2.44 m for the Borda tube).",
     settle: 55,
   },
   {
@@ -751,7 +751,8 @@ const EXERCISES = [
     rigWhy: { spoutVx: "the dry-weather flow the 45 s pre-charge runs at — the storm ramp up from it is yours." },
     viewParams: { gaugeField: "depth", dye: true, dyeDecay: 0 },
     digitNote: "your throttle is DRAWN: r = d mod 4 gives 2 / 4 / 6 / 8 cells erased straight down x = 4 m",
-    setup: ["Cut your own throttle: press [ twenty times to shrink the erase brush, then ] once / 3 / 5 / 6 times for r = 0 / 1 / 2 / 3, and erase down the x = 4 m line.",
+    setup: ["Press Z once — the rig ships with a 6-cell throttle already cut, and undo restores the whole floor so every rung starts equal (an erase stroke can widen a hole, never narrow it).",
+            "Cut your own throttle: press [ twenty times to shrink the erase brush, then ] once / 3 / 5 / 6 times for r = 0 / 1 / 2 / 3, and erase down the x = 4 m line.",
             "Settle 45 s at dry-weather flow (spout velocity 0.50 m/s) — the chamber must be pre-charged or the first flush is invisible.",
             "Ramp the spout in 0.25 m/s steps held 10 s to bracket the spill, then 0.08 m/s steps held 20 s to pin it.",
             "First spill is the chamber gauge one cell over the crest with a continuous sheet; then hover the sewer at x ≈ 2 m for q."],
@@ -825,6 +826,7 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "ONE gauge, moved along the flat run from x = 1.3 to 7.5 m in 0.2 m steps", why: "you are hunting the antinode and the node — the swing at each stop is the measurement" },
     ],
+    secondScene: { scene: "wave", when: "contrast run - repeat on wave (Scenes menu) with your d mod 3 row from the brief, submitted as series = spilling; its flat run is x = 0.65-1.15 m, stepped by 0.1 m." },
     start: "a steep sea wall at the end of a wave flume",
     task: "Set your period and stroke, slide one gauge along the flat run in 0.2 m steps, note the biggest swing and the smallest, and take K_refl = (a_max − a_min)/(a_max + a_min).",
     settle: 45,
@@ -845,7 +847,7 @@ const EXERCISES = [
                       rule: "the amplitude paired with YOUR period",
                       table: [0.05, 0.08, 0.11, 0.15, 0.19, 0.23, 0.28, 0.30, 0.30, 0.30] }] },
     start: "the deep flume with a column of tracer particles",
-    task: "Set your period and stroke, zoom on the tracer column and raise the vertical exaggeration, then pause and read the VERTICAL extent of the surface trail against the bed trail.",
+    task: "Set your period and stroke, zoom on the tracer column (it arrives placed, at ×6 vertical exaggeration), then pause and read the VERTICAL extent of the surface trail against the bed trail.",
     settle: 40,
   },
   {
@@ -886,7 +888,7 @@ const EXERCISES = [
       { tool: "gauge", where: "x = 1.8 m, y = 0.20 m", why: "the second station — L comes from the lag between the two" },
     ],
     start: "a long shallow flume with a paddle and two gauge stations",
-    task: "Set your period and stroke, then read H crest-to-trough and L from the lag between the two gauges over 20–30 s of cycles, and compute U_r = H·L²/h³ with h = 0.348 m.",
+    task: "Set your period and stroke, then read H crest-to-trough and L from the lag between the two gauges over 20–30 s of cycles, and compute U_r = H·L²/h³ with h = 0.348 m. Read the crest/trough ratio — crest above the mean over trough below it — off the same trace.",
     settle: 42,
   },
 

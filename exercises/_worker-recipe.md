@@ -78,7 +78,7 @@ realtime) — budget sim-seconds accordingly.
   them (gauge value, hover/jump-box/overlay figures, panel q), from the
   same state the overlay prints — never a private recomputation.
 - Worked snippets (panel set, jump box, screenshots, timings):
-  exercises/HJ-1-belanger/README.md Appendix B. Read it before
+  exercises/HJ-1-belanger/_archive/README-full.md Appendix B. Read it before
   reinventing anything.
 - Scene ids (verify against SCENES keys): hammer, jet, venturi, m1, m2,
   m3, h23, a23, s1, s2, s3, c13, dambreak, wave, wavedeep, waveshallow,

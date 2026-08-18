@@ -15,11 +15,11 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 The penstock loses head to friction as the square of the discharge, and what
 is left arrives as jet velocity:
 
-    h_f = k·q²        v = √(2g(H − h_f))   ⇒   h_f = H − v²/2g
+    h_f = k·q²        u = √(2g(H − h_f))   ⇒   h_f = H − u²/2g
 
 so the jet's power per metre of width is
 
-    P = ρ·g·q·(H − k·q²)  =  ½·ρ·q·v²
+    P = ρ·g·q·(H − k·q²)  =  ½·ρ·q·u²
 
 Set dP/dq = 0 and the maximum lands at **h_f = H/3**, *whatever* k is: at
 peak power, one third of the head is burned in the pipe. That design rule is
@@ -41,13 +41,13 @@ explain the assignment in class. Look up **d mod 5**:
    axis — Erase (`2`), Wall (`1`) and Measure (toolbar).
 2. Press `R` and let it reach steady state — about **50 s**; the card counts
    it down.
-3. Measure the flow **q** (hover the pipe) and the jet speed **v** just past
+3. Measure the flow **q** (hover the pipe) and the jet speed **u** just past
    the nozzle (**Field → Speed**, hover the bright core), and submit
-   **gap, q, v**.
+   **gap, q, u**.
 
 ## For the instructor — pooling the class
 
-Collect one row per student (`student_id,digit,gap_m,q,v`), export the CSV
+Collect one row per student (`student_id,digit,gap_m,q,u`), export the CSV
 and run:
 
 ```bash
@@ -55,7 +55,7 @@ python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
 python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 ```
 
-The script computes h_f = H − v²/2g and P = ½ρqv² per point (H = 21.35 m),
+The script computes h_f = H − u²/2g and P = ½ρqu² per point (H = 21.35 m),
 fits h_f = k·q², and plots P against q with the frictionless ρgqH line
 running away above; the lower panel plots h_f/H against q with the ⅓ line
 across it.

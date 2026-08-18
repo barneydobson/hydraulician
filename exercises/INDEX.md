@@ -46,7 +46,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | DA-1 | The scale ladder | DA-1-scale-ladder/ | RIG-B weir ×3 scales | (λ, q, H) |
 | DA-2 | Time scales as √λ | DA-2-time-scales/ | RIG-C tank ×λ | (λ, t between marks) |
 | DA-3 | Scale effects, live | DA-3-scale-effects/ | DA-1/DA-2 rigs × resolutions | optional (λ, q, resolution, C_d) |
-| HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, v) |
+| HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |
 | HP-2 | Pelton principle | HP-2-pelton/ | shared jet rig | — (lecturer demo) |
 | NC-1 | Slope-area mystery discharge | NC-1-slope-area/ | **m3** (m1 impossible — kept as contrast) | (window x₀, Q̂) |
 | NC-2 | Is α really 1? | NC-2-alpha/ | s2 stations + gate wake | (station, α) |

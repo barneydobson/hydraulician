@@ -75,26 +75,28 @@ window.HP1 = {
     return best;
   },
 
-  /** one whole student run. HP1.student(0.84) -> {gap, q, v, ...}
+  /** one whole student run. HP1.student(0.84) -> {gap, q, u, ...}
+   *  (u, as the hover readout names the horizontal component the student
+   *  reads — the pooled CSV column is called u for the same reason.)
    *  50 s of spin-up, then 20 readings 0.8 s apart (the student's eyeball
    *  average of a wobbling readout). */
   student: function (nozGap) {
     var r = HP1.build(nozGap);
     APP.SIM.resetWater();                                   // R
     APP.SIM.step(Math.ceil(50 / APP.SIM.dt()));             // 50 s spin-up
-    var qs = [], vs = [], i = Math.floor(HP1.XM / APP.sim.dx);
+    var qs = [], us = [], i = Math.floor(HP1.XM / APP.sim.dx);
     for (var k = 0; k < 20; k++) {
-      qs.push(HP1.A().q[i]); vs.push(HP1.jetU());
+      qs.push(HP1.A().q[i]); us.push(HP1.jetU());
       APP.SIM.step(Math.ceil(0.8 / APP.SIM.dt()));
     }
     var mn = function (a) { return a.reduce(function (s, v) { return s + v; }, 0) / a.length; };
-    var q = mn(qs), v = mn(vs), H = +(HP1.res() - HP1.YC).toFixed(3);
+    var q = mn(qs), u = mn(us), H = +(HP1.res() - HP1.YC).toFixed(3);
     return { gap: nozGap, cells: r.nozzle.cells, gapm: r.nozzle.m,
-             H: H, q: +q.toFixed(3), v: +v.toFixed(3),
-             hf: +(H - v * v / 19.62).toFixed(3),
-             hfH: +((H - v * v / 19.62) / H).toFixed(3),
-             P_MW_per_m: +(0.5 * q * v * v / 1000).toFixed(3) };
+             H: H, q: +q.toFixed(3), u: +u.toFixed(3),
+             hf: +(H - u * u / 19.62).toFixed(3),
+             hfH: +((H - u * u / 19.62) / H).toFixed(3),
+             P_MW_per_m: +(0.5 * q * u * u / 1000).toFixed(3) };
   },
 };
-/* HP1.student(0.84) -> {cells:6, q:8.83, v:16.21, hf:7.94, hfH:0.372,
+/* HP1.student(0.84) -> {cells:6, q:8.83, u:16.21, hf:7.94, hfH:0.372,
                          P_MW_per_m:1.160}   — the peak of the pooled curve  */

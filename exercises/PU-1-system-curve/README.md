@@ -101,5 +101,5 @@ point.
 
 The full verification record — the rig geometry and why the pump is a spout
 inside the bore, the priming evidence, the ten-student sweep, the volume audit,
-safe bounds and troubleshooting — is archived in the repository at
+safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/PU-1-system-curve/_archive/README-full.md`.

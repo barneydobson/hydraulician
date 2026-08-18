@@ -104,5 +104,5 @@ shipped class gives slope 0.555 ± 0.009 with R² = 0.998.
 
 The full verification record — the exact-cell orifice ladder, why the plate
 thickness does not scale, the apron-choke failure this rig is built around,
-timings, safe bounds and troubleshooting — is archived in the repository at
+timings, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/DA-2-time-scales/_archive/README-full.md`.

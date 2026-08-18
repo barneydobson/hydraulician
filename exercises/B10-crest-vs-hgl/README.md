@@ -106,5 +106,5 @@ the class can see whether the offset is a constant or a trend.
 
 The full verification record — the ramp geometry that keeps the hump from
 throttling the pipe, the seven-student sweep, the onset-trigger evidence,
-hysteresis, safe bounds and troubleshooting — is archived in the repository at
+hysteresis, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/B10-crest-vs-hgl/_archive/README-full.md`.

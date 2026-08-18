@@ -124,8 +124,9 @@ Then verify like an examiner:
 - _archive/README-full.md — everything else, for maintainers and reruns:
   dry-run constants and why they are what they are, the verification record
   (simulated-class table, measured-vs-theory anchors, timing), safe bounds,
-  troubleshooting, embedded screenshots. Underscore folders are not
-  published to the Pages site, which is the point.
+  troubleshooting, embedded screenshots. The _archive folders are NOT
+  committed (.gitignore) — archive weight stays off GitHub, and the record
+  lives beside the brief on the machine that ran the verification.
 - collect_plot.py — pools a class CSV → PNG plot; matplotlib with the Agg
   backend; must run on your own data/simulated-class.csv and the resulting
   plots/pooled-demo.png ships in the folder.

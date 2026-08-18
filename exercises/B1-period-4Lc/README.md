@@ -88,5 +88,4 @@ re-expressed as a distance, b/a metres.
 
 The full verification record — the erase-versus-leave-alone valve test, the
 gauge-station investigation, the ten-digit measured sweep, robustness at
-both ends of the range and troubleshooting — is archived in the repository
-at `exercises/B1-period-4Lc/_archive/README-full.md`.
+both ends of the range and troubleshooting — is kept locally, out of version control, at `exercises/B1-period-4Lc/_archive/README-full.md`.

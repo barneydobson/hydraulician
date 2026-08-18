@@ -83,5 +83,5 @@ trend through everything except the rows flagged as noise-limited.
 The full verification record — the digit-by-digit sweep, the per-period
 median statistics behind H and the asymmetry, the wavelength cross-check
 against WV-1's own dispersion measurement, and the low-amplitude bonus
-points that anchor the low-U_r end — is archived in the repository at
+points that anchor the low-U_r end — is kept locally, out of version control, at
 `exercises/B6-ursell/_archive/README-full.md`.

@@ -93,5 +93,5 @@ Fr = 1 crossing back to the lip in `y_c` units against the textbook 3–4 `y_c`.
 
 The full verification record — the crest-length iteration, the level-margin
 and no-tailwater checks, the measured per-digit table, safe bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/FB-2-yc-three-ways/_archive/README-full.md`.

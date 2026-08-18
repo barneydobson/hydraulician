@@ -89,5 +89,5 @@ shaded.
 
 The full verification record — the settle and flutter measurements, the
 delivered-`n` windows, the end-station checks and the direct-step RMS gaps —
-is archived in the repository at
+is kept locally, out of version control, at
 `exercises/GV-1-backwater/_archive/README-full.md`.

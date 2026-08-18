@@ -97,5 +97,5 @@ as their own series with a `+` marking where their true ratio sits.
 The full verification record — the calibrated stroke tables and why the
 scene's own defaults are unsafe, the spin-up recording trap, the gauge-station
 and clearance measurements, the repeatability evidence behind the noise-floor
-finding, safe bounds and troubleshooting — is archived in the repository at
+finding, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/WV-2-buried-gauge/_archive/README-full.md`.

@@ -100,5 +100,5 @@ percentage below.
 The full verification record — the scene geometry, the self-similarity and
 steepest-gradient checks behind the fixed negative-wave station, the
 criterion sensitivity table, the ten-digit bore sweep and the safe station
-bounds — is archived in the repository at
+bounds — is kept locally, out of version control, at
 `exercises/B3-dambreak/_archive/README-full.md`.

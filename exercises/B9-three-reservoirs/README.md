@@ -93,5 +93,5 @@ law, ΣQ = 0.
 
 The full verification record — why this ships as the dynamic version rather
 than a quasi-steady one, the simulated-class table, the fill-and-settle
-mechanics, safe bounds and troubleshooting — is archived in the repository at
+mechanics, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/B9-three-reservoirs/_archive/README-full.md`.

@@ -105,5 +105,5 @@ gap is the ku² term the U28/U29 follow-up asks students to integrate.
 
 The full verification record — the ten-width ladder, the containment
 arithmetic behind the 12.0 m reservoir, the wave-damping decision, the seal
-audit, safe bounds and troubleshooting — is archived in the repository at
+audit, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/UN-3-surge-tank/_archive/README-full.md`.

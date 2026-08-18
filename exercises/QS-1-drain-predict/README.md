@@ -99,5 +99,4 @@ histogram of the signed error (t_meas − t_pred)/t_pred.
 
 The full verification record — the measured settled level, the two
 independent C_d routes, the post-shutoff transient the level table is
-designed around, safe bounds for η₂ and troubleshooting — is archived in the
-repository at `exercises/QS-1-drain-predict/_archive/README-full.md`.
+designed around, safe bounds for η₂ and troubleshooting — is kept locally, out of version control, at `exercises/QS-1-drain-predict/_archive/README-full.md`.

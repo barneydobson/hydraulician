@@ -96,5 +96,5 @@ how many of those actually plunged.
 The full verification record — the 15-cell measurement table with the
 observed behaviour of every row, the two-probe incident-wave method behind
 each ξ₀, the breaking-onset detector's blind spots at both ends of the
-domain and the paddle-safety ceiling — is archived in the repository at
+domain and the paddle-safety ceiling — is kept locally, out of version control, at
 `exercises/B5-iribarren/_archive/README-full.md`.

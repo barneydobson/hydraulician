@@ -96,5 +96,5 @@ against the geometric (1 − A₁/A₂)².
 The full verification record — why the step is 0.40 → 0.80 m and not
 0.40 → 1.00 m, why it sits at x = 3.80 m, the vertical head profile behind
 the near-invert gauge, the measured ten-level ladder, safe bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/LL-1-borda-carnot/_archive/README-full.md`.

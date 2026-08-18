@@ -98,5 +98,4 @@ groups (1.2–1.5%) is smaller than the scatter about the curve itself
 
 The full verification record — the five-resolution sweep on both rigs, the
 resolutions that break DA-1's weir and DA-2's orifice and why, the timings of
-the live moment and the troubleshooting table — is archived in the repository
-at `exercises/DA-3-scale-effects/_archive/README-full.md`.
+the live moment and the troubleshooting table — is kept locally, out of version control, at `exercises/DA-3-scale-effects/_archive/README-full.md`.

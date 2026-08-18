@@ -106,5 +106,4 @@ the rare-spawn tail tinted, over a histogram of the totals.
 
 The full verification record — the play-through log, a recipe card per bagged
 class, the not-achievable list with everything that was tried, the
-critical-slope flicker measurement and the raw panel numbers — is archived in
-the repository at `exercises/GV-2-profile-safari/_archive/README-full.md`.
+critical-slope flicker measurement and the raw panel numbers — is kept locally, out of version control, at `exercises/GV-2-profile-safari/_archive/README-full.md`.

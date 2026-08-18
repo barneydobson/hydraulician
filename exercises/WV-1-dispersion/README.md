@@ -94,5 +94,5 @@ relation.
 The full verification record — the stroke calibration and why the scene's own
 defaults break at the paddle, the measured wavelength table for both flumes,
 the crest-tracking and two-probe phase cross-checks, safe bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/WV-1-dispersion/_archive/README-full.md`.

@@ -105,5 +105,5 @@ The full verification record — how the 2–3 cell severity band and the
 4.6–7.0 m x-band were measured, why the background slope cannot be taken from
 the pipe next to the fault, why every gauge sits at y = 2.35 m, the blind
 six-pair location trial and its accuracy, safe bounds and troubleshooting —
-is archived in the repository at
+is kept locally, out of version control, at
 `exercises/LL-2-find-throttle/_archive/README-full.md`.

@@ -4,8 +4,9 @@
 #
 # The app is untouched by this: index.html and js/ carry no front matter, so
 # Jekyll copies them through verbatim — keep them that way. Directories that
-# start with an underscore (exercises/_runner, exercises/_code-changes, the
-# per-exercise _archive folders) are repo-only and never published.
+# start with an underscore (exercises/_runner, exercises/_code-changes) are
+# repo-only and never published; the per-exercise _archive folders are not
+# even committed (.gitignore).
 #
 # The Pages build enables jekyll-readme-index (README.md serves as a folder's
 # index), jekyll-relative-links (links to .md are rewritten to the rendered

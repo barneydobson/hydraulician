@@ -86,5 +86,5 @@ no fitting — climbing away above the data.
 The full verification record — the digit-by-digit sweep, the
 paddle-frequency fitting method, the noise-floor comparison that explains
 why the pooled points plateau far below the theory curve, and the runner
-notes behind all of it — is archived in the repository at
+notes behind all of it — is kept locally, out of version control, at
 `exercises/B4-orbital-decay/_archive/README-full.md`.

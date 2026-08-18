@@ -103,5 +103,5 @@ cell-quantisation error bars — and the same `Δz_c` against the re-timed
 
 The full verification record — the measured baseline and choking-height
 ladder, the crest-Froude evidence, the re-timing refinement, safe bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/FB-1-choking-hump/_archive/README-full.md`.

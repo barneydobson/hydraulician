@@ -100,5 +100,5 @@ with a second axis reading the same points as multiples of DWF.
 
 The full verification record — why the inflow cannot be the reservoir, the
 delivered brush ladder, the per-rung C_d, hold times, safe bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/CS-1-cso-spill/_archive/README-full.md`.

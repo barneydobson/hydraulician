@@ -92,5 +92,5 @@ clusters against those reference lines.
 The full verification record — the station scan that fixed x = 2.41 m, the
 measured C_c / C_v / C_d table for all three lips, the eye-versus-field bias
 in reading the jet, the two failed geometries behind the shipped ones and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/B8-three-orifices/_archive/README-full.md`.

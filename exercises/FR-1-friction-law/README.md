@@ -84,5 +84,5 @@ exponent forced to 2).
 The full verification record — why the pipe needs a tailwater and where that
 level has to land, why C_s and not C_f is the roughness knob, why the gauges
 sit 4.5 m and not 6 m apart, the measured ten-level ladder, safe bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/FR-1-friction-law/_archive/README-full.md`.

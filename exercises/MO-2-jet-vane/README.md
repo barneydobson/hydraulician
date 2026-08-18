@@ -87,5 +87,5 @@ python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 
 The full verification record — the jet-quality and droop measurements, the
 stagnation recipe and why both methods read high, the measured deep-V turn
-angle, the build traps and troubleshooting — is archived in the repository at
+angle, the build traps and troubleshooting — is kept locally, out of version control, at
 `exercises/MO-2-jet-vane/_archive/README-full.md`.

@@ -89,5 +89,5 @@ over a bar chart of the raw fall F.
 
 The full verification record — why m1 was abandoned for m3, the measured fall
 at every candidate window, the delivered-n spread, settle evidence and safe
-bounds — is archived in the repository at
+bounds — is kept locally, out of version control, at
 `exercises/NC-1-slope-area/_archive/README-full.md`.

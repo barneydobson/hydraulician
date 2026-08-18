@@ -83,5 +83,5 @@ below the class, and each row's measurement window as an error bar.
 
 The full verification record — the ten measured class rows, the m2
 station-sensitivity table, the tiltS0 checks, per-row flutter and safe
-bounds — is archived in the repository at
+bounds — is kept locally, out of version control, at
 `exercises/NC-3-bed-shear/_archive/README-full.md`.

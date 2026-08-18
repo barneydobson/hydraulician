@@ -4,8 +4,9 @@ Every demo from demo-programme.html, packaged one folder each: a short
 README brief (theory · your parameter · what to do · instructor pooling),
 collect_plot.py for the Blackboard CSV, the simulated-class data and plot
 that prove it works, and rig.js where geometry/instruments are drawn. Each
-folder's full verification record, director report and screenshots are
-archived in its `_archive/`. Statuses and measured caveats:
+folder's full verification record and director report live beside it in
+`_archive/`, kept out of version control (.gitignore) on the maintainer's
+machine — archive weight, not source. Statuses and measured caveats:
 _director-status.md. Interface proposals, programme-text amendments and the
 measurement watch-outs every worksheet leans on: CHANGES-NEEDED.md.
 
@@ -37,7 +38,7 @@ them, so the briefs do not repeat it. Every brief follows the trimmed
 pattern HP-1 set: short theory, the personalised rule with its lookup table,
 a handful of numbered steps, and instructor pooling with a discussion point
 or two, with the long verification record moved verbatim to `_archive/`
-inside each folder (repo only, not published to the web site).
+inside each folder — untracked, local to the maintainer's machine.
 
 **Standing rules (every worksheet carries them):** everyone on Resolution
 Medium (the picker sets this) · wait out the spin-up · median-of-the-wobble

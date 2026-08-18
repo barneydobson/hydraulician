@@ -84,5 +84,5 @@ at the slider's own c.
 
 The full verification record — the six-rung velocity ladder, the Joukowsky
 check at both celerities, settle-time evidence, safe gap bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/UN-1-celerity/_archive/README-full.md`.

@@ -96,5 +96,5 @@ own band.
 The full verification record — the probe-height and measuring-zone
 calibrations, the envelope scan at every period tried, the node-spacing and
 two-probe cross-checks, the eyeball-versus-DFT margin behind the caution
-above, safe bounds and troubleshooting — is archived in the repository at
+above, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/WV-3-reflection/_archive/README-full.md`.

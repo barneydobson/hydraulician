@@ -1,0 +1,6 @@
+# Per-exercise long-form records (verification, director reports) live beside
+# each brief on the maintainer's machine but are deliberately not committed —
+# they are archive weight, not source. See exercises/INDEX.md.
+exercises/*/_archive/
+
+.DS_Store

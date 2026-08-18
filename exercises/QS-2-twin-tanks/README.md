@@ -98,5 +98,4 @@ right panel the same points against A*.
 
 The full verification record — the simulated class, the pipe geometry that
 made the timescale both slow enough to read and robust to a hand-drawn stroke,
-repeatability, safe bounds and troubleshooting — is archived in the repository
-at `exercises/QS-2-twin-tanks/_archive/README-full.md`.
+repeatability, safe bounds and troubleshooting — is kept locally, out of version control, at `exercises/QS-2-twin-tanks/_archive/README-full.md`.

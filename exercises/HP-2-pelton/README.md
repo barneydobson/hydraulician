@@ -71,5 +71,5 @@ stagnation-ratio submission if a class wants a number to hand in.
 
 The full verification record — jet coherence and droop, the measured turn
 angle, the two build traps behind the V's geometry, and why no rotating wheel
-is reachable in this solver — is archived in the repository at
+is reachable in this solver — is kept locally, out of version control, at
 `exercises/HP-2-pelton/_archive/README-full.md`.

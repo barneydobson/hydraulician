@@ -90,5 +90,4 @@ digit's loss coefficient k = 2gH/u_max² in the panel underneath.
 
 The full verification record — the closed-pipe ringing investigation behind
 the wave-damping setting, the point gauge's bias during the rise, the
-ten-digit sweep, safe level bounds and troubleshooting — is archived in the
-repository at `exercises/UN-2-establishment/_archive/README-full.md`.
+ten-digit sweep, safe level bounds and troubleshooting — is kept locally, out of version control, at `exercises/UN-2-establishment/_archive/README-full.md`.

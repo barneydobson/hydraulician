@@ -394,8 +394,10 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 - The Pages deploy (`.github/workflows/pages.yml`) runs Jekyll over the repo
   so the markdown briefs render as web pages — README.md serves as its
   folder's index, links to `.md` are rewritten to the rendered page, and
-  underscore-prefixed folders (`exercises/_runner`, `_code-changes`,
-  `_archive`) are not published. The APP is only copied verbatim because
+  underscore-prefixed folders (`exercises/_runner`, `_code-changes`) are not
+  published. The per-exercise `_archive/` folders (each brief's long
+  verification record) are not even committed — .gitignore keeps them local
+  to this machine. The APP is only copied verbatim because
   `index.html` and `js/*` carry no YAML front matter; never add any. The
   exercise card links to the folder URL on `*.github.io` and to the raw
   `README.md` everywhere else.

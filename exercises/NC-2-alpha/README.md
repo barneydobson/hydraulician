@@ -99,5 +99,4 @@ the coarse-sampling bias shows up as a systematic offset below the 1:1 line.
 
 The full verification record — why s2 rather than m3's near-uniform apron, the
 rake's access path and its lack of smoothing, the per-station spreads, the
-coarse-sampling experiments and the gate rig — is archived in the repository
-at `exercises/NC-2-alpha/_archive/README-full.md`.
+coarse-sampling experiments and the gate rig — is kept locally, out of version control, at `exercises/NC-2-alpha/_archive/README-full.md`.

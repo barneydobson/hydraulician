@@ -71,5 +71,5 @@ across it.
 
 The full verification record — why the friction must be a drawn plate, the
 measured five-gap ladder, settle-time evidence, safe bounds and
-troubleshooting — is archived in the repository at
+troubleshooting — is kept locally, out of version control, at
 `exercises/HP-1-penstock-power/_archive/README-full.md`.

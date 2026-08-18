@@ -79,5 +79,5 @@ Manning's 3/5, then histograms every student's back-calculated
 
 The full verification record — the ten-run measured class, endpoint
 robustness out to t = 100 s, the flutter measurement and the safe `q` bounds
-— is archived in the repository at
+— is kept locally, out of version control, at
 `exercises/UF-1-normal-depth/_archive/README-full.md`.

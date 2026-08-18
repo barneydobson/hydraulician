@@ -87,5 +87,4 @@ lines with the residuals underneath.
   ceiling, so cavitation onset is a slide rather than a demonstration.
 
 The full verification record — the measured bore geometry, the head-convention
-proof, the ten-student sweep, safe bounds and troubleshooting — is archived in
-the repository at `exercises/B7-venturi-rating/_archive/README-full.md`.
+proof, the ten-student sweep, safe bounds and troubleshooting — is kept locally, out of version control, at `exercises/B7-venturi-rating/_archive/README-full.md`.

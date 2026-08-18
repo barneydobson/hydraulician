@@ -81,6 +81,5 @@ residual — percent away from the momentum prediction — in the panel below.
   high-`d` ones, which is the whole design case for a stilling basin.
 
 The full verification record — the measured class sweep, why the q floor
-moved to 0.42, the tailwater margins, safe bounds and troubleshooting — is
-archived in the repository at
+moved to 0.42, the tailwater margins, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/HJ-1-belanger/_archive/README-full.md`.

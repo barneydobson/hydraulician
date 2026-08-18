@@ -101,5 +101,4 @@ band that leaves the λ = ¼ droop visible rather than hiding it.
 
 The full verification record — the cell arithmetic that fixes the discharge
 band, the measured q → reservoir-level rule, the junk-floor and
-grid-refinement tests, safe bounds and troubleshooting — is archived in the
-repository at `exercises/DA-1-scale-ladder/_archive/README-full.md`.
+grid-refinement tests, safe bounds and troubleshooting — is kept locally, out of version control, at `exercises/DA-1-scale-ladder/_archive/README-full.md`.

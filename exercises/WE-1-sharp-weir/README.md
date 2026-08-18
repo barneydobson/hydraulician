@@ -92,6 +92,5 @@ each student's own `C_d` against their `H/P` with Rehbock drawn through it.
   why the pooled `C_d` sits a few percent under Rehbock.
 
 The full verification record — why the bed must end at the plate, the measured
-per-digit table and Rehbock comparison, safe bounds and troubleshooting — is
-archived in the repository at
+per-digit table and Rehbock comparison, safe bounds and troubleshooting — is kept locally, out of version control, at
 `exercises/WE-1-sharp-weir/_archive/README-full.md`.

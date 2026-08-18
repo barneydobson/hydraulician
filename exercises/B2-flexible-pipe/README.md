@@ -94,5 +94,4 @@ through the scatter.
 
 The full verification record — the six-gap ladder measured at both
 celerities, the Joukowsky agreement per leg, the v₀-drift and downsurge
-checks, and the timing bug that scaling fixed — is archived in the
-repository at `exercises/B2-flexible-pipe/_archive/README-full.md`.
+checks, and the timing bug that scaling fixed — is kept locally, out of version control, at `exercises/B2-flexible-pipe/_archive/README-full.md`.

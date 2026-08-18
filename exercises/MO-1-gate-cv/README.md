@@ -94,6 +94,5 @@ hydrostatic guess.
 
 The full verification record — the ponding trap and why the apron is
 truncated, the boundary-strategy measurement, the hover-fidelity scan behind
-the x = 5.63 m station, the safe opening band and troubleshooting — is
-archived in the repository at
+the x = 5.63 m station, the safe opening band and troubleshooting — is kept locally, out of version control, at
 `exercises/MO-1-gate-cv/_archive/README-full.md`.

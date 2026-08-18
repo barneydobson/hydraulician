@@ -106,18 +106,25 @@ Then verify like an examiner:
 
 ## Deliverables — folder exercises/<ID-slug>/ (e.g. exercises/HJ-1-belanger/)
 
-- README.md — the brief, sections in this order:
-  1. Title, demo id, refs line, one-paragraph purpose.
-  2. Lecturer setup (before class): ?scene link, rig to draw (or rig.js),
-     constants fixed by your dry-run, panel settings, timing budget.
-  3. Student worksheet (copy-pasteable): numbered steps from "open this
-     link" to "submit these numbers on Blackboard"; the personalised-
-     parameter rule; exact submission fields; standing-rules footer.
-  4. Collection & pooled plot (lecturer): expected CSV columns,
-     `python3 collect_plot.py class.csv` usage, what the plot should show,
-     2–3 discussion points, troubleshooting + safe parameter bounds.
-  5. Verification record: simulated-class table, measured vs theory
-     anchors, timing. Embed screenshots (![](shots/...)).
+- README.md — the PUBLIC brief, and it is SHORT
+  (exercises/HP-1-penstock-power/README.md is the pattern; it renders as a
+  web page on the Pages site, so it is what students and instructors read).
+  Sections in this order, nothing else:
+  1. Title, one-paragraph purpose, how to open (`?ex=` link). Do NOT repeat
+     the generic how-to-start — link ../INDEX.md#running-an-exercise.
+  2. Theory: the equation being measured, a few lines.
+  3. The personalised-parameter rule (d = last digit of the student number —
+     the lecturer explains the assignment in class, so state the rule, don't
+     tutor it).
+  4. What to do: numbered student steps from "open" to "submit these
+     numbers", including the settle wait and exact read stations.
+  5. For the instructor: CSV columns, `python3 collect_plot.py class.csv`
+     usage, what the pooled plot should show, 2–3 discussion points.
+- _archive/README-full.md — everything else, for maintainers and reruns:
+  dry-run constants and why they are what they are, the verification record
+  (simulated-class table, measured-vs-theory anchors, timing), safe bounds,
+  troubleshooting, embedded screenshots. Underscore folders are not
+  published to the Pages site, which is the point.
 - collect_plot.py — pools a class CSV → PNG plot; matplotlib with the Agg
   backend; must run on your own data/simulated-class.csv and the resulting
   plots/pooled-demo.png ships in the folder.
@@ -129,7 +136,7 @@ Then verify like an examiner:
   Confirm every PNG is non-trivial (>20 kB, visually checked with Read).
 - rig.js — only if the demo draws geometry or places instruments.
 - Director report — a hook on this machine refuses `report.md`-style
-  files, so instead END README.md with a final section
+  files, so instead END _archive/README-full.md with a final section
   "## Appendix — Director report", terse:
   - VERDICT: READY | READY-WITH-CAVEATS | NEEDS-CHANGE | NOT-FEASIBLE
   - Evidence: key measured numbers vs expected, in one table.

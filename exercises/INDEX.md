@@ -28,9 +28,13 @@ WE-1's q→level pairing), instrument positions and staged sequences stay in the
 student's hands: getting them wrong and seeing why is the exercise. `↻ Reset
 to this exercise` on the card restores the starting point.
 
-Each folder's README opens with a "How to start (30 seconds)" block; the old
-prose setup is kept below it as *Manual setup (fallback, or for building it
-yourself)* — still the record of every constant.
+How to run an exercise is described once, above — it is the same for all of
+them, so the briefs should not repeat it. HP-1 sets the trimmed brief
+pattern: short theory, the personalised rule, what to do, and instructor
+plotting/interpretation, with the long verification record moved to
+`_archive/` inside the folder (repo only, not published). Folders not yet
+trimmed still open with an older "How to start (30 seconds)" block and keep
+the *Manual setup* record inline.
 
 **Standing rules (every worksheet carries them):** everyone on Resolution
 Medium (the picker sets this) · wait out the spin-up · median-of-the-wobble

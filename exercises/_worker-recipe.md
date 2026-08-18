@@ -119,7 +119,8 @@ Then verify like an examiner:
   4. What to do: numbered student steps from "open" to "submit these
      numbers", including the settle wait and exact read stations.
   5. For the instructor: CSV columns, `python3 collect_plot.py class.csv`
-     usage, what the pooled plot should show, 2–3 discussion points.
+     usage, the shipped pooled plot, and a short Discussion points list —
+     only points the plot does not already make by itself.
 - _archive/README-full.md — everything else, for maintainers and reruns:
   dry-run constants and why they are what they are, the verification record
   (simulated-class table, measured-vs-theory anchors, timing), safe bounds,

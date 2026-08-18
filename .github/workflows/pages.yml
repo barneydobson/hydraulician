@@ -2,13 +2,14 @@ name: Deploy to GitHub Pages
 
 # The app is static (no build step, no dependencies) and is copied through
 # verbatim — but the deploy runs Jekyll (_config.yml) so the markdown briefs
-# in exercises/ render as web pages rather than as raw text. Runs on every
-# push to main; also runnable by hand from the Actions tab. Nothing here
-# fails the build if Pages is off — while the repo is private on a free plan
-# the enable step simply cannot run, and the job is skipped rather than red.
+# in exercises/ render as web pages rather than as raw text. Runs on pushes
+# and merges to main.
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
   workflow_dispatch:
 
 permissions:
@@ -23,6 +24,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     environment:
       name: github-pages

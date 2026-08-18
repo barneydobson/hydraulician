@@ -1207,10 +1207,10 @@ const CONTROLS = [
     info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. The card prints the RULE for your own parameter (d is your student number's last digit — your lecturer explains it); working it out and setting it is yours, because the picker never moves a slider or drops a gauge. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
 
   { h: "Flow" },
-  { id: "speed", label: "Speed", min: 0.02, max: 3, step: 0.01, log: true,
+  { id: "speed", label: "Speed", min: 0.02, max: 10, step: 0.01, log: true,
     get: () => state.speed, set: (v) => state.speed = v,
     fmt: (v) => "×" + v.toFixed(2) + " real time",
-    info: "How much simulated time passes per second of wall clock. Water hammer wants slow motion; backwater curves want fast." },
+    info: "How much simulated time passes per second of wall clock. Water hammer wants slow motion; backwater curves want fast. The scale is logarithmic — ×1 sits near two-thirds of the travel and the top decade (×3 to ×10) is for skipping waits, machine permitting: the note under the slider prints asked against achieved, and a heavy scene simply tops out at what the frame budget allows." },
   { id: "inflowOn", place: "res", type: "check", label: "Upstream reservoir",
     get: () => sim.p.inflow.on > 0.5,
     set: (v) => {
@@ -1816,7 +1816,9 @@ function tickFrame(realDt) {
     const warmTo = Math.max(state.scene.spinup || 0, exWarm);
     const warming = sim.t < warmTo;
     let want = warming ? state.nsubMax : Math.round(state.speed * realDt / h);
-    want = Math.max(1, Math.min(state.nsubMax, want));
+    // nsubMax is fractional (the AIMD governor creeps it), so round at the
+    // point of use — a substep count is an integer, and the panel prints it.
+    want = Math.max(1, Math.round(Math.min(state.nsubMax, want)));
     simAdvanced = SIM.step(want);
     state.nsub = want;
     if (warming) {

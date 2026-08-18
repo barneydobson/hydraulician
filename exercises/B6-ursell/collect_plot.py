@@ -12,7 +12,8 @@ What this draws: crest/trough asymmetry against the Ursell number U_r =
 H*L^2/h^3, with the classical Stokes-validity marker at U_r=26. The pooled
 story is W26's whole point: asymmetry grows with U_r, i.e. the wave itself
 tells you when linear (Airy) theory has stopped being an adequate
-description -- see README S2 for the flat-trough/peaked-crest screenshot this
+description -- see _archive/README-full.md S2 for the flat-trough/peaked-crest
+screenshot this
 number is standing in for.
 """
 import argparse
@@ -34,7 +35,7 @@ GRID = "#dedcd4"
 
 UR_MARKER = 26.0
 # Points whose own amplitude sits at/below this station's ambient noise floor
-# (verified in README §5 by inspecting the raw signal directly) are excluded
+# (verified in _archive/README-full.md §5 by inspecting the raw signal) are excluded
 # from the trend fit but still plotted, circled, so the reader can see them.
 NOISE_FLOOR_STUDENTS = {"low1"}
 

@@ -149,7 +149,7 @@ Three guard rails, each bought with an explosion:
   Screen-anchored furniture (frame, scale bar, legend, label clamps) follows
   `view.vis` — the visible part of the domain — so it stays on screen zoomed in.
 - `js/main.js` — boot, panel spec, pointer tools (wall / erase / valve / spout /
-  gauge / rake), view transform, frame loop, `window.APP`. The view is the
+  gauge / rake / tracers / measure), view transform, frame loop, `window.APP`. The view is the
   whole-domain letterbox rect scaled about a pan centre: wheel zooms about the
   cursor, middle-drag pans, pinch works on touch, `0` resets; the GPU just
   draws the bigger rect and the screen clips it. Every scenario control is live
@@ -391,3 +391,13 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
 - Keep dependency-free and classic-script; no modules, no bundlers, no fetch.
+- The Pages deploy (`.github/workflows/pages.yml`) runs Jekyll over the repo
+  so the markdown briefs render as web pages — README.md serves as its
+  folder's index, links to `.md` are rewritten to the rendered page, and
+  underscore-prefixed folders (`exercises/_runner`, `_code-changes`) are not
+  published. The per-exercise `_archive/` folders (each brief's long
+  verification record) are not even committed — .gitignore keeps them local
+  to this machine. The APP is only copied verbatim because
+  `index.html` and `js/*` carry no YAML front matter; never add any. The
+  exercise card links to the folder URL on `*.github.io` and to the raw
+  `README.md` everywhere else.

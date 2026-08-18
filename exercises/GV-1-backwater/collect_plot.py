@@ -33,7 +33,7 @@ WEIR_X = 13.4     # weir centreline, m
 WEIR_H = 0.42     # crest height above the local bed
 WEIR_W = 0.70     # weir wall thickness -> upstream face at WEIR_X - WEIR_W/2
 
-# Measured "delivered" n (Appendix / README Sec 3): two independent
+# Measured "delivered" n (_archive/README-full.md §5 + Director report): two independent
 # ~15-sample median windows at the mid-reach station x = 7 m gave medians
 # 0.0335 and 0.0439 (pooled 18-sample median 0.0346); S_f in a near-flat
 # backwater is a small difference of a smoothed energy line (CLAUDE.md: "in

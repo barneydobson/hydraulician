@@ -23,9 +23,10 @@ import sys
 import argparse
 
 # ---- the paper pump curve (printed and handed out on the day) -------------
-# H_pump(Q) = H0 - a*Q^2.  Chosen (see README Sec.4) so the intersection with
-# the class's own measured system curve lands mid-range of the personalised
-# Q sweep.
+# H_pump(Q) = H0 - a*Q^2.  Chosen so the intersection with the class's own
+# measured system curve lands mid-range of the personalised Q sweep (quoted in
+# the README's Theory section; the derivation is in
+# _archive/README-full.md Sec. 5).
 PUMP_H0 = 1.539
 PUMP_A = 33.72
 
@@ -90,7 +91,8 @@ def main():
     print(f"fitted  H = {Hs:.4f} + {K:.3f} * Q^2      R2 = {r2:.4f}")
 
     # personalised-rule check (informational: Q delivered != nominal vx, so a
-    # mismatch is expected and not itself a red flag -- see README Sec.3)
+    # mismatch is expected and not itself a red flag -- see the README's
+    # "Your pump speed")
     bad_digit = [r for r in rows if r["digit"] not in (None, "")
                  and not (0 <= float(r["digit"]) <= 9)]
     if bad_digit:
@@ -103,7 +105,7 @@ def main():
         print(f"graphical operating point: Q = {Qop:.4f} m^2/s,  H = {Hop:.4f} m")
     else:
         print("WARNING: paper pump curve does not intersect the fitted system curve "
-              "in Q>0 -- reprint it (see README Sec.4).")
+              "in Q>0 -- reprint it (see the README's Theory section).")
 
     # ---- plot ----
     import matplotlib

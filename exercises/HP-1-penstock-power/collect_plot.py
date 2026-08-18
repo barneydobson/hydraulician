@@ -6,19 +6,20 @@ annotate h_f/H at every point.
 
 CSV columns (Blackboard export, one row per submission):
 
-    student_id,digit,gap_m,q,v
+    student_id,digit,gap_m,q,u
 
     gap_m  the student's nozzle gap, metres
     q      unit discharge in the penstock, m2/s   (hover readout, mid-pipe)
-    v      jet velocity, m/s                      (hover readout "u" in the
-                                                   jet core at x = 57 m)
+    u      jet velocity, m/s — named after the hover readout's own "u", the
+           HORIZONTAL component, read in the jet core at x = 57 m. (A column
+           headed "v", the old name, is still accepted.)
 
 Everything else is instructor arithmetic and lives here:
 
-    h_f = H - v^2/2g          H = 21.35 m, the MEASURED static head from the
+    h_f = H - u^2/2g          H = 21.35 m, the MEASURED static head from the
                               reservoir surface to the pipe axis (the delivered
                               level, ~0.15 m below the 25.0 m slider)
-    P   = 0.5 * rho * q * v^2 [W per metre of pipe width]  ==  rho*g*q*(H - h_f)
+    P   = 0.5 * rho * q * u^2 [W per metre of pipe width]  ==  rho*g*q*(H - h_f)
 
 The fit is h_f = k q^2 through the origin (least squares), which turns the
 measured points into the textbook curve P = rho*g*q*(H - k q^2).  Its maximum
@@ -40,10 +41,13 @@ def read(path):
     with open(path, newline="") as fh:
         for r in csv.DictReader(fh):
             try:
+                spd = r.get("u")
+                if spd in (None, ""):
+                    spd = r["v"]                  # the column's old name
                 rows.append(dict(sid=r.get("student_id", "?"),
                                  gap=float(r["gap_m"]),
                                  q=float(r["q"]),
-                                 v=float(r["v"])))
+                                 u=float(spd)))
             except (TypeError, ValueError, KeyError):
                 continue
     return rows
@@ -62,10 +66,10 @@ def main():
     H = a.head
 
     q = np.array([r["q"] for r in rows])
-    v = np.array([r["v"] for r in rows])
+    u = np.array([r["u"] for r in rows])
     gap = np.array([r["gap"] for r in rows])
-    hf = H - v * v / (2 * G)
-    P = 0.5 * RHO * q * v * v / 1e6            # MW per metre of width
+    hf = H - u * u / (2 * G)
+    P = 0.5 * RHO * q * u * u / 1e6            # MW per metre of width
 
     # h_f = k q^2 through the origin
     k = float((q ** 2 * hf).sum() / (q ** 4).sum())
@@ -84,10 +88,10 @@ def main():
     print("  measured peak: gap %.2f m, q = %.2f, P = %.3f MW/m, h_f/H = %.3f"
           % (gap[ipk], q[ipk], P[ipk], hf[ipk] / H))
     print()
-    print("  gap    q      v      h_f     h_f/H    P MW/m")
+    print("  gap    q      u      h_f     h_f/H    P MW/m")
     for i in order:
         print("  %4.2f  %5.2f  %5.2f  %6.2f   %5.3f   %6.3f"
-              % (gap[i], q[i], v[i], hf[i], hf[i] / H, P[i]))
+              % (gap[i], q[i], u[i], hf[i], hf[i] / H, P[i]))
 
     # ---------------------------------------------------------------- plot
     fig, (ax, bx) = plt.subplots(2, 1, figsize=(8.4, 8.6), sharex=True,
@@ -124,7 +128,7 @@ def main():
         ax.annotate("%.2f" % (hf[i] / H), (q[i], P[i]),
                     textcoords="offset points", xytext=(0, 9), ha="center",
                     fontsize=8, color="#5a2a12")
-    ax.set_ylabel("jet power  P = ½ρq v²   [MW per m of width]")
+    ax.set_ylabel("jet power  P = ½ρq u²   [MW per m of width]")
     ax.set_title("HP-1 · Maximum power transmission — pooled class data\n"
                  "labels are $h_f/H$; the maximum sits where a third of the head "
                  "has gone to friction", fontsize=11)

@@ -8,9 +8,9 @@ same DA-1 weir rig at the same personalised (lambda, q):
                     submission, reused verbatim (source=DA1-original).
     dx-points       the SAME student's own (lambda, q), rebuilt once at ONE
                     extra assigned resolution (Low or High -- never Medium
-                    again, never Very high/Ultra, see README robustness
-                    section) -- H changes because the GRID changes, not the
-                    model (source=DA3-rerun).
+                    again, never Very high/Ultra, see the robustness section
+                    of _archive/README-full.md) -- H changes because the GRID
+                    changes, not the model (source=DA3-rerun).
 
     python3 collect_plot.py data/simulated-class.csv -o plots/pooled-demo.png
 
@@ -123,15 +123,15 @@ def main():
     # ---- second, stricter overlay test: DA-1's OWN H/P collapse ------------
     # The direct Hcells fit above is weak (R2 ~0.02): H_cells also carries
     # each digit's own H/P target, which swamps any pure resolution signal.
-    # DA-1's README (S2.3, S5.2) fits C_d = 0.4190 (H/P)^0.313 across their
+    # DA-1's _archive/README-full.md (S2.3, S5.2) fits C_d = 0.4190 (H/P)^0.313 across their
     # OWN 10 lambda-mechanism points, RMS 2.16%, P = 0.695652*lambda (design
     # constant, independent of the live grid -- DA-1 rig.js's own geom()).
     # Re-using their exact fit as the yardstick and asking the SAME question
     # -- does the dx-mechanism group sit on that curve too? -- is the
     # apples-to-apples version of the overlay test.
-    A1, B1, P_PER_LAM = 0.4190, 0.313, 0.6956521739130435  # DA-1 README S2.3/S5.2; P = 32 cells * (9/414) * lambda
+    A1, B1, P_PER_LAM = 0.4190, 0.313, 0.6956521739130435  # DA-1 _archive/README-full.md S2.3/S5.2; P = 32 cells * (9/414) * lambda
     print("  STRICTER OVERLAY TEST (residual about DA-1's own H/P collapse, "
-          "C_d = 0.419 (H/P)^0.313, README S2.3/S5.2):")
+          "C_d = 0.419 (H/P)^0.313, DA-1 archived record S2.3/S5.2):")
     for r in rows:
         r["HP"] = r["H"] / (P_PER_LAM * r["lam"])
         r["residDA1"] = 100 * (r["Cd"] / (A1 * r["HP"] ** B1) - 1)

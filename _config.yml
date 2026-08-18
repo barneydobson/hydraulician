@@ -1,0 +1,18 @@
+# GitHub Pages (see .github/workflows/pages.yml) runs Jekyll over the repo so
+# every markdown brief renders as a themed web page — an exercise README is
+# readable at its folder's URL, e.g. /exercises/HP-1-penstock-power/.
+#
+# The app is untouched by this: index.html and js/ carry no front matter, so
+# Jekyll copies them through verbatim — keep them that way. Directories that
+# start with an underscore (exercises/_runner, exercises/_code-changes) are
+# repo-only and never published; the per-exercise _archive folders are not
+# even committed (.gitignore).
+#
+# The Pages build enables jekyll-readme-index (README.md serves as a folder's
+# index), jekyll-relative-links (links to .md are rewritten to the rendered
+# page) and jekyll-optional-front-matter by default — nothing to list here.
+title: hydraulician
+description: Interactive 2D hydraulics in the vertical plane
+theme: jekyll-theme-primer
+exclude:
+  - CLAUDE.md

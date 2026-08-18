@@ -25,7 +25,7 @@ G = 9.81
 DX = 9.0 / 414.0          # Medium cell, the design grid
 N_P = 32                  # crest height in cells at lambda = 1
 
-# WE-1's measured floor, re-measured on this rig (README section 5):
+# WE-1's measured floor, re-measured on this rig (_archive/README-full.md, S5):
 # below ~7 cells of head the mass imbalance across the weir jumps.
 CELL_FLOOR = 7.0
 IMBALANCE_FLOOR = 8.0     # per cent

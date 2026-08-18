@@ -11,7 +11,7 @@
  * plus a gauge inside the shaft at (53.0, 6.0) read on the DEPTH field.
  *
  * Class constants: Resolution Medium, Reservoir level 12.0 m, celerity 70,
- * wave damping 0.03 (scene default). See README.md §1.
+ * wave damping 0.03 (scene default). See _archive/README-full.md §1.
  */
 (function () {
   var G = (typeof window !== "undefined") ? window : this;

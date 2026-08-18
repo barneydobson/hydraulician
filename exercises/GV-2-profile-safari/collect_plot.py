@@ -15,9 +15,10 @@ The score is RE-DERIVED here from the claimed class list against the score
 card's own point table, rather than trusted from the CSV — so one bad sum
 cannot silently reach the plot, and a mismatch is printed as a spot-check
 flag (the score card is explicitly designed to be spot-checkable this way;
-see README "Anti-copying").
+see the score card in README.md).
 
-POINTS (measured difficulty, this safari — see README §5/§Appendix):
+POINTS (measured difficulty, this safari — see _archive/README-full.md §5
+and its Director report):
     M1 M2 H2            1   (first-try in the sandbox, zero retunes)
     M3 S1 S2 S3 H3      2   (needed one retune, or the RIG-B truncation
                               trick to dodge the canonical ponding trap)

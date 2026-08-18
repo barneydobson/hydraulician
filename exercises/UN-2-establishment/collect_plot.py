@@ -8,7 +8,8 @@ Expected CSV columns (header row required, extra columns ignored):
     student_id, digit, level_m, H_m, l_m, umax_ms, t90_s[, k]
 
 H_m is the measured reservoir head above the pipe axis (NOT the raw slider
-value - gauge the actual surface, see README P3 note). l_m is the penstock
+value - gauge the actual surface, see the P3 note in the archived record,
+_archive/README-full.md section 2). l_m is the penstock
 length (entrance to valve); every row should show the same scene geometry,
 49.0 m for the hammer scene at its shipped geometry.
 

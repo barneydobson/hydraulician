@@ -12,8 +12,8 @@ Each student commits a PREDICTION before raising the hump:
 ...then raises the hump until it chokes and reports the height that did it,
 dzc. The plot is dzc vs dzpred with the 1:1 line theory predicts, plus
 cell-quantisation error bars (+/- one Delta-x = 21.7 mm at Medium, or +/- 2
-cells if dzc_cells is not supplied — see README Appendix, "bracket
-resolution" note).
+cells if dzc_cells is not supplied — see _archive/README-full.md, Appendix,
+"bracket resolution" note).
 
 Input columns (extras ignored, order irrelevant):
     q         unit discharge, m2/s per m width                    [required]
@@ -28,7 +28,8 @@ Input columns (extras ignored, order irrelevant):
                   probe finding: the pool rises as the hump is raised, so this is a
                   materially different number from the committed E1 above)  [optional]
     dzpred_star   e1_prechoke - 1.5*yc -- the RE-TIMED prediction              [optional,
-                  derived from e1_prechoke if absent; adopted protocol -- see README S3/S5]
+                  derived from e1_prechoke if absent; adopted protocol -- see
+                  _archive/README-full.md S3/S5]
     digit, student, source                                         carried through, not needed
 
   * V1 is taken as q/y1 (depth-averaged), matching the worksheet's protocol.
@@ -127,7 +128,8 @@ def main():
     ratio = [dzc[i] / dzpred[i] for i in range(len(pts))]
     # error bar: +/- 1 cell where the bracket resolution is known, else +/- 2
     # cells (this pass tested ONE height per digit, chosen from a fitted
-    # bias model rather than a tight bisection -- see README S5/Appendix).
+    # bias model rather than a tight bisection -- see _archive/README-full.md
+    # S5/Appendix).
     ebar = [(1 if p["cells"] else 2) * a.dx for p in pts]
 
     k_fit = fit_through_origin(dzpred, dzc)
@@ -147,7 +149,8 @@ def main():
     print("  cell size (Medium)    %.4f m -> quantisation error bar +/-1 cell = %.4f m" % (a.dx, a.dx))
 
     # ---------------------------------------------------- re-timed prediction
-    # ADOPTED protocol (FB1B refinement probe, see README S3/S5/Appendix): E1
+    # ADOPTED protocol (FB1B refinement probe, see _archive/README-full.md
+    # S3/S5/Appendix): E1
     # re-measured at the LAST hump step before it chokes, not committed once
     # before the hump is touched. No rig change -- same sharp hump, same dzc.
     have_star = all(p["dzpred_star"] for p in pts)

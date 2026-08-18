@@ -14,7 +14,8 @@ Each student reads THREE depths at their own personalised q, on one rig
 Pooled and normalised by each digit's OWN y_c, the three readings should sit
 as three roughly horizontal bands across the class: y_c/y_c = 1 (trivial),
 y_crest/y_c near-but-above 1 (the crest is a real, friction-affected 2D flow,
-not the idealised loss-free plateau -- see README S5), and y_brink/y_c
+not the idealised loss-free plateau -- see _archive/README-full.md S5), and
+y_brink/y_c
 notably below 1 (curvature at the lip breaks the hydrostatic assumption; the
 classical free-overfall figure is ~0.715).
 

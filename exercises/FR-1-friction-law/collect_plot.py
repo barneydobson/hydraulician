@@ -16,7 +16,7 @@ bore.  The fit is ordinary least squares on log10 h_f against log10 V:
 
 Two lambdas are printed: the free fit's lambda at the class-mean V, and the
 lambda you get if you FORCE the textbook m = 2.  They differ, and that gap is
-the discussion (see README section 4).
+the discussion (see the README's discussion points).
 
 matplotlib only — no numpy, no pandas.
 """
@@ -30,7 +30,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 G = 9.81
-L_GAUGE = 4.5       # m, gauge separation on the bore (see README §2)
+L_GAUGE = 4.5       # m, gauge separation on the bore (_archive/README-full.md §2)
 D_BORE = 0.3913     # m, 18 cells at Medium — the rasterised 0.40 m bore
 LEVEL_BASE, LEVEL_STEP = 3.30, 0.13
 

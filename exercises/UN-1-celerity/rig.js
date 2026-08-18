@@ -2,7 +2,8 @@
  *
  *   ?scene=hammer, Resolution: Medium (436 x 218, dx = 0.1376 m).
  *
- * Students do all of this with the mouse (README §3). This file is the
+ * Students do all of this with the mouse (README.md, and the long-form
+ * worksheet in _archive/README-full.md §3). This file is the
  * lecturer's spot-check: it redraws the nozzle, drops the gauges, slams the
  * valve and prints exactly the two numbers the student submits.
  *

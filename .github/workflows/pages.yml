@@ -1,10 +1,11 @@
 name: Deploy to GitHub Pages
 
-# The app is static (no build step, no dependencies), so "deploy" is just
-# uploading the repo as-is. Runs on every push to main; also runnable by hand
-# from the Actions tab. Nothing here fails the build if Pages is off — while
-# the repo is private on a free plan the enable step simply cannot run, and
-# the job is skipped rather than red.
+# The app is static (no build step, no dependencies) and is copied through
+# verbatim — but the deploy runs Jekyll (_config.yml) so the markdown briefs
+# in exercises/ render as web pages rather than as raw text. Runs on every
+# push to main; also runnable by hand from the Actions tab. Nothing here
+# fails the build if Pages is off — while the repo is private on a free plan
+# the enable step simply cannot run, and the job is skipped rather than red.
 on:
   push:
     branches: [main]
@@ -33,8 +34,16 @@ jobs:
         # it is available, so going public is the only manual step.
         with:
           enablement: true
+      # Renders every .md into a themed page (jekyll-theme-primer, see
+      # _config.yml) and copies everything else — the app included — verbatim.
+      # README.md serves as its folder's index, so an exercise brief lives at
+      # .../exercises/<folder>/.
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: .
+          destination: ./_site
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: ./_site
       - id: deployment
         uses: actions/deploy-pages@v4

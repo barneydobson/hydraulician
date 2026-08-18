@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 # (h0 = 1.6286 m above bed); tailrace x in [2.64, 10] filled to 0.40 m
 # (h1 = 0.1674 m above bed, WET bed — not the dry-front case). Dam/valve
 # centreline x=2.60, thickness 0.08 -> effective release interface at the
-# valve's upstream face, x_dam = 2.56 (see README Sec 5).
+# valve's upstream face, x_dam = 2.56 (see _archive/README-full.md Sec 5).
 G = 9.81
 X_DAM = 2.56
 H0 = 1.62861          # reservoir depth above bed (measured via SIM.columns)
@@ -44,7 +44,7 @@ C0 = math.sqrt(G * H0)          # negative-wave prediction, sqrt(g h0)
 
 def surge_speed(y1, y2):
     """Moving surge (bore) into still water of depth y1, downstream depth
-    y2: c = sqrt(g y2 (y1+y2) / (2 y1))  (see README Sec 2b for the
+    y2: c = sqrt(g y2 (y1+y2) / (2 y1))  (see _archive/README-full.md Sec 2b for the
     assumptions -- y1 still ahead of the bore, y2 the settled plateau
     behind it, both read from settled windows)."""
     return math.sqrt(G * y2 * (y1 + y2) / (2.0 * y1))
@@ -109,7 +109,7 @@ def main():
                 va="top")
 
     # negative wave: shared fixed station, one reference measurement (+ the
-    # class's read-to-read scatter, see README Sec 5) vs a sqrt(g h0) line
+    # class's read-to-read scatter, see _archive/README-full.md Sec 5) vs a sqrt(g h0) line
     # drawn over the reservoir span it was measured in.
     xs_res = [0.0, X_DAM]
     ax.plot(xs_res, [C0, C0], "--", color="#3b6ea5", lw=2,

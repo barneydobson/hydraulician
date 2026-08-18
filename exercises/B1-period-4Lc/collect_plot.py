@@ -9,13 +9,14 @@ CSV columns (the Blackboard export, one row per submission):
 
 Students submit `xd_m` (their own valve station) and `T_s` (the median
 period they read off the gauge trace, >=3 cycles); `L_m` is DERIVED here
-as xd_m - 6.0 (the pipe entrance, README S2's convention) if the column
+as xd_m - 6.0 (the pipe entrance, the station rule's own convention) if the column
 is absent, so a student does not have to do the subtraction by hand --
 but if a lecturer's own export already carries L_m, that value is used
 as-is. The fit is T = a*L + b, WITH an intercept -- unlike UN-1's
 Joukowsky fit, there is no a-priori reason the reflection plane sits
 exactly at the nominal entrance station, and the intercept is exactly the
-number that says how far off it is (README S1/S5). Compare the fitted
+number that says how far off it is (_archive/README-full.md S1/S5).
+Compare the fitted
 slope `a` against theory 4/c and read the intercept as a distance via
 b / a (metres): a positive offset means the effective acoustic length is
 LONGER than x_d - 6.0, i.e. the reservoir behaves as if its reflecting
@@ -137,7 +138,7 @@ def main(argv):
     print("         slope -> c = 4/slope = %.1f m/s  (slider: %g, %+.1f%%)"
           % (c_meas, C_SLIDER, 100 * (c_meas - C_SLIDER) / C_SLIDER))
     print("         R2 = %.4f" % r2)
-    print("         intercept b = %.4f s  ->  %.2f m  (b/a; the datum offset -- see README S1/S5)"
+    print("         intercept b = %.4f s  ->  %.2f m  (b/a; the datum offset -- see _archive/README-full.md)"
           % (b, offset_m))
     print("wrote", out)
     return 0

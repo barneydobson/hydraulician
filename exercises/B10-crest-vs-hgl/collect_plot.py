@@ -10,7 +10,8 @@ case-insensitively, extra columns ignored):
 
   digit      last digit of the student number, 0-9
   level      reservoir level they were told to set,
-             3.30 + 0.13*(digit mod 6)  (m)   -- see README 6.6 for the mod 6
+             3.30 + 0.13*(digit mod 6)  (m)   -- the mod 6 is measured, see
+             _archive/README-full.md Sec. 6.6
   z_sep      the crest SOFFIT elevation at which the pipe gave up      (m)
   hgl_crest  their HGL interpolated to the crest x from the two axis
              gauges at the LAST INTACT step                            (m)

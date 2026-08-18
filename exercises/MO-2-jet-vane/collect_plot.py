@@ -85,7 +85,7 @@ def main():
     fig.text(0.5, 0.03,
              "Known bias: reads HIGH, not scattered around 1 — the jet keeps accelerating under gravity\n"
              "over its last ~0.3 m of flight, and the solver's compressible EOS adds a small M²-ish term\n"
-             "at v/c ≈ 0.2 near the wall. Both push the same way. See README §2 for the measurement recipe.",
+             "at v/c ≈ 0.2 near the wall. Both push the same way. See the exercise README for the recipe.",
              ha="center", va="bottom", fontsize=8.5, color="#444444")
     fig.savefig(args.out)
     print(f"wrote {args.out}")

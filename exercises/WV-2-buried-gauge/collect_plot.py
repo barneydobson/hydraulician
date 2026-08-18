@@ -15,9 +15,10 @@ Expected CSV columns (extra columns ignored):
 `flume` must be "wave" or "wavedeep" (h defaults to 0.3528 / 0.7385 m if not
 given). If `kh` is missing it is solved from T_s and h via the full
 dispersion relation. Rows whose `note` contains "NOISE" are plotted as a
-separate, clearly-marked series (see README: the wavedeep bed gauge, read as
-a raw point probe, is dominated by paddle-generated turbulence rather than
-the (tiny) true attenuated signal at every period tried).
+separate, clearly-marked series (see _archive/README-full.md: the wavedeep
+bed gauge, read as a raw point probe, is dominated by paddle-generated
+turbulence rather than the (tiny) true attenuated signal at every period
+tried).
 """
 import csv
 import math

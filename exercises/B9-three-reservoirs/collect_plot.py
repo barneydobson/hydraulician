@@ -18,12 +18,12 @@ flips from supplier to customer. Each student also submits their own
 DIRECTLY-GAUGED junction head reading (Hjunction_early_m); the cluster of
 those readings is a second, independent check on where the crossing "should"
 be, and — this is the demo's honest twist, not a bug — the two do NOT
-coincide exactly. See the README for why: reading Q_B a few seconds after
-opening the valve (needed so every student's run fits a lecture slot) catches
-a real opening transient, so the pooled crossing sits above the slow,
-fully-settled junction head (measured separately, ~1.68-1.70 m here). The gap
-between "crossing you can measure in a few seconds" and "the number the
-system settles to if you wait" is itself the teaching point.
+coincide exactly. See `_archive/README-full.md` for why: reading Q_B a few
+seconds after opening the valve (needed so every student's run fits a lecture
+slot) catches a real opening transient, so the pooled crossing sits above the
+slow, fully-settled junction head (measured separately, ~1.68-1.70 m here).
+The gap between "crossing you can measure in a few seconds" and "the number
+the system settles to if you wait" is itself the teaching point.
 """
 import argparse
 import csv
@@ -35,9 +35,9 @@ import matplotlib.pyplot as plt
 
 # The settled (t ~ 15-40 s) junction head, measured directly with A, C at
 # their class-wide fixed levels (3.20 m / 0.60 m nominal) and independent of
-# which student's z_B(0) it was measured alongside (see README verification
-# table) -- it converges to the same value regardless, because Q_B -> 0 once
-# each run's own B has drained/filled to match it.
+# which student's z_B(0) it was measured alongside (see the verification table
+# in _archive/README-full.md) -- it converges to the same value regardless,
+# because Q_B -> 0 once each run's own B has drained/filled to match it.
 H_JUNCTION_SETTLED = 1.681
 
 

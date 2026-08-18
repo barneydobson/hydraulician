@@ -14,7 +14,8 @@
 window.UN2 = {
   BULK: 0.30,          // dry-run constant: tames the closed-pipe "ring" that
                         // an instant reservoir-level change otherwise excites
-                        // (see README Appendix - Director report, Iterations).
+                        // (see _archive/README-full.md, Appendix - Director
+                        // report, Iterations).
   L: 49.0,              // penstock length: entrance (x=6) to valve (x=55)
   C: (id) => CONTROLS.find(c => c.id === id),
 

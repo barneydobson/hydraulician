@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """collect_plot_m1.py -- NC-1 "Slope-area method: estimate the mystery discharge"
-(ORIGINAL m1 rig, preserved for the teaching contrast -- see README Appendix A
-"Why not m1". The live demo now runs on m3; see collect_plot.py.)
+(ORIGINAL m1 rig, preserved for the teaching contrast -- see
+_archive/README-full.md, "Appendix A -- Why not m1". The live demo now runs
+on m3; see collect_plot.py.)
 
 Pools a class CSV of two-gauge + cursor slope-area readings on the m1 scene
 (the same M1 backwater weir pool GV-1 digitises) and plots the class's

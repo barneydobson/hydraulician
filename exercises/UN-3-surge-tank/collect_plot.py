@@ -11,7 +11,8 @@ Required CSV columns (header row; extra columns ignored):
 Optional, and used if present:
 
     rest_level_m   standpipe rest level, m above the domain floor.  Enables the
-                   shaft-inertia correction (the open markers) — see README §4.
+                   shaft-inertia correction (the open markers) — see the
+                   pooling section of README.md.
     l_m,bp_m       penstock length and bore.  Default to the class constants
                    L = 47.0 m and b_p = 2.890 m.
 

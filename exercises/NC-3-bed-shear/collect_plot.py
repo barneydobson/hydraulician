@@ -193,7 +193,7 @@ def main():
                   % (r["_scene"], r["_q"], r["_tau0"], r["_dmin"]))
         print("pooled span (m2 anchor -> s2 max): Dmin %.1f -> %.1f mm  (x%.1f)"
               % (min(r["_dmin"] for r in others), max(dm), max(dm) / min(r["_dmin"] for r in others)))
-    print("s2-only span: x%.2f (all within the 'boulders' band, see README §4 discussion)"
+    print("s2-only span: x%.2f (all within the 'boulders' band, see the README discussion)"
           % (max(dm) / min(dm)))
 
 

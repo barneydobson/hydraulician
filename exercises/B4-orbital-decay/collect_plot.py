@@ -11,9 +11,11 @@ optional fields still plots.
 What this draws: the vertical (surface/bed) orbital-amplitude decay ratio
 against kh, alongside the linear-theory curve sinh(k(z+h))/sinh(k(z+h)) built
 from THIS scene's own tracer elevations (bed ~1.5 cells off the floor, surface
-~2 cells below the still surface -- see README S1/S5). Theory keeps climbing
+~2 cells below the still surface -- see _archive/README-full.md S1/S5). Theory
+keeps climbing
 exponentially with kh; measured points plateau once the true bed signal drops
-below the station's ambient noise floor -- see README S5 for why, and why that
+below the station's ambient noise floor -- see _archive/README-full.md S5 for
+why, and why that
 gap is itself the point of the demo, not a defect in it.
 """
 import argparse

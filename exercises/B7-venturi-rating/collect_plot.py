@@ -14,7 +14,8 @@ run; `dHead` is the barrel-minus-throat piezometric head difference in
 metres, read either from two Gauge-tool traces at the SAME elevation (so the
 stored z + p/rho.g values already agree) or from the plain hover/probe
 pressure-only reading at that same elevation (z cancels either way — see the
-README's head-convention note).
+README's Theory section, and _archive/README-full.md Sec. 1 for the measured
+proof that the two conventions agree to four decimals).
 
 The venturi meter equation, with a1/a2 the barrel/throat bore heights
 (m^2 per m width, i.e. the per-metre-width "areas" of this 2D-vertical

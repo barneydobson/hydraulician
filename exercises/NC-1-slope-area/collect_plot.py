@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """collect_plot.py -- NC-1 "Slope-area method: estimate the mystery discharge"
-(NC-1b rescue: ?scene=m3, replacing the m1 rig -- see README "Why not m1")
+(NC-1b rescue: ?scene=m3, replacing the m1 rig -- see _archive/README-full.md,
+"Appendix A -- Why not m1")
 
 Pools a class CSV of two-gauge + cursor slope-area readings taken on the m3
 scene (chute -> hydraulic jump -> M2 apron) and plots the class's estimated
@@ -34,12 +35,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 G = 9.81
-READABLE_MM = 10.0   # the go/no-go floor used to clear m3 (see README Sec. "Verify first")
+READABLE_MM = 10.0   # the go/no-go floor used to clear m3 (_archive/README-full.md Sec. 5.1)
 M1_BEST_F_MM = 3.24  # m1's best fall EVER measured, any window length, anywhere in its domain
-                      # (README Appendix A.5.1's length sweep) -- the most generous possible
-                      # comparison point for "how much bigger is F on m3"
+                      # (_archive/README-full.md Sec. A.5.1's length sweep) -- the most
+                      # generous possible comparison point for "how much bigger is F on m3"
 
-# Windows measured-and-rejected during calibration (README "Robustness"),
+# Windows measured-and-rejected during calibration (_archive/README-full.md's safe bounds),
 # NOT part of the class/pooled statistics -- drawn only as a faded reference
 # showing why the digit rule starts at x0=5.0, not further upstream.
 TRIMMED = [

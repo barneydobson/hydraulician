@@ -25,6 +25,7 @@ const state = {
   tool: "wall", brush: 0.055,
   mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
   ruler: true,                // metre ticks on the view edges — a workspace preference
+  measure: null, measDrag: null,   // the tape measure: {x0,y0,x1,y1} in metres
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   gauges: [], rakes: [], gaugeField: "head", tracers: null, tracerN: 9,
@@ -120,6 +121,7 @@ function loadScene(id, keepDrawing) {
   // the particles switched off and a tip asking you to find the key.
   if (sc.particles !== undefined) state.particles = !!sc.particles;
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
+  state.measure = null; state.measDrag = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -1377,6 +1379,20 @@ const CONTROLS = [
   { id: "ruler", type: "check", label: "Ruler",
     get: () => state.ruler, set: (v) => state.ruler = v,
     info: "Metre ticks along the bottom and left edges of the view, with faint grid lines at the major ticks. They follow the zoom, so drawn geometry can be placed at a stated station — \"the plate goes at x = 8.0 m\" — without counting scale bars. M toggles it." },
+  { id: "measure", type: "buttons", label: "Measure",
+    // The same tool as the bar's Measure button (and the 8 key); this row is
+    // where the last measurement stays readable as text.
+    sync: (el) => {
+      el.textContent = "";
+      const b = document.createElement("button");
+      b.textContent = state.tool === "measure" ? "✓ measuring — left-drag" : "✐ Measure with left-drag";
+      b.title = "Pick the Measure tool: left-drag between two points (Shift snaps), click to clear";
+      b.onclick = () => { b.blur(); state.tool = "measure"; window.syncTools(); syncPanel(); };
+      el.appendChild(b);
+    },
+    fmt: () => state.measure ? OVERLAY.measureText(state.measure)
+                             : "then left-drag between two points on the water",
+    info: "A tape measure: left-drag between two points for the straight-line length, the horizontal and vertical legs, and the slope written as 1 : n. Shift snaps to horizontal / vertical / 45°; a click without a drag clears it. The 8 key picks the tool from the keyboard, and the numbers stay printed here." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth y_c, normal depth y_n and the energy grade line, computed per column from the live depth and unit discharge." },
@@ -1594,6 +1610,7 @@ const TOOLS = [
   ["gauge", "Gauge", "Click to log head / depth"],
   ["rake", "Rake", "Click for a velocity–depth profile"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
+  ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
 ];
 
 function snap(x0, y0, x1, y1) {
@@ -1623,7 +1640,7 @@ function onDown(e) {
   const [x, y] = pointerPos(e);
   state.cursor = [x, y];
   if (pointers.size === 2) {         // second finger: abandon tools, pinch
-    state.drag = null; state.spoutDrag = false;
+    state.drag = null; state.spoutDrag = false; state.measDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
     const ps = [...pointers.values()];
     state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
@@ -1676,6 +1693,12 @@ function onDown(e) {
     syncPanel();
     return;
   }
+  if (state.tool === "measure") {
+    // A tape, not a wall: the drag never reaches SIM.addSeg. A bare click
+    // (see onUp) clears the tape instead of leaving a zero-length one.
+    state.measDrag = { x0: x, y0: y, x1: x, y1: y };
+    return;
+  }
   state.drag = { x0: x, y0: y, x1: x, y1: y };
 }
 
@@ -1724,6 +1747,12 @@ function onMove(e) {
     state.pour.r = state.brush * 4;
     return;
   }
+  if (state.measDrag) {
+    const d = state.measDrag;
+    if (e.shiftKey) { const s = snap(d.x0, d.y0, x, y); d.x1 = s[0]; d.y1 = s[1]; }
+    else { d.x1 = x; d.y1 = y; }
+    return;
+  }
   if (state.drag) {
     if (e.shiftKey) { const s = snap(state.drag.x0, state.drag.y0, x, y); state.drag.x1 = s[0]; state.drag.y1 = s[1]; }
     else { state.drag.x1 = x; state.drag.y1 = y; }
@@ -1737,6 +1766,14 @@ function onUp(e) {
   state.spoutDrag = false;
   if (state.vexDrag) { state.vexDrag = null; syncPanel(); return; }
   if (state.pour) { state.pour = null; sim.p.pour = null; }
+  if (state.measDrag) {
+    const d = state.measDrag;
+    // Shorter than a cell is a click: clear the tape rather than keep a dot.
+    state.measure = Math.hypot(d.x1 - d.x0, d.y1 - d.y0) < sim.dx ? null : d;
+    state.measDrag = null;
+    syncPanel();                      // the panel's Measure row prints the numbers
+    return;
+  }
   if (state.drag) {
     const d = state.drag;
     const kind = state.tool === "erase" ? 0 : state.tool === "valve" ? 128 : 255;
@@ -2005,6 +2042,8 @@ function drawOverlay(A) {
   }
   state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
   if (state.tracers) OVERLAY.drawTracers(ctx, view, state.tracers);
+  const meas = state.measDrag || state.measure;
+  if (meas) OVERLAY.drawMeasure(ctx, view, meas);
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();

@@ -149,7 +149,7 @@ Three guard rails, each bought with an explosion:
   Screen-anchored furniture (frame, scale bar, legend, label clamps) follows
   `view.vis` — the visible part of the domain — so it stays on screen zoomed in.
 - `js/main.js` — boot, panel spec, pointer tools (wall / erase / valve / spout /
-  gauge / rake), view transform, frame loop, `window.APP`. The view is the
+  gauge / rake / tracers / measure), view transform, frame loop, `window.APP`. The view is the
   whole-domain letterbox rect scaled about a pan centre: wheel zooms about the
   cursor, middle-drag pans, pinch works on touch, `0` resets; the GPU just
   draws the bigger rect and the screen clips it. Every scenario control is live

@@ -701,6 +701,42 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** One measurement as text: length, the two legs, and the slope the way a
+   *  drainage engineer says it (1 : n). Shared by the on-canvas chip and the
+   *  panel row so the two can never disagree. */
+  function measureText(m) {
+    const dx = m.x1 - m.x0, dy = m.y1 - m.y0, L = Math.hypot(dx, dy);
+    let s = L.toFixed(L < 0.1 ? 3 : 2) + " m · Δx " + Math.abs(dx).toFixed(2) +
+            " · Δy " + Math.abs(dy).toFixed(2);
+    if (Math.abs(dx) > 1e-3 && Math.abs(dy) > 1e-3) {
+      const n = Math.abs(dx / dy);
+      s += " · 1 : " + (n < 10 ? n.toFixed(2) : n.toFixed(0));
+    }
+    return s;
+  }
+
+  /** The tape measure: a line between the two dragged points, dotted Δx / Δy
+   *  legs, and the numbers on a chip. Coordinates are in metres, so the tape
+   *  survives zooming and a resolution rebuild. */
+  function drawMeasure(ctx, V, m) {
+    const ax = V.X(m.x0), ay = V.Y(m.y0), bx = V.X(m.x1), by = V.Y(m.y1);
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(127,212,255,0.45)";
+    ctx.setLineDash([2, 4]);
+    ctx.beginPath();                              // the right-angle legs
+    ctx.moveTo(ax, ay); ctx.lineTo(bx, ay); ctx.lineTo(bx, by);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.fillStyle = "#7fd4ff";
+    ctx.beginPath(); ctx.arc(ax, ay, 2.5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(bx, by, 2.5, 0, 7); ctx.fill();
+    chip(ctx, (ax + bx) / 2 + 8, Math.min(ay, by) - 12, measureText(m), "#7fd4ff");
+    ctx.restore();
+  }
+
   /** Edge rulers in metres: ticks along the bottom (x stations) and left
    *  (elevations above the datum) of the VISIBLE domain, with faint grid
    *  lines at the major ticks. They follow zoom and pan, so a drawn plate
@@ -767,5 +803,5 @@ const OVERLAY = (() => {
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
-           chip, fmt };
+           drawMeasure, measureText, chip, fmt };
 })();

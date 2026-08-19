@@ -288,10 +288,10 @@ const EXERCISES = [
                               1.326, 1.362, 1.389, 1.412, 1.434] }] },
     instruments: [
       { tool: "gauge", where: "x = 4.5 m, y ≈ 0.75 m", why: "the approach pool — H = h − 0.50" },
-      { tool: "cv", where: "Force box (9), optional: drag (2.00, 0.26) → (6.70, 1.60) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
+      { tool: "cv", where: "Force box (9), optional: drag about (2.0, 0.3) → (6.7, 1.6) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
     ],
     start: "an approach pool behind a sharp-crested weir",
-    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Force box round the plate reads F→ ≈ 2920 N/m at q = 0.35, about 3% above ρgP(h − P/2).",
+    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Force box round the plate reads F→ a few percent above ρgP(h − P/2).",
     settle: 60,
   },
 
@@ -343,7 +343,7 @@ const EXERCISES = [
       { tool: "gauge", where: "on the stagnation point, ~0.03 m off the plate face (README uses 1.32, 2.46)", why: "the stagnation head — the ratio is the answer" },
     ],
     start: "a horizontal jet from a spout striking a flat plate",
-    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Force box: 4.3 / 1.3 / 3.8 kN/m, then 5.2 for the V, which under-delivers because it floods.",
+    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Force box for each. The deep-V under-delivers because it floods.",
     settle: 5,
   },
 
@@ -505,7 +505,7 @@ const EXERCISES = [
       { tool: "gauge", where: "optionally in the free jet and on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
     ],
     start: "the jet-on-a-plate rig, as a lecturer demonstration",
-    task: "Read F→ off the Force box: flat plate ≈4.3 kN/m; redraw as the 6-stroke cup (README table) and the same box reads ≈7.3, close to the factor of two. Moving the box does not change the reading. The textbook deep-V reads only ≈5.2 because it floods.",
+    task: "Read F→ off the Force box: about 4 kN/m on the flat plate; redraw as the 6-stroke cup (README table) and the same box reads about 7 — close to the factor of two. The textbook deep-V reads only about 5 because it floods.",
     settle: 5,
   },
 

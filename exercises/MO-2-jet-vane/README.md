@@ -50,9 +50,9 @@ which is a source (footprint x 0.61–0.79) and not a force.
    Hover that station for **u, v** and use the full speed √(u² + v²).
 4. Pick the **Force box** (`9`) and drag one from **(0.85, 1.55)** to
    **(2.05, 3.20)**. That box encloses every shape in the table below and its
-   upstream face clears the spout. Drag a second box around the same shape to
-   check the reading is box-independent: on the plate and the corner two boxes
-   agree to ~1%, on the ramp to ~5%, on the churning deep-V to ~7%.
+   upstream face clears the spout. Drag a second box around the same shape if
+   you want the control-volume point made: the reading holds within a few
+   percent.
 5. Switch **Field → Momentum flux** and work through the four shapes below —
    the flat plate is already on the bench, so Erase (`2`) it and draw the next
    with Wall (`1`) each time. Warm colours are flow still heading the way the
@@ -61,59 +61,49 @@ which is a source (footprint x 0.61–0.79) and not a force.
 
 | shape | draw | θ | ρqv(1−cos θ) | F→ measured |
 |---|---|---|---|---|
-| flat plate | (1.35, 2.00)–(1.35, 3.00) | 90° | 3.48 kN/m | 4.31 ± 0.43 |
-| 45° ramp | (1.00, 2.90)–(1.80, 2.10) | 45° | 1.02 | 1.27 ± 0.21 |
-| 90° corner | ceiling (1.00, 2.60)–(1.35, 2.60), wall (1.35, 2.60)–(1.35, 1.60) | 90° | 3.48 | 3.80 ± 0.10 |
-| deep-V | two 0.9 m arms 15° either side of the axis from apex (1.90, 2.40) — ends (1.03, 2.63) and (1.03, 2.17) | 165° | 6.84 | 5.17 ± 0.35 |
+| flat plate | (1.35, 2.00)–(1.35, 3.00) | 90° | 3.5 kN/m | ≈4.3 |
+| 45° ramp | (1.00, 2.90)–(1.80, 2.10) | 45° | 1.0 | ≈1.3 |
+| 90° corner | ceiling (1.00, 2.60)–(1.35, 2.60), wall (1.35, 2.60)–(1.35, 1.60) | 90° | 3.5 | ≈3.8 |
+| deep-V | two arms from apex (1.90, 2.40) out to (1.05, 2.65) and (1.05, 2.15) | 165° | 6.8 | ≈5 |
 
 The V's apex needs one short capping stroke across it: butt-ended arms meeting
 at a point do not rasterise sealed, and a leaky apex shows no reversal at all.
 Keep the apex at 1.90 and no closer: at 1.60 the mouth lands at x = 0.73,
 inside the spout's own footprint, and no box face fits between source and vane.
 Faces drawn through that pressurised cavity read its pressure as force and
-report 8–9.5 kN/m that changes with the box — a number with nothing behind it.
+report a much larger number that changes with the box — a number with nothing
+behind it.
 
 ![deep-V at apex (1.90, 2.40): flooded wedge, force box reading ≈5.2 kN/m](shots/08-deepV-forcebox.png)
 
 ## For the instructor
 
 Write `F = ρqv(1 − cos θ)` on the board for each shape as it is redrawn, using
-the rig's measured q ≈ 0.78 m²/s and v ≈ 4.46 m/s, and read the box against it.
-The measured column is the mean ± sd of the raw control-volume integral at
-(0.85, 1.55)–(2.05, 3.20), sampled every 0.25 s over two 10 s windows after
-the shape had settled:
+the rig's q ≈ 0.78 m²/s and v ≈ 4.5 m/s, and read the box against it. Three
+things to say:
 
-| shape | θ | 1 − cos θ | F board (N/m) | F→ box (N/m) | box ÷ board |
-|---|---|---|---|---|---|
-| flat plate | 90° | 1.000 | **3 479** | **4 310 ± 430** | 1.24 |
-| 45° ramp | 45° | 0.293 | **1 019** | **1 270 ± 210** | 1.25 |
-| 90° corner | 90° | 1.000 | **3 479** | **3 800 ± 95** | 1.09 |
-| deep-V | 165° | 1.966 | **6 841** | **5 170 ± 350** | 0.76 |
-| *(Pelton ideal, unreachable)* | 180° | 2.000 | 6 958 | — | — |
-
-The plate and the ramp both read about 1.25 × the board figure, so the *ratio*
-the board predicts survives even though the absolute value does not: measured,
-the ramp is 0.295 of the plate against (1 − cos 45°)/(1 − cos 90°) = 0.293. The
-excess is deflected water raining back onto the jet and being driven in a
-second time, which the momentum-flux field shows directly.
+The plate and the ramp both read about a quarter above the board figure, so
+the *ratio* the board predicts survives even though the absolute values do
+not: the measured ramp/plate ratio is about 0.29, against
+(1 − cos 45°)/(1 − cos 90°) = 0.293. The excess is deflected water raining
+back onto the jet and being driven in a second time, which the momentum-flux
+field shows directly.
 
 The 90° corner is the cleaner picture of θ = 90° — the ceiling blocks the
-upward escape, so the sheet does not split as it does on the flat plate. It is
-worth saying out loud that the board gives the corner and the plate the same
-force and the bench does not: 3 800 against 4 310, and 9% above ρqv rather than
-24%. The difference is the rain-back the ceiling removes.
+upward escape, so the sheet does not split as it does on the flat plate. The
+board gives the corner and the plate the same force and the bench does not
+(about 3.8 against 4.3 kN/m): the difference is the rain-back the ceiling
+removes.
 
-The deep-V is the one that under-delivers. The board promises 1.97 × ρqv; the
-box reads 5 170, only 1.20 × the plate. A wedge this deep cannot drain in the
-vertical plane, so it floods and the return becomes a slow spill instead of a
-back-jet: measured inside the mouth the water moves at 1.9 m/s on average and
-0.6 m/s deeper in, against the jet's 4.4, and `F↑` falls to ≈ −2.9 kN/m against
-≈ −0.35 for the flat plate — the box is holding standing water. Say of the blue
-on the display that it is a real sign but its intensity is not a speedometer:
-the display is normalised against the scene's own `vmax`. HP-2
-(`exercises/HP-2-pelton/`) draws the shape that does deliver — a Pelton cup,
-which turns the jet by the same angle but exits down-and-back so gravity clears
-the spent water — and the same box reads 7.3 kN/m on it.
+The deep-V under-delivers. The board promises 1.97 × ρqv; the box reads about
+5 kN/m, barely above the plate. A wedge this deep cannot drain in the vertical
+plane, so it floods and the return becomes a slow spill instead of a back-jet
+— the water inside the mouth is slow, and `F↑` shows the box holding standing
+water. Say of the blue on the display that it is a real sign but its intensity
+is not a speedometer: the display is normalised against the scene's own
+`vmax`. HP-2 (`exercises/HP-2-pelton/`) draws the shape that does deliver — a
+Pelton cup, which turns the jet by the same angle but exits down-and-back so
+gravity clears the spent water — and the same box reads about 7 kN/m on it.
 
 **Optional submission.** Students can post their **stagnation-head ratio**
 (stagnation pressure head ÷ v²/2g) as `student,ratio`. Nothing is

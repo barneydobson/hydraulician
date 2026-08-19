@@ -30,7 +30,7 @@ own water column l_s to the oscillating mass gives
 Measured off this rig: **l = 47.0 m** (reservoir face at x = 6.0 to the tee at
 x = 53.0), bore **b_p = 2.890 m**, and the shaft stands on the pipe soffit at
 **y_s = 5.57 m**, so l_s = rest level − 5.57, about 6.2 m. With the reservoir
-at 12.0 m the shaft rests near 11.8 m and v₀ ≈ 1.0 m/s.
+at 12.0 m the shaft rests near 11.8 m and v₀ ≈ 1 m/s.
 
 ## Your standpipe width
 
@@ -96,11 +96,12 @@ gap is the ku² term the U28/U29 follow-up asks students to integrate.
   fat: a tall narrow shaft is mostly its own inertia. Ask what the correction
   would be for a tank ten times the pipe's area.
 - **The tank did not abolish the water hammer.** Switch Gauges plot to Head
-  and slam again: the 2.8 s Joukowsky wave is still there at ±6 m, because
-  this tank's area is only 0.33 of the pipe's, far too small to reflect the
-  pressure wave (a real one runs 10–50). What the tank has done is stop the
-  pipe having to absorb the flow's momentum, which is the other half of its
-  job — and it is why this demo reads the Depth channel, where the free
+  and slam again: the roughly 3 s Joukowsky wave is still there, swinging
+  about 6 m each way, because this tank's area is only 0.33 of the pipe's,
+  far too small to reflect the pressure wave (a real one runs 10–50). What
+  the tank has done is stop the pipe having to absorb the flow's momentum,
+  which is the other half of its job — and it is why this demo reads the
+  Depth channel, where the free
   surface filters that wave out.
 
 The full verification record — the ten-width ladder, the containment

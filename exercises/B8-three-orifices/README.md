@@ -85,7 +85,7 @@ clusters against those reference lines.
 - **C_c is not the whole story.** Switch **Field → Speed** and hover each
   lip's throat — flipping the digit reloads the geometry, so all three are a
   few keystrokes apart. The bellmouth's efflux is the slowest of the three
-  (C_v = 0.81) and the sharp edge's the fastest, so the bellmouth's gain in
+  (C_v ≈ 0.8) and the sharp edge's the fastest, so the bellmouth's gain in
   C_d = C_c·C_v is real but distinctly smaller than its gain in C_c alone.
 
 The full verification record — the station scan that fixed x = 2.41 m, the

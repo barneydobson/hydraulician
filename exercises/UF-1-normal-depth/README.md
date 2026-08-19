@@ -73,7 +73,7 @@ Manning's 3/5, then histograms every student's back-calculated
   the class's range. Ten independent runs collapsing onto one straight line
   is the finding; the exact exponent is the discussion.
 - **Why is there no tailwater to set?** Switch **Field → Froude**: the whole
-  chute reads supercritical (1.3–2.5 measured). Nothing downstream can
+  chute reads supercritical (roughly 1–2.5 measured). Nothing downstream can
   influence this reach, which is why this worksheet — unlike the jump demos —
   never asks anyone to re-check a level against `y_c` after changing `q`.
 

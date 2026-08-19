@@ -89,10 +89,9 @@ histogram of the signed error (t_meas − t_pred)/t_pred.
   5.3 m/s where √(2gh) says 5.9. The drain implies C_d ≈ 0.52, about 12%
   under the recommended 0.59 — and the same figure comes back from a second,
   independent route, so it is a property of this 2D slot rather than scatter.
-- **The straight line hiding underneath.** √h against t is straight
-  (R² = 0.984 across the whole usable range) because d(√h)/dt is constant for
-  a fixed orifice. That constancy *is* the formula, and this is the homework
-  key:
+- **The straight line hiding underneath.** √h against t is straight across
+  the whole usable range, because d(√h)/dt is constant for a fixed orifice.
+  That constancy *is* the formula, and this is the homework key:
 
 ![√h against t — the falling-head linearisation](plots/sqrt-h-vs-t.png)
 

@@ -145,8 +145,11 @@ window.JETRIG = {
   // down-and-back so gravity drains it under the spout. Chained butt ends at
   // 150–160 deg kinks overlap their stamped rectangles and seal — no caps
   // needed (unlike the V's 30 deg apex).
-  CUP: [[1.10, 2.64], [1.30, 2.58], [1.42, 2.42], [1.44, 2.22],
-        [1.34, 2.04], [1.16, 1.94], [0.98, 1.92]],
+  // Points on a 5 cm grid so the recipe is hand-drawable; the original
+  // finer-grained arc measured 7306 +/- 192 N/m and this one 7020 +/- 332 --
+  // the same "about 7 kN/m", so the round coordinates ship.
+  CUP: [[1.10, 2.65], [1.30, 2.60], [1.40, 2.40], [1.45, 2.20],
+        [1.35, 2.05], [1.15, 1.95], [1.00, 1.90]],
   // The demo's canonical Force box: encloses plate, cup AND the (moved) V;
   // upstream face at 0.85 clears the spout footprint (edge at 0.79) — a box
   // that swallows the spout encloses a SOURCE and stops reading a force.

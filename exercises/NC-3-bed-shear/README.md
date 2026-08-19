@@ -25,7 +25,7 @@ Shields threshold-of-motion grain size that resists it:
 The cursor box prints the slope as `S_f  1 : N` — convert it, `S_f = 1/N`.
 Grain classes to name your answer with: sand < 2 mm < gravel < 64 mm <
 cobbles < 256 mm < boulders. The mild-channel anchor everyone reads in Part B
-measures **τ₀ ≈ 58 N/m², D_min ≈ 64 mm** at x ≈ 7 m; land within about 20% of
+measures **τ₀ ≈ 60 N/m², D_min ≈ 60 mm** at x ≈ 7 m; land within about 20% of
 that and you hovered in the right place.
 
 ## Your discharge

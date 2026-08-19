@@ -78,7 +78,7 @@ q = 0.330 at that opening, so it needs no iteration.
    — **(4.50, 0.50) → (5.63, 2.00)** — and check the reading holds. Submit
    **a, y₀, y₁, C_d, F_R, F→** (with your `d`).
 
-![the Force box on the shipped 7-cell rig, reading F→ 1625 ±33 N/m](shots/04-force-box.png)
+![the Force box on the shipped 7-cell rig, reading about 1.6 kN/m](shots/04-force-box.png)
 
 Face rules: top anywhere above the water, bottom on or inside the bed,
 downstream clear of the gate plate, upstream clear of the reservoir edge.
@@ -106,40 +106,29 @@ the thing they estimate, and the table below is where each of them lands.
 
 ### What the box reads
 
-Headless, 40 raw integrals 0.25 s apart after a 90 s settle, one row per
-shipped opening. Forces are N/m.
-
-| a | y₀ (m) | y₁ (m) | C_d | **F→ measured** | board F_R | naive | F→ vs F_R | F→ vs naive |
-|---|---|---|---|---|---|---|---|---|
-| 5 cells | 1.258 | 0.110 | 0.611 | **6513 ± 55** | 6791 | 6474 | −4.1% | +0.6% |
-| 6 cells | 0.920 | 0.125 | 0.596 | **3112 ± 39** | 3323 | 3060 | −6.4% | +1.7% |
-| 7 cells | 0.717 | 0.143 | 0.578 | **1646 ± 29** | 1809 | 1562 | −9.0% | +5.4% |
-| 8 cells | 0.585 | 0.160 | 0.560 | **885 ± 43** | 1061 | 830 | −16.5% | +6.7% |
-
-The reading is box-independent: the second box agrees to 0.3% or better at
-every opening, and repeat cold starts of the same rig agree to 0.5% (7 cells:
-1642, 1646, 1648; 5 cells: 6540 and 6513). Net outflow through the faces
-time-averages to under 0.5% of ρq ≈ 330 kg/s per m, so the control volume is
-closed.
+Expect roughly 6.5 / 3 / 1.6 / 0.9 kN/m at the four openings. At every one the
+box lands within a few percent of `naive` and about 5–15% under `F_R`; moving
+the box, or restarting the rig, changes the reading by a percent or two. The
+full measured table is in the archive.
 
 ### Discussion points
 
 - **Which number is the force?** F→; `F_R` and `naive` are estimates of it.
-  The box reads 4 – 17% under `F_R` and within a few % of `naive`. Both of
-  the formula's assumptions fail at the vena face, measurably: the pressure
-  there is 1.68 × hydrostatic and the momentum flux 1.25 × ρqV₁ (Rake `6` at
-  x = 5.63 shows the jet core at 3.18 m/s against q/y₁ = 2.31). `naive` does
-  well here because the pool is nearly still and the gate's downstream face
-  is dry, so the plate carries close to plain hydrostatic thrust.
+  The box reads about 5–15% under `F_R` and within a few percent of `naive`.
+  Both of the formula's assumptions fail at the vena face: the pressure there
+  is well above hydrostatic, and Rake (`6`) at the vena shows the jet core
+  running faster than q/y₁ (about 3.2 against 2.3 m/s). `naive` does well
+  here because the pool is nearly still and the gate's downstream face is
+  dry, so the plate carries close to plain hydrostatic thrust.
 - **The `F_R` − `naive` gap tracks y₁, not the momentum flux.** This rig's
-  jet barely contracts (y₁/a ≈ 0.94 at 7 cells against the textbook
-  C_c ≈ 0.61 — a resolution property of a 5–8 cell opening). With the
-  textbook y₁ the ordering would reverse: `F_R` would sit 7% below `naive`.
-  Say so rather than teach around it.
-- **C_d drifts down (0.611 → 0.560) rather than sitting flat** because y₀/a
-  falls from 11.6 to 3.4 across the class, and the idealised orifice constant
-  is best obeyed by the smallest openings. A spread-out class measures the
-  trend without being told to look for it.
+  jet barely contracts (y₁/a ≈ 0.9 against the textbook C_c ≈ 0.61 — a
+  resolution property of a 5–8 cell opening). With the textbook y₁ the
+  ordering would reverse and `F_R` would sit below `naive`. Say so rather
+  than teach around it.
+- **C_d drifts down (about 0.61 → 0.56) rather than sitting flat** because
+  y₀/a falls from about 12 to 3 across the class, and the idealised orifice
+  constant is best obeyed by the smallest openings. A spread-out class
+  measures the trend without being told to look for it.
 
 The full verification record — the ponding trap and why the apron is
 truncated, the boundary-strategy measurement, the hover-fidelity scan behind

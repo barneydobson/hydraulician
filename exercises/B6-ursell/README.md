@@ -70,7 +70,7 @@ trend through everything except the rows flagged as noise-limited.
 ### Discussion points
 
 - **Nobody in the class gets a linear wave** — every digit lands at
-  U_r = 174–356. To show the far side of the marker, drop the stroke to
+  U_r = 170–360. To show the far side of the marker, drop the stroke to
   0.08 m at T = 3.0 s with a gauge chart up (the shipped `low2` calibration
   point, U_r ≈ 56): the trace goes very nearly symmetric on screen. Put the
   stroke back to 0.25 m and the lopsidedness returns in front of the class.

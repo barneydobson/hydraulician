@@ -4,10 +4,10 @@ The class splits into thirds and builds *the same weir at three sizes* — full
 scale, half scale and quarter scale, every length scaled by λ and the
 discharge by λ^1.5. Each student reads one number: the head standing over
 their own crest. Pooled raw, the three thirds do not even overlap — q spans
-12.7×, H spans 5.0×, and each third has its own rating curve. Re-plotted as
-two π-groups, with no metres anywhere, the thirty numbers become one curve.
-That collapse *is* Buckingham, and the class produces it without anyone being
-told what to expect.
+roughly 13×, H spans about 5×, and each third has its own rating curve.
+Re-plotted as two π-groups, with no metres anywhere, the thirty numbers
+become one curve. That collapse *is* Buckingham, and the class produces it
+without anyone being told what to expect.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **DA-1**, or use the direct link
@@ -79,8 +79,8 @@ python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 
 The script fits each third's own dimensional rating `H = A_λ q^n` for the raw
 panel, then re-plots every point as `C_d = q/(√g H^1.5)` against `H/P`, where
-the shipped class collapses onto one curve to 2.2% RMS — with a shaded ±3%
-band that leaves the λ = ¼ droop visible rather than hiding it.
+the shipped class collapses onto one curve — with a shaded band that leaves
+the λ = ¼ droop visible rather than hiding it.
 
 ![pooled class plot](plots/pooled-demo.png)
 

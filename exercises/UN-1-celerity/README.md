@@ -55,10 +55,6 @@ metres:
 
 ## For the instructor — pooling the class
 
-This one is basic enough that polling the class is optional: two or three
-nozzles run live make the same straight line on the board. The CSV route is
-here if you want the full plot.
-
 Collect one row per student (`student_id,digit,gap_m,celerity,v0_ms,dH_m`),
 export the CSV and run:
 

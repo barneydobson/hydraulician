@@ -1,81 +1,51 @@
-// UN-2 - Flow establishment: console-paste rig.
-//
-// No geometry is drawn for this demo (the scene's own nozzle is used
-// unmodified) - this file only reaches "still water, valve shut, gauge in
-// speed mode" the same way the worksheet does by hand, and runs one
-// establishment trace so a lecturer/TA can sanity-check a digit before
-// class. Paste into the console on ?scene=hammer, then e.g.:
-//
-//   UN2.setup(23.80);                 // reach rest at your level (m, elevation)
-//   UN2.open();                       // opens the valve, run starts
-//   // ... wait, or just watch the gauge chart (Gauges plot: Speed) ...
-//   UN2.read()                        // -> {t, V (bore mean), gauge speed}
-//
-window.UN2 = {
-  BULK: 0.30,          // dry-run constant: tames the closed-pipe "ring" that
-                        // an instant reservoir-level change otherwise excites
-                        // (see _archive/README-full.md, Appendix - Director
-                        // report, Iterations).
-  L: 49.0,              // penstock length: entrance (x=6) to valve (x=55)
-  C: (id) => CONTROLS.find(c => c.id === id),
-
-  /** Reach "still water, valve shut, at your personalised level." */
-  setup(level) {
-    const C = UN2.C;
-    APP.loadScene('hammer', false);           // fresh: t=0, valve OPEN, level=25
-    C('bulk').set(UN2.BULK); syncPanel();
-    if (APP.sim.p.valveClosed < 0.5) toggleValve();   // boots open -> close it
-    C('inLevel').set(level); syncPanel();
-    state.gaugeField = 'speed';
-    APP.state.paused = false;
-    APP.frames(600, 1 / 60);                  // 10 simulated seconds settle
-    APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: 30, y: 3.5, hist: [], colour: '#7fd4ff' });
-    APP.state.paused = true;
-    return UN2.read();
-  },
-
-  /** Open the valve - the run starts. */
-  open() {
-    if (APP.sim.p.valveClosed > 0.5) toggleValve();
-    APP.state.paused = false;
-  },
-
-  /** Bore-mean V (the truth channel) and the gauge's own point speed. */
-  read() {
-    const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
-    const iMid = Math.round(30 / APP.sim.dx);
-    const iTank = Math.round(3.0 / APP.sim.dx);
-    const g = APP.state.gauges[0];
-    return {
-      t: +APP.sim.t.toFixed(3),
-      V_boreMean: +A.V[iMid].toFixed(4),
-      gaugeSpeed: g && g.hist.length ? +g.hist[g.hist.length - 1].speed.toFixed(4) : null,
-      Hrest: +(A.surf[iTank] - 3.5).toFixed(4),   // head above the pipe axis
-      valveClosed: APP.sim.p.valveClosed,
-    };
-  },
-
-  /** Run one full trace (fresh setup -> open -> ~8s recorded) and extract
-   *  u_max / t90 / k exactly as the verification record did. */
-  student(level) {
-    UN2.setup(level);
-    const A0 = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
-    const iTank = Math.round(3.0 / APP.sim.dx);
-    const Hrest = A0.surf[iTank] - 3.5;
-    UN2.open();
-    const iMid = Math.round(30 / APP.sim.dx);
-    const t0 = APP.sim.t, series = [];
-    for (let k = 0; k < 480; k++) {
-      APP.frames(1, 1 / 60);
-      series.push({ t: APP.sim.t - t0, V: OVERLAY.analyse(APP.sim, APP.SIM.columns(true)).V[iMid] });
-    }
-    APP.state.paused = true;
-    const tail = series.filter(s => s.t > series[series.length - 1].t - 2.0).map(s => s.V).sort((a, b) => a - b);
-    const umax = tail[Math.floor(tail.length / 2)];
-    let t90 = null;
-    for (const s of series) { if (s.V >= 0.9 * umax) { t90 = s.t; break; } }
-    const k = 2 * 9.81 * Hrest / (umax * umax);
-    return { level, Hrest: +Hrest.toFixed(3), umax: +umax.toFixed(4), t90: +t90.toFixed(4), k: +k.toFixed(2) };
-  },
-};
+/* ============================================================================
+ * UN-2 · FLOW ESTABLISHMENT — scene notes and headless recipe
+ * ----------------------------------------------------------------------------
+ * The exercise runs on the `estab` SCENE (js/scenes.js), not a drawn rig:
+ * held reservoir compartments need scene-level sponge widths (spongeIn 3.0
+ * covers the whole tank), which a sandbox rig cannot set. The scene is a
+ * reservoir -> bellmouth -> 23 m x 0.8 m bore -> valve (boots CLOSED) ->
+ * exit orifice (0.4 m gap, k ~ 4) -> free jet over the open bottom edge.
+ *
+ *   http://localhost:8124/?scene=estab      (or ?ex=UN-2 for the card)
+ *
+ * WHY EACH PIECE IS THERE (each bought with a measured failure, 2026-08-19):
+ *   - LOW head + modest u_max: the rise must span several wave transits for
+ *     the rigid-column derivation to hold: t75/T = ln7·u_max·c/(8gH) ~ 5
+ *     here. On the hammer scene it is ~0.5 and the trace is Allievi's
+ *     staircase — that is why the old hammer-based UN-2 fitted 64% of
+ *     theory and was retired.
+ *   - Bellmouth chamfer at the mouth: sharp-edged, the entry grows a
+ *     flapping vena over ~one flush time (mid-pipe u noise ~10%, reversed
+ *     flow at the crown 2 m in); chamfered, plateau noise is 1–3%.
+ *   - Free-jet exit, open bottom edge: a tailwater reservoir drifts under
+ *     the sponge's weak drain side (+0.25 m in 20 s at 2 m²/s), and a
+ *     passive apron ponds 2 m deep and drowns the exit. The jet leaving
+ *     the domain does neither.
+ *   - bulk 0.30 (scene default): a level change on the shut pipe excites
+ *     the closed-pipe organ mode (period 4l/c ~ 3 s); at bulk 0.03 it rings
+ *     for minutes, at 0.30 it is still in ~30 s. That is the exercise's
+ *     settle.
+ *
+ * MEASURED (Medium 597x159, dx 0.0503, c 30, shipped scenes.js, one run per
+ * digit, 30 s settle then 40 s trace at 0.05 s; H = flowing level - 2.4):
+ *
+ *   level 3.4..4.3 -> u_max 2.05..2.86 m/s, plateau sd 1.1-2.3%,
+ *   k = 2gH/u_max² = 4.18-4.31, t75/ (ln7·l·u_max/2gH) = 0.94-1.08,
+ *   pooled through-origin slope 1.971 vs ln7 = 1.946 (+1.3%), R² 0.998.
+ *   c = 60 control at level 3.8: t75 4.15 s vs 4.07 s at c = 30 (~2%).
+ *   Worst-case settle (level change 3.3 -> 4.3 on the shut pipe): ring
+ *   decays to ±0.1 m/s by ~35 s; the shipped prefill (still(3.8)) halves
+ *   the kick, hence settle 30 in the exercise entry.
+ *   data/simulated-class.csv IS this sweep, one row per digit.
+ *
+ * HEADLESS RECIPE (exercises/_runner/runner.py, HOWTO.md):
+ *   launch --scene estab; then per digit:
+ *     APP.sim.p.inflow.level = 3.4 + 0.1*d; APP.sim.p.valveClosed = 1;
+ *     APP.SIM.resetWater();            // prefill + sponge adjust
+ *     pump --sim-seconds 30
+ *     APP.sim.p.valveClosed = 0;       // t = 0
+ *     ...sample APP.probe(14, 2.4).u every 0.05 sim-s for 40 s; u_max =
+ *     mean of the last 10 s, t75 = first crossing of 0.75*u_max; read the
+ *     flowing level off OVERLAY.analyse's surf at x ~ 1.5.
+ * ==========================================================================*/

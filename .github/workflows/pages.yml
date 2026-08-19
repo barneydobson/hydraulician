@@ -3,13 +3,13 @@ name: Deploy to GitHub Pages
 # The app is static (no build step, no dependencies) and is copied through
 # verbatim — but the deploy runs Jekyll (_config.yml) so the markdown briefs
 # in exercises/ render as web pages rather than as raw text. Runs on pushes
-# and merges to main.
+# to main, which includes every merged PR — a pull_request:closed trigger was
+# tried and removed: it runs in the PR branch's context, which the
+# github-pages environment's main-only rule refuses (a failed run with zero
+# steps on every merge).
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [closed]
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     environment:
       name: github-pages

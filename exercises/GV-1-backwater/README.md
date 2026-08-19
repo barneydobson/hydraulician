@@ -7,7 +7,7 @@ station rather than the discharge. Pooled, the class's own points trace the
 whole backwater curve; laid over a direct-step integration they collapse onto
 it to a fraction of a millimetre, everywhere except the last half-metre
 against the weir face, where the 1D hydrostatic assumption visibly, honestly,
-gives up. A validation study, run by the room.
+gives up.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **GV-1**, or use the direct link
@@ -75,13 +75,13 @@ shaded.
 ### Discussion points
 
 - **Why is the agreement this good?** The pool is deep relative to normal
-  depth (`h/y_n` ≈ 2–2.7), so the friction slope measures ~0.0004 against
+  depth (`h/y_n` ≈ 2–3), so the friction slope measures ~0.0004 against
   `S₀ = 0.0147` — under 3% of it. The GVF equation nearly degenerates to
   `dy/dx ≈ S₀`: the depth grows at exactly the rate the bed falls, and the
   surface comes out flat almost by construction. That is why an M1 pool
   behind a badly-placed weir can drown a reach for a long way upstream.
 - **Why does the weir-face point miss?** Hover the last half-metre with
-  **Field → Speed**: `u` climbs from ≈0.4 m/s out in the pool to ≈0.95 m/s at
+  **Field → Speed**: `u` climbs from ≈0.4 m/s out in the pool to ≈1 m/s at
   the face, and a vertical component appears. Hydrostatic pressure and
   gently-varying streamlines — the two assumptions the ODE is built on —
   both fail there, so the −27 mm gap is physics the 1D model was never asked

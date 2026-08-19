@@ -92,8 +92,8 @@ percentage below.
   class gets is a choice of criterion, not a constant. A short, deep
   reservoir does not owe you a self-similar rarefaction.
 - **A tiny precursor arrives long before the wave.** Read at millimetre
-  threshold and you recover ≈24 m/s, which is the scene's own acoustic
-  celerity re-equilibrating the pressure field, not gravity at work. It is
+  threshold and you recover ≈24 m/s — the scene's own acoustic celerity
+  (c = 24) re-equilibrating the pressure field, not gravity at work. It is
   invisible on screen, and it is the trap that a "first detectable change"
   stopwatch falls into.
 

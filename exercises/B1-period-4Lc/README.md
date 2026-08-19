@@ -76,7 +76,7 @@ re-expressed as a distance, b/a metres.
 
 - **The intercept is not zero, and that is the finding.** The fit is left
   free rather than forced through the origin, and the class measures an
-  offset of about 3.4 m: the wave behaves as if the reservoir's reflecting
+  offset of about 3 m: the wave behaves as if the reservoir's reflecting
   face sits that far UPSTREAM of the nominal entrance at x = 6.0 — inside
   the relaxation zone that holds the reservoir level, not at its edge. Real
   reservoirs are not points either, and where you measure L from is an

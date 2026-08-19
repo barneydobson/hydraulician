@@ -88,8 +88,8 @@ the coarse-sampling bias shows up as a systematic offset below the 1:1 line.
 
 - **The gate wake, live.** Paste this folder's `rig.js` into the console and
   run `NC2.gate.run(6)`: it rebuilds MO-1's sluice gate and rakes the jet.
-  The vena contracta reads α ≈ 1.79 and the wake half a metre downstream
-  2.30 — past N6's `α > 2` line, from pure vertical shear, in a solver with
+  The vena contracta reads α ≈ 1.8 and the wake half a metre downstream
+  2.3 — past N6's `α > 2` line, from pure vertical shear, in a solver with
   no lateral dimension to blame it on.
 - **"Free-slip" is not "frictionless."** Ask the class to predict the
   free-slip number before anyone ticks the box. It falls only a few percent:

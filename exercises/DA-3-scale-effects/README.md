@@ -4,7 +4,7 @@ DA-1 pooled thirty raw numbers into one `C_d(H/P)` curve and left a small,
 honest, λ-ordered residual living underneath it. DA-3 reproduces the *same
 shape of effect* without changing a single physical dimension: keep your own
 weir, your own q and your own level, change **only the Resolution**, and
-watch `C_d` move on its own. Grid spacing behaves like model scale because
+`C_d` moves on its own. Grid spacing behaves like model scale because
 mechanically it is one — `H/Δx` is no different in kind from `H/λ`. Re and We
 cannot follow Froude in a physical model for the same reason a coarser mesh
 cannot follow it here: the things that do not shrink with the model write the
@@ -85,12 +85,11 @@ groups (1.2–1.5%) is smaller than the scatter about the curve itself
 
 ### Discussion points
 
-- **Do the reload in front of them.** Take a λ = ¼ rig to **Resolution: Low**
-  and the crest itself changes — P rasterises to 5 cells instead of 8, 6.2%
-  short, and `C_d` reads 6% high. That is a *different weir*, not a worse
-  measurement of the same one. Back to **High** and it sharpens again: about
-  15 seconds of wall clock for the whole pair, and nothing but a dropdown
-  moved.
+- Take a λ = ¼ rig to **Resolution: Low** and the crest itself changes — P
+  rasterises to 5 cells instead of 8, 6.2% short, and `C_d` reads 6% high.
+  That is a *different weir*, not a worse measurement of the same one. Back
+  to **High** and it sharpens again: about 15 seconds of wall clock for the
+  whole pair, and nothing but a dropdown moved.
 - **The one outlier is the lesson, not noise.** d = 8's Low re-run lands at
   6.4 cells of head, under the ~7-cell floor DA-1 measured on this same rig
   by lowering q instead — two entirely different ways of taking cells out

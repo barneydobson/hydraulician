@@ -1,12 +1,10 @@
 # HP-2 · The Pelton principle without the wheel
 
-A spout fires a free jet across open air onto a drawn flat plate, then onto a
-deep, narrow V-splitter approximating θ → 165° — as close as this tool gets to
-a Pelton bucket without an actual rotating wheel. There is none, and it is not
-needed: the whole Pelton argument is a control volume, and the factor of two a
-bucket collects over a flat plate is something the class can watch happen
-rather than be told. Velocity triangles and u/v₁ = ½ stay on the slides; this
-rig's job is to make ρQΔv visceral.
+A spout fires a free jet at a drawn deflector, and a control-volume **Force
+box** reads the horizontal force on whatever it encloses. Three deflectors
+against the same jet: a flat plate (about 4 kN/m), a Pelton-style cup that
+turns the jet through ~165° (about 7 kN/m — close to the factor of two), and
+the deep-V of the textbook figure, which floods and reads only about 5.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **HP-2**, or use the direct link
@@ -17,59 +15,81 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 
 A vane that turns a jet through θ takes the whole change in momentum flux:
 
-    F = ρ·q·v·(1 − cos θ)        stagnation head = v²/2g
+    F = ρ·q·v·(1 − cos θ)        per metre of width
 
-A flat plate turns the jet through 90°, so 1 − cos θ = 1. A Pelton bucket
-turns it back on itself, θ → 180°, and collects twice as much from the same
-jet. Measured on this rig: the coherent core carries **q ≈ 0.78 m²/s** at
-**v ≈ 4.46 m/s**, and the deep V's arms sit at γ = 15° off the jet axis, i.e.
-**θ = 165°** (measured turn 160–165°, so the design angle is delivered).
+The Force box (tool `9`) evaluates the momentum theorem on the box you drag —
+the flux and pressure integral over its faces, time-averaged. F→ is the
+number to read; gravity never enters the horizontal budget. Moving the box
+does not change the reading, as long as it still encloses the whole deflector
+and not the spout.
 
-| shape | θ | 1 − cos θ | F (N per metre of width) |
-|---|---|---|---|
-| flat plate | 90° | 1.000 | **3 480** |
-| deep V (this rig) | 165° | 1.966 | **6 841** |
-| *Pelton ideal* | *180°* | *2.000* | *6 958* |
+Measured where the jet crosses the box's upstream face: **q ≈ 0.78 m²/s** at
+**v ≈ 4.4 m/s**, so ρqv ≈ 3.5 kN/m.
+
+| deflector | θ | 1 − cos θ | ρqv(1−cosθ) | F→ measured |
+|---|---|---|---|---|
+| flat plate | 90° | 1.00 | 3.5 kN/m | ≈4 |
+| cup (below) | ~168° | 1.98 | 6.9 kN/m | ≈7 |
+| deep-V | 165° | 1.97 | 6.9 kN/m | ≈5 |
 
 ## What to do
 
-This one is a lecturer demonstration — nothing is submitted, and the
-arithmetic goes on the board. It runs at real time or faster, in about 8 min.
+Lecturer demonstration, ~10 min. The card counts each settle down.
 
-1. The rig arrives on the **flat plate**, with the Field already on Speed.
-   Hover the jet at a clear station a little upstream of the plate: the box's
-   **u** — the horizontal component — is the jet velocity v of the formula,
-   ≈4.5 m/s here. Note how coherent the jet still is after its flight.
-2. Switch **Field → Momentum flux**: the incoming jet reads red (forward),
-   the splash turns white and blue (reversed). The colour is normalised
-   against the frame's own maximum, so it is an honest sign, not a
-   speedometer.
-3. Erase (`2`) the plate and redraw it as the deep V with Wall (`1`) — apex
-   at (1.60, 2.45), two 0.9 m arms at 15° either side of the jet axis, plus
-   one short capping stroke across the apex, because two arms sharing a drawn
-   endpoint do not seal. Press `R` and let it settle — about **5 s**; the card
-   counts it down. Both arms now run blue.
-4. Do the arithmetic: same jet, same q and v, F goes from ≈3 480 to
-   ≈6 840 N/m — the factor of two a bucket collects, in three numbers the
-   class watched happen.
+1. Pick the **Force box** tool (`9`) and drag a box from **(0.85, 1.55) to
+   (2.05, 3.20)** around the flat plate: **F→ ≈ 4 kN/m**. Drag a different
+   box around the same plate — the reading holds. Keep the upstream face
+   right of x ≈ 0.8: a box that contains the spout contains a source, and
+   its reading is not a force.
+2. Hover the jet just inside the upstream face: u ≈ 4.4 m/s, so ρqv ≈ 3.5
+   kN/m. The plate reads about 20% more because deflected water rains back
+   onto the jet and is driven in a second time — switch **Field → Momentum
+   flux** to see it.
+3. Erase (`2`) the plate and draw the cup with Wall (`1`) — six strokes:
 
-![momentum flux, flat plate: red jet, splash turning white and blue](shots/05-flat-momentum-flux.png)
+   | from | to |
+   |---|---|
+   | (1.10, 2.65) | (1.30, 2.60) |
+   | (1.30, 2.60) | (1.40, 2.40) |
+   | (1.40, 2.40) | (1.45, 2.20) |
+   | (1.45, 2.20) | (1.35, 2.05) |
+   | (1.35, 2.05) | (1.15, 1.95) |
+   | (1.15, 1.95) | (1.00, 1.90) |
 
-![momentum flux, deep V: strong reversal along both arms](shots/03-deepV-momentum-flux.png)
+   Nearest-5-cm accuracy is plenty — the cup is tolerant of hand-drawing.
 
-**If you want the head as well as the force**, put a gauge in the free jet and
-another on the stagnation point (MO-2's two stations). Expect the ratio to
-read **1.15–1.30, not 1**, and say why: the jet keeps accelerating under
-gravity over its last stretch of flight, and the solver's compressible
-equation of state adds a stagnation response scaling with M = v/c ≈ 0.20.
-Read gauges, not the raw hover box, for any head comparison — the gauge adds
-the elevation back.
+   This is one half of a Pelton bucket in section: the jet wraps the inside
+   of the cup and leaves down-and-back, so gravity clears the spent water
+   under the spout. Press `R`, let it settle: **F→ ≈ 7 kN/m — about 1.7× the
+   plate** — and the force arrow lengthens to match.
+4. Hover the exit sheet where it crosses the box face: about 5.5 m/s, heading
+   down-and-back — faster than it arrived, because the jet fell ~0.5 m
+   through the cup. On the board: ρq(v_in + v_out·cos θ) ≈
+   0.78 × (4.4 + 5.5×0.9) ≈ 7 kN/m — the box's number.
+5. Optional: draw the textbook deep-V — apex **(1.90, 2.40)**, two arms about
+   15° either side of the jet axis out to (1.05, 2.65) and (1.05, 2.15),
+   plus one short capping stroke across the apex (butt-ended arms meeting at
+   a point do not seal). θ = 165° promises 1.97 × ρqv; the box reads only
+   **about 5 kN/m**. A wedge this deep cannot drain in the vertical plane:
+   it floods (F↑ shows it holding standing water) and the return is a slow
+   spill. This is why real buckets turn the water downward and notch the lip.
 
-**Sibling demo MO-2** (`exercises/MO-2-jet-vane/`) runs the full turning
-series — flat, 45°, 90°, deep V — on this same rig, and carries the poolable
-stagnation-ratio submission if a class wants a number to hand in.
+![flat plate: force box reading about 4 kN/m](shots/06-plate-forcebox.png)
 
-The full verification record — jet coherence and droop, the measured turn
-angle, the two build traps behind the V's geometry, and why no rotating wheel
-is reachable in this solver — is kept locally, out of version control, at
+![cup: jet in, sheet out down-back, force box about 7 kN/m](shots/07-cup-forcebox.png)
+
+![deep-V: flooded wedge, force box about 5 kN/m](shots/08-deepV-forcebox.png)
+
+**Heads, if you want them:** gauges in the free jet and on the stagnation
+point (MO-2's two stations) read a ratio of 1.15–1.30 × v²/2g, not 1 — the
+jet accelerates under gravity over its last stretch of flight, and the
+equation of state adds a response at M = v/c ≈ 0.2. The plate's +20% above
+ρqv is the same kind of gap.
+
+**Sibling demo MO-2** (`exercises/MO-2-jet-vane/`) runs the turning series —
+flat, 45°, 90°, deep-V — on this rig, with the momentum-flux colours carrying
+the direction story and a poolable stagnation-ratio submission.
+
+The full verification record (box-independence, mass closure, the wall-pressure
+cross-check, the cup design trail) is kept locally, out of version control, at
 `exercises/HP-2-pelton/_archive/README-full.md`.

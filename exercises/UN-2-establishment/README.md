@@ -1,8 +1,8 @@
 # UN-2 · Flow establishment: the asymptotic start
 
 A student starts from nothing: valve shut, pipe full, water dead still. They
-open the valve and watch the speed trace claw its way up to a plateau — not
-instantly, because 49 m of water has inertia. Read where it settles (u_max)
+open the valve and the speed trace rises to a plateau — not instantly, because
+49 m of water has inertia. Read where it settles (u_max)
 and how long it took to get within 10% of there (t_90), and the inertia-head
 derivation predicts the ratio between them before anyone has measured
 anything. Personalised by reservoir level, the class's pooled t_90 against
@@ -50,7 +50,7 @@ sets:
    **Controls → Reservoir level** to your own value.
 2. Press `R` and let it reach steady state — about **10 s**; the card counts
    it down. Hover the pipe: the readout's **V** should be back to about
-   0.00 m/s.
+   0 m/s.
 3. Place a Gauge (`5`) mid-pipe, at x = 30 m on the axis. Its card plots
    **|u|**, the speed at that point.
 4. Press `V` again to open the valve — that is your t = 0 — and watch for
@@ -85,7 +85,7 @@ digit's loss coefficient k = 2gH/u_max² in the panel underneath.
   transit l/c = 49/70 ≈ 0.7 s, so the trace rings and crosses 90% on its
   first overshoot. Teach it as the validity limit of the derivation.
 - **Do not improvise "raise c and watch it match".** It measurably does not:
-  at c = 400 the fit is just as straight and lands at 139% of ln 19 instead,
+  at c = 400 the fit is just as straight and lands at roughly 140% of ln 19 instead,
   and the trace stays ringy at every celerity tried.
 
 The full verification record — the closed-pipe ringing investigation behind

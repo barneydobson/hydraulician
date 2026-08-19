@@ -5,9 +5,8 @@ area — the jet necks down to a **vena contracta** first. C_c is that necking
 ratio, and its value depends entirely on the shape of the entry: sharp edge,
 rounded bellmouth, or a re-entrant Borda tube. Each student is handed one of
 the three, measures C_c off the jet, and the pooled class splits into
-clusters. One of them is worth an hour on its own: the Borda value is
-**provable from ten lines of momentum**, with no empirical coefficient
-anywhere in the derivation.
+clusters. The Borda value is **provable from ten lines of momentum**, with no
+empirical coefficient anywhere in the derivation.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **B8**, or use the direct link
@@ -86,7 +85,7 @@ clusters against those reference lines.
 - **C_c is not the whole story.** Switch **Field → Speed** and hover each
   lip's throat — flipping the digit reloads the geometry, so all three are a
   few keystrokes apart. The bellmouth's efflux is the slowest of the three
-  (C_v = 0.81) and the sharp edge's the fastest, so the bellmouth's gain in
+  (C_v ≈ 0.8) and the sharp edge's the fastest, so the bellmouth's gain in
   C_d = C_c·C_v is real but distinctly smaller than its gain in C_c alone.
 
 The full verification record — the station scan that fixed x = 2.41 m, the

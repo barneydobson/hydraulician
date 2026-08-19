@@ -2,12 +2,11 @@
 
 A horizontal pressurised pipe is fed from a reservoir. Take a stretch of it in
 the middle and carry it over a hill — invert and soffit lifted together, bore
-unchanged. Nothing happens. Lift it again. Nothing happens. Keep going and at
-one particular height the pipe stops being a pipe: an air pocket opens under
-the crown, the crest gauge flattens onto the soffit, and the discharge stalls.
-That height is not a property of the pipe or of the pump — it is the elevation
-of the **hydraulic grade line** at the crest, which the class has already
-measured with two gauges either side.
+unchanged. Keep going and at one particular height the pipe stops being a
+pipe: an air pocket opens under the crown, the crest gauge flattens onto the
+soffit, and the discharge stalls. That height is not a property of the pipe
+or of the pump — it is the elevation of the **hydraulic grade line** at the
+crest, which the class has already measured with two gauges either side.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **B10**, or use the direct link
@@ -26,7 +25,7 @@ Separation begins where that pressure first reaches zero:
 
 Two datums matter and both are bigger than the effect being measured. Compare
 against the **soffit**, not the axis (half a bore, 0.196 m). Compare against
-the **HGL**, not the energy line (`V²/2g` is 0.29–0.86 m here).
+the **HGL**, not the energy line (`V²/2g` is roughly 0.3–0.9 m here).
 
 The crest sits at x = 5.60 m, which is 44.2 % of the way from gauge A
 (x = 3.70 m) to gauge B (x = 8.00 m), both on the pipe axis at y = 2.20 m:
@@ -85,10 +84,10 @@ python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
 python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 ```
 
-The script plots `z_sep` against each student's measured HGL at the crest with
-±1 cell error bars and the dashed 1:1 line that *is* the criterion, fits the
-slope, and puts the residual against driving head in the right-hand panel so
-the class can see whether the offset is a constant or a trend.
+The script plots `z_sep` against each student's measured HGL at the crest
+with the dashed 1:1 line that *is* the criterion, fits the slope, and puts
+the residual against driving head in the right-hand panel so the class can
+see whether the offset is a constant or a trend.
 
 ![pooled class plot](plots/pooled-demo.png)
 

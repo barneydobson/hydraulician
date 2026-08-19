@@ -58,7 +58,7 @@ of times your row gives.
    0.50 m/s) — 45 s on the clock. It should end as a puddle, everything running
    down the shaft to treatment: that is your check that the throttle is open.
 4. Place a gauge — Gauge (`5`) — in the weir bay at **x ≈ 4.25 m,
-   y ≈ 1.62 m**; its card plots depth, `h`.
+   y ≈ 1.60 m**; its card plots depth, `h`.
 5. Ramp **Spout velocity →** in 0.25 m/s steps held 10 s until the water
    reaches the crest, then drop back one step and creep up in 0.08 m/s steps
    held 20 s (the card's countdown times that hold). **First spill** is a

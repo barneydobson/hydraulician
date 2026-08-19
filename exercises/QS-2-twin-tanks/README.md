@@ -3,9 +3,9 @@
 Two open tanks stand side by side on a solid floor, joined by a pipe at the
 base with a valve in it. One tank starts 1.5 m higher than the other. Release
 the valve and the levels chase each other to a common level — the tall one
-falling, the short one rising, and (this is the point) at rates in the inverse
-ratio of their widths. Each student runs the rig with **their own** tank-2
-width, times how long the level *difference* takes to halve, and submits
+falling, the short one rising, at rates in the inverse ratio of their widths.
+Each student runs the rig with **their own** tank-2 width, times how long the
+level *difference* takes to halve, and submits
 (A₂, t_½). Pooled, t_½ against A₂ is a curve that bends over; against the
 equivalent area A* = A₁A₂/(A₁+A₂) it is one straight line through the origin.
 The class derives that grouping from its own data before anyone writes the ODE

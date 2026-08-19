@@ -2,11 +2,10 @@
 
 Every student turns their own rising main's pump up or down, reads the head it
 takes at the discharge flange, and submits `(Q, H)`. Pooled, the class's points
-trace the system's own resistance curve — nobody fitted a formula, they
-measured a real duct's response to being asked for more flow. Then the lecturer
-hands out a manufacturer-style pump curve on paper, the class finds the
-intersection graphically, and one student imposes that exact `Q` live: the
-flange gauge should land on the head the graph predicted.
+trace the system's own resistance curve. Then the lecturer hands out a
+manufacturer-style pump curve on paper, the class finds the intersection
+graphically, and one student imposes that exact `Q` live: the flange gauge
+should land on the head the graph predicted.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **PU-1**, or use the direct link
@@ -25,10 +24,10 @@ curve falls. They meet at one point, and that is where the machine will sit:
 
 `H_s` is the static lift, which the rig fixes by geometry: at the lowest flow
 the delivery tank stands **1.00 m** above the sump, so the fitted intercept is
-a check on the drawing rather than a free parameter (measured: 1.089 m fitted
-against 1.000 m). The paper pump curve to hand out is
+a check on the drawing rather than a free parameter (measured: about 1.1 m
+fitted against 1.0 m). The paper pump curve to hand out is
 **H_pump = 1.539 − 33.72·Q²**, which crosses the class's fitted system curve at
-**Q = 0.100 m²/s, H = 1.202 m**.
+about **Q = 0.10 m²/s, H = 1.2 m**.
 
 `H` is a *difference* of two gauges, flange minus sump. Gauge cards print
 piezometric head (elevation + pressure) above the domain floor, so the
@@ -91,8 +90,7 @@ point.
   discovery order is the lesson: they measure their system first, and only then
   get a "manufacturer" curve to intersect it with. Nominate one student to dial
   their spout until the hover `q` reads ≈ 0.10 and read the flange gauge live —
-  verified here at Q = 0.097 delivered and H = 1.239 m against the graph's
-  1.202 m.
+  it lands on the graph's crossing to within a few percent.
 - **NPSH and the affinity laws stay on slides, and *why* is the two minutes
   worth spending.** The solver's equation of state floors pressure at zero, so
   there is no suction side that can fall below vapour pressure and nothing to

@@ -142,14 +142,18 @@ Three guard rails, each bought with an explosion:
 - `js/scenes.js` — `SCENES`. `channel()` builds a prismatic GVF channel from
   (S₀, C_f, q) plus a control; `drop()` builds approach → chute → apron.
 - `js/sim.js` — `SIM`: grid allocation, wall rasterisation, the substep loop,
-  `columnBand` control bands, gauge/rake readbacks. Live parameters (`S.p`,
-  including the open-edge flags) survive a resolution rebuild.
+  `columnBand` control bands, gauge/rake readbacks, and `boxForce` — the
+  control-volume momentum integral behind the Force box tool (faces on grid
+  lines, solid-adjacent segments skipped, F→ has no gravity in it; a box
+  containing the spout encloses a source and is not a force). Live parameters
+  (`S.p`, including the open-edge flags) survive a resolution rebuild.
 - `js/overlay.js` — `OVERLAY`: the 2D canvas. y_c, y_n, energy grade line,
   surface-profile classification, jump detection, gauge charts, velocity rake.
   Screen-anchored furniture (frame, scale bar, legend, label clamps) follows
   `view.vis` — the visible part of the domain — so it stays on screen zoomed in.
 - `js/main.js` — boot, panel spec, pointer tools (wall / erase / valve / spout /
-  gauge / rake / tracers / measure), view transform, frame loop, `window.APP`. The view is the
+  gauge / rake / tracers / measure / force box), view transform, frame loop,
+  `window.APP` (incl. `boxForce` / `placeCV` for headless force reads). The view is the
   whole-domain letterbox rect scaled about a pan centre: wheel zooms about the
   cursor, middle-drag pans, pinch works on touch, `0` resets; the GPU just
   draws the bigger rect and the screen clips it. Every scenario control is live

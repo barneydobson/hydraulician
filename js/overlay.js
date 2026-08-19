@@ -737,6 +737,54 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** The force control volume: dashed box, the time-averaged horizontal force
+   *  as an arrow through the box centre, and the numbers on a chip. The arrow
+   *  is screen-fixed pixels per kN/m rather than domain-scaled, so plate →
+   *  deep-V reads as "the arrow doubles" at any zoom. F→ is the honest
+   *  headline: the x-budget has no gravity in it. F↑ is printed small — it
+   *  carries the weight of whatever water happens to be inside the box and
+   *  every splash that rains back in, so it flutters and it should. The ±
+   *  is the standard deviation of the instantaneous integral over the last
+   *  few seconds — the flutter is real (splash crossing the faces), not
+   *  measurement noise, and hiding it would overstate the instrument. */
+  function drawCV(ctx, V, cv) {
+    const x0 = V.X(cv.x0), x1 = V.X(cv.x1);
+    const y0 = V.Y(cv.y1), y1 = V.Y(cv.y0);          // screen y flips
+    const col = "#ffd166";
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,209,102,0.85)"; ctx.lineWidth = 1.6;
+    ctx.setLineDash([7, 5]);
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.setLineDash([]);
+    const live = cv.ema && isFinite(cv.ema.fx);
+    if (live) {
+      let sd = 0;
+      if (cv.hist && cv.hist.length > 8) {
+        let s = 0, s2 = 0;
+        for (const q of cv.hist) { s += q.fx; s2 += q.fx * q.fx; }
+        const n = cv.hist.length;
+        sd = Math.sqrt(Math.max(0, s2 / n - (s / n) * (s / n)));
+      }
+      const fx = cv.ema.fx, fy = cv.ema.fy;
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      const L = Math.min(Math.abs(fx) * 0.018, (x1 - x0) * 0.44);
+      if (L > 6) {                                   // the force arrow, x only
+        const s = Math.sign(fx), ax = cx - s * L / 2, bx = cx + s * L / 2;
+        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(ax, cy); ctx.lineTo(bx, cy); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bx + s * 9, cy); ctx.lineTo(bx, cy - 5); ctx.lineTo(bx, cy + 5);
+        ctx.closePath(); ctx.fill();
+      }
+      const fN = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
+      chip(ctx, x0, y0 - 12, "F→ " + fN(fx) + " ±" + fN(sd) +
+        " N/m · F↑ " + fN(fy), col);
+    } else {
+      chip(ctx, x0, y0 - 12, "force box · settling…", col);
+    }
+    ctx.restore();
+  }
+
   /** Edge rulers in metres: ticks along the bottom (x stations) and left
    *  (elevations above the datum) of the VISIBLE domain, with faint grid
    *  lines at the major ticks. They follow zoom and pan, so a drawn plate
@@ -803,5 +851,5 @@ const OVERLAY = (() => {
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
-           drawMeasure, measureText, chip, fmt };
+           drawMeasure, drawCV, measureText, chip, fmt };
 })();

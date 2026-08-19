@@ -4,9 +4,9 @@ Every student drops a column of orbit tracers into the deep-water flume,
 zooms in until the trails stop being invisible, and reads off how much
 smaller the loop is near the bed than at the surface. The vertical motion
 dies out almost completely well above the bed — the verified figure for this
-flume is 244× — while the horizontal motion never fully vanishes, because a
-particle sitting on the floor can still slide sideways but cannot sink into
-it.
+flume is about 200× — while the horizontal motion never fully vanishes,
+because a particle sitting on the floor can still slide sideways but cannot
+sink into it.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **B4**, or use the direct link

@@ -4,7 +4,7 @@ Everyone runs the same flat-bed channel, held comfortably subcritical at both
 ends, at their own discharge — and draws a bed hump at mid-reach. Each student
 commits a **prediction** for the height that will choke it, computed from a
 depth and a discharge they measured themselves, *before* touching the hump.
-Then they raise it in steps and watch: the dip over the crest deepens, the
+Then they raise it in steps: the dip over the crest deepens, the
 Froude view's white break creeps toward the hump, and at some height the whole
 upstream pool steps up while the crest snaps supercritical. Raising a physical
 sill in 22 mm steps and re-settling a flume after each one is an afternoon, not
@@ -61,7 +61,7 @@ the assignment in class.
    **`Δz_pred = E₁ − 1.5·y_c`**. Write it down *before* you touch the hump.
 4. Draw the hump — Wall (`1`), brush shrunk with `[` to about 0.04 m, one
    shift-held horizontal stroke ~1 m long centred on **x = 4.5 m**, started
-   inside the bed slab (y ≈ 0.48) and dragged up to a first height of ~0.05 m.
+   inside the bed slab (y ≈ 0.45) and dragged up to a first height of ~0.05 m.
 5. Raise it in about seven steps toward `2·Δz_pred` — `Z` to undo, redraw
    taller, re-settle 15–30 s each time (the fine steps near the top need the
    longer wait), and **jot `y₁` at every step**.
@@ -91,10 +91,10 @@ cell-quantisation error bars — and the same `Δz_c` against the re-timed
 
 ### Discussion points
 
-- **Watch the choke, don't just record it.** With Field → Froude number, take
-  one more step past `Δz_c`: the crest stays pale/orange however much taller
-  the hump goes, while the upstream pool keeps climbing. That is the crest
-  taking charge of the depth everywhere upstream of it.
+- With Field → Froude number, take one more step past `Δz_c`: the crest stays
+  pale/orange however much taller the hump goes, while the upstream pool
+  keeps climbing. That is the crest taking charge of the depth everywhere
+  upstream of it.
 - **Why is everyone's `Δz_c` about 1.9× their committed `Δz_pred`?** Not the
   sharp edge: a streamlined, ramped, broad-crested hump was built and tested
   and does *not* close the gap, while re-reading `E₁` at the last pre-choke

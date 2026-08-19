@@ -483,9 +483,80 @@ const SIM = (() => {
     return [u, v];
   }
 
+  /** Momentum-theorem force on whatever solid a box encloses, in N per metre
+   *  of width: F = −∮ ρf·[u(u·n) + P·n] dA over the four faces, minus the
+   *  weight of the enclosed water in y. The faces sit ON grid lines, so the
+   *  MAC staggering hands over the exact normal velocity (u on x-faces, v on
+   *  y-faces); f and P (= p/ρ, in U.b — hydrostatic P = g·depth, so ρ·f·P is
+   *  the physical pressure) are averaged across the face. A face segment with
+   *  a solid on either side is skipped: the fluid boundary continues along
+   *  the solid surface there, and the traction on that surface is exactly
+   *  the force being solved for. The whole box comes back in one readPixels
+   *  per texture; the caller owns any time-averaging — the instantaneous
+   *  integral carries every splash that crosses a face. `mdot` (net outflow,
+   *  kg/s per m) is the closure check: it should time-average to ~0, and a
+   *  box that includes the spout's footprint fails it loudly, because the
+   *  spout is a source — mass and momentum appear inside the box and the
+   *  budget is not a force any more. */
+  function boxForce(x0, y0, x1, y1) {
+    const gAbs = Math.abs(S.p.g), RHO = 1000;
+    const closed = S.p.valveClosed > 0.5;
+    let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
+    let jB = Math.round(Math.min(y0, y1) / S.dx), jT = Math.round(Math.max(y0, y1) / S.dx);
+    iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
+    jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
+    const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL−1..iR] × [jB−1..jT]
+    const need = w * h * 4;
+    if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvU);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvF);
+    const U = S.cvU, F = S.cvF;
+    const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
+    const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
+
+    let dFx = 0, dFy = 0, mdot = 0;                  // Σ f[u(u·n) + P n]·ds, Σ f(u·n)·ds
+    for (const [i, nx_] of [[iL, -1], [iR, 1]]) {    // x-faces: u is ON the face
+      for (let j = jB; j < jT; j++) {
+        if (sol(i - 1, j) || sol(i, j)) continue;
+        const a = k(i - 1, j), b = k(i, j);
+        const u = U[b];                              // u at the west face of cell i
+        const f = 0.5 * (F[a] + F[b]);
+        const P = 0.5 * (U[a + 2] + U[b + 2]);
+        const v = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const un = u * nx_;
+        dFx += f * (u * un + P * nx_);
+        dFy += f * (v * un);
+        mdot += f * un;
+      }
+    }
+    for (const [j, ny_] of [[jB, -1], [jT, 1]]) {    // y-faces: v is ON the face
+      for (let i = iL; i < iR; i++) {
+        if (sol(i, j - 1) || sol(i, j)) continue;
+        const a = k(i, j - 1), b = k(i, j);
+        const v = U[b + 1];                          // v at the south face of cell j
+        const f = 0.5 * (F[a] + F[b]);
+        const P = 0.5 * (U[a + 2] + U[b + 2]);
+        const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
+        const vn = v * ny_;
+        dFx += f * (u * vn);
+        dFy += f * (v * vn + P * ny_);
+        mdot += f * vn;
+      }
+    }
+    let m = 0;                                       // enclosed water, for the y-budget
+    for (let j = jB; j < jT; j++) {
+      for (let i = iL; i < iR; i++) if (!sol(i, j)) m += F[k(i, j)];
+    }
+    m *= RHO * S.dx * S.dx;
+    return { fx: -RHO * dFx * S.dx, fy: -RHO * dFy * S.dx - gAbs * m,
+             mdot: RHO * mdot * S.dx, mass: m, iL, iR, jB, jT };
+  }
+
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
-           dt, get, inletVel, bands,
+           boxForce, dt, get, inletVel, bands,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

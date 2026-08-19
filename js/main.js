@@ -26,6 +26,7 @@ const state = {
   mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,y0,x1,y1} in metres
+  cv: null, cvDrag: null,          // the force control volume: box + EMA force
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   gauges: [], rakes: [], gaugeField: "head", tracers: null, tracerN: 9,
@@ -122,6 +123,7 @@ function loadScene(id, keepDrawing) {
   if (sc.particles !== undefined) state.particles = !!sc.particles;
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.measure = null; state.measDrag = null;
+  state.cv = null; state.cvDrag = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -607,6 +609,7 @@ const EX = (() => {
     GINSP.closeAll();
     state.gauges.length = 0;
     state.rakes.length = 0;
+    state.cv = null;
     state.gaugeT = -1;
   }
   /** A rig payload may be the rig object itself, an encoded `#rig=` code, a
@@ -1611,6 +1614,7 @@ const TOOLS = [
   ["rake", "Rake", "Click for a velocity–depth profile"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
+  ["cv", "Force box", "Left-drag a control volume — reads the force on what it encloses. Click to clear"],
 ];
 
 function snap(x0, y0, x1, y1) {
@@ -1640,7 +1644,7 @@ function onDown(e) {
   const [x, y] = pointerPos(e);
   state.cursor = [x, y];
   if (pointers.size === 2) {         // second finger: abandon tools, pinch
-    state.drag = null; state.spoutDrag = false; state.measDrag = null;
+    state.drag = null; state.spoutDrag = false; state.measDrag = null; state.cvDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
     const ps = [...pointers.values()];
     state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
@@ -1699,6 +1703,11 @@ function onDown(e) {
     state.measDrag = { x0: x, y0: y, x1: x, y1: y };
     return;
   }
+  if (state.tool === "cv") {
+    // Same contract as the tape: a drag places the box, a bare click clears it.
+    state.cvDrag = { x0: x, y0: y, x1: x, y1: y };
+    return;
+  }
   state.drag = { x0: x, y0: y, x1: x, y1: y };
 }
 
@@ -1753,6 +1762,10 @@ function onMove(e) {
     else { d.x1 = x; d.y1 = y; }
     return;
   }
+  if (state.cvDrag) {
+    state.cvDrag.x1 = x; state.cvDrag.y1 = y;
+    return;
+  }
   if (state.drag) {
     if (e.shiftKey) { const s = snap(state.drag.x0, state.drag.y0, x, y); state.drag.x1 = s[0]; state.drag.y1 = s[1]; }
     else { state.drag.x1 = x; state.drag.y1 = y; }
@@ -1772,6 +1785,18 @@ function onUp(e) {
     state.measure = Math.hypot(d.x1 - d.x0, d.y1 - d.y0) < sim.dx ? null : d;
     state.measDrag = null;
     syncPanel();                      // the panel's Measure row prints the numbers
+    return;
+  }
+  if (state.cvDrag) {
+    const d = state.cvDrag;
+    // Thinner than 3 cells in either direction is a click: clear the box —
+    // a degenerate box has no interior for a momentum budget to close over.
+    if (Math.abs(d.x1 - d.x0) < 3 * sim.dx || Math.abs(d.y1 - d.y0) < 3 * sim.dx) {
+      state.cv = null;
+    } else {
+      placeCV(d.x0, d.y0, d.x1, d.y1);
+    }
+    state.cvDrag = null;
     return;
   }
   if (state.drag) {
@@ -1845,6 +1870,7 @@ function tickFrame(realDt) {
   const analysis = OVERLAY.analyse(sim, col);
   sampleGauges(analysis);
   sampleRakes();
+  sampleCV();
   sampleInlet(analysis);
   advanceTracers(simAdvanced);
   // Scenes whose subject is the orbital motion seed their own tracer rake as
@@ -1924,6 +1950,38 @@ function clearGaugeHistory() {
 }
 function sampleRakes() {
   state.rakes.forEach((rk) => { const r = SIM.rake(rk.x, rk.buf); rk.buf = r.buf; rk.i = r.i; });
+}
+
+/** Place (or move) the force control volume. Corners are normalised and the
+ *  running force estimate starts afresh — a moved box is a new measurement,
+ *  and blending it with the old one would print a number no box ever read. */
+function placeCV(x0, y0, x1, y1) {
+  state.cv = {
+    x0: Math.min(x0, x1), y0: Math.min(y0, y1),
+    x1: Math.max(x0, x1), y1: Math.max(y0, y1),
+    ema: null, hist: [], t0: sim.t,
+  };
+}
+
+/** One force integral per rendered frame, like the gauges: gated on the sim
+ *  clock actually moving, history dropped when the clock restarts. The EMA is
+ *  a τ = 1 s first-order filter in SIM time, so a headless pump at hundreds
+ *  of substeps a frame converges exactly as the live view does; `hist` keeps
+ *  the raw integrals of the last ~8 s for the card's ± flutter readout. */
+function sampleCV() {
+  const cv = state.cv;
+  if (!cv || state.paused) return;
+  if (sim.t < cv.t0) { cv.ema = null; cv.hist.length = 0; cv.t0 = sim.t; }
+  if (!(sim.t > cv.t0) && cv.ema) return;
+  const r = SIM.boxForce(cv.x0, cv.y0, cv.x1, cv.y1);
+  const a = 1 - Math.exp(-Math.min(sim.t - cv.t0, 0.25) / 1.0);
+  cv.t0 = sim.t;
+  cv.ema = cv.ema ? { fx: cv.ema.fx + (r.fx - cv.ema.fx) * a,
+                      fy: cv.ema.fy + (r.fy - cv.ema.fy) * a }
+                  : { fx: r.fx, fy: r.fy };
+  cv.hist.push({ t: sim.t, fx: r.fx });
+  while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
+  cv.last = r;
 }
 
 /** What the reservoir is actually DELIVERING.
@@ -2046,6 +2104,12 @@ function drawOverlay(A) {
   if (state.tracers) OVERLAY.drawTracers(ctx, view, state.tracers);
   const meas = state.measDrag || state.measure;
   if (meas) OVERLAY.drawMeasure(ctx, view, meas);
+  if (state.cvDrag) {
+    OVERLAY.drawCV(ctx, view, { x0: Math.min(state.cvDrag.x0, state.cvDrag.x1),
+                                y0: Math.min(state.cvDrag.y0, state.cvDrag.y1),
+                                x1: Math.max(state.cvDrag.x0, state.cvDrag.x1),
+                                y1: Math.max(state.cvDrag.y0, state.cvDrag.y1) });
+  } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv);
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -2657,6 +2721,7 @@ const RIG = (() => {
     };
     if (state.tracers) o.tracers = [r4(state.tracers.x), state.tracerN | 0,
                                     r4(state.tracers.trail)];
+    if (state.cv) o.cv = [r4(state.cv.x0), r4(state.cv.y0), r4(state.cv.x1), r4(state.cv.y1)];
     return o;
   }
 
@@ -2717,6 +2782,8 @@ const RIG = (() => {
     });
     state.rakes.length = 0;
     (o.rakes || []).slice(0, 2).forEach((x) => state.rakes.push({ x: +x, buf: null }));
+    state.cv = null;
+    if (Array.isArray(o.cv) && o.cv.length === 4) placeCV(+o.cv[0], +o.cv[1], +o.cv[2], +o.cv[3]);
     state.gaugeT = -1;
 
     const U = o.ui || {};
@@ -2739,6 +2806,7 @@ const RIG = (() => {
              (state.gauges.length === 1 ? "" : "s") : "") +
            (state.rakes.length ? " · " + state.rakes.length + " rake" +
              (state.rakes.length === 1 ? "" : "s") : "") +
+           (state.cv ? " · force box" : "") +
            " · scene " + id + (swapped ? " (unknown scene “" + o.scene + "”)" : "");
     return note;
   }
@@ -3147,6 +3215,8 @@ window.APP = {
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
   frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
   probe: (x, y) => SIM.probe(x, y),
+  boxForce: (x0, y0, x1, y1) => SIM.boxForce(x0, y0, x1, y1),   // one raw integral
+  placeCV,                                 // the Force box tool, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {
     const c = SIM.columns(); let v = 0;

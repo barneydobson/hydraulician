@@ -498,10 +498,11 @@ const EXERCISES = [
     viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "head" },
     digitNote: "lecturer demo: no personalised parameter",
     instruments: [
-      { tool: "gauge", where: "in the free jet and again on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
+      { tool: "cv", where: "Force box (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
+      { tool: "gauge", where: "optionally in the free jet and on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
     ],
     start: "the jet-on-a-plate rig, as a lecturer demonstration",
-    task: "Run the two bookends of the jet rig - flat plate, then the capped deep-V - and compute F = ρqv(1 − cos θ) on the board: ≈3 480 against ≈6 840 N/m, the factor of two a Pelton bucket collects.",
+    task: "Read F→ off the Force box: flat plate ≈4.3 kN/m, then redraw as the 6-stroke Pelton cup (README table) and the same box reads ≈7.3 — the bucket's near-doubling, measured. Move the box: the number holds, which IS the control-volume theorem. The textbook deep-V reads only ≈5.2 and visibly floods.",
     settle: 5,
   },
 

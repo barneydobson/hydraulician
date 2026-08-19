@@ -9,7 +9,12 @@
  *
  *   JETRIG.build()          // spout + erase the sandbox's own ledges
  *   JETRIG.flat()           // draw the flat plate (stagnation demo)
- *   JETRIG.deepV()          // swap to the deep-V splitter (theta ~165 deg)
+ *   JETRIG.cup()            // the Pelton cup: 6 strokes, turn ~165 deg, exit
+ *                           //   down-back so gravity clears the spent sheet
+ *   JETRIG.deepV()          // the textbook deep-V splitter -- kept as the
+ *                           //   "why shape matters" act: it FLOODS (see the
+ *                           //   force-box notes at the bottom of this file)
+ *   JETRIG.box()            // place the demo's Force box (the CV instrument)
  *   JETRIG.prime()          // settle ~5 sim-s -- call repeatedly (runner pump)
  *   JETRIG.stagnationGauges()   // drop the two gauges used for the head check
  *
@@ -128,7 +133,24 @@
 window.JETRIG = {
   SPOUT: { x: 0.70, y: 2.50, r: 0.09, vx: 4.5, vy: 0.0 },
   FLAT_X: 1.35,
-  V_APEX: [1.60, 2.45], V_HALF_DEG: 15, V_ARM: 0.9,
+  // Apex moved from the original (1.60, 2.45): at 1.60 the mouth lands at
+  // x = 0.73, inside the spout's own footprint, and NO control-volume face
+  // fits between source and vane — a face through the pressurised cavity
+  // reads its P term as force (9.5k, box-dependent, meaningless). At 1.90
+  // the mouth sits at 1.03 and the shipped Force box encloses the whole V.
+  V_APEX: [1.90, 2.40], V_HALF_DEG: 15, V_ARM: 0.9,
+  // One half of a Pelton bucket in section, drawn on the MEASURED jet
+  // trajectory (arrival core 2.37–2.57 at x = 1.1, u ≈ 4.4): entry lip above
+  // the jet, r ≈ 0.36 arc about (1.08, 2.28), exit lip throwing the sheet
+  // down-and-back so gravity drains it under the spout. Chained butt ends at
+  // 150–160 deg kinks overlap their stamped rectangles and seal — no caps
+  // needed (unlike the V's 30 deg apex).
+  CUP: [[1.10, 2.64], [1.30, 2.58], [1.42, 2.42], [1.44, 2.22],
+        [1.34, 2.04], [1.16, 1.94], [0.98, 1.92]],
+  // The demo's canonical Force box: encloses plate, cup AND the (moved) V;
+  // upstream face at 0.85 clears the spout footprint (edge at 0.79) — a box
+  // that swallows the spout encloses a SOURCE and stops reading a force.
+  BOX: [0.85, 1.55, 2.05, 3.20],
   ERASE_SEGS: 1,
 
   C: function (id) { return CONTROLS.find(function (c) { return c.id === id; }); },
@@ -157,6 +179,22 @@ window.JETRIG = {
     APP.SIM.addSeg(JETRIG.FLAT_X, 2.00, JETRIG.FLAT_X, 3.00, 0.06, 255);
     syncPanel(); APP.frames(2);
     return { kind: 'flat', x: JETRIG.FLAT_X };
+  },
+
+  cup: function () {
+    JETRIG.clearDeflector();
+    var P = JETRIG.CUP;
+    for (var k = 0; k + 1 < P.length; k++)
+      APP.SIM.addSeg(P[k][0], P[k][1], P[k + 1][0], P[k + 1][1], 0.06, 255);
+    syncPanel(); APP.frames(2);
+    return { kind: 'cup', strokes: P.length - 1 };
+  },
+
+  /** The demo's Force box (control-volume instrument, tool 9). */
+  box: function () {
+    var B = JETRIG.BOX;
+    APP.placeCV(B[0], B[1], B[2], B[3]);
+    return { kind: 'box', at: B };
   },
 
   d45: function () {
@@ -223,4 +261,28 @@ window.JETRIG = {
                        source:{x:0.7,y:2.5,r:0.09,vx:4.5,vy:0}, open:"0,0,1,0"}
    JETRIG.flat(); JETRIG.prime(5); JETRIG.stagnationGauges(); JETRIG.prime(3);
    JETRIG.deepV();  // theta -> 165 deg splitter
-   JETRIG.d45(); JETRIG.d90();  // the other two turning-series shapes (MO-2) */
+   JETRIG.d45(); JETRIG.d90();  // the other two turning-series shapes (MO-2)
+
+   FORCE-BOX MEASUREMENTS (2026-08-19, Medium, 10 s windows after >=8 s
+   settle, mean +/- sd of the raw integral; full record in _archive/):
+
+     bare jet flux at x 0.85-1.4    3355-3500 N/m   (rho.q.v board figure 3.5k)
+     flat plate                     4261 +/- 258    two boxes agree to 0.1%
+     cup                            7306 +/- 192    ratio 1.71; exit sheet
+                                                    5.3-5.9 m/s ~18 deg below
+                                                    horizontal; rho.q(v_in +
+                                                    v_out cos26) rebuilds 7.3k
+     deep-V (apex 1.90, capped)     5228 +/- 360    FLOODS: ~290 kg/m standing
+                                                    in the box, mouth is f~1.02
+                                                    mush, ratio only 1.23
+     empty box                      0 +/- 0         null check
+     wall-pressure integral, plate  4609 +/- 399    independent, +8% vs box
+
+   The V's shortfall is physics, not a bug: a deep wedge in the VERTICAL
+   plane cannot drain, so it runs as a flooded cavity and the "return" is a
+   slow spill. Tried and killed: gamma=20 (floods worse, 4438), an apex drain
+   notch (no change, 5397), a trajectory-tilted V (lower arm becomes a shelf,
+   pools 500 kg/m, 4498), an up-turning J-hook (droop-sensitive, ploughed,
+   3697), plan-view g=0 (spent water never leaves: 26 m^2 accumulated in
+   65 s). The cup wins because its turn is momentum-dominated (v^2/r ~ 13 g)
+   while its EXIT is gravity-drained -- each regime used where it is strong. */

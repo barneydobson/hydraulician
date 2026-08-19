@@ -521,10 +521,11 @@ const EXERCISES = [
     viewParams: { speed: 0.2, gaugeField: "head" },
     digitNote: "your nozzle gap is DRAWN: gap = 0.14 × (1 + (d mod 6)) m, in two pieces about y = 3.5",
     instruments: [
-      { tool: "gauge", where: "x = 30 m, y = 3.5 m", why: "mid-pipe, on the axis — reads H₀ then the plateau H₁" },
+      { tool: "gauge", where: "x = 30 m, y = 3.5 m — expand its card (⤢) to read the trace", why: "mid-pipe, on the axis — reads H₀ then the plateau H₁" },
+      { tool: "rake", where: "mid-pipe, x ≈ 30 m", why: "the rake chip's V is the bore-mean — that is v₀" },
     ],
     start: "a 60 m pipe from a reservoir to a valve, running steadily",
-    task: "Redraw the plate to your own nozzle gap, read the bore-mean V and the gauge head H₀, then press V to slam the valve and pause on the first flat top for H₁.",
+    task: "Redraw the plate to your own nozzle gap, read v₀ off a mid-pipe rake and H₀ off the expanded gauge trace, then press V to slam the valve and pause on the first flat top for H₁.",
     settle: 15,
   },
   {

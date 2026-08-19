@@ -44,13 +44,14 @@ metres:
    held to snap vertical: pipe floor (y = 2.0) up to y = 3.5 − gap/2, and
    y = 3.5 + gap/2 up to the pipe roof (y = 5.0). Measure (toolbar) checks it.
 3. Press `R` and let it reach steady state — about **15 s**; the card counts
-   it down. Hover mid-pipe for the bore-mean **V**, which is your **v₀**
-   (ignore the readout's y_c and S₀ lines — those belong to open channels),
-   and drop a Gauge (`5`) at x = 30 m on the pipe axis for its steady **H**.
-   Call that **H₀**.
-4. Press `V` to slam the valve, then **space** to pause on the first flat top
-   for **H₁** — read the plateau, not the ringing spike on the wave front —
-   and submit **gap, v₀, ΔH = H₁ − H₀**.
+   it down. Drop a Rake (`6`) mid-pipe: its chip prints **V**, the bore-mean
+   velocity — that is your **v₀**. Drop a Gauge (`5`) at x = 30 m on the pipe
+   axis and expand its card (the **⤢** button opens the gauge inspector, a
+   full-width trace that is much easier to read than the corner card). Its
+   steady **H** is **H₀**.
+4. Press `V` to slam the valve, then **space** to pause. Read **H₁** off the
+   first flat top of the inspector trace — the plateau, not the ringing spike
+   on the wave front — and submit **gap, v₀, ΔH = H₁ − H₀**.
 
 ## For the instructor — pooling the class
 

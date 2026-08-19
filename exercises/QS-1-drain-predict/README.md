@@ -6,9 +6,8 @@ different number. Before anyone touches the app they do the integral by hand:
 given the tank's plan width, the orifice size and the scene's own measured
 discharge coefficient, predict how long the surface takes to fall from h₁ to
 h₂. Then they switch the spout off, watch the number on the gauge fall, and
-time it for real. The payoff is a scatter of (predicted, measured) pairs
-against the 1:1 line — a wager each student made against their own stopwatch
-before a wheel was turned.
+time it for real. The result is a scatter of (predicted, measured) pairs
+against the 1:1 line.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **QS-1**, or use the direct link

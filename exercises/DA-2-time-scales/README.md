@@ -6,8 +6,7 @@ width, fill head and orifice gap all shrunk together — fills it, releases the
 orifice and times the fall between two marked, scale-appropriate levels.
 Pooled on log-log axes, t against λ is a straight line of slope **½**: the
 λ = ¼ tank drains in almost exactly half the time of the λ = 1 tank, not a
-quarter and not the same — kinematic similarity measured with a stopwatch
-rather than asserted from a slide.
+quarter and not the same.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **DA-2**, or use the direct link
@@ -91,10 +90,9 @@ shipped class gives slope 0.555 ± 0.009 with R² = 0.998.
 
 ### Discussion points
 
-- **Watch the rate fall while they wait.** The gauge trace flattens as the
-  tank empties, because discharge follows √h and not h — the same √h that put
-  the ½ into the time scale. It is also why the marked window stops at 0.3 h₀
-  instead of running to empty.
+- The gauge trace flattens as the tank empties, because discharge follows √h
+  and not h — the same √h that put the ½ into the time scale. It is also why
+  the marked window stops at 0.3 h₀ instead of running to empty.
 - **The measured slope is 0.555, not 0.500, and that residual is the
   lesson.** `C_d` is not quite constant across the ladder — mean 0.603, ±3–4%
   scatter, no monotone trend — so a thin plate stays close to Froude-similar

@@ -86,10 +86,10 @@ Fr = 1 crossing back to the lip in `y_c` units against the textbook 3–4 `y_c`.
   textbook quotes. That figure is derived for a channel arriving at normal
   depth on a real slope; a flat crest has no uniform-flow reach for a drawdown
   curve to depart from, so the whole crest *is* the drawdown curve.
-- **Watch the assumption break.** Hover across the last three or four columns
-  on the lip and watch the depth fall away. That is curvature defeating the
-  hydrostatic pressure assumption `y_c` is built on — visible, repeatable, and
-  the reason `y_brink < y_c` is a result rather than solver noise.
+- Hover across the last three or four columns on the lip — the depth falls
+  away. That is curvature defeating the hydrostatic pressure assumption
+  `y_c` is built on — visible, repeatable, and the reason `y_brink < y_c` is
+  a result rather than solver noise.
 
 The full verification record — the crest-length iteration, the level-margin
 and no-tailwater checks, the measured per-digit table, safe bounds and

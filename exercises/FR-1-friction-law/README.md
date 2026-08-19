@@ -72,8 +72,8 @@ exponent forced to 2).
 
 - **What the friction slope looks like.** Field is already on Pressure head:
   the HGL is *visibly* a straight fall along the bore, and S_f = h_f/L is the
-  gradient of that fall. Hover along the pipe at a fixed height and watch
-  `head p/ρg` drop linearly — that picture is what the equation is about.
+  gradient of that fall. Hover along the pipe at a fixed height: `head p/ρg`
+  drops linearly — that picture is what the equation is about.
 - **Why the exponent is steeper than 2.** The wall stress here comes from a
   sub-grid eddy viscosity that itself strengthens as the flow speeds up, so λ
   climbs with V rather than sitting still. A real rough pipe does the opposite

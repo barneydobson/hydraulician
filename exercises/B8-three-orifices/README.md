@@ -5,9 +5,8 @@ area — the jet necks down to a **vena contracta** first. C_c is that necking
 ratio, and its value depends entirely on the shape of the entry: sharp edge,
 rounded bellmouth, or a re-entrant Borda tube. Each student is handed one of
 the three, measures C_c off the jet, and the pooled class splits into
-clusters. One of them is worth an hour on its own: the Borda value is
-**provable from ten lines of momentum**, with no empirical coefficient
-anywhere in the derivation.
+clusters. The Borda value is **provable from ten lines of momentum**, with no
+empirical coefficient anywhere in the derivation.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **B8**, or use the direct link

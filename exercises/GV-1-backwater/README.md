@@ -7,7 +7,7 @@ station rather than the discharge. Pooled, the class's own points trace the
 whole backwater curve; laid over a direct-step integration they collapse onto
 it to a fraction of a millimetre, everywhere except the last half-metre
 against the weir face, where the 1D hydrostatic assumption visibly, honestly,
-gives up. A validation study, run by the room.
+gives up.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **GV-1**, or use the direct link

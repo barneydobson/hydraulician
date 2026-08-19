@@ -7,8 +7,8 @@ accelerating jet) and the panel's own discharge, each student computes two
 numbers a first-year formula sheet already gives them: a discharge coefficient
 and a control-volume thrust. Pooled, the C_d's land in a tight cluster around
 0.6 across openings that differ by 60% — a constant nobody typed in anywhere.
-The thrust does not track a naive hydrostatic guess at all, and closing that
-gap *is* the momentum equation's job.
+A **Force box** then measures the thrust on the same control volume, so both
+formula-sheet estimates can be compared with the force the flow delivers.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **MO-1**, or use the direct link
@@ -28,7 +28,18 @@ with ρ = 1000 kg/m³ and g = 9.81 m/s². The discharge is **q = 0.330 m²/s for
 the whole class** — your opening and its paired reservoir level are the
 personalisation. The bed's top face is at **y = 0.50 m** above the datum and
 the gate stands at **x = 5.50 m**, so your opening is `a` = (gate bottom
-− 0.50). Compute `naive` as well as `F_R`: the gap between them is the point.
+− 0.50). Compute `naive` as well as `F_R`.
+
+The **Force box** (tool `9`) evaluates the momentum theorem on the box you
+drag: the flux and pressure integral over its four faces, time-averaged, with
+the real flutter printed after the ±. **F→** is the number to read; gravity
+never enters the horizontal budget. Put its upstream face at the gauge station
+and its downstream face at the vena station and the box *is* the control volume
+the `F_R` formula is written on — with two differences. It uses the pressure
+and the velocity that are actually on those faces instead of assuming
+hydrostatic pressure and uniform velocity, and it holds the bed as well as the
+gate, so it carries the bed friction over the enclosed run (measured below:
+1.9 – 6.3% of the reading).
 
 ## Your gate opening
 
@@ -59,13 +70,26 @@ q = 0.330 at that opening, so it needs no iteration.
    springing out under the gate.
 5. Read **y₀** off the gauge card's `h`, then hover at **x = 5.63 m** and read
    the box's *depth h* as **y₁** — do not hover closer to the gate, where the
-   box smooths across the opening and reads far too deep. Submit **a, y₀, y₁,
-   C_d, F_R** (with your `d`).
+   box smooths across the opening and reads far too deep.
+6. Pick the **Force box** (`9`) and drag from **(3.50, 0.30)** to **(5.63,
+   3.20)**: upstream face at the gauge station, downstream face at the vena
+   station, bottom face inside the bed, top face clear of the gate. Give the
+   card a few seconds to fill its average, then read **F→**. Drag a second box
+   — **(4.50, 0.50) → (5.63, 2.00)** — and check the reading holds. Submit
+   **a, y₀, y₁, C_d, F_R, F→** (with your `d`).
+
+![the Force box on the shipped 7-cell rig, reading F→ 1625 ±33 N/m](shots/04-force-box.png)
+
+Face rules: top anywhere above the water, bottom on or inside the bed,
+downstream clear of the gate plate, upstream clear of the reservoir edge.
+Breaking them costs real percent — a top face cut through the pool reads 15%
+low, a downstream face through the plate reads half a plate — the numbers are
+in the archive.
 
 ## For the instructor — pooling the class
 
-Collect one row per student (`student,digit,a_m,q,y0_m,y1_m,Cd,FR_N_per_m`),
-export the CSV and run:
+Collect one row per student (`student,digit,a_m,q,y0_m,y1_m,Cd,FR_N_per_m`,
+plus the box reading), export the CSV and run:
 
 ```bash
 python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
@@ -75,24 +99,51 @@ python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 The script re-derives C_d, F_R and the naive comparator from (a, q, y₀, y₁)
 rather than trusting anyone's calculator, plots C_d against opening with the
 0.6 line and the pooled mean through it, and below that F_R against the naive
-hydrostatic guess.
+hydrostatic guess. Both lower-panel curves are *estimates*; the box measures
+the thing they estimate, and the table below is where each of them lands.
 
 ![pooled class plot](plots/pooled-demo.png)
 
+### What the box reads
+
+Headless, 40 raw integrals 0.25 s apart after a 90 s settle, one row per
+shipped opening. Forces are N/m.
+
+| a | y₀ (m) | y₁ (m) | C_d | **F→ measured** | board F_R | naive | F→ vs F_R | F→ vs naive |
+|---|---|---|---|---|---|---|---|---|
+| 5 cells | 1.258 | 0.110 | 0.611 | **6513 ± 55** | 6791 | 6474 | −4.1% | +0.6% |
+| 6 cells | 0.920 | 0.125 | 0.596 | **3112 ± 39** | 3323 | 3060 | −6.4% | +1.7% |
+| 7 cells | 0.717 | 0.143 | 0.578 | **1646 ± 29** | 1809 | 1562 | −9.0% | +5.4% |
+| 8 cells | 0.585 | 0.160 | 0.560 | **885 ± 43** | 1061 | 830 | −16.5% | +6.7% |
+
+The reading is box-independent: the second box agrees to 0.3% or better at
+every opening, and repeat cold starts of the same rig agree to 0.5% (7 cells:
+1642, 1646, 1648; 5 cells: 6540 and 6513). Net outflow through the faces
+time-averages to under 0.5% of ρq ≈ 330 kg/s per m, so the control volume is
+closed.
+
 ### Discussion points
 
-- **What would make hydrostatics right?** Zero velocity — `naive` is the exact
-  answer in the V → 0 limit. Switch Field → Speed and look at the jet
-  springing out under the gate: that momentum flux is precisely what a static
-  wall cannot feel, and it is why the gap grows from ~5% to ~28% as the gate
-  opens.
-- **Why does C_d drift down (0.611 → 0.560) rather than sit flat?** y₀/a falls
-  from 11.6 to 3.4 across the class, and the "deep upstream, small opening"
-  assumption behind the idealised orifice constant is best obeyed by the
-  smallest openings. The coefficient is slowly varying, not constant, and a
-  spread-out class measures the trend without being told to look for it.
+- **Which number is the force?** F→; `F_R` and `naive` are estimates of it.
+  The box reads 4 – 17% under `F_R` and within a few % of `naive`. Both of
+  the formula's assumptions fail at the vena face, measurably: the pressure
+  there is 1.68 × hydrostatic and the momentum flux 1.25 × ρqV₁ (Rake `6` at
+  x = 5.63 shows the jet core at 3.18 m/s against q/y₁ = 2.31). `naive` does
+  well here because the pool is nearly still and the gate's downstream face
+  is dry, so the plate carries close to plain hydrostatic thrust.
+- **The `F_R` − `naive` gap tracks y₁, not the momentum flux.** This rig's
+  jet barely contracts (y₁/a ≈ 0.94 at 7 cells against the textbook
+  C_c ≈ 0.61 — a resolution property of a 5–8 cell opening). With the
+  textbook y₁ the ordering would reverse: `F_R` would sit 7% below `naive`.
+  Say so rather than teach around it.
+- **C_d drifts down (0.611 → 0.560) rather than sitting flat** because y₀/a
+  falls from 11.6 to 3.4 across the class, and the idealised orifice constant
+  is best obeyed by the smallest openings. A spread-out class measures the
+  trend without being told to look for it.
 
 The full verification record — the ponding trap and why the apron is
 truncated, the boundary-strategy measurement, the hover-fidelity scan behind
-the x = 5.63 m station, the safe opening band and troubleshooting — is kept locally, out of version control, at
+the x = 5.63 m station, the safe opening band, and the force-box record (the
+three-box decomposition, the wall-pressure cross-check, the face-placement
+costs) — is kept locally, out of version control, at
 `exercises/MO-1-gate-cv/_archive/README-full.md`.

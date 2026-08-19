@@ -1,8 +1,7 @@
 # B6 · Ursell number: when Airy stops being enough
 
 Every student raises a long, shallow wave, measures its height, wavelength
-and still-water depth, and computes the Ursell number. Nobody has to be told
-the wave has stopped being sinusoidal — the class can just look at it: the
+and still-water depth, and computes the Ursell number. The
 crest stands up into a peak, the trough spreads out flat, and the longer the
 personalised period, the more pronounced that lopsidedness gets.
 

@@ -94,7 +94,7 @@ band that leaves the λ = ¼ droop visible rather than hiding it.
 - **The droop is the handover to DA-3.** λ = 1 sits +1.6% above the pooled
   curve, λ = ½ +0.4%, λ = ¼ −2.4% — monotone in λ, and refining the grid
   moves it by only 0.45%, so it is not a mesh artefact. What does not shrink
-  with the model is writing it: a free surface always ~2 cells thick is 25%
+  with the model is the grid: a free surface always ~2 cells thick is 25%
   of H at λ = ¼ against 6% at λ = 1, and the eddy viscosity is tied to Δx,
   not to λ^1.5. That is this solver's version of Re and We refusing to follow
   Froude.

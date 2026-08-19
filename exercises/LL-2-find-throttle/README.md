@@ -6,8 +6,7 @@ it went. B's only tool is four pressure gauges: walk them along the pipe, read
 the piezometric head, and the fault announces itself as a kink in an otherwise
 straight line. Locate it, size its loss coefficient from the kink, submit both
 numbers. Every pair hides a different fault, so every pair's answer is
-different — the most copy-proof submission in the pack, and exactly how a
-utility finds a half-shut valve in a buried main.
+different — exactly how a utility finds a half-shut valve in a buried main.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **LL-2**, or use the direct link
@@ -97,9 +96,7 @@ illustrative rather than a measured power law.
   HGL kink was the only evidence there was, exactly as for a buried main.
 - **The correction is not optional.** Ask what k_L would have been if nobody
   subtracted the background share: for the smaller (2-cell) faults it is a
-  25–30% error, bigger than the pair-to-pair spread in k_L itself. A kink is a
-  kink relative to something, and that something has to be measured, not
-  assumed to be zero.
+  25–30% error, bigger than the pair-to-pair spread in k_L itself.
 
 The full verification record — how the 2–3 cell severity band and the
 4.6–7.0 m x-band were measured, why the background slope cannot be taken from

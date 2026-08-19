@@ -2,12 +2,11 @@
 
 A horizontal pressurised pipe is fed from a reservoir. Take a stretch of it in
 the middle and carry it over a hill — invert and soffit lifted together, bore
-unchanged. Nothing happens. Lift it again. Nothing happens. Keep going and at
-one particular height the pipe stops being a pipe: an air pocket opens under
-the crown, the crest gauge flattens onto the soffit, and the discharge stalls.
-That height is not a property of the pipe or of the pump — it is the elevation
-of the **hydraulic grade line** at the crest, which the class has already
-measured with two gauges either side.
+unchanged. Keep going and at one particular height the pipe stops being a
+pipe: an air pocket opens under the crown, the crest gauge flattens onto the
+soffit, and the discharge stalls. That height is not a property of the pipe
+or of the pump — it is the elevation of the **hydraulic grade line** at the
+crest, which the class has already measured with two gauges either side.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **B10**, or use the direct link

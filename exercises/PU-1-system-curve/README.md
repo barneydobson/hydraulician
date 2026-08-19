@@ -2,11 +2,10 @@
 
 Every student turns their own rising main's pump up or down, reads the head it
 takes at the discharge flange, and submits `(Q, H)`. Pooled, the class's points
-trace the system's own resistance curve — nobody fitted a formula, they
-measured a real duct's response to being asked for more flow. Then the lecturer
-hands out a manufacturer-style pump curve on paper, the class finds the
-intersection graphically, and one student imposes that exact `Q` live: the
-flange gauge should land on the head the graph predicted.
+trace the system's own resistance curve. Then the lecturer hands out a
+manufacturer-style pump curve on paper, the class finds the intersection
+graphically, and one student imposes that exact `Q` live: the flange gauge
+should land on the head the graph predicted.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **PU-1**, or use the direct link

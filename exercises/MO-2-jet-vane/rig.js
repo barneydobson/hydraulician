@@ -9,7 +9,9 @@
  *
  *   JETRIG.build()          // spout + erase the sandbox's own ledges
  *   JETRIG.flat()           // draw the flat plate (stagnation demo)
+ *   JETRIG.d45(); JETRIG.d90()  // the 45 deg ramp and the 90 deg corner
  *   JETRIG.deepV()          // swap to the deep-V splitter (theta ~165 deg)
+ *   JETRIG.box()            // place the turning series' Force box (tool 9)
  *   JETRIG.prime()          // settle ~5 sim-s -- call repeatedly (runner pump)
  *   JETRIG.stagnationGauges()   // drop the two gauges used for the head check
  *
@@ -19,7 +21,7 @@
  *         │                                    ┃         │
  *         │  air below -- no bed, floor is OPEN (drains  │
  *   y=0.0 └──at the free-fall rate, CLAUDE.md)───────────┘
- *         0    0.55  0.70          1.35 (flat)  1.60(V apex)  9.0
+ *         0    0.55  0.70          1.35 (flat)  1.90(V apex)  9.0
  *
  * Every call below is a documented app entry point (same style as PU-1/MO-1's
  * rig.js in sibling folders):
@@ -65,9 +67,10 @@
  *     flight (visibly arcing -- fine for teaching a free jet's trajectory,
  *     wrong if you want a clean stagnation-vs-v^2/2g number). This is WHY
  *     the flat plate and 45/90 ramps sit close in (x=1.00-1.35, 0.3-0.65 m
- *     of flight) while the deep-V's APEX sits at x=1.60 (0.9 m) but its
- *     MOUTH -- where the return flow is actually read -- sits upstream at
- *     x=0.73, i.e. only 0.03 m of net extra flight beyond the plate case.
+ *     of flight) while the deep-V's APEX sits at x=1.90 (1.2 m) but its
+ *     MOUTH -- where the flow enters the vane -- sits upstream at x=1.03,
+ *     i.e. 0.33 m of flight, less than the plate's. The V is drooped into,
+ *     not aimed at: the jet arrives at the apex 15-25 deg below horizontal.
  *
  *   · STAGNATION HEAD is read from the RAW per-cell probe/gauge, not
  *     `OVERLAY.analyse`'s column reduction -- and that matters for the
@@ -106,29 +109,47 @@
  *     which is why this rig uses it. THE APEX MUST BE CAPPED: two segments
  *     sharing a butt endpoint (CLAUDE.md) do not seal the point they meet
  *     at -- verified by mask query, mask=0 (leaky) at the bare apex, fixed
- *     with one short extra segment plugging it, mask=255 after. Arm length
- *     matters too: an oversized V (first attempt, arm 0.9 m at apex x=1.60)
- *     put the MOUTH at x=0.731, almost on top of the spout at x=0.70 --
- *     contaminated every downstream reading with the raw Dirichlet source
- *     value (u=4.5,v=0 exactly). Keep >=0.35 m clearance between the
- *     spout's own footprint edge and the V's mouth.
+ *     with one short extra segment plugging it, mask=255 after. APEX POSITION
+ *     is what moved: the first build put the apex at x=1.60, which lands the
+ *     MOUTH at x=0.731, almost on top of the spout at x=0.70. That was known
+ *     to contaminate probe readings with the raw Dirichlet source value
+ *     (u=4.5,v=0 exactly); with the Force box it is fatal, because no CV face
+ *     fits between source and vane at all and a face cut through the
+ *     pressurised cavity reads its P term as force (8.0-9.5 kN/m, and the
+ *     number changes with the box). Apex moved to (1.90, 2.40): mouth at
+ *     1.031, so the shipped box at x=0.85 clears the spout footprint edge
+ *     (0.79) and still encloses the whole vane. Keep >=0.35 m clearance
+ *     between the spout's own footprint edge and the V's mouth.
  *
- *   · ACHIEVED TURN ANGLE (deep-V, gamma=15, apex (1.60,2.45), arm 0.9 m).
- *     Measured at a clean station x=0.55 (upstream of the spout footprint
- *     [0.61,0.79], so genuinely clear of the source): returning stream
- *     u=-5.29..-5.85 m/s, v=-0.26..+0.12 m/s (three repeat reads, ~0.4 sim-s
- *     apart) -- fast (as fast as or faster than the incoming jet) and
- *     almost perfectly horizontal, direction 179-183 deg in the lab frame.
- *     Crediting the incoming jet's own arrival angle at the apex (drooped
- *     ~15-25 deg below horizontal after 0.9 m of flight, not the nominal
- *     0 deg launch angle), the CV turn is ~160-165 deg -- matching the
- *     geometric design (165 deg) well. Method: velocity VECTOR at a station
- *     clear of both the source and the V, not a color read off the display.
+ *   · WHAT THE DEEP-V ACTUALLY DOES (gamma=15, apex (1.90,2.40), arm 0.9 m,
+ *     capped). It FLOODS. A wedge this deep cannot drain in the vertical
+ *     plane, so the geometric 165 deg turn is not the turn the water makes.
+ *     Measured (6 reads, 0.4 sim-s apart, wet cells f>0.5): inside the mouth
+ *     at x=1.05 the mean speed is 1.90 m/s with u running -2.77..+2.29 --
+ *     slow churn, f~0.99, pressurised mush, not a stream; deeper in at
+ *     x=1.20 the mean speed is 0.63 m/s, i.e. nearly stagnant. What gets
+ *     back past the spout (station x=0.55, clear of the source footprint) is
+ *     a FALLING curtain, u=-1.46 v=-4.31 mean, not the fast horizontal
+ *     back-jet the old apex-1.60 build measured (u=-5.3..-5.9, v~0, turn
+ *     ~160-165 deg). That old number was read with the mouth sitting on the
+ *     spout and does not describe the shipped rig. Consequence for the
+ *     board: F comes out at 0.76 of rho.q.v(1-cos165), see the force-box
+ *     table at the bottom of this file.
  * ==========================================================================*/
 window.JETRIG = {
   SPOUT: { x: 0.70, y: 2.50, r: 0.09, vx: 4.5, vy: 0.0 },
   FLAT_X: 1.35,
-  V_APEX: [1.60, 2.45], V_HALF_DEG: 15, V_ARM: 0.9,
+  // Apex moved from the original (1.60, 2.45): at 1.60 the mouth lands at
+  // x = 0.73, inside the spout's own footprint [0.61, 0.79], and NO
+  // control-volume face fits between source and vane. At 1.90 the mouth sits
+  // at 1.031 and the Force box below encloses the whole V. See the DEEP-V
+  // GEOMETRY note above.
+  V_APEX: [1.90, 2.40], V_HALF_DEG: 15, V_ARM: 0.9,
+  // The turning series' Force box: encloses the flat plate, the 45 deg ramp,
+  // the 90 deg corner AND the (moved) deep-V, with the upstream face at 0.85
+  // clear of the spout footprint edge (0.79) — a box that swallows the spout
+  // encloses a SOURCE and stops reading a force.
+  BOX: [0.85, 1.55, 2.05, 3.20],
   ERASE_SEGS: 1,
 
   C: function (id) { return CONTROLS.find(function (c) { return c.id === id; }); },
@@ -157,6 +178,13 @@ window.JETRIG = {
     APP.SIM.addSeg(JETRIG.FLAT_X, 2.00, JETRIG.FLAT_X, 3.00, 0.06, 255);
     syncPanel(); APP.frames(2);
     return { kind: 'flat', x: JETRIG.FLAT_X };
+  },
+
+  /** The turning series' Force box (control-volume instrument, tool 9). */
+  box: function () {
+    var B = JETRIG.BOX;
+    APP.placeCV(B[0], B[1], B[2], B[3]);
+    return { kind: 'box', at: B };
   },
 
   d45: function () {
@@ -222,5 +250,45 @@ window.JETRIG = {
 /* JETRIG.build() -> {dx:0.02174, grid:"414x230", dt:3.494e-4,
                        source:{x:0.7,y:2.5,r:0.09,vx:4.5,vy:0}, open:"0,0,1,0"}
    JETRIG.flat(); JETRIG.prime(5); JETRIG.stagnationGauges(); JETRIG.prime(3);
-   JETRIG.deepV();  // theta -> 165 deg splitter
-   JETRIG.d45(); JETRIG.d90();  // the other two turning-series shapes (MO-2) */
+   JETRIG.deepV();  // theta -> 165 deg splitter, apex (1.90, 2.40)
+   JETRIG.d45(); JETRIG.d90();  // the other two turning-series shapes (MO-2)
+   JETRIG.box();    // the Force box the whole series is read with
+
+   THE TURNING SERIES, MEASURED (2026-08-19, Medium, force box
+   (0.85,1.55)-(2.05,3.20); mean +/- sd of 40 raw SIM.boxForce integrals
+   0.25 sim-s apart, two such 10 s windows per shape, after >=10 s settle):
+
+     shape        theta  rho.q.v(1-cos)   F-> box         box/board  /plate
+     flat plate    90     3479 N/m        4310 +/- 430      1.24      1.00
+     45 deg ramp   45     1019            1270 +/- 210      1.25      0.295
+     90 deg corner 90     3479            3800 +/-  95      1.09      0.881
+     deep-V       165     6841            5170 +/- 350      0.76      1.20
+
+   Board figure from the bare jet, re-measured here at x=0.85-1.40 with no
+   deflector on the bench: q = 0.78-0.80 m^2/s, rho.int(f.u^2)dy = 3323-3502
+   N/m, momentum-weighted u = 4.16-4.44 m/s.
+
+   Reading the table:
+     · The plate and the ramp both sit ~1.25x above the board, so the RATIO
+       the board predicts survives: 1270/4310 = 0.295 against 0.293. The
+       excess is deflected water raining back onto the jet and being driven
+       in a second time.
+     · The 90 deg corner is NOT the plate's twin, though the board gives them
+       the same F: its ceiling blocks the upward split, so there is little
+       rain-back and it reads 3800, 11% under the plate and only 9% over
+       rho.q.v. It is also by far the steadiest reading (sd 95, i.e. 2.5%).
+     · The deep-V UNDER-delivers: 0.76 of the board, only 1.20x the plate,
+       because it floods (see the WHAT THE DEEP-V ACTUALLY DOES note above).
+       The same box holds 530 kg/m of water on the V against 340 on the
+       plate, and F-up reads -2824..-2994 against the plate's -315..-373.
+     · Box independence: a second box around the same shape agrees to ~1% on
+       the plate ([0.95,1.40,1.90,3.15]: 4262) and ~0.4% on the corner
+       ([0.90,1.20,1.80,3.00] and [0.85,1.00,2.05,3.20]: 3783/3784), ~5% on
+       the ramp ([0.90,1.30,2.20,3.05]: 1341) and ~7% on the churning V
+       ([0.90,1.35,2.25,3.10]: 5549). Mass closure (mdot) averages
+       -85..+27 kg/s/m against sds of 46-203 in every case -- zero within
+       flutter, i.e. no source inside the box.
+     · Live pipeline check (what the lecturer actually sees): the rig's own
+       path -- JETRIG.<shape>(); JETRIG.box(); settle 10 s; 900 frames --
+       gave card EMAs of F-> 4261 (plate), 1279 (45 deg), 3755 (90 deg) and
+       5185 (deep-V), against the raw-loop means 4310/1270/3800/5170. */

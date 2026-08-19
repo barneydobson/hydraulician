@@ -4,8 +4,7 @@ Every student closes their own nozzle twice: once at the slider's default
 celerity (70 m/s), once at double that (140 m/s). Joukowsky says
 ΔH = (c/g)Δv, so with the same Δv the two head rises should be in the same
 ratio as the two celerities — exactly 2.0. No physical rig can change a
-pipe's elastic modulus between two readings; this one does it with a slider,
-and the class watches its own point double.
+pipe's elastic modulus between two readings; this one does it with a slider.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **B2**, or use the direct link

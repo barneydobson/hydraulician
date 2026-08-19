@@ -1,8 +1,8 @@
 # UN-2 · Flow establishment: the asymptotic start
 
 A student starts from nothing: valve shut, pipe full, water dead still. They
-open the valve and watch the speed trace claw its way up to a plateau — not
-instantly, because 49 m of water has inertia. Read where it settles (u_max)
+open the valve and the speed trace rises to a plateau — not instantly, because
+49 m of water has inertia. Read where it settles (u_max)
 and how long it took to get within 10% of there (t_90), and the inertia-head
 derivation predicts the ratio between them before anyone has measured
 anything. Personalised by reservoir level, the class's pooled t_90 against

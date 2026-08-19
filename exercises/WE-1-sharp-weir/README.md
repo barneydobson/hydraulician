@@ -61,6 +61,21 @@ are just the crest plus the head the weir is about to produce.
    the surface near the inlet ripples or sags, your level is wrong.
 3. Read the gauge card at x = 4.5 m — it prints `1  h 0.xxx m`, steady to the
    last digit — take **H = h − 0.50**, and submit **q, H**.
+4. **Optional — what the plate carries.** The rating counts only the water
+   *above* the crest; the rest of the pool just presses on the plate. Pick the
+   **Force box** (`9`) and drag from **(2.00, 0.26)** to **(6.70, 1.60)** —
+   bottom face inside the bed (rest it on top of the bed instead and it misses
+   the plate's foot: 12% low), right face short of where the nappe lands. Give
+   the card a few seconds, then read **F→** against the hydrostatic pressure
+   diagram cut off at the crest,
+
+       F = ρ g P (h − P/2) = ρ g P (H + P/2)
+
+   which is 1962 N/m at q = 0.10, 2820 at q = 0.35 and 3350 at q = 0.55. `F→`
+   sits about 3% above it at every discharge — **2920 N/m** at q = 0.35 — and
+   moves under 1% if you redraw the box, say **(1.00, 0.10) → (6.60, 1.50)**.
+   The load on the plate is *linear* in H where the discharge is a 3/2 power.
+   Read `F→`; `F↑` is mostly the weight of the pool inside the box.
 
 ## For the instructor — pooling the class
 

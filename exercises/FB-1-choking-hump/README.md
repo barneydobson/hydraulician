@@ -4,7 +4,7 @@ Everyone runs the same flat-bed channel, held comfortably subcritical at both
 ends, at their own discharge — and draws a bed hump at mid-reach. Each student
 commits a **prediction** for the height that will choke it, computed from a
 depth and a discharge they measured themselves, *before* touching the hump.
-Then they raise it in steps and watch: the dip over the crest deepens, the
+Then they raise it in steps: the dip over the crest deepens, the
 Froude view's white break creeps toward the hump, and at some height the whole
 upstream pool steps up while the crest snaps supercritical. Raising a physical
 sill in 22 mm steps and re-settling a flume after each one is an afternoon, not
@@ -91,10 +91,10 @@ cell-quantisation error bars — and the same `Δz_c` against the re-timed
 
 ### Discussion points
 
-- **Watch the choke, don't just record it.** With Field → Froude number, take
-  one more step past `Δz_c`: the crest stays pale/orange however much taller
-  the hump goes, while the upstream pool keeps climbing. That is the crest
-  taking charge of the depth everywhere upstream of it.
+- With Field → Froude number, take one more step past `Δz_c`: the crest stays
+  pale/orange however much taller the hump goes, while the upstream pool
+  keeps climbing. That is the crest taking charge of the depth everywhere
+  upstream of it.
 - **Why is everyone's `Δz_c` about 1.9× their committed `Δz_pred`?** Not the
   sharp edge: a streamlined, ramped, broad-crested hump was built and tested
   and does *not* close the gap, while re-reading `E₁` at the last pre-choke

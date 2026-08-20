@@ -268,6 +268,10 @@ wave is also wide enough to erase the reaches that matter.
 - **Torricelli** (`jet`): efflux 5.62 m/s against √(2gh) = 5.8 m/s (Cv ≈ 0.97).
 - **Venturi**: nozzle jet 19.4 m/s against √(2gH) = 20.3 m/s.
 - **Mass balance** (`m2`): q = 0.251 in, 0.215–0.261 out, total volume steady.
+- **Flow establishment** (`estab`): t₇₅ vs ln 7·l·u_max/(2gH) over the ten-level
+  ladder fits at 101% of theory (R² 0.998), k = 4.2–4.3 throughout, and t₇₅ is
+  c-independent (30 vs 60: ~2%). The scene exists because hammer cannot host
+  this: there the rise finishes inside one wave transit.
 - **Conjugate depth** (`h23`, after the retune to q = 0.5): Fr₁ = 2.24,
   y₁ = 0.162 m, y₂ = 0.416 m against ½y₁(√(1+8Fr₁²) − 1) = 0.438 m, −5%. At
   the old q = 0.22 the same measurement read +65% — the jump was submerged,

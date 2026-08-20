@@ -58,7 +58,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | QS-1 | Predict the drain | QS-1-drain-predict/ | jet | (t_pred, t_meas) |
 | QS-2 | Two reservoirs find a level | QS-2-twin-tanks/ | RIG-C | (A₂, t_½) |
 | UN-1 | The class discovers c | UN-1-celerity/ | hammer + nozzle rungs | (v₀, ΔH) |
-| UN-2 | Flow establishment | UN-2-establishment/ | hammer | (level, u_max, t_90) |
+| UN-2 | Flow establishment | UN-2-establishment/ | estab | (level, u_max, t_75) |
 | UN-3 | Surge tank vs the ODE | UN-3-surge-tank/ | hammer + standpipe | (b_s, v₀, y_max, T) |
 | WV-1 | Dispersion, one period each | WV-1-dispersion/ | wavedeep + waveshallow | (T, L, flume) |
 | WV-2 | The buried wave gauge | WV-2-buried-gauge/ | wave + wavedeep | (T, ratio or "below noise") |

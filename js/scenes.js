@@ -528,6 +528,46 @@ const SCENES = (() => {
              "Push the celerity past ~90 m/s and the downsurge hits zero: column separation.",
              "Set wave damping to zero and the oscillation never dies."] },
 
+    // Establishment: shaped so the rigid-column derivation is actually valid,
+    // which the hammer scene cannot offer (there the rise is over inside one
+    // wave transit and the trace is Allievi's staircase). The rise must span
+    // several transits — t75/T = ln7·u_max·c/(8gH), so LOW head and a modest
+    // u_max — the entry must not shed (a sharp tank-to-pipe mouth grows a
+    // flapping vena over a flush time; the bellmouth chamfer takes the
+    // mid-pipe plateau noise from ~10% to 0.4–3%), and the spent jet must
+    // LEAVE (a tail reservoir drifts on the sponge's weak drain side, an
+    // apron ponds and drowns the exit; a free jet over the open bottom edge
+    // does neither). The exit orifice sets k ≈ 4 so u_max stays 2–2.8 m/s
+    // over the level ladder, and bulk 0.30 is load-bearing: a level change
+    // on the shut pipe excites the closed-pipe organ mode (period 4l/c ≈ 3 s)
+    // and without the damping it rings for minutes.
+    { id: "estab", name: "Flow establishment", key: "Rigid column",
+      group: "Pressure & transients",
+      blurb: "A reservoir, a 23 m full pipe, a shut valve. Open it and the column takes seconds to come up to speed: inertia against a loss that grows as u².",
+      W: 30, H: 8, c: 30, cf: 0.004, cs: 0.05, bulk: 0.30, nu: 1e-4,
+      valveOpen: 0, spinup: 12,
+      mode: 2, headMax: 6, hmax: 5, vmax: 4,
+      open: [1, 1, 1, 0],
+      spongeIn: 3.0,
+      inflow: { level: 3.8, q: 0, on: 1, free: 1 },
+      walls: () => [
+        [0.0, 1.0, 26.0, 1.0, 2.0],              // ground: solid to y = 2.0, the invert
+        [3.0, 3.05, 26.0, 3.05, 0.5],            // soffit: bore is y 2.0–2.8, l = 23 m
+        [3.0, 3.2, 3.0, 8.0, 0.3],               // tank wall above the soffit
+        [2.3, 3.45, 3.7, 2.85, 0.28],            // bellmouth chamfer on the soffit nose
+        [25.6, 1.95, 25.6, 2.20, 0.10],          // exit orifice …
+        [25.6, 2.60, 25.6, 2.85, 0.10],          //   … 0.4 m gap, sets k ≈ 4
+      ],
+      valves: () => [[25.0, 1.9, 25.0, 2.9, 0.12]],
+      // No floor past x = 26 and the bottom edge open: the jet free-falls out
+      // of the domain, so nothing ponds however long it runs.
+      water: (x, y, P) => (x < 3.0 ? (y < 3.8 ? still(3.8, y, P) : 0)
+                                   : x < 25.0 && y < 2.85 ? still(3.8, y, P) : 0),
+      tips: ["Press <b>V</b> to open the valve, then watch a mid-pipe gauge: the speed takes seconds to arrive — 23 m of water has inertia.",
+             "The plateau is set by head and losses, u_max = √(2gH/k); the time to get there is set by inertia.",
+             "Change the Slot celerity and the rise does not change: establishment is inertia, not elasticity.",
+             "The reservoir concedes a few centimetres under draw — read the level off its ∇ marker while the pipe flows."] },
+
     { id: "venturi", name: "Venturi contraction", key: "Bernoulli",
       group: "Pressure & transients",
       blurb: "A pressurised pipe with a throat. Head converts to velocity and back — the head map shows the drop and the imperfect recovery.",

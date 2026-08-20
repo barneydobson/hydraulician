@@ -54,6 +54,11 @@ Written briefs, data and plots for each one are in
 
 ## Method
 
+*Summary below. The full derivation — from the 2D Navier–Stokes equations
+through the piezometric head, the weakly-compressible closure, the
+discretisation and the wall treatment — is in
+[`docs/numerics.md`](docs/numerics.md).*
+
 The solver integrates the Navier–Stokes equations in the vertical plane: mass
 is conserved, and fluid accelerates under pressure, gravity, viscosity and bed
 drag.

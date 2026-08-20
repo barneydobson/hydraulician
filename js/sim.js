@@ -429,7 +429,13 @@ const SIM = (() => {
   }
 
   // -------------------------------------------------------------- readback
-  /** One cell: {f, dye, u, v, p, head}. Used by gauges and the hover readout. */
+  /** One cell: {f, dye, u, v, p, head}. Used by gauges and the hover readout.
+   *  `head` is the PRESSURE head p/ρg alone — no elevation term. In hydrostatic
+   *  water that is simply the submergence below the local free surface, so it
+   *  carries a unit vertical gradient everywhere wet and is not comparable
+   *  between cells at different heights. The piezometric head is h = z + p/ρg;
+   *  add the elevation yourself (see the gauge sampler in main.js). The name is
+   *  kept because `APP.probe()` is a public surface used by headless rigs. */
   function probe(x, y) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(y / S.dx)));

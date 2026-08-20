@@ -11,14 +11,29 @@ jets, rollers, pressurised pipes and water hammer.
 
 ## The model
 
+Full derivation in `docs/numerics.md` — multiphase (one-fluid VOF) 2D
+Navier–Stokes → heavy-fluid limit → piezometric head → weakly-compressible
+closure → discretisation → walls. That file is the place to
+put anything a reader needs to *understand* the scheme; keep this one for what a
+contributor needs to *not break* it.
+
 Barotropic **weakly-compressible Navier–Stokes** on a staggered (MAC) grid, with
 the cell fill fraction `f` doubling as the density:
 
 ```
-∂f/∂t + ∇·(f u) = 0                    exact, flux form
-∂u/∂t + (u·∇)u  = −∇p/ρ + g + ∇·(ν∇u) − C_f|u|u/Δ
-p/ρ = c² max(f − 1, 0)                 equation of state
+∂f/∂t + ∇·(f u) = 0                      exact, flux form
+∂u/∂t + (u·∇)u  = −∇P + χ(f)·g + ν_T∇²u − 1_wall·C_f|u|u/Δ
+P = p/ρ₀ = c² max(f − 1, 0)              equation of state
 ```
+
+`χ = smoothstep(0, 0.05, f)`
+is what survives of the multiphase weight `ρg → f·ρ_w·g` in the heavy-fluid limit
+(`ρ_w/ρ_a ≈ 800`): no water in a cell, no weight. With the air phase dropped
+`ρ → 0` in a void, the per-unit-mass momentum equation degenerates to `0/0`, and
+the velocity stored there is an extension field that must not be accelerated. `1_wall` restricts the friction to cells touching a
+solid: it is a **wall function** (a shear-stress BC divided by the cell height),
+not a bulk drag, which is why the delivered roughness is grid-dependent. And it
+is `ν_T∇²u`, *not* `∇·(ν_T∇u)` — the `∇ν_T·∇u` term is dropped.
 
 The EOS is the whole trick, and it is a **2D Preissmann slot**:
 
@@ -128,6 +143,20 @@ Three guard rails, each bought with an explosion:
     voids is advected and slowly bled away rather than zeroed — hard-zeroing it
     makes the air a rigid medium whose fake shear layer shreds any free jet
     within a metre of its nozzle.
+    **Keep gravity and `∇p` additive** and do not interpose anything new between
+    them (`docs/numerics.md` §4), or the hydrostatic state stops being a discrete
+    equilibrium. The implicit friction already sits between them, which is why
+    the balance is broken in wall-adjacent cells — a ~10⁻¹⁰ m/s-per-substep
+    defect at default settings, negligible but do not enlarge it.
+  - **Hydrostatic balance is a result, not an assumption.** Nothing imposes
+    `∂P/∂z = −g`; it is the condition for rest, and `P = 0` above `f = 1` fixes
+    the constant, giving the equilibrium fill `f = 1 + g(η−y)/c²` — which is
+    exactly `still()` in scenes.js. `docs/hydrostatic-attractor.js` verifies the
+    solver reaches it from a uniform (uncompressed) start: `|∂P/∂z + g|/g` falls
+    to 2×10⁻⁶ and the elevation implied by the pressure, `y + P/g`, is one number
+    at every depth. It takes ~100 s of simulated time, which is why scenes are
+    initialised with `still()` rather than uniform — a cold start would still be
+    settling at the end of a run.
   - **vof** — van Leer-limited flux-form advection of `f` (+ two dye channels)
     with an interFoam-style compression flux, and a **donor-cell positivity
     limiter**. See "Conservation" below — this is the single most important
@@ -171,6 +200,36 @@ Three guard rails, each bought with an explosion:
 - `S` R8 — 0 open, 128 valve, 255 wall. Rasterised CPU-side from a segment list
   so it can be undone and re-rasterised at any resolution.
 - `C` RGBA32F, nx×1 — column reduction: bed, depth, unit discharge, surface.
+
+## Notation
+
+Displayed symbols follow free-surface convention. Three different quantities
+get loosely called "head", so keep them apart:
+
+- `d` — water depth of the column.
+- `η` — water level: bed + `d`, above datum.
+- `h` — **piezometric** head, `h = z + p/ρg`. Absorbing gravity into the
+  pressure term turns the momentum equation into `Du/Dt = −g∇h + …`, so `h` is
+  the potential whose gradient drives the flow. It is
+  constant over the depth wherever the flow is hydrostatic, which is what makes
+  its *departure* from constant a direct measure of non-hydrostatic behaviour
+  (crests, brinks, gate vena contractas, chute toes, rollers, deep-water waves).
+- `H` — energy head, `h + αV²/2g`. Reserved; the overlay's energy grade line
+  carries it as `E`.
+
+`SIM.probe().head` is the **pressure** head `p/ρg` with no elevation term — in
+hydrostatic water it is just the submergence, so it carries a unit vertical
+gradient everywhere wet and is not comparable between cells at different
+heights. Rig scripts build the piezometric head themselves as
+`y + probe().head` (see `B6-ursell/rig.js`). The name is kept because
+`APP.probe()` is a public surface.
+
+The gauge `FIELDS` **keys** (`"head"`, `"depth"`) are serialised into permalinks
+and into every `ui.field` in `exercises-rigs.js` — rename the displayed symbol,
+never the key.
+
+`y_c` / `y_n` keep the entrenched open-channel symbols for critical and normal
+depth rather than `d_c` / `d_n`: they appear across 35 exercise briefs.
 
 ## Conservation — read this before touching the VOF pass
 

@@ -1931,6 +1931,11 @@ function sampleGauges(A) {
   state.gauges.forEach((gg) => {
     const pr = SIM.probe(gg.x, gg.y);
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(gg.x / sim.dx)));
+    // Piezometric head h = z + p/ρg. z is the gauge's y because every scene
+    // draws its bed as real geometry — except a tilted-gravity scene (m2),
+    // where the bed is flat and gravity carries S₀ instead, so the true
+    // elevation is y − S₀x. Gauge h there is short by S₀Δx between stations
+    // (0.20 m over m2's 13.6 m reach, against a working depth of 0.35 m).
     const s = { t: sim.t, head: gg.y + pr.head, depth: A.h[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
@@ -2116,7 +2121,7 @@ function drawOverlay(A) {
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
   const fld = state.gaugeField;
   const cards = OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-    fld === "head" ? "H" : fld === "depth" ? "h" : "|u|",
+    fld === "head" ? "h" : fld === "depth" ? "d" : "|u|",
     fld === "speed" ? "m/s" : "m");
   GINSP.tick(cards);
   if (state.inside && !state.drag) {
@@ -2304,9 +2309,13 @@ function dragWindow(el, handle, onPlace) {
  *  canvas because the things it needs (drag, wheel-zoom over a small target,
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
+  // Symbols follow free-surface convention: h is the piezometric head, d the
+  // depth and η the water level, leaving H free for the energy head. The KEYS
+  // are frozen — "head" and "depth" are serialised into permalinks and into
+  // every `ui.field` in exercises-rigs.js, so rename the symbol, never the key.
   const FIELDS = [
-    ["head",  "H", "m",   "piezometric head, z + p/ρg"],
-    ["depth", "h", "m",   "water depth of the column"],
+    ["head",  "h", "m",   "piezometric head, h = z + p/ρg"],
+    ["depth", "d", "m",   "water depth of the column"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],
   ];
   const open = [];              // live inspector windows

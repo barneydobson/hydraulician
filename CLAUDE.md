@@ -384,30 +384,17 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   `APP.frames(n)` (drives the whole frame including render), `APP.tick(n)`
   (physics only), `APP.probe(x,y)`, `APP.volume()`, `APP.zoomAt(px,py,factor)`,
   `APP.resetZoom()`.
-- `exercises/_runner/runner.py` was written for the Linux box it was made on
-  and will not run on macOS unmodified: it scans `/proc` for PIDs and probes
-  `/tmp/.X11-unix` for a display. Shim those two (`pgrep -f`, and a constant
-  true) rather than editing the runner. Two traps that each cost an hour: the
-  `chrome` on PATH must be an **exec wrapper script**, not a symlink — the
-  .app resolves its framework relative to the executable path, so a symlink
-  dies in dlopen — and a pgrep needle must not begin with `--`, because BSD
-  pgrep swallows `--user-data-dir=…` as its own options, matches nothing, and
-  cheerfully reports "killed 0" while the browser keeps running. If `launch`
-  fails through all four modes with "window.APP never appeared", the static
-  server has died: curl it before suspecting the runner or the GPU.
-- **The Force box is a momentum budget, not a dial**, and three things
-  invalidate a reading. A box enclosing a SOURCE — the spout's footprint, a
-  level control's relaxation sponge — is not measuring a force at all;
-  `boxForce`'s `mdot` is the closure check and fails loudly there. A number is
-  only trustworthy once a second, differently-placed box agrees: ~1% on steady
-  rigs, 5–8% on churning ones, and worse than that means a face is cutting
-  something it should not (a face through a pressurised cavity reads that
-  cavity's own P term as force, and the answer then moves with the box). And
-  every box also encloses whatever bed or duct wall crosses it — measured on
-  LL-1's expansion, F→ falls ~82 N/m per metre of enclosed duct — so keep
-  boxes as short as the enclosed hardware allows. A face inside a PRESSURISED
-  bore carries ρ·f·g·h, not ρgh (`f = 1 + gh/c²`: +4.4% at 21 m of head,
-  +7.4% at 37 m, at c = 70), so a hand check there is a two-face calculation.
+- `exercises/_runner/runner.py` is Linux-bound (`/proc`, X11 probe); the
+  macOS shims and their two measured traps are in the runner's own HOWTO.md.
+- **The Force box is a momentum budget, not a dial.** A box enclosing a
+  source (spout footprint, level-control sponge) is not measuring a force —
+  `mdot` is the closure check and fails loudly there. Trust a number only
+  once a second, differently-placed box agrees (~1% steady, 5–8% churning);
+  worse means a face is cutting a pressurised cavity and reading its P term
+  as force. Every box also carries its enclosed bed/duct-wall drag (~82 N/m
+  per metre, measured on LL-1), so keep boxes short; and a face inside a
+  pressurised bore reads ρ·f·g·h, not ρgh (`f = 1 + gh/c²` — +4% at 21 m of
+  head at c = 70).
 - A dev browser may serve stale cached JS from `python3 -m http.server`; force
   it with `fetch(url, {cache:"reload"})` then `location.reload()`.
 - A fast-math shader compiler is entitled to fold away `isnan()` and `x != x`.
@@ -449,18 +436,12 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   an INDEX row, a stated "about **N s**" countdown matches `settle`, and a
   printed ten-value digit ladder matches `base`/`step`. Programme-doc titles
   are warnings, never failures. Run it before printing worksheets.
-- Exercise briefs carry the minimum needed to RUN the demo, in plain language:
-  no dramatic framing, and expected readings rounded to about one significant
-  figure ("about 4 kN/m"). ± bands, standard deviations, run-to-run agreement
-  and any "measured over N windows" methodology belong in the folder's
-  `_archive/`, never in the brief. Coordinates a reader places BY HAND round
-  to a 5 cm grid or go functional ("just upstream of the plate"); values they
-  TYPE (levels, q, periods) stay exact, because typing is free. Keep precision
-  only where the point dies without it — a theory-vs-measured gap, or a ladder
-  value that is an operational trigger. And note that rounding a recipe's
-  coordinates makes it a NEW geometry: re-measure before shipping it (the
-  5 cm-grid Pelton cup reads 7020 N/m against the fine arc's 7306 — same
-  story, but that had to be checked, not assumed).
+- Briefs carry the minimum needed to RUN the demo, plainly: expected readings
+  to ~1 significant figure, statistics and methodology in the folder's
+  `_archive/`, hand-placed coordinates on a 5 cm grid (typed values stay
+  exact — typing is free). Precision survives only where the point dies
+  without it. Rounding a recipe's coordinates makes a NEW geometry —
+  re-measure before shipping it.
 - The Pages deploy (`.github/workflows/pages.yml`) runs Jekyll over the repo
   so the markdown briefs render as web pages — README.md serves as its
   folder's index, links to `.md` are rewritten to the rendered page, and

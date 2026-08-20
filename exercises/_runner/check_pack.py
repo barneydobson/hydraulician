@@ -2,37 +2,15 @@
 """check_pack.py — assert the teaching pack agrees with itself.
 
 Zero dependencies; exits non-zero on any failure, so it can gate a commit.
-
-WHY THIS EXISTS, AND WHY THERE IS NO SINGLE REGISTER INSTEAD
-------------------------------------------------------------
-The same exercise is described in four places, and they are NOT four copies
-of one thing — they are four artifacts with different jobs:
-
-  js/exercises.js            the machine-readable register: what the picker
-                             applies (scene, rig, settle, digit rule) and the
-                             two lines the card prints. THIS IS THE SOURCE.
-  exercises/<f>/README.md    the human brief. Prose a person writes; nothing
-                             can generate it.
-  exercises/INDEX.md         a navigation table. Its title column is
-                             deliberately ABBREVIATED to fit, and its rig
-                             column is hand-written prose — not fields.
-  exercises/demo-programme.html   a dated planning document (rev 1, 13 Aug),
-                             the source the pack was originally built from.
-                             History; deliberately not checked here.
-
-Collapsing those into one register is not available: CLAUDE.md keeps the app
-dependency-free and classic-script — no modules, no bundlers, no fetch — so
-the register has to BE a JS literal the browser can run from file://, not a
-JSON file something loads. Generating the docs from it would need a build
-step, which this project deliberately does not have.
-
-So the answer to drift is not centralisation, it is this: the handful of
-facts that are genuinely DERIVABLE from the register get asserted, and the
-prose is left to people. Checked here:
+The same exercise is described in several files ON PURPOSE — js/exercises.js
+is the register, the rest are prose with different jobs; CLAUDE.md's "pack is
+described in four places" note has the reasoning. This asserts the handful of
+facts that are derivable from the register and leaves the prose to people:
 
   1. every card's folder exists, and has a README
   2. the README's H1 id and title match the card
-  3. every card has a row in INDEX.md (title text NOT compared — see above)
+  3. every card has a row in INDEX.md (title text NOT compared — INDEX
+     abbreviates on purpose)
   4. when a README states an "about **N s**" countdown, one of them is the
      card's own `settle`
   5. when a card carries a base/step digit rule and the README prints a
@@ -41,22 +19,11 @@ prose is left to people. Checked here:
 
 Usage:  python3 exercises/_runner/check_pack.py [-v]
 """
-import difflib
 import os
 import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-def skeleton(t):
-    """Lowercase alphanumerics only — the words, stripped of markup and
-    punctuation, so two spellings of one title compare equal."""
-    return re.sub(r'[^a-z0-9]', '', re.sub(r'<[^>]+>', '', t).lower())
-
-
-def ratio(a, b):
-    return difflib.SequenceMatcher(None, skeleton(a), skeleton(b)).ratio()
 
 
 def cards():
@@ -160,25 +127,6 @@ def main():
         if os.path.isdir(p) and not d.startswith("_") and d not in seen_folders:
             fail.append("%-5s exercises/%s/ has no card in js/exercises.js" % ("", d))
 
-    # The programme doc is rev-1 history and is NOT part of the contract, but
-    # a title that has drifted there is still worth seeing: that is the drift
-    # that gets noticed on the published site. Warning only, never a failure.
-    warn = []
-    prog_path = os.path.join(ROOT, "exercises", "demo-programme.html")
-    if os.path.isfile(prog_path):
-        prog = dict(re.findall(r'<span class="id">([A-Z0-9\-]+)</span><h3>(.*?)</h3>',
-                               open(prog_path, encoding="utf-8").read()))
-        for e in ex:
-            p_title = prog.get(e["id"])
-            if p_title is None:
-                continue
-            # Compare alphanumeric skeletons, not glyphs: the programme writes
-            # the same words with HTML sub/sup and different punctuation
-            # (q<sup>3/5</sup> for q^(3/5)), and warning on that is noise
-            # nobody reads. Only a genuinely different title trips this.
-            if skeleton(p_title) and ratio(p_title, e["title"]) < 0.75:
-                warn.append("%-5s programme doc: %s" % (e["id"], p_title))
-
     print("%d exercises, %d assertions" % (len(ex), checked))
     if verbose:
         for e in ex:
@@ -188,10 +136,6 @@ def main():
         for f in fail:
             print("  " + f)
         return 1
-    if warn:
-        print("\n%d programme-doc title(s) adrift (rev-1 history, not a failure):" % len(warn))
-        for w in warn:
-            print("  " + w)
     print("pack is self-consistent")
     return 0
 

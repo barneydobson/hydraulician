@@ -31,6 +31,19 @@ After `pump --sim-seconds 25`: q=0.50 → Fr₁ 2.24, y₁ 0.176, y₂ 0.415, y�
 q=0.42 → Fr₁ 1.40, y₂/y₁ 1.84, +19 % over Bélanger: h23's tailwater is tuned for
 q = 0.5, so a lower q drowns the jump. Physics, not harness.
 
+## macOS
+
+The runner is written for the Linux box it was made on: it scans `/proc` for
+PIDs and probes `/tmp/.X11-unix`. Shim those two in a wrapper (`pgrep -f`,
+and a constant true) rather than editing this file. Two traps, each measured
+at about an hour: the `chrome` on PATH must be an **exec wrapper script**,
+not a symlink — the .app resolves its framework relative to the executable
+path, so a symlink dies in dlopen — and a pgrep needle must not begin with
+`--`, or BSD pgrep swallows it as options, matches nothing, and reports
+"killed 0" while the browser keeps running. If `launch` fails through all
+four modes with "window.APP never appeared", the static server has died:
+curl it before suspecting the runner or the GPU.
+
 ## Bites
 - `pump` leaves the sim **paused**; `APP.state.paused=false` returns it to rAF.
 - `OVERLAY.analyse` is a 10 %/call EMA — warm it as above or you read half an average.

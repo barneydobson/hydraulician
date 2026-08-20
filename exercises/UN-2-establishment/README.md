@@ -1,12 +1,11 @@
 # UN-2 · Flow establishment: the asymptotic start
 
-A student starts from nothing: valve shut, pipe full, water dead still. They
-open the valve and the speed trace rises to a plateau — not instantly, because
-49 m of water has inertia. Read where it settles (u_max)
-and how long it took to get within 10% of there (t_90), and the inertia-head
-derivation predicts the ratio between them before anyone has measured
-anything. Personalised by reservoir level, the class's pooled t_90 against
-l·u_max/2gH should be a straight line through the origin.
+A reservoir feeds a 23 m pipe with a shut valve at the far end. Open the
+valve and the column takes seconds to come up to speed — 23 m of water has
+inertia — approaching its final velocity instead of arriving at it. Each
+student runs their own reservoir level, reads the plateau speed and the time
+to reach 75% of it, and the pooled class points trace a straight line through
+the origin whose slope is ln 7, a number nobody typed in anywhere.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **UN-2**, or use the direct link
@@ -16,78 +15,82 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 ## Theory
 
 The driving head accelerates the column against a loss that grows with the
-square of the speed, so the flow approaches its plateau rather than arriving
-at it:
+square of the speed, so the flow approaches its plateau rather than arriving:
 
     u_max = √(2gH/k)
     t     = (l·u_max / 2gH)·ln[(u_max + u)/(u_max − u)]
 
-Put u = 0.9·u_max in the second and the logarithm becomes ln 19, so
+Put u = 0.75·u_max in the second and the logarithm becomes **ln 7 = 1.946**:
 
-    t_90 = ln 19 · l·u_max/(2gH)          ln 19 = 2.944
+    t_75 = ln 7 · l·u_max/(2gH)
 
 — a straight line through the origin, whatever each student's k turns out to
-be. Here the penstock is **l = 49.0 m** (reservoir face to valve) and
-**H = your reservoir level − 3.5 m**, the pipe axis. The picker also sets Wave
-damping to 0.30, which kills the ringing that a level change on a shut pipe
-otherwise excites, and Speed to ×0.2, because the gauge chart remembers 15
-real seconds and this event needs 3 simulated ones. Leave both where they are.
+be. Here the pipe is **l = 23 m** (mouth to the exit orifice) and
+**H = reservoir level − 2.4 m**, the pipe axis. Read the level off the ∇
+marker **while the pipe flows** — the reservoir concedes a few centimetres
+under draw, and the flowing level is the head the column actually sees.
 
 ## Your reservoir level
 
 **d** is the **last digit of your student number** — your lecturer will
-explain the assignment in class. Your level is **22.0 + 0.6·d** metres, an
+explain the assignment in class. Your level is **3.4 + 0.1·d** metres, an
 elevation above the domain floor, which is what the Reservoir level slider
 sets:
 
 | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **level (m)** | 22.0 | 22.6 | 23.2 | 23.8 | 24.4 | 25.0 | 25.6 | 26.2 | 26.8 | 27.4 |
+| **level (m)** | 3.4 | 3.5 | 3.6 | 3.7 | 3.8 | 3.9 | 4.0 | 4.1 | 4.2 | 4.3 |
 
 ## What to do
 
-1. Press `V` to shut the valve — the scene boots open and flowing — then set
-   **Controls → Reservoir level** to your own value.
-2. Press `R` and let it reach steady state — about **10 s**; the card counts
-   it down. Hover the pipe: the readout's **V** should be back to about
-   0 m/s.
-3. Place a Gauge (`5`) mid-pipe, at x = 30 m on the axis. Its card plots
-   **|u|**, the speed at that point.
-4. Press `V` again to open the valve — that is your t = 0 — and watch for
-   about fifteen real seconds. Pause (**space**) and read: the band the trace
-   settles into is **u_max** (not the first spike, which overshoots it), and
-   the first crossing of 0.9·u_max is **t_90**. Submit **level, u_max,
-   t_90**.
+1. Set **Controls → Reservoir level** to your value. Press `R` and let it
+   settle — about **30 s**; the card counts it down. The pipe should be full
+   and still.
+2. Place a Gauge (`5`) mid-pipe at x = 14 m on the axis (y ≈ 2.4) and expand
+   its card — the **⤢** button opens the inspector, a full-width trace.
+3. Press `V` to open the valve — that is your t = 0 — and watch about
+   fifteen seconds. Pause (**space**).
+4. Read off the inspector trace: the settled band is **u_max** (about
+   2–3 m/s depending on your level), and **t_75** is the first crossing of
+   0.75·u_max, timed from where the trace leaves zero. The crossing sits on
+   the steep flank, so it is sharp. Read the flowing reservoir level off its
+   marker before you pause, and submit **level, u_max, t_75**.
+
+![the pipe coming up to speed, the spent jet free-falling clear](shots/01-rise-and-jet.png)
+
+![the inspector trace: flat zero, then the asymptotic rise](shots/02-inspector-trace.png)
 
 ## For the instructor — pooling the class
 
 Collect one row per student
-(`student_id,digit,level_m,H_m,l_m,umax_ms,t90_s`), export the CSV and run:
+(`student_id,digit,level_m,H_m,l_m,umax_ms,t75_s`), export the CSV and run:
 
 ```bash
 python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
 python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 ```
 
-`H_m` is the head above the pipe axis (level − 3.5 m) and `l_m` is 49.0 for
-every row on this scene. The script fits t_90 against l·u_max/(2gH) forced
-through the origin, prints and plots that slope against ln 19, and puts each
-digit's loss coefficient k = 2gH/u_max² in the panel underneath.
+`H_m` is the flowing level − 2.4 and `l_m` is 23.0 for every row. The script
+fits t_75 against l·u_max/(2gH) forced through the origin, prints and plots
+that slope against ln 7, and puts each digit's loss coefficient k = 2gH/u_max²
+in the panel underneath. The shipped dry-run class — ten headless runs, one
+per digit — fits at 101% of ln 7 with k steady near 4.3.
 
 ![pooled class plot](plots/pooled-demo.png)
 
 ### Discussion points
 
-- **Why the whole class comes in early.** The fitted slope is 64% of ln 19 —
-  consistently, not scattered. The rigid-column derivation assumes pressure
-  communicates along the pipe effectively instantly, but here the time
-  constant l·u_max/2gH ≈ 0.25 s is *shorter* than the pipe's one-way wave
-  transit l/c = 49/70 ≈ 0.7 s, so the trace rings and crosses 90% on its
-  first overshoot. Teach it as the validity limit of the derivation.
-- **Do not improvise "raise c and watch it match".** It measurably does not:
-  at c = 400 the fit is just as straight and lands at roughly 140% of ln 19 instead,
-  and the trace stays ringy at every celerity tried.
+- **Why this rig and not the water-hammer pipe.** The derivation assumes
+  pressure communicates along the pipe much faster than the flow changes.
+  Here the rise spans about five wave round-trips, so it holds; on the
+  49 m hammer pipe the rise is over inside one transit and the trace is a
+  staircase of wave passes, not an asymptotic curve.
+- **The negative control.** Set the Slot celerity slider to 60 and re-run:
+  t_75 does not change (measured: about 2% apart). Establishment is inertia
+  against resistance — the pipe's elasticity is not in the equation, and the
+  rig can prove it.
 
-The full verification record — the closed-pipe ringing investigation behind
-the wave-damping setting, the point gauge's bias during the rise, the
-ten-digit sweep, safe level bounds and troubleshooting — is kept locally, out of version control, at `exercises/UN-2-establishment/_archive/README-full.md`.
+The full verification record — the design trail (two-reservoir and apron
+variants and why they failed, the bellmouth measurement), the ten-digit
+sweep, settle evidence and safe bounds — is kept locally, out of version
+control, at `exercises/UN-2-establishment/_archive/README-full.md`.

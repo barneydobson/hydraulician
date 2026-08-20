@@ -33,6 +33,18 @@ The EOS is the whole trick, and it is a **2D Preissmann slot**:
   rarefied cell: without tension every strong vortex core slowly cavitates
   into a hole.
 
+**A free jet is only free in the vertical plane.** Plan view is fully wet by
+construction (`water: () => 1`), so a jet there is *submerged*: it has no
+interface, it is invisible in every display mode (a dye line disperses to a
+uniform wash within a metre), and its deflected momentum ends up in the
+confining walls rather than crossing any control-volume face — measured on a
+plan-view Pelton splitter, the lateral force reads the same with one cup as
+with two, and opening the side edges to let it out drains the domain instead.
+So geometry that needs a free jet AND the horizontal plane — a Pelton
+splitter is the example — is out of reach in the same sense as a plunging
+breaker: the solver offers the right plane or the right jet, never both.
+HP-2's record has the numbers.
+
 No Poisson solve. Two fullscreen passes per substep: `vel` then `vof`.
 
 Three guard rails, each bought with an explosion:

@@ -411,6 +411,20 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
 - Keep dependency-free and classic-script; no modules, no bundlers, no fetch.
+- The pack is described in four places with different jobs, and they do NOT
+  collapse into one register: `js/exercises.js` is the machine-readable source
+  (what the picker applies, plus the card's two lines), the folder's
+  `README.md` is the human brief, `INDEX.md` is navigation whose titles are
+  deliberately abbreviated to fit the table, and `demo-programme.html` is the
+  dated rev-1 document the pack was built from — history. One shared data file
+  is not available anyway: no modules, no fetch and no build step means the
+  register has to BE a JS literal the browser runs from `file://`. So the
+  DERIVABLE agreements get asserted instead —
+  `python3 exercises/_runner/check_pack.py` (stdlib only, exits non-zero):
+  folders exist, each README's H1 id and title match its card, every card has
+  an INDEX row, a stated "about **N s**" countdown matches `settle`, and a
+  printed ten-value digit ladder matches `base`/`step`. Programme-doc titles
+  are warnings, never failures. Run it before printing worksheets.
 - The Pages deploy (`.github/workflows/pages.yml`) runs Jekyll over the repo
   so the markdown briefs render as web pages — README.md serves as its
   folder's index, links to `.md` are rewritten to the rendered page, and

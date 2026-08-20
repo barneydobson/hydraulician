@@ -33,17 +33,22 @@ The EOS is the whole trick, and it is a **2D Preissmann slot**:
   rarefied cell: without tension every strong vortex core slowly cavitates
   into a hole.
 
-**A free jet is only free in the vertical plane.** Plan view is fully wet by
-construction (`water: () => 1`), so a jet there is *submerged*: it has no
-interface, it is invisible in every display mode (a dye line disperses to a
-uniform wash within a metre), and its deflected momentum ends up in the
-confining walls rather than crossing any control-volume face — measured on a
-plan-view Pelton splitter, the lateral force reads the same with one cup as
-with two, and opening the side edges to let it out drains the domain instead.
-So geometry that needs a free jet AND the horizontal plane — a Pelton
-splitter is the example — is out of reach in the same sense as a plunging
-breaker: the solver offers the right plane or the right jet, never both.
-HP-2's record has the numbers.
+**A submerged jet is not a free jet — but it is still measurable.** Plan view
+is fully wet by construction (`water: () => 1`), so a jet there has no
+interface, it entrains, and the ambient (being the working fluid, not air)
+accumulates its momentum rather than staying still. A first plan-view Pelton
+splitter failed on every count and the conclusion drawn — "the solver offers
+the right plane or the right jet, never both" — was WRONG. That attempt used a
+wide slow jet at 46% blockage: invisible against its own ambient, flapping,
+and with the deflected water handed straight back through the measuring box by
+the near walls. Four changes fix it, and the `splitter` scene is the result —
+a small fast jet (D = 0.12 m at 8 m/s), low blockage (~20%), a short flight
+(0.75 D, before the shear layer rolls up), and a DUCT rather than a spout,
+whose `f >= 1` stamp is a mass source in an already-wet domain and blew the
+run up at t ≈ 6 s. Measured F↑/F→ = 0.00–0.04 with both cups against −0.14 to
+−0.21 with one, unchanged from Medium to Very high. The limit that does stand
+is the vertical-plane one: HP-2's deep-V floods because a horizontal-plane
+shape drawn on its side cannot drain.
 
 No Poisson solve. Two fullscreen passes per substep: `vel` then `vof`.
 

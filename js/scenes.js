@@ -706,6 +706,61 @@ const SCENES = (() => {
              "Long waves barely damp: measured 0.123 m at 2 m and 0.121 m at 7 m in the deeper tank.",
              "This is the tsunami and tidal end of the spectrum. Press <b>0</b> to zoom out."] }),
 
+    // The Pelton splitter, in the ONE plane that can hold it. A splitter
+    // divides the jet perpendicular to the wheel plane, so the plane
+    // containing the jet AND both exit streams is horizontal — a plan view,
+    // gravity out of it. HP-2's vertical-plane deep-V floods precisely
+    // because it is this shape drawn on its side.
+    //
+    // A submerged jet is workable here, but only bought with all four of:
+    // a SMALL fast jet (D = 0.12 m at 8 m/s — a wide slow one is invisible
+    // against its own ambient and flaps), LOW blockage (the bucket spans 20%
+    // of the domain, not half, or the walls return the deflected water
+    // straight back through the measuring box), a SHORT flight (the bucket
+    // sits 0.75 D downstream, before the shear layer rolls up), and a DUCT
+    // rather than a spout — the spout stamps f >= 1 every substep, which in
+    // an already-wet domain is a mass source that drains the box and blew
+    // the run up at t ~ 6 s. Damping (nu 3e-4, cs 0.20) buys the rest.
+    // Measured F↑/F→, both cups vs one: 0.00 / 0.03 / 0.04 against −0.20 /
+    // −0.19 / −0.21 at Medium / High / Very high — resolution-independent.
+    // Erasing the lower cup in place (one stroke, clear of the ridge) reads
+    // −0.14 rather than −0.20: the stub left at the ridge still turns a
+    // sliver of the lower half. Either way the sign flips and the magnitude
+    // is an order up, which is the whole demonstration.
+    { id: "splitter", name: "Pelton splitter — plan view", key: "Why buckets are split",
+      group: "Jets & waves",
+      blurb: "Looking down on a Pelton bucket: the jet hits the splitter ridge, divides, and both halves are thrown out sideways. Erase one cup and the side load appears.",
+      W: 4.0, H: 3.0, g: 0, c: 60, cf: 0.0, cs: 0.20, nu: 3e-4, slip: 1, bulk: 0.03,
+      mode: 2, ca: 0, vmax: 10, hmax: 2, headMax: 3, spinup: 2,
+      open: [1, 1, 0, 0],
+      inflow: { level: 99, v: 8.0, on: 1 },
+      walls: () => {
+        const YA = 1.5, R = 0.15, XS = 0.95, r = 0.06, L = 0.5;
+        const w = [
+          [0.0, 0.0, 0.0, YA - r, 0.06],          // left edge, barred …
+          [0.0, YA + r, 0.0, 3.0, 0.06],          // … except the throat
+          [0.0, YA - r, L, YA - r, 0.04],         // the duct that makes the jet
+          [0.0, YA + r, L, YA + r, 0.04],
+        ];
+        for (const sgn of [1, -1]) {              // the two cups, 165° each
+          let p0 = null;
+          for (let d = 0; d <= 165; d += 15) {
+            const t = d * Math.PI / 180;
+            const p = [XS + R * Math.sin(t), YA + sgn * R * (1 - Math.cos(t))];
+            if (p0) w.push([p0[0], p0[1], p[0], p[1], 0.035]);
+            p0 = p;
+          }
+        }
+        w.push([XS - 0.008, YA - 0.015, XS - 0.008, YA + 0.015, 0.04]);  // seal the ridge
+        return w;
+      },
+      water: () => 1,
+      tips: ["Plan view: gravity acts out of the plane, so the whole box is water and the jet is a <b>submerged</b> jet.",
+             "Force box (9) around the bucket — (0.90, 1.19) to (1.30, 1.81). <b>F→</b> is the thrust, <b>F↑</b> the side load.",
+             "With both cups F↑ is a few percent of F→: the halves throw water opposite ways and cancel.",
+             "Erase (2) the lower cup — one stroke (1.03, 1.19) to (1.03, 1.46), clear of the ridge — and F↑ settles near −15% of F→: the axial thrust a real wheel must not put on its bearings.",
+             "That balance is what the splitter ridge is FOR; HP-2 measures the momentum reversal it cannot show."] },
+
     { id: "plan", name: "Plan view — jet & wake", key: "Gravity off", group: "Jets & waves",
       blurb: "Looking down instead of side on: gravity acts out of the plane, so the whole box is water. A submerged jet, a bluff body, and a vortex street.",
       W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 2e-5, slip: 1, bulk: 0.03,

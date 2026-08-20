@@ -87,27 +87,38 @@ Lecturer demonstration, ~10 min. The card counts each settle down.
 
 ![deep-V: flooded wedge, force box about 5 kN/m](shots/08-deepV-forcebox.png)
 
-## What this rig does not show
+## What this rig does not show — and where it is shown
 
 A real Pelton bucket is a **double** cup with a splitter ridge down the
-middle, and none of the reasons for that are visible here. The splitter
-divides the jet into two halves and throws them out sideways, perpendicular
-to the wheel plane: that keeps the spent water clear of the incoming jet and
-of the following bucket, and the two lateral momentum components cancel, so
-the wheel puts no net side thrust on its bearings. All of it happens in the
-third dimension, which a vertical slice does not have.
+middle, and this rig cannot show why. The splitter divides the jet into two
+halves and throws them out sideways, perpendicular to the wheel plane: that
+keeps the spent water clear of the incoming jet and of the following bucket,
+and the two lateral momentum components cancel, so the wheel puts no net side
+thrust on its bearings. All of that happens in the third dimension, which a
+vertical slice does not have.
 
-The plane a splitter actually divides the flow in contains the jet and both
-exit streams, and is horizontal — a plan view, with gravity out of it. That
-is why the deep-V above floods: it is a horizontal-plane shape drawn on its
-side, so its exits have to climb against gravity instead of flying sideways.
-Building it in a plan-view scene does not rescue it, and that was measured
-rather than assumed: a plan view has no free surface, so the jet is
-submerged and invisible, and the lateral force reads the same with one cup
-as with two. The record is in the archive.
+The plane a splitter divides the flow in contains the jet and both exit
+streams, and is horizontal — a plan view, with gravity out of it. That is why
+the deep-V above floods: it is a horizontal-plane shape drawn on its side, so
+its exits must climb against gravity instead of flying sideways.
 
-So the numbers above are the momentum theorem, and they are sound. The
-bucket's shape is a separate argument that belongs on the slides.
+Drawn in the right plane it works. Load the **Pelton splitter** scene (`S`, or
+[`?scene=splitter`](https://barneydobson.github.io/hydraulician/?scene=splitter)):
+a 0.12 m jet at 8 m/s, looking down on the bucket. Put a Force box round it,
+about **(0.90, 1.19) to (1.30, 1.81)**, and read **F↑** — the side load —
+against F→:
+
+| bucket | F→ | F↑ / F→ |
+|---|---|---|
+| both cups | ≈10 kN/m | 0 to 4% |
+| one cup (erase the lower) | ≈3 kN/m | −14 to −20% |
+
+Both halves throw water opposite ways and the side load cancels. Take one
+away and a permanent side thrust appears, of order a fifth of the useful
+force — the load a real wheel's bearings must never see. That is what the
+ridge is for.
+
+![plan view: the jet divides on the splitter ridge, both halves wrapping their cups](shots/09-plan-splitter.png)
 
 **Heads, if you want them:** gauges in the free jet and on the stagnation
 point (MO-2's two stations) read a ratio of 1.15–1.30 × v²/2g, not 1 — the

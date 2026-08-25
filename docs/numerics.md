@@ -59,29 +59,24 @@ makes this a *free-surface* solver rather than a two-phase one:
 \rho \;\longrightarrow\; f\rho_w
 ```
 
-The weight becomes:
+and the weight with it:
 
 ```math
 \rho\,\mathbf{g} \;\longrightarrow\; f\rho_w\,\mathbf{g}
 ```
 
-The weight of a cell is proportional to how much water is in it, and a cell with
-none has none. Everything the solver does about voids descends from this.
+Three consequences follow, and between them they are the whole of what `f` does
+in this solver:
 
-Dividing momentum by `ρ = fρ_w` and writing `P = p/ρ_w` gives the per-unit-mass
-form:
-
-```math
-\frac{D\mathbf{u}}{Dt}
-= -\frac{1}{f}\nabla P + \mathbf{g}
-+ \frac{1}{f\rho_w}\nabla\cdot\boldsymbol{\tau}
-```
-
-Note where the `f` has gone. Weight per unit *mass* is just `g` — a parcel of
-water falls at `g` whatever fraction of a cell it occupies — while `f` has moved
-under the pressure gradient. The solver modifies both, and §2 step 2 says exactly
-how and why; the `f→0` limit, where this form is `0/0`, is the same place the
-weight above goes to zero.
+- **Where there is water, `f ≈ 1`**, and the momentum equation is the water's
+  alone — one phase, density `ρ_w`. Step 3 of §2 makes that exact, and it is why
+  `f` does **not** survive as a weighting inside the momentum equation.
+- **Where there is none, `ρ = 0`**: no mass, no weight, no pressure, and the
+  momentum equation is vacuous. But one velocity field spans the whole domain
+  and something must be stored in the void — step 4 of §2.
+- **The interface needs no dynamic condition of its own.** With the air gone the
+  surface condition is `p = 0`, and §3 delivers it algebraically rather than by
+  tracking where the surface is.
 
 Everything from here is a named modelling step (§2, §3). §4 discretises the
 result. Every term in the solver is introduced by one of those steps.
@@ -89,10 +84,9 @@ result. Every term in the solver is introduced by one of those steps.
 ## 2. From physics to a solvable model
 
 The equations of §1 cannot be integrated on a millimetre grid at a few thousand
-substeps a second. Four modelling steps stand between them and something that
-can be. Each is a standard choice with a literature behind it, listed here in
-the order it changes the equation; the third is large enough to get its own
-section.
+substeps a second. Five modelling steps stand between them and something that
+can be, ordered here so each depends only on the ones before it. The second is
+large enough to get its own section.
 
 ### Step 1 — Filter the equations: turbulence closure
 
@@ -115,52 +109,69 @@ instead of turbulent-flat.
 The solver applies `ν_T ∇²u`, **not** `∇·(ν_T ∇u)`: the `∇ν_T·∇u` term is
 dropped, a simplification exact only where `ν_T` is uniform. No wall damping is
 applied to `C_s`, so the subgrid length does not vanish at a solid the way a van
-Driest or dynamic model would; the near-wall stress is carried by step 4.
+Driest or dynamic model would; the near-wall stress is carried by step 5.
 
-### Step 2 — Constant reference density, and the void regularisation
+### Step 2 — Relax incompressibility
 
-The per-unit-mass form at the end of §1 is divided through by the local density
-`ρ = fρ_w`. The solver divides by the **constant** `ρ₀ = ρ_w` instead, and gates
-gravity rather than dividing it. Those are the only two ways `f` reaches the
-momentum equation.
+The constraint `∇·u = 0` makes pressure a global unknown and forces an elliptic
+solve every step. Replacing it with a barotropic equation of state makes pressure
+local and yields the free surface for nothing. It is the largest of the five
+steps and §3 is devoted to it. Two of its results are needed here: `f` is no
+longer pinned at 1 in water but carries the pressure as compression, and the
+size of that compression is `(c₀/c)²` — 7% at the default settings.
 
-**Dividing by `ρ₀` rather than `ρ`.** `−(1/f)∇P` becomes `−∇P`, and the viscous
-term loses its `1/f` the same way, leaving `ν_T∇²u`. In
-water `f` departs from 1 by at most a few percent (§3), and holding `ρ₀`
-constant is what makes the discrete hydrostatic balance exactly linear, so that
-the equilibrium profile of §3 is reached exactly rather than approximately.
+### Step 3 — One density in the momentum equation
 
-**Gravity is gated rather than divided.** The per-unit-mass form says a parcel
-falls at `g` whatever `f` is, but at `f = 0` it is `0/0`: there is no parcel,
-`ρ = 0`, and the momentum equation degenerates to `0 = 0`. The velocity stored in
-a void is not a fluid velocity. It is an extension field, kept only so the
-interface has something to be advected by, and so that a jet leaving a nozzle
-does not run into a rigid wall of stationary air. Forcing it would make that
-field fall, and the advection stencil would carry the spurious momentum back into
-the water at the interface.
+Water is incompressible. `f` departs from 1 only because step 2 stores pressure
+as compression, and that is a device for obtaining the pressure rather than a
+physical density variation. It is therefore confined to the equation of state
+and kept out of the momentum equation, which carries the single constant
+`ρ₀ = ρ_w`:
 
-So the solver restores the `f`-dependence of the **weight** from §1 —
-`ρg → fρ_w g`, no water, no weight — in a form that cuts off smoothly instead of
-dividing by zero:
+```math
+\frac{D\mathbf{u}}{Dt} = -\nabla P + \mathbf{g}
++ \nu_T \nabla^{2}\mathbf{u},
+\qquad P \equiv \frac{p}{\rho_0}
+```
+
+This is the step that removes `f` from the momentum equation: no `1/f` on the
+pressure gradient or the viscous term, and no `f` on the weight. Continuity
+meanwhile carries the full `f`, so the two are not formally consistent, and the
+size of the inconsistency is the compression itself, `(c₀/c)²`.
+
+It is deliberate. With `ρ₀` constant the discrete hydrostatic balance is exactly
+linear and the equilibrium profile of §3 is reached exactly rather than
+approximately; letting a compression that is a numerical device into the inertia
+and the weight would bend that profile by an amount with no physical meaning.
+
+One consequence to note for §4: with `ρ₀` constant, momentum is written in
+advective rather than conservative form. The two differ by `u(∇·u)`, which §3
+bounds at `O(M²)`.
+
+### Step 4 — The void gate
+
+Step 3 leaves gravity as `g` everywhere, but §1 established that a void has no
+mass and no weight, and one velocity field spans both regions. The velocity
+stored in a void is not a fluid velocity: it is an extension field, kept only so
+the interface has something to be advected by, and so that a jet leaving a nozzle
+does not run into a rigid wall of stationary air. Applying gravity to it would
+make it fall, and the advection stencil would carry that spurious momentum back
+into the water at the interface.
+
+So gravity is switched off as the fluid runs out:
 
 ```math
 \chi(f) = \operatorname{smoothstep}\left(0,\; 0.05,\; f\right)
 ```
 
-`χ ≡ 1` wherever there is water, and the fade band covers only cells less than 5%
-full — well below the `f ≈ 0.5` of an interface cell, where the per-unit-mass `g`
-is the correct answer and is what `χ` delivers. The pressure term
-needs no equivalent, because the equation of state already returns `P = 0` below
-`f = 1`. With `χ` in place a void is force-free by construction.
+`χ` is a **gate, not a factor of `f`**: it is exactly 1 for any cell more than 5%
+full, so in water the term is `g`, and only the last 5% into a void is ramped. An
+interface cell at `f ≈ 0.5` gets the full `g`, which is the right answer — the
+water in it is in free fall. The pressure term needs no equivalent, because the
+equation of state already returns `P = 0` below `f = 1`, so with `χ` in place a
+void is force-free.
 
-### Step 3 — Relax incompressibility
-
-The constraint `∇·u = 0` makes pressure a global unknown and forces an elliptic
-solve every step. Replacing it with a barotropic equation of state makes pressure
-local and yields the free surface for nothing. This is the largest of the four
-steps, and §3 is devoted to it.
-
-### Step 4 — Model the wall rather than resolve it
+### Step 5 — Model the wall rather than resolve it
 
 No-slip is a **boundary condition**, and the term it produces acts only at the
 wall. Resolving it requires the viscous sublayer — `y⁺ ≈ 1`, which at these
@@ -193,7 +204,7 @@ Two consequences follow directly, and both show up in how the model behaves:
 
 ### The resulting model
 
-Steps 1–4 applied to §1:
+Steps 1–5 applied to §1:
 
 ```math
 \frac{\partial f}{\partial t} + \nabla \cdot (f \mathbf{u}) = 0
@@ -208,19 +219,13 @@ Steps 1–4 applied to §1:
 with `P = p/ρ₀` supplied by the equation of state of §3, and `𝟙_wall` the
 indicator of cells adjacent to a solid.
 
-Two things about this equation are easy to misread, and both matter when
-comparing it against the code.
-
-**`χ` is a gate, not a factor of `f`.** `smoothstep(0, 0.05, f)` is *exactly* 1
-for any cell more than 5% full, so in water the gravity term is `g`, not `fg`.
-It only ramps down across the last 5% into a void.
-
-**`u` is advected, not `fu`.** Momentum is in advective (non-conservative) form
-and the advection carries no `f` weighting at all; only volume is in flux
-(conservative) form. A quasi-conservative formulation — dividing
+One thing about this equation is easy to misread, and it matters when checking
+it against the code: **`u` is advected, not `fu`.** Momentum is in advective
+(non-conservative) form and the advection carries no `f` weighting at all; only
+volume is in flux (conservative) form. A quasi-conservative formulation — dividing
 `∂(ρu)/∂t + ∇·(ρuu) = −∇p + ρg + ∇·τ` by the constant `ρ₀` to get
-`∂(fu)/∂t + ∇·(fuu) = −∇P + f,g + …` — *would* carry `f g`. That is not what is
-solved here.
+`∂(fu)/∂t + ∇·(fuu) = −∇P + f g + …` — *would* carry `f g`, and the gravity
+term here does not. That is not the form solved.
 
 §4 discretises this system and nothing else.
 
@@ -664,7 +669,7 @@ bibliography; titles are given without volume or page numbers.
   primitive equations". The eddy-viscosity subgrid closure of §2 step 1.
 - **Hirt, C. W. & Nichols, B. D. (1981)** — "Volume of fluid (VOF) method for
   the dynamics of free boundaries". The one-fluid free-surface formulation of
-  §1, and the origin of the `ρ_a → 0` degeneracy the wet-gate of §2 step 2
+  §1, and the origin of the `ρ_a → 0` degeneracy the void gate of §2 step 4
   regularises.
 - **Harlow, F. H. & Welch, J. E. (1965)** — "Numerical calculation of
   time-dependent viscous incompressible flow of fluid with free surface". The

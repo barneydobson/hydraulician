@@ -675,3 +675,7 @@ bibliography; titles are given without volume or page numbers.
 - **Cunge, J. A., Holly, F. M. & Verwey, A. (1980)** — *Practical Aspects of
   Computational River Hydraulics*. The Preissmann slot as used in sewer and
   river models, of which §3 is the two-dimensional analogue.
+
+<!-- Pages build only: github.com strips this tag and renders the math fences
+     natively; on the Jekyll site math.js rewrites them for MathJax. -->
+<script src="math.js" defer></script>

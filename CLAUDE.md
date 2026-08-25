@@ -467,4 +467,8 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   to this machine. The APP is only copied verbatim because
   `index.html` and `js/*` carry no YAML front matter; never add any. The
   exercise card links to the folder URL on `*.github.io` and to the raw
-  `README.md` everywhere else.
+  `README.md` everywhere else. ```math fences render on github.com but reach
+  the Jekyll site as plain code blocks, so README.md and docs/numerics.md end
+  with a `<script>` tag loading `docs/math.js` — stripped by GitHub's
+  sanitiser, live on the Pages build — which rewrites the blocks and pulls in
+  MathJax. Any new published page that carries ```math needs the same tag.

@@ -94,7 +94,7 @@
 
 <div class="wrap">
 
-<p class="eyebrow">hydraulician · demo programme rev 1 · 13 Aug 2026 · companion to the feasibility sheet</p>
+<p class="eyebrow">hydraulician · demo programme rev 1 · 13 Aug 2026 · HP-2 and UN-2 entries amended 20 Aug · companion to the feasibility sheet</p>
 <h1>The 30-demo programme</h1>
 <p class="subtitle">Thirty core demos across sixteen taught topics at roughly one per contact hour, plus ten backups. Twenty-six of the thirty end with each student submitting a number on Blackboard — designed as the engagement metric. Equation references are to your own lists: <span class="refs">H/U/Q/D/N/W</span> = 4A15 index, <span class="refs">#n</span> = 3A11 reference.</p>
 
@@ -190,11 +190,11 @@
 </div>
 
 <div class="demo explore">
-<div class="demo-head"><span class="id">HP-2</span><h3>The Pelton principle without the wheel</h3><span class="chip c-explore">EXPLORATORY</span></div>
+<div class="demo-head"><span class="id">HP-2</span><h3>Why turbine buckets are cups, not plates</h3><span class="chip c-explore">EXPLORATORY</span></div>
 <dl>
 <dt>Refs</dt><dd><span class="refs">H9–H14, #7</span> · F = ρQΔv on a vane; <span class="refs">H11</span> jet velocity C<sub>v</sub>√(2gH)</dd>
-<dt>Run</dt><dd>Spout jet onto a drawn flat plate, then a deep V-splitter approximating θ → 165°. Probe the stagnation head (≈ v²/2g), watch the momentum-flux display mode, compute F = ρqv vs ρqv(1 − cos θ) on the board. Velocity triangles and u/v₁ = ½ stay on slides — the sim supplies the physical intuition for ρQΔv<sub>w</sub>, which is the part students don't believe from chalk.</dd>
-<dt>Submit</dt><dd>Nothing — the wheel itself is out of the tool's reach (no rotating bodies).</dd>
+<dt>Run</dt><dd>Spout jet onto a drawn flat plate, then a curved cup that turns it back through ~165°, with a control-volume <b>Force box</b> reading the horizontal force on each: ≈4 kN/m against ≈7, close to the factor of two F = ρqv(1 − cos θ) predicts. Optionally the textbook deep-V, which reads only ≈5 because a wedge that deep cannot drain in the vertical plane. Velocity triangles and u/v₁ = ½ stay on slides — the sim supplies the physical intuition for ρQΔv<sub>w</sub>.</dd>
+<dt>Submit</dt><dd>Nothing — a lecturer demonstration. The wheel is out of the tool’s reach (no rotating bodies), and so is the <em>splitter</em>: it divides the jet perpendicular to the wheel plane, which a vertical slice does not have. Measured rather than assumed — the record is in the exercise’s archive.</dd>
 </dl>
 </div>
 </section>
@@ -280,10 +280,10 @@
 <div class="demo-head"><span class="id">UN-2</span><h3>Flow establishment: the asymptotic start</h3><span class="chip c-submit">SUBMIT</span></div>
 <dl>
 <dt>Refs</dt><dd><span class="refs">U1–U7</span> · inertia head; <span class="eqi">u_max = √(2gH/k)</span>; <span class="eqi">t = (l·u_max/2gH)·ln[(u_max+u)/(u_max−u)]</span></dd>
-<dt>Rig</dt><dd>Hammer scene, valve CLOSED, water reset (<span class="kbd">R</span>), gauges set to plot speed, speed slider ~×0.05.</dd>
-<dt>Run</dt><dd>Open the valve; the speed trace rises asymptotically. Read u<sub>max</sub> and the time to reach 90% of it.</dd>
-<dt>Submit</dt><dd>(u<sub>max</sub>, t<sub>90</sub>). Check: U6 gives t<sub>90</sub> = 2.94·(l·u<sub>max</sub>/2gH) ≈ 1 s at the defaults — hence the slow motion.</dd>
-<dt>Payoff</dt><dd>Personalised variant: each student a different reservoir level → pooled t<sub>90</sub> against l·u<sub>max</sub>/2gH is a line of slope ln 19. The time "constant" the derivation promises, measured.</dd>
+<dt>Rig</dt><dd>Establishment scene (<code>estab</code>): reservoir → 23 m pipe → valve, which boots CLOSED. Gauge mid-pipe, card set to plot speed.</dd>
+<dt>Run</dt><dd>Open the valve; the speed trace rises asymptotically. Read u<sub>max</sub> and the time to reach 75% of it.</dd>
+<dt>Submit</dt><dd>(u<sub>max</sub>, t<sub>75</sub>). Check: U6 at u = 0.75·u<sub>max</sub> gives t<sub>75</sub> = ln 7 ·(l·u<sub>max</sub>/2gH) — a few seconds here, so no slow motion is needed.</dd>
+<dt>Payoff</dt><dd>Personalised variant: each student a different reservoir level → pooled t<sub>75</sub> against l·u<sub>max</sub>/2gH is a line of slope ln 7 (measured: 101% of it). The hammer scene cannot host this — there the rise finishes inside one wave transit.</dd>
 </dl>
 </div>
 

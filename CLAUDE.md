@@ -48,6 +48,18 @@ The EOS is the whole trick, and it is a **2D Preissmann slot**:
   rarefied cell: without tension every strong vortex core slowly cavitates
   into a hole.
 
+**A free jet is only free in the vertical plane.** Plan view is fully wet by
+construction (`water: () => 1`), so a jet there is *submerged*: it has no
+interface, it is invisible in every display mode (a dye line disperses to a
+uniform wash within a metre), and its deflected momentum ends up in the
+confining walls rather than crossing any control-volume face — measured on a
+plan-view Pelton splitter, the lateral force reads the same with one cup as
+with two, and opening the side edges to let it out drains the domain instead.
+So geometry that needs a free jet AND the horizontal plane — a Pelton
+splitter is the example — is out of reach in the same sense as a plunging
+breaker: the solver offers the right plane or the right jet, never both.
+HP-2's record has the numbers.
+
 No Poisson solve. Two fullscreen passes per substep: `vel` then `vof`.
 
 Three guard rails, each bought with an explosion:
@@ -431,6 +443,17 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   `APP.frames(n)` (drives the whole frame including render), `APP.tick(n)`
   (physics only), `APP.probe(x,y)`, `APP.volume()`, `APP.zoomAt(px,py,factor)`,
   `APP.resetZoom()`.
+- `exercises/_runner/runner.py` is Linux-bound (`/proc`, X11 probe); the
+  macOS shims and their two measured traps are in the runner's own HOWTO.md.
+- **The Force box is a momentum budget, not a dial.** A box enclosing a
+  source (spout footprint, level-control sponge) is not measuring a force —
+  `mdot` is the closure check and fails loudly there. Trust a number only
+  once a second, differently-placed box agrees (~1% steady, 5–8% churning);
+  worse means a face is cutting a pressurised cavity and reading its P term
+  as force. Every box also carries its enclosed bed/duct-wall drag (~82 N/m
+  per metre, measured on LL-1), so keep boxes short; and a face inside a
+  pressurised bore reads ρ·f·g·h, not ρgh (`f = 1 + gh/c²` — +4% at 21 m of
+  head at c = 70).
 - A dev browser may serve stale cached JS from `python3 -m http.server`; force
   it with `fetch(url, {cache:"reload"})` then `location.reload()`.
 - A fast-math shader compiler is entitled to fold away `isnan()` and `x != x`.
@@ -458,6 +481,26 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
 - Keep dependency-free and classic-script; no modules, no bundlers, no fetch.
+- The pack is described in four places with different jobs, and they do NOT
+  collapse into one register: `js/exercises.js` is the machine-readable source
+  (what the picker applies, plus the card's two lines), the folder's
+  `README.md` is the human brief, `INDEX.md` is navigation whose titles are
+  deliberately abbreviated to fit the table, and `demo-programme.html` is the
+  dated rev-1 document the pack was built from — history. One shared data file
+  is not available anyway: no modules, no fetch and no build step means the
+  register has to BE a JS literal the browser runs from `file://`. So the
+  DERIVABLE agreements get asserted instead —
+  `python3 exercises/_runner/check_pack.py` (stdlib only, exits non-zero):
+  folders exist, each README's H1 id and title match its card, every card has
+  an INDEX row, a stated "about **N s**" countdown matches `settle`, and a
+  printed ten-value digit ladder matches `base`/`step`. Programme-doc titles
+  are warnings, never failures. Run it before printing worksheets.
+- Briefs carry the minimum needed to RUN the demo, plainly: expected readings
+  to ~1 significant figure, statistics and methodology in the folder's
+  `_archive/`, hand-placed coordinates on a 5 cm grid (typed values stay
+  exact — typing is free). Precision survives only where the point dies
+  without it. Rounding a recipe's coordinates makes a NEW geometry —
+  re-measure before shipping it.
 - The Pages deploy (`.github/workflows/pages.yml`) runs Jekyll over the repo
   so the markdown briefs render as web pages — README.md serves as its
   folder's index, links to `.md` are rewritten to the rendered page, and

@@ -1,4 +1,4 @@
-# HP-1 · Maximum power transmission
+# HP-1 · Maximum power transmission — the class finds h_f = H/3
 
 A hydro scheme feeds a 49 m penstock from a reservoir about 21 m above it and
 throws the water out of a nozzle. A big nozzle passes lots of water slowly; a

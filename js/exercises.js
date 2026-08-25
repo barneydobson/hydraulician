@@ -491,7 +491,7 @@ const EXERCISES = [
   },
   {
     id: "HP-2",
-    title: "The Pelton principle without the wheel",
+    title: "Why turbine buckets are cups, not plates",
     topic: "Hydropower",
     folder: "HP-2-pelton",
     scene: "sandbox",

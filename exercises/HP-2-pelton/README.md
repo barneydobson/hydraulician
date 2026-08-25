@@ -1,10 +1,16 @@
-# HP-2 · The Pelton principle without the wheel
+# HP-2 · Why turbine buckets are cups, not plates
 
 A spout fires a free jet at a drawn deflector, and a control-volume **Force
 box** reads the horizontal force on whatever it encloses. Three deflectors
-against the same jet: a flat plate (about 4 kN/m), a Pelton-style cup that
-turns the jet through ~165° (about 7 kN/m — close to the factor of two), and
-the deep-V of the textbook figure, which floods and reads only about 5.
+against the same jet: a flat plate (about 4 kN/m), a curved cup that turns
+the jet back through ~165° (about 7 kN/m — close to the factor of two), and
+the deep-V of the textbook figure, which reads only about 5 for a reason the
+rig itself explains.
+
+The demo is the momentum theorem: turning a jet back collects roughly twice
+what stopping it does, which is why an impulse turbine has buckets and not
+paddles. It is **not** a demonstration of the Pelton bucket's shape — see
+"What this rig does not show".
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **HP-2**, or use the direct link
@@ -58,10 +64,10 @@ Lecturer demonstration, ~10 min. The card counts each settle down.
 
    Nearest-5-cm accuracy is plenty — the cup is tolerant of hand-drawing.
 
-   This is one half of a Pelton bucket in section: the jet wraps the inside
-   of the cup and leaves down-and-back, so gravity clears the spent water
-   under the spout. Press `R`, let it settle: **F→ ≈ 7 kN/m — about 1.7× the
-   plate** — and the force arrow lengthens to match.
+   The jet wraps the inside of the cup and leaves down-and-back, which in
+   this plane is what keeps the spent sheet off the incoming jet. Press `R`,
+   let it settle: **F→ ≈ 7 kN/m — about 1.7× the plate** — and the force
+   arrow lengthens to match.
 4. Hover the exit sheet where it crosses the box face: about 5.5 m/s, heading
    down-and-back — faster than it arrived, because the jet fell ~0.5 m
    through the cup. On the board: ρq(v_in + v_out·cos θ) ≈
@@ -71,14 +77,37 @@ Lecturer demonstration, ~10 min. The card counts each settle down.
    plus one short capping stroke across the apex (butt-ended arms meeting at
    a point do not seal). θ = 165° promises 1.97 × ρqv; the box reads only
    **about 5 kN/m**. A wedge this deep cannot drain in the vertical plane:
-   it floods (F↑ shows it holding standing water) and the return is a slow
-   spill. This is why real buckets turn the water downward and notch the lip.
+   it floods (F↑ shows it holding standing water) and the return becomes a
+   slow spill instead of a fast sheet. That is a fact about drawing a
+   splitter side-on, not about splitters — see below.
 
 ![flat plate: force box reading about 4 kN/m](shots/06-plate-forcebox.png)
 
 ![cup: jet in, sheet out down-back, force box about 7 kN/m](shots/07-cup-forcebox.png)
 
 ![deep-V: flooded wedge, force box about 5 kN/m](shots/08-deepV-forcebox.png)
+
+## What this rig does not show
+
+A real Pelton bucket is a **double** cup with a splitter ridge down the
+middle, and none of the reasons for that are visible here. The splitter
+divides the jet into two halves and throws them out sideways, perpendicular
+to the wheel plane: that keeps the spent water clear of the incoming jet and
+of the following bucket, and the two lateral momentum components cancel, so
+the wheel puts no net side thrust on its bearings. All of it happens in the
+third dimension, which a vertical slice does not have.
+
+The plane a splitter actually divides the flow in contains the jet and both
+exit streams, and is horizontal — a plan view, with gravity out of it. That
+is why the deep-V above floods: it is a horizontal-plane shape drawn on its
+side, so its exits have to climb against gravity instead of flying sideways.
+Building it in a plan-view scene does not rescue it, and that was measured
+rather than assumed: a plan view has no free surface, so the jet is
+submerged and invisible, and the lateral force reads the same with one cup
+as with two. The record is in the archive.
+
+So the numbers above are the momentum theorem, and they are sound. The
+bucket's shape is a separate argument that belongs on the slides.
 
 **Heads, if you want them:** gauges in the free jet and on the stagnation
 point (MO-2's two stations) read a ratio of 1.15–1.30 × v²/2g, not 1 — the

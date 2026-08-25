@@ -156,7 +156,7 @@ function loadScene(id, keepDrawing) {
  *  Deliberately NOT reset — these are workspace preferences with no scene
  *  meaning, and a fresh boot cannot preserve them only because it cannot know
  *  them: the resolution budget, the pointer tool and its brush size, and
- *  whether the Controls / About panels are open.
+ *  whether the Controls panel is open.
  *
  *  Why in place rather than `location.href = "?scene=" + id`: the WebGL
  *  context, the six compiled programs and the panel DOM all survive, so the
@@ -3115,25 +3115,19 @@ function boot() {
   const setPanel = (open) => {
     document.getElementById("panel").classList.toggle("open", open);
     document.getElementById("panelBtn").classList.toggle("active", open);
-    if (open) { setAbout(false); }                               // they overlap
-  };
-  const setAbout = (open) => {
-    document.getElementById("about").classList.toggle("open", open);
-    document.getElementById("aboutBtn").classList.toggle("active", open);
-    if (open) {
-      document.getElementById("panel").classList.remove("open");
-      document.getElementById("panelBtn").classList.remove("active");
-    }
   };
   document.getElementById("panelBtn").onclick = () =>
     setPanel(!document.getElementById("panel").classList.contains("open"));
-  document.getElementById("aboutBtn").onclick = () =>
-    setAbout(!document.getElementById("about").classList.contains("open"));
+  // On the Pages build Jekyll renders numerics.md to numerics.html (it is not
+  // README.md, so jekyll-readme-index does not make it a folder index);
+  // everywhere else — file://, a plain static host — the .md itself is right.
+  document.getElementById("aboutBtn").href = "docs/numerics" +
+    (/\.github\.io$/i.test(location.hostname) ? ".html" : ".md");
 
   // Every floating box minimises (see MINI): the bar, the title/status box,
   // the tips line and the key list collapse to pills at their own anchors;
-  // Controls and About just close — their bar buttons are the way back in —
-  // and an announcement toast dismisses on click.
+  // Controls just closes — its bar button is the way back in — and an
+  // announcement toast dismisses on click.
   MINI.add("bar", document.getElementById("bar"),
     { corner: "inline", label: "☰", pill: { top: "14px", left: "14px" } });
   MINI.add("title", document.getElementById("title"),
@@ -3142,7 +3136,7 @@ function boot() {
     { label: "▸ tips", pill: { bottom: "18px", left: "50%", transform: "translateX(-50%)" } });
   MINI.add("keys", document.getElementById("keys"),
     { label: "▸ keys", pill: { bottom: "14px", left: "14px" } });
-  [["panel", setPanel], ["about", setAbout]].forEach(([id, close]) => {
+  [["panel", setPanel]].forEach(([id, close]) => {
     const b = document.createElement("button");
     b.className = "minbtn corner"; b.title = "Minimise"; b.textContent = "–";
     b.onclick = () => close(false);

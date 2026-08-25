@@ -69,13 +69,15 @@ drag.
 
 ```math
 \frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u} \cdot \nabla) \mathbf{u}
-= -\frac{\nabla p}{\rho} + \mathbf{g} + \nabla \cdot (\nu \nabla \mathbf{u})
-- \frac{C_f |\mathbf{u}| \mathbf{u}}{\Delta}
+= -\nabla P + \chi(f)\,\mathbf{g} + \nu_T \nabla^{2}\mathbf{u}
+- \mathbb{1}_{\text{wall}}\,\frac{C_f |\mathbf{u}| \mathbf{u}}{\Delta}
 ```
 
-Here `u` is velocity, `p` pressure, `ν` viscosity, `C_f` a bed
-friction coefficient, and `f` the fraction of a cell occupied by water, which
-also serves as the density.
+Here `u` is velocity and `f` the fraction of a cell occupied by water. The
+momentum equation runs on the water's constant density, so `P = p/ρ₀` is the
+pressure over that density; `χ(f)` switches gravity off as a cell runs out of
+water, `ν_T` is an eddy viscosity, and the bed friction — coefficient `C_f`,
+a wall function — acts only in cells touching a solid.
 
 The simplification is in how pressure is obtained. Treating water as
 incompressible makes pressure a global unknown: each step needs a Poisson
@@ -84,7 +86,7 @@ scheme. Instead the water is made slightly compressible, so pressure follows
 from the local fill fraction alone:
 
 ```math
-\frac{p}{\rho} = c^{2} \max(f - 1, 0)
+P = c^{2} \max(f - 1, 0)
 ```
 
 with `c` the speed at which pressure signals travel. A cell below capacity
@@ -251,3 +253,7 @@ Credit: inspired by Pavel Dobryakov's
 [WebGL-Fluid-Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation).
 
 **License:** [GPL-3.0](LICENSE).
+
+<!-- Pages build only: github.com strips this tag and renders the math fences
+     natively; on the Jekyll site docs/math.js rewrites them for MathJax. -->
+<script src="docs/math.js" defer></script>

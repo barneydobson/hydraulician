@@ -74,9 +74,8 @@ in this solver:
 - **Where there is none, `ρ = 0`**: no mass, no weight, no pressure, and the
   momentum equation is vacuous. But one velocity field spans the whole domain
   and something must be stored in the void — step 4 of §2.
-- **The interface needs no dynamic condition of its own.** With the air gone the
-  surface condition is `p = 0`, and §3 delivers it algebraically rather than by
-  tracking where the surface is.
+- **The surface condition is `p = 0`.** With the air gone that is the whole of
+  it, and §3 delivers it algebraically from the local fill.
 
 Everything from here is a named modelling step (§2, §3). §4 discretises the
 result. Every term in the solver is introduced by one of those steps.
@@ -134,19 +133,16 @@ and kept out of the momentum equation, which carries the single constant
 \qquad P \equiv \frac{p}{\rho_0}
 ```
 
-This is the step that removes `f` from the momentum equation: no `1/f` on the
-pressure gradient or the viscous term, and no `f` on the weight. Continuity
-meanwhile carries the full `f`, so the two are not formally consistent, and the
-size of the inconsistency is the compression itself, `(c₀/c)²`.
+`f` therefore appears nowhere in the momentum equation: the pressure gradient
+and the viscous term carry no `1/f`, and the weight carries no `f`. Continuity
+carries the full `f`, so momentum and continuity run on different densities, and
+the gap between them is the compression, `(c₀/c)²`.
 
-It is deliberate. With `ρ₀` constant the discrete hydrostatic balance is exactly
-linear and the equilibrium profile of §3 is reached exactly rather than
-approximately; letting a compression that is a numerical device into the inertia
-and the weight would bend that profile by an amount with no physical meaning.
+With `ρ₀` constant the discrete hydrostatic balance is exactly linear and the
+equilibrium profile of §3 is reached exactly.
 
-One consequence to note for §4: with `ρ₀` constant, momentum is written in
-advective rather than conservative form. The two differ by `u(∇·u)`, which §3
-bounds at `O(M²)`.
+Momentum is in advective rather than conservative form, the two differing by
+`u(∇·u)`, which §3 bounds at `O(M²)`.
 
 ### Step 4 — The void gate
 
@@ -154,22 +150,19 @@ Step 3 leaves gravity as `g` everywhere, but §1 established that a void has no
 mass and no weight, and one velocity field spans both regions. The velocity
 stored in a void is not a fluid velocity: it is an extension field, kept only so
 the interface has something to be advected by, and so that a jet leaving a nozzle
-does not run into a rigid wall of stationary air. Applying gravity to it would
-make it fall, and the advection stencil would carry that spurious momentum back
-into the water at the interface.
-
-So gravity is switched off as the fluid runs out:
+does not run into a rigid wall of stationary air. Gravity is switched off as the
+fluid runs out, so the void field stays unforced and the interface receives no
+momentum through the advection stencil from the empty cells above it:
 
 ```math
 \chi(f) = \operatorname{smoothstep}\left(0,\; 0.05,\; f\right)
 ```
 
-`χ` is a **gate, not a factor of `f`**: it is exactly 1 for any cell more than 5%
-full, so in water the term is `g`, and only the last 5% into a void is ramped. An
-interface cell at `f ≈ 0.5` gets the full `g`, which is the right answer — the
-water in it is in free fall. The pressure term needs no equivalent, because the
-equation of state already returns `P = 0` below `f = 1`, so with `χ` in place a
-void is force-free.
+`χ` is a **gate**: exactly 1 for any cell more than 5% full, ramping to 0 across
+the last 5% into a void. In water the term is therefore `g`, and an interface
+cell at `f ≈ 0.5` gets the full `g` — the water in it is in free fall. The
+pressure term needs no equivalent: the equation of state returns `P = 0` below
+`f = 1`, so with `χ` in place a void is force-free.
 
 ### Step 5 — Model the wall rather than resolve it
 
@@ -219,13 +212,9 @@ Steps 1–5 applied to §1:
 with `P = p/ρ₀` supplied by the equation of state of §3, and `𝟙_wall` the
 indicator of cells adjacent to a solid.
 
-One thing about this equation is easy to misread, and it matters when checking
-it against the code: **`u` is advected, not `fu`.** Momentum is in advective
-(non-conservative) form and the advection carries no `f` weighting at all; only
-volume is in flux (conservative) form. A quasi-conservative formulation — dividing
-`∂(ρu)/∂t + ∇·(ρuu) = −∇p + ρg + ∇·τ` by the constant `ρ₀` to get
-`∂(fu)/∂t + ∇·(fuu) = −∇P + f g + …` — *would* carry `f g`, and the gravity
-term here does not. That is not the form solved.
+`u` is the advected quantity and `f` the transported one: momentum is in
+advective (non-conservative) form and carries no `f` weighting, volume is in
+flux (conservative) form.
 
 §4 discretises this system and nothing else.
 
@@ -381,8 +370,9 @@ Two riders. The column settles **3.3% lower** than it started, because the slot
 storage has to be filled from the water already present; the final surface sits
 15.65 mm above a sharp-interface mass balance, which is 0.78 cells of smeared VOF
 interface at `Δx = 0.02`. And convergence is slow — around 100 s of simulated
-time to reach `10⁻⁴`, longer than a scene runs for. That is why `still()` exists:
-a scene initialised uniform would spend its entire run settling.
+time to reach `10⁻⁴`, longer than a scene runs for. Scenes are therefore
+initialised with `still()` — the equilibrium profile above — so the run starts
+already settled.
 
 Two further consequences. A still column stores more `f` than its geometric
 volume:
@@ -406,7 +396,7 @@ the soffit: water rises into it, there is always a free surface, and the
 piezometric head is the level in the slot. Slot width sets celerity through
 `c² = gA/B_s`.
 
-The correspondence here is exact rather than by analogy. Head above a point is
+The correspondence here is exact. Head above a point is
 `h_p = P/g = c²(f−1)/g`, so the excess volume a cell stores is
 `(f−1)Δx² = (g h_p/c²)Δx²`. Equating that to the classical slot's storage
 `B_s·h_p·Δx` over the same cell:
@@ -500,16 +490,14 @@ f^{n+1} = \Pi_f\left[f^{n}
 
 Three things to read off this.
 
-**Stages 1–3 are not a Lie composition.** `A`, `D` and `G` are all evaluated at
-the *same* old state and summed — one forward Euler, not three sequential
-sub-steps. That is why they share a single stencil fetch, and it costs nothing:
-sequential composition would differ at `O(Δt²)`, the order of the splitting
-error already present.
+**Stages 1–3 are summed, not composed.** `A`, `D` and `G` are all evaluated at
+the *same* old state and added — one forward Euler over the three, so they share
+a single stencil fetch. The difference from a sequential composition is
+`O(Δt²)`, the order of the splitting error already present.
 
 **Friction is the only implicit stage.** `u**` is the exact solution of
-`du/dt = F(u)` over `Δt` with `|u|` frozen at `|u*|`. That is why arbitrarily
-large roughness is stable — an explicit friction term would need
-`Δt < Δ/(C_f|u|)` and would fail exactly where the flow is fastest.
+`du/dt = F(u)` over `Δt` with `|u|` frozen at `|u*|`, so it is unconditionally
+stable and puts no bound on `Δt` at any roughness.
 
 **`Π` and `Π_f` are projections, not operators.** On velocity: the void bleed,
 the transport-consistency cap, the ±80 rails, prescribed sources, the boundary
@@ -532,8 +520,8 @@ below, `v` on side walls left and right), so a wide pond has no friction on
 
 **Volume second, with `uⁿ⁺¹`.** The flux that moves mass is the velocity the
 pressure step has just acted on, so the EOS on the next substep sees the volume
-its own pressure gradient produced. Advecting `f` with `uⁿ` would lag the
-pressure–volume coupling — the slot's restoring mechanism — by a full step.
+its own pressure gradient produced. That keeps the pressure–volume coupling —
+the slot's restoring mechanism — inside a single substep.
 
 Splitting error is `O(Δt)`, consistent with the forward Euler inside each stage.
 The scheme is first-order in time; with thousands of substeps a second this is

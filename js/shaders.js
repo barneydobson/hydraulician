@@ -731,7 +731,7 @@ void main(){
     water = mix(shallow, deep, clamp(sub / max(u_hmax, 0.05), 0.0, 1.0));
     water += vec3(0.10, 0.14, 0.16) * clamp(length(U.rg) / max(u_vmax, 0.01), 0.0, 1.0);
   } else if (u_mode == 1) {
-    float head = U.b / max(abs(u_g), 1e-3);   // piezometric head above the point (m)
+    float head = U.b / max(abs(u_g), 1e-3);   // pressure head p/ρg: submergence below the surface (m)
     water = turbo(head / max(u_hmax, 0.05));
   } else if (u_mode == 2) {
     water = turbo(length(U.rg) / max(u_vmax, 0.01));

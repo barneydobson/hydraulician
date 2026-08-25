@@ -28,7 +28,7 @@ the curve:
     α = Σ u_i³ Δy / (V³ h)       Δy = h / n,   n = 4 or 5
     V = the mean of YOUR OWN n points, not the chip's V
 
-`h` comes off the hover box. The rake's chip prints `u_max`, the
+`h` comes off the hover box's `depth d` row. The rake's chip prints `u_max`, the
 depth-averaged `V` and their `ratio` — and none of it is smoothed, so a
 single frame is not a reading.
 
@@ -51,7 +51,8 @@ explain the assignment in class.
 2. Place a rake — Rake (`6`) — at your station, anywhere in the water, and
    watch it run for 15–20 s.
 3. Press `SPACE` to pause on a typical moment — not a crest, not a trough —
-   then read `u_max`, `V` and `ratio` off the chip and `h` off the hover box.
+   then read `u_max`, `V` and `ratio` off the chip and `h` — the `depth d`
+   row — off the hover box.
 4. Read 4–5 points off the gold curve, spaced fairly evenly through the depth
    and nudged towards (not onto) bed and surface, integrate them into **α**,
    and submit **ratio** and **α**. Press `SPACE` again to resume.

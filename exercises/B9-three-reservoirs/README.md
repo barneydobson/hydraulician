@@ -52,11 +52,11 @@ not the one you aimed at.
 3. Place four gauges — Gauge (`5`) — at tank A (x ≈ 0.75, y ≈ 0.20), the
    junction (x ≈ 2.78, y ≈ 0.50), tank B (x ≈ 2.78, just **above** y = 1.0;
    lower is inside the shut valve's solid and reads a false dry) and tank C
-   (x ≈ 5.05, y ≈ 0.20). The cards plot piezometric head, `H`.
+   (x ≈ 5.05, y ≈ 0.20). The cards plot piezometric head, `h`.
 4. Right-drag into the shaft (x ≈ 2.78) to pour tank B up to your own level,
    keeping the pour just above the rising surface — aimed much higher, the
    falling column disperses instead of pooling. Stop, wait 10 s, and read the
-   settled `H` on B's card: that, not the level you aimed at, is your z_B(0).
+   settled `h` on B's card: that, not the level you aimed at, is your z_B(0).
 5. Press `V`: all three branches release together. Three seconds later note
    whether B's gauge is **rising or falling**, and read the junction gauge.
 6. Submit **z_B(0)**, the **sign of Q_B** (rising = into B, positive) and the

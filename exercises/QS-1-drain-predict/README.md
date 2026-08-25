@@ -55,11 +55,11 @@ reservoir and tailwater level in this app; h in the formula is η − 1.36.
 2. Let the tank reach its steady level — about **55 s**; the card counts it
    down.
 3. Drop a Gauge (`5`) low in the tank, around x = 1.0 m, y = 1.0 m. The
-   Gauges plot arrives on **Piezometric head**, so the card's live **H** is
+   Gauges plot arrives on **Piezometric head**, so the card's live trace is
    the surface elevation — that number is η. The **Speed** slider arrives at
    **×0.15**, which stretches the drain in wall-clock time without changing
    it; leave it there.
-4. Uncheck **Top-left spout**. Press **space** to pause the moment H reads
+4. Uncheck **Top-left spout**. Press **space** to pause the moment the card reads
    your **η₁**, read `t` off the status bar, resume, and pause again at
    **1.80 m** for the second reading. Submit **t_pred** and
    **t_meas = t₂ − t₁**. (The gauge chart's own scrolling window is far too

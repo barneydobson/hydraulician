@@ -1,12 +1,12 @@
 # NC-3 · Bed shear and the riprap size
 
 Every student runs two things. First, their own personalised discharge on a
-steep chute: the cursor readout prints the local depth `h` and friction slope
-`S_f` straight off the solver's own energy grade line, so `τ₀ = ρg·h·S_f` is
-measured rather than assumed, and on paper that stress becomes the smallest
-rock that would stay put. Second, the same reading once on a mild channel at
-its own fixed discharge, which gives everyone a shared second point almost
-for free. Nobody types in a grain size, and the change of bed slope alone
+steep chute: the cursor readout prints the local depth — its `d` row, `h` in
+the formulas below — and the friction slope `S_f` straight off the solver's
+own energy grade line, so `τ₀ = ρg·h·S_f` is measured rather than assumed,
+and on paper that stress becomes the smallest rock that would stay put.
+Second, the same reading once on a mild channel at its own fixed discharge,
+which gives everyone a shared second point almost for free. Nobody types in a grain size, and the change of bed slope alone
 moves the answer by a factor of about 14 — coarse gravel to boulders.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
@@ -41,8 +41,8 @@ explain the assignment in class.
 2. Press `R` and let it reach steady state — about **26 s**; the card counts
    it down.
 3. Hover mid-chute at **x ≈ 3.5 m** — clear of the first metre and of the
-   last 1.5 m before the brink — and read **h** and **S_f** as the middle of
-   ~10 s of wobble; this chute carries roll waves.
+   last 1.5 m before the brink — and read **h** — the box's `depth d` row —
+   and **S_f** as the middle of ~10 s of wobble; this chute carries roll waves.
 4. Compute τ₀ and D_min, and submit **τ₀ (N/m²)** and **D_min (mm)** —
    record your q, h and S_f too, the answer is checkable against them.
 
@@ -71,7 +71,7 @@ below the class, and each row's measurement window as an error bar.
 ### Discussion points
 
 - **Why the class cluster comes out flat — sweep it live.** Drag **Inflow q**
-  from 0.80 to 1.16 on the chute and watch the cursor box: `h` creeps, `S_f`
+  from 0.80 to 1.16 on the chute and watch the cursor box: `d` creeps, `S_f`
   hardly moves, and D_min stays inside the boulders band the whole way. A 45%
   change in discharge is worth almost nothing beside one change of slope from
   1-in-4 to 1-in-68. In τ₀ = ρgRS, S is doing nearly all the work — say so

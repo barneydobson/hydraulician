@@ -32,7 +32,7 @@ about **Q = 0.10 m²/s, H = 1.2 m**.
 `H` is a *difference* of two gauges, flange minus sump. Gauge cards print
 piezometric head (elevation + pressure) above the domain floor, so the
 difference is the head the pump adds above the sump's own surface. Read gauges,
-not the hover box's `head p/ρg` row — that one is pressure only.
+not the hover box's `pressure head p/ρg` row — that one carries no elevation.
 
 ## Your pump speed
 
@@ -65,7 +65,7 @@ Priming is shared by the whole class and comes before anybody's own digit.
 4. Drop two gauges (Gauge, `5`): the flange at **(3.0, 0.60)**, inside the pipe
    just downstream of the pump, and the sump's open water at **(0.9, 1.0)**.
 5. Hover the low-run bore (x ≈ 2.7 m) and read the **`q`** row — that is your
-   **Q** — take **H** as gauge 1's **H** minus gauge 2's **H**, and submit
+   **Q** — take **H** as gauge 1's **h** minus gauge 2's **h**, and submit
    **Q, H**.
 
 ## For the instructor — pooling the class

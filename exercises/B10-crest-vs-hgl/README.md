@@ -30,7 +30,7 @@ the **HGL**, not the energy line (`V²/2g` is roughly 0.3–0.9 m here).
 The crest sits at x = 5.60 m, which is 44.2 % of the way from gauge A
 (x = 3.70 m) to gauge B (x = 8.00 m), both on the pipe axis at y = 2.20 m:
 
-    HGL at the crest = H₁ + 0.442 · (H₂ − H₁)
+    HGL at the crest = h₁ + 0.442 · (h₂ − h₁)
 
 The tailwater stays at 2.50 m for everybody, and one cell is **0.0217 m** at
 Medium — the quantisation of every elevation in this exercise.
@@ -61,8 +61,8 @@ undoes back to the flat pipe instead of stacking a second hump on the first.
 1. Set **Reservoir level** to your value, press `R` and let it reach steady
    state — about **12 s**; the card counts it down.
 2. Drop two gauges (Gauge, `5`) on the pipe axis — A at (3.70, 2.20), B at
-   (8.00, 2.20) — read `H₁` and `H₂` off their cards, and interpolate the HGL
-   at the crest, `H₁ + 0.442·(H₂ − H₁)`. That number is your prediction of
+   (8.00, 2.20) — read `h₁` and `h₂` off their cards, and interpolate the HGL
+   at the crest, `h₁ + 0.442·(h₂ − h₁)`. That number is your prediction of
    where the pipe will give up.
 3. Jump the crest to 0.09 m *below* your prediction, then climb: 3-cell
    (0.065 m) steps while the crown pressure head is above 0.06 m, 1-cell

@@ -44,9 +44,9 @@ which is a source (footprint x 0.61–0.79) and not a force.
 2. Press `R` and let it reach steady state — about **5 s**; the card counts it
    down. Re-settle after every redraw below: 3–5 s for the gauges, 8 s before
    the Force box's `±` means anything.
-3. Read both gauge cards' **H**, which already includes elevation: the
-   stagnation pressure head is `H_stag − y_stag`, and the free-jet gauge's own
-   `H_ref − y_ref` should read ≈ 0, confirming it really is in free water.
+3. Read both gauge cards' **h**, which already includes elevation: the
+   stagnation pressure head is `h_stag − y_stag`, and the free-jet gauge's own
+   `h_ref − y_ref` should read ≈ 0, confirming it really is in free water.
    Hover that station for **u, v** and use the full speed √(u² + v²).
 4. Pick the **Force box** (`9`) and drag one from **(0.85, 1.55)** to
    **(2.05, 3.20)**. That box encloses every shape in the table below and its

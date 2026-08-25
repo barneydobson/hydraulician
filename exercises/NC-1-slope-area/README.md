@@ -52,11 +52,12 @@ explain the assignment in class.
    Controls panel shut: it holds the answer.
 2. Press `R` and let it reach steady state — about **32 s**; the card counts
    it down.
-3. Watch both gauge cards for 20–30 s. Each prints **`H`**, the surface
+3. Watch both gauge cards for 20–30 s. Each prints **`h`**, the surface
    elevation; **F** is the fall between the middles of the two traces, in mm
    — tens to well over a hundred, and clearly positive.
-4. Hover the midpoint **x₀ + 3.5** for **h** and **n**, and each window end
-   for **h₀** and **h₁** (middle of the wobble, never one glance); compute
+4. Hover the midpoint **x₀ + 3.5** for **h** (the box's `depth d` row) and
+   **n**, and each window end for **h₀** and **h₁** (middle of the wobble,
+   never one glance); compute
    Q̂₂ and submit **x₀, F, Q̂₂**.
 
 ## For the instructor — pooling the class

@@ -61,8 +61,8 @@ unchanged between the two runs:
    rig re-rasterises and the water starts again from empty.
 3. Press `R` and let it reach steady state — about **55 s**; the card counts
    it down (40 s at λ = ½, 28 s at λ = ¼).
-4. Read the card's `h`, work out **H = h − P** and **C_d = q/(√g·H^1.5)**,
-   and submit **λ, q, resolution, C_d**.
+4. Read the card's `d` as your `h`, work out **H = h − P** and
+   **C_d = q/(√g·H^1.5)**, and submit **λ, q, resolution, C_d**.
 
 ## For the instructor — pooling the class
 

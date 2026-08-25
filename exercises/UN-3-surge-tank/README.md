@@ -61,7 +61,7 @@ not the target; the wall centrelines are x = 53.0 ∓ (b_s/2 + 0.15):
    it down. The tank has to drain from its 25 m fill to 12.0 m and the shaft
    has to fill.
 4. Hover mid-pipe for the bore-mean **V**, which is your **v₀**, then place a
-   Gauge (`5`) inside the shaft, a metre or so above the pipe. Its **h** trace
+   Gauge (`5`) inside the shaft, a metre or so above the pipe. Its **d** trace
    is the water standing in your shaft; note the steady value as **h₀**.
 5. Press `V` to slam the valve and let it swing at least twice — a decaying
    wave, not a square wave. Pause (**space**) promptly and read **y_max** =

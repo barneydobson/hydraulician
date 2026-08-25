@@ -52,7 +52,7 @@ Even digits also run the deep flume, on its own rows:
    near it — **x ≈ 0.6 m** — once low, roughly a tenth of the depth above the
    floor (your **bed** gauge), then once about three-quarters of the way up
    with a visible band of water still above it (your **surface** gauge).
-4. Read the peak-to-peak swing of **H** on each card — half of (highest −
+4. Read the peak-to-peak swing of **h** on each card — half of (highest −
    lowest) is that gauge's amplitude — and submit **T**, **bed amplitude**,
    **surface amplitude** and **ratio = bed / surface**. A surface trace that
    goes flat and stops moving has left the water: place it lower and re-settle.

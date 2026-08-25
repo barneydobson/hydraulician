@@ -48,7 +48,7 @@ metres:
    velocity — that is your **v₀**. Drop a Gauge (`5`) at x = 30 m on the pipe
    axis and expand its card (the **⤢** button opens the gauge inspector, a
    full-width trace that is much easier to read than the corner card). Its
-   steady **H** is **H₀**.
+   steady **h** is your **H₀**.
 4. Press `V` to slam the valve, then **space** to pause. Read **H₁** off the
    first flat top of the inspector trace — the plateau, not the ringing spike
    on the wave front — and submit **gap, v₀, ΔH = H₁ − H₀**.

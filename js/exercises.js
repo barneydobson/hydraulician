@@ -566,7 +566,7 @@ const EXERCISES = [
     ],
     start: "the penstock with nozzle, tee and standpipe already built — the shaft width is yours",
     task: "Redraw the standpipe shaft to your own width and gauge it, then slam the valve and read y_max (first crest minus h₀) and the crest-to-crest period T off the Depth trace.",
-    settle: 60,
+    settle: 100,
   },
   {
     id: "B1",

@@ -34,8 +34,9 @@ q = 0.5, so a lower q drowns the jump. Physics, not harness.
 ## macOS
 
 The runner is written for the Linux box it was made on: it scans `/proc` for
-PIDs and probes `/tmp/.X11-unix`. Shim those two in a wrapper (`pgrep -f`,
-and a constant true) rather than editing this file. Two traps, each measured
+PIDs and probes `/tmp/.X11-unix`. `runner_mac.py` shims those two (`pgrep -f`,
+and a constant true) rather than editing this file — same CLI, so
+`python3 exercises/_runner/runner_mac.py launch --id UN3 --scene hammer`. Two traps, each measured
 at about an hour: the `chrome` on PATH must be an **exec wrapper script**,
 not a symlink — the .app resolves its framework relative to the executable
 path, so a symlink dies in dlopen — and a pgrep needle must not begin with

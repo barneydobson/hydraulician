@@ -57,9 +57,11 @@ not the target; the wall centrelines are x = 53.0 ∓ (b_s/2 + 0.15):
    y = 4.9 up to y = 29.6 at your **x_left** and **x_right**. Erase first and
    wall second — the later stroke wins, and that is what seals the shaft
    against its own hole.
-3. Press `R` and let it reach steady state — about **60 s**; the card counts
+3. Press `R` and let it reach steady state — about **100 s**; the card counts
    it down. The tank has to drain from its 25 m fill to 12.0 m and the shaft
-   has to fill.
+   has to fill. It is not settled at 60 s: the shaft is still swinging 0.6 m
+   then, against the 0.12 m it ends up at, and h₀ read early is what puts a
+   rest level above the reservoir.
 4. Hover mid-pipe for the bore-mean **V**, which is your **v₀**, then place a
    Gauge (`5`) inside the shaft, a metre or so above the pipe. Its **d** trace
    is the water standing in your shaft; note the steady value as **h₀**.

@@ -89,7 +89,11 @@
     // rather than interlock, so this is checked, never assumed (MO-2's rule).
     check: function () {
       var s = APP.sim, dx = s.dx, rows = [], bad = 0;
-      for (var j = 36; j <= 40; j++) {
+      // Scan by ELEVATION. j = 36..40 was Medium's dx baked in; at High those
+      // rows land inside the bore, the soffit reads as one 500-cell hole and
+      // every rig fails the seal it actually passes.
+      for (var y = 4.95; y <= 5.50; y += dx) {
+        var j = Math.round(y / dx);
         var holes = 0, x0 = null, x1 = null;
         for (var i = Math.round(6.6 / dx); i < Math.round(58.0 / dx); i++)
           if (s.mask[j * s.nx + i] === 0) { holes++; if (x0 === null) x0 = i * dx; x1 = i * dx; }
@@ -116,8 +120,16 @@
       dt = dt || 1 / 20; rec = rec || 44;
       APP.state.paused = false;
       var g = APP.state.gauges[0], bed = 2.0642, k;
+      // The gauge's depth channel is OVERLAY.analyse's 10 %/call EMA, and
+      // settle() runs on APP.tick, which never calls analyse. So the first
+      // frames after a settle replay the scene's stale 25 m initial fill: a
+      // 3 s median taken across that relaxation reads ~0.5 m high, and on the
+      // shipped dry-run class it put two of ten rest levels ABOVE the
+      // reservoir. Warm the EMA first, then open the window — and make the
+      // window 10 s, because the residual is a 0.12 m turbulent noise floor.
+      for (k = 0; k < Math.round(10 / dt); k++) APP.frames(1, dt);
       g.hist.length = 0;
-      for (k = 0; k < Math.round(3 / dt); k++) APP.frames(1, dt);
+      for (k = 0; k < Math.round(10 / dt); k++) APP.frames(1, dt);
       var pre = g.hist.map(function (h) { return h.depth; }).sort(function (a, b) { return a - b; });
       var rest = pre[pre.length >> 1], v0 = this.V(30.0), tslam = APP.sim.t;
       toggleValve();
@@ -152,7 +164,7 @@
       opts = opts || {};
       var c = this.setup(bs, opts);
       if (!c.ok) return { error: "rig not sealed", check: c };
-      this.settle(opts.settle || 50);
+      this.settle(opts.settle || 100);
       var r = this.slam(opts.rec || 44);
       r.bs = c.bs_delivered;
       r.T_theory = +(2 * Math.PI * Math.sqrt(this.L * r.bs / (9.81 * this.BP))).toFixed(3);

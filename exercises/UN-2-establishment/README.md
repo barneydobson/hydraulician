@@ -46,7 +46,7 @@ sets:
 1. Set **Controls → Reservoir level** to your value. Press `R` and let it
    settle — about **30 s**; the card counts it down. The pipe should be full
    and still.
-2. Place a Gauge (`5`) mid-pipe at x = 14 m on the axis (y ≈ 2.4) and expand
+2. Place a Gauge (`5`) mid-pipe at x = 14 m on the axis (z ≈ 2.4) and expand
    its card — the **⤢** button opens the inspector, a full-width trace.
 3. Press `V` to open the valve — that is your t = 0 — and watch about
    fifteen seconds. Pause (**space**).

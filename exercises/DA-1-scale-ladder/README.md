@@ -34,7 +34,7 @@ would make it the textbook λ^2.5 is exactly the width the slice does not
 have.
 
 The weir is broad-crested and stands on a bed pedestal whose top face is at
-**y = 0.50 m** on every rung; your own crest height **P** is in the table
+**z = 0.50 m** on every rung; your own crest height **P** is in the table
 below.
 
 ## Your scale and discharge
@@ -45,7 +45,7 @@ and the drawing loads with your digit. Your q is `q_base = 0.60 + 0.06·d`
 already scaled by λ^1.5, and the reservoir level is the one paired with it —
 never set one without the other:
 
-| d | λ | q (m²/s) | reservoir level (m) | gauge x, y (m) | P (m) |
+| d | λ | q (m²/s) | reservoir level (m) | gauge x, z (m) | P (m) |
 |---|---|---|---|---|---|
 | 0 | 1 | 0.600 | 1.795 | 2.17, 1.25 | 0.696 |
 | 1 | ½ | 0.235 | 1.165 | 1.09, 0.90 | 0.348 |

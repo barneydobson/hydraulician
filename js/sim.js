@@ -459,9 +459,9 @@ const SIM = (() => {
    *  between cells at different heights. The piezometric head is h = z + p/ρg;
    *  add the elevation yourself (see the gauge sampler in main.js). The name is
    *  kept because `APP.probe()` is a public surface used by headless rigs. */
-  function probe(x, y) {
+  function probe(x, z) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
-    const j = Math.max(0, Math.min(S.ny - 1, Math.floor(y / S.dx)));
+    const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const u = S.pxBuf[0], v = S.pxBuf[1], p = S.pxBuf[2];
@@ -472,7 +472,7 @@ const SIM = (() => {
              solid: S.mask[j * S.nx + i] };
   }
 
-  /** A whole column of velocity — the vertical rake. Returns u(y) at cell centres. */
+  /** A whole column of velocity — the vertical rake. Returns u(z) at cell centres. */
   function rake(x, out) {
     const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
     const buf = out && out.length >= S.ny * 4 ? out : new Float32Array(S.ny * 4);

@@ -33,7 +33,7 @@ Past that, the only thing left that can rise is the *upstream* depth — the
 crest, not the reservoir, is now in charge of the depth everywhere behind it.
 That is choking, and the height at which it starts is what the class measures.
 
-The rig is fixed and the same for everyone: bed top face at **y = 0.50 m**,
+The rig is fixed and the same for everyone: bed top face at **z = 0.50 m**,
 reservoir **and** tailwater both held at **1.00 m** (the reach has nothing to
 choke against unless both ends are held), gauge at **x = 2.5 m**, and the hump
 1 m long centred on **x = 4.5 m**.
@@ -61,7 +61,7 @@ the assignment in class.
    **`Δz_pred = E₁ − 1.5·y_c`**. Write it down *before* you touch the hump.
 4. Draw the hump — Wall (`1`), brush shrunk with `[` to about 0.04 m, one
    shift-held horizontal stroke ~1 m long centred on **x = 4.5 m**, started
-   inside the bed slab (y ≈ 0.45) and dragged up to a first height of ~0.05 m.
+   inside the bed slab (z ≈ 0.45) and dragged up to a first height of ~0.05 m.
 5. Raise it in about seven steps toward `2·Δz_pred` — `Z` to undo, redraw
    taller, re-settle 15–30 s each time (the fine steps near the top need the
    longer wait), and **jot `y₁` at every step**.

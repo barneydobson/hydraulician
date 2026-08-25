@@ -634,23 +634,23 @@ const EXERCISE_RIGS = {
 const EXERCISE_RIG_NOTES = {
   "UN-1": {
     control: "nozzle gap g = 0.14 x (1 + (d mod 6)) metres — the verified SIX-rung ladder, 0.14-0.84 m (the flow area is quantised to ONE cell at Medium)",
-    how: "Erase the scene's plate with the brush widened four `]` presses, then with the Wall tool and Shift held draw two vertical pieces at the same station: lower half from the pipe floor (y = 2.0) up to y = 3.5 - gap/2, upper half from y = 3.5 + gap/2 up to the pipe roof (y = 5.0).",
+    how: "Erase the scene's plate with the brush widened four `]` presses, then with the Wall tool and Shift held draw two vertical pieces at the same station: lower half from the pipe floor (z = 2.0) up to z = 3.5 - gap/2, upper half from z = 3.5 + gap/2 up to the pipe roof (z = 5.0).",
   },
   "LL-2": {
     control: "partner A's hidden fault: its station x (4.6-7.0 m) and its height (2-3 blocked cells of the 18-cell bore)",
-    how: "Wall tool with the brush narrowed two or three `[` presses to about one grid cell, Shift held, one short vertical stroke starting exactly on the pipe invert (y = 2.00 m) and ending between y = 2.04 and y = 2.07 m, at any x from 4.6 to 7.0 m.",
+    how: "Wall tool with the brush narrowed two or three `[` presses to about one grid cell, Shift held, one short vertical stroke starting exactly on the pipe invert (z = 2.00 m) and ending between z = 2.04 and z = 2.07 m, at any x from 4.6 to 7.0 m.",
   },
   "FB-1": {
     control: "hump height dz above the bed — raised in steps until the flow chokes",
-    how: "Wall tool with the brush shrunk to about 0.04 m, Shift held, a horizontal stroke about 1 m long centred on x = 4.5 m starting from inside the bed slab (about y = 0.48) up to a low first height, e.g. y = 0.55 m.",
+    how: "Wall tool with the brush shrunk to about 0.04 m, Shift held, a horizontal stroke about 1 m long centred on x = 4.5 m starting from inside the bed slab (about z = 0.48) up to a low first height, e.g. z = 0.55 m.",
   },
   "QS-2": {
     control: "tank 2 width A2 = 0.50 + 0.25·d metres (the payload ships A2 = 2.00, d = 6)",
-    how: "Wall tool, one vertical stroke (brush 0.10) at x = 3.60 + A2, floor to y ~ 3.2 — tank 2's far wall is the personalised dimension.",
+    how: "Wall tool, one vertical stroke (brush 0.10) at x = 3.60 + A2, floor to z ~ 3.2 — tank 2's far wall is the personalised dimension.",
   },
   "UN-3": {
     control: "standpipe width b_s = 0.70 + 0.14·d metres (the payload ships b_s = 0.98, d = 2)",
-    how: "Erase a hole in the pipe soffit with a short vertical stroke at x = 53.0 from y = 4.9 to y = 6.6 with the brush widened to your b_s, then Wall-tool Shift-drag the two shaft walls at x = 53.0 -/+ (b_s/2 + 0.15) from y = 4.9 up to y = 29.6.",
+    how: "Erase a hole in the pipe soffit with a short vertical stroke at x = 53.0 from z = 4.9 to z = 6.6 with the brush widened to your b_s, then Wall-tool Shift-drag the two shaft walls at x = 53.0 -/+ (b_s/2 + 0.15) from z = 4.9 up to z = 29.6.",
   },
   "B10": {
     control: "crest soffit elevation z_c — lifted step by step until the pipe separates (the payload ships the FLAT pipe, no crest)",

@@ -41,7 +41,7 @@ the slider's 0.30 m maximum):
 2. Press `R` and let it reach steady state — about **42 s**; the card counts
    it down.
 3. Drop two gauges with the **Gauge** tool (`5`) at **x = 1.0 m** and
-   **x = 1.8 m**, both around y = 0.20 m. Gauges plot arrives on **Depth**,
+   **x = 1.8 m**, both around z = 0.20 m. Gauges plot arrives on **Depth**,
    so each card reads `d`.
 4. Over 20–30 s of cycles read **H**, a typical crest-to-trough swing of a
    `d` trace, **Δt**, the lag between the two cards' crests, and the

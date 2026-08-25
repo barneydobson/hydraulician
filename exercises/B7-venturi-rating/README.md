@@ -28,7 +28,7 @@ bores are **a₁ = 0.6995 m** (barrel) and **a₂ = 0.3975 m** (throat), area ra
 
 `Δh` is the barrel head minus the throat head. Both gauges must sit at the
 **same elevation** — the invert is flat the whole length of the duct, so
-y = 0.85 m works at both stations. With `z` identical at the two taps the
+z = 0.85 m works at both stations. With `z` identical at the two taps the
 elevation term cancels, and the gauge cards and the plain hover readout give
 the same `Δh`.
 

@@ -162,10 +162,10 @@ Three guard rails, each bought with an explosion:
     defect at default settings, negligible but do not enlarge it.
   - **Hydrostatic balance is a result, not an assumption.** Nothing imposes
     `∂P/∂z = −g`; it is the condition for rest, and `P = 0` above `f = 1` fixes
-    the constant, giving the equilibrium fill `f = 1 + g(η−y)/c²` — which is
+    the constant, giving the equilibrium fill `f = 1 + g(η−z)/c²` — which is
     exactly `still()` in scenes.js. `docs/hydrostatic-attractor.js` verifies the
     solver reaches it from a uniform (uncompressed) start: `|∂P/∂z + g|/g` falls
-    to 2×10⁻⁶ and the elevation implied by the pressure, `y + P/g`, is one number
+    to 2×10⁻⁶ and the elevation implied by the pressure, `z + P/g`, is one number
     at every depth. It takes ~100 s of simulated time, which is why scenes are
     initialised with `still()` rather than uniform — a cold start would still be
     settling at the end of a run.
@@ -218,6 +218,10 @@ Three guard rails, each bought with an explosion:
 Displayed symbols follow free-surface convention. Three different quantities
 get loosely called "head", so keep them apart:
 
+- `z` — the vertical coordinate, elevation above the domain floor (the datum).
+  Displayed and documented as `z` everywhere (hover readout, gauge cards,
+  measure tape, briefs); code identifiers and serialised state keep their `y`
+  fields (`gauges[].y`, rig-JSON `"y"`, GLSL/screen coordinates).
 - `d` — water depth of the column.
 - `η` — water level: bed + `d`, above datum.
 - `h` — **piezometric** head, `h = z + p/ρg`. Absorbing gravity into the
@@ -233,7 +237,7 @@ get loosely called "head", so keep them apart:
 hydrostatic water it is just the submergence, so it carries a unit vertical
 gradient everywhere wet and is not comparable between cells at different
 heights. Rig scripts build the piezometric head themselves as
-`y + probe().head` (see `B6-ursell/rig.js`). The name is kept because
+`z + probe().head` (see `B6-ursell/rig.js`). The name is kept because
 `APP.probe()` is a public surface.
 
 The gauge `FIELDS` **keys** (`"head"`, `"depth"`) are serialised into permalinks
@@ -274,7 +278,7 @@ downstream in a steady state; total volume constant while inflow ≠ outflow.
   at 0.0136 instead of 0.0147. It is not cosmetic — S₀ is what the whole GVF
   classification is measured against, and with the wrong bed a23's domain
   volume swung ±15% on a ~60 s cycle that never settled.
-- A scene's bed must stay above y = 0 for the whole modelled reach. s3 ran a
+- A scene's bed must stay above z = 0 for the whole modelled reach. s3 ran a
   1-in-4 bed from 1.40 out to x = 6.4, where the slab is 0.2 m BELOW the
   domain floor — so the last 0.8 m was water sliding on the floor, draining
   out of the open bottom edge (q fell 1.20 → 0.98 along it) and being named
@@ -441,7 +445,7 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 
 - The render loop stops when the page is hidden. Headless testing goes through
   `APP.frames(n)` (drives the whole frame including render), `APP.tick(n)`
-  (physics only), `APP.probe(x,y)`, `APP.volume()`, `APP.zoomAt(px,py,factor)`,
+  (physics only), `APP.probe(x,z)`, `APP.volume()`, `APP.zoomAt(px,py,factor)`,
   `APP.resetZoom()`.
 - `exercises/_runner/runner.py` is Linux-bound (`/proc`, X11 probe); the
   macOS shims and their two measured traps are in the runner's own HOWTO.md.

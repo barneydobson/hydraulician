@@ -466,7 +466,7 @@ const OVERLAY = (() => {
     const press = !!probe && probe.f > 1.002 && capped;
     const cls = wet && A.ok[i] && !press ? classify(h, yn, yc, S0) : "";
     const rows = [];
-    rows.push(["x, y", fmt(mx, 2) + ", " + fmt(my, 2) + " m"]);
+    rows.push(["x, z", fmt(mx, 2) + ", " + fmt(my, 2) + " m"]);
     if (wet) {
       rows.push(["depth d", fmt(h, 3) + " m"]);
       if (!press) rows.push(["level η", fmt(A.bed[i] + h, 3) + " m above datum"]);
@@ -713,7 +713,7 @@ const OVERLAY = (() => {
   function measureText(m) {
     const dx = m.x1 - m.x0, dy = m.y1 - m.y0, L = Math.hypot(dx, dy);
     let s = L.toFixed(L < 0.1 ? 3 : 2) + " m · Δx " + Math.abs(dx).toFixed(2) +
-            " · Δy " + Math.abs(dy).toFixed(2);
+            " · Δz " + Math.abs(dy).toFixed(2);
     if (Math.abs(dx) > 1e-3 && Math.abs(dy) > 1e-3) {
       const n = Math.abs(dx / dy);
       s += " · 1 : " + (n < 10 ? n.toFixed(2) : n.toFixed(0));
@@ -721,7 +721,7 @@ const OVERLAY = (() => {
     return s;
   }
 
-  /** The tape measure: a line between the two dragged points, dotted Δx / Δy
+  /** The tape measure: a line between the two dragged points, dotted Δx / Δz
    *  legs, and the numbers on a chip. Coordinates are in metres, so the tape
    *  survives zooming and a resolution rebuild. */
   function drawMeasure(ctx, V, m) {

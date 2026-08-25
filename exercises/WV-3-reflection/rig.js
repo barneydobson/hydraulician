@@ -23,8 +23,8 @@
 // readPixels, so scanning many stations costs the same one sync per sample
 // as scanning one station would -- the same trick sim.js itself uses for
 // tracer advection. The per-station quantity extracted is EXACTLY what a
-// gauge reads: head = y_probe + p/(rho g) (see js/main.js sampleGauges,
-// `head: gg.y + pr.head`), just batched. Section 3 of the README separately
+// gauge reads: h = y_probe + p/(rho g) (see js/main.js sampleGauges,
+// `h: z + pr.phead`), just batched. Section 3 of the README separately
 // validates this against the literal on-screen gauge/chart a student uses.
 //
 // IMPORTANT (from WV-2's own README, "the spin-up trap", generalising to
@@ -276,8 +276,8 @@ window.WV3 = {
   // code path, max 4 gauges, state.gauges + APP.frames -- the same
   // rendering/analyse/sampleGauges pipeline a real browser tab runs), let
   // it run for a few seconds, and report BOTH fields the gauge card can
-  // show: "head" (y + p/(rho g), a raw point-pressure proxy for surface
-  // elevation) and "depth" (A.h[i], the per-COLUMN reduced depth -- what
+  // show: "h" (y + p/(rho g), a raw point-pressure proxy for surface
+  // elevation) and "d" (A.h[i], the per-COLUMN reduced depth -- what
   // the programme text's "depth oscillation amplitude" literally names,
   // and immune to gauge-y placement since it ignores gg.y entirely). Both
   // are always recorded in gg.hist regardless of the panel's gaugeField
@@ -299,12 +299,12 @@ window.WV3 = {
     APP.state.paused = true;
     const hist = APP.state.gauges[0].hist;
     const t = hist.map((p) => p.t);
-    const head = hist.map((p) => p.head), depth = hist.map((p) => p.depth);
+    const head = hist.map((p) => p.h), depth = hist.map((p) => p.d);
     const p2p = (arr) => (Math.max(...arr) - Math.min(...arr)) / 2;
     return {
       x, T, n: hist.length, spanSeconds: t.length ? t[t.length - 1] - t[0] : 0,
-      head: { p2p: p2p(head), dft: WV3.dftAmp(t, head, 1 / T) },
-      depth: { p2p: p2p(depth), dft: WV3.dftAmp(t, depth, 1 / T) },
+      h: { p2p: p2p(head), dft: WV3.dftAmp(t, head, 1 / T) },
+      d: { p2p: p2p(depth), dft: WV3.dftAmp(t, depth, 1 / T) },
     };
   },
 };

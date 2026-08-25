@@ -10,12 +10,12 @@
  *
  * A horizontal pressurised pipe fed by a reservoir:
  *
- *   y=5.0 ┌─────┬────────────────────────────────────────────┐
+ *   z=5.0 ┌─────┬────────────────────────────────────────────┐
  *         │ res │            air                             │
  *         │ ~L~ ├════════════════════════════════════════════╡ soffit 2.40–2.70
  *         │     │  BORE  0.40 m  (18 cells at Medium)        │ ← tailwater 2.50
  *         │     ├════════════════════════════════════════════╡ invert top 2.00
- *   y=0.0 └─────┴────────────────────────────────────────────┘ solid to the floor
+ *   z=0.0 └─────┴────────────────────────────────────────────┘ solid to the floor
  *         0    1.5                                          9.0
  *
  * Every call below is a documented app entry point — nothing here is private:
@@ -68,7 +68,7 @@ window.RIGA = {
     // because rasterise() replays scene walls, then user segs in order.
     APP.SIM.addSeg(0.60, 2.50, 7.20, 2.50, 1.10, 0);
     APP.SIM.addSeg(0.60, 3.20, 7.20, 3.20, 1.10, 0);
-    // invert: centreline y = 1.0, thickness 2.0 → spans 0 … 2.0. Solid all the
+    // invert: centreline z = 1.0, thickness 2.0 → spans 0 … 2.0. Solid all the
     // way to the domain floor: a thin slab leaves a void that the reservoir
     // fills through its own open bottom and the pipe gets a parallel path.
     APP.SIM.addSeg(R.X0, R.INV / 2, R.X1, R.INV / 2, R.INV, 255);
@@ -159,8 +159,8 @@ window.FR1 = {
     var mean = function (a) { return a.reduce(function (p, q) { return p + q; }, 0) / a.length; };
     var sd = function (a) { var m = mean(a);
       return Math.sqrt(mean(a.map(function (x) { return (x - m) * (x - m); }))); };
-    var hA = g[0].hist.map(function (r) { return r.head; }),
-        hB = g[1].hist.map(function (r) { return r.head; });
+    var hA = g[0].hist.map(function (r) { return r.h; }),
+        hB = g[1].hist.map(function (r) { return r.h; });
     return { t: +S.t.toFixed(2), level: S.p.inflow.level,
              H1: +mean(hA).toFixed(4), H2: +mean(hB).toFixed(4),
              sd1: +sd(hA).toFixed(4), sd2: +sd(hB).toFixed(4),

@@ -29,7 +29,7 @@ const state = {
   cv: null, cvDrag: null,          // the force control volume: box + EMA force
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
-  gauges: [], rakes: [], gaugeField: "head", tracers: null, tracerN: 9,
+  gauges: [], rakes: [], gaugeField: "h", tracers: null, tracerN: 9,
   gaugeT: -1,                 // sim time of the last gauge sample — see sampleGauges
   gaugeSeq: 0,                // ever-increasing gauge id, for inspector identity
   deliv: null,                // measured inlet discharge / level, for the panel
@@ -170,7 +170,7 @@ function switchScene(id) {
   state.dye = true;
   state.jumps = true;
   state.particles = false;            // scenes that want them set `sc.particles`
-  state.gaugeField = "head";
+  state.gaugeField = "h";
   state.tracerN = 9;
   GINSP.closeAll();
   if (state.paused) togglePause();    // via the toggle, so the button label follows
@@ -458,7 +458,7 @@ const EX = (() => {
 
   // ------------------------------------------------- the personalised digit
   /** `value = base + step·d`, or a per-digit `table` where the measured rule
-   *  is not linear (HJ-1's tailwater steps to 1.5·y_c at d = 6 and 9), with an
+   *  is not linear (HJ-1's tailwater steps to 1.5·d_c at d = 6 and 9), with an
    *  optional `mod` for "d mod N" rules. `also` carries the coupled values the
    *  worksheet makes the student derive.
    *
@@ -1247,16 +1247,16 @@ const CONTROLS = [
     fmt: (v) => {
       // Under head-driven inflow the slider is not the discharge — nothing
       // writes it back from the solver — so print what the inlet is actually
-      // delivering instead, and take y_c from that.
+      // delivering instead, and take d_c from that.
       const D = state.deliv;
       if (sim.p.inflow.free > 0.5) {
         return "head-driven  ·  q → " + (D ? D.q.toFixed(3) : "—") + " m²/s delivered" +
-               (D ? "   y_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
+               (D ? "   d_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
       }
       return v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
-             "   y_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m";
+             "   d_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m";
     },
-    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth y_c = (q²/g)^⅓ follows directly from it. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
+    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth d_c = (q²/g)^⅓ follows directly from it. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
   { id: "inFree", place: "res", type: "check", label: "Head-driven inflow",
     get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
@@ -1406,13 +1406,13 @@ const CONTROLS = [
     info: "A tape measure: left-drag between two points for the straight-line length, the horizontal and vertical legs, and the slope written as 1 : n. Shift snaps to horizontal / vertical / 45°; a click without a drag clears it. The 8 key picks the tool from the keyboard, and the numbers stay printed here." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
-    info: "Critical depth y_c, normal depth y_n and the energy grade line, computed per column from the live depth and unit discharge." },
+    info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
   { id: "labels", type: "check", label: "Profile labels",
     get: () => state.labels, set: (v) => state.labels = v,
-    info: "Names each reach by its gradually-varied-flow class. The letter is the bed (Mild, Steep, Critical, Horizontal, Adverse); the number is the zone — 1 above both y_n and y_c, 2 between them, 3 below both." },
+    info: "Names each reach by its gradually-varied-flow class. The letter is the bed (Mild, Steep, Critical, Horizontal, Adverse); the number is the zone — 1 above both d_n and d_c, 2 between them, 3 below both." },
   { id: "jumps", type: "check", label: "Jump analysis",
     get: () => state.jumps, set: (v) => state.jumps = v,
-    info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction y₂/y₁ = ½(√(1+8Fr₁²) − 1)." },
+    info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction d₂/d₁ = ½(√(1+8Fr₁²) − 1)." },
   { id: "particles", type: "check", label: "Particles",
     get: () => state.particles, set: (v) => state.particles = v,
     info: "Massless tracers. The clearest way to see wave orbits and jet spreading." },
@@ -1426,7 +1426,7 @@ const CONTROLS = [
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["head", "Piezometric head"], ["depth", "Depth"], ["speed", "Speed"]],
+    opts: [["h", "Piezometric head"], ["d", "Depth"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
@@ -1945,7 +1945,7 @@ function sampleGauges(A) {
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
     const z = gg.y - (sim.scene.tiltS0 || 0) * gg.x;
-    const s = { t: sim.t, head: z + pr.head, depth: A.h[i], speed: pr.speed };
+    const s = { t: sim.t, h: z + pr.phead, d: A.h[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2130,7 +2130,7 @@ function drawOverlay(A) {
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
   const fld = state.gaugeField;
   const cards = OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-    fld === "head" ? "h" : fld === "depth" ? "d" : "|u|",
+    fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
     fld === "speed" ? "m/s" : "m");
   GINSP.tick(cards);
   if (state.inside && !state.drag) {
@@ -2319,12 +2319,13 @@ function dragWindow(el, handle, onPlace) {
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
   // Symbols follow free-surface convention: h is the piezometric head, d the
-  // depth and η the water level, leaving H free for the energy head. The KEYS
-  // are frozen — "head" and "depth" are serialised into permalinks and into
-  // every `ui.field` in exercises-rigs.js, so rename the symbol, never the key.
+  // depth and η the water level, leaving H free for the energy head (the full
+  // rationale, texts included, is in docs/notation.md). Since rig format v2
+  // the KEYS are the symbols; older wire formats are rejected, not migrated —
+  // prototype, no back-compat.
   const FIELDS = [
-    ["head",  "h", "m",   "piezometric head, h = z + p/ρg"],
-    ["depth", "d", "m",   "water depth of the column"],
+    ["h",     "h", "m",   "piezometric head, h = z + p/ρg"],
+    ["d",     "d", "m",   "water depth of the column"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],
   ];
   const open = [];              // live inspector windows
@@ -2632,14 +2633,14 @@ const GINSP = (() => {
     const hdr = ["t_sim_s"];
     gs.forEach((g) => {
       const tag = "g" + (state.gauges.indexOf(g) + 1) +
-                  "_x" + g.x.toFixed(2) + "_y" + g.y.toFixed(2);
-      hdr.push(tag + "_head_m", tag + "_depth_m", tag + "_speed_mps");
+                  "_x" + g.x.toFixed(2) + "_z" + g.y.toFixed(2);
+      hdr.push(tag + "_h_m", tag + "_d_m", tag + "_speed_mps");
     });
     const cols = gs.length * 3, rows = new Map();
     gs.forEach((g, gi) => (g.log || []).forEach((s) => {
       let r = rows.get(s.t);
       if (!r) { r = new Array(cols).fill(""); rows.set(s.t, r); }
-      r[gi * 3] = String(s.head); r[gi * 3 + 1] = String(s.depth); r[gi * 3 + 2] = String(s.speed);
+      r[gi * 3] = String(s.h); r[gi * 3 + 1] = String(s.d); r[gi * 3 + 2] = String(s.speed);
     }));
     const ts = [...rows.keys()].sort((a, b) => a - b);
     const out = [hdr.join(",")];
@@ -2696,7 +2697,7 @@ const GINSP = (() => {
  *  dependency; falls back to `A` where it is missing). Deflate is worth it:
  *  a 35-stroke staircase rig is 4.4 kB of JSON and mostly repeated digits. */
 const RIG = (() => {
-  const V = 1;                                  // format version
+  const V = 2;                                  // format version
   /** Micrometres. Not cosmetic: B10's staircase snaps its step boundaries to
    *  cell centres on purpose (a boundary landing exactly on one is claimed by
    *  both neighbouring steps and pinches the bore a whole step deep), and at
@@ -2723,8 +2724,10 @@ const RIG = (() => {
       valveClosed: b01(p.valveClosed),
       inflow,
       tailwater: { on: b01(p.tailwater.on), level: r4(p.tailwater.level) },
-      source: { on: b01(p.source.on), x: r4(p.source.x), y: r4(p.source.y),
-                r: r4(p.source.r), vx: r4(p.source.vx), vy: r4(p.source.vy) },
+      // Wire keys follow the display notation (z vertical, vz its velocity);
+      // the runtime objects keep their .y fields — migrate() maps between them.
+      source: { on: b01(p.source.on), x: r4(p.source.x), z: r4(p.source.y),
+                r: r4(p.source.r), vx: r4(p.source.vx), vz: r4(p.source.vy) },
       wave: { on: b01(p.wave.on), amp: r4(p.wave.amp),
               period: r4(p.wave.period), x: r4(p.wave.x) },
       hyd: { c: r4(p.c), cf: r4(p.cf), cs: r4(p.cs), bulk: r4(p.bulk),
@@ -2743,14 +2746,22 @@ const RIG = (() => {
     return o;
   }
 
-  /** Version gate. v1 is the only format so far; a future v2 migrates here so
-   *  that links printed on this year's worksheets keep working. */
+  /** Version gate. Exactly the current format loads — this is a prototype
+   *  and old wire formats are NOT migrated (v2 renamed source y→z, vy→vz and
+   *  the gauge field keys head→h, depth→d; a v1 link is simply stale).
+   *  The wire keys follow the display notation; the runtime objects keep
+   *  their .y fields, so the v2 keys are mapped to runtime shape here. */
   function migrate(o) {
     if (!o || typeof o !== "object" || !Array.isArray(o.segs)) {
       throw new Error("not a hydraulician rig");
     }
-    if ((o.v | 0) > V) {
-      throw new Error("rig format v" + o.v + " is newer than this build (v" + V + ")");
+    if ((o.v | 0) !== V) {
+      throw new Error("rig format v" + (o.v | 0) + " — this build reads v" + V +
+                      " only (prototype, no back-compat); re-save the rig");
+    }
+    if (o.source) {                       // wire keys → runtime keys
+      if (o.source.z  !== undefined) { o.source.y  = +o.source.z;  delete o.source.z;  }
+      if (o.source.vz !== undefined) { o.source.vy = +o.source.vz; delete o.source.vz; }
     }
     return o;
   }
@@ -3040,7 +3051,7 @@ function boot() {
   }
 
   // A rig that is redrawn is a different domain, so the classification's
-  // running estimates must not survive the redraw — a stale domain-wide y_n
+  // running estimates must not survive the redraw — a stale domain-wide d_n
   // is what made a drowned gate on a 1-in-4 bed read "M1". Every path that
   // re-rasterises the walls goes through one of these; a resolution change or
   // a scene load builds a fresh grid and starts clean anyway.

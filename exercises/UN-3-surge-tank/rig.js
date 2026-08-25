@@ -58,12 +58,12 @@
       this.nozzle(opts.gap === undefined ? this.GAP : opts.gap);
       this.pipe(bs);
       CONTROLS.find(function (c) { return c.id === 'inLevel'; }).set(opts.level === undefined ? this.LEVEL : opts.level);
-      CONTROLS.find(function (c) { return c.id === 'gaugeField'; }).set('depth');
+      CONTROLS.find(function (c) { return c.id === 'gaugeField'; }).set('d');
       if (opts.bulk != null) CONTROLS.find(function (c) { return c.id === 'bulk'; }).set(opts.bulk);
       syncPanel();
       APP.state.gauges.length = 0;
       APP.state.gauges.push({ x: this.XT, y: this.YG, hist: [], colour: "#7fd4ff" });
-      APP.state.gaugeField = 'depth';
+      APP.state.gaugeField = 'd';
       return this.check();
     },
 
@@ -118,12 +118,12 @@
       var g = APP.state.gauges[0], bed = 2.0642, k;
       g.hist.length = 0;
       for (k = 0; k < Math.round(3 / dt); k++) APP.frames(1, dt);
-      var pre = g.hist.map(function (h) { return h.depth; }).sort(function (a, b) { return a - b; });
+      var pre = g.hist.map(function (h) { return h.d; }).sort(function (a, b) { return a - b; });
       var rest = pre[pre.length >> 1], v0 = this.V(30.0), tslam = APP.sim.t;
       toggleValve();
       g.hist.length = 0;
       for (k = 0; k < Math.round(rec / dt); k++) APP.frames(1, dt);
-      return this.reduce(g.hist.map(function (h) { return [h.t, h.depth]; }), rest, v0, bed, tslam);
+      return this.reduce(g.hist.map(function (h) { return [h.t, h.d]; }), rest, v0, bed, tslam);
     },
 
     // first upsurge peak above the pre-slam level, and the median peak-to-peak
@@ -142,7 +142,7 @@
       for (k = 1; k < tk.length; k++) per.push(+(tk[k][0] - tk[k - 1][0]).toFixed(3));
       per.sort(function (a, b) { return a - b; });
       return { v0: +v0.toFixed(4), rest_level: +(rest + bed).toFixed(3),
-               ymax: pk.length ? +(pk[0][1] - rest).toFixed(3) : null,
+               zmax: pk.length ? +(pk[0][1] - rest).toFixed(3) : null,
                T: per.length ? per[per.length >> 1] : null, periods: per,
                peaks: pk.map(function (p) { return [+p[0].toFixed(2), +(p[1] - rest).toFixed(3)]; }) };
     },
@@ -156,7 +156,7 @@
       var r = this.slam(opts.rec || 44);
       r.bs = c.bs_delivered;
       r.T_theory = +(2 * Math.PI * Math.sqrt(this.L * r.bs / (9.81 * this.BP))).toFixed(3);
-      r.ymax_bound = +(r.v0 * Math.sqrt(this.L * this.BP / (9.81 * r.bs))).toFixed(3);
+      r.zmax_bound = +(r.v0 * Math.sqrt(this.L * this.BP / (9.81 * r.bs))).toFixed(3);
       return r;
     }
   };

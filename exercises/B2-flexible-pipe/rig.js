@@ -64,7 +64,7 @@ window.B2 = {
     var hist = APP.state.gauges[0].hist;
     var tEnd = hist[hist.length - 1].t;
     var vals = hist.filter(function (p) { return p.t >= tEnd - w; })
-                   .map(function (p) { return p.head; })
+                   .map(function (p) { return p.h; })
                    .sort(function (a, b) { return a - b; });
     return vals.length ? vals[Math.floor(vals.length / 2)] : null;
   },

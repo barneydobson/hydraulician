@@ -16,13 +16,13 @@
  * an Open bottom edge, so the plunge has somewhere to go and nothing ponds
  * back onto the jet.
  *
- *   y=5.0 ┌──────────────────────────────────────────────────────┐
+ *   z=5.0 ┌──────────────────────────────────────────────────────┐
  *         │  air (the two sandbox ledges are ERASED)             │
  *         │                          ┃ gate, top well clear       │
  *         │  reservoir pool ~~~~~~~~~┃                            │
  *         │                          ┃ opening a  ↓ vena contracta│  open floor
- *   y=0.5 ├──────────────────────────┸────╌╌╌╌╌─────┤            │  beyond the
- *   y=0.0 └──────────────────────────────────────────┘  (bed ends, apron)
+ *   z=0.5 ├──────────────────────────┸────╌╌╌╌╌─────┤            │  beyond the
+ *   z=0.0 └──────────────────────────────────────────┘  (bed ends, apron)
  *         0                        5.5   5.5+a  ~7.0 (bx1)      9.0
  *
  * Every call below is a documented app entry point (same as WE-1's rig.js):
@@ -33,7 +33,7 @@
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  *
  * MEASURED FACTS (Medium, 414×230, Δx 21.7391 mm, dt 3.494e-4 s, W×H = 9×5 m)
- *   · bed top face y = 0.50 m lands exactly on a cell boundary (23 cells) —
+ *   · bed top face z = 0.50 m lands exactly on a cell boundary (23 cells) —
  *     same RIG-B convention as WE-1; keep every elevation a Δx multiple.
  *   · the gate opening a is READ OFF THE RASTERISED MASK, not the drawn
  *     value — addSeg quantises to whole cells and a "0.152 m" request can
@@ -45,13 +45,13 @@
  *     ignores it (u_in.a carries the free-flag, not a value) and the panel
  *     note under "Inflow q" keeps showing whatever the slider was last set
  *     to — for the venturi scene that default is q:0, so the note reads
- *     "0.000 m²/s ... y_c = 0.000 m" while real water is plainly moving.
+ *     "0.000 m²/s ... d_c = 0.000 m" while real water is plainly moving.
  *     MEASURED here: with the gate rig, free ON, level 0.70 m, run 45 s,
  *     `sim.p.inflow.q` stayed at its pre-toggle value (0.300) to 3 dp while
  *     the true column discharge (SIM.columns / the hover "q" row) settled
  *     at a DIFFERENT number entirely. See MO1_HEADDRIVEN_LOG below and the
  *     README §2. This is why MO-1 ships q-mode, not head-driven.
- *   · the sandbox's own two ledges (y ≈ 2.0–3.4) must be ERASED.
+ *   · the sandbox's own two ledges (z ≈ 2.0–3.4) must be ERASED.
  *   · bottom edge must be OPEN once the bed is truncated (draws at the
  *     free-fall rate, CLAUDE.md "outfall edges" note) — Wall would pond the
  *     plunge against the truncated bed's cut face.
@@ -124,7 +124,7 @@ window.MOGATE = {
     APP.state.gauges.length = 0;
     APP.state.gauges.push({ x: x, y: y === undefined ? MOGATE.BED + 0.15 : y,
                             hist: [], colour: "#7fd4ff" });
-    APP.state.gaugeField = "depth";
+    APP.state.gaugeField = "d";
     MOGATE.XG = x;
   },
 
@@ -219,7 +219,7 @@ window.MO1 = {
   XG_ELEV: 0.15,     // gauge marker height above bed (cosmetic only)
 
   /** Personalised opening: last digit of the student number, in CELLS so it
-   *  is exact at Medium — see README for the measured band and why (y₀/a >=
+   *  is exact at Medium — see README for the measured band and why (d₀/a >=
    *  2.5 fails at 9 cells, the naive-vs-CV mismatch is too small to see at
    *  4 cells and the pool gets impractically deep below 5). */
   aCells: function (d) { return 5 + Math.round(3 * d / 9); },   // 5,5,6,6,6,7,7,7,8,8
@@ -263,22 +263,22 @@ window.MO1 = {
       APP.frames(1, 1 / 60); n++;
     }
     APP.state.paused = true; APP.frames(2);
-    var a = g.hist.map(function (r) { return r.depth; }).sort(function (p, q) { return p - q; });
+    var a = g.hist.map(function (r) { return r.d; }).sort(function (p, q) { return p - q; });
     var med = a[a.length >> 1], mean = a.reduce(function (p, q) { return p + q; }, 0) / a.length;
-    return { t: +S.t.toFixed(2), n: a.length, y0: +med.toFixed(4), y0Mean: +mean.toFixed(4),
+    return { t: +S.t.toFixed(2), n: a.length, d0: +med.toFixed(4), d0Mean: +mean.toFixed(4),
              y0Min: +a[0].toFixed(4), y0Max: +a[a.length - 1].toFixed(4) };
   },
 
-  /** g = 9.81. C_d = q/(a*sqrt(2 g y0)); F_R = rho q (V0-V1) + 0.5 rho g (y0^2-y1^2);
-   *  naive = 0.5 rho g (y0-a)^2 — the "why not hydrostatics?" comparator. */
-  derive: function (a, q, y0, y1) {
+  /** g = 9.81. C_d = q/(a*sqrt(2 g d0)); F_R = rho q (V0-V1) + 0.5 rho g (d0^2-d1^2);
+   *  naive = 0.5 rho g (d0-a)^2 — the "why not hydrostatics?" comparator. */
+  derive: function (a, q, d0, d1) {
     var g = 9.81, rho = 1000;
-    var V0 = q / y0, V1 = q / y1;
-    var Cd = q / (a * Math.sqrt(2 * g * y0));
-    var FR = rho * q * (V0 - V1) + 0.5 * rho * g * (y0 * y0 - y1 * y1);
-    var naive = 0.5 * rho * g * Math.pow(y0 - a, 2);
-    return { a: a, q: q, y0: y0, y1: y1, V0: +V0.toFixed(3), V1: +V1.toFixed(3),
-             y0_a: +(y0 / a).toFixed(3), y1_a: +(y1 / a).toFixed(3),
+    var V0 = q / d0, V1 = q / d1;
+    var Cd = q / (a * Math.sqrt(2 * g * d0));
+    var FR = rho * q * (V0 - V1) + 0.5 * rho * g * (d0 * d0 - d1 * d1);
+    var naive = 0.5 * rho * g * Math.pow(d0 - a, 2);
+    return { a: a, q: q, d0: d0, d1: d1, V0: +V0.toFixed(3), V1: +V1.toFixed(3),
+             y0_a: +(d0 / a).toFixed(3), y1_a: +(d1 / a).toFixed(3),
              Cd: +Cd.toFixed(4), FR: +FR.toFixed(1), naive: +naive.toFixed(1),
              diffPct: +(100 * (FR - naive) / naive).toFixed(1) };
   },
@@ -296,15 +296,15 @@ window.MO1 = {
     MOGATE.build({ a: a, q: q, level: levelGuess, gaugeUX: MOGATE.GATE_X - MOGATE.GAUGE_DX });
     MO1.settle(s1);
     var r1 = MO1.record(6);
-    var lvl2 = +(MOGATE.BED + r1.y0).toFixed(4);
+    var lvl2 = +(MOGATE.BED + r1.d0).toFixed(4);
     MOGATE.C('inLevel').set(lvl2); syncPanel();
     MO1.settle(s2);
     var r2 = MO1.record(rec);
     var vena = MOGATE.findVena();
-    var d = MO1.derive(a, q, r2.y0, vena.h);
+    var d = MO1.derive(a, q, r2.d0, vena.h);
     return { a: a, aCells: Math.round(a / APP.sim.dx), q: q, levelSeed: levelGuess,
-             levelFixed: lvl2, y0: r2.y0, y0Flutter: +(r2.y0Max - r2.y0Min).toFixed(4),
-             venaX: vena.x, venaDxFromGate: vena.dxFromGate, y1: vena.h,
+             levelFixed: lvl2, d0: r2.d0, y0Flutter: +(r2.y0Max - r2.y0Min).toFixed(4),
+             venaX: vena.x, venaDxFromGate: vena.dxFromGate, d1: vena.h,
              derived: d, t: r2.t };
   },
 
@@ -317,16 +317,16 @@ window.MO1 = {
     MOGATE.build({ a: a, q: q, level: lv, gaugeUX: MOGATE.GATE_X - MOGATE.GAUGE_DX });
     MO1.settle(settle1 === undefined ? 40 : settle1);
     var r1 = MO1.record(6);
-    var lvl2 = +(MOGATE.BED + r1.y0).toFixed(4);   // one fixed-point correction
+    var lvl2 = +(MOGATE.BED + r1.d0).toFixed(4);   // one fixed-point correction
     MOGATE.C('inLevel').set(lvl2); syncPanel();
     MO1.settle(settle2 === undefined ? 20 : settle2);
     var r2 = MO1.record(rec === undefined ? 10 : rec);
     var hv = MOHOVER.read(MO1.venaX(), MOGATE.BED + 0.10);
-    var y1 = hv.hAnalysed;                         // exactly what the hover box prints
-    var der = MO1.derive(a, q, r2.y0, y1);
+    var d1 = hv.hAnalysed;                         // exactly what the hover box prints
+    var der = MO1.derive(a, q, r2.d0, d1);
     return { d: d, aCells: MO1.aCells(d), a: a, q: q, level: lv, levelFixed: lvl2,
-             y0: r2.y0, y0Flutter: +(r2.y0Max - r2.y0Min).toFixed(4),
-             venaX: MO1.venaX(), y1: y1, y1Raw: hv.hRaw, Fr1: hv.Fr,
+             d0: r2.d0, y0Flutter: +(r2.y0Max - r2.y0Min).toFixed(4),
+             venaX: MO1.venaX(), d1: d1, y1Raw: hv.hRaw, Fr1: hv.Fr,
              Cd: der.Cd, FR: der.FR, naive: der.naive, diffPct: der.diffPct, t: r2.t };
   },
 };
@@ -338,13 +338,13 @@ window.MO1 = {
  * ACTUAL column discharge settled at 0.307-0.309 (approach column 0.3094,
  * vena column 0.3073), a real ~7% away with NO on-panel number showing it.
  * The reservoir's own delivered level was also short of the slider: gauge
- * y0 read 0.6125 m against the "0.69 m deep at the inlet" the n_inLevel
+ * d0 read 0.6125 m against the "0.69 m deep at the inlet" the n_inLevel
  * note promised (FR-1's sponge-offset finding, P3, reproduced here). Two
  * independent reasons head-driven does not ship for this demo — see
  * README §2. */
 window.MO1_HEADDRIVEN_LOG = {
   a: 0.1522, level: 1.19, panelInflowQField: 0.330,
-  panel_n_inQ_text: "0.330 m²/s per m width  →  0.50 m/s   y_c = 0.223 m",
+  panel_n_inQ_text: "0.330 m²/s per m width  →  0.50 m/s   d_c = 0.223 m",
   panel_n_inLevel_text: "1.19 m above datum  ·  0.69 m deep at the inlet",
   gaugeY0: 0.6125, approachColumnQ: 0.3094, venaColumnQ: 0.3073, settleSecs: 45,
 };

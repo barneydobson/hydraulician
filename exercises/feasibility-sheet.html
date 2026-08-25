@@ -232,7 +232,7 @@
 <tr><th>Lab equivalent</th><th>In hydraulician</th></tr>
 <tr><td>Piezometer / pressure transducer + chart recorder</td><td><b>Gauge tool</b> (up to 4) — logs piezometric head, depth or speed against time; the chart prints the live value to 3 decimals</td></tr>
 <tr><td>Current-meter traverse</td><td><b>Rake tool</b> (up to 2) — full vertical u(z) profile, with u<sub>max</sub>, depth-average V and their ratio printed</td></tr>
-<tr><td>Point gauge + tape</td><td><b>Hover readout</b> — h, q, V, Fr, y<sub>c</sub>, measured y<sub>n</sub>, S₀, S<sub>f</sub>, delivered Manning n, u, v, p/ρg, fill fraction</td></tr>
+<tr><td>Point gauge + tape</td><td><b>Hover readout</b> — h, q, V, Fr, d<sub>c</sub>, measured d<sub>n</sub>, S₀, S<sub>f</sub>, delivered Manning n, u, w, p/ρg, fill fraction</td></tr>
 <tr><td>Dye injection, drogues</td><td><b>Dye timelines</b> (sheared line = velocity profile), right-drag pour carries dye; <b>particles</b>; <b>orbit tracers</b> with fading trails</td></tr>
 <tr><td>Wave paddle</td><td><b>Piston</b> — stroke 0.005–0.3 m, period 0.4–6 s, positionable, works in any scene with standing water</td></tr>
 <tr><td>Sluices, weirs, pipework</td><td><b>Wall / erase / valve tools</b> — butt-ended segments, snap to 45°, instant re-rasterise; <kbd class="kbd">V</kbd> slams every valve</td></tr>
@@ -270,7 +270,7 @@
 <tr><td><a href="#d1">Dimensional analysis &amp; similarity</a></td><td><span class="verdict v-ready">READY AS-IS</span></td><td>Froude scale ladders and π-collapse of pooled data; Re/We dissimilarity is itself the lesson</td></tr>
 <tr><td><a href="#e1">Linear wave theory</a></td><td><span class="verdict v-ready">READY AS-IS</span></td><td>Dispersion, orbital decay (verified), pressure attenuation, shoaling, Iribarren; no refraction, no plunging</td></tr>
 <tr><td><a href="#f1">Weirs, notches &amp; flumes</a></td><td><span class="verdict v-ready">READY AS-IS</span></td><td>Rectangular &amp; broad-crested ratings, drowning; V-notch and venturi flumes are 3D — use a hump</td></tr>
-<tr><td><a href="#f2">Uniform flow, specific energy, jump</a></td><td><span class="verdict v-ready">READY AS-IS</span></td><td>Home ground — the jump box already prints measured y₂ against Bélanger (−5% in h23)</td></tr>
+<tr><td><a href="#f2">Uniform flow, specific energy, jump</a></td><td><span class="verdict v-ready">READY AS-IS</span></td><td>Home ground — the jump box already prints measured d₂ against Bélanger (−5% in h23)</td></tr>
 <tr><td><a href="#f3">Gradually varied flow</a></td><td><span class="verdict v-ready">READY AS-IS</span></td><td>The scene set IS the profile zoo, with live auto-classification to argue with</td></tr>
 <tr><td><a href="#f4">Natural channels</a></td><td><span class="verdict v-ready">READY AS-IS</span> <span class="verdict v-not">PART NOT</span></td><td>Vertical velocity structure (α, β, profiles): yes. Compound channels &amp; conveyance: no lateral dimension</td></tr>
 <tr><td><a href="#g1">Foul &amp; storm sewer design</a></td><td><span class="verdict v-ready">READY AS-IS</span> <span class="verdict v-not">PART NOT</span></td><td>Surcharge, HGL, part-full→pressurised (the solver IS a Preissmann slot): yes. Design tables &amp; sediment: paper</td></tr>
@@ -287,7 +287,7 @@
 <tr><td>DESIGN TO SPEC</td><td>Meet a target — surge below X m, jump inside the box, no surcharge at 2×DWF — with the cheapest geometry. Verified live in front of everyone.</td></tr>
 <tr><td>JIGSAW</td><td>Each group owns one regime segment (a q, a period, a scale); the assembled master chart only makes sense when everyone's piece lands.</td></tr>
 <tr><td>BAKE-OFF</td><td>Measure the same quantity several independent ways; reconcile and budget the uncertainty.</td></tr>
-<tr><td>BREAK-IT CLINIC</td><td>Deliberately mis-set boundary conditions (tailwater below y<sub>c</sub>, inlet pinned under the backwater); students diagnose from gauges. The project's own hard-won pitfalls, taught forwards.</td></tr>
+<tr><td>BREAK-IT CLINIC</td><td>Deliberately mis-set boundary conditions (tailwater below d<sub>c</sub>, inlet pinned under the backwater); students diagnose from gauges. The project's own hard-won pitfalls, taught forwards.</td></tr>
 </table></div>
 </div>
 
@@ -325,15 +325,15 @@
 <tr><th>Concept / equation</th><th></th><th>How / why not</th></tr>
 <tr><td><span class="eqi">ΣF = ρQ(β₂V₂ − β₁V₁) + pressure terms</span></td><td class="mark ok">✓</td><td>All right-hand-side quantities measurable; β from the rake (see F4)</td></tr>
 <tr><td>Jet on a plate <span class="eqi">F = ρqV(1 − cos θ)</span> per m</td><td class="mark cav">✓*</td><td>Build with spout + wall; verify via stagnation head = V²/2g at the plate (probe), not via a force dial</td></tr>
-<tr><td>Force on a sluice gate</td><td class="mark ok">✓</td><td><span class="eqi">F/ρ = ½g(y₁²−y₂²) − q(V₂−V₁)</span> from measured y₁, y₂, q — s3 scene or sandbox</td></tr>
+<tr><td>Force on a sluice gate</td><td class="mark ok">✓</td><td><span class="eqi">F/ρ = ½g(d₁²−d₂²) − q(V₂−V₁)</span> from measured d₁, d₂, q — s3 scene or sandbox</td></tr>
 <tr><td>Hydraulic jump = momentum function equality, <span class="eqi">M = q²/(gy) + y²/2</span></td><td class="mark ok">✓</td><td>The jump box measures both conjugates; M₁ ≈ M₂ while E₁ ≠ E₂ is the whole lesson</td></tr>
 <tr><td>Force on bends / anchor thrust (pressurised)</td><td class="mark cav">✓*</td><td>Compute from probed p and V at the two legs of a drawn bend; no reaction readout</td></tr>
 <tr><td>Direct force-on-structure readout</td><td class="mark chg">Δ</td><td>Integrate p over solid-adjacent cells inside a user box — a contained overlay/readback feature</td></tr>
 </table></div>
 <div class="ex"><span class="tag">Exercise · pooled sweep — "gate thrust curve"</span>
-<p><b class="step">Setup:</b> sluice gate rig (s3 or drawn). <b class="step">Vary:</b> gate opening a across the class. <b class="step">Report:</b> y₁, y₂, q. <b class="step">Plot:</b> computed thrust F against a. Then spring the trap: compare with the hydrostatic estimate ½ρg(y₁−a)² and let the discrepancy introduce why momentum, not statics, sizes a gate.</p></div>
+<p><b class="step">Setup:</b> sluice gate rig (s3 or drawn). <b class="step">Vary:</b> gate opening a across the class. <b class="step">Report:</b> d₁, d₂, q. <b class="step">Plot:</b> computed thrust F against a. Then spring the trap: compare with the hydrostatic estimate ½ρg(d₁−a)² and let the discrepancy introduce why momentum, not statics, sizes a gate.</p></div>
 <div class="ex"><span class="tag">Exercise · predict → run — "momentum audit of a jump"</span>
-<p>On h23, each student computes M and E on both sides from the jump box's own y₁, y₂, Fr₁. Momentum should balance within a few percent; energy should not, by exactly ΔE = (y₂−y₁)³/(4y₁y₂), which the box also prints. One overlay of ten students' audits makes "jumps conserve momentum and destroy energy" an observed fact.</p></div>
+<p>On h23, each student computes M and E on both sides from the jump box's own d₁, d₂, Fr₁. Momentum should balance within a few percent; energy should not, by exactly ΔE = (d₂−d₁)³/(4d₁d₂), which the box also prints. One overlay of ten students' audits makes "jumps conserve momentum and destroy energy" an observed fact.</p></div>
 </div>
 
 <div class="topic" id="a3">
@@ -522,38 +522,38 @@
 <tr><td>Ogee/spillway profiles, C<sub>d</sub> vs H/H<sub>d</sub></td><td class="mark cav">✓*</td><td>Drawable but rasterised chunky — qualitative shapes only</td></tr>
 </table></div>
 <div class="ex"><span class="tag">Exercise · pooled sweep — "one point each, the exponent appears"</span>
-<p><b class="step">Setup:</b> template broad-crested weir, gauge upstream for H over crest. <b class="step">Vary:</b> inflow q per student (with the standing rule: keep any tailwater ≥ 1.3 y<sub>c</sub>). <b class="step">Report:</b> (q, H). <b class="step">Plot:</b> log q vs log H — the class-measured slope should land near 1.5, and the intercept gives C<sub>d</sub>. This is the purest version of the format: one run each, ten minutes, and a rating curve nobody was given.</p></div>
+<p><b class="step">Setup:</b> template broad-crested weir, gauge upstream for H over crest. <b class="step">Vary:</b> inflow q per student (with the standing rule: keep any tailwater ≥ 1.3 d<sub>c</sub>). <b class="step">Report:</b> (q, H). <b class="step">Plot:</b> log q vs log H — the class-measured slope should land near 1.5, and the intercept gives C<sub>d</sub>. This is the purest version of the format: one run each, ten minutes, and a rating curve nobody was given.</p></div>
 <div class="ex"><span class="tag">Exercise · pooled sweep — "drowning the weir"</span>
 <p>Fix q; each student a different tailwater level. Report the upstream head and whether the control still holds. The pooled curve of q/q<sub>free</sub> (or upstream level) against submergence ratio finds the modular limit empirically — the number design guides quote as ~0.66–0.8 depending on the weir.</p></div>
 </div>
 
 <div class="topic" id="f2">
 <div class="topic-head"><h3>F2 · Uniform flow, specific energy and the hydraulic jump</h3><span class="verdict v-ready">READY AS-IS</span></div>
-<p class="lede">Home ground. The jump box already does the headline comparison live (measured y₂ against ½y₁(√(1+8Fr₁²)−1); −5% in h23 at q = 0.5), the panel prints y<sub>c</sub> for any q you set, and normal depth arrives measured, not assumed.</p>
+<p class="lede">Home ground. The jump box already does the headline comparison live (measured d₂ against ½d₁(√(1+8Fr₁²)−1); −5% in h23 at q = 0.5), the panel prints d<sub>c</sub> for any q you set, and normal depth arrives measured, not assumed.</p>
 <div class="tablewrap"><table>
 <tr><th>Concept / equation</th><th></th><th>How / why not</th></tr>
 <tr><td>Chézy / Manning; normal depth</td><td class="mark cav">✓*</td><td>The delivered n is printed at the cursor — it is the grid's, not GMS tables' (limit 5). Frame as "gauge your channel, then use its n"</td></tr>
-<tr><td>Specific energy <span class="eqi">E = y + q²/2gy²</span>; E<sub>min</sub> at y<sub>c</sub></td><td class="mark ok">✓</td><td>Gate gives alternate-depth pairs at (nearly) the same E; brink shows the surface riding down to critical</td></tr>
-<tr><td>Critical depth <span class="eqi">y_c = (q²/g)^⅓</span>; Froude number</td><td class="mark ok">✓</td><td>Froude display diverges about Fr = 1; y<sub>c</sub> is drawn as an overlay line</td></tr>
-<tr><td>Bélanger <span class="eqi">y₂/y₁ = ½(√(1+8Fr₁²) − 1)</span></td><td class="mark ok">✓</td><td>Jump box prints measured vs predicted, live</td></tr>
-<tr><td>Jump energy loss <span class="eqi">ΔE = (y₂−y₁)³/4y₁y₂</span></td><td class="mark ok">✓</td><td>Printed in the jump box; visible as the EGL step</td></tr>
+<tr><td>Specific energy <span class="eqi">E = y + q²/2gy²</span>; E<sub>min</sub> at d<sub>c</sub></td><td class="mark ok">✓</td><td>Gate gives alternate-depth pairs at (nearly) the same E; brink shows the surface riding down to critical</td></tr>
+<tr><td>Critical depth <span class="eqi">d_c = (q²/g)^⅓</span>; Froude number</td><td class="mark ok">✓</td><td>Froude display diverges about Fr = 1; d<sub>c</sub> is drawn as an overlay line</td></tr>
+<tr><td>Bélanger <span class="eqi">d₂/d₁ = ½(√(1+8Fr₁²) − 1)</span></td><td class="mark ok">✓</td><td>Jump box prints measured vs predicted, live</td></tr>
+<tr><td>Jump energy loss <span class="eqi">ΔE = (d₂−d₁)³/4d₁d₂</span></td><td class="mark ok">✓</td><td>Printed in the jump box; visible as the EGL step</td></tr>
 <tr><td>Jump classification by Fr₁ (undular → strong)</td><td class="mark cav">✓*</td><td>Reachable range of Fr₁ ≈ 1.4–3 by varying q and tailwater; the extremes are qualitative</td></tr>
 </table></div>
 <div class="ex"><span class="tag">Exercise · pooled sweep — "Bélanger from eleven flumes"</span>
-<p><b class="step">Setup:</b> h23. <b class="step">Vary:</b> q per student (each re-checks tailwater ≥ 1.3 y<sub>c</sub> after changing it — that rule is itself syllabus). <b class="step">Report:</b> Fr₁ and y₂/y₁ from the jump box. <b class="step">Plot:</b> the class's points against the Bélanger curve. Then move the same experiment to s1 (steep bed) and watch the points fall systematically <em>below</em> the curve — the momentum balance is missing its weight term, and the class has discovered why the textbook derivation says "horizontal bed".</p></div>
-<div class="ex"><span class="tag">Exercise · bake-off — "find y_c three ways"</span>
-<p>Same channel, one q: (1) compute (q²/g)<sup>⅓</sup> from the panel's q; (2) read the depth at the brink where the M2 lands; (3) find the minimum of E from a gate's alternate-depth pairs. Three numbers that should agree — reconciling why the brink one is ~0.7 y<sub>c</sub> at the lip itself is the good discussion.</p></div>
+<p><b class="step">Setup:</b> h23. <b class="step">Vary:</b> q per student (each re-checks tailwater ≥ 1.3 d<sub>c</sub> after changing it — that rule is itself syllabus). <b class="step">Report:</b> Fr₁ and d₂/d₁ from the jump box. <b class="step">Plot:</b> the class's points against the Bélanger curve. Then move the same experiment to s1 (steep bed) and watch the points fall systematically <em>below</em> the curve — the momentum balance is missing its weight term, and the class has discovered why the textbook derivation says "horizontal bed".</p></div>
+<div class="ex"><span class="tag">Exercise · bake-off — "find d_c three ways"</span>
+<p>Same channel, one q: (1) compute (q²/g)<sup>⅓</sup> from the panel's q; (2) read the depth at the brink where the M2 lands; (3) find the minimum of E from a gate's alternate-depth pairs. Three numbers that should agree — reconciling why the brink one is ~0.7 d<sub>c</sub> at the lip itself is the good discussion.</p></div>
 </div>
 
 <div class="topic" id="f3">
 <div class="topic-head"><h3>F3 · Gradually varied flow and water surface profiles</h3><span class="verdict v-ready">READY AS-IS</span></div>
-<p class="lede">This is what the scene set was built for: M1, M2, chute→jump→M2, S1, S2, S3, C1/C3 on a measured knife-edge slope, H2/H3, A2 — with live auto-classification chips, y<sub>c</sub>/y<sub>n</sub>/EGL overlays, and controls (weir, gate, brink, tailwater) that can be erased and swapped mid-run. c13 even demonstrates the singular denominator of the GVF equation: its waviness grows along the reach <em>because</em> (1 − Fr²) → 0.</p>
+<p class="lede">This is what the scene set was built for: M1, M2, chute→jump→M2, S1, S2, S3, C1/C3 on a measured knife-edge slope, H2/H3, A2 — with live auto-classification chips, d<sub>c</sub>/d<sub>n</sub>/EGL overlays, and controls (weir, gate, brink, tailwater) that can be erased and swapped mid-run. c13 even demonstrates the singular denominator of the GVF equation: its waviness grows along the reach <em>because</em> (1 − Fr²) → 0.</p>
 <div class="tablewrap"><table>
 <tr><th>Concept / equation</th><th></th><th>How / why not</th></tr>
 <tr><td><span class="eqi">dy/dx = (S₀ − S_f) / (1 − Fr²)</span> and the 12-profile taxonomy</td><td class="mark ok">✓</td><td>Nine dedicated scenes; the overlay names each reach and can be toggled off for assessment</td></tr>
 <tr><td>Controls and computation direction (sub ↑, super ↓)</td><td class="mark ok">✓</td><td>Erase the weir on m1 and watch M1 relax to M2; raise tailwater on m3/h23 and the jump marches upstream</td></tr>
 <tr><td>Direct / standard step method</td><td class="mark ok">✓</td><td>Students compute; measured surface read at stations by hover or gauges for the overlay comparison</td></tr>
-<tr><td>Backwater length ~ y<sub>n</sub>/S₀</td><td class="mark ok">✓</td><td>m1's own tip; vary roughness and watch it stretch</td></tr>
+<tr><td>Backwater length ~ d<sub>n</sub>/S₀</td><td class="mark ok">✓</td><td>m1's own tip; vary roughness and watch it stretch</td></tr>
 </table></div>
 <div class="ex"><span class="tag">Exercise · predict → run — "name the profile before you load it"</span>
 <p>Hand out only (S₀, C_f, q, control type) for each of six scenes. Students classify letter and zone on paper — is C_f above or below 2.8·S₀, where does the control put the depth — then load with labels OFF, sketch what they see, and finally switch labels ON. Wrong guesses are the teaching moments: the overlay is an opponent to argue with, not an oracle.</p></div>
@@ -627,7 +627,7 @@
 <tr><td>U1–U7, #U6</td><td>Inertia head; flow establishment u<sub>max</sub> = √(2gH/k), time constant (l·u<sub>max</sub>/2gH)</td><td class="mark ok">✓</td><td>Open the hammer valve from rest at slow motion; the speed gauge traces the asymptotic rise — measure t₉₀ against U6</td></tr>
 <tr><td>U14–U16</td><td>Elastic pipe lowers c (effective bulk modulus K′)</td><td class="mark ok">✓</td><td>The c slider IS 1/K′: repeat one closure at two c values, Δp ratio = c ratio. The "flexible pipes slash the surge" lesson as an experiment</td></tr>
 <tr><td>U20–U22</td><td>Slow closure as a closing orifice, step-launched Δh = (c/g)Δu</td><td class="mark chg">Δ</td><td>Still gated on the fractional/scheduled valve (shopping-list #2)</td></tr>
-<tr><td>U23–U29</td><td>Surge tank ODE; y<sub>max</sub> by trial from u² = Ce<sup>y/Y</sup> + (y+Y)/k</td><td class="mark ok">✓</td><td>Draw the standpipe, slam the valve, measure y<sub>max</sub> and the period; students integrate U28/U29 and compare — the module's ODE made visible</td></tr>
+<tr><td>U23–U29</td><td>Surge tank ODE; z<sub>max</sub> by trial from u² = Ce<sup>y/Y</sup> + (y+Y)/k</td><td class="mark ok">✓</td><td>Draw the standpipe, slam the valve, measure z<sub>max</sub> and the period; students integrate U28/U29 and compare — the module's ODE made visible</td></tr>
 <tr><td>Q9–Q14</td><td>Finite-increment routing; attenuation pond; coupled-level dry dock</td><td class="mark cav">✓*</td><td>Works with a rectangular-weir pond (the listed V-notch is 3D); step the Q9 scheme on paper against the measured drawdown. Dry-dock two-level iteration = two-tank rig</td></tr>
 <tr><td>D23</td><td>Froude scales λ<sub>u</sub> = √λ, λ<sub>Q</sub> = λ<sup>5/2</sup></td><td class="mark cav">✓*</td><td>2D caveat worth a slide: per-metre q scales as λ<sup>3/2</sup> — the missing λ is exactly the width the slice doesn't have</td></tr>
 <tr><td>N9–N10</td><td>Slope-area method with velocity-head correction</td><td class="mark ok">✓</td><td>Mystery-discharge exercise: two gauges give the fall, the cursor gives n; iterate N10 and submit your Q̂ — then reveal the panel's q</td></tr>
@@ -635,8 +635,8 @@
 <tr><td>W10, W13–W15</td><td>L₀ = 1.56T²; c<sub>g</sub> = nc; K<sub>s</sub> = √(c<sub>g0</sub>/c<sub>g</sub>)</td><td class="mark cav">✓*</td><td>1.56T² is the dispersion sweep's target line; K<sub>s</sub> checks against the measured shoaling (0.123 → 0.152 m); c<sub>g</sub> only qualitatively (paddle bursts)</td></tr>
 <tr><td>W21</td><td>Reflection coefficient K<sub>refl</sub> = H<sub>r</sub>/H<sub>i</sub></td><td class="mark ok">✓</td><td>Surging-beach flume: partial standing wave; K<sub>refl</sub> = (a<sub>max</sub> − a<sub>min</sub>)/(a<sub>max</sub> + a<sub>min</sub>) from sliding a gauge between antinode and node</td></tr>
 <tr><td>W26</td><td>Ursell number H·L²/h³</td><td class="mark cav">✓*</td><td>Compute from measured H, L, h in the shallow flume, then <em>look</em>: flat troughs and peaked crests are the nonlinearity the number warns about</td></tr>
-<tr><td>#126–129</td><td>E<sub>s1</sub> = E<sub>s2</sub> + Δz over a bed hump; choking</td><td class="mark ok">✓</td><td>The missing specific-energy demo: raise a drawn hump until the upstream level jumps — measured Δz<sub>c</sub> against E₁ − 1.5y<sub>c</sub></td></tr>
-<tr><td>#144–146</td><td>Force on an obstacle; sluice gate Q = C<sub>d</sub>ab√(2gy₀)</td><td class="mark ok">✓</td><td>Gate rig: C<sub>d</sub> clusters near 0.6 across the class; F<sub>R</sub> from the CV — the two-numbers-per-student momentum exercise</td></tr>
+<tr><td>#126–129</td><td>E<sub>s1</sub> = E<sub>s2</sub> + Δz over a bed hump; choking</td><td class="mark ok">✓</td><td>The missing specific-energy demo: raise a drawn hump until the upstream level jumps — measured Δz<sub>c</sub> against E₁ − 1.5d<sub>c</sub></td></tr>
+<tr><td>#144–146</td><td>Force on an obstacle; sluice gate Q = C<sub>d</sub>ab√(2gd₀)</td><td class="mark ok">✓</td><td>Gate rig: C<sub>d</sub> clusters near 0.6 across the class; F<sub>R</sub> from the CV — the two-numbers-per-student momentum exercise</td></tr>
 <tr><td>#120–123, #147–149</td><td>c = √(gh); surge/bore in the moving frame</td><td class="mark ok">✓</td><td>Dam-break scene: time the negative wave against √(gh₀) and the bore against the conjugate-surge prediction</td></tr>
 <tr><td>#42–43</td><td>HGL-below-pipe criterion; cavitation avoidance</td><td class="mark cav">✓*</td><td>Failure demo: lift a pipe crest until flow separates — the sim's threshold is HGL itself (p floor at 0 gauge, limit 2), which makes the criterion vivid and the −10 m correction memorable</td></tr>
 </table></div>
@@ -668,7 +668,7 @@
 <li><b>Reading a number:</b> the gauge chart prints its live value; the hover readout gives spot values; for clean digits, <code>APP.probe(x, z)</code> in the dev console, and <code>APP.volume()</code> for storage exercises.</li>
 <li><b>Keep the tab visible</b> — the loop stops when the page is hidden. The speed slider (×0.02–3) is the slow-motion control for transients.</li>
 <li><b>Distribute set-ups</b> as <code>?scene=id</code> links; sandbox rigs travel as a recipe card (coordinates + a screenshot) until change #1 exists. <kbd class="kbd">Z</kbd> undoes a segment, <kbd class="kbd">R</kbd> resets the water without losing the drawing.</li>
-<li><b>The standing rule when students change q:</b> re-check the tailwater against y<sub>c</sub> = (q²/g)<sup>⅓</sup> (printed on the q slider) and keep it ≥ 1.3 y<sub>c</sub>. This is a real hydraulic fact about degenerate boundary controls, so enforcing it is teaching, not admin.</li>
+<li><b>The standing rule when students change q:</b> re-check the tailwater against d<sub>c</sub> = (q²/g)<sup>⅓</sup> (printed on the q slider) and keep it ≥ 1.3 d<sub>c</sub>. This is a real hydraulic fact about degenerate boundary controls, so enforcing it is teaching, not admin.</li>
 </ul>
 </div>
 

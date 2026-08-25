@@ -21,7 +21,7 @@ rig.js's NC2.freeSlip / NC2.gate) since those two are reference lines, not
 class data to histogram.
 
 This script does NOT re-derive alpha from raw (depth-fraction, u) points --
-unlike a q/y0/y1-style formula, each student reads their OWN 4-5 points off
+unlike a q/d0/d1-style formula, each student reads their OWN 4-5 points off
 the curve, so there is no fixed set of raw columns to recompute from. The
 spot-check this demo relies on instead is at the METHOD level: rig.js's
 NC2.windowStats() independently measures the full-resolution alpha at every

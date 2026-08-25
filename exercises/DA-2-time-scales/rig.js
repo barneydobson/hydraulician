@@ -26,7 +26,7 @@
 //   end-wall / plate x W1*lambda +/- 0.06         (0.12 m thick, EVERY lambda)
 //   apron            x (plate's right face) .. 9  (open; Right edge = Open
 //                    with a LOW pinned tailwater, see "Apron drainage" below)
-//   orifice          a VALVE stroke drawn ALONG y = 0 through the plate,
+//   orifice          a VALVE stroke drawn ALONG z = 0 through the plate,
 //                    floor-trimmed to N cells: N = round(4*lambda), i.e.
 //                    4/3/2/1 cells for lambda = 1, 3/4, 1/2, 1/4 — EXACT
 //                    quarters of the lambda=1 gap (4 cells = 86.96 mm).
@@ -86,7 +86,7 @@ window.DA2 = {
     C("budget").set("Medium");
     C("spoutOn").set(false);
     C("openL").set("0"); C("openT").set("0"); C("openB").set("0"); C("openR").set("1");
-    C("gaugeField").set("head");
+    C("gaugeField").set("h");
     C("mode").set("0");
     SIM.clearSegs();
     const xc = W;
@@ -154,7 +154,7 @@ window.DA2 = {
   /** Free-surface elevation at a gauge, read the way a gauge card reads it. */
   level(k) {
     const g = state.gauges[k];
-    return g.y + APP.probe(g.x, g.y).head;
+    return g.y + APP.probe(g.x, g.y).phead;
   },
 
   /** Spatially-averaged tank surface (verification only — NOT what a student

@@ -291,7 +291,7 @@ window.NC2 = {
       g0.hist.length = 0; APP.state.paused = false;
       const t0 = APP.sim.t; while (APP.sim.t - t0 < 6) APP.frames(1, 1 / 60);
       APP.state.paused = true; APP.frames(2);
-      const y0 = g0.hist.map((r) => r.depth).sort((p, q) => p - q)[Math.floor(g0.hist.length / 2)];
+      const y0 = g0.hist.map((r) => r.d).sort((p, q) => p - q)[Math.floor(g0.hist.length / 2)];
       const lvl2 = +(R.BED + y0).toFixed(4);
       NC2.C("inLevel").set(lvl2); syncPanel();
       APP.tick(Math.ceil(20 / APP.SIM.dt()));

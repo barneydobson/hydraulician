@@ -5,9 +5,9 @@
 
 Each student commits a PREDICTION before raising the hump:
 
-    E1     = y1 + V1^2/2g          (measured upstream, no hump)
-    yc     = (q^2/g)^(1/3)
-    dzpred = E1 - 1.5*yc           (committed BEFORE raising the hump)
+    E1     = d1 + V1^2/2g          (measured upstream, no hump)
+    dc     = (q^2/g)^(1/3)
+    dzpred = E1 - 1.5*dc           (committed BEFORE raising the hump)
 
 ...then raises the hump until it chokes and reports the height that did it,
 dzc. The plot is dzc vs dzpred with the 1:1 line theory predicts, plus
@@ -17,22 +17,22 @@ cells if dzc_cells is not supplied — see _archive/README-full.md, Appendix,
 
 Input columns (extras ignored, order irrelevant):
     q         unit discharge, m2/s per m width                    [required]
-    y1        approach depth measured upstream, no hump, m        [required*]
-    E1        specific energy = y1 + V1^2/2g, m                    [optional, derived from y1,q if absent]
-    yc        critical depth (q^2/g)^(1/3), m                      [optional, derived from q if absent]
-    dzpred    E1 - 1.5*yc, m  -- the COMMITTED prediction, made before the hump is touched
+    d1        approach depth measured upstream, no hump, m        [required*]
+    E1        specific energy = d1 + V1^2/2g, m                    [optional, derived from d1,q if absent]
+    dc        critical depth (q^2/g)^(1/3), m                      [optional, derived from q if absent]
+    dzpred    E1 - 1.5*dc, m  -- the COMMITTED prediction, made before the hump is touched
                                                                      [optional, derived if absent]
     dzc       measured choking height, m                           [required]
     dzc_cells resolution of the dzc measurement, in cells           [optional -> error bar]
     e1_prechoke   E1 re-measured at the LAST hump step before it chokes (FB1B refinement
                   probe finding: the pool rises as the hump is raised, so this is a
                   materially different number from the committed E1 above)  [optional]
-    dzpred_star   e1_prechoke - 1.5*yc -- the RE-TIMED prediction              [optional,
+    dzpred_star   e1_prechoke - 1.5*dc -- the RE-TIMED prediction              [optional,
                   derived from e1_prechoke if absent; adopted protocol -- see
                   _archive/README-full.md S3/S5]
     digit, student, source                                         carried through, not needed
 
-  * V1 is taken as q/y1 (depth-averaged), matching the worksheet's protocol.
+  * V1 is taken as q/d1 (depth-averaged), matching the worksheet's protocol.
 
 No numpy, no pandas -- matplotlib (Agg) only.
 """
@@ -82,27 +82,27 @@ def read(path):
                 dzc = float(row["dzc"])
             except (KeyError, ValueError):
                 continue
-            y1 = float(row["y1"]) if row.get("y1") else None
-            yc = float(row["yc"]) if row.get("yc") else yc_of(q)
+            d1 = float(row["d1"]) if row.get("d1") else None
+            dc = float(row["dc"]) if row.get("dc") else yc_of(q)
             if row.get("e1"):
                 E1 = float(row["e1"])
-            elif y1 is not None:
-                V1 = q / y1
-                E1 = y1 + V1 * V1 / (2 * G)
+            elif d1 is not None:
+                V1 = q / d1
+                E1 = d1 + V1 * V1 / (2 * G)
             else:
                 continue
-            dzpred = float(row["dzpred"]) if row.get("dzpred") else (E1 - 1.5 * yc)
+            dzpred = float(row["dzpred"]) if row.get("dzpred") else (E1 - 1.5 * dc)
             cells = float(row["dzc_cells"]) if row.get("dzc_cells") else None
             e1_star = float(row["e1_prechoke"]) if row.get("e1_prechoke") else None
             if row.get("dzpred_star"):
                 dzpred_star = float(row["dzpred_star"])
             elif e1_star is not None:
-                dzpred_star = e1_star - 1.5 * yc
+                dzpred_star = e1_star - 1.5 * dc
             else:
                 dzpred_star = None
             if q <= 0 or dzc <= 0:
                 continue
-            pts.append(dict(q=q, y1=y1, E1=E1, yc=yc, dzpred=dzpred, dzc=dzc, cells=cells,
+            pts.append(dict(q=q, d1=d1, E1=E1, dc=dc, dzpred=dzpred, dzc=dzc, cells=cells,
                             dzpred_star=dzpred_star,
                             digit=row.get("digit", ""), student=row.get("student", ""),
                             src=row.get("source", "")))
@@ -119,7 +119,7 @@ def main():
 
     pts = read(a.csv)
     if len(pts) < 3:
-        sys.exit("need at least 3 usable rows (columns q, y1 (or E1), dzc)")
+        sys.exit("need at least 3 usable rows (columns q, d1 (or E1), dzc)")
     pts.sort(key=lambda p: p["dzpred"])
 
     dzpred = [p["dzpred"] for p in pts]
@@ -169,7 +169,7 @@ def main():
     # ------------------------------------------------------------------ plot
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(11.5, 5.2),
                                  gridspec_kw=dict(width_ratios=[1.3, 1]))
-    fig.suptitle("FB-1 · the hump that chokes — $\\Delta z_c$ vs $\\Delta z_{pred} = E_1 - 1.5\\,y_c$", fontsize=13)
+    fig.suptitle("FB-1 · the hump that chokes — $\\Delta z_c$ vs $\\Delta z_{pred} = E_1 - 1.5\\,d_c$", fontsize=13)
 
     ax.errorbar(dzpred, dzc, yerr=ebar, fmt="o", ms=8, color="#2f7fd0",
                 ecolor="#9ab6d6", capsize=3, zorder=3, label="class points (±1 cell quant.)")

@@ -20,16 +20,16 @@ disturbance celerity:
 
     v = √(g·h₀)
 
-The bore advances into still water of depth y₁ and leaves it at y₂ behind
+The bore advances into still water of depth d₁ and leaves it at d₂ behind
 the front; mass and momentum conserved in the frame moving with the front
 give
 
-    v = √( g·y₂·(y₁ + y₂) / (2·y₁) )
+    v = √( g·d₂·(d₁ + d₂) / (2·d₁) )
 
 Measured constants for this scene: the release interface is the dam's
 upstream face at **x = 2.56 m**, the reservoir is **h₀ = 1.629 m** deep
 (so √(g h₀) = **4.00 m/s**), and the tailrace starts **wet** at
-**y₁ = 0.167 m**. Wet matters: this is the moving-surge case, not the
+**d₁ = 0.167 m**. Wet matters: this is the moving-surge case, not the
 dry-bed front, whose 2√(g h₀) limit does not apply here.
 
 ## Your bore stations
@@ -67,7 +67,7 @@ together.
 ## For the instructor — pooling the class
 
 Collect one row per student — the script reads
-`student,digit,x1_bore,x2_bore,v_bore,x_neg,v_neg`, plus `y1_bore,y2_bore`
+`student,digit,x1_bore,x2_bore,v_bore,x_neg,v_neg`, plus `d1_bore,d2_bore`
 (or a ready-made `v_bore_pred`) for the per-point surge prediction; any
 other columns are ignored. Then run:
 

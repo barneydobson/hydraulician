@@ -16,7 +16,7 @@
  * this rig builds the SAME physics (subcritical approach -> critical control ->
  * drawdown to a free overfall) on RIG-B instead, where q is a real, live
  * boundary condition (reservoir + open edge, exactly like FB-1/WE-1/MO-1), and
- * gets all three readings — y_c, mid-crest depth, brink depth — from ONE build.
+ * gets all three readings — d_c, mid-crest depth, brink depth — from ONE build.
  *
  * GEOMETRY — the crest's OWN top face IS the final approach to a free
  * overfall (not a hump that steps back down to a lower bed before some
@@ -31,12 +31,12 @@
  * full-height block (0.935 m) is not hand-drawable in one stroke. The two
  * constructions rasterise identically; see the README "THE BRUSH LIMIT".
  *
- *   y=5.0 ┌──────────────────────────────────────────────────────┐
+ *   z=5.0 ┌──────────────────────────────────────────────────────┐
  *         │  air (the two sandbox ledges are ERASED)              │
  *         │                          ╔══ crest (BED+DZ) ══╗       │
  *         │  reservoir ~~~~~~~~~~~~~~╝ pool   (1.1 m)      ║ falls│
- *   y=0.5 ├───────────────────────────╝────────────────────╨──────┤  no bed
- *   y=0.0 └───────────────────────────────────────────────────────┘  past lip
+ *   z=0.5 ├───────────────────────────╝────────────────────╨──────┤  no bed
+ *   z=0.0 └───────────────────────────────────────────────────────┘  past lip
  *         0                    X_TOE=6.3                  X_LIP=7.4  9.0
  *                                   mid-crest station x=6.85   (brink, Open bottom)
  *
@@ -48,7 +48,7 @@
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  *
  * MEASURED FACTS INHERITED FROM FB-1/WE-1/MO-1 (Medium, 414×230, Δx 21.7 mm)
- *   · bed top face y = 0.50 lands exactly on a cell boundary (23 cells).
+ *   · bed top face z = 0.50 lands exactly on a cell boundary (23 cells).
  *   · the sandbox's own two ledges (y ~ 2.0-3.4) must be ERASED.
  *   · bottom edge must be WALL under the approach bed and Open past the lip —
  *     here that just means Open (nothing solid sits under x > X_LIP anyway).
@@ -71,11 +71,11 @@
  *     from A.hRaw (spatially raw, per-column), time-medianed over the
  *     recording window, NOT A.h — see the station-fidelity discussion in
  *     the README.
- *   · A LONG flat crest does NOT hold a y_c plateau once real friction is
+ *   · A LONG flat crest does NOT hold a d_c plateau once real friction is
  *     included — depth decays gently while Fr is small and only steepens
  *     right at the end (dy/dx = -Sf/(1-Fr²) on this S0=0 crest). Iterating
  *     crest length from 4.4 m down to 1.1 m improved the mid-crest reading
- *     from 1.3-1.7x y_c to 1.16-1.32x — see the README "THE ITERATION".
+ *     from 1.3-1.7x d_c to 1.16-1.32x — see the README "THE ITERATION".
  * ==========================================================================*/
 window.FB2 = {
   BED: 0.50,            // base approach-bed top face (RIG-B standard datum)
@@ -146,19 +146,19 @@ window.FB2 = {
     // the raw-column brink station index for FB2.readBrink()
     APP.state.gauges.length = 0;
     APP.state.gauges.push({ x: R.xMid(), y: crest + 0.20, hist: [], colour: "#7fd4ff" });
-    APP.state.gaugeField = "depth";
+    APP.state.gaugeField = "d";
     R.iLip = R.findLip();
     return R.check();
   },
 
-  /** y_c(q) and a first-guess reservoir level: crest + 1.5 y_c (critical
+  /** d_c(q) and a first-guess reservoir level: crest + 1.5 d_c (critical
    *  specific energy above the CREST's own datum) + a small margin so the
    *  approach is comfortably subcritical, not marginal. Refined once by
    *  FB2.student()'s fixed-point pass — see README §2/§5 for the measured
    *  table (this rig's structure makes exact level far less sensitive than
    *  WE-1's weir rating: the crest is the control, not the approach head). */
-  yc: function (q) { return Math.pow(q * q / 9.81, 1 / 3); },
-  levelGuess: function (q) { return +(FB2.crestElev() + 1.65 * FB2.yc(q) + 0.03).toFixed(4); },
+  dc: function (q) { return Math.pow(q * q / 9.81, 1 / 3); },
+  levelGuess: function (q) { return +(FB2.crestElev() + 1.65 * FB2.dc(q) + 0.03).toFixed(4); },
 
   /** Rasterised crest / approach elevations, honestly read off sim.mask —
    *  same trick as WE-1's checkPlate / FB-1's checkHump. */
@@ -223,7 +223,7 @@ window.FB2 = {
     }
     APP.state.paused = true; APP.frames(2);
     var med = function (arr) { var a = arr.slice().sort(function (p, q) { return p - q; }); return a[a.length >> 1]; };
-    var hArr = g.hist.map(function (r) { return r.depth; });
+    var hArr = g.hist.map(function (r) { return r.d; });
     var crestMed = med(hArr);
     var brinkMed = med(brinkArr);
     // median Froude profile across the crest (column-wise median over the window)
@@ -231,29 +231,29 @@ window.FB2 = {
     for (var c = 0; c < ncols; c++) frMedProfile.push(med(frRows.map(function (r) { return r[c]; })));
     return {
       t: +S.t.toFixed(2), n: hArr.length,
-      yCrest: +crestMed.toFixed(4), yCrestMean: +(hArr.reduce(function (p, q) { return p + q; }, 0) / hArr.length).toFixed(4),
-      yBrink: +brinkMed.toFixed(4),
+      dCrest: +crestMed.toFixed(4), dCrestMean: +(hArr.reduce(function (p, q) { return p + q; }, 0) / hArr.length).toFixed(4),
+      dBrink: +brinkMed.toFixed(4),
       frProfile: frMedProfile, xToeIdx: Math.round(FB2.X_TOE / S.dx),
     };
   },
 
   /** Locate the Fr=1 upward crossing in a median Froude profile (array
    *  starting at column xToeIdx) and return its x-position and its distance
-   *  upstream of the lip in y_c units. */
+   *  upstream of the lip in d_c units. */
   criticalStation: function (frProfile, xToeIdx, q) {
-    var S = APP.sim, dx = S.dx, yc = FB2.yc(q);
+    var S = APP.sim, dx = S.dx, dc = FB2.dc(q);
     for (var c = 1; c < frProfile.length; c++) {
       if (frProfile[c - 1] < 1 && frProfile[c] >= 1) {
         var iCrit = xToeIdx + c;
         var xCrit = +(iCrit * dx).toFixed(4);
         return { iCrit: iCrit, xCrit: xCrit, distToLip: +(FB2.X_LIP - xCrit).toFixed(4),
-                 distToLipYc: +((FB2.X_LIP - xCrit) / yc).toFixed(3) };
+                 distToLipDc: +((FB2.X_LIP - xCrit) / dc).toFixed(3) };
       }
     }
     return null;
   },
 
-  /** One whole digit's worth of the demo, fresh: FB2.student(6) -> q, y_c,
+  /** One whole digit's worth of the demo, fresh: FB2.student(6) -> q, d_c,
    *  mid-crest depth, brink depth, critical-section position. Personalised
    *  discharge rule (FB-1's, reused — see README §2): q = 0.15 + 0.05*d,
    *  d = 0..8 (d = 9 substitutes d = 8, same reasoning as FB-1: the class
@@ -266,23 +266,23 @@ window.FB2 = {
     FB2.build(q);
     FB2.settle(baseSecs === undefined ? 45 : baseSecs);
     // one fixed-point level nudge: read the achieved mid-crest reading is not
-    // the right signal (it's meant to sit at y_c regardless); instead confirm
+    // the right signal (it's meant to sit at d_c regardless); instead confirm
     // the pool upstream of the crest is not marginal by checking hRaw well
     // upstream of X_TOE stays comfortably deep and flat (no re-tuning needed
     // in practice — see README §5 for the measured check).
     var rec = FB2.record(10);
-    var yc = FB2.yc(q);
+    var dc = FB2.dc(q);
     var crit = FB2.criticalStation(rec.frProfile, rec.xToeIdx, q);
     return {
-      d: d, q: q, yc: +yc.toFixed(4), level: APP.sim.p.inflow.level,
-      yCrest: rec.yCrest, yCrestMean: rec.yCrestMean, yBrink: rec.yBrink,
-      yCrestOverYc: +(rec.yCrest / yc).toFixed(4),
-      yBrinkOverYc: +(rec.yBrink / yc).toFixed(4),
-      critX: crit ? crit.xCrit : null, distToLipYc: crit ? crit.distToLipYc : null,
+      d: d, q: q, dc: +dc.toFixed(4), level: APP.sim.p.inflow.level,
+      dCrest: rec.dCrest, dCrestMean: rec.dCrestMean, dBrink: rec.dBrink,
+      dCrestOverDc: +(rec.dCrest / dc).toFixed(4),
+      dBrinkOverDc: +(rec.dBrink / dc).toFixed(4),
+      critX: crit ? crit.xCrit : null, distToLipDc: crit ? crit.distToLipDc : null,
       t: rec.t,
     };
   },
 };
 /* MEASURED, this machine, Medium (414x230, Δx 0.021739 m, Δt 3.494e-4 s):
-   see README §5 for the full class table (per-digit y_c/y_crest/y_brink,
+   see README §5 for the full class table (per-digit d_c/d_crest/d_brink,
    critical-section position, and the crest-length iteration). */

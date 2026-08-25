@@ -115,7 +115,7 @@
   }
 
   function gaugeAdd(x, y) { state.gauges.push({ x, y, hist: [] }); return state.gauges.length - 1; }
-  function gaugeHist(k) { return state.gauges[k].hist.map((h) => ({ t: h.t, head: h.head, depth: h.depth })); }
+  function gaugeHist(k) { return state.gauges[k].hist.map((r) => ({ t: r.t, h: r.h, d: r.d })); }
   function gaugeClear() { state.gauges.length = 0; }
 
   function stillWater(x) {

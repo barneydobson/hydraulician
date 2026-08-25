@@ -29,7 +29,7 @@
     stations.forEach(([x, y]) => state.gauges.push({ x, y, hist: [] }));
   }
   function gaugeHist(k) {
-    return state.gauges[k].hist.map((h) => ({ t: h.t, depth: h.depth, head: h.head }));
+    return state.gauges[k].hist.map((r) => ({ t: r.t, d: r.d, h: r.h }));
   }
 
   function stillWater(x) {
@@ -53,8 +53,8 @@
   // SIM.step() directly in a tight loop and sampling with SIM.probe() after
   // each chunk sidesteps the governor altogether and runs at whatever the
   // shared GPU actually delivers, without needing any wall-clock wait at
-  // all. Elevation at a station = y + probe(x,y).head (LL-1v: probe().head
-  // is pressure-only, so y+head is full piezometric head = free-surface
+  // all. Elevation at a station = y + probe(x,y).phead (LL-1v: probe().phead
+  // is pressure-only, so y+phead is full piezometric head = free-surface
   // elevation for a wet point, hydrostatic to a very good approximation on
   // this h/L~0.03-0.06 shallow flume) — cheap (1x1 readback), no column
   // reduction needed.
@@ -69,7 +69,7 @@
       const t = sim.t;
       stations.forEach((s, k) => {
         const pr = SIM.probe(s[0], s[1]);
-        rec[k].push({ t, elev: s[1] + pr.head, u: pr.u, v: pr.v });
+        rec[k].push({ t, elev: s[1] + pr.phead, u: pr.u, v: pr.v });
       });
       guard++;
     }

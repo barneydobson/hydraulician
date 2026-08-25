@@ -119,11 +119,13 @@ Driest or dynamic model would; the near-wall stress is carried by step 4.
 
 ### Step 2 — Constant reference density, and the void regularisation
 
-The per-unit-mass form at the end of §1 has two features the solver does not
-reproduce. They are the only places `f` enters the momentum equation.
+The per-unit-mass form at the end of §1 is divided through by the local density
+`ρ = fρ_w`. The solver divides by the **constant** `ρ₀ = ρ_w` instead, and gates
+gravity rather than dividing it. Those are the only two ways `f` reaches the
+momentum equation.
 
-**The pressure gradient uses a constant reference density.** `−(1/f)∇P` is
-replaced by `−∇P`: the constant `ρ₀ = ρ_w` in place of the local `ρ = fρ_w`. In
+**Dividing by `ρ₀` rather than `ρ`.** `−(1/f)∇P` becomes `−∇P`, and the viscous
+term loses its `1/f` the same way, leaving `ν_T∇²u`. In
 water `f` departs from 1 by at most a few percent (§3), and holding `ρ₀`
 constant is what makes the discrete hydrostatic balance exactly linear, so that
 the equilibrium profile of §3 is reached exactly rather than approximately.
@@ -204,9 +206,23 @@ Steps 1–4 applied to §1:
 ```
 
 with `P = p/ρ₀` supplied by the equation of state of §3, and `𝟙_wall` the
-indicator of cells adjacent to a solid. Momentum is in advective
-(non-conservative) form, volume in flux (conservative) form. §4 discretises this
-system and nothing else.
+indicator of cells adjacent to a solid.
+
+Two things about this equation are easy to misread, and both matter when
+comparing it against the code.
+
+**`χ` is a gate, not a factor of `f`.** `smoothstep(0, 0.05, f)` is *exactly* 1
+for any cell more than 5% full, so in water the gravity term is `g`, not `fg`.
+It only ramps down across the last 5% into a void.
+
+**`u` is advected, not `fu`.** Momentum is in advective (non-conservative) form
+and the advection carries no `f` weighting at all; only volume is in flux
+(conservative) form. A quasi-conservative formulation — dividing
+`∂(ρu)/∂t + ∇·(ρuu) = −∇p + ρg + ∇·τ` by the constant `ρ₀` to get
+`∂(fu)/∂t + ∇·(fuu) = −∇P + f,g + …` — *would* carry `f g`. That is not what is
+solved here.
+
+§4 discretises this system and nothing else.
 
 ## 3. Closure: weak compressibility, a 2D Preissmann slot
 

@@ -615,7 +615,9 @@ out vec4 o;
 uniform sampler2D u_F, u_U, u_S, u_C;
 uniform vec2  u_res, u_canvas;
 uniform float u_dx, u_g, u_c2, u_valve, u_time;
+uniform float u_tilt;         // scene tiltS0: elevation is y − S₀x when set
 uniform int   u_mode;         // 0 water 1 head 2 speed 3 Froude 4 vorticity
+                              // 5 momentum flux 6 piezometric head
 uniform float u_vmax, u_hmax; // colour-scale maxima
 uniform float u_dyeOn;
 uniform vec4  u_cursor;       // x, y (m), radius (m), tool tint
@@ -750,6 +752,16 @@ void main(){
     float dudy = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;
     float w = (dvdx - dudy) / (2.0 * u_dx);
     water = divg(0.5 + 0.5 * clamp(w / 40.0, -1.0, 1.0));
+  } else if (u_mode == 6) {
+    // Piezometric head h = z + p/ρg — the potential whose gradient drives the
+    // flow. Constant over the depth wherever the flow is hydrostatic, so the
+    // bands stand VERTICAL through a backwater or a uniform reach and bend
+    // exactly where vertical accelerations matter: weir crests and brinks
+    // (h sags), a chute toe (h bulges), gate contractions, jump rollers.
+    // A tilted-gravity scene draws a flat bed and carries S₀ in gravity, so the
+    // elevation term is y − S₀x there.
+    float hp = pm.y - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
+    water = turbo(hp / max(u_res.y * u_dx, 0.05));
   } else {
     // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
     // display pass runs once per FRAME, not once per substep — it is the two

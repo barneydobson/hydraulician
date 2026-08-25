@@ -486,6 +486,12 @@ const OVERLAY = (() => {
     if (probe) {
       rows.push(["u, v", fmt(probe.u, 2) + ", " + fmt(probe.v, 2) + " m/s"]);
       rows.push(["pressure head p/ρg", fmt(probe.head, 3) + " m"]);
+      // h = z + p/ρg. Shown in BOTH regimes: in hydrostatic open-channel flow
+      // it equals the level η above, but inside a pressurised conduit there is
+      // no surface and the η row is suppressed, which is exactly where the
+      // piezometric head is the only meaningful head to read.
+      rows.push(["head h = z + p/ρg",
+        fmt(my - (sim.scene.tiltS0 || 0) * mx + probe.head, 3) + " m"]);
       rows.push(["fill f", fmt(probe.f, 3) + (probe.f > 1.002 ? "  pressurised" : "")]);
     }
     if (!rows.length) return;

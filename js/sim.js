@@ -400,6 +400,7 @@ const SIM = (() => {
     gl.uniform2f(prog.draw.u("u_canvas"), view.w, view.h);   // drawn rect, so zoom keeps px/m honest
     gl.uniform1f(prog.draw.u("u_dx"), S.dx);
     gl.uniform1f(prog.draw.u("u_g"), -Math.abs(S.p.g));
+    gl.uniform1f(prog.draw.u("u_tilt"), S.scene.tiltS0 || 0);
     gl.uniform1f(prog.draw.u("u_c2"), S.p.c * S.p.c);
     gl.uniform1f(prog.draw.u("u_valve"), S.p.valveClosed);
     gl.uniform1f(prog.draw.u("u_time"), S.t);
@@ -429,7 +430,35 @@ const SIM = (() => {
   }
 
   // -------------------------------------------------------------- readback
-  /** One cell: {f, dye, u, v, p, head}. Used by gauges and the hover readout. */
+  /** Rescale the stored fill so the EOS pressure P = c²(f−1) is unchanged when
+   *  c changes: f → 1 + (f−1)·k with k = (c_old/c_new)². Only over-full cells
+   *  carry pressure, so cells below f = 1 are left alone and the geometric
+   *  volume min(f,1) is untouched. Without this, lowering c leaves the column
+   *  under-supported and it settles lower — 861 mm on a 4.5 m column for
+   *  25 → 8. One readback per slider change, not per frame. */
+  function rescaleFill(k) {
+    if (!(k > 0) || k === 1) return;
+    const n = S.nx * S.ny;
+    const buf = new Float32Array(n * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    for (let i = 0; i < n; i++) {
+      const f = buf[i * 4];
+      if (f > 1) buf[i * 4] = 1 + (f - 1) * k;
+    }
+    // texSubImage2D, not texImage2D: this texture is an FBO colour attachment
+    // and respecifying its storage would invalidate it.
+    gl.bindTexture(gl.TEXTURE_2D, S.F.read.tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+  }
+
+  /** One cell: {f, dye, u, v, p, head}. Used by gauges and the hover readout.
+   *  `head` is the PRESSURE head p/ρg alone — no elevation term. In hydrostatic
+   *  water that is simply the submergence below the local free surface, so it
+   *  carries a unit vertical gradient everywhere wet and is not comparable
+   *  between cells at different heights. The piezometric head is h = z + p/ρg;
+   *  add the elevation yourself (see the gauge sampler in main.js). The name is
+   *  kept because `APP.probe()` is a public surface used by headless rigs. */
   function probe(x, y) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(y / S.dx)));
@@ -557,6 +586,6 @@ const SIM = (() => {
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
-           boxForce, dt, get, inletVel, bands,
+           boxForce, dt, get, inletVel, bands, rescaleFill,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

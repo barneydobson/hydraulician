@@ -33,7 +33,7 @@ window is `h_start` = 0.9 h₀λ down to `h_stop` = 0.3 h₀λ — mid-drain, cl
 of the filling transient at the top and of the last few cells over the
 orifice at the bottom. Both are **elevations above the domain floor**, which
 is where the orifice sits, so they are heads over the orifice directly. The
-gauge card prints them as **H**.
+gauge card prints them as **h**.
 
 ## Your scale
 

@@ -20,9 +20,9 @@ discharge.
 
     Q = C_d · ⅔ · √(2g) · b · H^(3/2)        H = h − P
 
-`h` is the approach-pool depth, `P` the crest height above the bed, so `H` is
-the head over the crest. The exponent is 3/2 *only if* `C_d` is a constant, and
-it is not — Rehbock's fit says so directly:
+`h` is the approach-pool depth — the gauge card's `d` — and `P` the crest
+height above the bed, so `H` is the head over the crest. The exponent is 3/2
+*only if* `C_d` is a constant, and it is not — Rehbock's fit says so directly:
 
     C_d = 0.602 + 0.083 · H/P
 
@@ -59,8 +59,8 @@ are just the crest plus the head the weir is about to produce.
    it down. The pool should then be flat all the way back to the left edge,
    with a clean nappe springing off the crest and an air pocket under it. If
    the surface near the inlet ripples or sags, your level is wrong.
-3. Read the gauge card at x = 4.5 m — it prints `1  h 0.xxx m`, steady to the
-   last digit — take **H = h − 0.50**, and submit **q, H**.
+3. Read the gauge card at x = 4.5 m — it prints `1  d 0.xxx m`, steady to the
+   last digit; that reading is your `h` — take **H = h − 0.50**, and submit **q, H**.
 4. **Optional — what the plate carries.** The rating counts only the water
    *above* the crest; the rest of the pool just presses on the plate. Pick the
    **Force box** (`9`) and drag one from about **(2.0, 0.3)** to **(6.7, 1.6)**

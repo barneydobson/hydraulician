@@ -56,10 +56,10 @@ the assignment in class. The level is paired to your `q`
    it down. The pool upstream of the crest should look flat and calm, with a
    clear pale band on the crest and orange just before its downstream end.
 3. Reading **(2)**, on the crest: the gauge card at x = 6.85 m prints
-   `1  h 0.xxx m`. Take a typical value over a few seconds.
+   `1  d 0.xxx m`. Take a typical value over a few seconds.
 4. Reading **(3)**, at the lip: zoom in (wheel) on the right-hand end of the
    crest and hover the **last wet column that still has solid crest under
-   it** — not the falling sheet beyond — and read `depth h` from the hover
+   it** — not the falling sheet beyond — and read `depth d` from the hover
    box. Submit **q, y_c, y_crest, y_brink**.
 
 ## For the instructor — pooling the class

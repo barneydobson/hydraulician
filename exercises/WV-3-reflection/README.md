@@ -53,7 +53,7 @@ The contrast run on the gentle beach (`wave`) goes by **d mod 3** instead:
    it down. Most of that is travel: the wave has to reach the beach 7.7 m away
    and its reflection has to cross back before a pattern exists to measure.
 3. Press `0` to see the whole flat run, then with **Gauge** (`5`) click
-   mid-depth at **x = 1.3 m** and read the swing in **h** off the card —
+   mid-depth at **x = 1.3 m** and read the swing in **d** off the card —
    promptly, because the chart only remembers about 15 s.
 4. Click again every **0.2 m** out to **x = 7.5 m**, noting the biggest swing
    (an antinode) and the smallest (a node). With a = ½(highest − lowest) at

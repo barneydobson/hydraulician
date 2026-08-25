@@ -64,7 +64,7 @@ never set one without the other:
 2. Press `R` and let it reach steady state — about **55 s**; the card counts
    it down (the ½ and ¼ rungs are there in 40 s and 28 s).
 3. Drop a Gauge (`5`) at your station in the approach pool and read the
-   card's `h` — it should be steady to the last digit or two.
+   card's `d` — it should be steady to the last digit or two; that is your `h`.
 4. Compute **H = h − P** and submit **λ, q, H**.
 
 ## For the instructor — pooling the class

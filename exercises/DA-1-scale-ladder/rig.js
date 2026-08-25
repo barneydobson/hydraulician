@@ -151,7 +151,7 @@ window.DA1 = {
   gauge: function (x, y) {
     APP.state.gauges.length = 0;
     APP.state.gauges.push({ x: x, y: y, hist: [], colour: "#7fd4ff" });
-    APP.state.gaugeField = "depth";        // the card then prints "h 0.734 m"
+    APP.state.gaugeField = "depth";        // the card then prints "d 0.734 m"
     DA1.XG = x;
   },
 

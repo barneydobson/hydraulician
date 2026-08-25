@@ -52,12 +52,13 @@
        bar's last few buttons. Wrapping beats burying. */
     max-width: calc(100vw - 420px);
   }
-  #bar button, #bar select {
+  #bar button, #bar select, #bar a {
     appearance: none; border: 0; background: transparent; color: inherit;
     font: inherit; font-size: 13.5px; padding: 8px 11px; border-radius: 10px;
     cursor: pointer; transition: background .12s, transform .12s; white-space: nowrap;
+    text-decoration: none; display: inline-block;
   }
-  #bar button:hover { background: rgba(255,255,255,0.10); transform: translateY(-1px); }
+  #bar button:hover, #bar a:hover { background: rgba(255,255,255,0.10); transform: translateY(-1px); }
   #bar button.active { background: rgba(77,195,255,0.20); box-shadow: inset 0 0 0 1px rgba(77,195,255,0.55); }
   #bar select { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.13); font-weight: 600; }
   #bar .sep { width: 1px; height: 22px; background: rgba(255,255,255,0.13); margin: 0 3px; }
@@ -109,22 +110,6 @@
   #panel.open { display: block; }
   #panel::-webkit-scrollbar { width: 6px; }
   #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
-  #about {
-    position: fixed; top: 66px; left: 14px; z-index: 10; width: 430px;
-    padding: 16px 18px; display: none; max-height: calc(100vh - 96px); overflow: auto;
-    font-size: 13px; line-height: 1.5;
-  }
-  #about.open { display: block; }
-  #about h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em;
-    opacity: .55; margin: 16px 0 5px; }
-  #about h3:first-child { margin-top: 0; }
-  #about p, #about ul { margin: 0 0 9px; }
-  #about ul { padding-left: 17px; }
-  #about li { margin: 0 0 5px; }
-  #about code { font: 11.5px ui-monospace, SFMono-Regular, monospace; opacity: .9; }
-  #about pre { font: 11.5px/1.5 ui-monospace, SFMono-Regular, monospace;
-    background: rgba(255,255,255,0.05); border-radius: 6px; padding: 9px 11px;
-    margin: 0 0 10px; overflow-x: auto; }
   #panel h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; opacity: .5; margin: 15px 0 4px; }
   #panel h3:first-child { margin-top: 0; }
   #panel label.row { display: flex; align-items: center; gap: 8px; margin: 7px 0 1px; font-size: 13px; }
@@ -439,7 +424,8 @@
   <button id="resetBtn" title="Reload the scene's water (R)">Reset water</button>
   <button id="clearBtn" title="Remove everything you have drawn (C)">Clear drawing</button>
   <button id="panelBtn" title="Controls">Controls</button>
-  <button id="aboutBtn" title="What the solver is actually doing">About</button>
+  <a id="aboutBtn" title="What the solver is actually doing — the numerics derivation"
+     target="_blank" rel="noopener">About</a>
 </div>
 
 <div id="title" class="glass" role="button" tabindex="0" title="Choose a scene (S)">
@@ -457,63 +443,6 @@
 </div>
 
 <div id="panel" class="glass"></div>
-
-<div id="about" class="glass">
-  <h3>What this is actually solving</h3>
-  <p>Not a shallow-water model and not a smoke solver. This resolves the
-  <b>vertical plane</b>, so velocity profiles, jets, rollers and pressure are
-  in the picture rather than assumed away.</p>
-
-  <p>The equations are barotropic weakly-compressible Navier&ndash;Stokes on a
-  staggered grid, with the cell fill fraction <code>f</code> doing double duty
-  as the density:</p>
-  <pre>&part;f/&part;t + &nabla;&middot;(f u) = 0
-&part;u/&part;t + (u&middot;&nabla;)u = &minus;&nabla;p/&rho; + g + &nabla;&middot;(&nu;&nabla;u) &minus; C&#95;f|u|u/&Delta;
-p/&rho; = c&sup2; max(f &minus; 1, 0)</pre>
-
-  <h3>The trick is that last line</h3>
-  <p>It is a <b>2D Preissmann slot</b>. Where a cell is not full,
-  <code>p = 0</code> and the water falls freely &mdash; that <i>is</i> the free
-  surface, with no interface reconstruction needed. Where a cell is over-full
-  the water is compressed and pressure travels at celerity <code>c</code>.</p>
-  <p>So free-surface flow and pressurised pipe flow are the same equations, the
-  transition between them is automatic, and <code>c</code> is the slider that
-  sets your water-hammer surge. There is <b>no pressure Poisson solve</b> &mdash;
-  two GPU passes per substep, a few thousand substeps a second.</p>
-
-  <h3>What is measured, not assumed</h3>
-  <p>Normal depth and Manning&rsquo;s <i>n</i> are read off the computed energy
-  grade line, <i>S<sub>f</sub></i> = &minus;d<i>E</i>/d<i>x</i>, not derived
-  from the roughness slider. That matters because the effective resistance is
-  not just <code>C_f</code>: the no-slip wall adds stress through the eddy
-  viscosity, and a sloping bed rasterised onto a Cartesian grid is a staircase
-  whose steps are genuine form roughness. At ~8 cells of depth the delivered
-  <i>n</i> is ~0.07 almost regardless of the slider; at ~25 cells it falls
-  towards 0.02. <b>Depth relative to &Delta;x is the lever, not the slider.</b></p>
-
-  <h3>Honest limits</h3>
-  <ul>
-    <li><b>Celerity is not water&rsquo;s.</b> Real water hammer runs at ~1200 m/s;
-      here <code>c</code> is 8&ndash;400 m/s because the time step scales with
-      it. The <i>scaling</i> &mdash; &Delta;H = c&Delta;v/g, period 4L/c &mdash;
-      is exact; the absolute number is yours to choose.</li>
-    <li><b>Waves are damped by resolution.</b> A wave must be tall enough in
-      <i>cells</i> to survive an interface that is itself ~2 cells thick. No
-      viscosity slider changes this; stroke and &Delta;x do.</li>
-    <li><b>Plunging breakers are out of reach.</b> The overturning tongue is
-      thinner than the interface can hold, so breaks come out spilling.</li>
-    <li><b>Turbulence is a Smagorinsky closure</b> at metre-ish resolution:
-      good for the shape of a profile and the existence of a roller, not a
-      boundary-layer calculation.</li>
-  </ul>
-
-  <h3>Scale</h3>
-  <p>Gravity waves are Froude-scaled and there is no second length scale, so
-  shrinking a flume geometrically buys nothing: &Delta;x and the wave height
-  shrink together and <i>cells per wave height</i> is unchanged. The levers are
-  cell budget, domain <i>shape</i>, and steepness &mdash; which breaking caps
-  at H/L &asymp; 0.14.</p>
-</div>
 
 <div id="hint" class="glass"></div>
 

@@ -68,15 +68,15 @@ q = 0.330 at that opening, so it needs no iteration.
 4. Press `R` and let it reach steady state — about **70 s**; the card counts
    it down. The pool should look flat back to the left edge, with a clean jet
    springing out under the gate.
-5. Read **y₀** off the gauge card's `h`, then hover at **x = 5.63 m** and read
-   the box's *depth h* as **y₁** — do not hover closer to the gate, where the
+5. Read **y₀** off the gauge card's `d`, then hover at **x = 5.63 m** and read
+   the box's *depth d* as **y₁** — do not hover closer to the gate, where the
    box smooths across the opening and reads far too deep.
 6. Pick the **Force box** (`9`) and drag from **(3.50, 0.30)** to **(5.63,
    3.20)**: upstream face at the gauge station, downstream face at the vena
    station, bottom face inside the bed, top face clear of the gate. Give the
    card a few seconds to fill its average, then read **F→**. Drag a second box
    — **(4.50, 0.50) → (5.63, 2.00)** — and check the reading holds. Submit
-   **a, y₀, y₁, C_d, F_R, F→** (with your `d`).
+   **a, y₀, y₁, C_d, F_R, F→** (with your digit `d`).
 
 ![the Force box on the shipped 7-cell rig, reading about 1.6 kN/m](shots/04-force-box.png)
 

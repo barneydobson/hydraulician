@@ -156,7 +156,7 @@ function loadScene(id, keepDrawing) {
  *  Deliberately NOT reset — these are workspace preferences with no scene
  *  meaning, and a fresh boot cannot preserve them only because it cannot know
  *  them: the resolution budget, the pointer tool and its brush size, and
- *  whether the Controls / About panels are open.
+ *  whether the Controls panel is open.
  *
  *  Why in place rather than `location.href = "?scene=" + id`: the WebGL
  *  context, the six compiled programs and the panel DOM all survive, so the
@@ -1310,9 +1310,16 @@ const CONTROLS = [
 
   { h: "Hydraulics" },
   { id: "cel", label: "Slot celerity c", min: 8, max: 400, step: 1, log: true,
-    get: () => sim.p.c, set: (v) => sim.p.c = v,
-    fmt: (v) => v.toFixed(0) + " m/s   (Δh from Δv: " + (v / 9.81).toFixed(1) + " m per m/s)",
-    info: "The Preissmann-slot stiffness. Pressure waves travel at this speed, so it sets the water-hammer surge ΔH = cΔv/g. Lower c = bigger time step = faster run." },
+    get: () => sim.p.c,
+    // A column carries its hydrostatic load as compression, f − 1 = gd/c², so
+    // lowering c needs MORE slot storage and draws it from the water present:
+    // dragging 25 → 8 dropped a settled 4.5 m column by 861 mm. Rescaling f to
+    // hold P = c²(f−1) fixed makes the slider change the celerity and nothing
+    // else — the geometric volume min(f,1) is untouched.
+    set: (v) => { const o = sim.p.c; if (v !== o && v > 0) SIM.rescaleFill((o * o) / (v * v)); sim.p.c = v; },
+    fmt: (v) => v.toFixed(0) + " m/s   (Δh from Δv: " + (v / 9.81).toFixed(1)
+      + " m per m/s · ≤" + (100 * 9.81 * sim.H / (v * v)).toFixed(0) + "% compression)",
+    info: "The Preissmann-slot stiffness. Pressure waves travel at this speed, so it sets the water-hammer surge ΔH = cΔv/g. Lower c = bigger time step = faster run, but the water is held up by compression f − 1 = gd/c², so it also makes the fluid squashier — keep c well above √(gd)." },
   { id: "cf", label: "Bed roughness C_f", min: 0, max: 0.25, step: 0.002,
     get: () => sim.p.cf, set: (v) => sim.p.cf = v,
     fmt: (v) => v.toFixed(3) + (v === 0 ? "   frictionless" : ""),
@@ -1376,7 +1383,8 @@ const CONTROLS = [
     fmt: (v) => (v < 1.05 ? "true scale (1 : 1)" : "× " + v.toFixed(1) + " vertical"),
     info: "Stretches the view vertically. A 12 m × 1.5 m flume is a thin strip at true scale, so a 0.1 m wave is a few pixels — every long-section in hydraulics is drawn exaggerated for the same reason. You can also drag the empty band above or below the domain." },
   { id: "mode", type: "select", label: "Field",
-    opts: [["0", "Water"], ["1", "Pressure head"], ["2", "Speed"], ["3", "Froude number"],
+    opts: [["0", "Water"], ["1", "Pressure head"], ["6", "Piezometric head"],
+           ["2", "Speed"], ["3", "Froude number"],
            ["4", "Vorticity"], ["5", "Momentum flux"]],
     get: () => String(state.mode), set: (v) => state.mode = +v },
   { id: "ruler", type: "check", label: "Ruler",
@@ -1931,7 +1939,13 @@ function sampleGauges(A) {
   state.gauges.forEach((gg) => {
     const pr = SIM.probe(gg.x, gg.y);
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(gg.x / sim.dx)));
-    const s = { t: sim.t, head: gg.y + pr.head, depth: A.h[i], speed: pr.speed };
+    // Piezometric head h = z + p/ρg. For a scene whose bed is real geometry
+    // z is just the gauge's y, but a tilted-gravity scene (m2) draws a FLAT bed
+    // and carries S₀ in gravity instead, so the elevation is y − S₀x. Without
+    // that term m2's gauges read a flat grade line along a reach that loses
+    // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
+    const z = gg.y - (sim.scene.tiltS0 || 0) * gg.x;
+    const s = { t: sim.t, head: z + pr.head, depth: A.h[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2116,7 +2130,7 @@ function drawOverlay(A) {
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
   const fld = state.gaugeField;
   const cards = OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-    fld === "head" ? "H" : fld === "depth" ? "h" : "|u|",
+    fld === "head" ? "h" : fld === "depth" ? "d" : "|u|",
     fld === "speed" ? "m/s" : "m");
   GINSP.tick(cards);
   if (state.inside && !state.drag) {
@@ -2304,9 +2318,13 @@ function dragWindow(el, handle, onPlace) {
  *  canvas because the things it needs (drag, wheel-zoom over a small target,
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
+  // Symbols follow free-surface convention: h is the piezometric head, d the
+  // depth and η the water level, leaving H free for the energy head. The KEYS
+  // are frozen — "head" and "depth" are serialised into permalinks and into
+  // every `ui.field` in exercises-rigs.js, so rename the symbol, never the key.
   const FIELDS = [
-    ["head",  "H", "m",   "piezometric head, z + p/ρg"],
-    ["depth", "h", "m",   "water depth of the column"],
+    ["head",  "h", "m",   "piezometric head, h = z + p/ρg"],
+    ["depth", "d", "m",   "water depth of the column"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],
   ];
   const open = [];              // live inspector windows
@@ -3097,25 +3115,19 @@ function boot() {
   const setPanel = (open) => {
     document.getElementById("panel").classList.toggle("open", open);
     document.getElementById("panelBtn").classList.toggle("active", open);
-    if (open) { setAbout(false); }                               // they overlap
-  };
-  const setAbout = (open) => {
-    document.getElementById("about").classList.toggle("open", open);
-    document.getElementById("aboutBtn").classList.toggle("active", open);
-    if (open) {
-      document.getElementById("panel").classList.remove("open");
-      document.getElementById("panelBtn").classList.remove("active");
-    }
   };
   document.getElementById("panelBtn").onclick = () =>
     setPanel(!document.getElementById("panel").classList.contains("open"));
-  document.getElementById("aboutBtn").onclick = () =>
-    setAbout(!document.getElementById("about").classList.contains("open"));
+  // On the Pages build Jekyll renders numerics.md to numerics.html (it is not
+  // README.md, so jekyll-readme-index does not make it a folder index);
+  // everywhere else — file://, a plain static host — the .md itself is right.
+  document.getElementById("aboutBtn").href = "docs/numerics" +
+    (/\.github\.io$/i.test(location.hostname) ? ".html" : ".md");
 
   // Every floating box minimises (see MINI): the bar, the title/status box,
   // the tips line and the key list collapse to pills at their own anchors;
-  // Controls and About just close — their bar buttons are the way back in —
-  // and an announcement toast dismisses on click.
+  // Controls just closes — its bar button is the way back in — and an
+  // announcement toast dismisses on click.
   MINI.add("bar", document.getElementById("bar"),
     { corner: "inline", label: "☰", pill: { top: "14px", left: "14px" } });
   MINI.add("title", document.getElementById("title"),
@@ -3124,7 +3136,7 @@ function boot() {
     { label: "▸ tips", pill: { bottom: "18px", left: "50%", transform: "translateX(-50%)" } });
   MINI.add("keys", document.getElementById("keys"),
     { label: "▸ keys", pill: { bottom: "14px", left: "14px" } });
-  [["panel", setPanel], ["about", setAbout]].forEach(([id, close]) => {
+  [["panel", setPanel]].forEach(([id, close]) => {
     const b = document.createElement("button");
     b.className = "minbtn corner"; b.title = "Minimise"; b.textContent = "–";
     b.onclick = () => close(false);
@@ -3170,7 +3182,7 @@ function boot() {
     else if (k === "c") SIM.clearSegs();
     else if (k === "r") { SIM.resetWater(); clearGaugeHistory(); }
     else if (k === "p") { state.particles = !state.particles; syncPanel(); }
-    else if (k === "g") { state.mode = (state.mode + 1) % 6; syncPanel(); }
+    else if (k === "g") { state.mode = (state.mode + 1) % 7; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }

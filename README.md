@@ -187,7 +187,7 @@ brief in `exercises/<folder>/README.md` and add the row to `exercises/INDEX.md`
 real Chrome over CDP: `launch`, `eval`, `pump --sim-seconds`, `shot`, `bench`,
 `status`, `close`. See [`exercises/_runner/HOWTO.md`](exercises/_runner/HOWTO.md)
 for the worked example and the concurrency rules. Inside the page, `APP.frames(n)`,
-`APP.tick(n)`, `APP.probe(x,y)`, `APP.volume()` and `APP.zoomAt(...)` exist for
+`APP.tick(n)`, `APP.probe(x,z)`, `APP.volume()` and `APP.zoomAt(...)` exist for
 scripted runs — the render loop stops when the tab is hidden, so drive it
 through those rather than waiting on wall-clock time.
 

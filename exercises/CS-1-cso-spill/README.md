@@ -27,8 +27,8 @@ with `a` the throttle gap. √(2gH) is therefore a constant and q_spill is
 straight in `a`: double the throttle and you double the storm the works has to
 take before the river gets anything.
 
-Measured here: the chamber floor's top face sits at **y = 1.50 m** and the
-crest at **y = 2.50 m**, so H is exactly **1.00 m** and the chamber gauge —
+Measured here: the chamber floor's top face sits at **z = 1.50 m** and the
+crest at **z = 2.50 m**, so H is exactly **1.00 m** and the chamber gauge —
 plotting depth, `d` — reads the head over the throttle directly. `d` past
 1.00 m *is* spilling. Dry-weather flow is **1 × DWF = 0.070 m²/s**, which the
 spout delivers at a velocity of 0.50 m/s.
@@ -58,12 +58,12 @@ of times your row gives.
    0.50 m/s) — 45 s on the clock. It should end as a puddle, everything running
    down the shaft to treatment: that is your check that the throttle is open.
 4. Place a gauge — Gauge (`5`) — in the weir bay at **x ≈ 4.25 m,
-   y ≈ 1.60 m**; its card plots depth, `d`.
+   z ≈ 1.60 m**; its card plots depth, `d`.
 5. Ramp **Spout velocity →** in 0.25 m/s steps held 10 s until the water
    reaches the crest, then drop back one step and creep up in 0.08 m/s steps
    held 20 s (the card's countdown times that hold). **First spill** is a
    continuous sheet over the crest for a full 10 s with `d` ≥ 1.02 m.
-6. Hover the sewer at **x ≈ 2 m** (the readout's top row prints x, y) and read
+6. Hover the sewer at **x ≈ 2 m** (the readout's top row prints x, z) and read
    `q` as a typical value over several seconds, never off a slider. Submit
    **gap_cells** and **q_spill**.
 

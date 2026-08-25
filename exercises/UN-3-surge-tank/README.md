@@ -52,9 +52,9 @@ not the target; the wall centrelines are x = 53.0 ∓ (b_s/2 + 0.15):
    at x = 53.0, shaft standing at **b_s = 0.98 m**, which is d = 2. If that is
    your digit, go to step 3.
 2. Otherwise resize it. `Z` twice lifts the two shipped shaft walls; Erase
-   (`2`) the tee again at x = 53.0, from y = 4.9 to y = 6.6, with the brush
+   (`2`) the tee again at x = 53.0, from z = 4.9 to z = 6.6, with the brush
    widened to your own b_s; then Wall (`1`), Shift held, draw both walls from
-   y = 4.9 up to y = 29.6 at your **x_left** and **x_right**. Erase first and
+   z = 4.9 up to z = 29.6 at your **x_left** and **x_right**. Erase first and
    wall second — the later stroke wins, and that is what seals the shaft
    against its own hole.
 3. Press `R` and let it reach steady state — about **60 s**; the card counts

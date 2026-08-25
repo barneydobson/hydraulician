@@ -231,14 +231,14 @@
 <div class="tablewrap"><table>
 <tr><th>Lab equivalent</th><th>In hydraulician</th></tr>
 <tr><td>Piezometer / pressure transducer + chart recorder</td><td><b>Gauge tool</b> (up to 4) — logs piezometric head, depth or speed against time; the chart prints the live value to 3 decimals</td></tr>
-<tr><td>Current-meter traverse</td><td><b>Rake tool</b> (up to 2) — full vertical u(y) profile, with u<sub>max</sub>, depth-average V and their ratio printed</td></tr>
+<tr><td>Current-meter traverse</td><td><b>Rake tool</b> (up to 2) — full vertical u(z) profile, with u<sub>max</sub>, depth-average V and their ratio printed</td></tr>
 <tr><td>Point gauge + tape</td><td><b>Hover readout</b> — h, q, V, Fr, y<sub>c</sub>, measured y<sub>n</sub>, S₀, S<sub>f</sub>, delivered Manning n, u, v, p/ρg, fill fraction</td></tr>
 <tr><td>Dye injection, drogues</td><td><b>Dye timelines</b> (sheared line = velocity profile), right-drag pour carries dye; <b>particles</b>; <b>orbit tracers</b> with fading trails</td></tr>
 <tr><td>Wave paddle</td><td><b>Piston</b> — stroke 0.005–0.3 m, period 0.4–6 s, positionable, works in any scene with standing water</td></tr>
 <tr><td>Sluices, weirs, pipework</td><td><b>Wall / erase / valve tools</b> — butt-ended segments, snap to 45°, instant re-rasterise; <kbd class="kbd">V</kbd> slams every valve</td></tr>
 <tr><td>Head tanks and sumps</td><td><b>Reservoir</b> (level + q, or head-driven) and <b>tailwater</b> level controls; per-edge Wall / Open / Outfall</td></tr>
 <tr><td>The impossible knobs</td><td><b>Slot celerity c</b> (8–400 m/s — the water-hammer stiffness as a slider), bulk wave damping (0 = rings forever), free-slip toggle, gravity off, Smagorinsky C<sub>s</sub>, C<sub>f</sub></td></tr>
-<tr><td>Data logger</td><td>Dev console: <code>APP.probe(x,y)</code>, <code>APP.volume()</code>, <code>APP.sim</code> — for exercises that want clean numbers</td></tr>
+<tr><td>Data logger</td><td>Dev console: <code>APP.probe(x,z)</code>, <code>APP.volume()</code>, <code>APP.sim</code> — for exercises that want clean numbers</td></tr>
 </table></div>
 </div>
 
@@ -306,7 +306,7 @@
 <tr><td>Orifice: <span class="eqi">V = C_v√(2gh)</span>, <span class="eqi">C_d = C_c·C_v</span></td><td class="mark ok">✓</td><td><code>jet</code> scene; overflow lip holds h steady; C<sub>v</sub> ≈ 0.97 measured</td></tr>
 <tr><td>Vena contracta, C<sub>c</sub></td><td class="mark ok">✓</td><td>Visible at the lip. Bonus: 2D free-streamline theory gives C<sub>c</sub> = π/(π+2) = 0.611 for a sharp slot — the model is exactly the 2D case the theory solves</td></tr>
 <tr><td>Borda mouthpiece C<sub>c</sub> = ½</td><td class="mark ok">✓</td><td>Draw a short re-entrant lip on the jet tank (the scene's own tips suggest it)</td></tr>
-<tr><td>Velocity–area gauging (current-meter traverse)</td><td class="mark ok">✓</td><td>Rake gives u(y); students integrate by mid-section rule and check against the column q</td></tr>
+<tr><td>Velocity–area gauging (current-meter traverse)</td><td class="mark ok">✓</td><td>Rake gives u(z); students integrate by mid-section rule and check against the column q</td></tr>
 <tr><td>Float / dye timing</td><td class="mark cav">✓*</td><td>Time a dye-line between stations for mean V; concentration-based dilution gauging is out (dye is a visual tracer)</td></tr>
 <tr><td>Rotameter, electromagnetic, ultrasonic meters</td><td class="mark no">✗</td><td>Hardware; no rigid bodies (limit 4)</td></tr>
 </table></div>
@@ -665,7 +665,7 @@
 <ul style="max-width:80ch">
 <li><b>Same Resolution for everyone</b> in any pooled exercise — delivered friction depends on Δx (limit 5). Put "Resolution: Medium" on the worksheet.</li>
 <li><b>Wait out the spin-up countdown</b> before reading steady values. Most scenes settle in 10–30 s; the slow ones are jet (~55 s), m2 (~90 s) and c13 (~95 s) — these are measured settle times, not padding.</li>
-<li><b>Reading a number:</b> the gauge chart prints its live value; the hover readout gives spot values; for clean digits, <code>APP.probe(x, y)</code> in the dev console, and <code>APP.volume()</code> for storage exercises.</li>
+<li><b>Reading a number:</b> the gauge chart prints its live value; the hover readout gives spot values; for clean digits, <code>APP.probe(x, z)</code> in the dev console, and <code>APP.volume()</code> for storage exercises.</li>
 <li><b>Keep the tab visible</b> — the loop stops when the page is hidden. The speed slider (×0.02–3) is the slow-motion control for transients.</li>
 <li><b>Distribute set-ups</b> as <code>?scene=id</code> links; sandbox rigs travel as a recipe card (coordinates + a screenshot) until change #1 exists. <kbd class="kbd">Z</kbd> undoes a segment, <kbd class="kbd">R</kbd> resets the water without losing the drawing.</li>
 <li><b>The standing rule when students change q:</b> re-check the tailwater against y<sub>c</sub> = (q²/g)<sup>⅓</sup> (printed on the q slider) and keep it ≥ 1.3 y<sub>c</sub>. This is a real hydraulic fact about degenerate boundary controls, so enforcing it is teaching, not admin.</li>

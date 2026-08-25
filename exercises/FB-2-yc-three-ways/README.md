@@ -27,7 +27,7 @@ streamlines curve sharply downward at the lip, the pressure there is not
 hydrostatic, and `y_c = (q²/g)^⅓` — which assumes it is — stops applying. The
 classical figure for the brink depth is 0.715·y_c.
 
-The rig is fixed: bed top face at **y = 0.50 m**, crest top at **y = 0.935 m**
+The rig is fixed: bed top face at **z = 0.50 m**, crest top at **z = 0.935 m**
 and **1.1 m** long, ending exactly at the brink at **x = 7.40 m**, with the
 gauge already sitting mid-crest at **x = 6.85 m**. The display comes up on
 **Froude number**, so the critical transition is visible as a pale/white break

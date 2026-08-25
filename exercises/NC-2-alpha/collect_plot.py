@@ -144,7 +144,7 @@ def main():
                  xy=(2.0, 0), xytext=(2.05, ytop * 0.34), fontsize=6.7, color="#b33",
                  arrowprops=dict(arrowstyle="-", color="#b33", lw=0.6, alpha=0.6))
 
-    axh.set_xlabel(r"energy coefficient $\alpha = \sum u^3\Delta y \,/\, (V^3 h)$")
+    axh.set_xlabel(r"energy coefficient $\alpha = \sum u^3\Delta z \,/\, (V^3 h)$")
     axh.set_ylabel("students")
     axh.set_title(args.title + "\n“assume $\\alpha=1$”, judged")
     axh.set_xlim(0.9, 2.6)

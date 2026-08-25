@@ -45,7 +45,7 @@ next three students take **x = 11, 12 and 13 m**, in that order.
 1. Press `R` and let it reach steady state — about **30 s**; the card counts
    it down. There is nothing to set.
 2. Hover over the water at your station: the top row of the box prints the
-   cursor's own **x, y**, so you can put it exactly on your chainage.
+   cursor's own **x, z**, so you can put it exactly on your chainage.
 3. Read the **surface** row ("… m above datum") off the **M1 profile** box,
    watch it for a few seconds, take the typical value, and submit **x,
    surface elevation**.

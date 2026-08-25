@@ -44,7 +44,7 @@ explain the assignment in class.
 1. Raise **Reservoir level** to your own value — the bench idles with the
    reservoir level equal to the tailwater, so nothing flows until you do.
 2. Drop two gauges — Gauge (`5`) — at **x = 4.0 m** and **x = 8.5 m**, both at
-   **y = 2.20 m**, mid-height in the bore.
+   **z = 2.20 m**, mid-height in the bore.
 3. Press `R` and let it reach steady state — about **22 s**; the card counts
    it down.
 4. Read **H₁** and **H₂** as the value each gauge trace is *centred* on (not

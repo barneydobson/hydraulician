@@ -26,7 +26,7 @@ past the gate and `V = q/y` at each:
 
 with ρ = 1000 kg/m³ and g = 9.81 m/s². The discharge is **q = 0.330 m²/s for
 the whole class** — your opening and its paired reservoir level are the
-personalisation. The bed's top face is at **y = 0.50 m** above the datum and
+personalisation. The bed's top face is at **z = 0.50 m** above the datum and
 the gate stands at **x = 5.50 m**, so your opening is `a` = (gate bottom
 − 0.50). Compute `naive` as well as `F_R`.
 
@@ -48,7 +48,7 @@ explain the assignment in class. Your opening is `a = 5 + round(3d/9)` cells,
 which you draw; the reservoir level beside it is the settled fixed point for
 q = 0.330 at that opening, so it needs no iteration.
 
-| d | opening a | gate bottom, y (m) | Reservoir level (m) |
+| d | opening a | gate bottom, z (m) | Reservoir level (m) |
 |---|---|---|---|
 | 0, 1 | 5 cells (0.109 m) | **0.609** | **1.7565** |
 | 2, 3, 4 | 6 cells (0.130 m) | **0.630** | **1.4181** |
@@ -57,14 +57,14 @@ q = 0.330 at that opening, so it needs no iteration.
 
 ## What to do
 
-1. The gate arrives drawn at the 7-cell opening (bottom at y = 0.652). Adjust
+1. The gate arrives drawn at the 7-cell opening (bottom at z = 0.652). Adjust
    it to your own row — Erase (`2`) to raise the bottom, Wall (`1`) to carry
    it down; zoom in first and set the height with Measure (`8`) against the
    bed's 0.50 m top face.
 2. Set **Reservoir level** to your row. **Inflow q** stays at 0.330 for
    everyone.
 3. Place a gauge — Gauge (`5`) — in the calm pool at **x = 3.5 m**, just above
-   the bed (y ≈ 0.65 m).
+   the bed (z ≈ 0.65 m).
 4. Press `R` and let it reach steady state — about **70 s**; the card counts
    it down. The pool should look flat back to the left edge, with a clean jet
    springing out under the gate.

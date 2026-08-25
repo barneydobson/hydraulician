@@ -2484,7 +2484,7 @@ const GINSP = (() => {
     el.querySelector(".ginsp-dot").style.background = g.colour;
     el.querySelector(".ginsp-name").textContent = "Gauge " + (k + 1);
     el.querySelector(".ginsp-pos").textContent =
-      "x " + g.x.toFixed(2) + " · y " + g.y.toFixed(2) + " m";
+      "x " + g.x.toFixed(2) + " · z " + g.y.toFixed(2) + " m";
     const last = L.length ? L[L.length - 1] : null;
     FIELDS.forEach(([f]) => {
       const V = o.vb[f];
@@ -3226,7 +3226,7 @@ window.APP = {
   clearGaugeHistory,
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
   frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
-  probe: (x, y) => SIM.probe(x, y),
+  probe: (x, z) => SIM.probe(x, z),
   boxForce: (x0, y0, x1, y1) => SIM.boxForce(x0, y0, x1, y1),   // one raw integral
   placeCV,                                 // the Force box tool, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */

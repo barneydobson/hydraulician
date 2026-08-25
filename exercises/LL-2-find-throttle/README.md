@@ -39,8 +39,8 @@ There is no digit on this one. The personalised parameter is **partner A's own
 hidden stroke**, and it is unique to each pair:
 
 - **Severity — 2 or 3 of the bore's 18 cells** (11–17%): a vertical stroke
-  from the pipe invert (y ≈ 2.00 m) up to a top *you* choose between
-  **y = 2.04 and 2.07 m**. One cell is undetectable; four de-pressurises the
+  from the pipe invert (z ≈ 2.00 m) up to a top *you* choose between
+  **z = 2.04 and 2.07 m**. One cell is undetectable; four de-pressurises the
   pipe downstream.
 - **Position — any x from 4.6 to 7.0 m.** Nearer the mouth the entry length
   contaminates the reading; nearer the outlet the tailwater does.
@@ -56,7 +56,7 @@ Write your own (x, height) down privately — you need it for the reveal.
 2. Press `R` and let it reach steady state — about **20 s**; the card counts
    it down.
 3. **Partner B, round 1 (coarse):** four gauges — Gauge (`5`) — at
-   **x = 3.80, 5.20, 6.60, 8.00**, every one at **y = 2.35 m** (near the
+   **x = 3.80, 5.20, 6.60, 8.00**, every one at **z = 2.35 m** (near the
    soffit, always, no exceptions). Read the centred heads after 20 s: a clean
    1.40 m gap drops ≈ 0.07 m, so the gap that drops far more brackets your
    fault. A fifth click bumps the oldest gauge off — that is how you walk them.
@@ -100,7 +100,7 @@ illustrative rather than a measured power law.
 
 The full verification record — how the 2–3 cell severity band and the
 4.6–7.0 m x-band were measured, why the background slope cannot be taken from
-the pipe next to the fault, why every gauge sits at y = 2.35 m, the blind
+the pipe next to the fault, why every gauge sits at z = 2.35 m, the blind
 six-pair location trial and its accuracy, safe bounds and troubleshooting —
 is kept locally, out of version control, at
 `exercises/LL-2-find-throttle/_archive/README-full.md`.

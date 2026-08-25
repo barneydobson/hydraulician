@@ -14,12 +14,12 @@
  * of an uncontrolled one. A hump is then drawn AS A SECOND STROKE stacked on
  * top of the bed slab at mid-reach — see FB1.hump() below.
  *
- *   y=5.0 ┌──────────────────────────────────────────────────────┐
+ *   z=5.0 ┌──────────────────────────────────────────────────────┐
  *         │  air (the two sandbox ledges are ERASED)             │
  *         │                     ▄▄▄▄▄  ← hump, raised in steps    │
  *         │  reservoir pool ~~~▄▄▄▄▄▄▄~~~~~~~~~~~~~~~~~ tailwater │→ level control
- *   y=0.5 ├──────────────────────────────────────────────────────┤  bed top face
- *   y=0.0 └──────────────────────────────────────────────────────┘  solid to floor
+ *   z=0.5 ├──────────────────────────────────────────────────────┤  bed top face
+ *   z=0.0 └──────────────────────────────────────────────────────┘  solid to floor
  *         0          2.5(gauge)  4.0–5.0 (hump)                9.0
  *
  * Every call below is a documented app entry point — nothing here is private:
@@ -30,13 +30,13 @@
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  *
  * MEASURED FACTS THE DEPENDENT DEMOS INHERIT (Medium, 414 × 230, Δx 21.7 mm)
- *   · the bed top face y = 0.50 lands exactly on a cell boundary (23 cells);
+ *   · the bed top face z = 0.50 lands exactly on a cell boundary (23 cells);
  *     0.50 / 0.0217391 = 23.000, so the drawn and rasterised bed agree exactly.
  *     Keep every RIG-B elevation a multiple of Δx and nothing quantises.
- *   · the sandbox's own two ledges (y ≈ 2.0–3.4) must be ERASED — they sit above
+ *   · the sandbox's own two ledges (z ≈ 2.0–3.4) must be ERASED — they sit above
  *     the water here, but they catch spray and ruin a screenshot.
  *   · bottom edge must be WALL (the sandbox default drains) and the bed slab must
- *     be solid all the way to y = 0 — a thin slab leaves a sealed void.
+ *     be solid all the way to z = 0 — a thin slab leaves a sealed void.
  *   · CANONICAL RIG-B PONDS. Bed across the domain + Open right edge + no
  *     tailwater settles to ~1.46 m deep, drowning everything (WE-1 Director
  *     report). FB-1 does NOT avoid this by truncating the bed at a brink (that
@@ -84,7 +84,7 @@ window.RIGB = {
     // user segs in order, so an erase stroke placed first still lands on them)
     APP.SIM.addSeg(0.60, 2.50, 7.20, 2.50, 1.10, 0);
     APP.SIM.addSeg(0.60, 3.20, 7.20, 3.20, 1.10, 0);
-    // bed slab: centreline bed/2, thickness bed → spans y = 0 … bed. Solid to
+    // bed slab: centreline bed/2, thickness bed → spans z = 0 … bed. Solid to
     // the domain floor, and run past the left edge so no end column is left open.
     APP.SIM.addSeg(R.X0, bed / 2, bx1, bed / 2, bed, 255);
     // the control, if this demo has one (FB-1 does not — see FB1.hump instead)
@@ -114,7 +114,7 @@ window.RIGB = {
     APP.state.gauges.length = 0;
     APP.state.gauges.push({ x: x, y: y === undefined ? RIGB.BED + 0.25 : y,
                             hist: [], colour: "#7fd4ff" });
-    APP.state.gaugeField = "depth";
+    APP.state.gaugeField = "d";
     RIGB.XG = x;
   },
 
@@ -146,7 +146,7 @@ window.RIGB = {
 
 /* ============================================================================
  * FB-1 · one student run — "the hump that chokes"
- *   E_s1 = E_s2 + Δz;  choking when Δz > E1 − E_c,  E_c = 1.5·y_c
+ *   E_s1 = E_s2 + Δz;  choking when Δz > E1 − E_c,  E_c = 1.5·d_c
  *
  *   hump: a flat-topped rectangular block, width HUMPW, centred at XHUMP,
  *   drawn as ONE stroke stacked on the bed slab (so ONE Z-undo removes it and
@@ -175,7 +175,7 @@ window.FB1 = {
    *  with q (≈2–7 cm) that a truly independent upstream reservoir would
    *  need is instead absorbed by the reservoir's own soft relaxation
    *  sponge, which is exactly why "measure, don't assume" matters here:
-   *  the achieved y1 (baseline, no hump) is what the class actually reads
+   *  the achieved d1 (baseline, no hump) is what the class actually reads
    *  and uses for E1 — see data/simulated-class.csv. */
   LEVEL: {},
   TW: 1.00,             // fixed tailwater level (elevation, m) — see README
@@ -193,7 +193,7 @@ window.FB1 = {
    *  isolated-uniform-approach assumption). Use this to jump straight near
    *  the true Δz_c instead of bisecting from zero. */
   K_BIAS: 1.90,
-  dzTarget: function (q, y1) { return FB1.K_BIAS * FB1.dzPred(q, y1); },
+  dzTarget: function (q, d1) { return FB1.K_BIAS * FB1.dzPred(q, d1); },
 
   /** Build (or rebuild) the bare channel + tailwater, no hump yet. Records
    *  sim.segs.length AFTER the base build as the floor for hump()'s undo —
@@ -263,14 +263,14 @@ window.FB1 = {
       }
     }
     APP.state.paused = true; APP.frames(2);
-    var hArr = g.hist.map(function (r) { return r.depth; }).sort(function (p, q) { return p - q; });
+    var hArr = g.hist.map(function (r) { return r.d; }).sort(function (p, q) { return p - q; });
     var hMed = hArr[hArr.length >> 1];
     var hMean = hArr.reduce(function (p, q) { return p + q; }, 0) / hArr.length;
     frMax.sort(function (p, q) { return p - q; });
     var frMed = frMax[frMax.length >> 1];
     return { t: +S.t.toFixed(2), n: hArr.length,
-             y1: +hMed.toFixed(4), y1Mean: +hMean.toFixed(4),
-             y1Min: +hArr[0].toFixed(4), y1Max: +hArr[hArr.length - 1].toFixed(4),
+             d1: +hMed.toFixed(4), d1Mean: +hMean.toFixed(4),
+             d1Min: +hArr[0].toFixed(4), d1Max: +hArr[hArr.length - 1].toFixed(4),
              frCrestMed: +frMed.toFixed(3), frCrestMax: +frMax[frMax.length - 1].toFixed(3) };
   },
 
@@ -288,13 +288,13 @@ window.FB1 = {
     return m;
   },
 
-  /** y_c and E1 from a measured baseline (q, y1) — the class's own protocol. */
-  yc: function (q) { return Math.pow(q * q / 9.81, 1 / 3); },
-  E1: function (q, y1) { return y1 + (q * q) / (2 * 9.81 * y1 * y1); },
-  dzPred: function (q, y1) { return FB1.E1(q, y1) - 1.5 * FB1.yc(q); },
+  /** d_c and E1 from a measured baseline (q, d1) — the class's own protocol. */
+  dc: function (q) { return Math.pow(q * q / 9.81, 1 / 3); },
+  E1: function (q, d1) { return d1 + (q * q) / (2 * 9.81 * d1 * d1); },
+  dzPred: function (q, d1) { return FB1.E1(q, d1) - 1.5 * FB1.dc(q); },
 
   /** One whole digit's worth of the demo, fresh: FB1.student(6) → baseline
-   *  E1/y_c/Δz_pred, then jumps the hump straight to the measured K_BIAS
+   *  E1/d_c/Δz_pred, then jumps the hump straight to the measured K_BIAS
    *  target (skipping the worksheet's own step-by-step climb, which is what
    *  the WORKSHEET protocol is for — this is the fast "measure the class"
    *  path used to build data/simulated-class.csv) and reports the choke
@@ -305,26 +305,26 @@ window.FB1 = {
     FB1.buildBase(q, lv, FB1.TW);
     FB1.settle(baseSecs === undefined ? 45 : baseSecs);
     var base = FB1.record(6);
-    var dzPred = FB1.dzPred(q, base.y1);
-    var dzTarget = FB1.dzTarget(q, base.y1);
+    var dzPred = FB1.dzPred(q, base.d1);
+    var dzTarget = FB1.dzTarget(q, base.d1);
     var cells = Math.round(dzTarget / APP.sim.dx);
     var hc = FB1.hump(+(cells * APP.sim.dx).toFixed(4));
     FB1.settle(humpSecs === undefined ? 30 : humpSecs);
     var choked = FB1.record(7);
     return { d: d, q: q, level: lv, tw: FB1.TW,
-             y1: base.y1, yc: +FB1.yc(q).toFixed(4), E1: +FB1.E1(q, base.y1).toFixed(4),
+             d1: base.d1, dc: +FB1.dc(q).toFixed(4), E1: +FB1.E1(q, base.d1).toFixed(4),
              dzPred: +dzPred.toFixed(4), dzc: hc.dzRasterised, dzcCells: hc.cells,
              frCrestMed: choked.frCrestMed, frCrestMax: choked.frCrestMax,
-             y1Choked: choked.y1 };
+             d1Choked: choked.d1 };
   },
 };
 /* MEASURED, this machine, Medium (414 × 230, Δx 0.02174 m, Δt 3.494e-4 s):
    q = 0.15 + 0.05·d, reservoir level = tailwater level = 1.00 m (fixed).
-   Baseline (no hump) y1 ranges 0.499 (d=0) to 0.532 m (d=8); margin over
-   critical (y1/y_c) 3.78 → 1.70, comfortably above the 1.3–1.5·y_c rule
+   Baseline (no hump) d1 ranges 0.499 (d=0) to 0.532 m (d=8); margin over
+   critical (d1/d_c) 3.78 → 1.70, comfortably above the 1.3–1.5·d_c rule
    at every digit. Δz_c ≈ 1.90 × Δz_pred, tight (ratio 1.87–1.94) across
    the whole class — see data/simulated-class.csv and README §4/§5 for the
    full table, the physical reason for the bias, and the d=0 (q=0.10)
    robustness failure that set the range's floor. Example:
-   FB1.student(4) -> q=0.35, y1≈0.517, yc=0.232, E1≈0.540, dzPred≈0.193,
+   FB1.student(4) -> q=0.35, d1≈0.517, dc=0.232, E1≈0.540, dzPred≈0.193,
                      dzc measured ≈17 cells (0.370 m), crest Fr ≈1.0 there. */

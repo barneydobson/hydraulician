@@ -56,7 +56,7 @@ what the meter sees.
    (2.4, 0.85) and the throat at (5.0, 0.85). Each card prints a live **h**,
    the piezometric head.
 4. Take Δh = barrel **h** − throat **h**, hover the barrel run (x ≈ 2.0–3.2 m)
-   and read the **`q`** row — ignore the `y_c` and profile rows beside it, they
+   and read the **`q`** row — ignore the `d_c` and profile rows beside it, they
    are an open-channel readout and mean nothing in a full pipe — and submit
    **q, dHead**.
 

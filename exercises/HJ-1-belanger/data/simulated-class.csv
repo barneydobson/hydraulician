@@ -2,10 +2,10 @@
 # live WebGL context (not the agent browser pane). See README.md Appendix A
 # for the run protocol (settle time, median-window sampling) and per-row notes.
 # Rule: q = 0.42 + 0.03*d  (d = last digit of student number, 0-9)
-# Tailwater: apron (0.15 m) + 1.3*y_c, except d=6 and d=9 which needed 1.5*y_c
+# Tailwater: apron (0.15 m) + 1.3*d_c, except d=6 and d=9 which needed 1.5*d_c
 # to damp the pumping oscillation CLAUDE.md documents for drowned-adjacent
 # tailwaters (see Appendix A).
-student,digit,scene,q,tail,y1,y2,Fr1,y2_over_y1,dE,source
+student,digit,scene,q,tail,d1,d2,Fr1,d2_over_d1,dE,source
 S00,0,h23,0.42,0.490,0.168,0.394,2.40,2.35,0.065,measured
 S01,1,h23,0.45,0.507,0.168,0.436,2.05,2.60,0.082,measured
 S02,2,h23,0.48,0.522,0.190,0.444,1.82,2.34,0.044,measured

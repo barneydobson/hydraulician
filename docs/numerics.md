@@ -3,6 +3,7 @@
 How the solver gets from the multiphase Navier–Stokes equations in the vertical
 plane to the two GPU passes it actually integrates.
 
+[Notation](#notation) ·
 [Governing equations](#1-governing-equations) ·
 [Physics → model](#2-from-physics-to-a-solvable-model) ·
 [Closure](#3-closure-weak-compressibility-a-2d-preissmann-slot) ·
@@ -12,6 +13,19 @@ plane to the two GPU passes it actually integrates.
 [Boundaries](#6-boundaries) ·
 [Limits](#7-what-is-not-represented) ·
 [References](#references)
+
+---
+
+## Notation
+
+Symbols follow the register in [notation.md](notation.md), which also carries
+the motivation — the depth and head communities disagree about `h`, and the
+app follows the Battjes & Labeur (Delft) set. The short form used throughout
+this document: `x`, `z` coordinates (`z = 0` at the domain floor, bed at
+`z_b`); velocity `u = (u, w)`, depth-average `V`; depth `d` with `d_c`, `d_n`,
+`d₁`, `d₂`; water level `η = z_b + d`; piezometric head `h = z + p/ρg`;
+energy head `H = h + αV²/2g`; specific energy `E = H − z_b`; pressure head
+always spelled `p/ρg`.
 
 ---
 
@@ -602,7 +616,7 @@ the roughness slider.** Consequently normal depth and `n` are *measured* off the
 computed energy grade line rather than derived from `C_f`:
 
 ```math
-y_n = h\left(S_f/S_0\right)^{1/3} \qquad n = h^{2/3}\sqrt{S_f}\,/\,V
+d_n = h\left(S_f/S_0\right)^{1/3} \qquad n = h^{2/3}\sqrt{S_f}\,/\,V
 ```
 
 ## 6. Boundaries

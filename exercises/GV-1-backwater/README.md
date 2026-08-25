@@ -75,7 +75,7 @@ shaded.
 ### Discussion points
 
 - **Why is the agreement this good?** The pool is deep relative to normal
-  depth (`h/y_n` ≈ 2–3), so the friction slope measures ~0.0004 against
+  depth (`h/d_n` ≈ 2–3), so the friction slope measures ~0.0004 against
   `S₀ = 0.0147` — under 3% of it. The GVF equation nearly degenerates to
   `dy/dx ≈ S₀`: the depth grows at exactly the rate the bed falls, and the
   surface comes out flat almost by construction. That is why an M1 pool

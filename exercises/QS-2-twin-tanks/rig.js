@@ -56,7 +56,7 @@ window.QS2 = {
     C("cs").set(P.cs);                    // pipe roughness — see the header
     C("openL").set("0"); C("openR").set("0");
     C("openB").set("0"); C("openT").set("0");
-    C("gaugeField").set("head");
+    C("gaugeField").set("h");
     C("mode").set("0");
     SIM.clearSegs();
 
@@ -135,7 +135,7 @@ window.QS2 = {
    *  Wall. Nothing here needs the spout or a hand-judged level. */
   fill(maxSec) {
     const P = QS2.P, C = QS2.C;
-    const el = (k) => state.gauges[k].y + APP.probe(state.gauges[k].x, state.gauges[k].y).head;
+    const el = (k) => state.gauges[k].y + APP.probe(state.gauges[k].x, state.gauges[k].y).phead;
     const small = Math.round(0.25 / APP.SIM.dt()), chunk = Math.round(4 / APP.SIM.dt());
     // ONE reservoir setting does the whole fill. Valve open, level at `hi`:
     // tank 1 fills straight from the boundary and is then HELD at hi, while
@@ -165,7 +165,7 @@ window.QS2 = {
   /** Free-surface elevation in each tank, read the way a gauge reads it. */
   levels() {
     const P = QS2.P, g = state.gauges;
-    const el = (k) => +(g[k].y + APP.probe(g[k].x, g[k].y).head).toFixed(4);
+    const el = (k) => +(g[k].y + APP.probe(g[k].x, g[k].y).phead).toFixed(4);
     return JSON.stringify({ t: +APP.sim.t.toFixed(2), h1: el(0), h2: el(1),
                             dh: +(el(0) - el(1)).toFixed(4) });
   },
@@ -203,7 +203,7 @@ window.QS2 = {
     const g1 = state.gauges[0].hist, g2 = state.gauges[1].hist;
     const n = Math.min(g1.length, g2.length);
     const T = [], D = [];
-    for (let k = 0; k < n; k++) { T.push(g1[k].t - QS2.t0); D.push(g1[k].head - g2[k].head); }
+    for (let k = 0; k < n; k++) { T.push(g1[k].t - QS2.t0); D.push(g1[k].h - g2[k].h); }
     // Release value: the STILL difference read just before the valve opened.
     // The first tenth of a second after it opens carries a pressure transient
     // (the gauge cards spike) that depresses the difference by ~1%, which is
@@ -231,7 +231,7 @@ window.QS2 = {
     const g1 = state.gauges[0].hist, g2 = state.gauges[1].hist;
     const n = Math.min(g1.length, g2.length), out = [];
     for (let k = 0; k < n; k += (every || 15))
-      out.push([+(g1[k].t - QS2.t0).toFixed(3), +g1[k].head.toFixed(4), +g2[k].head.toFixed(4)]);
+      out.push([+(g1[k].t - QS2.t0).toFixed(3), +g1[k].h.toFixed(4), +g2[k].h.toFixed(4)]);
     return JSON.stringify(out);
   },
 

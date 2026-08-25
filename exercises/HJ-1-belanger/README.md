@@ -1,7 +1,7 @@
 # HJ-1 · Bélanger from a room full of flumes
 
 Every student runs the same hydraulic jump at their own discharge, reads three
-numbers off the jump box, and posts (Fr₁, y₂/y₁). Pooled on one axis the
+numbers off the jump box, and posts (Fr₁, d₂/d₁). Pooled on one axis the
 class's points trace the Bélanger curve — a momentum balance that none of them
 solved individually, drawn by twenty laptops at once. A few volunteers then
 take the same jump onto a 1-in-4 bed, where their points fall visibly below
@@ -18,9 +18,9 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 A jump is a *momentum* balance across the roller, not an energy one, so the
 depth ratio across it depends on nothing but the Froude number arriving:
 
-    y₂/y₁ = ½·(√(1 + 8·Fr₁²) − 1)        ΔE = (y₂ − y₁)³ / 4·y₁·y₂
+    d₂/d₁ = ½·(√(1 + 8·Fr₁²) − 1)        ΔE = (d₂ − d₁)³ / 4·d₁·d₂
 
-That is why y₂/y₁ needs only Fr₁, and why ΔE is a leftover rather than an
+That is why d₂/d₁ needs only Fr₁, and why ΔE is a leftover rather than an
 input. The scene is a chute onto a flat apron; the apron's bed sits at
 **0.15 m** above the domain floor, and the tailwater levels below are
 **elevations above that floor**, not depths over the bed — the panel prints
@@ -31,13 +31,13 @@ both.
 **d** is the **last digit of your student number** — your lecturer will
 explain the assignment in class. Set **Inflow q** to `q = 0.42 + 0.03·d`, and
 the **Tailwater level** to the row that goes with it. The tailwater is
-1.3·y_c above the apron, except at d = 6 and d = 9 where it is 1.5·y_c; the q
-slider prints your own y_c, so the pairing is yours to check.
+1.3·d_c above the apron, except at d = 6 and d = 9 where it is 1.5·d_c; the q
+slider prints your own d_c, so the pairing is yours to check.
 
 | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **q (m²/s)** | 0.42 | 0.45 | 0.48 | 0.51 | 0.54 | 0.57 | 0.60 | 0.63 | 0.66 | 0.69 |
-| **y_c (m)** | 0.262 | 0.274 | 0.286 | 0.298 | 0.310 | 0.321 | 0.332 | 0.343 | 0.354 | 0.365 |
+| **d_c (m)** | 0.262 | 0.274 | 0.286 | 0.298 | 0.310 | 0.321 | 0.332 | 0.343 | 0.354 | 0.365 |
 | **tailwater (m)** | 0.490 | 0.507 | 0.522 | 0.538 | 0.553 | 0.567 | 0.648 | 0.596 | 0.610 | 0.700 |
 
 ## What to do
@@ -47,15 +47,15 @@ slider prints your own y_c, so the pairing is yours to check.
    it down.
 3. Watch the orange **HYDRAULIC JUMP** box on the apron for ~10 s and take a
    typical middle reading rather than a peak, then submit **Fr₁** and
-   **y₂/y₁** (with your `d` and `q`).
+   **d₂/d₁** (with your `d` and `q`).
 
 Also, for the coda volunteers: switch to scene **s1** (Scenes menu) for the
 same jump on a 1-in-4 bed at tailwater 0.95 / 1.00 / 1.05 m, and submit that
-point too — expect y₂ well under Bélanger.
+point too — expect d₂ well under Bélanger.
 
 ## For the instructor — pooling the class
 
-Collect one row per student (`student,digit,scene,q,tail,Fr1,y2_over_y1`),
+Collect one row per student (`student,digit,scene,q,tail,Fr1,d2_over_d1`),
 export the CSV and run:
 
 ```bash

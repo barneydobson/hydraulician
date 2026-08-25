@@ -15,10 +15,10 @@ exercises/ that the lecturer can pick up and run cold in a lecture hall.
   solver is deterministic, so a submission can be spot-checked by re-running;
   copying a neighbour mismatches your own digit.
 - The pooled class plot (lecturer collects the Blackboard CSV) is the payoff —
-  e.g. eleven (Fr₁, y₂/y₁) points tracing the Bélanger curve.
+  e.g. eleven (Fr₁, d₂/d₁) points tracing the Bélanger curve.
 - Standing rules that go on every worksheet: everyone on Resolution: Medium;
   wait out the spin-up countdown; keep the tab visible (sim pauses hidden);
-  after changing q, re-check any tailwater ≥ 1.3·y_c with y_c = (q²/g)^⅓
+  after changing q, re-check any tailwater ≥ 1.3·d_c with d_c = (q²/g)^⅓
   (printed on the q slider).
 
 ## Hard rules

@@ -6,13 +6,13 @@ Usage:
     python3 collect_plot.py class.csv [-o plots/pooled-demo.png]
 
 Input CSV (Blackboard export, or data/simulated-class.csv):
-    student,digit,q,tail,Fr1,y2_over_y1[,y1,y2,dE,source]
+    student,digit,q,tail,Fr1,d2_over_d1[,d1,d2,dE,source]
 
-Only `Fr1` and `y2_over_y1` are needed for the payoff plot; every other
+Only `Fr1` and `d2_over_d1` are needed for the payoff plot; every other
 column is optional and is used for the side panels / colouring if present.
 
 The plot: each student's single point against the Belanger curve
-    y2/y1 = 0.5 * (sqrt(1 + 8*Fr1^2) - 1)
+    d2/d1 = 0.5 * (sqrt(1 + 8*Fr1^2) - 1)
 plus, if scene=s1 rows are present, the steep-bed coda points, which must
 fall BELOW the curve (a 1-in-4 bed has a weight component that the
 horizontal-bed momentum balance ignores).
@@ -50,11 +50,11 @@ def read_rows(path):
     for row in csv.DictReader(lines):
         row = { (k or "").strip(): (v if v is not None else "") for k, v in row.items() }
         fr = fnum(row, "Fr1")
-        ratio = fnum(row, "y2_over_y1")
+        ratio = fnum(row, "d2_over_d1")
         if ratio is None:
-            y1, y2 = fnum(row, "y1"), fnum(row, "y2")
-            if y1 and y2:
-                ratio = y2 / y1
+            d1, d2 = fnum(row, "d1"), fnum(row, "d2")
+            if d1 and d2:
+                ratio = d2 / d1
         if fr is None or ratio is None:
             continue
         row["_Fr1"], row["_ratio"] = fr, ratio
@@ -72,7 +72,7 @@ def main():
 
     rows = read_rows(args.csvfile)
     if not rows:
-        sys.exit("no usable rows (need Fr1 and y2_over_y1, or y1 and y2)")
+        sys.exit("no usable rows (need Fr1 and d2_over_d1, or d1 and d2)")
 
     flat = [r for r in rows if r["_scene"] != "s1"]
     steep = [r for r in rows if r["_scene"] == "s1"]
@@ -87,7 +87,7 @@ def main():
         gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08})
 
     ax.plot(xs, [belanger(x) for x in xs], "-", color="#3b6ea5", lw=2,
-            label=r"Belanger  $y_2/y_1=\frac{1}{2}\left(\sqrt{1+8Fr_1^2}-1\right)$")
+            label=r"Belanger  $d_2/d_1=\frac{1}{2}\left(\sqrt{1+8Fr_1^2}-1\right)$")
     ax.plot(xs, [0.95 * belanger(x) for x in xs], "--", color="#9bb7d4", lw=1,
             label="-5% reference (measured class mean is +3.2%)")
 
@@ -114,7 +114,7 @@ def main():
             ax.annotate(name, (r["_Fr1"], r["_ratio"]), textcoords="offset points",
                         xytext=(7, -3), fontsize=7, color="#44546a")
 
-    ax.set_ylabel(r"measured  $y_2/y_1$")
+    ax.set_ylabel(r"measured  $d_2/d_1$")
     ax.set_title(args.title)
     ax.grid(alpha=0.25)
     ax.legend(loc="upper left", fontsize=8, framealpha=0.95)

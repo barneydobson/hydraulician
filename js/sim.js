@@ -452,13 +452,14 @@ const SIM = (() => {
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
   }
 
-  /** One cell: {f, dye, u, v, p, head}. Used by gauges and the hover readout.
-   *  `head` is the PRESSURE head p/ρg alone — no elevation term. In hydrostatic
-   *  water that is simply the submergence below the local free surface, so it
-   *  carries a unit vertical gradient everywhere wet and is not comparable
-   *  between cells at different heights. The piezometric head is h = z + p/ρg;
-   *  add the elevation yourself (see the gauge sampler in main.js). The name is
-   *  kept because `APP.probe()` is a public surface used by headless rigs. */
+  /** One cell: {f, dye, u, v, p, phead}. Used by gauges and the hover readout.
+   *  `phead` is the PRESSURE head p/ρg alone — no elevation term. In
+   *  hydrostatic water that is simply the submergence below the local free
+   *  surface, so it carries a unit vertical gradient everywhere wet and is not
+   *  comparable between cells at different heights. The piezometric head is
+   *  h = z + p/ρg; add the elevation yourself (see the gauge sampler in
+   *  main.js). Renamed from `head` with rig format v2 — the old name kept
+   *  being read as piezometric, which it never was. */
   function probe(x, z) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
@@ -468,7 +469,7 @@ const SIM = (() => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const g = Math.abs(S.p.g) || 9.81;
-    return { i, j, f: S.pxBuf[0], u, v, p, head: p / g, speed: Math.hypot(u, v),
+    return { i, j, f: S.pxBuf[0], u, v, p, phead: p / g, speed: Math.hypot(u, v),
              solid: S.mask[j * S.nx + i] };
   }
 

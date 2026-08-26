@@ -8,8 +8,9 @@ One row per student: student_id,digit,level_m,c1_m,c2_m,c3_m,c4_m,c5_m
 (level_m and any extra columns are carried but not needed for the test.)
 
 Friction ∝ u² takes Δc ∝ c² out of the surge per cycle, so 1/c climbs in equal
-steps. One line per student, 1/c against crest number: straight lines, and
-near-parallel, because the slope belongs to the rig rather than to the digit.
+steps of 4/(3Y) — Y being lA/(2gkA_s) from the lectures' closed form. One line
+per student, 1/c against crest number: straight, and near-parallel, because Y
+belongs to the rig rather than to the digit.
 """
 import argparse
 import csv
@@ -60,19 +61,20 @@ def main():
         sys.exit("no usable rows in %s" % a.csv)
     rows.sort(key=lambda d: str(d["digit"]))
 
-    print("  d  level   crests (m)                    slope 1/c   R2")
+    print("  d  level   crests (m)                    slope 1/c   R2       Y (m)")
     for d in rows:
         ns = list(range(1, len(d["c"]) + 1))
         d["slope"], d["r2"] = fit(ns, [1.0 / v for v in d["c"]])
-        print("  %-2s %5s   %-28s  %.3f       %.4f"
+        d["Y"] = 4.0 / (3.0 * d["slope"])        # crest step is 4/(3Y)
+        print("  %-2s %5s   %-28s  %.3f       %.4f   %.2f"
               % (d["digit"], d["level"], " ".join("%.2f" % v for v in d["c"]),
-                 d["slope"], d["r2"]))
+                 d["slope"], d["r2"], d["Y"]))
     n = len(rows)
-    sl = [d["slope"] for d in rows]
+    Ys = [d["Y"] for d in rows]
     print("\n  R2 of 1/c against n : %.4f mean, %.4f worst"
           % (sum(d["r2"] for d in rows) / n, min(d["r2"] for d in rows)))
-    print("  slope               : %.3f .. %.3f m^-1 — the rig's, not the digit's"
-          % (min(sl), max(sl)))
+    print("  Y = 4/(3*slope)     : %.2f .. %.2f m, mean %.2f — the rig's, not the digit's"
+          % (min(Ys), max(Ys), sum(Ys) / n))
 
     fig, ax = plt.subplots(figsize=(6.4, 4.6))
     for d in rows:

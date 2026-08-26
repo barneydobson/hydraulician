@@ -51,10 +51,26 @@ The reciprocal is worth recognising on sight: it is the coordinate that
 straightens any quadratic drag — a coasting cyclist, a spun-down flywheel —
 because "loss ∝ the square of what is left" is the same statement each time.
 A friction ∝ u would take a fixed *fraction* per cycle instead, and want log c.
-The size of the step scales with k, so a lossier tee tilts the line steeper.
 
-Note what is not in any of this: no penstock length, no bore, no shaft width,
-no v₀. Five numbers off one trace are enough.
+### The slope is Y
+
+The shape is only half of it. Solving the ODE — the result quoted in lectures —
+gives
+
+    u² = C·e^(z/Y) + (1/k)(z + Y),        Y = l·A / (2g·k·A_s)
+
+Put u = 0 at each end of a swing and C drops out, leaving the two heights
+related in units of Y and nothing else; chain the upswing to the downswing
+(friction reverses, so Y changes sign with it) and the crest-to-crest step is
+
+    Δ(1/c) = 4 / (3Y)          so      Y = 4 / (3 × slope)
+
+The straight line therefore *measures* the constant in that solution. The 4/3
+is the gentle-surge limit, but it is worth 1% out to c₁ = 0.8·Y and this rig
+runs at c₁ ≈ 0.4·Y, so take it as exact. Expect **Y ≈ 6 m**.
+
+None of this asks you for the penstock length, the bore, the shaft width or
+v₀. Five numbers off one trace measure Y, and Y carries all four.
 
 ## Your reservoir level
 
@@ -76,10 +92,10 @@ metres, set on the **Reservoir level** slider. Nothing is drawn.
    steady value of its **d** trace as **h₀**.
 4. Press `V` to slam the valve. Let it swing five times, then pause (**space**).
 5. Read the five crest heights above h₀ as **c₁ … c₅** — about 2.5, 1.7, 1.2,
-   1.0 and 0.8 m. Work out 1/c for each and check the steps between them.
-   Submit the five crests.
+   1.0 and 0.8 m. Work out 1/c for each, check the steps between them are
+   equal, and take your **Y = 4 / (3 × step)**. Submit the five crests.
 
-Expect steps of about 0.2 m⁻¹, the same all the way down.
+Expect steps of about 0.2 m⁻¹, the same all the way down, and Y ≈ 6 m.
 
 ## For the instructor — pooling the class
 
@@ -96,11 +112,16 @@ every one of the ten digits comes out straight to R² = 0.993–0.999, so no
 student gets the wrong verdict.
 
 Worth pointing out when the lines go up: they are close to **parallel** —
-slopes 0.20 to 0.24 m⁻¹ across the whole ladder. The digit sets how big a
-surge you start with, but the slope belongs to the rig (k and the geometry),
-not to how hard you drove it. What little trend there is runs the other way
-from the guess — a higher reservoir stands a longer column of water in the
-shaft, and that extra inertia slows the decay per cycle slightly.
+slopes 0.20 to 0.24 m⁻¹, so Y = 5.6 to 6.8 m across the whole ladder. The
+digit sets how big a surge you start with; Y belongs to the rig, and the class
+has just measured the same constant ten independent ways. What little trend
+there is runs the other way from the guess — a higher reservoir stands a
+longer column of water in the shaft, and that extra inertia slows the decay
+per cycle slightly.
+
+The follow-up, if you want one: Y = lA/(2gkA_s) inverts to k, and k is the
+number the design example in lectures needs. It comes out several times larger
+than the h₀ drawdown implies — see the first discussion point.
 
 ### Discussion points
 

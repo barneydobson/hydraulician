@@ -548,24 +548,27 @@ const EXERCISES = [
   },
   {
     id: "UN-3",
-    title: "Surge tank: measure y_max against the ODE",
+    title: "Surge tank: is the damping u²?",
     topic: "Water hammer",
     folder: "UN-3-surge-tank",
     scene: "hammer",
     rig: "UN-3",
-    // Wave damping 0.03 and the 12.0 m reservoir are the rig's own; the Depth
-    // channel and ×2 speed are how the mass oscillation is readable at all.
+    // Wave damping 0.03 is the rig's own; the Depth channel and ×2 speed are
+    // how the mass oscillation is readable at all. inLevel here is the d = 5
+    // rung of the digit ladder — the student sets their own.
     rigParams: { budget: "Medium", inLevel: 12.0, bulk: 0.03, cel: 70 },
-    rigWhy: { inLevel: "the scene default of 25 m fails containment: 31.7 m of head at b_s ≈ 1 m.",
+    rigWhy: { inLevel: "the scene default of 25 m fails containment; the ladder runs 10.0–13.6 m.",
               bulk: "the shipped value: 0.30 throttles the nozzle by 33% and corrupts the decay.",
               view: "Depth, because the Head channel's ±6 m Joukowsky wave buries the 3 m mass oscillation." },
     viewParams: { gaugeField: "depth", speed: 2 },
-    digitNote: "your standpipe width is DRAWN: b_s = 0.70 + 0.14·d m, and it is the DELIVERED width you record",
+    digit: { label: "reservoir level", control: "inLevel", base: 10.0, step: 0.4,
+             unit: "m", rule: "level = 10.0 + 0.4·d" },
+    digitNote: "your reservoir level is a SLIDER, not a drawing — level = 10.0 + 0.4·d metres",
     instruments: [
-      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, y ≈ 6 m", why: "the mass oscillation — y_max is its first crest minus h₀" },
+      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, y ≈ 6 m", why: "the mass oscillation — the crests are read off its Depth trace" },
     ],
-    start: "the penstock with nozzle, tee and standpipe already built — the shaft width is yours",
-    task: "Redraw the standpipe shaft to your own width and gauge it, then slam the valve and read y_max (first crest minus h₀) and the crest-to-crest period T off the Depth trace.",
+    start: "the penstock with nozzle, tee and standpipe already built — only the reservoir level is yours",
+    task: "Set your reservoir level, note the steady shaft level h₀, then slam the valve and read the first five crest heights above h₀. Equally spaced 1/c means friction ∝ u²; a constant ratio would mean ∝ u.",
     settle: 100,
   },
   {

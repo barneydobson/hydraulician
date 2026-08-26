@@ -649,8 +649,8 @@ const EXERCISE_RIG_NOTES = {
     how: "Wall tool, one vertical stroke (brush 0.10) at x = 3.60 + A2, floor to y ~ 3.2 — tank 2's far wall is the personalised dimension.",
   },
   "UN-3": {
-    control: "standpipe width b_s = 0.70 + 0.14·d metres (the payload ships b_s = 0.98, d = 2)",
-    how: "Erase a hole in the pipe soffit with a short vertical stroke at x = 53.0 from y = 4.9 to y = 6.6 with the brush widened to your b_s, then Wall-tool Shift-drag the two shaft walls at x = 53.0 -/+ (b_s/2 + 0.15) from y = 4.9 up to y = 29.6.",
+    control: "reservoir level = 10.0 + 0.4·d metres (the payload ships 12.0, d = 5)",
+    how: "Set the Reservoir level slider, then press R. Nothing is drawn — the standpipe ships built and is the same for everyone.",
   },
   "B10": {
     control: "crest soffit elevation z_c — lifted step by step until the pipe separates (the payload ships the FLAT pipe, no crest)",

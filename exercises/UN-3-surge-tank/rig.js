@@ -117,7 +117,10 @@
     // Gauge history is filled by tickFrame only (APP.frames), never APP.tick,
     // and it is a 900-sample ring buffer: 45 sim-s at dt = 1/20.
     slam: function (rec, dt) {
-      dt = dt || 1 / 20; rec = rec || 44;
+      // 10 Hz, not 20: the gauge ring is 900 samples, so 20 Hz caps the record
+      // at 45 s and the mass oscillation is ~10 s. 10 Hz buys 90 s = six crests,
+      // and the crests are broad enough that 0.1 s costs nothing.
+      dt = dt || 1 / 10; rec = rec || 70;
       APP.state.paused = false;
       var g = APP.state.gauges[0], bed = 2.0642, k;
       // The gauge's depth channel is OVERLAY.analyse's 10 %/call EMA, and
@@ -159,16 +162,20 @@
                peaks: pk.map(function (p) { return [+p[0].toFixed(2), +(p[1] - rest).toFixed(3)]; }) };
     },
 
-    // one complete student run
-    student: function (bs, opts) {
+    // One complete student run. The personalised parameter is the RESERVOIR
+    // LEVEL (a slider) — the shaft is the same for everyone, because redrawing
+    // it was the slowest step in the demo and the test does not need it.
+    student: function (level, opts) {
       opts = opts || {};
-      var c = this.setup(bs, opts);
+      var c = this.setup(opts.bs || 0.98, { level: level });
       if (!c.ok) return { error: "rig not sealed", check: c };
       this.settle(opts.settle || 100);
-      var r = this.slam(opts.rec || 44);
-      r.bs = c.bs_delivered;
-      r.T_theory = +(2 * Math.PI * Math.sqrt(this.L * r.bs / (9.81 * this.BP))).toFixed(3);
-      r.ymax_bound = +(r.v0 * Math.sqrt(this.L * this.BP / (9.81 * r.bs))).toFixed(3);
+      var r = this.slam(opts.rec);
+      r.level = level;
+      // Crest heights above the resting level — the five numbers the brief asks
+      // for. 1/c linear in n is the u^2 law; c_{n+1}/c_n constant is the u law.
+      r.crests = r.peaks.filter(function (p) { return p[1] > 0.25; })
+                        .slice(0, 6).map(function (p) { return p[1]; });
       return r;
     }
   };

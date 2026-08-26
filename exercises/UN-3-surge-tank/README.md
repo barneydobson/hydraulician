@@ -13,10 +13,11 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 
 ## Theory
 
-Rigid column in the penstock, free surface in the shaft, friction ∝ u² — the
-u²–y equation from lectures:
+Rigid column in the penstock, free surface in the shaft, friction ∝ u². z is
+the shaft level below the reservoir, so this is the equation lectures write as
+u²–y:
 
-    (l/g)·du/dt = y − k·u|u|          dy/dt = −(A/A_s)·u
+    (l/g)·du/dt = z − k·u|u|          dz/dt = −(A/A_s)·u
 
 Write it for the successive crest heights c₁, c₂, c₃ … above the resting
 level and one consequence falls out that you can check on a calculator:
@@ -77,12 +78,12 @@ no student gets the wrong verdict.
   decay. In steady running no water flows up the shaft; after the slam all of
   it does, through a tee that contracts to a third of the bore. The damping is
   that entry loss, not penstock friction — a throttled surge tank by accident.
-- **The tank did not abolish the water hammer.** Switch Gauges to Head and slam
-  again: the roughly 3 s Joukowsky wave is still there, swinging about 6 m each
-  way, because this tank's area is only 0.33 of the pipe's (a real one runs
-  10–50). Reading the Depth channel is what filters it out. It also costs you
-  the first crest — c₁ comes in low, which is why the straight line is fitted
-  through all five and not anchored on c₁.
+- **The tank did not abolish the water hammer.** Switch Gauges to the **h**
+  channel and slam again: the roughly 3 s Joukowsky wave is still there,
+  swinging about 6 m each way, because this tank's area is only 0.33 of the
+  pipe's (a real one runs 10–50). Reading **d** instead is what filters it out.
+  It also costs you the first crest — c₁ comes in low, which is why the
+  straight line is fitted through all five and not anchored on c₁.
 
 The full verification record is kept locally, out of version control, at
 `exercises/UN-3-surge-tank/_archive/README-full.md`.

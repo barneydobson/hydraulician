@@ -21,7 +21,7 @@ const OVERLAY = (() => {
   // line, S_f = −dE/dx. Any quadratic drag law gives S_f ∝ q²/h³ at fixed q,
   // so the depth at which S_f would equal the bed slope is
   //
-  //     y_n = h · (S_f / S₀)^⅓
+  //     d_n = h · (S_f / S₀)^⅓
   //
   // and Manning's n follows from its own definition, n = h^⅔ √S_f / V. Both
   // are then guaranteed consistent with whatever the solver is really doing.
@@ -42,7 +42,7 @@ const OVERLAY = (() => {
   }
 
   /** Surface-profile class at one column: letter (bed slope) + zone (1/2/3).
-   *  The C band is ±5% — y_n is measured off the energy line, and a tighter
+   *  The C band is ±5% — d_n is measured off the energy line, and a tighter
    *  band makes a genuinely critical reach flicker between M and S. */
   function classify(h, yn, yc, S0) {
     let letter;
@@ -110,7 +110,7 @@ const OVERLAY = (() => {
     // sheet is in free fall and the reduction's "bed" is merely wherever the
     // falling water happens to reach — so the guard band above, which only
     // clears a fixed distance either side of the lip, still left a confident
-    // M3 hanging over the whole waterfall (and fed those columns into the y_n
+    // M3 hanging over the whole waterfall (and fed those columns into the d_n
     // median). The discriminator is the solid mask: a channel column has a
     // wall directly under its lowest wet cell, a falling nappe does not.
     // That test is also the honest answer to "is there water here at all?",
@@ -192,11 +192,11 @@ const OVERLAY = (() => {
       if (ok[i] && out.h[i] > 4 * dx) out.n[i] = manning(out.h[i], out.V[i], Sf);
     }
 
-    // --- normal depth from y_n = h·(S_f/S₀)^⅓.
+    // --- normal depth from d_n = h·(S_f/S₀)^⅓.
     //
     //     Fitting that per column is far too noisy: in a backwater curve S_f is
     //     small and every wobble in the energy line moves the answer. But
-    //     y_n·S₀^⅓ = h·S_f^⅓ contains no S₀ at all, so a robust median of THAT
+    //     d_n·S₀^⅓ = h·S_f^⅓ contains no S₀ at all, so a robust median of THAT
     //     over the whole domain gives one well-determined constant, and
     //     dividing it back out by the local S₀^⅓ still gives each reach of a
     //     compound channel its own normal depth.
@@ -233,7 +233,7 @@ const OVERLAY = (() => {
    *  by columns whose S_f sits in a sane band, so a redrawn rig inherits the
    *  old rig's normal depth for as long as the new one fails to produce
    *  candidates: a drowned gate on a 1-in-4 bed read "M1" that way, because
-   *  the local y_c collapsed with the local q while the global y_n did not.
+   *  the local d_c collapsed with the local q while the global d_n did not.
    *  Anything that re-rasterises the walls calls this. */
   function resetEstimates(sim) {
     if (!sim) return;
@@ -242,7 +242,7 @@ const OVERLAY = (() => {
 
   /** Locate hydraulic jumps: Fr crosses 1 downwards and the depth jumps up.
    *  Reports the measured conjugate pair alongside the momentum prediction
-   *  y₂/y₁ = ½(√(1+8Fr₁²) − 1), so the two can be compared on screen. */
+   *  d₂/d₁ = ½(√(1+8Fr₁²) − 1), so the two can be compared on screen. */
   function findJumps(A, sim) {
     const nx = sim.nx, dx = sim.dx, g = Math.abs(sim.p.g) || 9.81;
     const win = Math.max(3, Math.round(0.20 / dx));       // averaging half-window
@@ -268,8 +268,8 @@ const OVERLAY = (() => {
         const lim = Math.min(nx - win - 2, i + reach);
         while (k < lim && A.Fr[k] > 0.9) k++;
         if (k < lim && A.hRaw[k + win] > 1.6 * A.hRaw[i]) {
-          // y₁ is the THINNEST section upstream, y₂ the deepest downstream.
-          // Averaging instead drags the roller into y₁ and the conjugate-depth
+          // d₁ is the THINNEST section upstream, d₂ the deepest downstream.
+          // Averaging instead drags the roller into d₁ and the conjugate-depth
           // check then reads 100% high.
           const y1 = ext(A.hRaw, i - 2 * win, i, false);
           const y2 = ext(A.hRaw, k + win, k + 4 * win, true);
@@ -368,7 +368,7 @@ const OVERLAY = (() => {
     // legend
     const B = V.vis || V;
     let ly = B.y + 16;
-    [["energy grade line", C.egl], ["normal depth  yₙ", C.yn], ["critical depth  y𝆑", C.yc]]
+    [["energy grade line  H", C.egl], ["normal depth  dₙ", C.yn], ["critical depth  d𝆑", C.yc]]
       .forEach(([t, c], k) => {
         ctx.save();
         ctx.strokeStyle = c; ctx.lineWidth = 1.6;
@@ -378,7 +378,7 @@ const OVERLAY = (() => {
         ctx.fillStyle = C.dim;
         ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
         ctx.textBaseline = "middle";
-        ctx.fillText(t.replace("y𝆑", "y_c"), B.x + 46, ly + k * 15 + 1);
+        ctx.fillText(t.replace("d𝆑", "d_c"), B.x + 46, ly + k * 15 + 1);
       });
   }
 
@@ -402,7 +402,7 @@ const OVERLAY = (() => {
     });
   }
 
-  /** Bracket each hydraulic jump and show measured vs momentum-predicted y₂. */
+  /** Bracket each hydraulic jump and show measured vs momentum-predicted d₂. */
   function drawJumps(ctx, V, jumps) {
     const B = V.vis || V;
     jumps.forEach((J) => {
@@ -421,8 +421,8 @@ const OVERLAY = (() => {
       const err = 100 * (J.y2 - J.y2p) / Math.max(J.y2p, 1e-6);
       const rows = [
         "HYDRAULIC JUMP",
-        "Fr₁ " + fmt(J.Fr1, 2) + "   y₁ " + fmt(J.y1, 3) + " m",
-        "y₂ " + fmt(J.y2, 3) + " m   (momentum: " + fmt(J.y2p, 3) +
+        "Fr₁ " + fmt(J.Fr1, 2) + "   d₁ " + fmt(J.y1, 3) + " m",
+        "d₂ " + fmt(J.y2, 3) + " m   (momentum: " + fmt(J.y2p, 3) +
           ", " + (err >= 0 ? "+" : "") + fmt(err, 0) + "%)",
         "ΔE " + fmt(J.dE, 3) + " m lost in the roller",
       ];
@@ -457,7 +457,7 @@ const OVERLAY = (() => {
     // perfectly measurable station next to a weir).
     const wet = A.onBed[i] && h > 3 * sim.dx;
     // Inside a pressurised conduit there is no free surface to have a profile:
-    // the column's "surface" is the soffit and y_c / y_n / S_f are fiction (a
+    // the column's "surface" is the soffit and d_c / d_n / S_f are fiction (a
     // full pipe read "H2 profile"). Fill fraction alone does not say so — any
     // submerged cell carries hydrostatic f > 1 — so the test is a water body
     // that reaches its lid AND a cell that is genuinely over-full.
@@ -466,7 +466,7 @@ const OVERLAY = (() => {
     const press = !!probe && probe.f > 1.002 && capped;
     const cls = wet && A.ok[i] && !press ? classify(h, yn, yc, S0) : "";
     const rows = [];
-    rows.push(["x, y", fmt(mx, 2) + ", " + fmt(my, 2) + " m"]);
+    rows.push(["x, z", fmt(mx, 2) + ", " + fmt(my, 2) + " m"]);
     if (wet) {
       rows.push(["depth d", fmt(h, 3) + " m"]);
       if (!press) rows.push(["level η", fmt(A.bed[i] + h, 3) + " m above datum"]);
@@ -475,8 +475,8 @@ const OVERLAY = (() => {
     }
     if (wet && !press) {
       rows.push(["Fr", fmt(A.Fr[i], 2) + (A.Fr[i] > 1 ? "  supercritical" : "  subcritical")]);
-      rows.push(["y_c", fmt(yc, 3) + " m"]);
-      if (isFinite(yn)) rows.push(["y_n", fmt(yn, 3) + " m  (measured)"]);
+      rows.push(["d_c", fmt(yc, 3) + " m"]);
+      if (isFinite(yn)) rows.push(["d_n", fmt(yn, 3) + " m  (measured)"]);
       rows.push(["S₀", (S0 >= 0 ? "1 : " + fmt(1 / Math.max(S0, 1e-9), 0) : "adverse")]);
       // n is only computed where the classification is trustworthy, so a
       // guard-band station prints the slope alone rather than "n = NaN".
@@ -484,14 +484,14 @@ const OVERLAY = (() => {
         (isFinite(A.n[i]) ? "   n = " + fmt(A.n[i], 3) : "")]);
     }
     if (probe) {
-      rows.push(["u, v", fmt(probe.u, 2) + ", " + fmt(probe.v, 2) + " m/s"]);
-      rows.push(["pressure head p/ρg", fmt(probe.head, 3) + " m"]);
+      rows.push(["u, w", fmt(probe.u, 2) + ", " + fmt(probe.v, 2) + " m/s"]);
+      rows.push(["pressure head p/ρg", fmt(probe.phead, 3) + " m"]);
       // h = z + p/ρg. Shown in BOTH regimes: in hydrostatic open-channel flow
       // it equals the level η above, but inside a pressurised conduit there is
       // no surface and the η row is suppressed, which is exactly where the
       // piezometric head is the only meaningful head to read.
       rows.push(["head h = z + p/ρg",
-        fmt(my - (sim.scene.tiltS0 || 0) * mx + probe.head, 3) + " m"]);
+        fmt(my - (sim.scene.tiltS0 || 0) * mx + probe.phead, 3) + " m"]);
       rows.push(["fill f", fmt(probe.f, 3) + (probe.f > 1.002 ? "  pressurised" : "")]);
     }
     if (!rows.length) return;
@@ -713,7 +713,7 @@ const OVERLAY = (() => {
   function measureText(m) {
     const dx = m.x1 - m.x0, dy = m.y1 - m.y0, L = Math.hypot(dx, dy);
     let s = L.toFixed(L < 0.1 ? 3 : 2) + " m · Δx " + Math.abs(dx).toFixed(2) +
-            " · Δy " + Math.abs(dy).toFixed(2);
+            " · Δz " + Math.abs(dy).toFixed(2);
     if (Math.abs(dx) > 1e-3 && Math.abs(dy) > 1e-3) {
       const n = Math.abs(dx / dy);
       s += " · 1 : " + (n < 10 ? n.toFixed(2) : n.toFixed(0));
@@ -721,7 +721,7 @@ const OVERLAY = (() => {
     return s;
   }
 
-  /** The tape measure: a line between the two dragged points, dotted Δx / Δy
+  /** The tape measure: a line between the two dragged points, dotted Δx / Δz
    *  legs, and the numbers on a chip. Coordinates are in metres, so the tape
    *  survives zooming and a resolution rebuild. */
   function drawMeasure(ctx, V, m) {

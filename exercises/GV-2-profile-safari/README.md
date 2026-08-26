@@ -4,7 +4,7 @@ A timed game, not a measurement exercise. Sandbox, labels on, score card in
 hand: in 20 minutes, draw as many **distinct**, correctly-labelled
 surface-profile classes as you can and screenshot the overlay's own orange
 chip as proof. It forces exactly the exam's classification reasoning — read
-the bed slope, compare the depth with `y_n` and `y_c`, name the zone —
+the bed slope, compare the depth with `d_n` and `d_c`, name the zone —
 disguised as a collecting game. A2 and the whole C family are deliberately
 rare: nobody is expected to clear the board, and the pooled "who found what"
 chart is the payoff, not any one student's score.
@@ -16,14 +16,14 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 
 ## Theory
 
-The chip drawn over a reach is `classify(h, y_n, y_c, S₀)`, and it is the
+The chip drawn over a reach is `classify(h, d_n, d_c, S₀)`, and it is the
 whole game:
 
-    letter — from the BED:    S₀ > 0 → M if y_n > y_c, S if y_n < y_c
+    letter — from the BED:    S₀ > 0 → M if d_n > d_c, S if d_n < d_c
                               (inside ±5% → C) · S₀ ≈ 0 → H · S₀ < 0 → A
-    zone   — from the WATER:  1 above both y_n and y_c · 2 between them
-                              3 below both  (H and A have no y_n:
-                              2 if h > y_c, else 3)
+    zone   — from the WATER:  1 above both d_n and d_c · 2 between them
+                              3 below both  (H and A have no d_n:
+                              2 if h > d_c, else 3)
 
 Thirteen chips exist — M1 M2 M3 · S1 S2 S3 · C1 C2 C3 · H2 H3 · A2 A3. A
 reach only earns one if it holds about **0.46 m** of contiguous same-class
@@ -98,8 +98,8 @@ the rare-spawn tail tinted, over a histogram of the totals.
   off for exactly this reason): the chip flickers C1/C3/M1 from one second to
   the next on a tuned, shipped scene, never mind a hand-drawn one.
 - **Adjudicating a suspicious chip.** A drowned control flips the *letter*,
-  not just the zone: `y_c` is local and collapses with the local discharge,
-  while `y_n` comes from a domain-wide median that goes stale — so a fully
+  not just the zone: `d_c` is local and collapses with the local discharge,
+  while `d_n` comes from a domain-wide median that goes stale — so a fully
   drowned gate on an unmistakably 1-in-4 bed reads **M1** end to end. Ask a
   claimant for the local `Fr`, and treat any chip centred within ~0.3 m of a
   structure as suspect.

@@ -15,7 +15,7 @@
 //   the junction, its own pipe being that shaft's lower stretch. A and C's
 //   pipes are horizontal (QS-2's floor-trim trick); B's pipe is the SAME
 //   trick rotated 90 degrees: a valve column spanning the shaft's full width
-//   from the bed up to `gateH`, aimed at y=0 so the bottom-edge trim shaves
+//   from the bed up to `gateH`, aimed at z = 0 so the bottom-edge trim shaves
 //   its lowest row exactly as it does for a horizontal pipe.
 //
 //   Because toggleValve()/V flips EVERY valve cell at once (P8 in
@@ -44,7 +44,7 @@
 //     shaft      x xJ0 .. xJ1 (width wJ)       junction + B's own tank
 //     block 2    x xJ1 .. xJ1+L2               J-C pipe length L2
 //     tank C     x xJ1+L2 .. 9                 tailwater-controlled, level zC
-//   A-J, C-J pipes: horizontal valve bands aimed at y=0 (floor-trim).
+//   A-J, C-J pipes: horizontal valve bands aimed at z = 0 (floor-trim).
 //   B-J "pipe": the shaft's own lower stretch, y 0..gateH, valve the FULL
 //     shaft width — a vertical duct of length gateH, gap wJ.
 window.B9 = {
@@ -63,7 +63,7 @@ window.B9 = {
     // there regardless of how much water is stacked above — a dry read that
     // looks like "still low" and defeated the fillB() stop condition on the
     // first pass (found by inspection: the shaft read f > 1.06, head ~3.5 m
-    // at y = 1.1 after a pour that never saw its own gauge move).
+    // at z = 1.1 after a pour that never saw its own gauge move).
     gBy: null,                                // set from gateH in build(); see below
   },
 
@@ -90,7 +90,7 @@ window.B9 = {
     C("cs").set(P.cs);
     C("openL").set("1"); C("openR").set("1");
     C("openB").set("0"); C("openT").set("0");
-    C("gaugeField").set("head");
+    C("gaugeField").set("h");
     C("mode").set("0");
     // Defensive: guarantee valid numeric levels before the FIRST syncPanel()
     // call below, rather than relying on fillAC() (which runs later) to set
@@ -111,7 +111,7 @@ window.B9 = {
       // J-C pipe: symmetric through block 2
       [X.xJ1 - 0.07, 0, X.xC0 + 0.07, 0, P.pipeBrush, 128],
       // B-J riser: the shaft's own full width, valve, from the floor up to gateH.
-      // Aimed at y=0 so the same bottom-edge trim applies (removes its lowest
+      // Aimed at z = 0 so the same bottom-edge trim applies (removes its lowest
       // row); above gateH the shaft is left open — that IS tank B.
       [X.xJc, -0.20, X.xJc, P.gateH, P.wJ, 128],
     ];
@@ -193,7 +193,7 @@ window.B9 = {
   fillB(maxSec) {
     const P = B9.P, X = B9.geomX();
     state.paused = true;
-    const el = () => state.gauges[1].y + APP.probe(state.gauges[1].x, state.gauges[1].y).head;
+    const el = () => state.gauges[1].y + APP.probe(state.gauges[1].x, state.gauges[1].y).phead;
     const fine = Math.round(0.01 / APP.SIM.dt());
     // A narrow shaft (wJ ~ 0.5 m) fills MUCH faster per unit pour strength
     // than an open tank: measured 1.5-2 m/s of rise from r=0.12/vy=-0.6, so
@@ -217,7 +217,7 @@ window.B9 = {
 
   levels() {
     const g = state.gauges;
-    const el = (k) => +(g[k].y + APP.probe(g[k].x, g[k].y).head).toFixed(4);
+    const el = (k) => +(g[k].y + APP.probe(g[k].x, g[k].y).phead).toFixed(4);
     return JSON.stringify({ t: +APP.sim.t.toFixed(2),
       junction: el(0), B: el(1), A: el(2), C: el(3) });
   },
@@ -306,8 +306,8 @@ window.B9 = {
       if (k > 0) APP.tick(steps);
       const c = SIM.columns(true);
       T.push(APP.sim.t - t0);
-      Hj.push(gJ.y + APP.probe(gJ.x, gJ.y).head);
-      ZB.push(gB.y + APP.probe(gB.x, gB.y).head);
+      Hj.push(gJ.y + APP.probe(gJ.x, gJ.y).phead);
+      ZB.push(gB.y + APP.probe(gB.x, gB.y).phead);
       QA.push(c[iAJ * 4 + 2]);
       QC.push(c[iJC * 4 + 2]);
     }

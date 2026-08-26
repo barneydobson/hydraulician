@@ -28,7 +28,7 @@ against the **soffit**, not the axis (half a bore, 0.196 m). Compare against
 the **HGL**, not the energy line (`V²/2g` is roughly 0.3–0.9 m here).
 
 The crest sits at x = 5.60 m, which is 44.2 % of the way from gauge A
-(x = 3.70 m) to gauge B (x = 8.00 m), both on the pipe axis at y = 2.20 m:
+(x = 3.70 m) to gauge B (x = 8.00 m), both on the pipe axis at z = 2.20 m:
 
     HGL at the crest = h₁ + 0.442 · (h₂ − h₁)
 

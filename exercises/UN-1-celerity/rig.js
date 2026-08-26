@@ -78,10 +78,10 @@ window.UN1 = {
     APP.SIM.step(Math.ceil(12 / APP.SIM.dt()));        // 12 s spin-up, flat out
     UN1.gauges();
     UN1.run(1.6);                                      // steady baseline
-    var v0 = UN1.v0(), H0 = APP.state.gauges[0].hist.slice(-1)[0].head;
+    var v0 = UN1.v0(), H0 = APP.state.gauges[0].hist.slice(-1)[0].h;
     toggleValve();                                     // V — SLAM
     UN1.run(0.75);                                     // land on the 1st plateau
-    var H1 = APP.state.gauges[0].hist.slice(-1)[0].head;
+    var H1 = APP.state.gauges[0].hist.slice(-1)[0].h;
     UN1.run(5.5);                                      // let the square wave run
     APP.state.paused = true; APP.frames(2);
     return { gap: g, c: APP.sim.p.c, v0: v0, dH: +(H1 - H0).toFixed(2),

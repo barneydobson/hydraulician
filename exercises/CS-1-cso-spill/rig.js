@@ -13,9 +13,9 @@
  * follow a q ramp (0.15 m of level = +17 % of delivered q -- measured).
  *
  * Geometry (all elevations above the domain floor, Medium = 414x230, dx 21.739 mm):
- *   feed invert (incoming sewer)  y = 3.00      x = -0.3 .. 3.00
- *   chamber floor  (top face)     y = 1.50      x = 2.95 .. 4.60
- *   overflow crest (top of plate) y = 2.50      x = 4.50   -> head at spill 1.00 m
+ *   feed invert (incoming sewer)  z = 3.00      x = -0.3 .. 3.00
+ *   chamber floor  (top face)     z = 1.50      x = 2.95 .. 4.60
+ *   overflow crest (top of plate) z = 2.50      x = 4.50   -> head at spill 1.00 m
  *   throttle shaft (to treatment) x = 4.00, cut through the floor slab
  * Everything that leaves the chamber falls clear into open air and off the
  * draining bottom edge: nothing downstream can back up into the measurement.
@@ -86,7 +86,7 @@ window.CS1 = (function () {
     const S2 = APP.sim.p.source;
     S2.on = 1; S2.x = g.spoutX; S2.y = g.spoutY; S2.r = g.spoutR;
     S2.vx = (o.vx !== undefined ? o.vx : 0.5); S2.vy = 0;
-    C('gaugeField').set('depth');
+    C('gaugeField').set('d');
     C('dye').set(true);
     C('dyeDecay').set(0);
     APP.state.gauges.length = 0;

@@ -7,7 +7,7 @@
 One row per student: student_id,digit,level_m,c1_m,c2_m,c3_m,c4_m,c5_m
 (level_m and any extra columns are carried but not needed for the test.)
 
-The u²–y equation's crest sequence satisfies 1/c linear in n; a viscous, ∝ u
+The surge ODE's crest sequence satisfies 1/c linear in n; a viscous, ∝ u
 friction would give log c linear in n instead. Left panel is the first, right
 panel the second, one line per student. Straight beats bent, and the printed
 R² pair says so per student as well as by eye.

@@ -3,13 +3,13 @@
 // No geometry is drawn for this demo — the stock ?scene=jet tank, orifice
 // and spout are used exactly as shipped. This file only does the two things
 // every student does by hand: switch the spout off and drop a gauge on the
-// tank surface, low enough (y = 1.00, well below the orifice at 1.30-1.42)
-// that its "head" reading stays valid (= free-surface elevation) for the
+// tank surface, low enough (z = 1.00, well below the orifice at 1.30-1.42)
+// that its "h" reading stays valid (= free-surface elevation) for the
 // whole drain down to the h2 = 1.80 m stop level.
 //
 // Usage: open ?scene=jet, wait out the spin-up (~55 s), then in the
 // console:
-//   QS1.armGauge()      // spout off, gauge dropped, gaugeField = head
+//   QS1.armGauge()      // spout off, gauge dropped, gaugeField = h
 //   QS1.report()         // current elevation + status-bar time, JSON
 
 window.QS1 = {
@@ -24,7 +24,7 @@ window.QS1 = {
   armGauge() {
     const C = QS1.C;
     C("spoutOn").set(false);
-    C("gaugeField").set("head");
+    C("gaugeField").set("h");
     syncPanel();
     state.gauges.length = 0;
     state.gauges.push({ x: 1.00, y: 1.00, hist: [], colour: "#7fd4ff" });
@@ -36,8 +36,8 @@ window.QS1 = {
     const last = g && g.hist.length ? g.hist[g.hist.length - 1] : null;
     return JSON.stringify({
       t: +sim.t.toFixed(2),
-      eta: last ? +last.head.toFixed(3) : null,     // free-surface elevation, m
-      h: last ? +(last.head - QS1.orificeCentre).toFixed(3) : null,  // head above orifice centre
+      eta: last ? +last.h.toFixed(3) : null,     // free-surface elevation, m
+      h: last ? +(last.h - QS1.orificeCentre).toFixed(3) : null,  // head above orifice centre
     });
   },
 

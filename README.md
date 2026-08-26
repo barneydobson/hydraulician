@@ -57,7 +57,10 @@ Written briefs, data and plots for each one are in
 *Summary below. The full derivation — from the 2D Navier–Stokes equations
 through the piezometric head, the weakly-compressible closure, the
 discretisation and the wall treatment — is in
-[`docs/numerics.md`](docs/numerics.md).*
+[`docs/numerics.md`](docs/numerics.md). The symbols used throughout, and why
+they were chosen against the different conventions of the main texts, are in
+[`docs/notation.md`](docs/notation.md); the measured engineering lore is in
+[`docs/engineering-notes.md`](docs/engineering-notes.md).*
 
 The solver integrates the Navier–Stokes equations in the vertical plane: mass
 is conserved, and fluid accelerates under pressure, gravity, viscosity and bed
@@ -147,7 +150,7 @@ The file map:
 | `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col`, `part`, `disp` |
 | `js/scenes.js` | `SCENES` — `channel()` builds a prismatic GVF reach, `drop()` an approach → chute → apron |
 | `js/sim.js` | `SIM` — grid allocation, wall rasterisation, the substep loop, control bands, readbacks |
-| `js/overlay.js` | `OVERLAY` — the 2D canvas: y_c, y_n, EGL, profile classification, jump detection, gauges, rake |
+| `js/overlay.js` | `OVERLAY` — the 2D canvas: d_c, d_n, EGL, profile classification, jump detection, gauges, rake |
 | `js/main.js` | boot, the panel spec, pointer tools, view transform, frame loop, `window.APP` |
 | `js/exercises.js` | `EXERCISES` — the 40 teaching demos the `E` menu and `?ex=` read |
 | `js/exercises-rigs.js` | the drawn rigs (RIG-A duct, RIG-B channel, RIG-C tanks, RIG-D chamber) those demos load |
@@ -172,7 +175,7 @@ ends), boundary flags, and live parameters. `channel(...)` builds a prismatic
 reach from (S₀, C_f, q) plus a control and `drop(...)` builds an approach →
 chute → apron, so most new scenes are a call to one of those plus a few drawn
 segments. Copy the nearest neighbour and read its comments; the ones about
-tailwater ≥ 1.3·y_c and about beds staying above the domain floor are load
+tailwater ≥ 1.3·d_c and about beds staying above the domain floor are load
 bearing.
 
 **Adding an exercise.** Append an entry to `EXERCISES` in `js/exercises.js`.
@@ -187,7 +190,7 @@ brief in `exercises/<folder>/README.md` and add the row to `exercises/INDEX.md`
 real Chrome over CDP: `launch`, `eval`, `pump --sim-seconds`, `shot`, `bench`,
 `status`, `close`. See [`exercises/_runner/HOWTO.md`](exercises/_runner/HOWTO.md)
 for the worked example and the concurrency rules. Inside the page, `APP.frames(n)`,
-`APP.tick(n)`, `APP.probe(x,y)`, `APP.volume()` and `APP.zoomAt(...)` exist for
+`APP.tick(n)`, `APP.probe(x,z)`, `APP.volume()` and `APP.zoomAt(...)` exist for
 scripted runs — the render loop stops when the tab is hidden, so drive it
 through those rather than waiting on wall-clock time.
 

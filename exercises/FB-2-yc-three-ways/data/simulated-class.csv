@@ -1,4 +1,4 @@
-student,digit,d,scene,q,level,y_c,y_crest,y_brink,y_crest_over_yc,y_brink_over_yc,crit_x,dist_to_lip_yc,t_settle,source
+student,digit,d,scene,q,level,d_c,d_crest,d_brink,d_crest_over_dc,d_brink_over_dc,crit_x,dist_to_lip_dc,t_settle,source
 sim00,0,0,sandbox+FB2rig,0.15,1.1824,0.1319,0.1728,0.1078,1.3103,0.8174,7.2826,0.890,55.01,measured
 sim01,1,1,sandbox+FB2rig,0.20,1.2284,0.1598,0.2114,0.1357,1.3232,0.8494,7.2826,0.735,55.01,measured
 sim02,2,2,sandbox+FB2rig,0.25,1.2707,0.1854,0.2379,0.1588,1.2833,0.8566,7.2826,0.633,55.01,measured

@@ -470,7 +470,7 @@ void main(){
 
   // ------------------------------------------------- pass 3: column reduce
   // One texel per grid column: bed level, depth, unit discharge, surface.
-  // Everything the open-channel overlay needs (y_c, y_n, Fr, energy line)
+  // Everything the open-channel overlay needs (d_c, d_n, Fr, energy line)
   // is derived from these four numbers on the CPU.
   const FS_COL = `#version 300 es
 precision highp float;

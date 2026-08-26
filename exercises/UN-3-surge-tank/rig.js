@@ -58,12 +58,22 @@
       this.nozzle(opts.gap === undefined ? this.GAP : opts.gap);
       this.pipe(bs);
       CONTROLS.find(function (c) { return c.id === 'inLevel'; }).set(opts.level === undefined ? this.LEVEL : opts.level);
-      CONTROLS.find(function (c) { return c.id === 'gaugeField'; }).set('depth');
+      CONTROLS.find(function (c) { return c.id === 'gaugeField'; }).set('d');
       if (opts.bulk != null) CONTROLS.find(function (c) { return c.id === 'bulk'; }).set(opts.bulk);
+      // Pin the view speed. tickFrame() takes `state.speed * realDt / h`
+      // substeps, so APP.frames(1, dt) advances speed*dt of sim time and the
+      // gauge samples that much apart. reduce()'s peak detector compares a
+      // FIXED 0.9 s neighbourhood, so at the card's speed = 2 that window is
+      // only +/-4 samples, spurious wiggles on the rising limb qualify as
+      // maxima, and the first "crest" reads 2.07 m against the true 2.57 m.
+      // Measured both ways; at speed 1 the run reproduces the shipped CSV
+      // exactly. Students are unaffected — they read the visible peak off the
+      // chart, not a detector — so the card keeps speed 2.
+      APP.state.speed = 1;
       syncPanel();
       APP.state.gauges.length = 0;
       APP.state.gauges.push({ x: this.XT, y: this.YG, hist: [], colour: "#7fd4ff" });
-      APP.state.gaugeField = 'depth';
+      APP.state.gaugeField = 'd';
       return this.check();
     },
 
@@ -123,7 +133,7 @@
       dt = dt || 1 / 10; rec = rec || 70;
       APP.state.paused = false;
       var g = APP.state.gauges[0], bed = 2.0642, k;
-      // The gauge's depth channel is OVERLAY.analyse's 10 %/call EMA, and
+      // The gauge's d channel is OVERLAY.analyse's 10 %/call EMA, and
       // settle() runs on APP.tick, which never calls analyse. So the first
       // frames after a settle replay the scene's stale 25 m initial fill: a
       // 3 s median taken across that relaxation reads ~0.5 m high, and on the
@@ -133,12 +143,12 @@
       for (k = 0; k < Math.round(10 / dt); k++) APP.frames(1, dt);
       g.hist.length = 0;
       for (k = 0; k < Math.round(10 / dt); k++) APP.frames(1, dt);
-      var pre = g.hist.map(function (h) { return h.depth; }).sort(function (a, b) { return a - b; });
+      var pre = g.hist.map(function (h) { return h.d; }).sort(function (a, b) { return a - b; });
       var rest = pre[pre.length >> 1], v0 = this.V(30.0), tslam = APP.sim.t;
       toggleValve();
       g.hist.length = 0;
       for (k = 0; k < Math.round(rec / dt); k++) APP.frames(1, dt);
-      return this.reduce(g.hist.map(function (h) { return [h.t, h.depth]; }), rest, v0, bed, tslam);
+      return this.reduce(g.hist.map(function (h) { return [h.t, h.d]; }), rest, v0, bed, tslam);
     },
 
     // first upsurge peak above the pre-slam level, and the median peak-to-peak
@@ -157,7 +167,7 @@
       for (k = 1; k < tk.length; k++) per.push(+(tk[k][0] - tk[k - 1][0]).toFixed(3));
       per.sort(function (a, b) { return a - b; });
       return { v0: +v0.toFixed(4), rest_level: +(rest + bed).toFixed(3),
-               ymax: pk.length ? +(pk[0][1] - rest).toFixed(3) : null,
+               zmax: pk.length ? +(pk[0][1] - rest).toFixed(3) : null,
                T: per.length ? per[per.length >> 1] : null, periods: per,
                peaks: pk.map(function (p) { return [+p[0].toFixed(2), +(p[1] - rest).toFixed(3)]; }) };
     },

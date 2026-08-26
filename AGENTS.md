@@ -1,0 +1,115 @@
+# hydraulician
+
+Interactive 2D hydraulics in the **vertical plane**: GPU (WebGL2), zero
+dependencies, no build step. A teaching tool — draw a channel, a pipe or a
+tank and free-surface Navier–Stokes runs through it, with the measurements
+(depths, heads, profiles, jumps) done on screen.
+
+**Run it:** serve statically (`python3 -m http.server 8124`) and open
+`index.html` — or double-click it; classic scripts, so `file://` works.
+`.claude/launch.json` has a preview config on port 8124. `?scene=<id>` boots a
+scene, `?ex=<id>` an exercise. Sibling project: `hydraulics-fun` (plan-view
+shallow water); this one resolves the depth.
+
+## Where things live
+
+| Path | What it is |
+|---|---|
+| `index.html` | markup + all CSS, classic script tags; the control panel is generated from a spec in `main.js` |
+| `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
+| `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
+| `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` |
+| `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
+| `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
+| `js/main.js` | boot, panel spec, pointer tools, view transform, `window.APP`, rig save/load (`RIG`) |
+| `js/exercises.js` | the exercise register the picker reads (machine-readable source of the pack) |
+| `js/exercises-rigs.js` | drawn rigs + applied settings per exercise, as rig-format JSON |
+| `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
+| `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
+| `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
+| `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
+| `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
+| `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
+| `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
+
+## The model, in one paragraph
+
+Weakly-compressible Navier–Stokes on a MAC grid, with the VOF fill fraction
+`f` doubling as the density and the EOS `P = c² max(f−1, 0)` acting as a 2D
+Preissmann slot: an unfilled cell has `p = 0` (that *is* the free surface —
+no interface reconstruction), an over-full cell is pressurised water with
+celerity `c`. No Poisson solve; two fullscreen passes per substep. The whole
+derivation, including what is deliberately not represented, is in
+[docs/numerics.md](docs/numerics.md).
+
+## Notation
+
+Symbols are the register in [docs/notation.md](docs/notation.md) — depth `d`
+(`d_c`, `d_n`, `d₁`, `d₂`), level `η`, piezometric head `h = z + p/ρg`,
+energy head `H`, specific energy `E = H − z_b`, velocity `u = (u, w)`,
+pressure head always spelled `p/ρg`. Two standing rules:
+
+- **Rename displayed symbols, not code identifiers.** The GLSL and runtime
+  state keep `y`/`v` for the vertical fields; the display says `z`/`w`.
+- **Serialized keys go through the version gate.** The rig wire format is v2
+  (`z`, `vz`, gauge fields `"h"`/`"d"`/`"speed"`); `RIG.migrate` in `main.js`
+  accepts exactly the current version and rejects anything else — prototype,
+  no back-compat. Any future key change bumps `V`; old links just break.
+
+## Rules that keep it alive
+
+Each of these was bought with a measured failure; the stories and numbers are
+in [docs/engineering-notes.md](docs/engineering-notes.md). Breaking one tends
+to look fine for a minute and explode in an exercise.
+
+- **VOF positivity is a donor-side flux cap, never an `f` clamp** — clamping
+  invents water at machine speed. Both face neighbours must compute the
+  identical flux. Read the Conservation section before touching the vof pass.
+- **Gravity and `∇p` stay additive in the vel pass** — anything interposed
+  breaks the discrete hydrostatic equilibrium.
+- **Geometry contracts:** wall segments have butt ends; slabs leaving the
+  domain are extrapolated, not clamped; a scene's bed stays above `z = 0`;
+  ground is solid all the way down; the closed outer ring is stamped last.
+- **Controls:** a subcritical reach needs a real downstream control; a
+  tailwater stands clear of critical (`≥ 1.3 d_c`, rechecked when `q`
+  changes); outfall edges (`open` = 2) are for brinks, never ponds.
+- **The panel toggles are self-configuring** — the sandbox must be able to
+  reproduce any scene by hand; that is the acceptance test for control
+  changes.
+- **Zero dependencies, classic scripts** — no modules, no bundlers, no fetch,
+  and no YAML front matter in `index.html` or `js/*` (the Pages build copies
+  them verbatim only because there is none).
+
+## Testing
+
+The render loop stops when the page is hidden, so headless work drives the
+app directly: `APP.frames(n)`, `APP.tick(n)`, `APP.probe(x,z)` (returns
+`u, v, p, phead, f, speed` — `phead` is pressure head only), `APP.volume()`,
+`APP.zoomAt(...)`, `APP.boxForce` / `APP.placeCV`. `exercises/_runner/runner.py`
+wraps that over CDP (Linux-bound — macOS shims in its HOWTO.md).
+`python3 exercises/_runner/check_pack.py` asserts the derivable agreements of
+the exercise pack; run it before printing worksheets.
+
+## The exercise pack
+
+Described in four places with different jobs that do **not** collapse into
+one register: `js/exercises.js` is the machine-readable source, each folder's
+`README.md` is the human brief, `INDEX.md` is abbreviated navigation, and
+`demo-programme.html` is the dated rev-1 document the pack was built from —
+history. Briefs carry the minimum needed to run the demo; statistics and
+methodology live in each folder's uncommitted `_archive/`. Coordinates in a
+recipe are exact — rounding them makes a new geometry; re-measure before
+shipping. `spinup` values are measured settle times, not guesses.
+
+## Gotchas worth knowing on day one
+
+- A dev browser may serve stale JS from `http.server`; force with
+  `fetch(url, {cache:"reload"})` then `location.reload()`.
+- Resolution changes Δx, not the physics: the domain is a fixed physical
+  rectangle and the grid is sized to a cell budget.
+- `state.rt` in the status bar is the speed truth — m2 at ~0.9× real time is
+  the design point, not a bug.
+- The Force box, the Froude view, and surface-wave damping all have
+  non-obvious failure modes — read their sections in
+  [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"
+  anything they show.

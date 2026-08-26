@@ -1,4 +1,4 @@
-student,digit,scene,x1_bore,x2_bore,t1_bore,t2_bore,v_bore,y1_bore,y2_bore,v_bore_pred,x_neg,t_neg,v_neg,v_neg_pred,source
+student,digit,scene,x1_bore,x2_bore,t1_bore,t2_bore,v_bore,d1_bore,d2_bore,v_bore_pred,x_neg,t_neg,v_neg,v_neg_pred,source
 S01,0,dambreak,3.0,4.5,0.1297,0.5126,3.917,0.1674,0.626,3.817,1.0,0.3933,3.966,3.997,measured
 S02,1,dambreak,3.5,5.0,0.2599,0.643,3.915,0.1674,0.606,3.708,1.0,0.3933,3.966,3.997,measured
 S03,2,dambreak,4.0,5.5,0.3866,0.7786,3.827,0.1674,0.685,4.138,1.0,0.3933,3.966,3.997,measured

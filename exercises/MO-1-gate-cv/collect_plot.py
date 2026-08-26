@@ -6,18 +6,18 @@
 Input columns (extras ignored, order irrelevant, case-insensitive):
     a_m       gate opening, m                                    [required]
     q         class-wide unit discharge, m2/s per m width        [required]
-    y0_m      upstream (approach pool) depth, m                  [required]
-    y1_m      downstream depth at the vena-contracta station, m  [required]
+    d0_m      upstream (approach pool) depth, m                  [required]
+    d1_m      downstream depth at the vena-contracta station, m  [required]
     a_cells, digit, student, level_m, Fr1, source   carried through, not needed
 
 Everything the class needs (C_d, the CV thrust F_R, and the naive hydrostatic
-comparator) is RE-DERIVED here from (a, q, y0, y1) rather than trusted from
+comparator) is RE-DERIVED here from (a, q, d0, d1) rather than trusted from
 the CSV, so a bad upstream number cannot silently survive into the plot:
 
-    V0 = q/y0, V1 = q/y1
-    C_d   = q / (a * sqrt(2 g y0))                          orifice rating
-    F_R   = rho q (V0-V1) + 0.5 rho g (y0^2 - y1^2)         CV momentum, per m
-    naive = 0.5 rho g (y0-a)^2                              "just hydrostatics"
+    V0 = q/d0, V1 = q/d1
+    C_d   = q / (a * sqrt(2 g d0))                          orifice rating
+    F_R   = rho q (V0-V1) + 0.5 rho g (d0^2 - d1^2)         CV momentum, per m
+    naive = 0.5 rho g (d0-a)^2                              "just hydrostatics"
                                                              trap comparator
 
 Output: a two-panel figure —
@@ -57,17 +57,17 @@ def read(path):
             try:
                 a = float(row["a_m"])
                 q = float(row["q"])
-                y0 = float(row["y0_m"])
-                y1 = float(row["y1_m"])
+                d0 = float(row["d0_m"])
+                d1 = float(row["d1_m"])
             except (KeyError, ValueError):
                 continue
-            if a <= 0 or q <= 0 or y0 <= a or y1 <= 0:
+            if a <= 0 or q <= 0 or d0 <= a or d1 <= 0:
                 continue
-            V0, V1 = q / y0, q / y1
-            Cd = q / (a * math.sqrt(2 * G * y0))
-            FR = RHO * q * (V0 - V1) + 0.5 * RHO * G * (y0 * y0 - y1 * y1)
-            naive = 0.5 * RHO * G * (y0 - a) ** 2
-            pts.append(dict(a=a, q=q, y0=y0, y1=y1, V0=V0, V1=V1, Cd=Cd, FR=FR,
+            V0, V1 = q / d0, q / d1
+            Cd = q / (a * math.sqrt(2 * G * d0))
+            FR = RHO * q * (V0 - V1) + 0.5 * RHO * G * (d0 * d0 - d1 * d1)
+            naive = 0.5 * RHO * G * (d0 - a) ** 2
+            pts.append(dict(a=a, q=q, d0=d0, d1=d1, V0=V0, V1=V1, Cd=Cd, FR=FR,
                              naive=naive, diffPct=100.0 * (FR - naive) / naive,
                              digit=row.get("digit", ""), student=row.get("student", "")))
     return pts
@@ -81,7 +81,7 @@ def main():
 
     pts = read(args.csv)
     if len(pts) < 3:
-        sys.exit("need at least 3 usable rows (columns a_m, q, y0_m, y1_m)")
+        sys.exit("need at least 3 usable rows (columns a_m, q, d0_m, d1_m)")
     pts.sort(key=lambda p: p["a"])
 
     a_mm = [p["a"] * 1000 for p in pts]
@@ -144,7 +144,7 @@ def main():
     ax.set_xlim(*xr)
     ax.set_ylim(min(0.45, min(Cd) - 0.03), max(0.68, max(Cd) + 0.03))
     ax.set_xlabel("gate opening  a  (mm)")
-    ax.set_ylabel("discharge coefficient  $C_d = q / (a\\sqrt{2 g y_0})$")
+    ax.set_ylabel("discharge coefficient  $C_d = q / (a\\sqrt{2 g d_0})$")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="lower left", fontsize=9)
     ax.set_title("class-wide q = %.3f m$^2$/s; personalised opening a only" % pts[0]["q"],
@@ -157,7 +157,7 @@ def main():
     bx.plot(xj, FR, "o", ms=9, color="#2f7fd0", zorder=3, label="class $F_R$ per student (CV momentum)")
     bx.plot(a_u, FR_u, "-", color="#2f7fd0", lw=1.6, alpha=0.85, zorder=2)
     bx.plot(xj, naive, "s", ms=6, color="#d1495b", zorder=3, alpha=0.85,
-            label=r"naive $\frac{1}{2}\rho g (y_0-a)^2$ per student")
+            label=r"naive $\frac{1}{2}\rho g (d_0-a)^2$ per student")
     bx.plot(a_u, naive_u, "--", color="#d1495b", lw=1.8, zorder=2, label="naive trend")
     bx.set_xlim(*xr)
     bx.set_xlabel("gate opening  a  (mm)")

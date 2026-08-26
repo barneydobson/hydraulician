@@ -14,63 +14,30 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 ## Theory
 
 Rigid column in the penstock, free surface in the shaft, friction ∝ u². z is
-the shaft level below the reservoir, so this is the equation lectures write as
-u²–y:
+the shaft level below the reservoir, so this is the u²–y equation from
+lectures, and the solution lectures quote for it:
 
     (l/g)·du/dt = z − k·u|u|          dz/dt = −(A/A_s)·u
 
-You do not have to solve that to test it. Follow the energy round one cycle,
-writing c for the crest height above the resting level.
-
-At a crest the water is momentarily still, so the surge holds all its energy
-as height — it has lifted a column of area A_s through c/2:
-
-    E ∝ c²
-
-Friction spends that store at a rate (head loss) × (discharge) = k·u²·A·u, and
-over one cycle both the speed of the water and the distance it travels scale
-with c. So a cycle costs
-
-    ΔE ∝ c³
-
-Differentiating E ∝ c² gives ΔE ∝ c·Δc. Put the two together, c·Δc ∝ c³:
-
-    Δc ∝ c²
-
-**That is the result.** The height lost per cycle grows as the *square* of the
-height, so a big surge is punished hard and a small one is barely touched —
-which is why the tail of the trace lingers rather than dying away evenly.
-Divide by c² and that becomes a constant step:
-
-    Δ(1/c) = Δc / c² = constant
-
-So 1/c₁, 1/c₂, 1/c₃ … climb by the same amount every cycle. Plot them against
-crest number and k·u² friction is a **straight line**.
-
-The reciprocal is worth recognising on sight: it is the coordinate that
-straightens any quadratic drag — a coasting cyclist, a spun-down flywheel —
-because "loss ∝ the square of what is left" is the same statement each time.
-A friction ∝ u would take a fixed *fraction* per cycle instead, and want log c.
-
-### The slope is Y
-
-The shape is only half of it. Solving the ODE — the result quoted in lectures —
-gives
-
     u² = C·e^(z/Y) + (1/k)(z + Y),        Y = l·A / (2g·k·A_s)
 
-Put u = 0 at each end of a swing and C drops out, leaving the two heights
-related in units of Y and nothing else; chain the upswing to the downswing
-(friction reverses, so Y changes sign with it) and the crest-to-crest step is
+Put u = 0 at each end of a swing and C drops out, leaving the two ends related
+in units of Y alone. Chain the upswing to the downswing — friction reverses, so
+Y changes sign with it — and the successive crest heights c₁, c₂, c₃ … above
+the resting level come out obeying
 
-    Δ(1/c) = 4 / (3Y)          so      Y = 4 / (3 × slope)
+    Δ(1/c) = 4 / (3Y)
 
-The straight line therefore *measures* the constant in that solution. The 4/3
-is the gentle-surge limit, but it is worth 1% out to c₁ = 0.8·Y and this rig
-runs at c₁ ≈ 0.4·Y, so take it as exact. Expect **Y ≈ 6 m**.
+So **1/c climbs in equal steps**, a straight line against crest number, and
+**the slope is Y**: Y = 4 / (3 × step). The 4/3 is the gentle-surge limit,
+worth 1% out to c₁ = 0.8·Y; this rig runs at c₁ ≈ 0.4·Y. Expect Y ≈ 6 m.
 
-None of this asks you for the penstock length, the bore, the shaft width or
-v₀. Five numbers off one trace measure Y, and Y carries all four.
+The constant step is quadratic drag showing its hand — the height lost per
+cycle goes as c², so a big surge is punished hard and a small one barely
+touched, which is why the tail of the trace lingers rather than dying away
+evenly. A friction ∝ u would take a fixed *fraction* each cycle instead, and
+want log c. Note what none of it asked for: the penstock length, the bore, the
+shaft width, v₀. Five numbers off one trace measure Y, and Y carries all four.
 
 ## Your reservoir level
 

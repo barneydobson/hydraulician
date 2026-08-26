@@ -4,7 +4,7 @@
     {
       "name": "hydraulician",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8124", "--bind", "127.0.0.1"],
+      "runtimeArgs": [".claude/serve.py", "8124", "127.0.0.1"],
       "port": 8124
     }
   ]

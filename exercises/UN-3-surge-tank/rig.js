@@ -60,15 +60,10 @@
       CONTROLS.find(function (c) { return c.id === 'inLevel'; }).set(opts.level === undefined ? this.LEVEL : opts.level);
       CONTROLS.find(function (c) { return c.id === 'gaugeField'; }).set('d');
       if (opts.bulk != null) CONTROLS.find(function (c) { return c.id === 'bulk'; }).set(opts.bulk);
-      // Pin the view speed. tickFrame() takes `state.speed * realDt / h`
-      // substeps, so APP.frames(1, dt) advances speed*dt of sim time and the
-      // gauge samples that much apart. reduce()'s peak detector compares a
-      // FIXED 0.9 s neighbourhood, so at the card's speed = 2 that window is
-      // only +/-4 samples, spurious wiggles on the rising limb qualify as
-      // maxima, and the first "crest" reads 2.07 m against the true 2.57 m.
-      // Measured both ways; at speed 1 the run reproduces the shipped CSV
-      // exactly. Students are unaffected — they read the visible peak off the
-      // chart, not a detector — so the card keeps speed 2.
+      // Pin the speed: APP.frames(1, dt) advances speed*dt, so at the card's
+      // speed = 2 the gauge samples 0.2 s apart, reduce()'s fixed 0.9 s peak
+      // window shrinks to ±4 samples, and c1 reads 2.07 m for a true 2.57 m.
+      // Students read the chart, not the detector, so the card keeps speed 2.
       APP.state.speed = 1;
       syncPanel();
       APP.state.gauges.length = 0;

@@ -4,3 +4,6 @@
 exercises/*/_archive/
 
 .DS_Store
+
+# Byte-compiled Python — regenerated on every run, never source.
+__pycache__/

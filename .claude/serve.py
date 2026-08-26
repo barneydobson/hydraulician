@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
-"""Static server for development — same as `python3 -m http.server`, plus
-`Cache-Control: no-store` on everything.
+"""`python3 -m http.server` plus `Cache-Control: no-store`, for launch.json.
 
-`http.server` sends only `Last-Modified`: no `Cache-Control`, no `ETag`. With
-no explicit freshness a browser falls back to a HEURISTIC — a fraction of how
-long the file had been sitting unchanged — so a file that has been stable for
-a while can be served from cache for a long time after you edit it. That is
-survivable for a single file. It is not survivable here, because the app is
-eight separate classic scripts with no bundler: the browser can revalidate the
-ones you have been editing all morning and keep a stale `js/main.js`, and then
-`js/exercises-rigs.js` (rig format v2) is read by a `js/main.js` that only
-knows v1 and every rig refuses to load. That mixed state is invisible from the
-server side and survives an ordinary reload.
-
-No-store means every request is a real request. It costs nothing on localhost.
-
-Used by .claude/launch.json. Nothing here ships: Jekyll skips dot-directories,
-so .claude/ is not part of the Pages build.
+http.server sends Last-Modified and nothing else, so script freshness is left
+to browser heuristics — and with eight unbundled classic scripts a partially
+stale cache runs one build's main.js against another's payloads (the "rig
+format v2 is newer than this build (v1)" failure). No-store costs nothing on
+localhost. Not deployed: Jekyll skips dot-directories.
 """
 import functools
 import http.server
@@ -26,8 +15,6 @@ import sys
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, must-revalidate")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
         super().end_headers()
 
 

@@ -2697,7 +2697,10 @@ const GINSP = (() => {
  *  dependency; falls back to `A` where it is missing). Deflate is worth it:
  *  a 35-stroke staircase rig is 4.4 kB of JSON and mostly repeated digits. */
 const RIG = (() => {
-  const V = 2;                                  // format version
+  const V = 2;   // format version — bump the ?v= stamp on index.html's script
+                 // tags with it, so cached copies of the old build cannot mix
+                 // with the new payloads (that mix is exactly "rig format v2
+                 // is newer than this build (v1)" on every rig).
   /** Micrometres. Not cosmetic: B10's staircase snaps its step boundaries to
    *  cell centres on purpose (a boundary landing exactly on one is claimed by
    *  both neighbouring steps and pinches the bore a whole step deep), and at

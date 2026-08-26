@@ -568,7 +568,7 @@ const EXERCISES = [
       { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — the crests are read off its d trace" },
     ],
     start: "the penstock with nozzle, tee and standpipe already built — only the reservoir level is yours",
-    task: "Set your reservoir level, note the steady shaft level h₀, then slam the valve and read the first five crest heights above h₀. Equally spaced 1/c means friction ∝ u²; a constant ratio would mean ∝ u.",
+    task: "Set your reservoir level, note the steady shaft level h₀, then slam the valve and read the first five crest heights above h₀. Friction ∝ u² loses Δc ∝ c² per cycle, so 1/c should climb in equal steps — check that it does.",
     settle: 100,
   },
   {

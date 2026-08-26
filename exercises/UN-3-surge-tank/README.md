@@ -19,16 +19,42 @@ u²–y:
 
     (l/g)·du/dt = z − k·u|u|          dz/dt = −(A/A_s)·u
 
-Write it for the successive crest heights c₁, c₂, c₃ … above the resting
-level and one consequence falls out that you can check on a calculator:
+You do not have to solve that to test it. Follow the energy round one cycle,
+writing c for the crest height above the resting level.
 
-| friction law | signature in the crests |
-|---|---|
-| ∝ u² (the lectures' k u²) | **1/c₁, 1/c₂, 1/c₃ … are equally spaced** |
-| ∝ u (viscous) | **c₂/c₁, c₃/c₂ … are equal** |
+At a crest the water is momentarily still, so the surge holds all its energy
+as height — it has lifted a column of area A_s through c/2:
 
-Nothing else survives the algebra — not the penstock length, not the bore,
-not the shaft width, not v₀. Two friction laws, five numbers, one trace.
+    E ∝ c²
+
+Friction spends that store at a rate (head loss) × (discharge) = k·u²·A·u, and
+over one cycle both the speed of the water and the distance it travels scale
+with c. So a cycle costs
+
+    ΔE ∝ c³
+
+Differentiating E ∝ c² gives ΔE ∝ c·Δc. Put the two together, c·Δc ∝ c³:
+
+    Δc ∝ c²
+
+**That is the result.** The height lost per cycle grows as the *square* of the
+height, so a big surge is punished hard and a small one is barely touched —
+which is why the tail of the trace lingers rather than dying away evenly.
+Divide by c² and that becomes a constant step:
+
+    Δ(1/c) = Δc / c² = constant
+
+So 1/c₁, 1/c₂, 1/c₃ … climb by the same amount every cycle. Plot them against
+crest number and k·u² friction is a **straight line**.
+
+The reciprocal is worth recognising on sight: it is the coordinate that
+straightens any quadratic drag — a coasting cyclist, a spun-down flywheel —
+because "loss ∝ the square of what is left" is the same statement each time.
+A friction ∝ u would take a fixed *fraction* per cycle instead, and want log c.
+The size of the step scales with k, so a lossier tee tilts the line steeper.
+
+Note what is not in any of this: no penstock length, no bore, no shaft width,
+no v₀. Five numbers off one trace are enough.
 
 ## Your reservoir level
 
@@ -50,11 +76,10 @@ metres, set on the **Reservoir level** slider. Nothing is drawn.
    steady value of its **d** trace as **h₀**.
 4. Press `V` to slam the valve. Let it swing five times, then pause (**space**).
 5. Read the five crest heights above h₀ as **c₁ … c₅** — about 2.5, 1.7, 1.2,
-   1.0 and 0.8 m. Work out c₂/c₁, c₃/c₂ … and 1/c₁, 1/c₂ … Which one is
-   constant? Submit the five crests.
+   1.0 and 0.8 m. Work out 1/c for each and check the steps between them.
+   Submit the five crests.
 
-Expect the ratios to climb from about 0.66 to about 0.83 — so the damping is
-not ∝ u — while the gaps in 1/c stay near 0.2 all the way down.
+Expect steps of about 0.2 m⁻¹, the same all the way down.
 
 ## For the instructor — pooling the class
 
@@ -66,10 +91,16 @@ python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
 python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 ```
 
-The left panel plots 1/c against crest number, the right log c: the first is
-straight and the second bends. On the shipped dry-run class every one of the
-ten digits gives R² = 0.993–0.999 for 1/c against 0.964–0.986 for log c, so
-no student gets the wrong verdict.
+One line per student, 1/c against crest number. On the shipped dry-run class
+every one of the ten digits comes out straight to R² = 0.993–0.999, so no
+student gets the wrong verdict.
+
+Worth pointing out when the lines go up: they are close to **parallel** —
+slopes 0.20 to 0.24 m⁻¹ across the whole ladder. The digit sets how big a
+surge you start with, but the slope belongs to the rig (k and the geometry),
+not to how hard you drove it. What little trend there is runs the other way
+from the guess — a higher reservoir stands a longer column of water in the
+shaft, and that extra inertia slows the decay per cycle slightly.
 
 ### Discussion points
 

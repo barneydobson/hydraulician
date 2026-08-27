@@ -463,8 +463,11 @@ SUITES.pack = async (B) => {
   for (const id of ids) {
     let r;
     try {
+      // The picker applies its rig a microtask later — EX.ready is the handle
+      // for that, and without awaiting it every read is one exercise behind.
       r = await B.evaluate(`(async () => {
-        await APP.pickExercise(${JSON.stringify(id)});
+        APP.pickExercise(${JSON.stringify(id)});
+        await EX.ready;
         APP.frames(3);
         return { ex: EX.current && EX.current.id, scene: APP.sim.scene.id,
                  field: APP.state.gaugeField, segs: APP.sim.segs.length };

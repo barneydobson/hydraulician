@@ -224,17 +224,22 @@ SUITES.api = async (B) => {
       probeKeys: Object.keys(pr).sort(),
       probeFinite: [pr.u, pr.w, pr.phead, pr.f, pr.speed].every(Number.isFinite),
       analyseKeys: Object.keys(A).sort(),
-      // analyse() mixes plain arrays with the Float32Arrays the smoothing
-      // returns, so "is it an array" has to admit both. Read the sample at a
-      // column the overlay itself trusts (A.ok — it clears the boundary ring
-      // and the guard band either side of every cliff, where d_n is NaN by
-      // construction), and allow Infinity: on a level bed S0 = 0, so no depth
-      // is "normal" and Infinity is the right answer.
-      analyseArrays: ["d", "dc", "dn", "H", "dRaw", "q", "V", "Fr"].filter((k) => {
-        const a = A[k];
-        if (!(Array.isArray(a) || ArrayBuffer.isView(a)) || a.length !== A.d.length) return true;
+      // Shape first: every per-column field is one entry per column, whether
+      // it is a plain array or one of the Float32Arrays the smoothing returns.
+      // A field lost to a rename is undefined and fails here.
+      analyseShape: ["d", "dc", "dn", "H", "dRaw", "q", "V", "Fr", "S0", "ok", "onBed"]
+        .filter((k) => {
+          const a = A[k];
+          return !(Array.isArray(a) || ArrayBuffer.isView(a)) || a.length !== A.d.length;
+        }),
+      // Values only for the fields that are defined everywhere. d_n is NOT
+      // one of them: it is MEASURED off the energy line, so it is NaN where
+      // the friction slope is unusable and Infinity on a level bed — which is
+      // why the hover readout prints it behind an isFinite guard. Its health
+      // is asserted through dnGlobal instead.
+      analyseValues: ["d", "dc", "H", "dRaw", "q", "V", "Fr"].filter((k) => {
         const i = A.ok.findIndex((good, n) => good && A.d[n] > 3 * APP.sim.dx);
-        return i < 0 || typeof a[i] !== "number" || Number.isNaN(a[i]);
+        return i < 0 || !Number.isFinite(A[k][i]);
       }),
       okColumns: A.ok.reduce((n, v) => n + (v ? 1 : 0), 0),
       boxKeys: Object.keys(bf).sort(),
@@ -256,8 +261,10 @@ SUITES.api = async (B) => {
     !["h", "yc", "yn", "hRaw", "E"].some((k) => r.analyseKeys.includes(k)),
     "keys: " + r.analyseKeys.join(","));
   ok("API analyse() has trustworthy columns to read", r.okColumns > 20, r.okColumns + " ok columns");
-  ok("API analyse() arrays carry numbers", r.analyseArrays.length === 0,
-    "not numeric: " + r.analyseArrays.join(","));
+  ok("API analyse() returns one entry per column for every field",
+    r.analyseShape.length === 0, "wrong shape: " + r.analyseShape.join(","));
+  ok("API analyse() values are finite where the overlay trusts them",
+    r.analyseValues.length === 0, "not finite: " + r.analyseValues.join(","));
   ok("API analyse() still reports dnGlobal", r.dnGlobal === "number");
   ok("API boxForce() exposes fx/fz, not fy",
     r.boxKeys.includes("fz") && !r.boxKeys.includes("fy"),

@@ -4,10 +4,9 @@
     python3 collect_plot.py class.csv                 -> plots/pooled-demo.png
     python3 collect_plot.py data/simulated-class.csv   the shipped dry-run class
 
-One row per student: student_id,digit,level_m,T_s,L_m,k_s2m. The digit sets
-the reservoir level and so the amplitude; k belongs to the rig, so the plot
-of k against digit should come out flat. An outlier is almost always a
-misread period — its L column gives it away.
+One row per student: student_id,digit,level_m,k_s2m. The digit sets the
+reservoir level and so the amplitude; k belongs to the rig, so the plot of
+k against digit should come out flat.
 """
 import argparse
 import csv
@@ -27,8 +26,6 @@ def read_rows(path):
                 rows.append({"id": r.get("student_id", "?"),
                              "digit": int(r["digit"]),
                              "level": float(r.get("level_m") or "nan"),
-                             "T": float(r.get("T_s") or "nan"),
-                             "L": float(r.get("L_m") or "nan"),
                              "k": float(r["k_s2m"])})
             except (KeyError, TypeError, ValueError):
                 continue
@@ -46,10 +43,9 @@ def main():
         sys.exit("no usable rows in %s" % a.csv)
     rows.sort(key=lambda d: d["digit"])
 
-    print("  d  level    T(s)   L(m)     k")
+    print("  d  level     k")
     for d in rows:
-        print("  %d  %5.1f   %5.2f   %4.0f   %5.2f"
-              % (d["digit"], d["level"], d["T"], d["L"], d["k"]))
+        print("  %d  %5.1f   %5.2f" % (d["digit"], d["level"], d["k"]))
     ks = [d["k"] for d in rows]
     mk = sum(ks) / len(ks)
     print("\n  k: %.2f .. %.2f, mean %.2f  (+/- %.0f%%) — the rig's, not the digit's"

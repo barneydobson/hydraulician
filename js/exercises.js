@@ -568,7 +568,7 @@ const EXERCISES = [
       { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — the whole decay downloads from this gauge (Controls → Gauges → ⤓ CSV)" },
     ],
     start: "the penstock with nozzle, tee and standpipe already built — only the reservoir level is yours",
-    task: "Set your level, gauge the shaft, slam the valve and let it swing five times. Download the gauge CSV and build the README's Euler model beside it in Excel: T off the trace fixes L, then tune k until the model lies on the measurement. Submit T, L and k — k is the rig's, so everyone should agree.",
+    task: "Set your level, gauge the shaft, slam the valve and let it swing five times. Download the gauge CSV (Controls → Gauges → ⤓ CSV), integrate the surge ODE beside it in Excel — the equations are in the README — and adjust k until the model matches the trace. Submit k.",
     settle: 100,
   },
   {

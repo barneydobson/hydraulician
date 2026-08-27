@@ -64,13 +64,16 @@ solver merely extends `h` into the non-hydrostatic cells it resolves.
 `y` survives only where it is genuinely something else: `y⁺` wall units, and
 chart reference lines like `y = 2x`.
 
-## Where code and display part company
+## Code follows the register — with two exceptions
 
-Displayed symbols are the set above; code identifiers are not renamed to
-match. The GLSL and the runtime state keep `y` for the vertical texture /
-gauge / source fields and `v` for the vertical velocity component
-(`probe().v`), because a rename there buys no reader anything and risks the
-solver. Two consequences worth knowing:
+Code identifiers follow the display set too: the GLSL, the runtime state and
+the public API say `z` for the domain vertical, `w` for the vertical velocity
+and `d` for depth (`probe().w`, `boxForce().fz`, `analyse().d/.dc/.dn/.H`,
+`findJumps().d1/.d2`, `gauges[].z`, `source.z/.vz`), so a reader meets one
+notation everywhere. Two deliberate exceptions: GLSL *swizzles* (`.y` is
+component syntax — `U.g` still stores `w`) and screen-space pixel coordinates
+(canvas y-down) stay `y`; the view transform (`V.Y(z)`, `toDomain`) is the
+boundary between the two. Two consequences worth knowing:
 
 - The rig **wire format** (permalinks, `.json` rigs) is v2: it writes `z` /
   `vz` for the spout and gauge-field keys `"h"` / `"d"` / `"speed"`. The v1

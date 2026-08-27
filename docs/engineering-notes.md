@@ -213,10 +213,10 @@ downstream in a steady state; total volume constant while inflow ≠ outflow.
 
 Normal depth and Manning's n are read off the solver rather than derived from
 `C_f`. The friction slope comes from the computed energy grade line,
-`S_f = −dE/dx`; any quadratic drag gives `S_f ∝ q²/h³`, so
+`S_f = −dH/dx`; any quadratic drag gives `S_f ∝ q²/d³`, so
 
 ```
-d_n = h·(S_f/S₀)^⅓        n = h^⅔ √S_f / V
+d_n = d·(S_f/S₀)^⅓        n = d^⅔ √S_f / V
 ```
 
 This matters because the effective resistance is **not** just `C_f`: the no-slip

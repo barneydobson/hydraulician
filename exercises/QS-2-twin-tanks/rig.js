@@ -81,8 +81,8 @@ window.QS2 = {
     segs.forEach((s) => SIM.addSeg(s[0], s[1], s[2], s[3], s[4], s[5]));
 
     state.gauges.length = 0;
-    state.gauges.push({ x: 0.90, y: P.gy, hist: [], colour: "#7fd4ff" });   // tank 1
-    state.gauges.push({ x: x1 + 0.5 * P.A2, y: P.gy, hist: [], colour: "#ffd479" }); // tank 2
+    state.gauges.push({ x: 0.90, z: P.gy, hist: [], colour: "#7fd4ff" });   // tank 1
+    state.gauges.push({ x: x1 + 0.5 * P.A2, z: P.gy, hist: [], colour: "#ffd479" }); // tank 2
     QS2.valve(false);
     syncPanel();
     return QS2.geom();
@@ -135,7 +135,7 @@ window.QS2 = {
    *  Wall. Nothing here needs the spout or a hand-judged level. */
   fill(maxSec) {
     const P = QS2.P, C = QS2.C;
-    const el = (k) => state.gauges[k].y + APP.probe(state.gauges[k].x, state.gauges[k].y).phead;
+    const el = (k) => state.gauges[k].z + APP.probe(state.gauges[k].x, state.gauges[k].z).phead;
     const small = Math.round(0.25 / APP.SIM.dt()), chunk = Math.round(4 / APP.SIM.dt());
     // ONE reservoir setting does the whole fill. Valve open, level at `hi`:
     // tank 1 fills straight from the boundary and is then HELD at hi, while

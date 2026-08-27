@@ -159,8 +159,8 @@ window.PU1 = {
 
   ix: function (x) { return Math.round(x / APP.sim.dx); },
 
-  openAt: function (x, y) {
-    var S = APP.sim, i = Math.round(x / S.dx), j = Math.round(y / S.dx);
+  openAt: function (x, z) {
+    var S = APP.sim, i = Math.round(x / S.dx), j = Math.round(z / S.dx);
     return S.mask[j * S.nx + i] === 0;
   },
 
@@ -208,7 +208,7 @@ window.PU1 = {
 
   /** Piezometric head = pressure head + elevation. probe().phead is
    *  PRESSURE head only -- see the big warning above. */
-  piezo: function (x, y) { return APP.probe(x, y).phead + y; },
+  piezo: function (x, z) { return APP.probe(x, z).phead + z; },
 
   /** What a student reads and submits: Q (delivered, at the flange column)
    *  and H (flange piezometric head above the CURRENT sump surface). Both
@@ -223,7 +223,7 @@ window.PU1 = {
     return {
       d: d, t: +APP.sim.t.toFixed(2), vxSet: APP.sim.p.source.vx,
       flangePiezo: +Hf.toFixed(4), flangeQ: +A.q[iF].toFixed(4),
-      flangeDepth: +A.h[iF].toFixed(4),
+      flangeDepth: +A.d[iF].toFixed(4),
       sumpSurf: Hs, tankSurf: +A.surf[iT].toFixed(4),
       vol: +APP.volume().toFixed(4), H: +(Hf - Hs).toFixed(4),
     };
@@ -233,8 +233,8 @@ window.PU1 = {
    *  flange, one on the sump surface. */
   gauges: function () {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: PU1.FLANGE_X, y: PU1.FLANGE_Y, hist: [], colour: '#7fd4ff' });
-    APP.state.gauges.push({ x: PU1.SUMP_X, y: 1.0, hist: [], colour: '#ffb648' });
+    APP.state.gauges.push({ x: PU1.FLANGE_X, z: PU1.FLANGE_Y, hist: [], colour: '#7fd4ff' });
+    APP.state.gauges.push({ x: PU1.SUMP_X, z: 1.0, hist: [], colour: '#ffb648' });
   },
 };
 /* PU1.build() -> {dx:0.02174, grid:"414x230", sump_open:true, low_bore_open:true,

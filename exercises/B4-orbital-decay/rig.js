@@ -114,7 +114,7 @@
     return state.tracers.list.map((tr) => ({ x0: tr.x0, y0: tr.y0, path: tr.path.slice() }));
   }
 
-  function gaugeAdd(x, y) { state.gauges.push({ x, y, hist: [] }); return state.gauges.length - 1; }
+  function gaugeAdd(x, z) { state.gauges.push({ x, z, hist: [] }); return state.gauges.length - 1; }
   function gaugeHist(k) { return state.gauges[k].hist.map((r) => ({ t: r.t, h: r.h, d: r.d })); }
   function gaugeClear() { state.gauges.length = 0; }
 

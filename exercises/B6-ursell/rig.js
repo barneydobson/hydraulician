@@ -26,7 +26,7 @@
   function gaugesReset(stations) {
     // stations: [[x,y], ...]
     state.gauges.length = 0;
-    stations.forEach(([x, y]) => state.gauges.push({ x, y, hist: [] }));
+    stations.forEach(([x, z]) => state.gauges.push({ x, z, hist: [] }));
   }
   function gaugeHist(k) {
     return state.gauges[k].hist.map((r) => ({ t: r.t, d: r.d, h: r.h }));
@@ -69,7 +69,7 @@
       const t = sim.t;
       stations.forEach((s, k) => {
         const pr = SIM.probe(s[0], s[1]);
-        rec[k].push({ t, elev: s[1] + pr.phead, u: pr.u, v: pr.v });
+        rec[k].push({ t, elev: s[1] + pr.phead, u: pr.u, w: pr.w });
       });
       guard++;
     }

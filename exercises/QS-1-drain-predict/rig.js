@@ -27,7 +27,7 @@ window.QS1 = {
     C("gaugeField").set("h");
     syncPanel();
     state.gauges.length = 0;
-    state.gauges.push({ x: 1.00, y: 1.00, hist: [], colour: "#7fd4ff" });
+    state.gauges.push({ x: 1.00, z: 1.00, hist: [], colour: "#7fd4ff" });
     return { spoutOn: sim.p.source.on, gauges: state.gauges.length };
   },
 

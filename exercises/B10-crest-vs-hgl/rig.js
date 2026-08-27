@@ -159,8 +159,8 @@ window.B10 = {
    *  either side of the crest, used to interpolate the HGL AT the crest. */
   gauges: function (xA, yA, xB, yB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: yA, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: yB, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: yA, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: yB, hist: [], colour: "#ffb648" });
     B10.XA = xA; B10.YA = yA; B10.XB = xB; B10.YB = yB;
   },
 

@@ -90,7 +90,7 @@ window.CS1 = (function () {
     C('dye').set(true);
     C('dyeDecay').set(0);
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: g.gaugeX, y: g.gaugeY, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: g.gaugeX, z: g.gaugeY, hist: [], colour: "#7fd4ff" });
     syncPanel();
     return state();
   }

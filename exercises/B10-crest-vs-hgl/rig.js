@@ -14,13 +14,13 @@
  * short mid-length band both invert AND soffit are raised by the SAME amount
  * (a pipe going over a hill, bore height held constant):
  *
- *   y=5.0 ┌─────┬───────────┬──╱▔▔▔▔▔╲───────────────────────────────────┐
+ *   z=5.0 ┌─────┬───────────┬──╱▔▔▔▔▔╲───────────────────────────────────┐
  *         │ res │   air     │ ╱ crest  ╲          air                   │
  *         │     ├═══════════╡  (rises) ╞══════════════════════════════════╡ soffit 2.40 (+rise)
  *         │     │ BORE      │  0.3913 m constant gap, the whole way      │ <- tailwater 2.50
  *         │     │ 0.40 m    ╲__________╱                                 │ invert top 2.00 (+rise)
  *         │     ├══════════════════════════════════════════════════════════╡
- *   y=0.0 └─────┴──────────────────────────────────────────────────────────┘ solid to floor
+ *   z=0.0 └─────┴──────────────────────────────────────────────────────────┘ solid to floor
  *         0    1.5      XC-1.45  XC-0.25  XC+0.25  XC+1.45            9.0
  *                              (ramp)  (crest top)  (ramp)     XC = 5.60
  *              gauge A 3.70 ^                             ^ gauge B 8.00
@@ -159,8 +159,8 @@ window.B10 = {
    *  either side of the crest, used to interpolate the HGL AT the crest. */
   gauges: function (xA, yA, xB, yB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: yA, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: yB, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: yA, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: yB, hist: [], colour: "#ffb648" });
     B10.XA = xA; B10.YA = yA; B10.XB = xB; B10.YB = yB;
   },
 
@@ -302,7 +302,7 @@ window.B10 = {
         for (var s = 0; s < 3; s++) {
           var pr = APP.probe(xTop[s], yTop);
           if (pr.f < fm) fm = pr.f;
-          if (pr.head < pm) pm = pr.head;
+          if (pr.phead < pm) pm = pr.phead;
         }
         fCrest.push(fm); pCrest.push(pm);
         // Crown-VOID scan: walk the cell row directly under the soffit from the
@@ -322,7 +322,7 @@ window.B10 = {
     }
     APP.state.paused = true; APP.frames(2);
     var med = function (a) { var b = a.filter(function (v) { return v === v; }).slice().sort(function (p, q) { return p - q; }); return b.length ? b[b.length >> 1] : NaN; };
-    var hA = g[0].hist.map(function (r) { return r.head; }), hB = g[1].hist.map(function (r) { return r.head; });
+    var hA = g[0].hist.map(function (r) { return r.h; }), hB = g[1].hist.map(function (r) { return r.h; });
     var H1 = med(hA), H2 = med(hB);
     var Lx = B.XB - B.XA, frac = (B.XC - B.XA) / Lx;
     var Hc_pred = H1 + (H2 - H1) * frac;    // straight-line HGL interpolated to the crest x

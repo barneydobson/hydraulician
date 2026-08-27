@@ -42,7 +42,7 @@ inside each folder — untracked, local to the maintainer's machine.
 
 **Standing rules (every worksheet carries them):** everyone on Resolution
 Medium (the picker sets this) · wait out the spin-up · median-of-the-wobble
-reads, never one frame · after changing q, re-check any tailwater ≥ 1.3·y_c ·
+reads, never one frame · after changing q, re-check any tailwater ≥ 1.3·d_c ·
 pause-and-read promptly (the chart buffer keeps moving).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
@@ -59,7 +59,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | QS-2 | Two reservoirs find a level | QS-2-twin-tanks/ | RIG-C | (A₂, t_½) |
 | UN-1 | The class discovers c | UN-1-celerity/ | hammer + nozzle rungs | (v₀, ΔH) |
 | UN-2 | Flow establishment | UN-2-establishment/ | estab | (level, u_max, t_75) |
-| UN-3 | Surge tank vs the ODE | UN-3-surge-tank/ | hammer + standpipe | (b_s, v₀, y_max, T) |
+| UN-3 | Surge tank vs the ODE | UN-3-surge-tank/ | hammer + standpipe | (b_s, v₀, z_max, T) |
 | WV-1 | Dispersion, one period each | WV-1-dispersion/ | wavedeep + waveshallow | (T, L, flume) |
 | WV-2 | The buried wave gauge | WV-2-buried-gauge/ | wave + wavedeep | (T, ratio or "below noise") |
 | WV-3 | Reflection coefficient | WV-3-reflection/ | wavesurge + wave | (T, K_refl) |
@@ -70,10 +70,10 @@ pause-and-read promptly (the chart buffer keeps moving).
 | LL-2 | Find the throttle | LL-2-find-throttle/ | RIG-A + hidden fault | (x_found, k_L) per pair |
 | PU-1 | System curve, honest operating point | PU-1-system-curve/ | sump + spout riser | (Q, H) |
 | WE-1 | Rating a sharp-crested weir | WE-1-sharp-weir/ | RIG-B | (q, H) |
-| UF-1 | Normal depth ∝ q^0.6-ish | UF-1-normal-depth/ | s2 | (q, y_n) |
+| UF-1 | Normal depth ∝ q^0.6-ish | UF-1-normal-depth/ | s2 | (q, d_n) |
 | FB-1 | The hump that chokes | FB-1-choking-hump/ | RIG-B + hump | (Δz_c, Δz_pred) |
 | FB-2 | Critical depth three ways | FB-2-yc-three-ways/ | RIG-B crest + overfall | three depths |
-| HJ-1 | Bélanger from a room of flumes | HJ-1-belanger/ | h23 (+ s1 coda) | (Fr₁, y₂/y₁) |
+| HJ-1 | Bélanger from a room of flumes | HJ-1-belanger/ | h23 (+ s1 coda) | (Fr₁, d₂/d₁) |
 | GV-1 | The class digitises the backwater | GV-1-backwater/ | m1 | (x, elevation) |
 | GV-2 | Profile safari | GV-2-profile-safari/ | sandbox game | score + screenshots |
 | CS-1 | When does your chamber spill? | CS-1-cso-spill/ | bespoke CSO, spout-fed | (gap, q_spill) |

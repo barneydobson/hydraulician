@@ -15,12 +15,12 @@
  *   JETRIG.prime()          // settle ~5 sim-s -- call repeatedly (runner pump)
  *   JETRIG.stagnationGauges()   // drop the two gauges used for the head check
  *
- *   y=3.0 ┌─────────────────────────────────────────────┐
+ *   z=3.0 ┌─────────────────────────────────────────────┐
  *         │        (spout)                    │(plate)  │
- *   y=2.5 │        (P)---jet--->  droops ~0.1-0.5 m  ┃   │
+ *   z = 2.5 │        (P)---jet--->  droops ~0.1-0.5 m  ┃   │
  *         │                                    ┃         │
  *         │  air below -- no bed, floor is OPEN (drains  │
- *   y=0.0 └──at the free-fall rate, CLAUDE.md)───────────┘
+ *   z=0.0 └──at the free-fall rate, CLAUDE.md)───────────┘
  *         0    0.55  0.70          1.35 (flat)  1.90(V apex)  9.0
  *
  * Every call below is a documented app entry point (same style as PU-1/MO-1's
@@ -28,10 +28,10 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)     kind 255 wall, 0 ERASE
  *   sim.p.source = {on,x,y,r,vx,vy}     THE SPOUT (Dirichlet velocity, and a
  *     volume TOP-UP inside its own footprint -- see "priming" note below)
- *   APP.probe(x,y) -> {u,v,p,head}      .head is p/(rho g) ONLY -- PRESSURE
+ *   APP.probe(x,y) -> {u,v,p,phead}     .phead is p/(rho g) ONLY -- PRESSURE
  *     head, not full piezometric head (LL-1v's rule, CHANGES-NEEDED.md).
- *     Piezometric head = probe(x,y).head + y. The on-screen GAUGE tool adds
- *     the +y for you (js/main.js sampleGauges: head: gg.y + pr.head) -- read
+ *     Piezometric head = probe(x,y).phead + y. The on-screen GAUGE tool adds
+ *     the +y for you (js/main.js sampleGauges: h: gg.z + pr.phead) -- read
  *     GAUGES for any head comparison, or add +y by hand if hovering raw.
  *
  * MEASURED FACTS (Medium, sandbox W=9 H=5, 414x230, dx=0.021739 m,
@@ -231,14 +231,14 @@ window.JETRIG = {
   /** The two gauges the stagnation-ratio measurement was taken from. */
   stagnationGauges: function () {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: JETRIG.FLAT_X - 0.03, y: 2.46, hist: [], colour: '#7fd4ff' }); // stagnation
-    APP.state.gauges.push({ x: 0.95, y: 2.50, hist: [], colour: '#ffb648' });                 // reference
-    JETRIG.C('gaugeField').set('head'); syncPanel();
+    APP.state.gauges.push({ x: JETRIG.FLAT_X - 0.03, z: 2.46, hist: [], colour: '#7fd4ff' }); // stagnation
+    APP.state.gauges.push({ x: 0.95, z: 2.50, hist: [], colour: '#ffb648' });                 // reference
+    JETRIG.C('gaugeField').set('h'); syncPanel();
   },
 
-  /** Piezometric head = pressure head + elevation (LL-1v; probe().head is
+  /** Piezometric head = pressure head + elevation (LL-1v; probe().phead is
    *  pressure-only). Use this for any raw-probe head comparison. */
-  piezo: function (x, y) { return APP.probe(x, y).head + y; },
+  piezo: function (x, z) { return APP.probe(x, z).phead + z; },
 
   check: function () {
     var s = APP.sim.p.source;

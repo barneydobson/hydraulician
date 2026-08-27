@@ -6,15 +6,15 @@ Usage:
     python3 collect_plot.py class.csv [-o plots/pooled-demo.png]
 
 Input CSV (Blackboard export, or data/simulated-class.csv):
-    student,digit,scene,q,yn[,n_back,S0,source]
+    student,digit,scene,q,dn[,n_back,S0,source]
 
-Only `q` and `yn` (the cursor-read, measured normal depth in m) are needed
+Only `q` and `dn` (the cursor-read, measured normal depth in m) are needed
 for the payoff plot. If `n_back` is missing it is computed here from
-n = yn^(5/3) * sqrt(S0) / q (S0 defaults to 0.25, the scene's 1-in-4 slope,
+n = dn^(5/3) * sqrt(S0) / q (S0 defaults to 0.25, the scene's 1-in-4 slope,
 per js/scenes.js — override with --s0 if a future cohort uses a different
 scene).
 
-The plot: log(yn) vs log(q), least-squares slope compared against the
+The plot: log(dn) vs log(q), least-squares slope compared against the
 Manning-theory reference of 3/5 = 0.6 (#115-118, N2). A second panel
 histograms each student's back-calculated Manning n (#117) — the "channel
 whose n nobody typed in".
@@ -47,14 +47,14 @@ def read_rows(path, s0_default):
     for row in csv.DictReader(lines):
         row = {(k or "").strip(): (v if v is not None else "") for k, v in row.items()}
         q = fnum(row, "q")
-        yn = fnum(row, "yn") if fnum(row, "yn") is not None else fnum(row, "y_n")
-        if q is None or yn is None or q <= 0 or yn <= 0:
+        dn = fnum(row, "dn") if fnum(row, "dn") is not None else fnum(row, "d_n")
+        if q is None or dn is None or q <= 0 or dn <= 0:
             continue
         s0 = fnum(row, "S0") or s0_default
         nback = fnum(row, "n_back")
         if nback is None:
-            nback = (yn ** (5.0 / 3.0)) * math.sqrt(s0) / q
-        row["_q"], row["_yn"], row["_S0"], row["_n"] = q, yn, s0, nback
+            nback = (dn ** (5.0 / 3.0)) * math.sqrt(s0) / q
+        row["_q"], row["_yn"], row["_S0"], row["_n"] = q, dn, s0, nback
         rows.append(row)
     return rows
 
@@ -86,7 +86,7 @@ def main():
 
     rows = read_rows(args.csvfile, args.s0)
     if not rows:
-        sys.exit("no usable rows (need q and yn)")
+        sys.exit("no usable rows (need q and dn)")
 
     qs = [r["_q"] for r in rows]
     yns = [r["_yn"] for r in rows]
@@ -103,7 +103,7 @@ def main():
     xs_line = [lo + (hi - lo) * k / 200.0 for k in range(201)]
 
     axl.plot(xs_line, [coef * x ** slope for x in xs_line], "-", color="#3b6ea5", lw=2,
-              label=r"fitted  $y_n = %.3f\, q^{%.3f}$  ($R^2$=%.3f)" % (coef, slope, r2))
+              label=r"fitted  $d_n = %.3f\, q^{%.3f}$  ($R^2$=%.3f)" % (coef, slope, r2))
     # 0.6-slope Manning reference, anchored through the data centroid so the
     # two lines are visually comparable rather than arbitrarily offset.
     gx = math.exp(sum(math.log(x) for x in qs) / len(qs))
@@ -129,7 +129,7 @@ def main():
     axl.set_xscale("log")
     axl.set_yscale("log")
     axl.set_xlabel(r"inflow  $q$  (m$^2$/s)")
-    axl.set_ylabel(r"measured normal depth  $y_n$  (m)  — overlay cursor read")
+    axl.set_ylabel(r"measured normal depth  $d_n$  (m)  — overlay cursor read")
     axl.set_title(args.title)
     axl.grid(alpha=0.25, which="both")
     axl.legend(loc="upper left", fontsize=8, framealpha=0.95)
@@ -149,7 +149,7 @@ def main():
     fig.savefig(args.out, dpi=150, bbox_inches="tight")
 
     print("wrote %s" % args.out)
-    print("UF-1 points: %d   q %.2f-%.2f   yn %.3f-%.3f m"
+    print("UF-1 points: %d   q %.2f-%.2f   dn %.3f-%.3f m"
           % (len(rows), min(qs), max(qs), min(yns), max(yns)))
     print("fitted slope %.3f vs Manning 3/5 = 0.600   (R^2 = %.4f)" % (slope, r2))
     print("back-calculated n: %.4f - %.4f   mean %.4f   stdev %.4f"

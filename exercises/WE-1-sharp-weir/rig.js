@@ -10,30 +10,30 @@
  *
  * RIG-B is the sandbox stripped to a rectangular flume:
  *
- *   y=5.0 ┌──────────────────────────────────────────────────────┐
+ *   z=5.0 ┌──────────────────────────────────────────────────────┐
  *         │  air (the two sandbox ledges are ERASED)             │
  *         │                                 ┃ plate crest 1.00   │  (WE-1 only)
  *         │  reservoir pool  ~~~~~~~~~~~~~~~┃ ← nappe            │→ open right edge
- *   y=0.5 ├─────────────────────────────────┸────────────────────┤  bed top face
- *   y=0.0 └──────────────────────────────────────────────────────┘  solid to floor
+ *   z=0.5 ├─────────────────────────────────┸────────────────────┤  bed top face
+ *   z=0.0 └──────────────────────────────────────────────────────┘  solid to floor
  *         0                              6.5                    9.0
  *
  * Every call below is a documented app entry point — nothing here is private:
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs() = the C key       SIM.undoSeg() = the Z key
  *   CONTROLS.find(c => c.id === "…").set(v); syncPanel()   = moving a slider
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  *
  * MEASURED FACTS THE DEPENDENT DEMOS INHERIT (Medium, 414 × 230, Δx 21.7 mm)
- *   · the bed top face y = 0.50 lands exactly on a cell boundary (23 cells);
+ *   · the bed top face z = 0.50 lands exactly on a cell boundary (23 cells);
  *     0.50 / 0.0217391 = 23.000, so the drawn and rasterised bed agree exactly.
  *     Keep every RIG-B elevation a multiple of Δx and nothing quantises.
- *   · the sandbox's own two ledges (y ≈ 2.0–3.4) must be ERASED — they sit above
+ *   · the sandbox's own two ledges (z ≈ 2.0–3.4) must be ERASED — they sit above
  *     the water here, but they catch spray and ruin a screenshot. Two fat erase
  *     strokes; RIGB.build does it.
  *   · bottom edge must be WALL (the sandbox default drains) and the bed slab must
- *     be solid all the way to y = 0 — a thin slab leaves a sealed void.
+ *     be solid all the way to z = 0 — a thin slab leaves a sealed void.
  *   · right edge OPEN (= 1, zero-gradient) is correct here because everything
  *     leaving RIG-B past a weir/gate is a thin supercritical sheet. Do NOT use
  *     outfall (= 2) — CLAUDE.md's rule, and measured: it drags the last columns
@@ -86,7 +86,7 @@ window.RIGB = {
     // user segs in order, so an erase stroke placed first still lands on them)
     APP.SIM.addSeg(0.60, 2.50, 7.20, 2.50, 1.10, 0);
     APP.SIM.addSeg(0.60, 3.20, 7.20, 3.20, 1.10, 0);
-    // bed slab: centreline bed/2, thickness bed → spans y = 0 … bed. Solid to
+    // bed slab: centreline bed/2, thickness bed → spans z = 0 … bed. Solid to
     // the domain floor, and run past the left edge so no end column is left open.
     APP.SIM.addSeg(R.X0, bed / 2, bx1, bed / 2, bed, 255);
     // the control, if this demo has one
@@ -115,12 +115,12 @@ window.RIGB = {
   },
 
   /** One gauge in the approach pool — the same push the Gauge tool does.
-   *  y is only the marker height; the card's "h" is the COLUMN depth at x. */
-  gauge: function (x, y) {
+   *  y is only the marker height; the card's "d" is the COLUMN depth at x. */
+  gauge: function (x, z) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: x, y: y === undefined ? RIGB.BED + 0.25 : y,
+    APP.state.gauges.push({ x: x, z: z === undefined ? RIGB.BED + 0.25 : z,
                             hist: [], colour: "#7fd4ff" });
-    APP.state.gaugeField = "depth";     // the card then prints "h 0.734 m"
+    APP.state.gaugeField = "d";     // the card then prints "d 0.734 m"
     RIGB.XG = x;
   },
 
@@ -224,7 +224,7 @@ window.WE1 = {
       APP.frames(1, 1 / 60); n++;
     }
     APP.state.paused = true; APP.frames(2);
-    var a = g.hist.map(function (r) { return r.depth; }).sort(function (p, q) { return p - q; });
+    var a = g.hist.map(function (r) { return r.d; }).sort(function (p, q) { return p - q; });
     var med = a[a.length >> 1], mean = a.reduce(function (p, q) { return p + q; }, 0) / a.length;
     return { t: +S.t.toFixed(2), n: a.length,
              h: +med.toFixed(4), hMean: +mean.toFixed(4),

@@ -13,7 +13,7 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs()  = the C key      SIM.undoSeg() = the Z key
  *   toggleValve()    = the V key      SIM.resetWater() = the R key
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   OVERLAY.analyse(sim, SIM.columns(true)).V[i]  = the "V" line the hover
  *                                                   readout prints
  * Gauge history is filled by tickFrame, i.e. APP.frames(n) -- NOT by
@@ -39,7 +39,7 @@ window.B1 = {
 
   gauge: function (x) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: x, y: B1.YC, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: x, z: B1.YC, hist: [], colour: "#7fd4ff" });
   },
 
   v0: function (x) {
@@ -56,11 +56,11 @@ window.B1 = {
     return +APP.sim.t.toFixed(3);
   },
 
-  /** extract the period from a recorded {t,head} trace: rising mean-crossings,
+  /** extract the period from a recorded {t,h} trace: rising mean-crossings,
    *  linearly interpolated, median of consecutive intervals. */
   period: function (hist) {
     var xs = hist.map(function (p) { return p.t; });
-    var ys = hist.map(function (p) { return p.head; });
+    var ys = hist.map(function (p) { return p.h; });
     var mean = ys.reduce(function (a, b) { return a + b; }, 0) / ys.length;
     var crossings = [];
     for (var i = 1; i < ys.length; i++) {
@@ -112,7 +112,7 @@ window.B1 = {
       erase: !!opts.erase, gaugeX: gaugeX,
       T4Lc: +((4 * (xd - B1.XE)) / APP.sim.p.c).toFixed(4),
       t: hist.map(function (p) { return +p.t.toFixed(4); }),
-      h: hist.map(function (p) { return +p.head.toFixed(3); })
+      h: hist.map(function (p) { return +p.h.toFixed(3); })
     };
   },
 };

@@ -27,7 +27,7 @@ height above the bed, so `H` is the head over the crest. The exponent is 3/2
     C_d = 0.602 + 0.083 · H/P
 
 Here the crest is **P = 0.50 m** above a bed whose top face sits at
-**y = 0.50 m**, so the crest itself is at y = 1.00 m and
+**z = 0.50 m**, so the crest itself is at z = 1.00 m and
 
     H = h − 0.50
 

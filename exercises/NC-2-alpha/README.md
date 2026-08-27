@@ -22,10 +22,10 @@ it to 1. Its momentum counterpart is `β`:
 
     α = Σ u³ ΔA / (V³ A)         β = Σ u² ΔA / (V² A)
 
-For a vertical profile of unit width ΔA is just Δy, so with n points read off
+For a vertical profile of unit width ΔA is just Δz, so with n points read off
 the curve:
 
-    α = Σ u_i³ Δy / (V³ h)       Δy = h / n,   n = 4 or 5
+    α = Σ u_i³ Δz / (V³ h)       Δz = h / n,   n = 4 or 5
     V = the mean of YOUR OWN n points, not the chip's V
 
 `h` comes off the hover box's `depth d` row. The rake's chip prints `u_max`, the

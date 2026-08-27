@@ -5,7 +5,7 @@
 //
 // Geometry this relies on (see README §1 "Scene recon"):
 //   orifice wall face (outer) x = 2.35, wall footprint x in [2.25, 2.35]
-//   opening (the gap in the wall)         y in [1.30, 1.42]   (0.12 m)
+//   opening (the gap in the wall)         z in [1.30, 1.42]   (0.12 m)
 //   tank interior is x < 2.25 (open water); jet falls freely for x > 2.35
 //
 // All three variants start from the SCENE DEFAULT (nothing pre-drawn) —
@@ -34,7 +34,7 @@
 // A short tube projecting INTO the tank (upstream) from the orifice edges:
 // two parallel strokes at the opening's own height. Centrelines are offset
 // OUTWARD by half the stroke thickness so the tube's INNER faces land
-// exactly on y=1.30/1.42 (preserving the 0.12 m bore) — centring the
+// exactly on z=1.30/1.42 (preserving the 0.12 m bore) — centring the
 // strokes on the original edges pinches the bore instead, the first
 // mistake made building this rig (see README §4).
 (function () {

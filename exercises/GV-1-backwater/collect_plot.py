@@ -120,10 +120,10 @@ def main():
 
     # --- seed the direct step from the class's OWN best near-weir point,
     # not from a theoretical weir-rating formula. (Dry-run finding: assuming
-    # critical depth at the crest, elevation = crest + y_c, predicts a pool
+    # critical depth at the crest, elevation = crest + d_c, predicts a pool
     # ~130 mm LOWER than the measured 0.891 m -- this weir runs at H/P ~0.76,
     # well outside the small-H/P regime where that idealisation is good, and
-    # CLAUDE.md itself notes broad-crested weirs pond well above 1.0 y_c.
+    # CLAUDE.md itself notes broad-crested weirs pond well above 1.0 d_c.
     # Seeding from a measurement sidesteps a bad weir-coefficient assumption
     # entirely, and is standard GVF practice: start from a known control.)
     seed_candidates = [r for r in rows if r["x"] <= WEIR_FACE_X - 0.15]

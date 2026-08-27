@@ -13,10 +13,10 @@ Usage:
 
 Input CSV columns (Blackboard export, or data/simulated-class.csv):
     student,digit,scene,x1_bore,x2_bore,t1_bore,t2_bore,v_bore,
-    y1_bore,y2_bore,v_bore_pred,x_neg,t_neg,v_neg,v_neg_pred,source
+    d1_bore,d2_bore,v_bore_pred,x_neg,t_neg,v_neg,v_neg_pred,source
 
 Required per row: x1_bore,x2_bore,v_bore (bore) and x_neg,v_neg (negative
-wave). y1_bore/y2_bore let the script recompute the surge prediction itself
+wave). d1_bore/d2_bore let the script recompute the surge prediction itself
 if v_bore_pred is missing; v_neg_pred is recomputed from H0 below if absent.
 """
 import argparse
@@ -72,7 +72,7 @@ def read_rows(path):
             continue
         row["_xmid"] = 0.5 * (x1 + x2)
         row["_v_bore"] = v_bore
-        y1b, y2b = fnum(row, "y1_bore"), fnum(row, "y2_bore")
+        y1b, y2b = fnum(row, "d1_bore"), fnum(row, "d2_bore")
         vpred = fnum(row, "v_bore_pred")
         if vpred is None and y1b and y2b:
             vpred = surge_speed(y1b, y2b)
@@ -125,7 +125,7 @@ def main():
     if bore:
         order = sorted(bore, key=lambda r: r["_xmid"])
         for k, r in enumerate(order):
-            lbl = "surge prediction at each student's own y₂" if k == 0 else None
+            lbl = "surge prediction at each student's own d₂" if k == 0 else None
             ax.plot([r["_xmid"], r["_xmid"]], [r["_v_bore"], r["_v_bore_pred"]],
                     "-", color="#e07a1f", lw=1.2, alpha=0.55, zorder=3)
             ax.scatter([r["_xmid"]], [r["_v_bore_pred"]], marker="_", s=220,

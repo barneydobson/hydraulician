@@ -15,16 +15,16 @@
  *     PU1.setVx(6)                 // dial student digit d=6's spout velocity
  *     PU1.read(6)                  // {Q, H, ...} -- what that student submits
  *
- *   y=5.0 ┌────────────────────────────────────────┬───────────┬────────┐
+ *   z=5.0 ┌────────────────────────────────────────┬───────────┬────────┐
  *         │                                        │  high run │  tank  │chute
  *         │                    ┌───────────────────┴═══════════╡ soffit 2.40-2.70
  *         │                    ║ riser (0.4 wide)   HIGH BORE   │ (open, ▲=lip)
  *         │  sump (open)       ║ x 3.6-4.0          0.40 m      │  2.90
- *   y=0.8 │  (open, no roof)   ╠════╗ low-run soffit ├──────────┤────────┤
+ *   z=0.8 │  (open, no roof)   ╠════╗ low-run soffit ├──────────┤────────┤
  *         │  ~1.5-1.8 m deep   ║LOW ║ 0.80            │ tank    │ open   │
- *   y=0.4 │                    ║BORE║                 │ floor = │ bottom │
+ *   z = 0.4 │                    ║BORE║                 │ floor = │ bottom │
  *         │      (P)=pump      ║0.40║                 │ high    │ (drain)│
- *   y=0.0 └────────────────────╨────╨─────────────────┴invert───┴────────┘
+ *   z=0.0 └────────────────────╨────╨─────────────────┴invert───┴────────┘
  *         0   0.9   1.8   2.0(P) 3.0(gauge) 3.6  4.0  4.0-6.5   6.5-8.5 8.5-9.0
  *
  * Every call below is a documented app entry point -- nothing here is private:
@@ -33,11 +33,11 @@
  *     (no CONTROLS id for x/y -- the panel only exposes on/r/vx/vy; position
  *     is whatever the Spout tool's drag sets, i.e. sim.p.source.x/y).
  *   CONTROLS.find(c=>c.id==="...").set(v); syncPanel()
- *   APP.probe(x,y) -> {u,v,p,head}      NOTE: .head is p/(rho g) ONLY -- the
+ *   APP.probe(x,y) -> {u,v,p,phead}     NOTE: .phead is p/(rho g) ONLY -- the
  *     PRESSURE head, not the full piezometric head. For a point at physical
- *     elevation y, piezometric head = probe(x,y).head + y. Get this wrong and
+ *     elevation y, piezometric head = probe(x,y).phead + y. Get this wrong and
  *     a pressurised reading comes out LOWER than a free surface it is in fact
- *     holding up (see README Sec.2 "the probe.head trap").
+ *     holding up (see README Sec.2 "the probe.phead trap").
  *   OVERLAY.analyse(sim, SIM.columns(true)).surf[i]  -- exact free-surface
  *     elevation for an OPEN column (sump, tank). Do NOT use .surf inside a
  *     pressurised column -- it reports bed+depth, i.e. the physical soffit
@@ -96,7 +96,7 @@
  *     from there into the sump's own open top, raising the sump even while
  *     the pump ran. Fixed with one extra vertical "cap" stroke immediately
  *     upstream of the riser (x=3.525) sealing that pocket off.
- *   · probe(x,y).head is PRESSURE head only (p/(rho g)), not p/(rho g)+y.
+ *   · probe(x,y).phead is PRESSURE head only (p/(rho g)), not p/(rho g)+y.
  *     Piezometric head needs +y added by hand. Cross-checked against the
  *     open sump's own column-reduction surface (OVERLAY.analyse(...).surf):
  *     agreement to 5 mm once the +y term was added; without it, a
@@ -135,7 +135,7 @@ window.PU1 = {
     APP.SIM.clearSegs();
     // the sandbox's own two ledges cross this footprint; erase them first
     APP.SIM.addSeg(0, 2.7, 9, 2.7, 2.2, 0);
-    // floor: sump + low run + riser base, solid to y=0
+    // floor: sump + low run + riser base, solid to z = 0
     APP.SIM.addSeg(0.0, P.FLOOR_TOP / 2, P.X_RISER1, P.FLOOR_TOP / 2, P.FLOOR_TOP, 255);
     // low-run soffit (roof over the pump/flange section only)
     APP.SIM.addSeg(P.X_MOUTH, P.LOW_SOF + 0.15, P.X_RISER0, P.LOW_SOF + 0.15, 0.30, 255);
@@ -159,8 +159,8 @@ window.PU1 = {
 
   ix: function (x) { return Math.round(x / APP.sim.dx); },
 
-  openAt: function (x, y) {
-    var S = APP.sim, i = Math.round(x / S.dx), j = Math.round(y / S.dx);
+  openAt: function (x, z) {
+    var S = APP.sim, i = Math.round(x / S.dx), j = Math.round(z / S.dx);
     return S.mask[j * S.nx + i] === 0;
   },
 
@@ -206,9 +206,9 @@ window.PU1 = {
     return s.vx;
   },
 
-  /** Piezometric head = pressure head + elevation. probe().head is
+  /** Piezometric head = pressure head + elevation. probe().phead is
    *  PRESSURE head only -- see the big warning above. */
-  piezo: function (x, y) { return APP.probe(x, y).head + y; },
+  piezo: function (x, z) { return APP.probe(x, z).phead + z; },
 
   /** What a student reads and submits: Q (delivered, at the flange column)
    *  and H (flange piezometric head above the CURRENT sump surface). Both
@@ -223,7 +223,7 @@ window.PU1 = {
     return {
       d: d, t: +APP.sim.t.toFixed(2), vxSet: APP.sim.p.source.vx,
       flangePiezo: +Hf.toFixed(4), flangeQ: +A.q[iF].toFixed(4),
-      flangeDepth: +A.h[iF].toFixed(4),
+      flangeDepth: +A.d[iF].toFixed(4),
       sumpSurf: Hs, tankSurf: +A.surf[iT].toFixed(4),
       vol: +APP.volume().toFixed(4), H: +(Hf - Hs).toFixed(4),
     };
@@ -233,8 +233,8 @@ window.PU1 = {
    *  flange, one on the sump surface. */
   gauges: function () {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: PU1.FLANGE_X, y: PU1.FLANGE_Y, hist: [], colour: '#7fd4ff' });
-    APP.state.gauges.push({ x: PU1.SUMP_X, y: 1.0, hist: [], colour: '#ffb648' });
+    APP.state.gauges.push({ x: PU1.FLANGE_X, z: PU1.FLANGE_Y, hist: [], colour: '#7fd4ff' });
+    APP.state.gauges.push({ x: PU1.SUMP_X, z: 1.0, hist: [], colour: '#ffb648' });
   },
 };
 /* PU1.build() -> {dx:0.02174, grid:"414x230", sump_open:true, low_bore_open:true,

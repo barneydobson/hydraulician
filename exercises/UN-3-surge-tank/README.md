@@ -1,11 +1,11 @@
-# UN-3 · Surge tank: measure y_max against the ODE
+# UN-3 · Surge tank: measure z_max against the ODE
 
 A standpipe is teed into the penstock just upstream of the valve. Establish
 the flow and slam the valve, and the pipe's momentum has nowhere to go but up
 the shaft: what follows is a **mass oscillation** — upsurge, downsurge and a
 friction decay — with a period of about ten seconds and an amplitude of about
 three metres. Two numbers come off one gauge trace. Pooled, the class's
-periods trace the ODE's √b_s law, and every measured y_max sits **below** the
+periods trace the ODE's √b_s law, and every measured z_max sits **below** the
 frictionless bound: the shortfall is the ku² term.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
@@ -19,7 +19,7 @@ Take the penstock water as a rigid column and the shaft as a frictionless
 U-tube, and the surge-tank ODE gives a period and an upsurge:
 
     T     = 2π·√(l·b_s / (g·b_p))
-    y_max = v₀·√(l·b_p / (g·b_s))
+    z_max = v₀·√(l·b_p / (g·b_s))
 
 l is the penstock length, b_p the bore and b_s the shaft width. That version
 puts all the inertia in the penstock and none in the shaft; adding the shaft's
@@ -52,9 +52,9 @@ not the target; the wall centrelines are x = 53.0 ∓ (b_s/2 + 0.15):
    at x = 53.0, shaft standing at **b_s = 0.98 m**, which is d = 2. If that is
    your digit, go to step 3.
 2. Otherwise resize it. `Z` twice lifts the two shipped shaft walls; Erase
-   (`2`) the tee again at x = 53.0, from y = 4.9 to y = 6.6, with the brush
+   (`2`) the tee again at x = 53.0, from z = 4.9 to z = 6.6, with the brush
    widened to your own b_s; then Wall (`1`), Shift held, draw both walls from
-   y = 4.9 up to y = 29.6 at your **x_left** and **x_right**. Erase first and
+   z = 4.9 up to z = 29.6 at your **x_left** and **x_right**. Erase first and
    wall second — the later stroke wins, and that is what seals the shaft
    against its own hole.
 3. Press `R` and let it reach steady state — about **60 s**; the card counts
@@ -64,14 +64,14 @@ not the target; the wall centrelines are x = 53.0 ∓ (b_s/2 + 0.15):
    Gauge (`5`) inside the shaft, a metre or so above the pipe. Its **d** trace
    is the water standing in your shaft; note the steady value as **h₀**.
 5. Press `V` to slam the valve and let it swing at least twice — a decaying
-   wave, not a square wave. Pause (**space**) promptly and read **y_max** =
+   wave, not a square wave. Pause (**space**) promptly and read **z_max** =
    first crest − h₀ (the first crest is the biggest) and **T** = crest to
-   crest. Submit **b_s (delivered), v₀, y_max, T**.
+   crest. Submit **b_s (delivered), v₀, z_max, T**.
 
 ## For the instructor — pooling the class
 
 Collect one row per student
-(`student_id,digit,bs_m,v0_ms,ymax_m,T_s,rest_level_m`), export the CSV and
+(`student_id,digit,bs_m,v0_ms,zmax_m,T_s,rest_level_m`), export the CSV and
 run:
 
 ```bash
@@ -82,7 +82,7 @@ python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 `rest_level_m` — the student's own h₀ + 2.06 m — is optional, and worth
 asking for because it enables the shaft-inertia correction. The script plots
 measured period against 2π√(l·b_s/(g·b_p)) on the left, with the
-shaft-corrected prediction as open markers, and measured y_max against the
+shaft-corrected prediction as open markers, and measured z_max against the
 frictionless bound on the right, each point's shortfall drawn as a stem: that
 gap is the ku² term the U28/U29 follow-up asks students to integrate.
 

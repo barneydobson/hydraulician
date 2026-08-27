@@ -23,17 +23,17 @@ A bed rise spends **specific** energy, not total energy. Across the hump
 
 and the least a section can carry `q` on is the critical energy
 
-    E_c = 1.5·y_c        y_c = (q²/g)^⅓
+    E_c = 1.5·d_c        d_c = (q²/g)^⅓
 
 so the crest can pay for the rise until `Δz` exceeds what `E₁` has to spare:
 
-    Δz_pred = E₁ − 1.5·y_c
+    Δz_pred = E₁ − 1.5·d_c
 
 Past that, the only thing left that can rise is the *upstream* depth — the
 crest, not the reservoir, is now in charge of the depth everywhere behind it.
 That is choking, and the height at which it starts is what the class measures.
 
-The rig is fixed and the same for everyone: bed top face at **y = 0.50 m**,
+The rig is fixed and the same for everyone: bed top face at **z = 0.50 m**,
 reservoir **and** tailwater both held at **1.00 m** (the reach has nothing to
 choke against unless both ends are held), gauge at **x = 2.5 m**, and the hump
 1 m long centred on **x = 4.5 m**.
@@ -56,25 +56,25 @@ the assignment in class.
    held at 1.00 m and stay there.
 2. Press `R` and let it reach steady state — about **60 s**; the card counts
    it down.
-3. Read `y₁` on the gauge card at x = 2.5 m and commit your prediction:
-   `E₁ = y₁ + (q/y₁)²/2g`, `y_c` off the q slider,
-   **`Δz_pred = E₁ − 1.5·y_c`**. Write it down *before* you touch the hump.
+3. Read `d₁` on the gauge card at x = 2.5 m and commit your prediction:
+   `E₁ = d₁ + (q/d₁)²/2g`, `d_c` off the q slider,
+   **`Δz_pred = E₁ − 1.5·d_c`**. Write it down *before* you touch the hump.
 4. Draw the hump — Wall (`1`), brush shrunk with `[` to about 0.04 m, one
    shift-held horizontal stroke ~1 m long centred on **x = 4.5 m**, started
-   inside the bed slab (y ≈ 0.45) and dragged up to a first height of ~0.05 m.
+   inside the bed slab (z ≈ 0.45) and dragged up to a first height of ~0.05 m.
 5. Raise it in about seven steps toward `2·Δz_pred` — `Z` to undo, redraw
    taller, re-settle 15–30 s each time (the fine steps near the top need the
-   longer wait), and **jot `y₁` at every step**.
+   longer wait), and **jot `d₁` at every step**.
 6. It has choked when the gauge climbs step after step *and* **Field → Froude
    number** goes pale, then orange, on the crest: that height is `Δz_c`. From
-   the `y₁` you jotted at the LAST step before it choked, recompute the
-   prediction the same way to get `Δz_pred*`, and submit **q, y₁, E₁, y_c,
-   Δz_pred, Δz_c** together with the re-timed pair `y₁*` and `Δz_pred*`.
+   the `d₁` you jotted at the LAST step before it choked, recompute the
+   prediction the same way to get `Δz_pred*`, and submit **q, d₁, E₁, d_c,
+   Δz_pred, Δz_c** together with the re-timed pair `d₁*` and `Δz_pred*`.
 
 ## For the instructor — pooling the class
 
 Collect one row per student
-(`student,digit,q,y1,E1,yc,dzpred,dzc,y1_prechoke,dzpred_star`), export the CSV
+(`student,digit,q,d1,E1,dc,dzpred,dzc,d1_prechoke,dzpred_star`), export the CSV
 and run:
 
 ```bash
@@ -82,7 +82,7 @@ python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
 python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
 ```
 
-The script derives `E₁`, `y_c` and both predictions wherever a student left
+The script derives `E₁`, `d_c` and both predictions wherever a student left
 them out, then plots `Δz_c` against `Δz_pred` with the 1:1 line and
 cell-quantisation error bars — and the same `Δz_c` against the re-timed
 `Δz_pred*` beside it; the right panel is both ratios against `q`.

@@ -1,4 +1,4 @@
-student,digit,scene,q,yn,yn_min,yn_max,flatness_pct,ynGlobal,S0_overlay,n_overlay_median,n_back,source
+student,digit,scene,q,dn,dn_min,dn_max,flatness_pct,dnGlobal,S0_overlay,n_overlay_median,n_back,source
 sim00,0,s2,0.8,0.2359,0.2351,0.2362,0.266,0.2503,0.2447,0.0612,0.0563,measured
 sim01,1,s2,0.84,0.2433,0.2426,0.2446,0.506,0.2581,0.2447,0.0516,0.0564,measured
 sim02,2,s2,0.88,0.2582,0.2579,0.2585,0.065,0.274,0.2447,0.0611,0.0595,measured

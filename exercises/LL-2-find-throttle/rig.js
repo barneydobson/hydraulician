@@ -16,11 +16,11 @@
  * fault: a short VERTICAL wall segment rising from the invert, one grid cell
  * or so wide, to a height that blocks 2 or 3 of the bore's 18 cells:
  *
- *   y=2.70 ┤            (air above the soffit)
- *   y=2.40 ┼═══════════════════════●═══════════════════════════ soffit
+ *   z = 2.70 ┤            (air above the soffit)
+ *   z = 2.40 ┼═══════════════════════●═══════════════════════════ soffit
  *          │           BORE        █  <- partner A's fault (2-3 cells tall,
  *          │       0.3913 m        █     ~1 cell wide, invisible at 0-zoom)
- *   y=2.00 ┼═══════════════════════█═══════════════════════════ invert
+ *   z = 2.00 ┼═══════════════════════█═══════════════════════════ invert
  *          │                    x = x_fault (partner A's choice, 4.6-7.0 m)
  *
  * MEASURED FACTS THIS RIG ADDS ON TOP OF RIG-A (see README §5 for the numbers)
@@ -34,7 +34,7 @@
  *     column fill fraction f collapsing to ~0.6-0.7 a bore-height or so past
  *     the plate). The worksheet band is 2-3 cells, not the "30-60% of the
  *     bore" a first guess suggests — see README §5.1.
- *   · gauges tap NEAR THE SOFFIT (y = 2.35, not RIG-A's mid-bore 2.20 or
+ *   · gauges tap NEAR THE SOFFIT (z = 2.35, not RIG-A's mid-bore 2.20 or
  *     LL-1's near-invert 2.10). The fault rises FROM the invert, so the
  *     invert side is the disturbed wake and the soffit side is the "far
  *     wall" — LL-1's rule ("tap near a wall, not the centreline, near a
@@ -42,9 +42,9 @@
  *     obstruction, not always the same wall. Verified with a vertical head
  *     profile, README §5.3.
  *   · EVERY gauge in this rig sits at the SAME y (2.35), always. `SIM.probe`'s
- *     "head" is p/(rho g) only — the PRESSURE head, not the full piezometric
+ *     "phead" is p/(rho g) only — the PRESSURE head, not the full piezometric
  *     head z + p/(rho g) — confirmed by probing a vertical line in undisturbed
- *     RIG-A flow: z + head is constant (~const across y) but "head" alone
+ *     RIG-A flow: z + phead is constant (~const across y) but "phead" alone
  *     falls off steeply with y. Comparing two gauges at *different* heights
  *     therefore folds a (y1 - y2) offset into the reading. Fixing y sidesteps
  *     the question entirely: a same-height difference is exactly the true
@@ -84,7 +84,7 @@ window.RIGA = window.RIGA || {
     // because rasterise() replays scene walls, then user segs in order.
     APP.SIM.addSeg(0.60, 2.50, 7.20, 2.50, 1.10, 0);
     APP.SIM.addSeg(0.60, 3.20, 7.20, 3.20, 1.10, 0);
-    // invert: centreline y = 1.0, thickness 2.0 → spans 0 … 2.0. Solid all the
+    // invert: centreline z = 1.0, thickness 2.0 → spans 0 … 2.0. Solid all the
     // way to the domain floor: a thin slab leaves a void that the reservoir
     // fills through its own open bottom and the pipe gets a parallel path.
     APP.SIM.addSeg(R.X0, R.INV / 2, R.X1, R.INV / 2, R.INV, 255);
@@ -110,8 +110,8 @@ window.RIGA = window.RIGA || {
   /** Two gauges on the pipe axis. Same push the Gauge tool does. */
   gauges: function (xA, xB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: RIGA.AXIS, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: RIGA.AXIS, hist: [], colour: "#ffb648" });
     RIGA.XA = xA; RIGA.XB = xB; RIGA.L = +(xB - xA).toFixed(3);
   },
 
@@ -197,11 +197,11 @@ window.LL2 = {
    *  student clicks (state.gauges.length>=4 -> shift, then push). Passing
    *  the WHOLE set of x's you want visible is the harness equivalent of a
    *  student clicking each one in turn, left to right. */
-  setGauges: function (xs, y) {
-    y = y === undefined ? LL2.Y : y;
+  setGauges: function (xs, z) {
+    z = z === undefined ? LL2.Y : z;
     APP.state.gauges.length = 0;
     var cols = ["#7fd4ff", "#ffb648", "#5fd08a", "#ff8fa3"];
-    xs.forEach(function (x, k) { APP.state.gauges.push({ x: x, y: y, hist: [], colour: cols[k] }); });
+    xs.forEach(function (x, k) { APP.state.gauges.push({ x: x, z: z, hist: [], colour: cols[k] }); });
   },
 
   /** Fast settle: physics only, no render (matches FR1.settle/LL1.settle). */
@@ -235,8 +235,8 @@ window.LL2 = {
     function sd(a) { var m = mean(a); return Math.sqrt(mean(a.map(function (v) { return (v - m) * (v - m); }))); }
     return { t: +S.t.toFixed(2),
              x: g.map(function (gg) { return gg.x; }),
-             H: g.map(function (gg) { return +mean(gg.hist.map(function (r) { return r.head; })).toFixed(5); }),
-             Hsd: g.map(function (gg) { return +sd(gg.hist.map(function (r) { return r.head; })).toFixed(5); }),
+             H: g.map(function (gg) { return +mean(gg.hist.map(function (r) { return r.h; })).toFixed(5); }),
+             Hsd: g.map(function (gg) { return +sd(gg.hist.map(function (r) { return r.h; })).toFixed(5); }),
              V: Vsum.map(function (v) { return +(v / nV).toFixed(4); }) };
   },
 

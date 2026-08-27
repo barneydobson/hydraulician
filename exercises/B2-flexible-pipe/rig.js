@@ -11,7 +11,7 @@
  * almost verbatim):
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   toggleValve()    = the V key      SIM.resetWater() = the R key
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   OVERLAY.analyse(sim, SIM.columns(true)).V[i]  = the "V" line the hover
  *                                                   readout prints
  * Gauge history is filled by tickFrame (APP.frames(n)), NOT by
@@ -43,7 +43,7 @@ window.B2 = {
 
   gauge: function () {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: B2.XG, y: B2.YC, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: B2.XG, z: B2.YC, hist: [], colour: "#7fd4ff" });
   },
 
   v0: function (x) {
@@ -64,7 +64,7 @@ window.B2 = {
     var hist = APP.state.gauges[0].hist;
     var tEnd = hist[hist.length - 1].t;
     var vals = hist.filter(function (p) { return p.t >= tEnd - w; })
-                   .map(function (p) { return p.head; })
+                   .map(function (p) { return p.h; })
                    .sort(function (a, b) { return a - b; });
     return vals.length ? vals[Math.floor(vals.length / 2)] : null;
   },

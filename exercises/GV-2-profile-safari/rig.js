@@ -128,9 +128,9 @@ window.CHAN = {
   probe: function (x) {
     var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
     var i = Math.round(x / APP.sim.dx);
-    return { x: x, i: i, ok: !!A.ok[i], h: +A.h[i].toFixed(4), S0: +A.S0[i].toFixed(5),
-             yn: +A.yn[i].toFixed(4), yc: +A.yc[i].toFixed(4), Fr: +A.Fr[i].toFixed(3),
-             cls: A.ok[i] ? OVERLAY.classify(A.h[i], A.yn[i], A.yc[i], A.S0[i]) : "" };
+    return { x: x, i: i, ok: !!A.ok[i], h: +A.d[i].toFixed(4), S0: +A.S0[i].toFixed(5),
+             yn: +A.dn[i].toFixed(4), yc: +A.dc[i].toFixed(4), Fr: +A.Fr[i].toFixed(3),
+             cls: A.ok[i] ? OVERLAY.classify(A.d[i], A.dn[i], A.dc[i], A.S0[i]) : "" };
   },
 };
 
@@ -154,7 +154,7 @@ window.RECIPES = {
    *  mild bed, meant as a "pure backwater" M1 in the spirit of the shipped
    *  m1 scene. Two heights tested (0.35 m and 0.55 m above the bed) both
    *  read M2 the whole reach (8-10/10 samples), M1 only flickering 2-4/10 —
-   *  on this short a reach the measured y_n already sits close to what the
+   *  on this short a reach the measured d_n already sits close to what the
    *  weir pool delivers, so the +5% M1 margin isn't reliably cleared. Not
    *  shipped as a recipe; mild123's gate-pool M1 below is the verified one.
    *  Left here as a documented dead end, not deleted from history — see
@@ -174,7 +174,7 @@ window.RECIPES = {
   },
 
   /** Small gate on a steep bed, NO tailwater -> S1 (still pool behind the
-   *  gate), S3 (the whole apron, asymptoting toward y_n, no jump anywhere).
+   *  gate), S3 (the whole apron, asymptoting toward d_n, no jump anywhere).
    *  Clean and fast (~35s) — this is the better S3 demo than the roll-wave
    *  bands above. a = 0.35 (the shipped s3 value) DROWNS from a dry start;
    *  0.15 is the safe sandbox opening. */
@@ -212,8 +212,8 @@ window.RECIPES = {
 
   /** Gate + weir at S0 = 1-in-8.5 (c13's own slope), scaled to fit the
    *  sandbox — the knife edge. C1 and C3 BOTH appear (confirmed by direct
-   *  probe: y_n ~ 0.23-0.24 m sits within the classifier's +-5% band of the
-   *  local y_c much of the time) but FLICKER between C1/C3/M1/M3/S1 sample
+   *  probe: d_n ~ 0.23-0.24 m sits within the classifier's +-5% band of the
+   *  local d_c much of the time) but FLICKER between C1/C3/M1/M3/S1 sample
    *  to sample, exactly like the shipped c13 scene (which ships with labels
    *  OFF by default for this reason — CLAUDE.md/js/scenes.js). Needed the
    *  longest settle of anything in this safari (~110s) and never reached

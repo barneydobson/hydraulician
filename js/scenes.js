@@ -7,24 +7,24 @@
  * budget and the canvas letterboxes it, so a scene behaves identically
  * whatever shape the window is.
  *
- *   seg = [x0, y0, x1, y1, thickness]
+ *   seg = [x0, z0, x1, z1, thickness]
  *
  * is a straight edge with BUTT ends — exactly what the left-drag tool
  * produces, so every scene here is something you could have drawn yourself.
- * x0,y0 → x1,y1 is the centreline, so a bed whose top face should sit at
+ * x0,z0 → x1,z1 is the centreline, so a bed whose top face should sit at
  * z has its centreline at z − thickness/2.
  *
  * Two rules learned the hard way:
  *  · Ground must be solid all the way down. A thin slab leaves a sealed void
  *    underneath that fills through any opening and then drowns the outfall
- *    above it. Beds are drawn thick enough to reach below y = 0.
+ *    above it. Beds are drawn thick enough to reach below z = 0.
  *  · A Dirichlet level boundary applies over the whole ghost column below
  *    that level, so anything you do not want flooded needs a wall at x = 0.
  *  · A subcritical reach needs a real downstream control — a tailwater level
  *    or a brink. The open boundary is zero-gradient, which is correct for
  *    supercritical outflow but simply ponds a subcritical one.
- *  · A tailwater level must stand clear of critical depth — tail ≥ 1.3 y_c,
- *    rechecked whenever q moves, since y_c = (q²/g)^⅓. Set AT y_c the outlet
+ *  · A tailwater level must stand clear of critical depth — tail ≥ 1.3 d_c,
+ *    rechecked whenever q moves, since d_c = (q²/g)^⅓. Set AT d_c the outlet
  *    chokes and the one-cell Dirichlet argues with the flow it should be
  *    setting; set below it, it is asking for a depth the outlet cannot hold.
  *
@@ -48,7 +48,7 @@ const SCENES = (() => {
   // Hydrostatic fill: the equilibrium f for still water standing at `lev`.
   // Starting here rather than at f = 1 avoids a spurious water-hammer
   // transient the moment a scene loads.
-  const still = (lev, y, P) => (y < lev ? 1 + P.g * (lev - y) / (P.c * P.c) : 0);
+  const still = (lev, z, P) => (z < lev ? 1 + P.g * (lev - z) / (P.c * P.c) : 0);
 
   const base = {
     W: 8, H: 4.5, g: 9.81, c: 25, cf: 0.03, cs: 0.16, nu: 1e-5,
@@ -58,7 +58,7 @@ const SCENES = (() => {
     inflow: { level: 0, q: 0, on: 0, free: 0 },
     tailwater: { level: 0, on: 0 },
     wave: { amp: 0, period: 1.5, on: 0, x: 0.15 },
-    source: { on: 0, x: 0.5, y: 4.0, r: 0.12, vx: 1.2, vy: -1.6 },
+    source: { on: 0, x: 0.5, z: 4.0, r: 0.12, vx: 1.2, vz: -1.6 },
     walls: () => [],
     water: () => 0,
   };
@@ -69,20 +69,20 @@ const SCENES = (() => {
   // different controls bolted on, so they are all generated from one place.
   // The two numbers that decide everything:
   //
-  //     y_c = (q²/g)^⅓                        critical depth
-  //     y_n = [ C_f q² / (2.8 g S₀) ]^⅓        normal depth
+  //     d_c = (q²/g)^⅓                        critical depth
+  //     d_n = [ C_f q² / (2.8 g S₀) ]^⅓        normal depth
   //
   // The 2.8 is the same wall-function-to-Manning factor the overlay uses
   // (OVERLAY.KN); it drops out of the ratio, which is all that matters:
   //
-  //     y_n / y_c = [ C_f / (2.8 S₀) ]^⅓   →   mild if C_f > 2.8 S₀,
+  //     d_n / d_c = [ C_f / (2.8 S₀) ]^⅓   →   mild if C_f > 2.8 S₀,
   //                                            steep if C_f < 2.8 S₀,
   //                                            critical if equal.
   //
   // So each profile below is produced by choosing S₀ and C_f either side of
   // that line, then adding the control (weir, gate, brink, tailwater) that
   // puts the depth in zone 1, 2 or 3.
-  const TH = 1.4;                          // bed thickness — reaches below y=0
+  const TH = 1.4;                          // bed thickness — reaches below z=0
 
   function channel(o) {
     const W = o.W, H = o.H, xEnd = o.xEnd === undefined ? W : o.xEnd;
@@ -132,13 +132,13 @@ const SCENES = (() => {
     const ynE = S0 > 1e-5 ? Math.pow(o.cf * o.q * o.q / (2.8 * 9.81 * S0), 1 / 3) : ycE * 1.6;
     const d0 = o.start === undefined ? Math.min(Math.max(ycE, ynE), 0.6) : o.start;
     const crest = o.weir ? bedTop(o.weir.x) + o.weir.h : -1e9;
-    const water = (x, y, P) => {
-      if (x >= xEnd || y <= bedTop(x)) return 0;
+    const water = (x, z, P) => {
+      if (x >= xEnd || z <= bedTop(x)) return 0;
       let lev;
       if (o.gate && x < o.gate.x) lev = inLevel;                 // pool behind the gate
       else if (o.weir && x < o.weir.x) lev = Math.max(crest, bedTop(x) + d0);
       else lev = Math.max(bedTop(x) + d0, twLevel);
-      return still(lev, y, P);
+      return still(lev, z, P);
     };
 
     return Object.assign({
@@ -194,11 +194,11 @@ const SCENES = (() => {
         [o.xa - ext, o.hi - offR + ext * sr, o.xb, o.lo - offR, TH],          // drop face
         [o.xb, o.lo - off, W + 1, apron(W + 1) - off, TH],                    // apron
       ],
-      water: (x, y, P) => {
+      water: (x, z, P) => {
         const bed = x < o.xa ? o.hi : (x < o.xb ? o.hi - sr * (x - o.xa) : apron(x));
-        if (y <= bed) return 0;
+        if (z <= bed) return 0;
         const lev = x < o.xa ? inLevel : Math.max(bed + 0.10, twLevel);
-        return still(lev, y, P);
+        return still(lev, z, P);
       },
     }, o.extra || {});
   }
@@ -250,8 +250,8 @@ const SCENES = (() => {
         [0.0, bed - 0.40, xb, bed - 0.40, 0.80],                     // flat bed
         [xb, bed - off, W + 0.4, bed + S * (W + 0.4 - xb) - off, TH],  // beach
       ],
-      water: (x, y, P) => (y > bed && y < lev && x < xb + (y - bed) / S
-                            ? still(lev, y, P) : 0),
+      water: (x, z, P) => (z > bed && z < lev && x < xb + (z - bed) / S
+                            ? still(lev, z, P) : 0),
       id: o.id, name: o.name, key: o.key, blurb: o.blurb, tips: o.tips,
     };
   }
@@ -275,7 +275,7 @@ const SCENES = (() => {
       // wrong under a pool. Mode 1 mirrors the interior, so the floor
       // bleeds at the free-fall rate instead.
       open: [0, 0, 1, 0],
-      source: { on: 1, x: 0.55, y: 4.55, r: 0.14, vx: 1.1, vy: -1.4 },
+      source: { on: 1, x: 0.55, z: 4.55, r: 0.14, vx: 1.1, vz: -1.4 },
       // The second ledge starts at 3.4, not 4.2. Water leaves the first at
       // (3.2, 2.9) doing ~2.3 m/s and lands 0.50 m on at x ≈ 3.70, so a ledge
       // beginning at 4.2 is never touched — with the floor draining, the
@@ -296,9 +296,9 @@ const SCENES = (() => {
              "Close a pipe off completely and the water pressurises: watch the gold sheen."] },
 
     // ------------------------------------------------- MILD  (C_f > 2.8 S₀)
-    // S₀ = 1 in 68, C_f = 0.125  →  y_n ≈ 0.27 m against y_c ≈ 0.19 m.
+    // S₀ = 1 in 68, C_f = 0.125  →  d_n ≈ 0.27 m against d_c ≈ 0.19 m.
     // inletDepth is the MEASURED backwater depth arriving from the weir
-    // (the M1 curve does not decay to y_n within this reach). The inlet
+    // (the M1 curve does not decay to d_n within this reach). The inlet
     // level must meet the profile: pinned lower, the boundary chokes the
     // backwater and sheds ripples; the level is an elevation above the
     // datum, bed0 + inletDepth.
@@ -310,25 +310,25 @@ const SCENES = (() => {
       id: "m1", name: "M1 · backwater behind a weir", key: "Mild, zone 1",
       blurb: "A weir on a mild slope holds the depth above normal depth all the way upstream — the M1 backwater curve.",
       tips: ["The weir is the control; the curve is computed <i>upstream</i> from it.",
-             "The surface stays above y_n (green) everywhere — zone 1, so M<b>1</b>.",
-             "Backwater length scales as y_n/S₀. Drop the roughness and it stretches.",
+             "The surface stays above d_n (green) everywhere — zone 1, so M<b>1</b>.",
+             "Backwater length scales as d_n/S₀. Drop the roughness and it stretches.",
              "Erase the weir and the same channel relaxes towards M2."] }),
 
     // tilt: flat bed + tilted gravity, because at M2's working depth the
     // rasterised bed staircase excites standing waves the demo cannot absorb
     // (m1 runs deep enough to hide the same steps).
     // inletDepth is the depth the arriving profile actually wants — here the
-    // measured y_n (0.36), since an M2 leaves normal depth and draws down to
+    // measured d_n (0.36), since an M2 leaves normal depth and draws down to
     // the brink. Pin it lower and the inlet chokes and sheds ripples for ever:
     // measured surface fluctuation over t = 60–110 s at x = 1.3 m was 37 mm
     // with the level held at 0.205 (the flow was standing at 0.354 regardless)
     // against 17 mm once it was let up to 0.35. It also stops the class
     // flickering M1 / M2 / M1 along a reach that should read M2 end to end —
     // one run now, 0 → 13.5 m.
-    //   The 0.205 figure came from an earlier y_n measurement of 0.215 that
+    //   The 0.205 figure came from an earlier d_n measurement of 0.215 that
     // was itself wrong: the free-fall columns past the brink were still in the
-    // y_n median (see the mask guard in overlay.analyse). With them excluded
-    // y_n measures 0.36, and the inlet has to follow.
+    // d_n median (see the mask guard in overlay.analyse). With them excluded
+    // d_n measures 0.36, and the inlet has to follow.
     Object.assign(channel({
       W: 16, H: 0.95, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
       inletDepth: 0.35, xEnd: 13.6, tilt: true,
@@ -338,7 +338,7 @@ const SCENES = (() => {
       blurb: "The same mild channel ending in a brink. The surface is drawn down through critical depth at the lip — the M2 curve.",
       tips: ["Colour is Froude number: blue subcritical, red supercritical.",
              "The brink forces critical depth, so the control is downstream.",
-             "The surface sits between y_n and y_c — zone 2, so M<b>2</b>.",
+             "The surface sits between d_n and d_c — zone 2, so M<b>2</b>.",
              "Dye timelines are on: the shear in each line <i>is</i> the velocity profile."] }),
 
     // Zone 3 comes from a DROP, not from a gate. A sluice gate that is even
@@ -354,15 +354,15 @@ const SCENES = (() => {
       cf: 0.010, cs: 0.06, q: 0.25, inletDepth: 0.30, tail: 0.20,
       hmax: 0.5, vmax: 4, spinup: 22,   // measured: profile arrives by 17 s
       tips: ["Supercritical on the chute, subcritical on the apron — the jump is the only way across.",
-             "The jump box compares the measured y₂ against ½y₁(√(1+8Fr₁²) − 1).",
-             "Past the jump the depth sits between y_n and y_c: that reach is M<b>2</b>.",
+             "The jump box compares the measured d₂ against ½d₁(√(1+8Fr₁²) − 1).",
+             "Past the jump the depth sits between d_n and d_c: that reach is M<b>2</b>.",
              "Raise the tailwater and the jump marches upstream onto the chute."] }),
 
     // ------------------------------------------------ STEEP  (C_f < 2.8 S₀)
     // S₀ = 1 in 4 at q = 1.2 m²/s. Against the MEASURED resistance that is
-    // y_n ≈ 0.32 m under y_c = 0.53 m, i.e. Fr ≈ 2.1 at normal depth — steep,
+    // d_n ≈ 0.32 m under d_c = 0.53 m, i.e. Fr ≈ 2.1 at normal depth — steep,
     // and deep enough (≈ 24 cells) that the delivered n stays near 0.03.
-    // Every steep scene keeps its bed above y = 0 for the whole modelled
+    // Every steep scene keeps its bed above z = 0 for the whole modelled
     // reach: where the slab sinks below the domain floor the water runs on
     // the floor instead, which is not the channel the scene is describing.
     Object.assign(channel({
@@ -372,7 +372,7 @@ const SCENES = (() => {
     }), {
       id: "s1", name: "S1 · steep bed, drowned outlet", key: "Steep, zone 1",
       blurb: "A steep channel with the tailwater held above critical. The supercritical sheet jumps, and above the jump the surface climbs to the control — an S1 curve.",
-      tips: ["On a steep bed y_n sits <i>below</i> y_c, so zone 1 means above both.",
+      tips: ["On a steep bed d_n sits <i>below</i> d_c, so zone 1 means above both.",
              "The reach downstream of the jump, backed up by the tailwater, is S<b>1</b>.",
              "Lower the tailwater and the jump runs downstream out of the domain.",
              "Upstream of the jump the same channel is running S2."] }),
@@ -385,12 +385,12 @@ const SCENES = (() => {
       id: "s2", name: "S2 · chute from a reservoir", key: "Steep, zone 2",
       blurb: "Water spilling from a reservoir onto a steep bed passes through critical at the crest and accelerates down towards normal depth — the S2 curve.",
       tips: ["The control is the crest at the top: critical depth sits at the entrance.",
-             "The surface falls from y_c towards y_n from above — zone 2, so S<b>2</b>.",
-             "Both y_c and y_n are drawn; note that y_n is the <i>lower</i> one here.",
+             "The surface falls from d_c towards d_n from above — zone 2, so S<b>2</b>.",
+             "Both d_c and d_n are drawn; note that d_n is the <i>lower</i> one here.",
              "Nothing downstream can influence this reach — it is supercritical throughout."] }),
 
     // W = 5.6 is not arbitrary: at S₀ = 1 in 4 a bed starting at 1.40 reaches
-    // y = 0 exactly there. Run the reach any further (it used to go to 6.4)
+    // z = 0 exactly there. Run the reach any further (it used to go to 6.4)
     // and the slab is below the domain floor, so the last 0.8 m was water
     // sliding on the floor and draining out of the open bottom edge — the
     // discharge fell from 1.20 to 0.98 along it and the overlay named the
@@ -402,23 +402,23 @@ const SCENES = (() => {
       hmax: 0.7, vmax: 6, spinup: 26,
     }), {
       id: "s3", name: "S3 · gate on a steep bed", key: "Steep, zone 3",
-      blurb: "A gate opened tighter than normal depth. The flow leaves below y_n and climbs back up towards it — the S3 curve, with no jump anywhere.",
-      tips: ["The opening is smaller than y_n, so the depth starts below <i>both</i> depths.",
-             "The surface rises asymptotically towards y_n — zone 3, so S<b>3</b>.",
+      blurb: "A gate opened tighter than normal depth. The flow leaves below d_n and climbs back up towards it — the S3 curve, with no jump anywhere.",
+      tips: ["The opening is smaller than d_n, so the depth starts below <i>both</i> depths.",
+             "The surface rises asymptotically towards d_n — zone 3, so S<b>3</b>.",
              "No jump anywhere: the flow is supercritical before and after, so none is needed.",
-             "Erase the gate and redraw it wider than y_n and the same channel runs S2."] }),
+             "Erase the gate and redraw it wider than d_n and the same channel runs S2."] }),
 
-    // ------------------------------------------ CRITICAL  (y_n = y_c)
+    // ------------------------------------------ CRITICAL  (d_n = d_c)
     // Tuned against the DELIVERED resistance, not the nominal C_f: at this
     // depth-to-Δx the wall function + eddy viscosity + bed staircase deliver
     // far more drag than C_f suggests, so the slope that balances them is
     // 1 in 8.5 with C_f nearly zero. The weir is low (0.12 m) because a
-    // broad-crested weir ponds ~1.5 y_c of head above its crest — the old
+    // broad-crested weir ponds ~1.5 d_c of head above its crest — the old
     // 0.30 m crest drowned the gate and turned the whole reach into one M1
     // pool.
-    // 1 in 9.5 measured y_n = 0.205 against y_c = 0.192 — 7% high, which is
+    // 1 in 9.5 measured d_n = 0.205 against d_c = 0.192 — 7% high, which is
     // outside classify()'s ±5% C band, so the "critical" scene reported M.
-    // y_n ∝ S₀^−⅓, so closing a 7% gap wants ~23% more slope; steepening
+    // d_n ∝ S₀^−⅓, so closing a 7% gap wants ~23% more slope; steepening
     // also thins the flow, which raises the delivered roughness and pushes
     // back, so this is deliberately short of that at 1 in 8.5.
     Object.assign(channel({
@@ -430,7 +430,7 @@ const SCENES = (() => {
       // profile was still a long way from its final shape.
       mode: 3, hmax: 0.45, vmax: 3.0, spinup: 95,
     }), {
-      id: "c13", name: "C1 / C3 · critical slope", key: "y_n = y_c",
+      id: "c13", name: "C1 / C3 · critical slope", key: "d_n = d_c",
       labels: 0,
       // This scene is WAVY and cannot be made otherwise: at Fr ≈ 1 the
       // (1 − Fr²) in dy/dx = (S₀ − S_f)/(1 − Fr²) vanishes, so every
@@ -445,57 +445,57 @@ const SCENES = (() => {
       // above what the pool wants. Lowering it does quieten the pool a lot
       // (28 → 1 mm at x = 0.4 at 0.27), but the gate pool then collapses to
       // 0.147 m — under the gate's own 0.15 m opening, so the gate stops
-      // controlling, the C3 reach goes with it, and y_n/y_c falls to 0.905,
+      // controlling, the C3 reach goes with it, and d_n/d_c falls to 0.905,
       // outside the ±5% C band the whole scene is calibrated on.
-      blurb: "The knife edge: a slope where the measured normal depth equals critical depth. Zone 2 vanishes, and the depth hugs y_c along the whole reach.",
-      tips: ["The slope is tuned so the <i>measured</i> y_n equals y_c — the dashed lines overlap.",
+      blurb: "The knife edge: a slope where the measured normal depth equals critical depth. Zone 2 vanishes, and the depth hugs d_c along the whole reach.",
+      tips: ["The slope is tuned so the <i>measured</i> d_n equals d_c — the dashed lines overlap.",
              "Below the gate is C<b>3</b>; behind the weir is C<b>1</b>. There is no zone 2.",
              "The middle of the reach rides Fr ≈ 1: the Froude colours sit right at the white break.",
              "Profile labels are off here by default: on a knife edge the class genuinely flickers between M, C and S. Turn them on in Controls to watch it.",
              "Nudge the roughness either way and watch it become decisively mild or steep."] }),
 
-    // ------------------------------------------- HORIZONTAL  (S₀ = 0, y_n = ∞)
+    // ------------------------------------------- HORIZONTAL  (S₀ = 0, d_n = ∞)
     drop({
       id: "h23", name: "Hydraulic jump on a level apron", key: "Chute → jump → H2",
       blurb: "A chute onto a flat apron: supercritical sheet, hydraulic jump, then an H2 drawdown to the tailwater. The clearest look at a jump in the set.",
-      // q = 0.5, not 0.22, and the tailwater sits at 1.3 y_c rather than
-      // exactly ON y_c. Two separate faults were being fixed:
-      //  · tail 0.17 WAS y_c (0.170) to three figures. A subcritical level
+      // q = 0.5, not 0.22, and the tailwater sits at 1.3 d_c rather than
+      // exactly ON d_c. Two separate faults were being fixed:
+      //  · tail 0.17 WAS d_c (0.170) to three figures. A subcritical level
       //    control cannot stand at critical depth — the outlet chokes and the
       //    one-cell Dirichlet fights the flow it is supposed to be setting.
-      //    Just lifting it to 1.5 y_c cut the drift by half and the temporal
+      //    Just lifting it to 1.5 d_c cut the drift by half and the temporal
       //    flutter from 19% to 12%.
       //  · at q = 0.22 the apron ran ~12 cells deep, where the delivered
       //    roughness is enormous, so its backwater climbed 0.19 m over 3.5 m
-      //    and drowned the jump back onto the chute: measured y₂ came out 65%
+      //    and drowned the jump back onto the chute: measured d₂ came out 65%
       //    ABOVE the conjugate depth, which is the one number this scene asks
       //    you to check. Deeper flow is the lever (not C_f — see s2, where
-      //    15× the roughness moved y_n by 7%). At q = 0.5 the apron runs ~37
-      //    cells deep, the jump stands free on the apron, and y₂ = 0.416 m
+      //    15× the roughness moved d_n by 7%). At q = 0.5 the apron runs ~37
+      //    cells deep, the jump stands free on the apron, and d₂ = 0.416 m
       //    against a predicted 0.438 — within 5%.
       W: 7.5, H: 1.6, hi: 0.80, lo: 0.15, xa: 1.0, xb: 4.0, S0: 0,
       cf: 0.008, cs: 0.06, q: 0.5, inletDepth: 0.34, tail: 0.38,
       hmax: 0.65, vmax: 4, spinup: 20,   // measured: profile arrives by 15 s
-      tips: ["A horizontal bed has no normal depth — y_n is infinite, so there is no zone 1.",
+      tips: ["A horizontal bed has no normal depth — d_n is infinite, so there is no zone 1.",
              "The chute runs S2/S3; past the jump the level apron runs H<b>2</b>.",
-             "The jump box reports y₁, y₂ and Fr₁ — check y₂/y₁ = ½(√(1+8Fr₁²) − 1).",
-             "Energy loss across a jump is (y₂−y₁)³/(4y₁y₂); the EGL drops by exactly that.",
+             "The jump box reports d₁, d₂ and Fr₁ — check d₂/d₁ = ½(√(1+8Fr₁²) − 1).",
+             "Energy loss across a jump is (d₂−d₁)³/(4d₁d₂); the EGL drops by exactly that.",
              "Raise the tailwater and the jump slides back up towards the drop."] }),
 
     // ------------------------------------------------ ADVERSE  (S₀ < 0)
     drop({
       id: "a23", name: "A2 · adverse apron", key: "Uphill",
       blurb: "The apron rises downstream. Gravity now opposes the flow, there is no normal depth, and only zones 2 and 3 exist.",
-      // tail 0.16 was BELOW critical depth (y_c = 0.170) — a level control
+      // tail 0.16 was BELOW critical depth (d_c = 0.170) — a level control
       // asking for a depth the outlet cannot hold, so it choked at critical
-      // and the Dirichlet argued with it. 1.53 y_c is a real control.
+      // and the Dirichlet argued with it. 1.53 d_c is a real control.
       // The other half of this scene's cure was the apron() slope bug above:
       // the drawn adverse slope was −0.0233 instead of −0.030, and with it
       // the domain volume swung ±15% on a ~60 s cycle that never settled.
       W: 7.5, H: 1.7, hi: 0.85, lo: 0.12, xa: 1.0, xb: 4.0, S0: -0.03,
       cf: 0.008, cs: 0.06, q: 0.22, inletDepth: 0.28, tail: 0.26,
       hmax: 0.45, vmax: 4, spinup: 26,
-      tips: ["The apron climbs, so S₀ is negative and uniform flow is impossible — no y_n.",
+      tips: ["The apron climbs, so S₀ is negative and uniform flow is impossible — no d_n.",
              "Past the jump, running uphill against gravity, the apron is A<b>2</b>.",
              "A2 steepens as it goes: an adverse bed cannot sustain the flow for long.",
              "Flatten the apron back to level and the same two profiles become H2 and H3."] }),
@@ -514,14 +514,14 @@ const SCENES = (() => {
       spongeIn: 5.5,                           // hold the whole reservoir tank
       inflow: { level: 25.0, q: 0, on: 1, free: 1 },
       walls: () => [
-        [0.0, 1.0, 58.5, 1.0, 2.0],              // invert — top face at y = 2.0
+        [0.0, 1.0, 58.5, 1.0, 2.0],              // invert — top face at z = 2.0
         [6.0, 5.35, 58.5, 5.35, 0.7],            // soffit — 3 m clear bore
         [6.0, 5.0, 6.0, 30.0, 0.7],              // reservoir wall above the pipe
         [56.5, 2.0, 56.5, 3.30, 0.5],            // nozzle plate, 0.4 m gap …
         [56.5, 3.70, 56.5, 5.0, 0.5],            // … which sets the pipe velocity
       ],
       valves: () => [[55.0, 2.0, 55.0, 5.0, 0.5]],
-      water: (x, y, P) => (x < 5.6 || (y > 2.0 && y < 5.0) ? still(25.0, y, P) : 0),
+      water: (x, z, P) => (x < 5.6 || (z > 2.0 && z < 5.0) ? still(25.0, z, P) : 0),
       tips: ["Drop a <b>gauge</b> on the pipe, then press <b>V</b> to slam the valve.",
              "Upsurge is ΔH = c·Δv/g ≈ 20 m on top of 21 m static — read it off the trace.",
              "The trace is a square wave of period 4L/c ≈ 2.8 s. Halve c and it halves too.",
@@ -551,8 +551,8 @@ const SCENES = (() => {
       spongeIn: 3.0,
       inflow: { level: 3.8, q: 0, on: 1, free: 1 },
       walls: () => [
-        [0.0, 1.0, 26.0, 1.0, 2.0],              // ground: solid to y = 2.0, the invert
-        [3.0, 3.05, 26.0, 3.05, 0.5],            // soffit: bore is y 2.0–2.8, l = 23 m
+        [0.0, 1.0, 26.0, 1.0, 2.0],              // ground: solid to z = 2.0, the invert
+        [3.0, 3.05, 26.0, 3.05, 0.5],            // soffit: bore is z 2.0–2.8, l = 23 m
         [3.0, 3.2, 3.0, 8.0, 0.3],               // tank wall above the soffit
         [2.3, 3.45, 3.7, 2.85, 0.28],            // bellmouth chamfer on the soffit nose
         [25.6, 1.95, 25.6, 2.20, 0.10],          // exit orifice …
@@ -561,8 +561,8 @@ const SCENES = (() => {
       valves: () => [[25.0, 1.9, 25.0, 2.9, 0.12]],
       // No floor past x = 26 and the bottom edge open: the jet free-falls out
       // of the domain, so nothing ponds however long it runs.
-      water: (x, y, P) => (x < 3.0 ? (y < 3.8 ? still(3.8, y, P) : 0)
-                                   : x < 25.0 && y < 2.85 ? still(3.8, y, P) : 0),
+      water: (x, z, P) => (x < 3.0 ? (z < 3.8 ? still(3.8, z, P) : 0)
+                                   : x < 25.0 && z < 2.85 ? still(3.8, z, P) : 0),
       tips: ["Press <b>V</b> to open the valve, then watch a mid-pipe gauge: the speed takes seconds to arrive — 23 m of water has inertia.",
              "The plateau is set by head and losses, u_max = √(2gH/k); the time to get there is set by inertia.",
              "Change the Slot celerity and the rise does not change: establishment is inertia, not elasticity.",
@@ -597,7 +597,7 @@ const SCENES = (() => {
         [7.3, 1.77, 10.0, 1.77, 0.72],
         [1.5, 1.41, 1.5, 2.4, 0.12],             // reservoir wall above the pipe
       ],
-      water: (x, y, P) => (x < 1.5 || (y > 0.72 && y < 1.41) ? still(2.05, y, P) : 0),
+      water: (x, z, P) => (x < 1.5 || (z > 0.72 && z < 1.41) ? still(2.05, z, P) : 0),
       tips: ["Head falls through the throat and recovers — imperfectly. That gap is the loss.",
              "The diffuser is far gentler than the contraction, and for a good reason.",
              "Hover at the throat: p/ρg drops exactly as much as V²/2g rises.",
@@ -610,7 +610,7 @@ const SCENES = (() => {
       open: [0, 1, 0, 0],
       walls: () => [[0.0, -0.02, 10.0, -0.02, 0.50]],   // bed top at 0.23
       valves: () => [[2.60, 0.23, 2.60, 2.6, 0.08]],
-      water: (x, y, P) => (y > 0.23 ? (x < 2.56 ? still(1.85, y, P) : still(0.40, y, P)) : 0),
+      water: (x, z, P) => (z > 0.23 ? (x < 2.56 ? still(1.85, z, P) : still(0.40, z, P)) : 0),
       tips: ["Press <b>V</b> to pull the dam out.",
              "The negative wave runs upstream at √(gh₀); the surge front steepens into a bore.",
              "The surge is a moving hydraulic jump — same momentum balance, different frame."] },
@@ -631,8 +631,8 @@ const SCENES = (() => {
         [2.30, 0.30, 2.30, 1.30, 0.10],          // orifice, 1.30 → 1.42
         [2.30, 1.42, 2.30, 3.40, 0.10],
       ],
-      source: { on: 1, x: 1.10, y: 3.15, r: 0.13, vx: 0.1, vy: -1.6 },
-      water: (x, y, P) => (x > 0.38 && x < 2.25 && y > 0.55 ? still(2.70, y, P) : 0),
+      source: { on: 1, x: 1.10, z: 3.15, r: 0.13, vx: 0.1, vz: -1.6 },
+      water: (x, z, P) => (x > 0.38 && x < 2.25 && z > 0.55 ? still(2.70, z, P) : 0),
       tips: ["Jet speed should be √(2g·h) with h measured from the free surface.",
              "The spout keeps the head topped up and the lip spills the excess.",
              "Turn the spout off and watch the jet decay as the tank empties.",

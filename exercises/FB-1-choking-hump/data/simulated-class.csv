@@ -1,4 +1,4 @@
-student,digit,scene,q,level,tail,y1,V1,E1,yc,dzpred,dzc,dzc_cells,frCrestMed,frCrestMax,precells,y1_prechoke,e1_prechoke,dzpred_star,source
+student,digit,scene,q,level,tail,d1,V1,E1,dc,dzpred,dzc,dzc_cells,frCrestMed,frCrestMax,precells,d1_prechoke,e1_prechoke,dzpred_star,source
 sim01,0,sandbox,0.15,1.0,1.0,0.4986,0.3008,0.5032,0.1319,0.3054,0.587,27,0.964,0.997,24,0.7324,0.7345,0.5367,measured
 sim02,1,sandbox,0.2,1.0,1.0,0.4988,0.401,0.507,0.1598,0.2674,0.5,23,0.99,1.102,21,0.7163,0.7203,0.4806,measured
 sim03,2,sandbox,0.25,1.0,1.0,0.5008,0.4992,0.5135,0.1854,0.2354,0.4565,21,1.01,1.121,19,0.7159,0.7221,0.444,measured

@@ -6,7 +6,7 @@
 
 Required CSV columns (header row; extra columns ignored):
 
-    student_id,digit,bs_m,v0_ms,ymax_m,T_s
+    student_id,digit,bs_m,v0_ms,zmax_m,T_s
 
 Optional, and used if present:
 
@@ -17,7 +17,7 @@ Optional, and used if present:
                    L = 47.0 m and b_p = 2.890 m.
 
 Left panel  — measured period against 2*pi*sqrt(l*b_s/(g*b_p)).
-Right panel — measured y_max against the frictionless bound
+Right panel — measured z_max against the frictionless bound
               v0*sqrt(l*b_p/(g*b_s)); points must sit BELOW the 1:1 line, and
               the shortfall is the ku^2 friction term (U28/U29).
 """
@@ -48,7 +48,7 @@ def read_rows(path):
                     digit=r.get("digit", ""),
                     bs=bs,
                     v0=float(r["v0_ms"]),
-                    ymax=float(r["ymax_m"]),
+                    zmax=float(r["zmax_m"]),
                     T=float(r["T_s"]),
                     l=float(r.get("l_m") or L_DEFAULT),
                     bp=float(r.get("bp_m") or BP_DEFAULT),
@@ -100,7 +100,7 @@ def main():
 
     print("%d submissions from %s\n" % (len(rows), a.csv))
     hdr = ("  d   b_s      v0     T_meas   T_simple   err     T_shaft   err"
-           "     y_max   bound    gap")
+           "     z_max   bound    gap")
     print(hdr)
     print("  " + "-" * (len(hdr) - 2))
     eT, eTc, gap, gapc = [], [], [], []
@@ -108,16 +108,16 @@ def main():
         Ts, Zs = theory(d)
         Tc, Zc = theory_corrected(d)
         eT.append(pct(d["T"], Ts))
-        gap.append(100.0 * (1 - d["ymax"] / Zs))
+        gap.append(100.0 * (1 - d["zmax"] / Zs))
         line = ("  %-3s %5.3f  %6.3f   %6.2f     %6.2f  %+6.1f%%"
                 % (d["digit"], d["bs"], d["v0"], d["T"], Ts, eT[-1]))
         if Tc:
             eTc.append(pct(d["T"], Tc))
-            gapc.append(100.0 * (1 - d["ymax"] / Zc))
+            gapc.append(100.0 * (1 - d["zmax"] / Zc))
             line += "    %6.2f  %+5.1f%%" % (Tc, eTc[-1])
         else:
             line += "         --      --"
-        line += "    %6.3f  %6.3f  %4.0f%%" % (d["ymax"], Zs, gap[-1])
+        line += "    %6.3f  %6.3f  %4.0f%%" % (d["zmax"], Zs, gap[-1])
         if gapc:
             line += "  %6.3f %4.0f%%" % (Zc, gapc[-1])
         print(line)
@@ -128,10 +128,10 @@ def main():
     if eTc:
         print("  period vs shaft-corrected theory   : %+.1f%% mean  (%+.1f%% .. %+.1f%%)"
               % (mean(eTc), min(eTc), max(eTc)))
-    print("  y_max shortfall below the simple bound       : %.0f%% mean  (%.0f%% .. %.0f%%)"
+    print("  z_max shortfall below the simple bound       : %.0f%% mean  (%.0f%% .. %.0f%%)"
           % (mean(gap), min(gap), max(gap)))
     if gapc:
-        print("  y_max shortfall below the corrected bound    : %.0f%% mean  (%.0f%% .. %.0f%%)"
+        print("  z_max shortfall below the corrected bound    : %.0f%% mean  (%.0f%% .. %.0f%%)"
               % (mean(gapc), min(gapc), max(gapc)))
 
     # ------------------------------------------------------------------ plot
@@ -160,22 +160,22 @@ def main():
     axT.grid(alpha=0.3); axT.legend(fontsize=8, loc="upper left")
 
     xb = [theory(d)[1] for d in rows]
-    yb = [d["ymax"] for d in rows]
+    yb = [d["zmax"] for d in rows]
     xbc = [theory_corrected(d)[1] for d in rows if theory_corrected(d)[1]]
     lim2 = [0, max(xb + xbc) * 1.12]
     axY.plot(lim2, lim2, "k--", lw=1, label="frictionless bound (1:1)")
     if xbc:
-        axY.scatter(xbc, [d["ymax"] for d in rows if theory_corrected(d)[1]], s=64,
+        axY.scatter(xbc, [d["zmax"] for d in rows if theory_corrected(d)[1]], s=64,
                     facecolors="none", edgecolors="#d62728", zorder=3,
                     label="... against the shaft-corrected bound")
-    axY.scatter(xb, yb, s=64, c="#2ca02c", zorder=3, label=r"measured $y_{max}$")
+    axY.scatter(xb, yb, s=64, c="#2ca02c", zorder=3, label=r"measured $z_{max}$")
     for x, y, d in zip(xb, yb, rows):
         axY.plot([x, x], [y, x], color="#999", lw=0.8, zorder=2)
         axY.annotate("%.0f%%" % (100 * (1 - y / x)), (x, (y + x) / 2), fontsize=7,
                      xytext=(5, -3), textcoords="offset points", color="#777")
     axY.set_xlim(lim2); axY.set_ylim(lim2)
     axY.set_xlabel(r"frictionless bound  $v_0\sqrt{l\,b_p/(g\,b_s)}$  (m)")
-    axY.set_ylabel(r"measured first upsurge  $y_{max}$  (m)")
+    axY.set_ylabel(r"measured first upsurge  $z_{max}$  (m)")
     axY.set_title(r"Upsurge — the grey gap is the $ku^2$ term (U28/U29)", fontsize=10)
     axY.grid(alpha=0.3); axY.legend(fontsize=8, loc="upper left")
 

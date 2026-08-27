@@ -1,8 +1,8 @@
 # Worker recipe — demo verification & packaging (read fully before starting)
 
 You are one of up to three agents packaging classroom demos for the hydraulician
-app (the project's CLAUDE.md applies — read it if it is not already in your
-context). Each demo from exercises/demo-programme.html becomes a folder under
+app (the project instructions apply — AGENTS.md and docs/engineering-notes.md;
+read them if they are not already in your context). Each demo from exercises/demo-programme.html becomes a folder under
 exercises/ that the lecturer can pick up and run cold in a lecture hall.
 
 ## The teaching format (why these folders exist)
@@ -84,7 +84,7 @@ realtime) — budget sim-seconds accordingly.
   m3, h23, a23, s1, s2, s3, c13, dambreak, wave, wavedeep, waveshallow,
   wavesurge.
 - Server: http://localhost:8124 is already running — never start another.
-  Stale cache: `fetch(url,{cache:"reload"})` then reload (CLAUDE.md).
+  Stale cache: `fetch(url,{cache:"reload"})` then reload (AGENTS.md).
 
 ## What "demonstrating" means
 

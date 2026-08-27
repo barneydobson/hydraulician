@@ -160,14 +160,16 @@ classic script so that double-clicking `index.html` on a `file://` URL still
 works, which is what a lecturer with no terminal will do. Keep it that way, and
 keep it dependency-free.
 
-**Read [`CLAUDE.md`](CLAUDE.md) before touching the solver.** It is the
-contributor briefing: the model, the state textures, the coordinate and
-geometry contracts, and — most valuable — the guard rails, each of which was
-bought with an explosion (the transport-consistency cap, the open-boundary
-ring, the control bands, the soft level boundaries, the conservation rule in
-the VOF pass). The section on conservation in particular is not optional
-reading: an earlier positivity clamp invented enough water to triple the
-discharge along a flume while the depth sat perfectly steady.
+**Read [`AGENTS.md`](AGENTS.md) and
+[`docs/engineering-notes.md`](docs/engineering-notes.md) before touching the
+solver.** AGENTS.md is the map; the engineering notes are the contributor
+briefing: the model, the state textures, the coordinate and geometry
+contracts, and — most valuable — the guard rails, each of which was bought
+with an explosion (the transport-consistency cap, the open-boundary ring, the
+control bands, the soft level boundaries, the conservation rule in the VOF
+pass). The section on conservation in particular is not optional reading: an
+earlier positivity clamp invented enough water to triple the discharge along
+a flume while the depth sat perfectly steady.
 
 **Adding a scene.** Scenes are plain data in `js/scenes.js` — a physical
 domain `W × H`, a wall segment list (`[x0,y0,x1,y1,th]` centrelines with butt
@@ -225,13 +227,14 @@ Water enters at the top left by default; everything else is drawn.
 | **left-drag** | draw a straight edge (hold **shift** to snap to 0°/45°/90°) |
 | **right-drag** | pour a larger flow |
 | **wheel** / **middle-drag** | zoom about the cursor · pan (**0** resets, **+** / **−** step) |
-| **1**–**8** | wall · erase · valve · spout · gauge · rake · tracers · measure |
+| **1**–**9** | wall · erase · valve · spout · gauge · rake · tracers · measure · force box |
 | **[** **]** | brush size |
 | **Z** / **C** | undo edge / clear drawing |
 | **V** | open / slam every valve |
 | **space** / **R** | pause / reload the scene's water |
 | **G** / **P** / **D** / **N** / **M** | cycle the field · particles · dye · channel overlay · ruler |
 | **S** / **E** | scene list · exercise list |
+| **H** / **?** | start screen · keyboard shortcuts |
 
 Further limits, beyond those in [Summary](#summary):
 

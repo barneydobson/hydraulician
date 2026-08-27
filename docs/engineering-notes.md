@@ -80,6 +80,20 @@ at every depth. It takes ~100 s of simulated time, which is why scenes are
 initialised with `still()` rather than uniform — a cold start would still be
 settling at the end of a run.
 
+## State textures
+
+- `U` RGBA32F — `r` = u at the **west** face of this cell, `g` = w at the
+  **south** face (a swizzle, not the notation: `U.g` stores `w`), `b` = p/ρ
+  at the cell centre (diagnostic, also what the display uses for submergence),
+  `a` = ∇·u.
+- `F` RGBA32F — `r` = f, `g`/`b` = dye A/B.
+- `S` R8 — 0 open, 128 valve, 255 wall. Rasterised CPU-side from a segment
+  list so it can be undone and re-rasterised at any resolution.
+- `C` RGBA32F, nx×1 — the column reduction: bed, depth, unit discharge,
+  surface. The `col` pass walks the *connected* water body from the lowest
+  wet cell, so a raised flume bed or a tank standing above a puddle is
+  handled.
+
 ## Guard rails, each bought with an explosion
 
 - **Transport-consistency cap.** The VOF donor limiter cannot move mass faster
@@ -177,8 +191,9 @@ downstream in a steady state; total volume constant while inflow ≠ outflow.
 
 - Domain = a fixed physical rectangle (`scene.W × scene.H`). The grid is sized
   to a cell budget, so changing resolution changes Δx but not the physics, and
-  resizing the window only moves the letterbox.
-- Wall segments have **butt** ends, not round caps. `[x0,y0,x1,y1,th]` is the
+  resizing the window only moves the letterbox. Live parameters (`S.p`, the
+  open-edge flags included) survive a resolution rebuild.
+- Wall segments have **butt** ends, not round caps. `[x0,z0,x1,z1,th]` is the
   centreline; the endpoints are the true extent. Round caps quietly eat half a
   thickness off every gap, which is fatal when the gap is the demonstration.
   Consequence: a *sloping* slab is cut perpendicular to its axis, so it must be
@@ -353,9 +368,28 @@ so it runs at roughly 0.9× real time and there is no bug to find. `analyse`
 costs 0.5 ms per frame against that — well under a percent. If a scene feels
 slow, check `state.rt` in the status bar before suspecting the overlay.
 
+## The view
+
+- **The vertical exaggeration is fitted to the window, not 1:1.** `autoVex()`
+  picks the stretch that makes the domain fill `VEX_FILL` (62%) of the canvas,
+  clamped to [1, 8]; `state.vexAuto` says nobody has taken the number over
+  yet. A scene's own `view.vex` wins and clears the flag, as does the slider
+  or a drag on the letterbox band; `resetZoom` (the `0` key) returns to the
+  fitted value rather than to 1:1. It is recomputed on resize and whenever
+  the side panel opens or closes, because both change what "fills the window"
+  means. A 14 m × 2 m flume at true scale is 23% of a desktop window and 14%
+  of an upright phone, which is a 0.1 m wave a couple of pixels tall — and
+  the ruler, the scale bar and the ∇ markers all follow the same rect, so
+  nothing on screen stops being true.
+- **Screen-anchored overlay furniture follows `view.vis`** — the visible part
+  of the domain — so the frame, the scale bar, the legend and the label
+  clamps stay on screen zoomed in.
+
 ## Measurement gotchas
 
-- **The Force box is a momentum budget, not a dial.** A box enclosing a
+- **The Force box is a momentum budget, not a dial.** The control-volume
+  integral takes its faces on grid lines, skips solid-adjacent face segments,
+  and carries no gravity term in F→. A box enclosing a
   source (spout footprint, level-control sponge) is not measuring a force —
   `mdot` is the closure check and fails loudly there. Trust a number only
   once a second, differently-placed box agrees (~1% steady, 5–8% churning);

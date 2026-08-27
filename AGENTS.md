@@ -31,6 +31,7 @@ shallow water); this one resolves the depth.
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
 | `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
+| `test/` | `ui-smoke.mjs` layout gate and `cdp.mjs`, its portable headless-Chrome client |
 | `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
 
 ## The model, in one paragraph
@@ -85,21 +86,34 @@ to look fine for a minute and explode in an exercise.
   changes.
 - **Zero dependencies, classic scripts** — no modules, no bundlers, no fetch,
   and no YAML front matter in `index.html` or `js/*` (the Pages build copies
-  them verbatim only because there is none).
+  them verbatim only because there is none). Any published page carrying
+  `math` code fences must end with a `<script>` tag loading `docs/math.js` —
+  stripped on github.com, live on the Pages build, where it rewrites the
+  fences for MathJax (README.md and docs/numerics.md show the pattern).
 
 ## Testing
 
-Three gates, all zero-dependency and all non-zero on failure:
+Four gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 |---|---|---|
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
+| `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it | 8 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing
 anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
+
+`ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
+`WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
+`index.html`, the TOOLBAR spec, `DOCK`, `START` or the boot wiring. Every
+case in it is a bug that reached the working tree while the strip was being
+built, so a failure there is a real regression rather than a tightened
+expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
+`--use-angle=d3d11` itself, because the software rasteriser renders a
+full-window WebGL canvas so slowly that a spin-up scene times the run out.
 
 The two checkers are complements: `check_notation.py` greps for *names*,
 `smoke.js` proves the names are *connected* — a field renamed at the write
@@ -140,6 +154,12 @@ shipping. `spinup` values are measured settle times, not guesses.
   rectangle and the grid is sized to a cell budget.
 - `state.rt` in the status bar is the speed truth — m2 at ~0.9× real time is
   the design point, not a bug.
+- The vertical exaggeration is fitted to the window (`autoVex` in main.js),
+  not 1:1 — a scene's `view.vex`, the slider or a drag on the letterbox band
+  takes the number over, and `0` resets to the fitted value, not to 1:1. The
+  ruler, scale bar and ∇ markers follow the same rect, so nothing on screen
+  stops being true; details in
+  [docs/engineering-notes.md](docs/engineering-notes.md).
 - The Force box, the Froude view, and surface-wave damping all have
   non-obvious failure modes — read their sections in
   [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"

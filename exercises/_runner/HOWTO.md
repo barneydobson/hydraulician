@@ -27,7 +27,8 @@ $R close  --id HJ1                      # ALWAYS, even after a failure
 })()
 ```
 After `pump --sim-seconds 25`: q=0.50 → Fr₁ 2.24, d₁ 0.176, d₂ 0.415, d₂ᵖ 0.476
-(CLAUDE.md's verified pair is 2.24 / 0.416 — the harness reproduces it).
+(the verified pair in docs/engineering-notes.md is 2.24 / 0.416 — the harness
+reproduces it).
 q=0.42 → Fr₁ 1.40, d₂/d₁ 1.84, +19 % over Bélanger: h23's tailwater is tuned for
 q = 0.5, so a lower q drowns the jump. Physics, not harness.
 

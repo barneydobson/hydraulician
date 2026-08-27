@@ -616,7 +616,7 @@ the roughness slider.** Consequently normal depth and `n` are *measured* off the
 computed energy grade line rather than derived from `C_f`:
 
 ```math
-d_n = h\left(S_f/S_0\right)^{1/3} \qquad n = h^{2/3}\sqrt{S_f}\,/\,V
+d_n = d\left(S_f/S_0\right)^{1/3} \qquad n = d^{2/3}\sqrt{S_f}\,/\,V
 ```
 
 ## 6. Boundaries
@@ -659,8 +659,9 @@ number.
 Verified numbers — water hammer against Joukowsky, Torricelli efflux, venturi
 throat, conjugate depth against Bélanger, mass balance along a 14 m flume — are
 summarised in the [Method section of the README](../README.md#method). The full
-table and the headless procedure behind it live in `CLAUDE.md`, which is
-repo-only and not published to the site.
+table and the measured lore behind it live in
+[engineering-notes.md](engineering-notes.md); the headless API that produced
+it is documented in the repo root's AGENTS.md.
 
 ## References
 

@@ -64,7 +64,10 @@ def historical(path):
 def walk(*globs):
     """Every committed file matching one of the suffixes, minus the record."""
     for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "__pycache__")]
+        # `.claude` can hold nested WORKTREES — other branches' source, which
+        # is not this checkout's to judge and would be checked on its own.
+        dirs[:] = [d for d in dirs
+                   if d not in (".git", ".claude", "node_modules", "__pycache__")]
         for f in files:
             p = os.path.join(base, f)
             if historical(p):

@@ -439,6 +439,17 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 
 ## Gotchas
 
+- **The vertical exaggeration is fitted to the window, not 1:1.** `autoVex()`
+  picks the stretch that makes the domain fill `VEX_FILL` (62%) of the canvas,
+  clamped to [1, 8]; `state.vexAuto` says nobody has taken the number over yet.
+  A scene's own `view.vex` wins and clears the flag, as does the slider or a
+  drag on the letterbox band; `resetZoom` (the `0` key) returns to the fitted
+  value rather than to 1:1. It is recomputed on resize and whenever the side
+  panel opens or closes, because both change what "fills the window" means.
+  A 14 m × 2 m flume at true scale is 23% of a desktop window and 14% of an
+  upright phone, which is a 0.1 m wave a couple of pixels tall — and the
+  ruler, the scale bar and the ∇ markers all follow the same rect, so nothing
+  on screen stops being true.
 - The render loop stops when the page is hidden. Headless testing goes through
   `APP.frames(n)` (drives the whole frame including render), `APP.tick(n)`
   (physics only), `APP.probe(x,y)`, `APP.volume()`, `APP.zoomAt(px,py,factor)`,

@@ -145,6 +145,10 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
 
     return {
       evaluate, errors,
+      /** Raw protocol, bound to this tab — device emulation and screenshots.
+       *  Chrome will not open a window narrower than about 500 css px, so a
+       *  true phone viewport can only be had through Emulation. */
+      send: (method, params) => send(method, params, sessionId),
       close: async () => {
         listeners.delete(onEvent);
         await send("Target.closeTarget", { targetId });

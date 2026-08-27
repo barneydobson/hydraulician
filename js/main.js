@@ -36,6 +36,9 @@ const state = {
   cursor: [0, 0], inside: false, hover: null,
   drag: null, pour: null,
   zoom: 1, vex: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false, vexDrag: null,
+  // The exaggeration is fitted to the window until somebody sets it by hand —
+  // then it is theirs, and a resize stops moving it (see autoVex).
+  vexAuto: true,
   flashKey: null, flashT: 0,
   fps: 60, rt: 1, simDt: 0,
   tipIdx: 0, tipAt: 0,
@@ -108,7 +111,40 @@ function zoomAt(px, py, factor) {
   computeView();
 }
 
-function resetZoom() { state.zoom = 1; state.panC = null; state.vex = 1; }
+/** The vertical exaggeration that makes the domain fill `FILL` of the window.
+ *
+ *  A 14 m × 2 m flume at true scale is a strip: 23% of a desktop window's
+ *  height, and 14% of a phone held upright, which is a 0.1 m wave a couple of
+ *  pixels tall. Every long-section in hydraulics is drawn exaggerated for
+ *  exactly this reason, and the ruler, the scale bar and the ∇ markers all
+ *  follow the same rect, so nothing said on screen stops being true.
+ *
+ *  Never below 1 — the view is stretched, never squashed — and capped, because
+ *  past about ×8 the water stops looking like water. The remaining margin is
+ *  deliberate: the empty band above and below the domain is the drag handle
+ *  for this very number. */
+const VEX_FILL = 0.62, VEX_MAX = 8;
+function autoVex() {
+  if (!canvas || !sim || !(sim.W > 0) || !(sim.H > 0)) return 1;
+  const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
+  // From baseRect: a width-limited rect is `cw · H · vex / W` tall.
+  const v = VEX_FILL * ch * sim.W / (cw * sim.H);
+  return Math.max(1, Math.min(VEX_MAX, v));
+}
+
+/** Apply it, unless the reader has taken the number over by hand. */
+function applyAutoVex() {
+  if (!state.vexAuto) return;
+  const v = autoVex();
+  if (Math.abs(v - state.vex) > 1e-3) { state.vex = v; computeView(); }
+}
+
+function resetZoom() {
+  state.zoom = 1; state.panC = null;
+  // "Reset the view" means the view you were given, which is the fitted one —
+  // not 1:1, which is the thing that needed fixing.
+  state.vexAuto = true; state.vex = autoVex();
+}
 
 /** Case- and accent-folded, for the two exercise filters. Nobody types the
  *  acute in "Bélanger", and a search box that only matches it is a search box
@@ -143,7 +179,9 @@ function loadScene(id, keepDrawing) {
   // it: a 12 m flume letterboxes to a strip a couple of hundred pixels tall,
   // and a 100 mm orbit in that is about one pixel. `0` still resets.
   if (sc.view) {
-    if (sc.view.vex) state.vex = sc.view.vex;
+    // A scene that states its own exaggeration has measured it against what it
+    // is trying to show, so it wins and the automatic fit stands down.
+    if (sc.view.vex) { state.vex = sc.view.vex; state.vexAuto = false; }
     if (sc.view.zoom) { state.zoom = sc.view.zoom; state.panC = [sc.view.cx, sc.view.cy]; }
   }
   computeView();
@@ -1378,8 +1416,9 @@ const CONTROLS = [
 
   { h: "View" },
   { id: "vex", label: "Vertical exaggeration", min: 1, max: 12, step: 0.1,
-    get: () => state.vex, set: (v) => { state.vex = v; computeView(); },
-    fmt: (v) => (v < 1.05 ? "true scale (1 : 1)" : "× " + v.toFixed(1) + " vertical"),
+    get: () => state.vex, set: (v) => { state.vex = v; state.vexAuto = false; computeView(); },
+    fmt: (v) => (v < 1.05 ? "true scale (1 : 1)" : "× " + v.toFixed(1) + " vertical") +
+                (state.vexAuto ? "  ·  fitted to the window" : ""),
     info: "Stretches the view vertically. A 12 m × 1.5 m flume is a thin strip at true scale, so a 0.1 m wave is a few pixels — every long-section in hydraulics is drawn exaggerated for the same reason. You can also drag the empty band above or below the domain." },
   { id: "mode", type: "select", label: "Field",
     opts: [["0", "Water"], ["1", "Pressure head"], ["6", "Piezometric head"],
@@ -1622,7 +1661,14 @@ const TOOLS = [
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
   ["cv", "Force box", "Left-drag a control volume — reads the force on what it encloses. Click to clear"],
+  // Tenth, and deliberately last: the digits 1–9 already mean the nine above
+  // them, in worksheets as well as in muscle memory. Pour has no digit; on a
+  // desktop its shortcut is the right-drag that works in any tool.
+  ["pour", "Pour", "Drag to pour water — or right-drag with any tool"],
 ];
+
+/** The tools the number keys can reach. */
+const TOOL_KEYS = Math.min(9, TOOLS.length);
 
 // ==========================================================================
 //  The top strip: icons, their hover card, and the groups they sit in.
@@ -1659,6 +1705,9 @@ const ICONS = {
            '<rect x="11.6" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>',
   play:    '<path d="M6.5 4.2 15.5 10l-9 5.8Z" fill="currentColor" stroke="none"/>',
   reset:   '<path d="M4.5 10a5.5 5.5 0 1 1 1.7 4"/><path d="M4.5 15v-5h5"/>',
+  undo:    '<path d="M7 5.5 3.5 9 7 12.5"/><path d="M3.5 9h8A4.5 4.5 0 0 1 16 13.5v1"/>',
+  pour:    '<path d="M4.5 4.5h7l-1 4.5h-5z"/><path d="M11.5 6.2c1.6 0 2.2 1 2.2 2s-.8 1.9-2.2 1.9"/>' +
+           '<path d="M7.2 12.4c1.1 1.4 1.8 2.3 1.8 3.2a1.9 1.9 0 1 1-3.8 0c0-.9.8-1.8 2-3.2z"/>',
   clear:   '<path d="M5 6h10"/><path d="M8 6V4.5h4V6"/><path d="M6.5 6l.8 9h5.4l.8-9"/>',
   sliders: '<path d="M4 6h12M4 10h12M4 14h12"/><circle cx="8" cy="6" r="1.9" fill="#070b0f"/>' +
            '<circle cx="13" cy="10" r="1.9" fill="#070b0f"/><circle cx="6.5" cy="14" r="1.9" fill="#070b0f"/>',
@@ -1698,7 +1747,11 @@ const TIP = (() => {
     t.style.top = (r.bottom + 8) + "px";
   }
   function hide() { if (el) el.classList.remove("show"); }
-  return { show, hide };
+  /** Whether this machine has a pointer that can hover at all. */
+  function hoverable() {
+    return !(window.matchMedia && matchMedia("(hover: none)").matches);
+  }
+  return { show, hide, hoverable };
 })();
 
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
@@ -1753,8 +1806,15 @@ const TOOLBAR = [
       hint: "A blank flume — clears what is drawn and starts over",
       act: () => newSandbox() },
   ],
-  TOOLS.slice(0, 4).map(toolItem),
-  TOOLS.slice(4).map(toolItem),
+  // Draw: the four drawing tools, Pour beside them, and Undo — which was the
+  // Z key and nothing else, so on a touch screen a mis-drawn stroke could not
+  // be taken back at all.
+  TOOLS.slice(0, 4).map(toolItem).concat(
+    [toolItem(TOOLS[TOOLS.length - 1])],
+    [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
+       hint: "Take back the last thing you drew",
+       act: () => SIM.undoSeg() }]),
+  TOOLS.slice(4, TOOLS.length - 1).map(toolItem),
   [
     { id: "playBtn", icon: () => (state.paused ? "play" : "pause"), key: "space",
       label: () => (state.paused ? "Run" : "Pause"),
@@ -1790,7 +1850,8 @@ const TOOLBAR = [
  *  in TOOLS, which is exactly what the number keys do. */
 function toolItem([id, label, tip]) {
   const n = TOOLS.findIndex((t) => t[0] === id) + 1;
-  return { icon: id === "valve" ? "gate" : id, label, hint: tip, key: String(n),
+  return { icon: id === "valve" ? "gate" : id, label, hint: tip,
+           key: n <= TOOL_KEYS ? String(n) : "",
            on: () => state.tool === id,
            act: () => { state.tool = id; syncToolbar(); syncPanel(); } };
 }
@@ -1816,12 +1877,16 @@ function buildToolbar() {
       const label = typeof it.label === "function" ? it.label() : it.label;
       b.setAttribute("aria-label", label);
       b.appendChild(iconEl(typeof it.icon === "function" ? it.icon() : it.icon));
-      b.onclick = () => { b.blur(); it.act(b); syncToolbar(); };
-      b.onpointerenter = () => TIP.show(b, typeof it.label === "function" ? it.label() : it.label,
-                                        it.hint, it.key);
-      b.onpointerleave = () => TIP.hide();
-      b.onfocus = () => TIP.show(b, typeof it.label === "function" ? it.label() : it.label,
+      const tip = () => TIP.show(b, typeof it.label === "function" ? it.label() : it.label,
                                  it.hint, it.key);
+      b.onclick = () => { b.blur(); TIP.hide(); it.act(b); syncToolbar(); };
+      // Only a pointer that can hover gets the card. On a touch screen there
+      // is no hover to leave, so it would appear on the tap that presses the
+      // button and then sit there over the water until something else was
+      // tapped.
+      b.onpointerenter = (e) => { if (e.pointerType !== "touch") tip(); };
+      b.onpointerleave = () => TIP.hide();
+      b.onfocus = () => { if (TIP.hoverable()) tip(); };
       b.onblur = () => TIP.hide();
       it.el = b;
       g.appendChild(b);
@@ -1840,13 +1905,17 @@ function buildToolbar() {
 function fitBar() {
   const bar = document.getElementById("bar"), g = document.getElementById("groups");
   if (!bar || !g) return;
-  // A couple of pixels of slack: flex lays out in fractions, so an exactly
-  // fitting strip reports a scrollWidth a pixel or two over its client width
-  // and would otherwise shrink itself for nothing.
-  const over = () => g.scrollWidth > g.clientWidth + 2;
+  // One pixel of slack, and no more: flex lays out in fractions, so an exactly
+  // fitting strip can report a scrollWidth a pixel over its client width and
+  // would otherwise shrink itself for nothing. Two pixels of slack is already
+  // too much — it leaves the last button clipped along its edge.
+  const over = () => g.scrollWidth > g.clientWidth + 1;
   bar.classList.remove("tight", "tighter");
   if (over()) bar.classList.add("tight");
   if (over()) bar.classList.add("tighter");
+  // Still too many for the room: the groups scroll, and the last one visible
+  // is faded so that it looks like it continues rather than like it ends.
+  bar.classList.toggle("scrolls", over());
 }
 
 /** Repaint the strip from live state. Cheap enough to call from anywhere that
@@ -1877,12 +1946,12 @@ const KEYS = (() => {
   let el = null, anchor = null;
   const LINES = [
     ["left-drag", "draw with the current tool"],
-    ["right-drag", "pour water"],
+    ["right-drag", "pour water, whatever tool is in your hand"],
     ["shift", "snap to horizontal / vertical / 45°"],
     ["wheel", "zoom"],
     ["middle-drag", "pan"],
     ["0", "reset the view"],
-    ["1 – 9", "pick a tool"],
+    ["1 – 9", "pick a tool (Pour has no digit — right-drag instead)"],
     ["[ ]", "brush size"],
     ["Z", "undo a stroke"],
     ["C", "clear the drawing"],
@@ -1961,20 +2030,34 @@ const KEYS = (() => {
  *  on the window edge: the exercise stays loaded, the screen goes back to
  *  being all water, and one click brings the brief back. */
 const DOCK = (() => {
-  const W = 348, MINW = 900;
+  // MINW: below this there is no width to give away, so the panel overlays.
+  // PHONE: below THIS a 348 px panel would cover almost the whole screen, so
+  // it becomes a bottom sheet instead — the water keeps the top of the screen,
+  // which on a phone is the only part tall enough to read a flume in.
+  const W = 348, MINW = 900, PHONE = 620;
   let shown = false, folded = false, kind = "Exercise", id = "";
   const el = () => document.getElementById("dock");
   const body = () => el().querySelector(".dock-body");
   const foot = () => el().querySelector(".dock-foot");
 
   function narrow() { return innerWidth < MINW; }
+  function phone() { return innerWidth < PHONE; }
+  /** Must agree with `--sheet-h` in the stylesheet. */
+  function sheetH() { return Math.round(Math.min(0.58 * innerHeight, 520)); }
   function sync() {
     const open = shown && !folded;
     el().classList.toggle("open", open);
     el().classList.toggle("over", narrow());
-    document.documentElement.style.setProperty(
-      "--dock", (open && !narrow()) ? W + "px" : "0px");
+    el().classList.toggle("sheet", phone());
+    // A side panel takes WIDTH out of the viewport; the same panel as a bottom
+    // sheet takes HEIGHT. Either way the water is drawn in what is left, never
+    // behind the panel — otherwise the domain centres itself on a canvas whose
+    // lower half nobody can see.
+    const root = document.documentElement.style;
+    root.setProperty("--dock", (open && !narrow() && !phone()) ? W + "px" : "0px");
+    root.setProperty("--dockb", (open && phone()) ? sheetH() + "px" : "0px");
     fitBar();                    // the panel takes its width out of the strip
+    applyAutoVex();              // …and out of what "fills the window" means
     el().querySelector(".dock-h .eid").textContent = id;
     el().querySelector(".dock-h .kind").textContent = kind;
     const fold = document.getElementById("dockfold");
@@ -2188,10 +2271,16 @@ function onDown(e) {
     const B = baseRect(), py = pointerPx(e)[1];
     if (state.zoom < 1.001 && (py < B.by - 2 || py > B.by + B.h + 2)) {
       state.vexDrag = { py, vex: state.vex, mid: B.by + B.h / 2 };
+      state.vexAuto = false;          // dragging the band claims the number
       return;
     }
   }
-  if (e.button === 2 || e.pointerType === "touch" && e.shiftKey) {
+  // Pouring: a right-drag anywhere, or the Pour tool. The tool exists because
+  // a touch screen has no second button and no Shift — the old
+  // `pointerType === "touch" && e.shiftKey` was unreachable on every device it
+  // named, which made half of "draw an edge, pour water" impossible on a
+  // phone. Right-drag still works regardless of the tool in your hand.
+  if (e.button === 2 || state.tool === "pour") {
     state.pour = { x, y, r: state.brush * 4, vx: 0, vy: sim.p.g > 0.5 ? -2.0 : 0, lx: x, ly: y };
     sim.p.pour = state.pour;
     return;
@@ -2770,6 +2859,11 @@ function drawSpout(ctx) {
 }
 
 function updateStatus() {
+  // The chip shares the strip with the icons and is allowed to shrink them,
+  // so the fit has to be rechecked whenever what it says changes — a boot-time
+  // measurement is taken while it still reads "Sandbox" with no clock, and a
+  // long scene name would then push a whole group out of sight.
+  fitBar();
   document.getElementById("status").textContent =
     sim.nx + "×" + sim.ny + " · Δx " + (sim.dx * 1000).toFixed(0) + " mm · " +
     "t " + sim.t.toFixed(1) + " s · ×" + state.rt.toFixed(2) + " RT · " +
@@ -3599,7 +3693,9 @@ function boot() {
   document.getElementById("docktab").onclick = (e) => { e.currentTarget.blur(); DOCK.fold(false); };
   // The panel is inset by --dock, so a window resize can cross the width where
   // docking stops being affordable and it has to go back to overlaying.
-  addEventListener("resize", () => { DOCK.sync(); fitBar(); });
+  // A resize (or a rotated phone) changes what "fills the window" means, and
+  // the panel opening or closing changes it too — DOCK.sync calls this as well.
+  addEventListener("resize", () => { DOCK.sync(); fitBar(); applyAutoVex(); });
 
   buildPanel();
   const q = new URLSearchParams(location.search);
@@ -3696,7 +3792,9 @@ function boot() {
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
-    else if (k >= "1" && k <= String(TOOLS.length)) { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }
+    // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
+    // so a tenth tool would have made "9" fail ("9" > "10" lexically).
+    else if (+k >= 1 && +k <= TOOL_KEYS) { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }
     else if (k === "[") state.brush = Math.max(0.015, state.brush / 1.3);
     else if (k === "]") state.brush = Math.min(0.5, state.brush * 1.3);
     else if (k === "0") resetZoom();

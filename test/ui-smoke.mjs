@@ -69,7 +69,16 @@ const PROBE = `
                                  !b.querySelector("svg").innerHTML.trim()).length,
     unlabelled: [...document.querySelectorAll("#groups .tbtn")]
                   .filter((b) => !b.getAttribute("aria-label")).length,
-    groupsClipped: g.scrollWidth > g.clientWidth + 1,
+    // Not "is there overflow" — flex rounds, and a pixel or two of slack hides
+    // nothing. What must not happen is a BUTTON falling outside the visible
+    // box, which is how a whole group once vanished behind a long scene name.
+    groupsClipped: (() => {
+      const gr = g.getBoundingClientRect();
+      return [...g.querySelectorAll(".tbtn")].some((b) => {
+        const r = b.getBoundingClientRect();
+        return r.left < gr.left - 1 || r.right > gr.right + 1;
+      });
+    })(),
     startOpen: document.getElementById("start").classList.contains("open"),
     startItems: document.querySelectorAll("#startlist .si").length,
     startSideways: (() => { const l = document.getElementById("startlist");
@@ -104,8 +113,8 @@ async function main() {
       check("every strip button is labelled", p.unlabelled === 0, p.unlabelled + " bare");
       eq("the strip renders the whole spec", p.buttons, p.specCount);
       check("no control is scrolled out of the strip", !p.groupsClipped);
-      // The tools are reached by the number keys, which stop at 9.
-      check("the tools fit the number keys", p.toolCount <= 9, p.toolCount + " tools");
+      // How the digits map to the tools is checked under "touch parity".
+      check("the pack has tools at all", p.toolCount > 0);
 
       // Filtering the pack, and the side door out of it.
       const filtered = await tab.evaluate(`
@@ -268,6 +277,125 @@ async function main() {
         `));
         await tab.close();
       } finally { await narrow.close(); }
+    }
+    // ------------------------------------------------------- the fitted view
+    console.log("\nthe view is fitted to the window, not left at 1:1");
+    {
+      const tab = await browser.open(INDEX + "?scene=m3");
+      const v = await tab.evaluate(`
+        const fill = () => Math.round(100 * APP.view.h / APP.view.pxH);
+        return { vex: APP.state.vex, auto: APP.state.vexAuto, fill: fill() };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("a wide flat flume is exaggerated", v.vex > 1, "vex " + v.vex);
+      check("the fit is marked automatic", v.auto);
+      // The point of the whole thing: the domain is worth looking at.
+      check("the domain fills the window", v.fill >= 50, "fills " + v.fill + "%");
+      // Setting it by hand takes it over, and a resize must not steal it back.
+      const owned = await tab.evaluate(`
+        APP.state.vex = 3; APP.state.vexAuto = false;
+        dispatchEvent(new Event("resize"));
+        return { vex: APP.state.vex, auto: APP.state.vexAuto };
+      `);
+      eq("a hand-set exaggeration is kept", owned.vex, 3);
+      check("and stays hand-set", !owned.auto);
+      // …and "reset the view" gives back the fitted one, not 1:1.
+      const reset = await tab.evaluate(`
+        APP.resetZoom();
+        return { vex: APP.state.vex, auto: APP.state.vexAuto };
+      `);
+      check("reset returns to the fitted view", reset.vex > 1 && reset.auto, "vex " + reset.vex);
+      await tab.close();
+    }
+
+    console.log("\na scene that states its own exaggeration keeps it");
+    {
+      // The wave flumes measured theirs against what they are trying to show.
+      const scene = await (async () => {
+        const t = await browser.open(INDEX + "?scene=sandbox");
+        const id = await t.evaluate(`
+          const s = APP.SCENES.list.find((s) => s.view && s.view.vex);
+          return s ? { id: s.id, vex: s.view.vex } : null;
+        `);
+        await t.close();
+        return id;
+      })();
+      if (!scene) { console.log("  --   no scene pins a vex; nothing to check"); }
+      else {
+        const tab = await browser.open(INDEX + "?scene=" + scene.id);
+        const r = await tab.evaluate("return { vex: APP.state.vex, auto: APP.state.vexAuto };");
+        eq("the scene's own vex is used (" + scene.id + ")", r.vex, scene.vex);
+        check("the automatic fit stands down", !r.auto);
+        await tab.close();
+      }
+    }
+
+    // ------------------------------------------------------- touch parity
+    console.log("\neverything reachable without a keyboard or a second button");
+    {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const ids = APP.TOOLS.map((t) => t[0]);
+        const strip = APP.ui.TOOLBAR.flat();
+        const labels = strip.map((it) => typeof it.label === "function" ? it.label() : it.label);
+        // Pour must be a TOOL, so a finger can select it; the old path was
+        // right-click, or touch + a Shift key no phone has.
+        const pour = strip.find((it) => it.label === "Pour");
+        pour.el.click();
+        const armed = APP.state.tool;
+        return { hasPour: ids.includes("pour"), armed,
+                 hasUndo: !!document.getElementById("undoBtn"),
+                 digits: strip.filter((it) => /^[0-9]$/.test(it.key || "")).length,
+                 labels };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("Pour is a tool", r.hasPour);
+      eq("and the strip arms it", r.armed, "pour");
+      check("Undo is a button, not only the Z key", r.hasUndo);
+      // The digits address at most nine tools; a tenth must not shadow one.
+      check("at most nine tools carry a digit", r.digits <= 9, r.digits + " digits");
+      await tab.close();
+    }
+
+    // --------------------------------------------------------- phone sizes
+    console.log("\na phone gets a bottom sheet, not a side panel");
+    {
+      // Chrome will not open a window narrower than ~500 css px, which is
+      // still inside the phone branch (< 620).
+      const phone = await launch({ width: 420, height: 880 });
+      try {
+        const tab = await phone.open(INDEX + "?ex=HJ-1",
+          { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+        const r = await tab.evaluate(`
+          const d = document.getElementById("dock");
+          const dr = d.getBoundingClientRect();
+          const c = document.getElementById("view");
+          return { sheet: d.classList.contains("sheet"), open: d.classList.contains("open"),
+                   left: Math.round(dr.left), bottom: Math.round(dr.bottom),
+                   width: Math.round(dr.width), height: Math.round(dr.height),
+                   inner: [innerWidth, innerHeight],
+                   canvasW: c.clientWidth, canvasH: c.clientHeight,
+                   foldHidden: getComputedStyle(document.getElementById("dockfold")).display === "none",
+                   fill: Math.round(100 * APP.view.h / APP.view.pxH),
+                   vex: APP.state.vex };
+        `);
+        check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+        check("the panel is a sheet", r.sheet);
+        eq("it spans the width", r.width, r.inner[0]);
+        eq("it sits on the bottom", r.bottom, r.inner[1]);
+        check("it leaves the water the top half", r.height < r.inner[1] * 0.62,
+              r.height + " of " + r.inner[1]);
+        check("the seam handle is put away", r.foldHidden);
+        eq("the canvas keeps the whole width", r.canvasW, r.inner[0]);
+        // The sheet takes HEIGHT the way the side panel takes width: without
+        // this the domain centres itself on a full-height canvas whose lower
+        // half is behind the sheet.
+        eq("the canvas stops at the sheet", r.canvasH, r.inner[1] - r.height);
+        // Without the fitted view this is the 14%-of-the-screen sliver.
+        check("the flume is still worth looking at", r.fill >= 45,
+              "fills " + r.fill + "% at vex " + r.vex.toFixed(1));
+        await tab.close();
+      } finally { await phone.close(); }
     }
   } finally {
     await browser.close();

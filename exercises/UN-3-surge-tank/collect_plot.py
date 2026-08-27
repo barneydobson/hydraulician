@@ -8,9 +8,9 @@ One row per student: student_id,digit,level_m,c1_m,c2_m,c3_m,c4_m,c5_m
 (level_m and any extra columns are carried but not needed for the test.)
 
 Friction ∝ u² takes Δc ∝ c² out of the surge per cycle, so 1/c climbs in equal
-steps of 4/(3Y) — Y being lA/(2gkA_s) from the lectures' closed form. One line
-per student, 1/c against crest number: straight, and near-parallel, because Y
-belongs to the rig rather than to the digit.
+steps of 4/(3Y) — Y being lA/(2gkA_s) from the lectures' closed form. Invert it
+for k and every student should report the same number, whatever their reservoir
+level. One line per student, 1/c against crest number: straight, and parallel.
 """
 import argparse
 import csv
@@ -39,6 +39,12 @@ def read_rows(path):
     return rows
 
 
+L_EFF = 65.0        # m — the moving column: 47 m of penstock plus the shaft's
+                    # own water referred to the pipe. Using the bare 47 m
+                    # understates k by ~28%; see the theory note in README.md.
+AREA_RATIO = 3.0    # A / A_s — 21 cells of bore to 7 of shaft, at Medium.
+
+
 def fit(xs, ys):
     """Least-squares slope and R² of ys against xs."""
     n = len(xs)
@@ -61,20 +67,23 @@ def main():
         sys.exit("no usable rows in %s" % a.csv)
     rows.sort(key=lambda d: str(d["digit"]))
 
-    print("  d  level   crests (m)                    slope 1/c   R2       Y (m)")
+    print("  d  level   crests (m)                    slope 1/c   R2       Y (m)   k")
     for d in rows:
         ns = list(range(1, len(d["c"]) + 1))
         d["slope"], d["r2"] = fit(ns, [1.0 / v for v in d["c"]])
-        d["Y"] = 4.0 / (3.0 * d["slope"])        # crest step is 4/(3Y)
-        print("  %-2s %5s   %-28s  %.3f       %.4f   %.2f"
+        d["Y"] = 4.0 / (3.0 * d["slope"])            # crest step is 4/(3Y)
+        d["k"] = L_EFF * AREA_RATIO / (2 * 9.81 * d["Y"])
+        print("  %-2s %5s   %-28s  %.3f       %.4f   %.2f    %.3f"
               % (d["digit"], d["level"], " ".join("%.2f" % v for v in d["c"]),
-                 d["slope"], d["r2"], d["Y"]))
+                 d["slope"], d["r2"], d["Y"], d["k"]))
     n = len(rows)
-    Ys = [d["Y"] for d in rows]
+    ks = [d["k"] for d in rows]
+    mk = sum(ks) / n
     print("\n  R2 of 1/c against n : %.4f mean, %.4f worst"
           % (sum(d["r2"] for d in rows) / n, min(d["r2"] for d in rows)))
-    print("  Y = 4/(3*slope)     : %.2f .. %.2f m, mean %.2f — the rig's, not the digit's"
-          % (min(Ys), max(Ys), sum(Ys) / n))
+    print("  k = L(A/A_s)/(2gY)  : %.2f .. %.2f, mean %.2f s^2/m  (+/- %.0f%%)"
+          % (min(ks), max(ks), mk, 100 * max(abs(x - mk) for x in ks) / mk))
+    print("  k is the rig's — a flat spread across the ladder is the result.")
 
     fig, ax = plt.subplots(figsize=(6.4, 4.6))
     for d in rows:

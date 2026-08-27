@@ -565,10 +565,10 @@ const EXERCISES = [
              unit: "m", rule: "level = 10.0 + 0.4·d" },
     digitNote: "your reservoir level is a SLIDER, not a drawing — level = 10.0 + 0.4·d metres",
     instruments: [
-      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — the crests are read off its d trace" },
+      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — h₀ and the crests are both read off its d trace, so the datum cancels" },
     ],
     start: "the penstock with nozzle, tee and standpipe already built — only the reservoir level is yours",
-    task: "Set your reservoir level, note the steady shaft level h₀, then slam the valve and read the first five crest heights above h₀. Friction ∝ u² loses Δc ∝ c² per cycle, so 1/c climbs in equal steps — check that it does, then read the lectures' Y = 4/(3 × step) off the slope.",
+    task: "Set your reservoir level, note the steady shaft level h₀, then slam the valve and read the first five crest heights ABOVE h₀. Friction ∝ u² loses Δc ∝ c² per cycle, so 1/c climbs in equal steps: the sheet turns that step into Y = 4/(3 × step) and then k = L(A/A_s)/(2gY). Submit k — it is the rig's, so everyone should agree.",
     settle: 100,
   },
   {

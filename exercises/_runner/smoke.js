@@ -225,14 +225,18 @@ SUITES.api = async (B) => {
       probeFinite: [pr.u, pr.w, pr.phead, pr.f, pr.speed].every(Number.isFinite),
       analyseKeys: Object.keys(A).sort(),
       // analyse() mixes plain arrays with the Float32Arrays the smoothing
-      // returns, and d_n is legitimately Infinity on a level bed (S0 = 0,
-      // so no depth is "normal") — so: indexable, and numeric where wet.
+      // returns, so "is it an array" has to admit both. Read the sample at a
+      // column the overlay itself trusts (A.ok — it clears the boundary ring
+      // and the guard band either side of every cliff, where d_n is NaN by
+      // construction), and allow Infinity: on a level bed S0 = 0, so no depth
+      // is "normal" and Infinity is the right answer.
       analyseArrays: ["d", "dc", "dn", "H", "dRaw", "q", "V", "Fr"].filter((k) => {
         const a = A[k];
         if (!(Array.isArray(a) || ArrayBuffer.isView(a)) || a.length !== A.d.length) return true;
-        const mid = A.onBed.findIndex((b, i) => b && A.d[i] > 3 * APP.sim.dx);
-        return mid < 0 || typeof a[mid] !== "number" || Number.isNaN(a[mid]);
+        const i = A.ok.findIndex((good, n) => good && A.d[n] > 3 * APP.sim.dx);
+        return i < 0 || typeof a[i] !== "number" || Number.isNaN(a[i]);
       }),
+      okColumns: A.ok.reduce((n, v) => n + (v ? 1 : 0), 0),
       boxKeys: Object.keys(bf).sort(),
       boxFinite: [bf.fx, bf.fz, bf.mdot].every(Number.isFinite),
       recKeys: Object.keys(rec).sort(),
@@ -251,6 +255,7 @@ SUITES.api = async (B) => {
     ["d", "dc", "dn", "dRaw", "H"].every((k) => r.analyseKeys.includes(k)) &&
     !["h", "yc", "yn", "hRaw", "E"].some((k) => r.analyseKeys.includes(k)),
     "keys: " + r.analyseKeys.join(","));
+  ok("API analyse() has trustworthy columns to read", r.okColumns > 20, r.okColumns + " ok columns");
   ok("API analyse() arrays carry numbers", r.analyseArrays.length === 0,
     "not numeric: " + r.analyseArrays.join(","));
   ok("API analyse() still reports dnGlobal", r.dnGlobal === "number");

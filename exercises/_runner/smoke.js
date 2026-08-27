@@ -51,6 +51,35 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css
 let passed = 0;
 const failures = [];
 
+/** Page-side helpers, injected once per navigation.
+ *
+ *  `__low()` drops to the smallest grid: this harness runs on SwiftShader in
+ *  CI, where Medium is ~10× too slow to settle a scene inside a test. The
+ *  physics being asserted (mass conservation, hydrostatic rest, a jump that
+ *  obeys momentum) is resolution-independent — only the delivered roughness
+ *  is not, and nothing here measures that.
+ *
+ *  `__settle(t, ms)` advances to `t` seconds of SIMULATED time but gives up
+ *  after `ms` of wall clock, reporting what it reached. A test that reports
+ *  "settled to 12 s of 25" is debuggable; one that hangs is not. */
+const HELPERS = `
+  window.__low = () => {
+    const c = CONTROLS.find((x) => x.id === "budget");
+    if (c && APP.state.budget !== "Low") { c.set("Low"); }
+    return { nx: APP.sim.nx, ny: APP.sim.ny, dx: APP.sim.dx };
+  };
+  window.__settle = (target, ms) => {
+    const t0 = Date.now();
+    while (APP.sim.t < target && Date.now() - t0 < ms) APP.tick(200);
+    return APP.sim.t;
+  };
+  window.__warm = (n) => {
+    let A;
+    for (let i = 0; i < (n || 20); i++) A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+    return A;
+  };
+`;
+
 function ok(name, cond, detail) {
   if (cond) { passed++; return true; }
   failures.push(name + (detail === undefined ? "" : "\n      " + detail));
@@ -142,7 +171,12 @@ async function browser() {
     await send("Page.navigate", { url });
     for (let i = 0; i < 160; i++) {                 // software GL boots slowly
       await new Promise((r) => setTimeout(r, 250));
-      try { if (await evaluate("!!(window.APP && window.APP.sim)")) return; } catch (_) { /* mid-navigation */ }
+      try {
+        if (await evaluate("!!(window.APP && window.APP.sim)")) {
+          await evaluate(HELPERS + "true");
+          return;
+        }
+      } catch (_) { /* mid-navigation */ }
     }
     // Ask the page why. A missing WebGL2 context is the usual answer, and
     // "APP never appeared" on its own sends people hunting the wrong bug.
@@ -176,7 +210,7 @@ const SUITES = {};
 SUITES.api = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=h23`);
   const r = await B.evaluate(`(() => {
-    APP.tick(400);
+    __low(); APP.tick(400);
     const pr = APP.probe(3.0, 0.30);
     const A  = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
     APP.placeCV(4.0, 0.10, 5.2, 0.60);
@@ -237,11 +271,12 @@ SUITES.api = async (B) => {
   // Belanger 0.438. Settle by simulated time so the count is independent of
   // Δt, then warm the analyse EMA the way the overlay does.
   const j = await B.evaluate(`(() => {
-    while (APP.sim.t < 40) APP.tick(500);
-    let A; for (let i = 0; i < 25; i++) A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+    __low();
+    const t = __settle(30, 120000);
+    const A = __warm(25);
     const J = OVERLAY.findJumps(A, APP.sim)[0];
-    return J ? { t: APP.sim.t, keys: Object.keys(J).sort(),
-                 d1: J.d1, d2: J.d2, d2p: J.d2p, Fr1: J.Fr1, dE: J.dE } : { t: APP.sim.t };
+    return J ? { t, keys: Object.keys(J).sort(),
+                 d1: J.d1, d2: J.d2, d2p: J.d2p, Fr1: J.Fr1, dE: J.dE } : { t };
   })()`);
   if (ok("PHYSICS h23 still forms a hydraulic jump", j.keys !== undefined,
          "settled to t = " + (j.t || 0).toFixed(1) + " s with no free jump found")) {
@@ -316,10 +351,11 @@ SUITES.physics = async (B) => {
   // and it is the first thing a careless edit to the vel pass breaks.
   await B.goto(`http://localhost:${PORT}/?scene=venturi`);
   const rest = await B.evaluate(`(() => {
+    __low();
     APP.sim.p.inflow.on = 0; APP.sim.p.tailwater.on = 0; APP.sim.p.source.on = 0;
     APP.SIM.resetWater();
     const v0 = APP.volume();
-    APP.tick(3000);
+    __settle(APP.sim.t + 8, 90000);
     const v1 = APP.volume();
     let maxSpeed = 0, nan = 0;
     for (let x = 0.5; x < APP.sim.W; x += 0.75) {
@@ -341,8 +377,9 @@ SUITES.physics = async (B) => {
   // A flowing reach: mass in ≈ mass out once settled, and the profile is sane.
   await B.goto(`http://localhost:${PORT}/?scene=m1`);
   const flow = await B.evaluate(`(() => {
-    APP.tick(20000);
-    let A; for (let i = 0; i < 20; i++) A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+    __low();
+    __settle(30, 120000);
+    const A = __warm(20);
     const wet = [];
     for (let i = 5; i < APP.sim.nx - 5; i++) if (A.onBed[i] && A.d[i] > 3 * APP.sim.dx) wet.push(i);
     const q = wet.map((i) => A.q[i]).filter(Number.isFinite);
@@ -368,7 +405,7 @@ SUITES.scenes = async (B) => {
     try {
       r = await B.evaluate(`(() => {
         APP.loadScene(${JSON.stringify(id)}, false);
-        APP.tick(300);
+        __low(); APP.tick(300);
         APP.frames(2);
         const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
         const p = APP.probe(APP.sim.W * 0.5, APP.sim.H * 0.5);

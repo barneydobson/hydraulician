@@ -60,6 +60,11 @@
       CONTROLS.find(function (c) { return c.id === 'inLevel'; }).set(opts.level === undefined ? this.LEVEL : opts.level);
       CONTROLS.find(function (c) { return c.id === 'gaugeField'; }).set('d');
       if (opts.bulk != null) CONTROLS.find(function (c) { return c.id === 'bulk'; }).set(opts.bulk);
+      // Pin the speed: APP.frames(1, dt) advances speed*dt, so at the card's
+      // speed = 2 the gauge samples 0.2 s apart, reduce()'s fixed 0.9 s peak
+      // window shrinks to ±4 samples, and c1 reads 2.07 m for a true 2.57 m.
+      // Students read the chart, not the detector, so the card keeps speed 2.
+      APP.state.speed = 1;
       syncPanel();
       APP.state.gauges.length = 0;
       APP.state.gauges.push({ x: this.XT, z: this.YG, hist: [], colour: "#7fd4ff" });
@@ -89,7 +94,11 @@
     // rather than interlock, so this is checked, never assumed (MO-2's rule).
     check: function () {
       var s = APP.sim, dx = s.dx, rows = [], bad = 0;
-      for (var j = 36; j <= 40; j++) {
+      // Scan by ELEVATION. j = 36..40 was Medium's dx baked in; at High those
+      // rows land inside the bore, the soffit reads as one 500-cell hole and
+      // every rig fails the seal it actually passes.
+      for (var y = 4.95; y <= 5.50; y += dx) {
+        var j = Math.round(y / dx);
         var holes = 0, x0 = null, x1 = null;
         for (var i = Math.round(6.6 / dx); i < Math.round(58.0 / dx); i++)
           if (s.mask[j * s.nx + i] === 0) { holes++; if (x0 === null) x0 = i * dx; x1 = i * dx; }
@@ -113,11 +122,22 @@
     // Gauge history is filled by tickFrame only (APP.frames), never APP.tick,
     // and it is a 900-sample ring buffer: 45 sim-s at dt = 1/20.
     slam: function (rec, dt) {
-      dt = dt || 1 / 20; rec = rec || 44;
+      // 10 Hz, not 20: the gauge ring is 900 samples, so 20 Hz caps the record
+      // at 45 s and the mass oscillation is ~10 s. 10 Hz buys 90 s = six crests,
+      // and the crests are broad enough that 0.1 s costs nothing.
+      dt = dt || 1 / 10; rec = rec || 70;
       APP.state.paused = false;
       var g = APP.state.gauges[0], bed = 2.0642, k;
+      // The gauge's d channel is OVERLAY.analyse's 10 %/call EMA, and
+      // settle() runs on APP.tick, which never calls analyse. So the first
+      // frames after a settle replay the scene's stale 25 m initial fill: a
+      // 3 s median taken across that relaxation reads ~0.5 m high, and on the
+      // shipped dry-run class it put two of ten rest levels ABOVE the
+      // reservoir. Warm the EMA first, then open the window — and make the
+      // window 10 s, because the residual is a 0.12 m turbulent noise floor.
+      for (k = 0; k < Math.round(10 / dt); k++) APP.frames(1, dt);
       g.hist.length = 0;
-      for (k = 0; k < Math.round(3 / dt); k++) APP.frames(1, dt);
+      for (k = 0; k < Math.round(10 / dt); k++) APP.frames(1, dt);
       var pre = g.hist.map(function (h) { return h.d; }).sort(function (a, b) { return a - b; });
       var rest = pre[pre.length >> 1], v0 = this.V(30.0), tslam = APP.sim.t;
       toggleValve();
@@ -147,16 +167,20 @@
                peaks: pk.map(function (p) { return [+p[0].toFixed(2), +(p[1] - rest).toFixed(3)]; }) };
     },
 
-    // one complete student run
-    student: function (bs, opts) {
+    // One complete student run. The personalised parameter is the RESERVOIR
+    // LEVEL (a slider) — the shaft is the same for everyone, because redrawing
+    // it was the slowest step in the demo and the test does not need it.
+    student: function (level, opts) {
       opts = opts || {};
-      var c = this.setup(bs, opts);
+      var c = this.setup(opts.bs || 0.98, { level: level });
       if (!c.ok) return { error: "rig not sealed", check: c };
-      this.settle(opts.settle || 50);
-      var r = this.slam(opts.rec || 44);
-      r.bs = c.bs_delivered;
-      r.T_theory = +(2 * Math.PI * Math.sqrt(this.L * r.bs / (9.81 * this.BP))).toFixed(3);
-      r.zmax_bound = +(r.v0 * Math.sqrt(this.L * this.BP / (9.81 * r.bs))).toFixed(3);
+      this.settle(opts.settle || 100);
+      var r = this.slam(opts.rec);
+      r.level = level;
+      // Crest heights above the resting level — the five numbers the brief asks
+      // for. 1/c linear in n is the u^2 law; c_{n+1}/c_n constant is the u law.
+      r.crests = r.peaks.filter(function (p) { return p[1] > 0.25; })
+                        .slice(0, 6).map(function (p) { return p[1]; });
       return r;
     }
   };

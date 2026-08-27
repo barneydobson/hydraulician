@@ -548,7 +548,7 @@ const EXERCISES = [
   },
   {
     id: "UN-3",
-    title: "Surge tank: is the damping u²?",
+    title: "Surge tank: fit k to the decay",
     topic: "Water hammer",
     folder: "UN-3-surge-tank",
     scene: "hammer",
@@ -565,10 +565,10 @@ const EXERCISES = [
              unit: "m", rule: "level = 10.0 + 0.4·d" },
     digitNote: "your reservoir level is a SLIDER, not a drawing — level = 10.0 + 0.4·d metres",
     instruments: [
-      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — h₀ and the crests are both read off its d trace, so the datum cancels" },
+      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — the whole decay downloads from this gauge (Controls → Gauges → ⤓ CSV)" },
     ],
     start: "the penstock with nozzle, tee and standpipe already built — only the reservoir level is yours",
-    task: "Set your reservoir level, note the steady shaft level h₀, then slam the valve and read the first five crest heights ABOVE h₀. Friction ∝ u² loses Δc ∝ c² per cycle, so 1/c climbs in equal steps: the sheet turns that step into Y = 4/(3 × step) and then k = L(A/A_s)/(2gY). Submit k — it is the rig's, so everyone should agree.",
+    task: "Set your level, gauge the shaft, slam the valve and let it swing five times. Download the gauge CSV and build the README's Euler model beside it in Excel: T off the trace fixes L, then tune k until the model lies on the measurement. Submit T, L and k — k is the rig's, so everyone should agree.",
     settle: 100,
   },
   {

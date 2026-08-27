@@ -27,7 +27,7 @@
  *     {x, buf}. SIM.rake(x, buf) re-reads U raw every call -- NO temporal or
  *     spatial smoothing anywhere in the rake path: bed/surf come from
  *     A.bed[i]/A.surf[i] (OVERLAY.analyse's RAW per-column reduction, not the
- *     EMA'd A.h/A.q used by the hover box), and the velocity buffer is a
+ *     EMA'd A.d/A.q used by the hover box), and the velocity buffer is a
  *     fresh readPixels of U each call. The on-screen chip (u_max, V, ratio)
  *     is therefore INSTANTANEOUS, not a running average -- confirmed by
  *     reading js/main.js (sampleRakes() every frame) and js/overlay.js
@@ -269,7 +269,7 @@ window.NC2 = {
       NC2.C("mode").set("0"); NC2.C("channel").set(false); NC2.C("labels").set(false); NC2.C("jumps").set(false);
       syncPanel();
       APP.state.gauges.length = 0;
-      APP.state.gauges.push({ x: gx - R.GAUGE_DX, y: bed + 0.15, hist: [], colour: "#7fd4ff" });
+      APP.state.gauges.push({ x: gx - R.GAUGE_DX, z: bed + 0.15, hist: [], colour: "#7fd4ff" });
       return R.gate;
     },
 

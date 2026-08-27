@@ -104,8 +104,8 @@ window.LL1 = {
   /** Two gauges -- same push the Gauge tool does. Second one LOW in the pipe. */
   gauges: function (xA, yA, xB, yB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: yA, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: yB, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: yA, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: yB, hist: [], colour: "#ffb648" });
     LL1.XA = xA; LL1.YA = yA; LL1.XB = xB; LL1.YB = yB;
   },
 
@@ -157,7 +157,7 @@ window.LL1 = {
       APP.frames(1, 1 / 60); n++;
       if (n % 6 === 0) {
         var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
-        Vs1.push(A.V[iUp]); Vs2.push(A.V[iDn]); hsDn.push(A.h[iDn]);
+        Vs1.push(A.V[iUp]); Vs2.push(A.V[iDn]); hsDn.push(A.d[iDn]);
       }
     }
     APP.state.paused = true; APP.frames(2);

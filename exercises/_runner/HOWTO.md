@@ -23,7 +23,7 @@ $R close  --id HJ1                      # ALWAYS, even after a failure
   var A; for (var i=0;i<15;i++) A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
   APP.state.paused = true;
   var j = OVERLAY.findJumps(A, APP.sim)[0];          // undefined if no free jump
-  return JSON.stringify({Fr1:j.Fr1, y1:j.y1, y2:j.y2, y2p:j.y2p, dE:j.dE});
+  return JSON.stringify({Fr1:j.Fr1, d1:j.d1, d2:j.d2, d2p:j.d2p, dE:j.dE});
 })()
 ```
 After `pump --sim-seconds 25`: q=0.50 → Fr₁ 2.24, d₁ 0.176, d₂ 0.415, d₂ᵖ 0.476

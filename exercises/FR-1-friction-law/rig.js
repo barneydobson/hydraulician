@@ -22,7 +22,7 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs() = the C key       SIM.undoSeg() = the Z key
  *   CONTROLS.find(c => c.id === "…").set(v); syncPanel()   = moving a slider
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   OVERLAY.analyse(sim, SIM.columns(true)).V[i]  = the "V" the readout prints
  *
  * MEASURED FACTS THE DEPENDENT DEMOS INHERIT  (Medium, 414 × 230, Δx 21.7 mm)
@@ -94,8 +94,8 @@ window.RIGA = {
   /** Two gauges on the pipe axis. Same push the Gauge tool does. */
   gauges: function (xA, xB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: RIGA.AXIS, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: RIGA.AXIS, hist: [], colour: "#ffb648" });
     RIGA.XA = xA; RIGA.XB = xB; RIGA.L = +(xB - xA).toFixed(3);
   },
 
@@ -151,7 +151,7 @@ window.FR1 = {
       APP.frames(1, 1 / 60); n++;
       if (n % 10 === 0) {
         var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true)), v = 0, m = 0;
-        for (var i = iA; i <= iB; i++) { v += A.V[i]; m++; if (A.h[i] < hmin) hmin = A.h[i]; }
+        for (var i = iA; i <= iB; i++) { v += A.V[i]; m++; if (A.d[i] < hmin) hmin = A.d[i]; }
         Vs.push(v / m);
       }
     }

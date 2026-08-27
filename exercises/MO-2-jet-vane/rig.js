@@ -31,7 +31,7 @@
  *   APP.probe(x,y) -> {u,v,p,phead}     .phead is p/(rho g) ONLY -- PRESSURE
  *     head, not full piezometric head (LL-1v's rule, CHANGES-NEEDED.md).
  *     Piezometric head = probe(x,y).phead + y. The on-screen GAUGE tool adds
- *     the +y for you (js/main.js sampleGauges: h: gg.y + pr.phead) -- read
+ *     the +y for you (js/main.js sampleGauges: h: gg.z + pr.phead) -- read
  *     GAUGES for any head comparison, or add +y by hand if hovering raw.
  *
  * MEASURED FACTS (Medium, sandbox W=9 H=5, 414x230, dx=0.021739 m,
@@ -231,14 +231,14 @@ window.JETRIG = {
   /** The two gauges the stagnation-ratio measurement was taken from. */
   stagnationGauges: function () {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: JETRIG.FLAT_X - 0.03, y: 2.46, hist: [], colour: '#7fd4ff' }); // stagnation
-    APP.state.gauges.push({ x: 0.95, y: 2.50, hist: [], colour: '#ffb648' });                 // reference
+    APP.state.gauges.push({ x: JETRIG.FLAT_X - 0.03, z: 2.46, hist: [], colour: '#7fd4ff' }); // stagnation
+    APP.state.gauges.push({ x: 0.95, z: 2.50, hist: [], colour: '#ffb648' });                 // reference
     JETRIG.C('gaugeField').set('h'); syncPanel();
   },
 
   /** Piezometric head = pressure head + elevation (LL-1v; probe().phead is
    *  pressure-only). Use this for any raw-probe head comparison. */
-  piezo: function (x, y) { return APP.probe(x, y).phead + y; },
+  piezo: function (x, z) { return APP.probe(x, z).phead + z; },
 
   check: function () {
     var s = APP.sim.p.source;

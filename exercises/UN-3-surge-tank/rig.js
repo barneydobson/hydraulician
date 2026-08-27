@@ -67,7 +67,7 @@
       APP.state.speed = 1;
       syncPanel();
       APP.state.gauges.length = 0;
-      APP.state.gauges.push({ x: this.XT, y: this.YG, hist: [], colour: "#7fd4ff" });
+      APP.state.gauges.push({ x: this.XT, z: this.YG, hist: [], colour: "#7fd4ff" });
       APP.state.gaugeField = 'd';
       return this.check();
     },

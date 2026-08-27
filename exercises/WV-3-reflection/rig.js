@@ -277,9 +277,9 @@ window.WV3 = {
   // rendering/analyse/sampleGauges pipeline a real browser tab runs), let
   // it run for a few seconds, and report BOTH fields the gauge card can
   // show: "h" (y + p/(rho g), a raw point-pressure proxy for surface
-  // elevation) and "d" (A.h[i], the per-COLUMN reduced depth -- what
+  // elevation) and "d" (A.d[i], the per-COLUMN reduced depth -- what
   // the programme text's "depth oscillation amplitude" literally names,
-  // and immune to gauge-y placement since it ignores gg.y entirely). Both
+  // and immune to gauge-y placement since it ignores gg.z entirely). Both
   // are always recorded in gg.hist regardless of the panel's gaugeField
   // display setting, so one run gives both. For each field: the naive
   // peak-to-peak/2 (== half the difference of the two numbers the on-

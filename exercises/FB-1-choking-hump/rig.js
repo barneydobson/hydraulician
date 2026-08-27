@@ -26,7 +26,7 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs() = the C key       SIM.undoSeg() = the Z key
  *   CONTROLS.find(c => c.id === "…").set(v); syncPanel()   = moving a slider
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  *
  * MEASURED FACTS THE DEPENDENT DEMOS INHERIT (Medium, 414 × 230, Δx 21.7 mm)
@@ -110,9 +110,9 @@ window.RIGB = {
     return R.check();
   },
 
-  gauge: function (x, y) {
+  gauge: function (x, z) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: x, y: y === undefined ? RIGB.BED + 0.25 : y,
+    APP.state.gauges.push({ x: x, z: z === undefined ? RIGB.BED + 0.25 : z,
                             hist: [], colour: "#7fd4ff" });
     APP.state.gaugeField = "d";
     RIGB.XG = x;

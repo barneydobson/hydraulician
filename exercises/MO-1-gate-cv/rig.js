@@ -29,7 +29,7 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs() = the C key       SIM.undoSeg() = the Z key
  *   CONTROLS.find(c => c.id === "…").set(v); syncPanel()   = moving a slider
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  *
  * MEASURED FACTS (Medium, 414×230, Δx 21.7391 mm, dt 3.494e-4 s, W×H = 9×5 m)
@@ -120,9 +120,9 @@ window.MOGATE = {
     return R.check();
   },
 
-  gauge: function (x, y) {
+  gauge: function (x, z) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: x, y: y === undefined ? MOGATE.BED + 0.15 : y,
+    APP.state.gauges.push({ x: x, z: z === undefined ? MOGATE.BED + 0.15 : z,
                             hist: [], colour: "#7fd4ff" });
     APP.state.gaugeField = "d";
     MOGATE.XG = x;
@@ -192,7 +192,7 @@ window.MOGATE = {
  * recomputation (CLAUDE.md / recipe rule).
  * ==========================================================================*/
 window.MOHOVER = {
-  read: function (x, y) {
+  read: function (x, z) {
     var rows = [], cls = null;
     var ctx = {
       save: function () {}, restore: function () {}, beginPath: function () {},
@@ -203,11 +203,11 @@ window.MOHOVER = {
       set textAlign(v) {}, set textBaseline(v) {}, set lineWidth(v) {},
     };
     var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
-    var probe = APP.sim.probe ? APP.sim.probe(x, y) : APP.probe(x, y);
-    OVERLAY.drawCursorReadout(ctx, APP.view, A, APP.sim, x, y, probe);
+    var probe = APP.sim.probe ? APP.sim.probe(x, z) : APP.probe(x, z);
+    OVERLAY.drawCursorReadout(ctx, APP.view, A, APP.sim, x, z, probe);
     var i = Math.max(0, Math.min(APP.sim.nx - 1, Math.floor(x / APP.sim.dx)));
-    return { x: x, i: i, painted: rows, ok: !!A.ok[i], hAnalysed: +A.h[i].toFixed(4),
-             hRaw: +A.hRaw[i].toFixed(4), Fr: +A.Fr[i].toFixed(3) };
+    return { x: x, i: i, painted: rows, ok: !!A.ok[i], dAnalysed: +A.d[i].toFixed(4),
+             dRaw: +A.dRaw[i].toFixed(4), Fr: +A.Fr[i].toFixed(3) };
   },
 };
 
@@ -322,11 +322,11 @@ window.MO1 = {
     MO1.settle(settle2 === undefined ? 20 : settle2);
     var r2 = MO1.record(rec === undefined ? 10 : rec);
     var hv = MOHOVER.read(MO1.venaX(), MOGATE.BED + 0.10);
-    var d1 = hv.hAnalysed;                         // exactly what the hover box prints
+    var d1 = hv.dAnalysed;                         // exactly what the hover box prints
     var der = MO1.derive(a, q, r2.d0, d1);
     return { d: d, aCells: MO1.aCells(d), a: a, q: q, level: lv, levelFixed: lvl2,
              d0: r2.d0, y0Flutter: +(r2.y0Max - r2.y0Min).toFixed(4),
-             venaX: MO1.venaX(), d1: d1, y1Raw: hv.hRaw, Fr1: hv.Fr,
+             venaX: MO1.venaX(), d1: d1, d1Raw: hv.dRaw, Fr1: hv.Fr,
              Cd: der.Cd, FR: der.FR, naive: der.naive, diffPct: der.diffPct, t: r2.t };
   },
 };

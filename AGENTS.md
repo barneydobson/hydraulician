@@ -88,13 +88,34 @@ to look fine for a minute and explode in an exercise.
 
 ## Testing
 
-The render loop stops when the page is hidden, so headless work drives the
-app directly: `APP.frames(n)`, `APP.tick(n)`, `APP.probe(x,z)` (returns
-`u, w, p, phead, f, speed` — `phead` is pressure head only), `APP.volume()`,
-`APP.zoomAt(...)`, `APP.boxForce` / `APP.placeCV`. `exercises/_runner/runner.py`
-wraps that over CDP (Linux-bound — macOS shims in its HOWTO.md).
-`python3 exercises/_runner/check_pack.py` asserts the derivable agreements of
-the exercise pack; run it before printing worksheets.
+Three gates, all zero-dependency and all non-zero on failure:
+
+| Command | Guards | Cost |
+|---|---|---|
+| `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders) | instant |
+| `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
+| `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
+
+Run the first two before printing worksheets, and `smoke.js` before pushing
+anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
+(~2.5 min); `--keep` leaves the browser open on failure.
+
+The two checkers are complements: `check_notation.py` greps for *names*,
+`smoke.js` proves the names are *connected* — a field renamed at the write
+site but not the read site greps clean and returns `undefined` at runtime.
+
+Driving the app yourself: the render loop stops when the page is hidden, so
+headless work goes through `APP.frames(n)`, `APP.tick(n)`, `APP.probe(x,z)`
+(returns `u, w, p, phead, f, speed` — `phead` is pressure head only),
+`APP.volume()`, `APP.zoomAt(...)`, `APP.boxForce` / `APP.placeCV`.
+`exercises/_runner/runner.py` wraps that over CDP (Linux-bound — macOS shims
+in its HOWTO.md); `smoke.js` carries its own portable CDP client.
+
+Two sharp edges that have cost time, both now commented in `smoke.js`:
+`APP.volume()` reads the **cached** column reduction, so straight after a
+rebuild or `resetWater()` it returns 0 until `SIM.columns(true)` forces the
+readback; and `APP.pickExercise()` lands its rig a microtask later, so
+`await EX.ready` before reading what it applied.
 
 ## The exercise pack
 

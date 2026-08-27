@@ -107,6 +107,22 @@ scan(code, r"(?<![\w.])(?:pr|probe|p)\.head\b",
      "retired field .head — probe() returns .phead (pressure head only)")
 scan(code, r"\.fy\b", "retired field .fy — boxForce() returns .fz")
 
+# --- 1b. ...and the same names quoted in prose ----------------------------
+# The docs name these APIs constantly. A rename that updates the code and
+# leaves the prose behind is how a brief ends up telling a student to read a
+# field that no longer exists — which is worse than a stale comment, because
+# they will type it.
+docs = [p for p in walk(".md", ".html") if rel(p) not in REGISTER]
+scan(docs, r"probe\([^)]*\)\.head\b|\bpr\.head\b",
+     "prose names probe().head — it is probe().phead now")
+scan(docs, r"\bynGlobal\b", "prose names ynGlobal — it is dnGlobal now")
+scan(docs, r"\bA\.hRaw\b|\bA\.h\[|\bA\.yc\b|\bA\.yn\b",
+     "prose names a retired analyse() field — use .d / .dRaw / .dc / .dn")
+scan(docs, r"findJumps[^)]*\)\.y[12]\b|\bJ\.y[12]p?\b",
+     "prose names a retired findJumps() field — use .d1 / .d2 / .d2p")
+scan(docs, r"boxForce[^)]*\)\.fy\b|\breturns?\s+.*\bfy\b.*N/m",
+     "prose names boxForce().fy — it is .fz now")
+
 # --- 2. gauge objects carry z ---------------------------------------------
 scan(code, r"gauges\.push\(\{[^}]*\by\s*:",
      "gauge object still has a y: key — gauges carry z:")

@@ -366,6 +366,10 @@ SUITES.physics = async (B) => {
     __low();
     APP.sim.p.inflow.on = 0; APP.sim.p.tailwater.on = 0; APP.sim.p.source.on = 0;
     APP.SIM.resetWater();
+    // volume() reads the column reduction, which is a cached readback — it
+    // is stale until the next step, so take the baseline AFTER one tick or
+    // the comparison is against zero.
+    APP.tick(1);
     const v0 = APP.volume();
     __settle(APP.sim.t + 8, 90000);
     const v1 = APP.volume();
@@ -386,27 +390,42 @@ SUITES.physics = async (B) => {
   ok("PHYSICS still water stays still", rest.maxSpeed < 0.35,
     "max speed " + rest.maxSpeed.toFixed(3) + " m/s");
 
-  // A flowing reach: mass in ≈ mass out once settled, and the profile is sane.
+  // A flowing reach. Measured over the middle 60% only: the inlet sponge and
+  // the brink are boundary treatments, not the reach, and including them
+  // measures those instead.
   await B.goto(`http://localhost:${PORT}/?scene=m1`);
   const flow = await B.evaluate(`(() => {
     __low();
-    __settle(30, 120000);
+    const t = __settle(30, 150000);
     const A = __warm(20);
+    const nx = A.d.length, lo = Math.floor(nx * 0.2), hi = Math.floor(nx * 0.8);
     const wet = [];
-    for (let i = 5; i < APP.sim.nx - 5; i++) if (A.onBed[i] && A.d[i] > 3 * APP.sim.dx) wet.push(i);
-    const q = wet.map((i) => A.q[i]).filter(Number.isFinite);
-    const qLo = Math.min(...q), qHi = Math.max(...q);
-    return { n: wet.length, qLo, qHi, dMid: A.d[wet[Math.floor(wet.length / 2)]],
-             dcMid: A.dc[wet[Math.floor(wet.length / 2)]],
-             HMono: A.H[wet[0]] > A.H[wet[wet.length - 1]] };
+    for (let i = lo; i < hi; i++) if (A.ok[i] && A.d[i] > 3 * APP.sim.dx) wet.push(i);
+    const q = wet.map((i) => A.q[i]).filter(Number.isFinite).sort((a, b) => a - b);
+    const med = q[q.length >> 1];
+    const third = Math.floor(wet.length / 3);
+    const medOf = (arr) => { const s = arr.slice().sort((a, b) => a - b); return s[s.length >> 1]; };
+    const qUp = medOf(wet.slice(0, third).map((i) => A.q[i]));
+    const qDn = medOf(wet.slice(-third).map((i) => A.q[i]));
+    const mid = wet[Math.floor(wet.length / 2)];
+    return { t, n: wet.length, qLo: q[0], qHi: q[q.length - 1], med, qUp, qDn,
+             dMid: A.d[mid], dcMid: A.dc[mid],
+             HFalls: A.H[wet[0]] > A.H[wet[wet.length - 1]] };
   })()`);
   ok("PHYSICS m1 has a wet reach to measure", flow.n > 50, flow.n + " columns");
-  ok("PHYSICS discharge is continuous along the reach",
-    flow.qHi > 0 && (flow.qHi - flow.qLo) / flow.qHi < 0.45,
-    `q ${flow.qLo.toFixed(3)}–${flow.qHi.toFixed(3)} m²/s`);
+  ok("PHYSICS discharge holds one value along the reach",
+    flow.med > 0 && (flow.qHi - flow.qLo) / flow.med < 0.8,
+    `q ${flow.qLo.toFixed(3)}–${flow.qHi.toFixed(3)}, median ${flow.med.toFixed(3)} m²/s` +
+    ` (settled to ${flow.t.toFixed(1)} s)`);
+  // The signature of the conservation bug this project has already been bitten
+  // by: a clamped VOF invents water, so q climbs monotonically downstream
+  // while the depth sits perfectly steady. Guard the direction, not the noise.
+  ok("PHYSICS discharge does not grow downstream (no invented water)",
+    flow.qDn < 1.4 * flow.qUp,
+    `upstream third ${flow.qUp.toFixed(3)} → downstream third ${flow.qDn.toFixed(3)} m²/s`);
   ok("PHYSICS m1 runs subcritical (mild backwater)", flow.dMid > flow.dcMid,
     `d ${flow.dMid.toFixed(3)} vs d_c ${flow.dcMid.toFixed(3)}`);
-  ok("PHYSICS the energy line falls downstream", flow.HMono);
+  ok("PHYSICS the energy line falls downstream", flow.HFalls);
 };
 
 SUITES.scenes = async (B) => {

@@ -5,8 +5,7 @@ dependencies, no build step. A teaching tool — draw a channel, a pipe or a
 tank and free-surface Navier–Stokes runs through it, with the measurements
 (depths, heads, profiles, jumps) done on screen.
 
-**Run it:** serve statically (`python3 .claude/serve.py 8124` — `http.server`
-plus no-store, so edits are never cache-shadowed) and open
+**Run it:** serve statically (`python3 -m http.server 8124`) and open
 `index.html` — or double-click it; classic scripts, so `file://` works.
 `.claude/launch.json` has a preview config on port 8124. `?scene=<id>` boots a
 scene, `?ex=<id>` an exercise. Sibling project: `hydraulics-fun` (plan-view
@@ -145,11 +144,8 @@ shipping. `spinup` values are measured settle times, not guesses.
 
 ## Gotchas worth knowing on day one
 
-- A dev browser may serve stale JS from a bare `http.server` — and a PARTIAL
-  stale (old `main.js`, new payloads) fails every rig with "format v2 is newer
-  than this build". Serve via `.claude/serve.py` (no-store); the `?v=` stamp
-  on index.html's script tags, bumped with `RIG`'s `V`, breaks mixes on format
-  changes.
+- A dev browser may serve stale JS from `http.server`; force with
+  `fetch(url, {cache:"reload"})` then `location.reload()`.
 - Resolution changes Δx, not the physics: the domain is a fixed physical
   rectangle and the grid is sized to a cell budget.
 - `state.rt` in the status bar is the speed truth — m2 at ~0.9× real time is

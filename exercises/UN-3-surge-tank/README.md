@@ -20,16 +20,11 @@ level below the reservoir:
     (L/g)·du/dt = z − k·u|u|          dz/dt = −(A/A_s)·u
 
 A/A_s = 2.9/0.96, read off the screen. L = 75 m is the length of the moving
-column — longer than the 47 m of pipe because the water in the shaft moves
-A/A_s times faster than the water in the pipe, and counts accordingly.
+column — longer than the pipe as measured because the water in the shaft moves
+at a different speed than the pipe.
 
-k is the unknown. Integrate the pair from the first crest — u = 0 there, so
-no starting velocity is needed and the slam transient is skipped — and
-change k until the computed z matches the measured one.
-
-One numerical point: update z with the current step's u, as written in the
-equations below. Updating it with the previous step's u feeds energy into
-the oscillation, and the fitted k then depends on the step size.
+k is unknown. Integrate the equations above from the first crest where u is
+known (= 0) and iterate k until the computed z matches the measured one.
 
 ## Your reservoir level
 
@@ -51,8 +46,8 @@ metres, set on the **Reservoir level** slider. Nothing is drawn.
    Open it in Excel: columns t, h, d, speed.
 5. From the d column compute the measured **z = R − 2 − d** (the pipe floor
    is 2 m above datum), and **dt** between successive rows.
-6. Start the model at the first crest — z equal to the measured value there,
-   u = 0 — and step both forward:
+6. Start the model at the first crest, set z0 to the measured value there,
+   u = 0 (no velocity at crest) — and step both forward:
 
        u_i = u_{i−1} + dt_i · (g/L) · (z_{i−1} − k·u_{i−1}·|u_{i−1}|)
        z_i = z_{i−1} − dt_i · (A/A_s) · u_i
@@ -75,13 +70,6 @@ One point per student, k against digit. On the shipped dry-run class k runs
 
 ### Discussion points
 
-- **Why the measured decay is sharper than the model.** With k set to match
-  the first three crests, the model sits about 0.1 m above the measured
-  fourth and fifth. Quadratic drag removes Δc ∝ c² per cycle, so its decay
-  almost stops as the swing shrinks; the water also has small losses that
-  are linear in u (boundary-layer viscosity — in the sim, the explicit
-  viscosities), and these do not fade with amplitude. The u² term dominates
-  the large swings; the linear losses take over the tail.
 - **k is not the penstock's friction.** Steady running draws the shaft down
   only about 0.1 m at about 1 m/s — a k of about 0.1, twenty times less than
   the surge measures. In steady running no water turns up the shaft; after

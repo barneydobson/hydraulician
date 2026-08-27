@@ -49,8 +49,14 @@ Symbols are the register in [docs/notation.md](docs/notation.md) — depth `d`
 energy head `H`, specific energy `E = H − z_b`, velocity `u = (u, w)`,
 pressure head always spelled `p/ρg`. Two standing rules:
 
-- **Rename displayed symbols, not code identifiers.** The GLSL and runtime
-  state keep `y`/`v` for the vertical fields; the display says `z`/`w`.
+- **Code identifiers follow the notation too.** The whole stack — GLSL
+  identifiers, runtime state, public API fields — uses `z` for the domain
+  vertical, `w` for the vertical velocity, `d` for depth (`probe().w`,
+  `boxForce().fz`, `analyse().d/.dc/.dn/.H`, `findJumps().d1/.d2`,
+  `gauges[].z`, `source.z/.vz`). Two deliberate exceptions: GLSL *swizzles*
+  (`.y` is component syntax, `U.g` still stores w) and screen-space pixel
+  coordinates (canvas y-down) stay `y`; the view transform (`V.Y(z)`,
+  `toDomain`) is the boundary between the two.
 - **Serialized keys go through the version gate.** The rig wire format is v2
   (`z`, `vz`, gauge fields `"h"`/`"d"`/`"speed"`); `RIG.migrate` in `main.js`
   accepts exactly the current version and rejects anything else — prototype,
@@ -84,7 +90,7 @@ to look fine for a minute and explode in an exercise.
 
 The render loop stops when the page is hidden, so headless work drives the
 app directly: `APP.frames(n)`, `APP.tick(n)`, `APP.probe(x,z)` (returns
-`u, v, p, phead, f, speed` — `phead` is pressure head only), `APP.volume()`,
+`u, w, p, phead, f, speed` — `phead` is pressure head only), `APP.volume()`,
 `APP.zoomAt(...)`, `APP.boxForce` / `APP.placeCV`. `exercises/_runner/runner.py`
 wraps that over CDP (Linux-bound — macOS shims in its HOWTO.md).
 `python3 exercises/_runner/check_pack.py` asserts the derivable agreements of

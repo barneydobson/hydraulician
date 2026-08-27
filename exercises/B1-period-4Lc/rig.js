@@ -13,7 +13,7 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs()  = the C key      SIM.undoSeg() = the Z key
  *   toggleValve()    = the V key      SIM.resetWater() = the R key
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   OVERLAY.analyse(sim, SIM.columns(true)).V[i]  = the "V" line the hover
  *                                                   readout prints
  * Gauge history is filled by tickFrame, i.e. APP.frames(n) -- NOT by
@@ -39,7 +39,7 @@ window.B1 = {
 
   gauge: function (x) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: x, y: B1.YC, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: x, z: B1.YC, hist: [], colour: "#7fd4ff" });
   },
 
   v0: function (x) {

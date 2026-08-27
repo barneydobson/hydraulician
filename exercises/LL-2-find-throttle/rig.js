@@ -110,8 +110,8 @@ window.RIGA = window.RIGA || {
   /** Two gauges on the pipe axis. Same push the Gauge tool does. */
   gauges: function (xA, xB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: RIGA.AXIS, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: RIGA.AXIS, hist: [], colour: "#ffb648" });
     RIGA.XA = xA; RIGA.XB = xB; RIGA.L = +(xB - xA).toFixed(3);
   },
 
@@ -197,11 +197,11 @@ window.LL2 = {
    *  student clicks (state.gauges.length>=4 -> shift, then push). Passing
    *  the WHOLE set of x's you want visible is the harness equivalent of a
    *  student clicking each one in turn, left to right. */
-  setGauges: function (xs, y) {
-    y = y === undefined ? LL2.Y : y;
+  setGauges: function (xs, z) {
+    z = z === undefined ? LL2.Y : z;
     APP.state.gauges.length = 0;
     var cols = ["#7fd4ff", "#ffb648", "#5fd08a", "#ff8fa3"];
-    xs.forEach(function (x, k) { APP.state.gauges.push({ x: x, y: y, hist: [], colour: cols[k] }); });
+    xs.forEach(function (x, k) { APP.state.gauges.push({ x: x, z: z, hist: [], colour: cols[k] }); });
   },
 
   /** Fast settle: physics only, no render (matches FR1.settle/LL1.settle). */

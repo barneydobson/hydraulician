@@ -107,8 +107,8 @@ window.DA2 = {
     C("twOn").set(true); C("twLevel").set(P.twLevel);
     const gy = 0.05 * P.h0 * lambda;
     state.gauges.length = 0;
-    state.gauges.push({ x: 0.5 * W, y: gy, hist: [], colour: "#7fd4ff" });       // tank (student gauge)
-    state.gauges.push({ x: Math.min(xc + 1.0, 8.8), y: 0.02, hist: [], colour: "#ffd479" }); // apron check
+    state.gauges.push({ x: 0.5 * W, z: gy, hist: [], colour: "#7fd4ff" });       // tank (student gauge)
+    state.gauges.push({ x: Math.min(xc + 1.0, 8.8), z: 0.02, hist: [], colour: "#ffd479" }); // apron check
     DA2.valve(false);
     syncPanel();
     return DA2.geom();
@@ -154,7 +154,7 @@ window.DA2 = {
   /** Free-surface elevation at a gauge, read the way a gauge card reads it. */
   level(k) {
     const g = state.gauges[k];
-    return g.y + APP.probe(g.x, g.y).phead;
+    return g.z + APP.probe(g.x, g.z).phead;
   },
 
   /** Spatially-averaged tank surface (verification only — NOT what a student

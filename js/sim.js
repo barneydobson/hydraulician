@@ -42,27 +42,27 @@ const SIM = (() => {
   // ------------------------------------------------------------- geometry
   /** Stamp a thick straight segment (metres) into the solid mask.
    *  Ends are BUTT, not round: the endpoints are the true extent of the edge,
-   *  so a gate drawn to y = 0.39 leaves an opening that starts at 0.39. Round
+   *  so a gate drawn to z = 0.39 leaves an opening that starts at 0.39. Round
    *  caps quietly eat half a thickness off every gap, which is fatal when the
    *  gap is the thing being demonstrated. */
   function stampSeg(mask, seg, value) {
-    const [x0, y0, x1, y1, th] = seg;
+    const [x0, z0, x1, z1, th] = seg;
     const r = Math.max(th, S.dx * 1.7) * 0.5;
     const i0 = Math.max(0, Math.floor((Math.min(x0, x1) - r) / S.dx));
     const i1 = Math.min(S.nx - 1, Math.ceil((Math.max(x0, x1) + r) / S.dx));
-    const j0 = Math.max(0, Math.floor((Math.min(y0, y1) - r) / S.dx));
-    const j1 = Math.min(S.ny - 1, Math.ceil((Math.max(y0, y1) + r) / S.dx));
-    const ax = x1 - x0, ay = y1 - y0;
-    const len2 = ax * ax + ay * ay;
+    const j0 = Math.max(0, Math.floor((Math.min(z0, z1) - r) / S.dx));
+    const j1 = Math.min(S.ny - 1, Math.ceil((Math.max(z0, z1) + r) / S.dx));
+    const ax = x1 - x0, az = z1 - z0;
+    const len2 = ax * ax + az * az;
     const dot = len2 < 1e-9;                       // degenerate = a disc
     for (let j = j0; j <= j1; j++) {
-      const py = (j + 0.5) * S.dx;
+      const pz = (j + 0.5) * S.dx;
       for (let i = i0; i <= i1; i++) {
         const px = (i + 0.5) * S.dx;
-        let t = dot ? 0 : ((px - x0) * ax + (py - y0) * ay) / len2;
+        let t = dot ? 0 : ((px - x0) * ax + (pz - z0) * az) / len2;
         if (!dot && (t < 0 || t > 1)) continue;
-        const dx = px - (x0 + t * ax), dy = py - (y0 + t * ay);
-        if (dx * dx + dy * dy <= r * r) mask[j * S.nx + i] = value;
+        const dx = px - (x0 + t * ax), dz = pz - (z0 + t * az);
+        if (dx * dx + dz * dz <= r * r) mask[j * S.nx + i] = value;
       }
     }
   }
@@ -94,8 +94,8 @@ const SIM = (() => {
   }
 
   /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */
-  function addSeg(x0, y0, x1, y1, th, kind) {
-    S.segs.push([x0, y0, x1, y1, th, kind]);
+  function addSeg(x0, z0, x1, z1, th, kind) {
+    S.segs.push([x0, z0, x1, z1, th, kind]);
     rasterise();
   }
   function undoSeg() { if (S.segs.length) { S.segs.pop(); rasterise(); } }
@@ -195,21 +195,21 @@ const SIM = (() => {
   function resetWater() {
     const n = S.nx * S.ny, d = new Float32Array(n * 4);
     const P = { g: Math.abs(S.p.g), c: S.p.c };
-    const w = S.scene.water;
+    const water = S.scene.water;
     for (let j = 0; j < S.ny; j++) {
       for (let i = 0; i < S.nx; i++) {
         const k = (j * S.nx + i) * 4;
-        d[k] = Math.max(0, w((i + 0.5) * S.dx, (j + 0.5) * S.dx, P) || 0);
+        d[k] = Math.max(0, water((i + 0.5) * S.dx, (j + 0.5) * S.dx, P) || 0);
       }
     }
     for (const b of [S.F.a, S.F.b]) {
       gl.bindTexture(gl.TEXTURE_2D, b.tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, d);
     }
-    const z = new Float32Array(n * 4);
+    const zero = new Float32Array(n * 4);
     for (const b of [S.U.a, S.U.b]) {
       gl.bindTexture(gl.TEXTURE_2D, b.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, z);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, zero);
     }
     S.t = 0;
   }
@@ -223,7 +223,7 @@ const SIM = (() => {
     return Math.min(acoustic, viscous);
   }
 
-  /** The y-range a level control (inflow / tailwater) is allowed to touch:
+  /** The z-range a level control (inflow / tailwater) is allowed to touch:
    *  the contiguous run of open cells in that grid column which contains the
    *  control level — or, if the level sits above every run (a plan-view duct
    *  fed at "level 99"), the topmost run below it. Applying the control to
@@ -300,11 +300,11 @@ const SIM = (() => {
     gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
     gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
-    gl.uniform4f(pr.u("u_src0"), s0.x, s0.y, s0.r, s0.on);
-    gl.uniform4f(pr.u("u_sv0"), s0.vx, s0.vy, 0, 0);   // spout runs clear
+    gl.uniform4f(pr.u("u_src0"), s0.x, s0.z, s0.r, s0.on);
+    gl.uniform4f(pr.u("u_sv0"), s0.vx, s0.vz, 0, 0);   // spout runs clear
     if (s1) {
-      gl.uniform4f(pr.u("u_src1"), s1.x, s1.y, s1.r, 1);
-      gl.uniform4f(pr.u("u_sv1"), s1.vx, s1.vy, 0, 0.85);
+      gl.uniform4f(pr.u("u_src1"), s1.x, s1.z, s1.r, 1);
+      gl.uniform4f(pr.u("u_sv1"), s1.vx, s1.vz, 0, 0.85);
     } else {
       gl.uniform4f(pr.u("u_src1"), 0, 0, 0, 0);
       gl.uniform4f(pr.u("u_sv1"), 0, 0, 0, 0);
@@ -452,7 +452,7 @@ const SIM = (() => {
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
   }
 
-  /** One cell: {f, dye, u, v, p, phead}. Used by gauges and the hover readout.
+  /** One cell: {f, dye, u, w, p, phead}. Used by gauges and the hover readout.
    *  `phead` is the PRESSURE head p/ρg alone — no elevation term. In
    *  hydrostatic water that is simply the submergence below the local free
    *  surface, so it carries a unit vertical gradient everywhere wet and is not
@@ -465,11 +465,11 @@ const SIM = (() => {
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
-    const u = S.pxBuf[0], v = S.pxBuf[1], p = S.pxBuf[2];
+    const u = S.pxBuf[0], w = S.pxBuf[1], p = S.pxBuf[2];
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const g = Math.abs(S.p.g) || 9.81;
-    return { i, j, f: S.pxBuf[0], u, v, p, phead: p / g, speed: Math.hypot(u, v),
+    return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, speed: Math.hypot(u, w),
              solid: S.mask[j * S.nx + i] };
   }
 
@@ -495,29 +495,29 @@ const SIM = (() => {
     return { i0: a, w, ny: S.ny, dx: S.dx, buf };
   }
 
-  /** Bilinear (u, v) at a point, from a patch. u lives on x-faces, v on
-   *  y-faces, so each is offset half a cell from the centre. */
-  function patchVel(p, x, y) {
-    const gx = x / p.dx - p.i0, gy = y / p.dx;
+  /** Bilinear (u, w) at a point, from a patch. u lives on x-faces, w on
+   *  z-faces, so each is offset half a cell from the centre. */
+  function patchVel(p, x, z) {
+    const gx = x / p.dx - p.i0, gz = z / p.dx;
     const sx = Math.max(0, Math.min(p.w - 1.001, gx));
-    const sy = Math.max(0, Math.min(p.ny - 1.001, gy - 0.5));
-    const i = Math.floor(sx), j = Math.floor(sy), fx = sx - i, fy = sy - j;
+    const sz = Math.max(0, Math.min(p.ny - 1.001, gz - 0.5));
+    const i = Math.floor(sx), j = Math.floor(sz), fx = sx - i, fz = sz - j;
     const at = (ii, jj, c) => p.buf[((jj * p.w) + Math.min(ii, p.w - 1)) * 4 + c];
-    const u = (at(i, j, 0) * (1 - fx) + at(i + 1, j, 0) * fx) * (1 - fy)
-            + (at(i, j + 1, 0) * (1 - fx) + at(i + 1, j + 1, 0) * fx) * fy;
+    const u = (at(i, j, 0) * (1 - fx) + at(i + 1, j, 0) * fx) * (1 - fz)
+            + (at(i, j + 1, 0) * (1 - fx) + at(i + 1, j + 1, 0) * fx) * fz;
     const tx = Math.max(0, Math.min(p.w - 1.001, gx - 0.5));
-    const ty = Math.max(0, Math.min(p.ny - 1.001, gy));
-    const i2 = Math.floor(tx), j2 = Math.floor(ty), gxf = tx - i2, gyf = ty - j2;
-    const v = (at(i2, j2, 1) * (1 - gxf) + at(i2 + 1, j2, 1) * gxf) * (1 - gyf)
-            + (at(i2, j2 + 1, 1) * (1 - gxf) + at(i2 + 1, j2 + 1, 1) * gxf) * gyf;
-    return [u, v];
+    const tz = Math.max(0, Math.min(p.ny - 1.001, gz));
+    const i2 = Math.floor(tx), j2 = Math.floor(tz), gxf = tx - i2, gzf = tz - j2;
+    const w = (at(i2, j2, 1) * (1 - gxf) + at(i2 + 1, j2, 1) * gxf) * (1 - gzf)
+            + (at(i2, j2 + 1, 1) * (1 - gxf) + at(i2 + 1, j2 + 1, 1) * gxf) * gzf;
+    return [u, w];
   }
 
   /** Momentum-theorem force on whatever solid a box encloses, in N per metre
    *  of width: F = −∮ ρf·[u(u·n) + P·n] dA over the four faces, minus the
-   *  weight of the enclosed water in y. The faces sit ON grid lines, so the
-   *  MAC staggering hands over the exact normal velocity (u on x-faces, v on
-   *  y-faces); f and P (= p/ρ, in U.b — hydrostatic P = g·depth, so ρ·f·P is
+   *  weight of the enclosed water in z. The faces sit ON grid lines, so the
+   *  MAC staggering hands over the exact normal velocity (u on x-faces, w on
+   *  z-faces); f and P (= p/ρ, in U.b — hydrostatic P = g·depth, so ρ·f·P is
    *  the physical pressure) are averaged across the face. A face segment with
    *  a solid on either side is skipped: the fluid boundary continues along
    *  the solid surface there, and the traction on that surface is exactly
@@ -528,11 +528,11 @@ const SIM = (() => {
    *  box that includes the spout's footprint fails it loudly, because the
    *  spout is a source — mass and momentum appear inside the box and the
    *  budget is not a force any more. */
-  function boxForce(x0, y0, x1, y1) {
+  function boxForce(x0, z0, x1, z1) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
     const closed = S.p.valveClosed > 0.5;
     let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
-    let jB = Math.round(Math.min(y0, y1) / S.dx), jT = Math.round(Math.max(y0, y1) / S.dx);
+    let jB = Math.round(Math.min(z0, z1) / S.dx), jT = Math.round(Math.max(z0, z1) / S.dx);
     iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
     jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
     const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL−1..iR] × [jB−1..jT]
@@ -546,7 +546,7 @@ const SIM = (() => {
     const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
     const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
 
-    let dFx = 0, dFy = 0, mdot = 0;                  // Σ f[u(u·n) + P n]·ds, Σ f(u·n)·ds
+    let dFx = 0, dFz = 0, mdot = 0;                  // Σ f[u(u·n) + P n]·ds, Σ f(u·n)·ds
     for (const [i, nx_] of [[iL, -1], [iR, 1]]) {    // x-faces: u is ON the face
       for (let j = jB; j < jT; j++) {
         if (sol(i - 1, j) || sol(i, j)) continue;
@@ -554,33 +554,33 @@ const SIM = (() => {
         const u = U[b];                              // u at the west face of cell i
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const v = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const w = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
         const un = u * nx_;
         dFx += f * (u * un + P * nx_);
-        dFy += f * (v * un);
+        dFz += f * (w * un);
         mdot += f * un;
       }
     }
-    for (const [j, ny_] of [[jB, -1], [jT, 1]]) {    // y-faces: v is ON the face
+    for (const [j, nz_] of [[jB, -1], [jT, 1]]) {    // z-faces: w is ON the face
       for (let i = iL; i < iR; i++) {
         if (sol(i, j - 1) || sol(i, j)) continue;
         const a = k(i, j - 1), b = k(i, j);
-        const v = U[b + 1];                          // v at the south face of cell j
+        const w = U[b + 1];                          // w at the south face of cell j
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
         const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
-        const vn = v * ny_;
-        dFx += f * (u * vn);
-        dFy += f * (v * vn + P * ny_);
-        mdot += f * vn;
+        const wn = w * nz_;
+        dFx += f * (u * wn);
+        dFz += f * (w * wn + P * nz_);
+        mdot += f * wn;
       }
     }
-    let m = 0;                                       // enclosed water, for the y-budget
+    let m = 0;                                       // enclosed water, for the z-budget
     for (let j = jB; j < jT; j++) {
       for (let i = iL; i < iR; i++) if (!sol(i, j)) m += F[k(i, j)];
     }
     m *= RHO * S.dx * S.dx;
-    return { fx: -RHO * dFx * S.dx, fy: -RHO * dFy * S.dx - gAbs * m,
+    return { fx: -RHO * dFx * S.dx, fz: -RHO * dFz * S.dx - gAbs * m,
              mdot: RHO * mdot * S.dx, mass: m, iL, iR, jB, jT };
   }
 

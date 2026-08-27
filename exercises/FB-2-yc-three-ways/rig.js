@@ -44,7 +44,7 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs() = the C key       SIM.undoSeg() = the Z key
  *   CONTROLS.find(c => c.id === "…").set(v); syncPanel()   = moving a slider
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  *
  * MEASURED FACTS INHERITED FROM FB-1/WE-1/MO-1 (Medium, 414×230, Δx 21.7 mm)
@@ -60,7 +60,7 @@
  *     MARGIN": a 5-26% energy margin over the crest gave indistinguishable
  *     approach profiles, because the crest+brink pair is the control, not
  *     the reservoir head).
- *   · A.h (what both the Gauge tool and the hover box print) carries a
+ *   · A.d (what both the Gauge tool and the hover box print) carries a
  *     SPATIAL box-smoothing window (sw = round(0.09/dx) ~ 4 cells each side,
  *     js/overlay.js `sm()`) on top of hRaw, plus the `ok` cliff-guard zeroes
  *     6 cells either side of any bed-slope discontinuity bigger than 2.5
@@ -68,8 +68,8 @@
  *     MO-1 measured this smoothing reading 2.3x the true depth next to a
  *     GATE FACE; a brink is gentler (no sudden re-narrowing, just an edge)
  *     but the same mechanism applies, so record() reads the brink station
- *     from A.hRaw (spatially raw, per-column), time-medianed over the
- *     recording window, NOT A.h — see the station-fidelity discussion in
+ *     from A.dRaw (spatially raw, per-column), time-medianed over the
+ *     recording window, NOT A.d — see the station-fidelity discussion in
  *     the README.
  *   · A LONG flat crest does NOT hold a d_c plateau once real friction is
  *     included — depth decays gently while Fr is small and only steepens
@@ -145,7 +145,7 @@ window.FB2 = {
     // instruments: gauge at mid-crest (student-style reading), plus record
     // the raw-column brink station index for FB2.readBrink()
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: R.xMid(), y: crest + 0.20, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: R.xMid(), z: crest + 0.20, hist: [], colour: "#7fd4ff" });
     APP.state.gaugeField = "d";
     R.iLip = R.findLip();
     return R.check();
@@ -203,8 +203,8 @@ window.FB2 = {
   },
 
   /** Advance `secs` through the FULL frame loop (gauge history + a warmed
-   *  OVERLAY.analyse) and return medians of: mid-crest gauge depth (A.h,
-   *  exactly what the on-screen gauge card prints), brink depth (A.hRaw at
+   *  OVERLAY.analyse) and return medians of: mid-crest gauge depth (A.d,
+   *  exactly what the on-screen gauge card prints), brink depth (A.dRaw at
    *  the lip column — spatially RAW, see the header note), and the crest
    *  Froude profile (for locating the Fr=1 crossing). */
   record: function (secs) {
@@ -217,7 +217,7 @@ window.FB2 = {
       APP.frames(1, 1 / 60); n++;
       if (n % 4 === 0) {
         A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
-        brinkArr.push(A.hRaw[FB2.iLip]);
+        brinkArr.push(A.dRaw[FB2.iLip]);
         frRows.push(A.Fr.slice(Math.round(FB2.X_TOE / S.dx), FB2.iLip + 1));
       }
     }

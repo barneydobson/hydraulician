@@ -121,10 +121,10 @@ window.B9 = {
     const gBy = P.gBy == null ? P.gateH + 0.08 : P.gBy;   // just clear of the gate, see P.gBy note
     state.gauges.length = 0;
     const gJx = P.gJx == null ? X.xJc : P.gJx;
-    state.gauges.push({ x: gJx, y: P.gJy, hist: [], colour: "#7fd4ff" });      // 0: junction
-    state.gauges.push({ x: X.xJc, y: gBy, hist: [], colour: "#ffd479" });      // 1: tank B
-    state.gauges.push({ x: 0.5 * P.xA, y: 0.20, hist: [], colour: "#8effa1" }); // 2: tank A
-    state.gauges.push({ x: X.xC0 + 1.0, y: 0.20, hist: [], colour: "#ff8ea1" });// 3: tank C
+    state.gauges.push({ x: gJx, z: P.gJy, hist: [], colour: "#7fd4ff" });      // 0: junction
+    state.gauges.push({ x: X.xJc, z: gBy, hist: [], colour: "#ffd479" });      // 1: tank B
+    state.gauges.push({ x: 0.5 * P.xA, z: 0.20, hist: [], colour: "#8effa1" }); // 2: tank A
+    state.gauges.push({ x: X.xC0 + 1.0, z: 0.20, hist: [], colour: "#ff8ea1" });// 3: tank C
     syncPanel();
     return B9.geom();
   },
@@ -193,7 +193,7 @@ window.B9 = {
   fillB(maxSec) {
     const P = B9.P, X = B9.geomX();
     state.paused = true;
-    const el = () => state.gauges[1].y + APP.probe(state.gauges[1].x, state.gauges[1].y).phead;
+    const el = () => state.gauges[1].z + APP.probe(state.gauges[1].x, state.gauges[1].z).phead;
     const fine = Math.round(0.01 / APP.SIM.dt());
     // A narrow shaft (wJ ~ 0.5 m) fills MUCH faster per unit pour strength
     // than an open tank: measured 1.5-2 m/s of rise from r=0.12/vy=-0.6, so

@@ -128,9 +128,9 @@ window.CHAN = {
   probe: function (x) {
     var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
     var i = Math.round(x / APP.sim.dx);
-    return { x: x, i: i, ok: !!A.ok[i], h: +A.h[i].toFixed(4), S0: +A.S0[i].toFixed(5),
-             yn: +A.yn[i].toFixed(4), yc: +A.yc[i].toFixed(4), Fr: +A.Fr[i].toFixed(3),
-             cls: A.ok[i] ? OVERLAY.classify(A.h[i], A.yn[i], A.yc[i], A.S0[i]) : "" };
+    return { x: x, i: i, ok: !!A.ok[i], h: +A.d[i].toFixed(4), S0: +A.S0[i].toFixed(5),
+             yn: +A.dn[i].toFixed(4), yc: +A.dc[i].toFixed(4), Fr: +A.Fr[i].toFixed(3),
+             cls: A.ok[i] ? OVERLAY.classify(A.d[i], A.dn[i], A.dc[i], A.S0[i]) : "" };
   },
 };
 

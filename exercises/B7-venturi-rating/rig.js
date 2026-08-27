@@ -16,8 +16,8 @@
 // dHead, so students do not need to know the head-convention distinction.
 (function () {
   window.APP.state.gauges.length = 0;
-  window.APP.state.gauges.push({ x: 2.4, y: 0.85, hist: [], colour: "#7fd4ff" }); // 1: barrel
-  window.APP.state.gauges.push({ x: 5.0, y: 0.85, hist: [], colour: "#ffb648" }); // 2: throat
+  window.APP.state.gauges.push({ x: 2.4, z: 0.85, hist: [], colour: "#7fd4ff" }); // 1: barrel
+  window.APP.state.gauges.push({ x: 5.0, z: 0.85, hist: [], colour: "#ffb648" }); // 2: throat
   const gf = window.CONTROLS.find((c) => c.id === "gaugeField");
   if (gf) gf.set("h"); // gauge charts plot piezometric head (already the default)
   window.syncPanel();

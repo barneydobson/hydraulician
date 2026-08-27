@@ -366,12 +366,14 @@ SUITES.physics = async (B) => {
     __low();
     APP.sim.p.inflow.on = 0; APP.sim.p.tailwater.on = 0; APP.sim.p.source.on = 0;
     APP.SIM.resetWater();
-    // volume() reads the column reduction, which is a cached readback — it
-    // is stale until the next step, so take the baseline AFTER one tick or
-    // the comparison is against zero.
-    APP.tick(1);
+    // volume() reads the column reduction through the CACHED readback, which
+    // only refreshes every few frames — straight after a rebuild or a reset
+    // that cache is still zeros. columns(true) forces the readback, and
+    // volume() then reads the fresh buffer. Without this the baseline is 0.
+    APP.tick(1); APP.SIM.columns(true);
     const v0 = APP.volume();
     __settle(APP.sim.t + 8, 90000);
+    APP.SIM.columns(true);
     const v1 = APP.volume();
     let maxSpeed = 0, nan = 0;
     for (let x = 0.5; x < APP.sim.W; x += 0.75) {

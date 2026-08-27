@@ -49,10 +49,10 @@ not the one you aimed at.
    rig loads with both off and the valve shut.
 2. Press `R` and let A and C fill to their levels — about 45 s on the clock
    (the card's 20 s countdown times each later change).
-3. Place four gauges — Gauge (`5`) — at tank A (x ≈ 0.75, y ≈ 0.20), the
-   junction (x ≈ 2.78, y ≈ 0.50), tank B (x ≈ 2.78, just **above** y = 1.0;
+3. Place four gauges — Gauge (`5`) — at tank A (x ≈ 0.75, z ≈ 0.20), the
+   junction (x ≈ 2.78, z ≈ 0.50), tank B (x ≈ 2.78, just **above** z = 1.0;
    lower is inside the shut valve's solid and reads a false dry) and tank C
-   (x ≈ 5.05, y ≈ 0.20). The cards plot piezometric head, `h`.
+   (x ≈ 5.05, z ≈ 0.20). The cards plot piezometric head, `h`.
 4. Right-drag into the shaft (x ≈ 2.78) to pour tank B up to your own level,
    keeping the pour just above the rising surface — aimed much higher, the
    falling column disperses instead of pooling. Stop, wait 10 s, and read the

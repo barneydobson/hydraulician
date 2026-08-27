@@ -52,7 +52,7 @@ const WV2 = {
     APP.loadScene(flumeId, false);
     WV2.C('speed').set(1);
     WV2.C('waveOn').set(true); WV2.C('waveT').set(T); WV2.C('waveA').set(amp);
-    WV2.C('gaugeField').set('head');
+    WV2.C('gaugeField').set('h');
     syncPanel();
     const spinup = APP.state.scene.spinup || 0;
     // The scene runs FLAT OUT (ignoring dt/speed) until sim.t clears
@@ -70,7 +70,7 @@ const WV2 = {
     APP.state.paused = true;
     const bed = APP.state.gauges[0].hist, surf = APP.state.gauges[1].hist;
     function dftAmp(hist, freq) {
-      const t = hist.map(p => p.t), y = hist.map(p => p.head);
+      const t = hist.map(p => p.t), y = hist.map(p => p.h);
       const n = t.length, mean = y.reduce((a, b) => a + b, 0) / n;
       let re = 0, im = 0;
       for (let i = 0; i < n; i++) {
@@ -82,7 +82,7 @@ const WV2 = {
     }
     const freq = 1 / T;
     const ampBed = dftAmp(bed, freq), ampSurf = dftAmp(surf, freq);
-    const yb = bed.map(p => p.head), ys = surf.map(p => p.head);
+    const yb = bed.map(p => p.h), ys = surf.map(p => p.h);
     const p2pBed = (Math.max(...yb) - Math.min(...yb)) / 2;
     const p2pSurf = (Math.max(...ys) - Math.min(...ys)) / 2;
     return {

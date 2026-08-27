@@ -43,11 +43,11 @@ explain the assignment in class.
 ## What to do
 
 1. Draw your valve at **x_d** — Valve (`3`), Shift-drag one stroke from
-   below the pipe floor to above its roof (about y = 1.8 up to 5.2), then
+   below the pipe floor to above its roof (about z = 1.8 up to 5.2), then
    press `V` twice: it must go fully red, no green sliver. Leave the
    scene's own valve near the far end alone — `V` slams both, which is
    fine, they seal two separate reaches.
-2. Drop a Gauge (`5`) at **x_d − 3, y ≈ 3.5 m** — three metres upstream of
+2. Drop a Gauge (`5`) at **x_d − 3, z ≈ 3.5 m** — three metres upstream of
    your own valve. Read nearer the reservoir and its soft boundary smears
    the trace into something you cannot time.
 3. Press `R` and let it reach steady state — about **13 s**; the card

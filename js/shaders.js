@@ -55,7 +55,7 @@ void main(){
   // -------------------------------------------------------------- prelude
   // Shared by the two simulation passes. Texture channel contract:
   //   u_U  RGBA32F   r = u at the WEST face of this cell
-  //                  g = v at the SOUTH face of this cell
+  //                  g = w at the SOUTH face of this cell
   //                  b = p/ρ at the cell centre (m²/s², diagnostic)
   //                  a = ∇·u at the cell centre (diagnostic)
   //   u_F  RGBA32F   r = f (fill fraction / density)
@@ -80,7 +80,7 @@ uniform float u_valve;        // 1 = valves closed (solid), 0 = open
 uniform vec4  u_in;           // left reservoir: level (m), velocity (m/s), on, free
                               // free = 1 pins the level only and lets the head drive the flow
 uniform vec2  u_tw;           // right tailwater: level (m), on
-uniform vec2  u_inBand;       // y-range the inflow control applies to (bed of the
+uniform vec2  u_inBand;       // z-range the inflow control applies to (bed of the
                               // connected inlet run → min(level, run top)). Without
                               // this the Dirichlet floods any cavity under a raised
                               // bed slab and the prescribed velocity pressurises it
@@ -88,8 +88,8 @@ uniform vec2  u_inBand;       // y-range the inflow control applies to (bed of t
 uniform vec2  u_twBand;       // same for the right tailwater column
 uniform vec2  u_spongeN;      // relaxation-sponge width in columns (inflow, tailwater)
 uniform vec4  u_openMode;     // L R B T : 0 wall, 1 open (zero-gradient), 2 outfall
-uniform vec4  u_src0, u_src1; // point sources: x, y, radius (m), on
-uniform vec4  u_sv0,  u_sv1;  // source velocity x, y and dye A, dye B
+uniform vec4  u_src0, u_src1; // point sources: x, z, radius (m), on
+uniform vec4  u_sv0,  u_sv1;  // source velocity x, z and dye A, dye B
 uniform float u_time;
 
 ivec2 NXY;
@@ -150,50 +150,50 @@ void main(){
   vec4 tSS = TU(ivec2(i,   j-2)), tNN = TU(ivec2(i,   j+2));
   vec4 tNW = TU(ivec2(i-1, j+1)), tSE = TU(ivec2(i+1, j-1));
 
-  float u0 = t0.r, v0 = t0.g;
+  float u0 = t0.r, w0 = t0.g;
   float fC = TF(c).r, fW = TF(ivec2(i-1,j)).r, fS = TF(ivec2(i,j-1)).r;
   float sC = SO(c),   sW = SO(ivec2(i-1,j)),   sS = SO(ivec2(i,j-1));
 
   // --- transverse velocity interpolated onto each face node
-  float vAtU = 0.25 * (tW.g + t0.g + tNW.g + tN.g);
-  float uAtV = 0.25 * (tS.r + t0.r + tSE.r + tE.r);
+  float wAtU = 0.25 * (tW.g + t0.g + tNW.g + tN.g);
+  float uAtW = 0.25 * (tS.r + t0.r + tSE.r + tE.r);
 
   // --- advection
   float un = u0 - dt * ( u0    * ud3(tWW.r, tW.r, u0, tE.r, tEE.r, u0,    dx)
-                       + vAtU  * ud3(tSS.r, tS.r, u0, tN.r, tNN.r, vAtU,  dx) );
-  float vn = v0 - dt * ( uAtV  * ud3(tWW.g, tW.g, v0, tE.g, tEE.g, uAtV,  dx)
-                       + v0    * ud3(tSS.g, tS.g, v0, tN.g, tNN.g, v0,    dx) );
+                       + wAtU  * ud3(tSS.r, tS.r, u0, tN.r, tNN.r, wAtU,  dx) );
+  float wn = w0 - dt * ( uAtW  * ud3(tWW.g, tW.g, w0, tE.g, tEE.g, uAtW,  dx)
+                       + w0    * ud3(tSS.g, tS.g, w0, tN.g, tNN.g, w0,    dx) );
 
   // --- eddy viscosity (Smagorinsky). Without this the velocity–depth
   //     profile stays laminar-parabolic instead of turbulent-flat.
   float dudx = (tE.r - t0.r) / dx;
-  float dvdy = (tN.g - t0.g) / dx;
+  float dwdz = (tN.g - t0.g) / dx;
   float sxy  = 0.5 * ((tN.r - tS.r) + (tE.g - tW.g)) / (2.0 * dx);
-  float smag = sqrt(2.0*(dudx*dudx + dvdy*dvdy) + 4.0*sxy*sxy);
+  float smag = sqrt(2.0*(dudx*dudx + dwdz*dwdz) + 4.0*sxy*sxy);
   float nuT  = u_nu + (u_cs*dx)*(u_cs*dx)*smag;
 
   // --- wall-aware Laplacian: a solid neighbour reflects (no-slip) or mirrors
-  float wUp = max(SO(ivec2(i,j+1)), SO(ivec2(i-1,j+1)));
-  float wDn = max(SO(ivec2(i,j-1)), SO(ivec2(i-1,j-1)));
-  float wLf = max(SO(ivec2(i-1,j)), SO(ivec2(i-1,j-1)));
-  float wRt = max(SO(ivec2(i+1,j)), SO(ivec2(i+1,j-1)));
+  float sUp = max(SO(ivec2(i,j+1)), SO(ivec2(i-1,j+1)));
+  float sDn = max(SO(ivec2(i,j-1)), SO(ivec2(i-1,j-1)));
+  float sLf = max(SO(ivec2(i-1,j)), SO(ivec2(i-1,j-1)));
+  float sRt = max(SO(ivec2(i+1,j)), SO(ivec2(i+1,j-1)));
   float ghost = mix(-1.0, 1.0, u_slip);
-  float uN = mix(tN.r, ghost*u0, wUp), uS = mix(tS.r, ghost*u0, wDn);
-  float vL = mix(tW.g, ghost*v0, wLf), vR = mix(tE.g, ghost*v0, wRt);
+  float uN = mix(tN.r, ghost*u0, sUp), uS = mix(tS.r, ghost*u0, sDn);
+  float wL = mix(tW.g, ghost*w0, sLf), wR = mix(tE.g, ghost*w0, sRt);
   un += dt * nuT * (tE.r + tW.r + uN + uS - 4.0*u0) / (dx*dx);
-  vn += dt * nuT * (vR + vL + tN.g + tS.g - 4.0*v0) / (dx*dx);
+  wn += dt * nuT * (wR + wL + tN.g + tS.g - 4.0*w0) / (dx*dx);
 
   // --- gravity, only where there is water to pull on
-  float fFu = max(fC, fW), fFv = max(fC, fS);
-  vn += dt * u_g * smoothstep(0.0, 0.05, fFv);
+  float fFu = max(fC, fW), fFw = max(fC, fS);
+  wn += dt * u_g * smoothstep(0.0, 0.05, fFw);
   un += dt * u_gx * smoothstep(0.0, 0.05, fFu);
 
   // --- bed friction: a wall function applied in the cells touching a solid,
   //     integrated implicitly so any roughness is stable
-  float spU = sqrt(un*un + vAtU*vAtU) + 1e-6;
-  float spV = sqrt(vn*vn + uAtV*uAtV) + 1e-6;
-  un /= 1.0 + dt * u_cf * spU * max(wUp, wDn) / dx;
-  vn /= 1.0 + dt * u_cf * spV * max(wLf, wRt) / dx;
+  float spU = sqrt(un*un + wAtU*wAtU) + 1e-6;
+  float spW = sqrt(wn*wn + uAtW*uAtW) + 1e-6;
+  un /= 1.0 + dt * u_cf * spU * max(sUp, sDn) / dx;
+  wn /= 1.0 + dt * u_cf * spW * max(sLf, sRt) / dx;
 
   // --- pressure gradient (three cell-centred divergences from the stencil)
   float dvC = (tE.r  - t0.r + tN.g  - t0.g) / dx;
@@ -201,7 +201,7 @@ void main(){
   float dvS = (tSE.r - tS.r + t0.g  - tS.g) / dx;
   float pC = press(fC, dvC);
   un -= dt * (pC - press(fW, dvW)) / dx;
-  vn -= dt * (pC - press(fS, dvS)) / dx;
+  wn -= dt * (pC - press(fS, dvS)) / dx;
 
   // --- void handling. Hard-zeroing the velocity in empty cells makes the air
   //     behave like a rigid medium, and the fake shear layer shreds any free
@@ -211,9 +211,9 @@ void main(){
   //     slowly, so still air stays still. Nothing forces a void (gravity and
   //     ∇p are both gated on f), so this cannot run away.
   float dryU = 1.0 - smoothstep(0.0, 0.02, fFu);
-  float dryV = 1.0 - smoothstep(0.0, 0.02, fFv);
+  float dryW = 1.0 - smoothstep(0.0, 0.02, fFw);
   un *= 1.0 - min(dt * 1.5 * dryU, 1.0);
-  vn *= 1.0 - min(dt * 1.5 * dryV, 1.0);
+  wn *= 1.0 - min(dt * 1.5 * dryW, 1.0);
 
   // --- transport-consistency cap. The VOF donor limiter cannot move mass
   //     faster than a quarter cell per substep (dx/4dt), but nothing above
@@ -226,20 +226,20 @@ void main(){
   //     guard — pressurised cells (f ≈ 1) never bind the donor cap.
   float capBase = 0.20 * dx / dt;
   float capU = mix(capBase, 80.0, smoothstep(0.05, 0.50, fFu));
-  float capV = mix(capBase, 80.0, smoothstep(0.05, 0.50, fFv));
+  float capW = mix(capBase, 80.0, smoothstep(0.05, 0.50, fFw));
   un = clamp(un, -capU, capU);
-  vn = clamp(vn, -capV, capV);
+  wn = clamp(wn, -capW, capW);
 
   // --- prescribed sources
   vec2 pu = vec2(float(i),       float(j) + 0.5) * dx;   // u-node position
-  vec2 pv = vec2(float(i) + 0.5, float(j)      ) * dx;   // v-node position
+  vec2 pw = vec2(float(i) + 0.5, float(j)      ) * dx;   // w-node position
   if (u_src0.w > 0.5) {
     if (distance(pu, u_src0.xy) < u_src0.z) un = u_sv0.x;
-    if (distance(pv, u_src0.xy) < u_src0.z) vn = u_sv0.y;
+    if (distance(pw, u_src0.xy) < u_src0.z) wn = u_sv0.y;
   }
   if (u_src1.w > 0.5) {
     if (distance(pu, u_src1.xy) < u_src1.z) un = u_sv1.x;
-    if (distance(pv, u_src1.xy) < u_src1.z) vn = u_sv1.y;
+    if (distance(pw, u_src1.xy) < u_src1.z) wn = u_sv1.y;
   }
   if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) {
     // Feathered plug: a hard velocity step at the waterline waterfalls into
@@ -269,28 +269,28 @@ void main(){
   // sqrt(2gL). The transport cap alone leaves ~12 m/s of headroom, and the
   // one-cell Dirichlet can resonate with the pond slosh right up to it —
   // the drowned-jump scenes used to pump themselves apart at t ≈ 40 s.
-  float gzv = abs(u_g);
-  float capR = (u_tw.y > 0.5) ? sqrt(2.0 * gzv * max(u_tw.x, 0.05)) + 1.0 : capBase;
-  float capL = (u_in.z > 0.5) ? sqrt(2.0 * gzv * max(u_in.x, 0.05)) + 1.0 : capBase;
-  if (i == 0)          vn = tE.g;
+  float gMag = abs(u_g);
+  float capR = (u_tw.y > 0.5) ? sqrt(2.0 * gMag * max(u_tw.x, 0.05)) + 1.0 : capBase;
+  float capL = (u_in.z > 0.5) ? sqrt(2.0 * gMag * max(u_in.x, 0.05)) + 1.0 : capBase;
+  if (i == 0)          wn = tE.g;
   if (i == 1 && u_in.z > 0.5 && u_in.w > 0.5) un = clamp(un, -capL, capL);
-  if (i == NXY.x - 1) { un = clamp(un, -min(capR, capBase), min(capR, capBase)); vn = tW.g; }
+  if (i == NXY.x - 1) { un = clamp(un, -min(capR, capBase), min(capR, capBase)); wn = tW.g; }
   if (j == 0)          un = tN.r;
-  if (j == NXY.y - 1) { vn = clamp(vn, -capBase, capBase); un = tS.r; }
+  if (j == NXY.y - 1) { wn = clamp(wn, -capBase, capBase); un = tS.r; }
 
   // --- no flux through solids; outermost faces are outside the domain
   if (sC > 0.5 || sW > 0.5) un = 0.0;
-  if (sC > 0.5 || sS > 0.5) vn = 0.0;
+  if (sC > 0.5 || sS > 0.5) wn = 0.0;
   if (i == 0) un = 0.0;
-  if (j == 0) vn = 0.0;
+  if (j == 0) wn = 0.0;
 
   // Belt and braces: one NaN anywhere poisons the whole field for good, and
   // a scene that has silently died is worse than one that clips. Written as
   // an explicit range test rather than isnan() or a self-comparison, both of
   // which a fast-math shader compiler is entitled to fold away.
   un = (un > -80.0 && un < 80.0) ? un : (un > 0.0 ? 80.0 : (un < 0.0 ? -80.0 : 0.0));
-  vn = (vn > -80.0 && vn < 80.0) ? vn : (vn > 0.0 ? 80.0 : (vn < 0.0 ? -80.0 : 0.0));
-  o = vec4(un, vn, pC, dvC);
+  wn = (wn > -80.0 && wn < 80.0) ? wn : (wn > 0.0 ? 80.0 : (wn < 0.0 ? -80.0 : 0.0));
+  o = vec4(un, wn, pC, dvC);
 }`;
 
   // ------------------------------------------------------------ pass 2: VOF
@@ -320,8 +320,8 @@ void main(){
   ivec2 c = ivec2(gl_FragCoord.xy);
   int i = c.x, j = c.y;
   float dx = u_dx, dt = u_dt;
-  float x = (float(i) + 0.5) * dx, y = (float(j) + 0.5) * dx;
-  float gz = abs(u_g);
+  float x = (float(i) + 0.5) * dx, z = (float(j) + 0.5) * dx;
+  float gMag = abs(u_g);
 
   if (SO(c) > 0.5) { o = vec4(0.0); return; }
 
@@ -334,14 +334,14 @@ void main(){
     vec4 m = TF(s);
     if (gL) {
       if (u_in.z > 0.5) {                   // upstream reservoir
-        m.r = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2 : 0.0;
+        m.r = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2 : 0.0;
         m.g = (u_dyeLine.y > 0.5 && fract(u_time / max(u_dyeLine.x, 0.05)) < 0.07) ? 1.0 : 0.0;
         m.b = 0.0;
       } else if (u_openMode.x > 1.5) m = vec4(0.0);
     }
     if (gR) {
       if (u_tw.y > 0.5) {                   // downstream level control
-        m.r = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2 : 0.0;
+        m.r = (z > u_twBand.x && z < u_tw.x) ? 1.0 + gMag * (u_tw.x - z) / u_c2 : 0.0;
       } else if (u_openMode.y > 1.5) m = vec4(0.0);
     }
     // Outfall ghosts are held EMPTY, so ∇p spills the last interior column
@@ -363,13 +363,13 @@ void main(){
 
   float fC = F0.r;
   float uW = TU(c).r, uE = TU(ivec2(i+1,j)).r;
-  float vS = TU(c).g, vN = TU(ivec2(i,j+1)).g;
+  float wS = TU(c).g, wN = TU(ivec2(i,j+1)).g;
 
   // --- limited upwind face values
   float ffW = faceVal(fWW, Fw.r, fC,   Fe.r, uW);
   float ffE = faceVal(Fw.r, fC,  Fe.r, fEE,  uE);
-  float ffS = faceVal(fSS, Fs.r, fC,   Fn.r, vS);
-  float ffN = faceVal(Fs.r, fC,  Fn.r, fNN,  vN);
+  float ffS = faceVal(fSS, Fs.r, fC,   Fn.r, wS);
+  float ffN = faceVal(Fs.r, fC,  Fn.r, fNN,  wN);
 
   // --- interface compression: an artificial velocity c_α|u| along ∇α that
   //     pushes the smeared interface back together. α(1−α) switches it off
@@ -378,19 +378,19 @@ void main(){
   float aS = min(Fs.r, 1.0), aN = min(Fn.r, 1.0);
   float cW = 0.0, cE = 0.0, cS = 0.0, cN = 0.0;
   if (u_ca > 0.0) {
-    float gx, gy, gm, am;
-    gx = (aC - aW) / dx;  gy = ((aNW + aN) - (aSW + aS)) / (4.0*dx);
-    gm = sqrt(gx*gx + gy*gy) + 1e-8;  am = 0.5*(aC + aW);
+    float gx, gz, gm, am;
+    gx = (aC - aW) / dx;  gz = ((aNW + aN) - (aSW + aS)) / (4.0*dx);
+    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aC + aW);
     cW = u_ca * abs(uW) * am * (1.0 - am) * gx / gm;
-    gx = (aE - aC) / dx;  gy = ((aN + aNE) - (aS + aSE)) / (4.0*dx);
-    gm = sqrt(gx*gx + gy*gy) + 1e-8;  am = 0.5*(aE + aC);
+    gx = (aE - aC) / dx;  gz = ((aN + aNE) - (aS + aSE)) / (4.0*dx);
+    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aE + aC);
     cE = u_ca * abs(uE) * am * (1.0 - am) * gx / gm;
-    gy = (aC - aS) / dx;  gx = ((aSE + aE) - (aSW + aW)) / (4.0*dx);
-    gm = sqrt(gx*gx + gy*gy) + 1e-8;  am = 0.5*(aC + aS);
-    cS = u_ca * abs(vS) * am * (1.0 - am) * gy / gm;
-    gy = (aN - aC) / dx;  gx = ((aNE + aE) - (aNW + aW)) / (4.0*dx);
-    gm = sqrt(gx*gx + gy*gy) + 1e-8;  am = 0.5*(aN + aC);
-    cN = u_ca * abs(vN) * am * (1.0 - am) * gy / gm;
+    gz = (aC - aS) / dx;  gx = ((aSE + aE) - (aSW + aW)) / (4.0*dx);
+    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aC + aS);
+    cS = u_ca * abs(wS) * am * (1.0 - am) * gz / gm;
+    gz = (aN - aC) / dx;  gx = ((aNE + aE) - (aNW + aW)) / (4.0*dx);
+    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aN + aC);
+    cN = u_ca * abs(wN) * am * (1.0 - am) * gz / gm;
   }
 
   // Donor-cell positivity limiter. A cell can only lose through four faces,
@@ -403,7 +403,7 @@ void main(){
   // the sign of the same flux, and therefore agree on the same limit.
   float lim4 = 0.25 * dx / dt;
   float FW = uW*ffW + cW, FE = uE*ffE + cE;
-  float FS = vS*ffS + cS, FN = vN*ffN + cN;
+  float FS = wS*ffS + cS, FN = wN*ffN + cN;
   FW = clamp(FW, -lim4 * fC,   lim4 * Fw.r);
   FE = clamp(FE, -lim4 * Fe.r, lim4 * fC);
   FS = clamp(FS, -lim4 * fC,   lim4 * Fs.r);
@@ -427,8 +427,8 @@ void main(){
   // jump's surges instead of absorbing them.
   if (u_tw.y > 0.5 && u_spongeN.y > 0.5 && float(i) > u_res.x - 2.0 - u_spongeN.y) {
     float s = (float(i) - (u_res.x - 2.0 - u_spongeN.y)) / u_spongeN.y;
-    float tgt = (y > u_twBand.x && y < u_tw.x) ? 1.0 + gz * (u_tw.x - y) / u_c2
-              : (y >= u_tw.x ? 0.0 : fNew);
+    float tgt = (z > u_twBand.x && z < u_tw.x) ? 1.0 + gMag * (u_tw.x - z) / u_c2
+              : (z >= u_tw.x ? 0.0 : fNew);
     float rate = tgt > fNew ? 8.0 * s * s : 2.0 * s * s;
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
@@ -440,27 +440,27 @@ void main(){
   // period for ever), so it keeps the gentle quadratic ramp.
   if (u_in.z > 0.5 && u_spongeN.x > 0.5 && float(i) < 1.0 + u_spongeN.x) {
     float s = (1.0 + u_spongeN.x - float(i)) / u_spongeN.x;
-    float tgt = (y > u_inBand.x && y < u_in.x) ? 1.0 + gz * (u_in.x - y) / u_c2
-              : (y >= u_in.x ? 0.0 : fNew);
+    float tgt = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2
+              : (z >= u_in.x ? 0.0 : fNew);
     float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * s : 2.0 * s * s)
                                 : (tgt > fNew ? 8.0 * s * s : 2.0 * s * s);
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
 
   // --- dye rides along (advective form, first-order upwind is plenty)
-  float div = ((uE - uW) + (vN - vS)) / dx;
+  float div = ((uE - uW) + (wN - wS)) / dx;
   vec2 dC = F0.gb;
   vec2 dWu = uW > 0.0 ? Fw.gb : dC, dEu = uE > 0.0 ? dC : Fe.gb;
-  vec2 dSu = vS > 0.0 ? Fs.gb : dC, dNu = vN > 0.0 ? dC : Fn.gb;
-  vec2 dNew = dC - dt * ((uE*dEu - uW*dWu + vN*dNu - vS*dSu) / dx - dC*div);
+  vec2 dSu = wS > 0.0 ? Fs.gb : dC, dNu = wN > 0.0 ? dC : Fn.gb;
+  vec2 dNew = dC - dt * ((uE*dEu - uW*dWu + wN*dNu - wS*dSu) / dx - dC*div);
   dNew *= 1.0 - dt * u_dyeDecay;
   dNew = clamp(dNew, 0.0, 1.0);
 
   // --- point sources add volume and colour
-  if (u_src0.w > 0.5 && distance(vec2(x,y), u_src0.xy) < u_src0.z) {
+  if (u_src0.w > 0.5 && distance(vec2(x,z), u_src0.xy) < u_src0.z) {
     fNew = max(fNew, 1.0); dNew = max(dNew, u_sv0.zw);
   }
-  if (u_src1.w > 0.5 && distance(vec2(x,y), u_src1.xy) < u_src1.z) {
+  if (u_src1.w > 0.5 && distance(vec2(x,z), u_src1.xy) < u_src1.z) {
     fNew = max(fNew, 1.0); dNew = max(dNew, u_sv1.zw);
   }
 
@@ -470,7 +470,7 @@ void main(){
 
   // ------------------------------------------------- pass 3: column reduce
   // One texel per grid column: bed level, depth, unit discharge, surface.
-  // Everything the open-channel overlay needs (y_c, y_n, Fr, energy line)
+  // Everything the open-channel overlay needs (d_c, d_n, Fr, energy line)
   // is derived from these four numbers on the CPU.
   const FS_COL = `#version 300 es
 precision highp float;
@@ -506,7 +506,7 @@ void main(){
   // Walk up the connected water body only. Spray and nappes higher up the
   // column are not part of the depth, and letting them in makes the surface
   // elevation — and everything derived from it — jump about.
-  float h = 0.0, q = 0.0, top = float(jb) * u_dx;
+  float d = 0.0, q = 0.0, top = float(jb) * u_dx;
   int dry = 0;
   for (int j = jb; j < NY - 1; j++) {
     if (SO(ivec2(i,j)) > 0.5) break;          // soffit / obstruction
@@ -515,11 +515,11 @@ void main(){
     dry = 0;
     float uc = 0.5 * (texelFetch(u_U, ivec2(i,  j), 0).r
                     + texelFetch(u_U, ivec2(i+1,j), 0).r);
-    h += f * u_dx;
+    d += f * u_dx;
     q += f * uc * u_dx;
     if (f > 0.5) top = (float(j) + 1.0) * u_dx;
   }
-  o = vec4(float(jb) * u_dx, h, q, top);
+  o = vec4(float(jb) * u_dx, d, q, top);
 }`;
 
   // ------------------------------------------------------------- particles
@@ -537,14 +537,14 @@ vec2 velAt(vec2 pos){
   vec2 g = pos / u_dx;
   vec2 lo = vec2(0.0), hi = u_res - vec2(1.001);
   vec2 pu = clamp(vec2(g.x,       g.y - 0.5), lo, hi);   // u lives on x-faces
-  vec2 pv = clamp(vec2(g.x - 0.5, g.y      ), lo, hi);
+  vec2 pw = clamp(vec2(g.x - 0.5, g.y      ), lo, hi);
   ivec2 iu = ivec2(pu); vec2 fu = pu - vec2(iu);
-  ivec2 iv = ivec2(pv); vec2 fv = pv - vec2(iv);
+  ivec2 iw = ivec2(pw); vec2 fw = pw - vec2(iw);
   float u = mix(mix(texelFetch(u_U, iu,             0).r, texelFetch(u_U, iu+ivec2(1,0), 0).r, fu.x),
                 mix(texelFetch(u_U, iu+ivec2(0,1),  0).r, texelFetch(u_U, iu+ivec2(1,1), 0).r, fu.x), fu.y);
-  float v = mix(mix(texelFetch(u_U, iv,             0).g, texelFetch(u_U, iv+ivec2(1,0), 0).g, fv.x),
-                mix(texelFetch(u_U, iv+ivec2(0,1),  0).g, texelFetch(u_U, iv+ivec2(1,1), 0).g, fv.x), fv.y);
-  return vec2(u, v);
+  float w = mix(mix(texelFetch(u_U, iw,             0).g, texelFetch(u_U, iw+ivec2(1,0), 0).g, fw.x),
+                mix(texelFetch(u_U, iw+ivec2(0,1),  0).g, texelFetch(u_U, iw+ivec2(1,1), 0).g, fw.x), fw.y);
+  return vec2(u, w);
 }
 
 void main(){
@@ -615,13 +615,13 @@ out vec4 o;
 uniform sampler2D u_F, u_U, u_S, u_C;
 uniform vec2  u_res, u_canvas;
 uniform float u_dx, u_g, u_c2, u_valve, u_time;
-uniform float u_tilt;         // scene tiltS0: elevation is y − S₀x when set
+uniform float u_tilt;         // scene tiltS0: elevation is z − S₀x when set
 uniform int   u_mode;         // 0 water 1 head 2 speed 3 Froude 4 vorticity
                               // 5 momentum flux 6 piezometric head
 uniform float u_vmax, u_hmax; // colour-scale maxima
 uniform float u_dyeOn;
-uniform vec4  u_cursor;       // x, y (m), radius (m), tool tint
-uniform vec4  u_guide;        // preview line x0,y0,x1,y1 (m); w<0 = off
+uniform vec4  u_cursor;       // x, z (m), radius (m), tool tint
+uniform vec4  u_guide;        // preview line x0,z0,x1,z1 (m); w<0 = off
 uniform float u_guideOn;
 
 vec4 blF(vec2 g){
@@ -737,9 +737,9 @@ void main(){
     water = turbo(length(U.rg) / max(u_vmax, 0.01));
   } else if (u_mode == 3) {
     // STREAMWISE velocity, not the 2D speed magnitude. A Froude number is
-    // u/√(gh) — the vertical component is not part of it, and including it
+    // u/√(gd) — the vertical component is not part of it, and including it
     // paints vertical warm streaks down every plunging wave face: measured on
-    // a23's apron, |v| exceeds |u| in 30% of wet cells and |u,v| triples the
+    // a23's apron, |w| exceeds |u| in 30% of wet cells and |u,w| triples the
     // cells that render supercritical (1.5% against 0.5%). Because the ramp
     // below is diverging about Fr = 1, that reads as violent banding even
     // where the reach is comfortably subcritical. The depth is per-column so
@@ -748,10 +748,10 @@ void main(){
     water = divg(0.5 * clamp(fr, 0.0, 2.0));
   } else if (u_mode == 4) {
     ivec2 gi = ivec2(clamp(g, vec2(1.0), u_res - vec2(2.0)));
-    float dvdx = texelFetch(u_U, gi + ivec2(1,0), 0).g - texelFetch(u_U, gi - ivec2(1,0), 0).g;
-    float dudy = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;
-    float w = (dvdx - dudy) / (2.0 * u_dx);
-    water = divg(0.5 + 0.5 * clamp(w / 40.0, -1.0, 1.0));
+    float dwdx = texelFetch(u_U, gi + ivec2(1,0), 0).g - texelFetch(u_U, gi - ivec2(1,0), 0).g;
+    float dudz = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;
+    float vort = (dwdx - dudz) / (2.0 * u_dx);
+    water = divg(0.5 + 0.5 * clamp(vort / 40.0, -1.0, 1.0));
   } else if (u_mode == 6) {
     // Piezometric head h = z + p/ρg — the potential whose gradient drives the
     // flow. Constant over the depth wherever the flow is hydrostatic, so the
@@ -759,7 +759,7 @@ void main(){
     // exactly where vertical accelerations matter: weir crests and brinks
     // (h sags), a chute toe (h bulges), gate contractions, jump rollers.
     // A tilted-gravity scene draws a flat bed and carries S₀ in gravity, so the
-    // elevation term is y − S₀x there.
+    // elevation term is z − S₀x there.
     float hp = pm.y - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
     water = turbo(hp / max(u_res.y * u_dx, 0.05));
   } else {

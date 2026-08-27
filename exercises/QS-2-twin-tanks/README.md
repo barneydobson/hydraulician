@@ -50,7 +50,7 @@ The rig arrives drawn with tank 2 at A₂ = 2.00 m, the valve shut and the
 upstream reservoir standing by at 2.00 m. This one needs its steps in order.
 
 1. Erase (`2`) tank 2's far wall and redraw it with Wall (`1`) at
-   **x = 3.60 + your A₂**, floor to about y = 3.2 — the Ruler (`M`) and
+   **x = 3.60 + your A₂**, floor to about z = 3.2 — the Ruler (`M`) and
    Measure (`8`) put it on station.
 2. Place a Gauge (`5`) low in each tank, around (0.9, 0.30) and (4.6, 0.30):
    card 1 is tank 1, card 2 is tank 2.

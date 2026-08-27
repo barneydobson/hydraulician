@@ -3,4 +3,9 @@
 # they are archive weight, not source. See exercises/INDEX.md.
 exercises/*/_archive/
 
+# Git worktrees for parallel branches are checked out in here (see AGENTS.md).
+# They are whole working copies of the repo — never source. `.claude/launch.json`
+# stays tracked, so this ignores the worktree directory only.
+.claude/worktrees/
+
 .DS_Store

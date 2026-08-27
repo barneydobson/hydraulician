@@ -28,7 +28,7 @@ bores are **a₁ = 0.6995 m** (barrel) and **a₂ = 0.3975 m** (throat), area ra
 
 `Δh` is the barrel head minus the throat head. Both gauges must sit at the
 **same elevation** — the invert is flat the whole length of the duct, so
-y = 0.85 m works at both stations. With `z` identical at the two taps the
+z = 0.85 m works at both stations. With `z` identical at the two taps the
 elevation term cancels, and the gauge cards and the plain hover readout give
 the same `Δh`.
 
@@ -56,7 +56,7 @@ what the meter sees.
    (2.4, 0.85) and the throat at (5.0, 0.85). Each card prints a live **h**,
    the piezometric head.
 4. Take Δh = barrel **h** − throat **h**, hover the barrel run (x ≈ 2.0–3.2 m)
-   and read the **`q`** row — ignore the `y_c` and profile rows beside it, they
+   and read the **`q`** row — ignore the `d_c` and profile rows beside it, they
    are an open-channel readout and mean nothing in a full pipe — and submit
    **q, dHead**.
 

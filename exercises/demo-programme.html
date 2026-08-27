@@ -104,7 +104,7 @@
 <li><b>Personalised parameters.</b> Each submit-demo assigns the student a parameter from their student number (e.g. <span class="eqi">q = 0.20 + 0.03·d</span> where d = last digit). The solver is deterministic: same parameter → same steady answer, so any submission can be spot-checked by re-running it. Copying a neighbour's number produces a mismatch with your own digit — the cheap fraud is self-marking.</li>
 <li><b>Marking engagement, not accuracy.</b> A generous tolerance band (say ±15% of the re-run value, or simply "a number was submitted in the window") scores the credit. The pooled plot the class builds is the pedagogical payoff, and outliers are discussion material, not lost marks.</li>
 <li><b>Mechanics.</b> One Blackboard test per hour, 1–2 numeric fields, open only during the slot. 26/30 core demos produce numbers (87% — comfortably past the 50% you need); the 4 exploratory demos can log a screenshot upload or nothing at all.</li>
-<li><b>Standing rules</b> (put them on every worksheet): everyone on the same <b>Resolution: Medium</b>; wait out the spin-up countdown; keep the tab visible (the sim pauses when hidden); after changing q, re-check any tailwater against y<sub>c</sub> = (q²/g)<sup>⅓</sup> (printed on the q slider) and keep it ≥ 1.3 y<sub>c</sub>.</li>
+<li><b>Standing rules</b> (put them on every worksheet): everyone on the same <b>Resolution: Medium</b>; wait out the spin-up countdown; keep the tab visible (the sim pauses when hidden); after changing q, re-check any tailwater against d<sub>c</sub> = (q²/g)<sup>⅓</sup> (printed on the q slider) and keep it ≥ 1.3 d<sub>c</sub>.</li>
 <li><b>Prep flags.</b> Demos marked <span class="chip c-prep">DRY-RUN</span> are sandbox builds or parameter choices I have not verified numerically — run them once before class. Scenes with verified numbers (hammer, h23, flumes, jet, venturi) carry no flag.</li>
 </ul>
 </div>
@@ -136,8 +136,8 @@
 <div class="callout">
 <h2>Three standard rigs (built once, reused)</h2>
 <p>Drawn geometry cannot yet be saved, so the reused rigs are recipes. Build each once in front of the class (60–90 s of drawing) or have students build from the card — the drawing is itself part of the engagement.</p>
-<div class="rig"><b>RIG-A · THE DUCT</b> — Sandbox. A horizontal pressurised pipe: invert slab from x = 1.5 to 9 with top face at y = 2.0; soffit slab from x = 1.5 to 9 leaving a 0.40 m bore; reservoir wall above the pipe mouth at x = 1.5. Reservoir ON, head-driven, level per exercise. Used by FR-1, LL-1, LL-2, PU-1, B7, B10.</div>
-<div class="rig"><b>RIG-B · THE CHANNEL</b> — Sandbox. A flat bed slab (top face y = 0.5) across the domain, reservoir feeding q on the left, tailwater or a drawn control on the right. Used by WE-1, FB-1, MO-1, and any weir/gate variant.</div>
+<div class="rig"><b>RIG-A · THE DUCT</b> — Sandbox. A horizontal pressurised pipe: invert slab from x = 1.5 to 9 with top face at z = 2.0; soffit slab from x = 1.5 to 9 leaving a 0.40 m bore; reservoir wall above the pipe mouth at x = 1.5. Reservoir ON, head-driven, level per exercise. Used by FR-1, LL-1, LL-2, PU-1, B7, B10.</div>
+<div class="rig"><b>RIG-B · THE CHANNEL</b> — Sandbox. A flat bed slab (top face z = 0.5) across the domain, reservoir feeding q on the left, tailwater or a drawn control on the right. Used by WE-1, FB-1, MO-1, and any weir/gate variant.</div>
 <div class="rig"><b>RIG-C · TWIN TANKS</b> — Sandbox. Two open tanks with solid floors joined by a short pipe at the base; widths per exercise. Used by QS-2, DA-2, B9 (three tanks).</div>
 </div>
 
@@ -218,7 +218,7 @@
 <dl>
 <dt>Refs</dt><dd><span class="refs">N6, #44–46, #49–50</span> · energy and momentum coefficients</dd>
 <dt>Rig</dt><dd>Any flowing channel scene; each student a personalised station x (and optionally free-slip toggled for contrast).</dd>
-<dt>Run</dt><dd>Rake at your station. The chip prints u<sub>max</sub>, depth-average V and their ratio; read 4–5 profile points off the drawn curve (or <code>APP.SIM.rake</code>) and integrate α = Σu³Δy / (V³h) by mid-ordinate.</dd>
+<dt>Run</dt><dd>Rake at your station. The chip prints u<sub>max</sub>, depth-average V and their ratio; read 4–5 profile points off the drawn curve (or <code>APP.SIM.rake</code>) and integrate α = Σu³Δz / (V³h) by mid-ordinate.</dd>
 <dt>Submit</dt><dd>Your α (or, minimal version, the printed u<sub>max</sub>/V ratio).</dd>
 <dt>Expect</dt><dd>α ≈ 1.05–1.2 in uniform reaches, spiking downstream of gates — the histogram is the day "assume α = 1" becomes a judged approximation (N6's compound-channel &gt;2 case stays on slides: no lateral dimension).</dd>
 </dl>
@@ -288,13 +288,13 @@
 </div>
 
 <div class="demo">
-<div class="demo-head"><span class="id">UN-3</span><h3>Surge tank: measure y<sub>max</sub> against the ODE</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
+<div class="demo-head"><span class="id">UN-3</span><h3>Surge tank: measure z<sub>max</sub> against the ODE</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
 <dl>
 <dt>Refs</dt><dd><span class="refs">U23–U29</span> · the module's surge-tank ODE and trial-solved upsurge</dd>
 <dt>Rig</dt><dd>Hammer scene + one drawn open standpipe (width per student, 0.5–2 m) teed into the pipe just upstream of the valve, tall enough to contain the surge.</dd>
 <dt>Run</dt><dd>Establish flow, slam <span class="kbd">V</span>, gauge the standpipe: the mass oscillation is the whole trace — upsurge, downsurge, friction decay.</dd>
-<dt>Submit</dt><dd>(standpipe width b<sub>s</sub>, measured y<sub>max</sub>, measured period).</dd>
-<dt>Expect</dt><dd>Period near 2π√(l·b<sub>s</sub>/(g·b<sub>p</sub>)) — b<sub>s</sub> = 1 m on the 3 m bore gives ≈ 8 s. y<sub>max</sub> sits below the frictionless bound v₀√(l·b<sub>p</sub>/(g·b<sub>s</sub>)); the gap IS the ku² term, and integrating U28/U29 to explain it quantitatively is the follow-up problem sheet.</dd>
+<dt>Submit</dt><dd>(standpipe width b<sub>s</sub>, measured z<sub>max</sub>, measured period).</dd>
+<dt>Expect</dt><dd>Period near 2π√(l·b<sub>s</sub>/(g·b<sub>p</sub>)) — b<sub>s</sub> = 1 m on the 3 m bore gives ≈ 8 s. z<sub>max</sub> sits below the frictionless bound v₀√(l·b<sub>p</sub>/(g·b<sub>s</sub>)); the gap IS the ku² term, and integrating U28/U29 to explain it quantitatively is the follow-up problem sheet.</dd>
 </dl>
 </div>
 </section>
@@ -342,11 +342,11 @@
 <div class="demo">
 <div class="demo-head"><span class="id">MO-1</span><h3>Sluice gate: thrust and C<sub>d</sub> from the control volume</h3><span class="chip c-submit">SUBMIT</span><span class="chip c-prep">DRY-RUN</span></div>
 <dl>
-<dt>Refs</dt><dd><span class="refs">#144–146</span> · F<sub>R</sub> = ρQ(V₁−V₂) + ½ρg(y₁²−y₂²); Q = C<sub>d</sub>ab√(2gy₀) · <span class="refs">#7–12</span></dd>
+<dt>Refs</dt><dd><span class="refs">#144–146</span> · F<sub>R</sub> = ρQ(V₁−V₂) + ½ρg(d₁²−d₂²); Q = C<sub>d</sub>ab√(2gd₀) · <span class="refs">#7–12</span></dd>
 <dt>Rig</dt><dd>RIG-B with a drawn vertical gate, opening a personalised.</dd>
-<dt>Run</dt><dd>Measure y₀ upstream, y₁ downstream (hover), q (panel). Compute both the discharge coefficient and the CV thrust per metre.</dd>
+<dt>Run</dt><dd>Measure d₀ upstream, d₁ downstream (hover), q (panel). Compute both the discharge coefficient and the CV thrust per metre.</dd>
 <dt>Submit</dt><dd>(C<sub>d</sub>, F<sub>R</sub>).</dd>
-<dt>Payoff</dt><dd>C<sub>d</sub> clusters near 0.6 across every opening — a constant nobody put in. The thrust curve vs opening sets up the "why not hydrostatics?" trap: compare with ½ρg(y₀−a)² and let the mismatch teach the momentum equation's job.</dd>
+<dt>Payoff</dt><dd>C<sub>d</sub> clusters near 0.6 across every opening — a constant nobody put in. The thrust curve vs opening sets up the "why not hydrostatics?" trap: compare with ½ρg(d₀−a)² and let the mismatch teach the momentum equation's job.</dd>
 </dl>
 </div>
 
@@ -435,11 +435,11 @@
 <div class="demo">
 <div class="demo-head"><span class="id">UF-1</span><h3>Normal depth scales as q<sup>3/5</sup></h3><span class="chip c-submit">SUBMIT</span></div>
 <dl>
-<dt>Refs</dt><dd><span class="refs">#115–118, N2</span> · y<sub>n</sub> = (qn/√S₀)<sup>3/5</sup></dd>
-<dt>Rig</dt><dd><code>?scene=s2</code> (settles in ~22 s; the S2 profile approaches y<sub>n</sub> from above), personalised q 0.8–1.6.</dd>
-<dt>Run</dt><dd>After settling, read the measured y<sub>n</sub> at the cursor (the overlay's green line — remember it is measured off the energy line, not assumed).</dd>
-<dt>Submit</dt><dd>(q, y<sub>n</sub>).</dd>
-<dt>Payoff</dt><dd>Pooled log y<sub>n</sub> vs log q: slope 3/5 — Manning's exponent, extracted by the class from a channel whose n nobody typed in. Back-calculating that n (#117) from any single point is the natural second submission.</dd>
+<dt>Refs</dt><dd><span class="refs">#115–118, N2</span> · d<sub>n</sub> = (qn/√S₀)<sup>3/5</sup></dd>
+<dt>Rig</dt><dd><code>?scene=s2</code> (settles in ~22 s; the S2 profile approaches d<sub>n</sub> from above), personalised q 0.8–1.6.</dd>
+<dt>Run</dt><dd>After settling, read the measured d<sub>n</sub> at the cursor (the overlay's green line — remember it is measured off the energy line, not assumed).</dd>
+<dt>Submit</dt><dd>(q, d<sub>n</sub>).</dd>
+<dt>Payoff</dt><dd>Pooled log d<sub>n</sub> vs log q: slope 3/5 — Manning's exponent, extracted by the class from a channel whose n nobody typed in. Back-calculating that n (#117) from any single point is the natural second submission.</dd>
 </dl>
 </div>
 </section>
@@ -453,7 +453,7 @@
 <dt>Refs</dt><dd><span class="refs">#125–129, #131–132</span> · E<sub>s1</sub> = E<sub>s2</sub> + Δz; choking when Δz &gt; E₁ − E<sub>c</sub></dd>
 <dt>Rig</dt><dd>RIG-B flowing subcritical (tailwater set), personalised q. Students draw a low bed hump and raise it in increments (undo <span class="kbd">Z</span>, redraw taller).</dd>
 <dt>Run</dt><dd>Watch the surface dip over the hump grow until, at some height, the upstream level jumps and the crest goes critical — the Froude display snapping to the white break on the crest is the moment.</dd>
-<dt>Submit</dt><dd>Your choking height Δz<sub>c</sub>, alongside the predicted E₁ − 1.5y<sub>c</sub>.</dd>
+<dt>Submit</dt><dd>Your choking height Δz<sub>c</sub>, alongside the predicted E₁ − 1.5d<sub>c</sub>.</dd>
 <dt>Payoff</dt><dd>The single most instructive specific-energy exercise there is, and it cannot be done in a real flume in ten minutes.</dd>
 </dl>
 </div>
@@ -461,9 +461,9 @@
 <div class="demo">
 <div class="demo-head"><span class="id">FB-2</span><h3>Critical depth three ways</h3><span class="chip c-submit">SUBMIT</span></div>
 <dl>
-<dt>Refs</dt><dd><span class="refs">#128–129, #131–134</span> and the list's own y<sub>brink</sub> ≈ 0.7y<sub>c</sub> note · broad-crested Q = 1.705·C<sub>d</sub>·b·h<sup>3/2</sup></dd>
+<dt>Refs</dt><dd><span class="refs">#128–129, #131–134</span> and the list's own d<sub>brink</sub> ≈ 0.7d<sub>c</sub> note · broad-crested Q = 1.705·C<sub>d</sub>·b·h<sup>3/2</sup></dd>
 <dt>Rig</dt><dd><code>?scene=m2</code> (brink) and a broad-crested block from FB-1's rig; personalised q.</dd>
-<dt>Run</dt><dd>(1) y<sub>c</sub> = (q²/g)<sup>⅓</sup> from the panel's printed value; (2) depth ON the broad crest (should ride y<sub>c</sub>); (3) depth at the brink lip (should read ≈ 0.7y<sub>c</sub>, with critical sitting 3–4 y<sub>c</sub> upstream).</dd>
+<dt>Run</dt><dd>(1) d<sub>c</sub> = (q²/g)<sup>⅓</sup> from the panel's printed value; (2) depth ON the broad crest (should ride d<sub>c</sub>); (3) depth at the brink lip (should read ≈ 0.7d<sub>c</sub>, with critical sitting 3–4 d<sub>c</sub> upstream).</dd>
 <dt>Submit</dt><dd>Three depths. Reconciling why (3) is low — curvature at the lip breaks the hydrostatic assumption — is the discussion that separates a formula from an understanding.</dd>
 </dl>
 </div>
@@ -475,10 +475,10 @@
 <div class="demo">
 <div class="demo-head"><span class="id">HJ-1</span><h3>Bélanger from a room full of flumes</h3><span class="chip c-submit">SUBMIT</span></div>
 <dl>
-<dt>Refs</dt><dd><span class="refs">#137–143</span> · conjugate depths and ΔE = (y₂−y₁)³/4y₁y₂</dd>
-<dt>Rig</dt><dd><code>?scene=h23</code> (validated: measured y₂ within −5% of Bélanger at the shipped q), personalised q 0.3–0.7 <em>with the tailwater rule applied</em>: set tail ≥ 1.3·(q²/g)<sup>⅓</sup> — the worksheet carries a small q → tailwater table.</dd>
-<dt>Run</dt><dd>The jump box prints Fr₁, y₁, y₂, the momentum prediction and ΔE, live.</dd>
-<dt>Submit</dt><dd>(Fr₁, y₂/y₁).</dd>
+<dt>Refs</dt><dd><span class="refs">#137–143</span> · conjugate depths and ΔE = (d₂−d₁)³/4d₁d₂</dd>
+<dt>Rig</dt><dd><code>?scene=h23</code> (validated: measured d₂ within −5% of Bélanger at the shipped q), personalised q 0.3–0.7 <em>with the tailwater rule applied</em>: set tail ≥ 1.3·(q²/g)<sup>⅓</sup> — the worksheet carries a small q → tailwater table.</dd>
+<dt>Run</dt><dd>The jump box prints Fr₁, d₁, d₂, the momentum prediction and ΔE, live.</dd>
+<dt>Submit</dt><dd>(Fr₁, d₂/d₁).</dd>
 <dt>Payoff</dt><dd>The class's points trace the Bélanger curve. Optional coda for the last ten minutes: three volunteers rerun on <code>?scene=s1</code> and their points fall visibly <em>below</em> the curve — the horizontal-bed assumption failing on a 1-in-4 slope, discovered rather than announced.</dd>
 </dl>
 </div>

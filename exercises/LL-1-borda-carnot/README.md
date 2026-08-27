@@ -45,8 +45,8 @@ explain the assignment in class.
 
 1. Raise **Reservoir level** to your own value — the bench idles with the
    reservoir level equal to the tailwater, so nothing flows until you do.
-2. Drop two gauges — Gauge (`5`) — at **x = 3.40 m, y = 2.20 m** (mid-height
-   of the narrow bore, just before the step) and at **x = 7.60 m, y = 2.10 m**
+2. Drop two gauges — Gauge (`5`) — at **x = 3.40 m, z = 2.20 m** (mid-height
+   of the narrow bore, just before the step) and at **x = 7.60 m, z = 2.10 m**
    — **low in the wide pipe, near the invert**, not mid-height: a centreline
    tap reads the still-mixing jet core and can sign-flip the recovery.
 3. Press `R` and let it reach steady state — about **20 s**; the card counts
@@ -86,9 +86,9 @@ against the geometric (1 − A₁/A₂)².
   the pipe is short and the bore generous — it is pure turbulent dissipation,
   over almost as soon as it starts.
 - **Where you tap matters as much as what you read.** Live: drop a third gauge
-  at bore mid-height, **x = 7.60 m, y = 2.40 m**, and compare its trace with
+  at bore mid-height, **x = 7.60 m, z = 2.40 m**, and compare its trace with
   the near-invert one. It sits nearly 0.3 m lower — enough to sign-flip the
-  measured recovery — because y = 2.40 m is exactly the old narrow-bore
+  measured recovery — because z = 2.40 m is exactly the old narrow-bore
   soffit, and that jet boundary has still not mixed out four metres past the
   step. A pressure reading only means something once you say where in the
   section it was taken, and how far downstream.

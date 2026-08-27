@@ -21,7 +21,7 @@ rig.js's NC2.freeSlip / NC2.gate) since those two are reference lines, not
 class data to histogram.
 
 This script does NOT re-derive alpha from raw (depth-fraction, u) points --
-unlike a q/y0/y1-style formula, each student reads their OWN 4-5 points off
+unlike a q/d0/d1-style formula, each student reads their OWN 4-5 points off
 the curve, so there is no fixed set of raw columns to recompute from. The
 spot-check this demo relies on instead is at the METHOD level: rig.js's
 NC2.windowStats() independently measures the full-resolution alpha at every
@@ -144,7 +144,7 @@ def main():
                  xy=(2.0, 0), xytext=(2.05, ytop * 0.34), fontsize=6.7, color="#b33",
                  arrowprops=dict(arrowstyle="-", color="#b33", lw=0.6, alpha=0.6))
 
-    axh.set_xlabel(r"energy coefficient $\alpha = \sum u^3\Delta y \,/\, (V^3 h)$")
+    axh.set_xlabel(r"energy coefficient $\alpha = \sum u^3\Delta z \,/\, (V^3 h)$")
     axh.set_ylabel("students")
     axh.set_title(args.title + "\n“assume $\\alpha=1$”, judged")
     axh.set_xlim(0.9, 2.6)

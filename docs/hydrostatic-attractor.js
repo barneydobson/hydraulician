@@ -8,7 +8,7 @@
 // supplies the constant of integration.
 //
 // Every scene is initialised by scenes.js `still()` with the equilibrium profile
-// f = 1 + g(lev-y)/c^2 already in place, so the scenes never test this. Here the
+// f = 1 + g(lev-z)/c^2 already in place, so the scenes never test this. Here the
 // column starts UNIFORM and uncompressed -- f = 1 throughout, hence P = 0
 // everywhere, which is maximally wrong -- and the question is whether it
 // converges to P = g(eta - z).

@@ -25,11 +25,11 @@ const state = {
   tool: "wall", brush: 0.055,
   mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
   ruler: true,                // metre ticks on the view edges — a workspace preference
-  measure: null, measDrag: null,   // the tape measure: {x0,y0,x1,y1} in metres
+  measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the force control volume: box + EMA force
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
-  gauges: [], rakes: [], gaugeField: "head", tracers: null, tracerN: 9,
+  gauges: [], rakes: [], gaugeField: "h", tracers: null, tracerN: 9,
   gaugeT: -1,                 // sim time of the last gauge sample — see sampleGauges
   gaugeSeq: 0,                // ever-increasing gauge id, for inspector identity
   deliv: null,                // measured inlet discharge / level, for the panel
@@ -101,12 +101,12 @@ function computeView() {
 function zoomAt(px, py, factor) {
   const z1 = Math.min(16, Math.max(1, state.zoom * factor));
   if (Math.abs(z1 - state.zoom) < 1e-6) return;
-  const [dx0, dy0] = view.toDomain(px, py);
+  const [dx0, dz0] = view.toDomain(px, py);
   const B = baseRect();
   state.zoom = z1;
   state.panC = [
     dx0 + (B.bx + B.w / 2 - px) * sim.W / (B.w * z1),
-    dy0 + (py - B.by - B.h / 2) * sim.H / (B.h * z1),
+    dz0 + (py - B.by - B.h / 2) * sim.H / (B.h * z1),
   ];
   computeView();
 }
@@ -218,7 +218,7 @@ function switchScene(id) {
   state.dye = true;
   state.jumps = true;
   state.particles = false;            // scenes that want them set `sc.particles`
-  state.gaugeField = "head";
+  state.gaugeField = "h";
   state.tracerN = 9;
   GINSP.closeAll();
   if (state.paused) togglePause();    // via the toggle, so the glyph follows
@@ -505,7 +505,7 @@ const EX = (() => {
 
   // ------------------------------------------------- the personalised digit
   /** `value = base + step·d`, or a per-digit `table` where the measured rule
-   *  is not linear (HJ-1's tailwater steps to 1.5·y_c at d = 6 and 9), with an
+   *  is not linear (HJ-1's tailwater steps to 1.5·d_c at d = 6 and 9), with an
    *  optional `mod` for "d mod N" rules. `also` carries the coupled values the
    *  worksheet makes the student derive.
    *
@@ -1457,16 +1457,16 @@ const CONTROLS = [
     fmt: (v) => {
       // Under head-driven inflow the slider is not the discharge — nothing
       // writes it back from the solver — so print what the inlet is actually
-      // delivering instead, and take y_c from that.
+      // delivering instead, and take d_c from that.
       const D = state.deliv;
       if (sim.p.inflow.free > 0.5) {
         return "head-driven  ·  q → " + (D ? D.q.toFixed(3) : "—") + " m²/s delivered" +
-               (D ? "   y_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
+               (D ? "   d_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
       }
       return v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
-             "   y_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m";
+             "   d_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m";
     },
-    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth y_c = (q²/g)^⅓ follows directly from it. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
+    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth d_c = (q²/g)^⅓ follows directly from it. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
   { id: "inFree", place: "res", type: "check", label: "Head-driven inflow",
     get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
@@ -1501,7 +1501,7 @@ const CONTROLS = [
     fmt: (v) => v.toFixed(2) + " m/s",
     info: "Horizontal velocity of the water leaving the spout. Use the Spout tool (4) to drag the spout anywhere." },
   { id: "spoutVy", place: "spout", label: "Spout velocity ↑", min: -6, max: 3, step: 0.05,
-    get: () => sim.p.source.vy, set: (v) => sim.p.source.vy = v,
+    get: () => sim.p.source.vz, set: (v) => sim.p.source.vz = v,
     fmt: (v) => v.toFixed(2) + " m/s" },
 
   { h: "Boundaries" },
@@ -1617,13 +1617,13 @@ const CONTROLS = [
     info: "A tape measure: left-drag between two points for the straight-line length, the horizontal and vertical legs, and the slope written as 1 : n. Shift snaps to horizontal / vertical / 45°; a click without a drag clears it. The 8 key picks the tool from the keyboard, and the numbers stay printed here." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
-    info: "Critical depth y_c, normal depth y_n and the energy grade line, computed per column from the live depth and unit discharge." },
+    info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
   { id: "labels", type: "check", label: "Profile labels",
     get: () => state.labels, set: (v) => state.labels = v,
-    info: "Names each reach by its gradually-varied-flow class. The letter is the bed (Mild, Steep, Critical, Horizontal, Adverse); the number is the zone — 1 above both y_n and y_c, 2 between them, 3 below both." },
+    info: "Names each reach by its gradually-varied-flow class. The letter is the bed (Mild, Steep, Critical, Horizontal, Adverse); the number is the zone — 1 above both d_n and d_c, 2 between them, 3 below both." },
   { id: "jumps", type: "check", label: "Jump analysis",
     get: () => state.jumps, set: (v) => state.jumps = v,
-    info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction y₂/y₁ = ½(√(1+8Fr₁²) − 1)." },
+    info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction d₂/d₁ = ½(√(1+8Fr₁²) − 1)." },
   { id: "particles", type: "check", label: "Particles",
     get: () => state.particles, set: (v) => state.particles = v,
     info: "Massless tracers. The clearest way to see wave orbits and jet spreading." },
@@ -1637,7 +1637,7 @@ const CONTROLS = [
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["head", "Piezometric head"], ["depth", "Depth"], ["speed", "Speed"]],
+    opts: [["h", "Piezometric head"], ["d", "Depth"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
@@ -2401,11 +2401,11 @@ const START = (() => {
   return { open, close, toggle, isOpen, renderList };
 })();
 
-function snap(x0, y0, x1, y1) {
-  const dx = x1 - x0, dy = y1 - y0;
-  const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
-  const r = Math.hypot(dx, dy);
-  return [x0 + r * Math.cos(a), y0 + r * Math.sin(a)];
+function snap(x0, z0, x1, z1) {
+  const dx = x1 - x0, dz = z1 - z0;
+  const a = Math.round(Math.atan2(dz, dx) / (Math.PI / 4)) * (Math.PI / 4);
+  const r = Math.hypot(dx, dz);
+  return [x0 + r * Math.cos(a), z0 + r * Math.sin(a)];
 }
 
 function pointerPx(e) {
@@ -2425,8 +2425,8 @@ const pointers = new Map();          // active pointers, for pinch zoom
 function onDown(e) {
   try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* synthetic events */ }
   pointers.set(e.pointerId, pointerPx(e));
-  const [x, y] = pointerPos(e);
-  state.cursor = [x, y];
+  const [x, z] = pointerPos(e);
+  state.cursor = [x, z];
   if (pointers.size === 2) {         // second finger: abandon tools, pinch
     state.drag = null; state.spoutDrag = false; state.measDrag = null; state.cvDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
@@ -2458,19 +2458,19 @@ function onDown(e) {
   // named, which made half of "draw an edge, pour water" impossible on a
   // phone. Right-drag still works regardless of the tool in your hand.
   if (e.button === 2 || state.tool === "pour") {
-    state.pour = { x, y, r: state.brush * 4, vx: 0, vy: sim.p.g > 0.5 ? -2.0 : 0, lx: x, ly: y };
+    state.pour = { x, z, r: state.brush * 4, vx: 0, vz: sim.p.g > 0.5 ? -2.0 : 0, lx: x, lz: z };
     sim.p.pour = state.pour;
     return;
   }
   if (state.tool === "spout") {
-    sim.p.source.x = x; sim.p.source.y = y; sim.p.source.on = 1;
+    sim.p.source.x = x; sim.p.source.z = z; sim.p.source.on = 1;
     state.spoutDrag = true;
     syncPanel();
     return;
   }
   if (state.tool === "gauge") {
     if (state.gauges.length >= 4) state.gauges.shift();
-    state.gauges.push({ x, y, hist: [], log: [], id: ++state.gaugeSeq,
+    state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
                         colour: CONFIG.gaugeColours[state.gauges.length % 4] });
     syncPanel();                      // the inspector row lists the live gauges
     return;
@@ -2490,15 +2490,15 @@ function onDown(e) {
   if (state.tool === "measure") {
     // A tape, not a wall: the drag never reaches SIM.addSeg. A bare click
     // (see onUp) clears the tape instead of leaving a zero-length one.
-    state.measDrag = { x0: x, y0: y, x1: x, y1: y };
+    state.measDrag = { x0: x, z0: z, x1: x, z1: z };
     return;
   }
   if (state.tool === "cv") {
     // Same contract as the tape: a drag places the box, a bare click clears it.
-    state.cvDrag = { x0: x, y0: y, x1: x, y1: y };
+    state.cvDrag = { x0: x, z0: z, x1: x, z1: z };
     return;
   }
-  state.drag = { x0: x, y0: y, x1: x, y1: y };
+  state.drag = { x0: x, z0: z, x1: x, z1: z };
 }
 
 function onMove(e) {
@@ -2521,9 +2521,9 @@ function onMove(e) {
     computeView();
     return;
   }
-  const [x, y] = pointerPos(e);
-  state.cursor = [x, y];
-  state.inside = x >= 0 && y >= 0 && x <= sim.W && y <= sim.H;
+  const [x, z] = pointerPos(e);
+  state.cursor = [x, z];
+  state.inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
   if (state.panDrag) {
     const px = pointerPx(e), d = state.panDrag;
     state.panC = [
@@ -2534,31 +2534,31 @@ function onMove(e) {
     return;
   }
   if (state.spoutDrag) {
-    sim.p.source.x = x; sim.p.source.y = y;
+    sim.p.source.x = x; sim.p.source.z = z;
     return;
   }
   if (state.pour) {
     const dt = 1 / 60;
     state.pour.vx = Math.max(-6, Math.min(6, (x - state.pour.lx) / dt * 0.35));
-    state.pour.vy = Math.max(-6, Math.min(6, (y - state.pour.ly) / dt * 0.35 + (sim.p.g > 0.5 ? -2 : 0)));
-    state.pour.x = x; state.pour.y = y;
-    state.pour.lx = x; state.pour.ly = y;
+    state.pour.vz = Math.max(-6, Math.min(6, (z - state.pour.lz) / dt * 0.35 + (sim.p.g > 0.5 ? -2 : 0)));
+    state.pour.x = x; state.pour.z = z;
+    state.pour.lx = x; state.pour.lz = z;
     state.pour.r = state.brush * 4;
     return;
   }
   if (state.measDrag) {
     const d = state.measDrag;
-    if (e.shiftKey) { const s = snap(d.x0, d.y0, x, y); d.x1 = s[0]; d.y1 = s[1]; }
-    else { d.x1 = x; d.y1 = y; }
+    if (e.shiftKey) { const s = snap(d.x0, d.z0, x, z); d.x1 = s[0]; d.z1 = s[1]; }
+    else { d.x1 = x; d.z1 = z; }
     return;
   }
   if (state.cvDrag) {
-    state.cvDrag.x1 = x; state.cvDrag.y1 = y;
+    state.cvDrag.x1 = x; state.cvDrag.z1 = z;
     return;
   }
   if (state.drag) {
-    if (e.shiftKey) { const s = snap(state.drag.x0, state.drag.y0, x, y); state.drag.x1 = s[0]; state.drag.y1 = s[1]; }
-    else { state.drag.x1 = x; state.drag.y1 = y; }
+    if (e.shiftKey) { const s = snap(state.drag.x0, state.drag.z0, x, z); state.drag.x1 = s[0]; state.drag.z1 = s[1]; }
+    else { state.drag.x1 = x; state.drag.z1 = z; }
   }
 }
 
@@ -2572,7 +2572,7 @@ function onUp(e) {
   if (state.measDrag) {
     const d = state.measDrag;
     // Shorter than a cell is a click: clear the tape rather than keep a dot.
-    state.measure = Math.hypot(d.x1 - d.x0, d.y1 - d.y0) < sim.dx ? null : d;
+    state.measure = Math.hypot(d.x1 - d.x0, d.z1 - d.z0) < sim.dx ? null : d;
     state.measDrag = null;
     syncPanel();                      // the panel's Measure row prints the numbers
     return;
@@ -2581,10 +2581,10 @@ function onUp(e) {
     const d = state.cvDrag;
     // Thinner than 3 cells in either direction is a click: clear the box —
     // a degenerate box has no interior for a momentum budget to close over.
-    if (Math.abs(d.x1 - d.x0) < 3 * sim.dx || Math.abs(d.y1 - d.y0) < 3 * sim.dx) {
+    if (Math.abs(d.x1 - d.x0) < 3 * sim.dx || Math.abs(d.z1 - d.z0) < 3 * sim.dx) {
       state.cv = null;
     } else {
-      placeCV(d.x0, d.y0, d.x1, d.y1);
+      placeCV(d.x0, d.z0, d.x1, d.z1);
     }
     state.cvDrag = null;
     return;
@@ -2593,10 +2593,10 @@ function onUp(e) {
     const d = state.drag;
     const kind = state.tool === "erase" ? 0 : state.tool === "valve" ? 128 : 255;
     const th = state.tool === "erase" ? state.brush * 2.2 : state.brush;
-    if (Math.hypot(d.x1 - d.x0, d.y1 - d.y0) < sim.dx) {
-      SIM.addSeg(d.x0, d.y0, d.x0 + sim.dx * 0.5, d.y0, th, kind);   // a dot
+    if (Math.hypot(d.x1 - d.x0, d.z1 - d.z0) < sim.dx) {
+      SIM.addSeg(d.x0, d.z0, d.x0 + sim.dx * 0.5, d.z0, th, kind);   // a dot
     } else {
-      SIM.addSeg(d.x0, d.y0, d.x1, d.y1, th, kind);
+      SIM.addSeg(d.x0, d.z0, d.x1, d.z1, th, kind);
     }
     state.drag = null;
   }
@@ -2672,7 +2672,7 @@ function tickFrame(realDt) {
     mode: state.mode, vmax: vmaxFor(), hmax: hmaxFor(analysis),
     dye: state.dye, particles: state.particles,
     cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1 : state.brush * 0.55],
-    guide: state.drag ? [state.drag.x0, state.drag.y0, state.drag.x1, state.drag.y1] : [0, 0, 0, 0],
+    guide: state.drag ? [state.drag.x0, state.drag.z0, state.drag.x1, state.drag.z1] : [0, 0, 0, 0],
     guideOn: !!state.drag,
   });
 
@@ -2719,15 +2719,15 @@ function sampleGauges(A) {
   if (!(sim.t > state.gaugeT)) return;
   state.gaugeT = sim.t;
   state.gauges.forEach((gg) => {
-    const pr = SIM.probe(gg.x, gg.y);
+    const pr = SIM.probe(gg.x, gg.z);
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(gg.x / sim.dx)));
     // Piezometric head h = z + p/ρg. For a scene whose bed is real geometry
-    // z is just the gauge's y, but a tilted-gravity scene (m2) draws a FLAT bed
-    // and carries S₀ in gravity instead, so the elevation is y − S₀x. Without
+    // z is just the gauge's own z, but a tilted-gravity scene (m2) draws a FLAT
+    // bed and carries S₀ in gravity instead, so the elevation is z − S₀x. Without
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
-    const z = gg.y - (sim.scene.tiltS0 || 0) * gg.x;
-    const s = { t: sim.t, head: z + pr.head, depth: A.h[i], speed: pr.speed };
+    const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
+    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2751,10 +2751,10 @@ function sampleRakes() {
 /** Place (or move) the force control volume. Corners are normalised and the
  *  running force estimate starts afresh — a moved box is a new measurement,
  *  and blending it with the old one would print a number no box ever read. */
-function placeCV(x0, y0, x1, y1) {
+function placeCV(x0, z0, x1, z1) {
   state.cv = {
-    x0: Math.min(x0, x1), y0: Math.min(y0, y1),
-    x1: Math.max(x0, x1), y1: Math.max(y0, y1),
+    x0: Math.min(x0, x1), z0: Math.min(z0, z1),
+    x1: Math.max(x0, x1), z1: Math.max(z0, z1),
     ema: null, hist: [], t0: sim.t,
   };
 }
@@ -2769,12 +2769,12 @@ function sampleCV() {
   if (!cv || state.paused) return;
   if (sim.t < cv.t0) { cv.ema = null; cv.hist.length = 0; cv.t0 = sim.t; }
   if (!(sim.t > cv.t0) && cv.ema) return;
-  const r = SIM.boxForce(cv.x0, cv.y0, cv.x1, cv.y1);
+  const r = SIM.boxForce(cv.x0, cv.z0, cv.x1, cv.z1);
   const a = 1 - Math.exp(-Math.min(sim.t - cv.t0, 0.25) / 1.0);
   cv.t0 = sim.t;
   cv.ema = cv.ema ? { fx: cv.ema.fx + (r.fx - cv.ema.fx) * a,
-                      fy: cv.ema.fy + (r.fy - cv.ema.fy) * a }
-                  : { fx: r.fx, fy: r.fy };
+                      fz: cv.ema.fz + (r.fz - cv.ema.fz) * a }
+                  : { fx: r.fx, fz: r.fz };
   cv.hist.push({ t: sim.t, fx: r.fx });
   while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
   cv.last = r;
@@ -2794,13 +2794,13 @@ function sampleInlet(A) {
   const i0 = Math.max(2, Math.min(sim.nx - 12, sp + 2)), i1 = Math.min(sim.nx - 2, i0 + 9);
   let q = 0, s = 0, n = 0;
   for (let i = i0; i <= i1; i++) {
-    if (!(A.onBed[i] && A.h[i] > 3 * sim.dx)) continue;
-    q += A.q[i]; s += A.bed[i] + A.h[i]; n++;
+    if (!(A.onBed[i] && A.d[i] > 3 * sim.dx)) continue;
+    q += A.q[i]; s += A.bed[i] + A.d[i]; n++;
   }
   if (!n) { state.deliv = null; return; }
   q /= n; s /= n;
   const d = state.deliv || (state.deliv = { q, level: s });
-  d.q += 0.05 * (q - d.q);              // A.q/A.h already carry a 10 %/frame
+  d.q += 0.05 * (q - d.q);              // A.q/A.d already carry a 10 %/frame
   d.level += 0.05 * (s - d.level);      // EMA; this is the display's own settle
 }
 
@@ -2847,8 +2847,8 @@ function seedTracers(x) {
     // smudge that hid a 17 mm orbit completely.
     trail: state.scene.trailSeconds || 2.5 * (sim.p.wave.period || 1.2) };
   for (let k = 0; k < n; k++) {
-    const y = lo + (hi - lo) * (k / (n - 1));
-    state.tracers.list.push({ x, y, x0: x, y0: y, path: [] });
+    const z = lo + (hi - lo) * (k / (n - 1));
+    state.tracers.list.push({ x, z, x0: x, z0: z, path: [] });
   }
 }
 
@@ -2866,17 +2866,17 @@ function advanceTracers(dtSim) {
   const h = dtSim / nsub;
   for (const t of T.list) {
     for (let s = 0; s < nsub; s++) {
-      const a = SIM.patchVel(P, t.x, t.y);
-      const b = SIM.patchVel(P, t.x + a[0] * h, t.y + a[1] * h);
+      const a = SIM.patchVel(P, t.x, t.z);
+      const b = SIM.patchVel(P, t.x + a[0] * h, t.z + a[1] * h);
       t.x += 0.5 * (a[0] + b[0]) * h;
-      t.y += 0.5 * (a[1] + b[1]) * h;
+      t.z += 0.5 * (a[1] + b[1]) * h;
     }
     t.x = Math.max(sim.dx, Math.min(sim.W - sim.dx, t.x));
-    t.y = Math.max(sim.dx, Math.min(sim.H - sim.dx, t.y));
+    t.z = Math.max(sim.dx, Math.min(sim.H - sim.dx, t.z));
     // A tracer that has drifted right out of its rake is no longer showing
     // the orbit at the station it was seeded at, so put it back.
-    if (Math.abs(t.x - t.x0) > 0.9) { t.x = t.x0; t.y = t.y0; t.path.length = 0; }
-    t.path.push(t.x, t.y, sim.t);
+    if (Math.abs(t.x - t.x0) > 0.9) { t.x = t.x0; t.z = t.z0; t.path.length = 0; }
+    t.path.push(t.x, t.z, sim.t);
     while (t.path.length > 6 && sim.t - t.path[2] > T.trail) t.path.splice(0, 3);
   }
 }
@@ -2902,9 +2902,9 @@ function drawOverlay(A) {
   if (meas) OVERLAY.drawMeasure(ctx, view, meas);
   if (state.cvDrag) {
     OVERLAY.drawCV(ctx, view, { x0: Math.min(state.cvDrag.x0, state.cvDrag.x1),
-                                y0: Math.min(state.cvDrag.y0, state.cvDrag.y1),
+                                z0: Math.min(state.cvDrag.z0, state.cvDrag.z1),
                                 x1: Math.max(state.cvDrag.x0, state.cvDrag.x1),
-                                y1: Math.max(state.cvDrag.y0, state.cvDrag.y1) });
+                                z1: Math.max(state.cvDrag.z0, state.cvDrag.z1) });
   } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv);
   drawMarkers(ctx);
   drawSpout(ctx);
@@ -2912,7 +2912,7 @@ function drawOverlay(A) {
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
   const fld = state.gaugeField;
   const cards = OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-    fld === "head" ? "h" : fld === "depth" ? "d" : "|u|",
+    fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
     fld === "speed" ? "m/s" : "m");
   GINSP.tick(cards);
   if (state.inside && !state.drag) {
@@ -2935,10 +2935,10 @@ function flashOf(key) {
  *  its marker so "which thing is this?" answers itself. */
 function drawMarkers(ctx) {
   const p = sim.p, V = view;
-  const level = (side, y, label, colour, key) => {
+  const level = (side, z, label, colour, key) => {
     const x0 = side === "L" ? V.X(0) : V.X(sim.W);
     const dir = side === "L" ? 1 : -1;
-    const ypx = V.Y(y);
+    const ypx = V.Y(z);
     const f = flashOf(key);
     ctx.save();
     ctx.globalAlpha = 0.55 + 0.45 * f;
@@ -3011,7 +3011,7 @@ function drawMarkers(ctx) {
 function drawSpout(ctx) {
   const s = sim.p.source;
   if (!(s.on > 0.5) && state.tool !== "spout") return;
-  const x = view.X(s.x), y = view.Y(s.y);
+  const x = view.X(s.x), y = view.Y(s.z);
   const r = Math.max(5, s.r / sim.W * view.w);
   const fl = flashOf("spout");
   ctx.save();
@@ -3020,9 +3020,9 @@ function drawSpout(ctx) {
   ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.stroke();
   ctx.setLineDash([]);
-  const sp = Math.hypot(s.vx, s.vy);
+  const sp = Math.hypot(s.vx, s.vz);
   if (sp > 0.05) {
-    const ax = s.vx / sp, ay = -s.vy / sp, L = r + 12;
+    const ax = s.vx / sp, ay = -s.vz / sp, L = r + 12;
     ctx.beginPath();
     ctx.moveTo(x, y); ctx.lineTo(x + ax * L, y + ay * L);
     ctx.moveTo(x + ax * L, y + ay * L);
@@ -3106,12 +3106,13 @@ function dragWindow(el, handle, onPlace) {
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
   // Symbols follow free-surface convention: h is the piezometric head, d the
-  // depth and η the water level, leaving H free for the energy head. The KEYS
-  // are frozen — "head" and "depth" are serialised into permalinks and into
-  // every `ui.field` in exercises-rigs.js, so rename the symbol, never the key.
+  // depth and η the water level, leaving H free for the energy head (the full
+  // rationale, texts included, is in docs/notation.md). Since rig format v2
+  // the KEYS are the symbols; older wire formats are rejected, not migrated —
+  // prototype, no back-compat.
   const FIELDS = [
-    ["head",  "h", "m",   "piezometric head, h = z + p/ρg"],
-    ["depth", "d", "m",   "water depth of the column"],
+    ["h",     "h", "m",   "piezometric head, h = z + p/ρg"],
+    ["d",     "d", "m",   "water depth of the column"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],
   ];
   const open = [];              // live inspector windows
@@ -3271,7 +3272,7 @@ const GINSP = (() => {
     el.querySelector(".ginsp-dot").style.background = g.colour;
     el.querySelector(".ginsp-name").textContent = "Gauge " + (k + 1);
     el.querySelector(".ginsp-pos").textContent =
-      "x " + g.x.toFixed(2) + " · y " + g.y.toFixed(2) + " m";
+      "x " + g.x.toFixed(2) + " · z " + g.z.toFixed(2) + " m";
     const last = L.length ? L[L.length - 1] : null;
     FIELDS.forEach(([f]) => {
       const V = o.vb[f];
@@ -3419,14 +3420,14 @@ const GINSP = (() => {
     const hdr = ["t_sim_s"];
     gs.forEach((g) => {
       const tag = "g" + (state.gauges.indexOf(g) + 1) +
-                  "_x" + g.x.toFixed(2) + "_y" + g.y.toFixed(2);
-      hdr.push(tag + "_head_m", tag + "_depth_m", tag + "_speed_mps");
+                  "_x" + g.x.toFixed(2) + "_z" + g.z.toFixed(2);
+      hdr.push(tag + "_h_m", tag + "_d_m", tag + "_speed_mps");
     });
     const cols = gs.length * 3, rows = new Map();
     gs.forEach((g, gi) => (g.log || []).forEach((s) => {
       let r = rows.get(s.t);
       if (!r) { r = new Array(cols).fill(""); rows.set(s.t, r); }
-      r[gi * 3] = String(s.head); r[gi * 3 + 1] = String(s.depth); r[gi * 3 + 2] = String(s.speed);
+      r[gi * 3] = String(s.h); r[gi * 3 + 1] = String(s.d); r[gi * 3 + 2] = String(s.speed);
     }));
     const ts = [...rows.keys()].sort((a, b) => a - b);
     const out = [hdr.join(",")];
@@ -3462,7 +3463,7 @@ const GINSP = (() => {
  *
  *  Two things make that true and they are worth stating:
  *
- *  - **Segments are physical**, `[x0,y0,x1,y1,thickness,kind]` in metres, and
+ *  - **Segments are physical**, `[x0,z0,x1,z1,thickness,kind]` in metres, and
  *    `SIM.rasterise()` re-stamps them into whatever grid is current. So a rig
  *    saved at Medium loads sealed at Low or High; the cell COUNT of a gap
  *    changes (it always does — see UN-1's quantised nozzle), the geometry
@@ -3483,7 +3484,7 @@ const GINSP = (() => {
  *  dependency; falls back to `A` where it is missing). Deflate is worth it:
  *  a 35-stroke staircase rig is 4.4 kB of JSON and mostly repeated digits. */
 const RIG = (() => {
-  const V = 1;                                  // format version
+  const V = 2;                                  // format version
   /** Micrometres. Not cosmetic: B10's staircase snaps its step boundaries to
    *  cell centres on purpose (a boundary landing exactly on one is claimed by
    *  both neighbouring steps and pinches the bore a whole step deep), and at
@@ -3510,14 +3511,16 @@ const RIG = (() => {
       valveClosed: b01(p.valveClosed),
       inflow,
       tailwater: { on: b01(p.tailwater.on), level: r4(p.tailwater.level) },
-      source: { on: b01(p.source.on), x: r4(p.source.x), y: r4(p.source.y),
-                r: r4(p.source.r), vx: r4(p.source.vx), vy: r4(p.source.vy) },
+      // Wire keys follow the display notation (z vertical, vz its velocity);
+      // and match the runtime fields since the code-wide z/w rename.
+      source: { on: b01(p.source.on), x: r4(p.source.x), z: r4(p.source.z),
+                r: r4(p.source.r), vx: r4(p.source.vx), vz: r4(p.source.vz) },
       wave: { on: b01(p.wave.on), amp: r4(p.wave.amp),
               period: r4(p.wave.period), x: r4(p.wave.x) },
       hyd: { c: r4(p.c), cf: r4(p.cf), cs: r4(p.cs), bulk: r4(p.bulk),
              ca: r4(p.ca), nu: r4(p.nu), slip: b01(p.slip), g: r4(p.g) },
       dye: { line: r4(p.dyeLine), decay: r4(p.dyeDecay) },
-      gauges: state.gauges.map((g) => [r4(g.x), r4(g.y)]),
+      gauges: state.gauges.map((g) => [r4(g.x), r4(g.z)]),
       rakes: state.rakes.map((k) => r4(k.x)),
       ui: { mode: state.mode | 0, field: state.gaugeField, speed: r4(state.speed),
             channel: b01(state.channel), labels: b01(state.labels),
@@ -3526,18 +3529,22 @@ const RIG = (() => {
     };
     if (state.tracers) o.tracers = [r4(state.tracers.x), state.tracerN | 0,
                                     r4(state.tracers.trail)];
-    if (state.cv) o.cv = [r4(state.cv.x0), r4(state.cv.y0), r4(state.cv.x1), r4(state.cv.y1)];
+    if (state.cv) o.cv = [r4(state.cv.x0), r4(state.cv.z0), r4(state.cv.x1), r4(state.cv.z1)];
     return o;
   }
 
-  /** Version gate. v1 is the only format so far; a future v2 migrates here so
-   *  that links printed on this year's worksheets keep working. */
+  /** Version gate. Exactly the current format loads — this is a prototype
+   *  and old wire formats are NOT migrated (v2 renamed source y→z, vy→vz and
+   *  the gauge field keys head→h, depth→d; a v1 link is simply stale).
+   *  Wire keys and runtime keys agree since the code-wide z/w rename, so
+   *  there is nothing to map — only the version to check. */
   function migrate(o) {
     if (!o || typeof o !== "object" || !Array.isArray(o.segs)) {
       throw new Error("not a hydraulician rig");
     }
-    if ((o.v | 0) > V) {
-      throw new Error("rig format v" + o.v + " is newer than this build (v" + V + ")");
+    if ((o.v | 0) !== V) {
+      throw new Error("rig format v" + (o.v | 0) + " — this build reads v" + V +
+                      " only (prototype, no back-compat); re-save the rig");
     }
     return o;
   }
@@ -3582,7 +3589,7 @@ const RIG = (() => {
     GINSP.closeAll();
     state.gauges.length = 0;
     (o.gauges || []).slice(0, 4).forEach((g) => {
-      state.gauges.push({ x: +g[0], y: +g[1], hist: [], log: [], id: ++state.gaugeSeq,
+      state.gauges.push( { x: +g[0], z: +g[1], hist: [], log: [], id: ++state.gaugeSeq,
                           colour: CONFIG.gaugeColours[state.gauges.length % 4] });
     });
     state.rakes.length = 0;
@@ -3827,7 +3834,7 @@ function boot() {
   }
 
   // A rig that is redrawn is a different domain, so the classification's
-  // running estimates must not survive the redraw — a stale domain-wide y_n
+  // running estimates must not survive the redraw — a stale domain-wide d_n
   // is what made a drowned gate on a 1-in-4 bed read "M1". Every path that
   // re-rasterises the walls goes through one of these; a resolution change or
   // a scene load builds a fresh grid and starts clean anyway.
@@ -4016,8 +4023,8 @@ window.APP = {
   clearGaugeHistory,
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
   frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
-  probe: (x, y) => SIM.probe(x, y),
-  boxForce: (x0, y0, x1, y1) => SIM.boxForce(x0, y0, x1, y1),   // one raw integral
+  probe: (x, z) => SIM.probe(x, z),
+  boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   placeCV,                                 // the Force box tool, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {

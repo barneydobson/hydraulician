@@ -11,7 +11,7 @@
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs()  = the C key      SIM.undoSeg() = the Z key
  *   toggleValve()    = the V key      SIM.resetWater() = the R key
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   OVERLAY.analyse(sim, SIM.columns(true)).V[i]  = the "V" line the hover
  *                                                   readout prints
  * NOTE: gauge history is filled by tickFrame, i.e. by APP.frames(n) — NOT by
@@ -48,7 +48,7 @@ window.UN1 = {
   gauges: function () {
     APP.state.gauges.length = 0;
     [UN1.XG, UN1.XV].forEach(function (x, k) {
-      APP.state.gauges.push({ x: x, y: UN1.YC, hist: [],
+      APP.state.gauges.push({ x: x, z: UN1.YC, hist: [],
         colour: ["#7fd4ff", "#ffb648", "#5fd08a", "#ff8fa3"][k] });
     });
   },
@@ -78,10 +78,10 @@ window.UN1 = {
     APP.SIM.step(Math.ceil(12 / APP.SIM.dt()));        // 12 s spin-up, flat out
     UN1.gauges();
     UN1.run(1.6);                                      // steady baseline
-    var v0 = UN1.v0(), H0 = APP.state.gauges[0].hist.slice(-1)[0].head;
+    var v0 = UN1.v0(), H0 = APP.state.gauges[0].hist.slice(-1)[0].h;
     toggleValve();                                     // V — SLAM
     UN1.run(0.75);                                     // land on the 1st plateau
-    var H1 = APP.state.gauges[0].hist.slice(-1)[0].head;
+    var H1 = APP.state.gauges[0].hist.slice(-1)[0].h;
     UN1.run(5.5);                                      // let the square wave run
     APP.state.paused = true; APP.frames(2);
     return { gap: g, c: APP.sim.p.c, v0: v0, dH: +(H1 - H0).toFixed(2),

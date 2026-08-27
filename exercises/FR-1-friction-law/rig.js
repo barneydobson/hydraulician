@@ -10,19 +10,19 @@
  *
  * A horizontal pressurised pipe fed by a reservoir:
  *
- *   y=5.0 ┌─────┬────────────────────────────────────────────┐
+ *   z=5.0 ┌─────┬────────────────────────────────────────────┐
  *         │ res │            air                             │
  *         │ ~L~ ├════════════════════════════════════════════╡ soffit 2.40–2.70
  *         │     │  BORE  0.40 m  (18 cells at Medium)        │ ← tailwater 2.50
  *         │     ├════════════════════════════════════════════╡ invert top 2.00
- *   y=0.0 └─────┴────────────────────────────────────────────┘ solid to the floor
+ *   z=0.0 └─────┴────────────────────────────────────────────┘ solid to the floor
  *         0    1.5                                          9.0
  *
  * Every call below is a documented app entry point — nothing here is private:
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   SIM.clearSegs() = the C key       SIM.undoSeg() = the Z key
  *   CONTROLS.find(c => c.id === "…").set(v); syncPanel()   = moving a slider
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   OVERLAY.analyse(sim, SIM.columns(true)).V[i]  = the "V" the readout prints
  *
  * MEASURED FACTS THE DEPENDENT DEMOS INHERIT  (Medium, 414 × 230, Δx 21.7 mm)
@@ -68,7 +68,7 @@ window.RIGA = {
     // because rasterise() replays scene walls, then user segs in order.
     APP.SIM.addSeg(0.60, 2.50, 7.20, 2.50, 1.10, 0);
     APP.SIM.addSeg(0.60, 3.20, 7.20, 3.20, 1.10, 0);
-    // invert: centreline y = 1.0, thickness 2.0 → spans 0 … 2.0. Solid all the
+    // invert: centreline z = 1.0, thickness 2.0 → spans 0 … 2.0. Solid all the
     // way to the domain floor: a thin slab leaves a void that the reservoir
     // fills through its own open bottom and the pipe gets a parallel path.
     APP.SIM.addSeg(R.X0, R.INV / 2, R.X1, R.INV / 2, R.INV, 255);
@@ -94,8 +94,8 @@ window.RIGA = {
   /** Two gauges on the pipe axis. Same push the Gauge tool does. */
   gauges: function (xA, xB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: RIGA.AXIS, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: RIGA.AXIS, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: RIGA.AXIS, hist: [], colour: "#ffb648" });
     RIGA.XA = xA; RIGA.XB = xB; RIGA.L = +(xB - xA).toFixed(3);
   },
 
@@ -151,7 +151,7 @@ window.FR1 = {
       APP.frames(1, 1 / 60); n++;
       if (n % 10 === 0) {
         var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true)), v = 0, m = 0;
-        for (var i = iA; i <= iB; i++) { v += A.V[i]; m++; if (A.h[i] < hmin) hmin = A.h[i]; }
+        for (var i = iA; i <= iB; i++) { v += A.V[i]; m++; if (A.d[i] < hmin) hmin = A.d[i]; }
         Vs.push(v / m);
       }
     }
@@ -159,8 +159,8 @@ window.FR1 = {
     var mean = function (a) { return a.reduce(function (p, q) { return p + q; }, 0) / a.length; };
     var sd = function (a) { var m = mean(a);
       return Math.sqrt(mean(a.map(function (x) { return (x - m) * (x - m); }))); };
-    var hA = g[0].hist.map(function (r) { return r.head; }),
-        hB = g[1].hist.map(function (r) { return r.head; });
+    var hA = g[0].hist.map(function (r) { return r.h; }),
+        hB = g[1].hist.map(function (r) { return r.h; });
     return { t: +S.t.toFixed(2), level: S.p.inflow.level,
              H1: +mean(hA).toFixed(4), H2: +mean(hB).toFixed(4),
              sd1: +sd(hA).toFixed(4), sd2: +sd(hB).toFixed(4),

@@ -1,4 +1,4 @@
-student,digit,a_cells,a_m,q,level_m,y0_m,y1_m,Fr1,Cd,FR_N_per_m,naive_N_per_m,diff_pct,source
+student,digit,a_cells,a_m,q,level_m,d0_m,d1_m,Fr1,Cd,FR_N_per_m,naive_N_per_m,diff_pct,source
 S01,0,5,0.1087,0.33,1.7603,1.2590,0.1100,3.043,0.6108,6812.0,6490.2,5.0,runner-headless
 S02,1,5,0.1087,0.33,1.7603,1.2590,0.1100,3.043,0.6108,6812.0,6490.2,5.0,runner-headless
 S03,2,6,0.1304,0.33,1.4160,0.9205,0.1224,2.479,0.5955,3311.2,3062.0,8.1,runner-headless

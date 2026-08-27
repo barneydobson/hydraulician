@@ -39,10 +39,10 @@ metres:
 
 1. Erase the shipped nozzle plate at x = 56.5 m — Erase (`2`), but press `]`
    four times first, because the default brush is narrower than the plate.
-   Stroke it away from y = 2.05 up to y = 4.95.
+   Stroke it away from z = 2.05 up to z = 4.95.
 2. Draw your own gap in two pieces at the same station — Wall (`1`), Shift
-   held to snap vertical: pipe floor (y = 2.0) up to y = 3.5 − gap/2, and
-   y = 3.5 + gap/2 up to the pipe roof (y = 5.0). Measure (toolbar) checks it.
+   held to snap vertical: pipe floor (z = 2.0) up to z = 3.5 − gap/2, and
+   z = 3.5 + gap/2 up to the pipe roof (z = 5.0). Measure (toolbar) checks it.
 3. Press `R` and let it reach steady state — about **15 s**; the card counts
    it down. Drop a Rake (`6`) mid-pipe: its chip prints **V**, the bore-mean
    velocity — that is your **v₀**. Drop a Gauge (`5`) at x = 30 m on the pipe

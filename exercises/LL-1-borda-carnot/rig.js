@@ -11,13 +11,13 @@
  * RIG-A's invert (full length, solid to the floor) and reservoir wall are
  * unchanged. The soffit is split into two strokes that meet at the step:
  *
- *   y=5.0 ┌─────┬──────────────────┬─────────────────────────────────┐
+ *   z=5.0 ┌─────┬──────────────────┬─────────────────────────────────┐
  *         │ res │       air        │              air                 │
  *         │     ├══════════════════╡soffit 2.40-2.70                  │
  *         │     │ BORE 0.40 m      ├───────────────────────────────────┤ soffit 2.80-3.10
  *         │     │ (18 cells)       │   BORE  0.80 m  (37 cells)        │ <- tailwater 2.95
  *         │     ├══════════════════╪═══════════════════════════════════╡ invert top 2.00
- *   y=0.0 └─────┴──────────────────┴───────────────────────────────────┘ solid to floor
+ *   z=0.0 └─────┴──────────────────┴───────────────────────────────────┘ solid to floor
  *         0    1.5               3.80                                 9.0
  *                                  ^ the step (STEP, not mid-length: see README §5.2)
  *
@@ -30,11 +30,11 @@
  *   · the tailwater band shifts with the new soffit: it must land in
  *     (2.80, 3.10), not FR-1's (2.40, 2.69). Check SIM.bands().twB after any
  *     geometry edit -- it must read [2, 2.804].
- *   · a downstream pressure gauge near bore-mid (y = 2.40, matching FR-1's
+ *   · a downstream pressure gauge near bore-mid (z = 2.40, matching FR-1's
  *     convention for a UNIFORM pipe) reads the still-mixing jet core: the
  *     cross-section is not hydrostatic even 9-11 step-heights past the step
  *     (measured +/-0.28 m swing with height at x = 7.6-8.2). Gauge 2 is
- *     placed near the INVERT (y = 2.10) instead, where the near-wall reading
+ *     placed near the INVERT (z = 2.10) instead, where the near-wall reading
  *     is close to plateaued. See README section 5.3 -- load-bearing.
  *   · h_L = (V1^2-V2^2)/2g - (H2-H1) is a difference of two O(0.1 m) terms:
  *     noisier than FR-1's single h_f. Read >= 20 s, not ~12 s.
@@ -104,8 +104,8 @@ window.LL1 = {
   /** Two gauges -- same push the Gauge tool does. Second one LOW in the pipe. */
   gauges: function (xA, yA, xB, yB) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: xA, y: yA, hist: [], colour: "#7fd4ff" });
-    APP.state.gauges.push({ x: xB, y: yB, hist: [], colour: "#ffb648" });
+    APP.state.gauges.push({ x: xA, z: yA, hist: [], colour: "#7fd4ff" });
+    APP.state.gauges.push({ x: xB, z: yB, hist: [], colour: "#ffb648" });
     LL1.XA = xA; LL1.YA = yA; LL1.XB = xB; LL1.YB = yB;
   },
 
@@ -157,12 +157,12 @@ window.LL1 = {
       APP.frames(1, 1 / 60); n++;
       if (n % 6 === 0) {
         var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
-        Vs1.push(A.V[iUp]); Vs2.push(A.V[iDn]); hsDn.push(A.h[iDn]);
+        Vs1.push(A.V[iUp]); Vs2.push(A.V[iDn]); hsDn.push(A.d[iDn]);
       }
     }
     APP.state.paused = true; APP.frames(2);
     var med = function (a) { var b = a.slice().sort(function (p, q) { return p - q; }); return b[b.length >> 1]; };
-    var hA = g[0].hist.map(function (r) { return r.head; }), hB = g[1].hist.map(function (r) { return r.head; });
+    var hA = g[0].hist.map(function (r) { return r.h; }), hB = g[1].hist.map(function (r) { return r.h; });
     var V1 = med(Vs1), V2 = med(Vs2), H1 = med(hA), H2 = med(hB);
     var idealRecovery = (V1 * V1 - V2 * V2) / (2 * 9.81);
     var measuredRecovery = H2 - H1;

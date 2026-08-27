@@ -13,12 +13,12 @@
  *
  *  λ = 1        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~┌─────────────┐        crest 1.196
  *          pool  ↑H       ●gauge             │  broad crest│ ←brink
- *   y=0.50 ├─────────────────────────────────┴─────────────┤ bed top (PEDESTAL)
- *   y=0.00 └─────────────────────────────────────────────────────────┘ floor
+ *   z=0.50 ├─────────────────────────────────┴─────────────┤ bed top (PEDESTAL)
+ *   z=0.00 └─────────────────────────────────────────────────────────┘ floor
  *          0        x_g=2.174           x_b=4.783      x_e=6.522     9.0
  *
  *  λ = ¼   ~~~~~~~┌──┐                            (the SAME weir, quarter size)
- *   y=0.50 ├──────┴──┤ ................................ nothing past the brink
+ *   z=0.50 ├──────┴──┤ ................................ nothing past the brink
  *
  * WHAT SCALES (the model) — P, crest length, approach length, weir station,
  *   gauge station, and q by λ^1.5.  Every base dimension is a multiple of
@@ -31,7 +31,7 @@
  *      gauge station  100         50        25
  *
  * WHAT DOES NOT SCALE (and is therefore where the scale effects live) —
- *   · the BED PEDESTAL (top face y = 0.50 m, 23 cells): the height of the
+ *   · the BED PEDESTAL (top face z = 0.50 m, 23 cells): the height of the
  *     flume floor above the domain floor is not part of the modelled weir,
  *     it is what the model stands on (DA-2's "why the plate does not scale").
  *     Keeping it fixed also keeps WE-1's 10-second bed self-check valid on
@@ -44,7 +44,7 @@
  * Every call below is a documented app entry point — nothing here is private:
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
  *   CONTROLS.find(c => c.id === "…").set(v); syncPanel()   = moving a slider
- *   state.gauges.push({x,y,hist:[],colour})   = a click with the Gauge tool
+ *   state.gauges.push({x,z,hist:[],colour})   = a click with the Gauge tool
  *   SIM.columns(true) → Float32Array, 4 per column: bed, depth, q, surface
  * ==========================================================================*/
 window.DA1 = {
@@ -148,10 +148,10 @@ window.DA1 = {
   },
 
   /** One gauge in the approach pool — the same push the Gauge tool does. */
-  gauge: function (x, y) {
+  gauge: function (x, z) {
     APP.state.gauges.length = 0;
-    APP.state.gauges.push({ x: x, y: y, hist: [], colour: "#7fd4ff" });
-    APP.state.gaugeField = "depth";        // the card then prints "d 0.734 m"
+    APP.state.gauges.push({ x: x, z: z, hist: [], colour: "#7fd4ff" });
+    APP.state.gaugeField = "d";        // the card then prints "d 0.734 m"
     DA1.XG = x;
   },
 
@@ -199,7 +199,7 @@ window.DA1 = {
       APP.frames(1, 1 / 60); n++;
     }
     APP.state.paused = true; APP.frames(2);
-    var a = gg.hist.map(function (r) { return r.depth; }).sort(function (p, q) { return p - q; });
+    var a = gg.hist.map(function (r) { return r.d; }).sort(function (p, q) { return p - q; });
     var med = a[a.length >> 1];
     return { t: +S.t.toFixed(2), n: a.length,
              h: +med.toFixed(4), hMin: +a[0].toFixed(4), hMax: +a[a.length - 1].toFixed(4),

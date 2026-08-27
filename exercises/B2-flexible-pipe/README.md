@@ -25,7 +25,7 @@ near the physical ceiling, an MDPE plastic main an order of magnitude
 softer. Same water, same closure, stiffer pipe, bigger surge — and the ratio
 of the two ΔH is the ratio of the two celerities, whatever your own v₀ is.
 
-The gauge station is **x = 30 m, y = 3.5 m** — mid-pipe, the same for both
+The gauge station is **x = 30 m, z = 3.5 m** — mid-pipe, the same for both
 legs and 25 m from the valve.
 
 ## Your nozzle gap
@@ -42,9 +42,9 @@ runs 70, then 140. Look up **d mod 6**:
 
 1. Redraw the nozzle plate at **your gap** — Erase (`2`) the shipped plate,
    then Wall (`1`) two Shift-dragged pieces at the same station leaving
-   your gap centred on the pipe axis at y = 3.5 m (Measure, `8`, sets the
+   your gap centred on the pipe axis at z = 3.5 m (Measure, `8`, sets the
    width).
-2. Drop a Gauge (`5`) at **x = 30 m, y = 3.5 m**, press `R` and let it
+2. Drop a Gauge (`5`) at **x = 30 m, z = 3.5 m**, press `R` and let it
    reach steady state — about **13 s**; the card counts it down.
 3. Note the steady **V** on the hover readout in the pipe (your **v₀**) and
    the steady gauge value (**H₀**); press `V` to slam, pause (space) on the

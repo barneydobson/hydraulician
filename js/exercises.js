@@ -47,7 +47,7 @@
  *                  `table` where the measured rule is not linear, `mod: N` for
  *                  "d mod N" rules, `also: [...]` for the coupled values the
  *                  worksheet makes them derive, `rule` for the sentence that
- *                  says WHY (HJ-1's 1.3·y_c). The card prints the RULE and the
+ *                  says WHY (HJ-1's 1.3·d_c). The card prints the RULE and the
  *                  panel row it goes on — "q (m²/s): q = 0.42 + 0.03·d" — and
  *                  the student does the arithmetic; d is their student
  *                  number's last digit and the lecturer owns explaining it.
@@ -95,7 +95,7 @@
  *
  * Standing rules every worksheet carries: Resolution Medium · wait out the
  * settle · median-of-the-wobble reads, never one frame · after changing q,
- * re-check any tailwater ≥ 1.3·y_c · keep the tab visible.
+ * re-check any tailwater ≥ 1.3·d_c · keep the tab visible.
  */
 const EXERCISES = [
 
@@ -112,7 +112,7 @@ const EXERCISES = [
     digit: { label: "q", control: "inQ", base: 0.80, step: 0.04, unit: "m²/s",
              rule: "q = 0.80 + 0.04·d" },
     start: "a steep chute running uniform flow, with your own inflow to set",
-    task: "Set your q, then hover mid-chute at x ≈ 3.5 m and read the MEASURED y_n off the hover box.",
+    task: "Set your q, then hover mid-chute at x ≈ 3.5 m and read the MEASURED d_n off the hover box.",
     settle: 26,
   },
   {
@@ -155,14 +155,14 @@ const EXERCISES = [
     digit: { label: "q", control: "inQ", base: 0.42, step: 0.03, unit: "m²/s",
              rule: "q = 0.42 + 0.03·d",
              also: [{ label: "tailwater", control: "twLevel", unit: "m",
-                      // 1.3·y_c everywhere except d = 6 and d = 9, which need
-                      // 1.5·y_c to stop the reading pumping (measured).
-                      rule: "1.3 · y_c (1.5 · y_c at d = 6 and 9) — check it yourself against the y_c the q slider prints",
+                      // 1.3·d_c everywhere except d = 6 and d = 9, which need
+                      // 1.5·d_c to stop the reading pumping (measured).
+                      rule: "1.3 · d_c (1.5 · d_c at d = 6 and 9) — check it yourself against the d_c the q slider prints",
                       table: [0.490, 0.507, 0.522, 0.538, 0.553,
                               0.567, 0.648, 0.596, 0.610, 0.700] }] },
-    secondScene: { scene: "s1", when: "optional coda - switch to s1 (Scenes menu) for the same jump on a 1-in-4 bed, tailwater 0.95 / 1.00 / 1.05 m, and expect y₂ well under Bélanger." },
+    secondScene: { scene: "s1", when: "optional coda - switch to s1 (Scenes menu) for the same jump on a 1-in-4 bed, tailwater 0.95 / 1.00 / 1.05 m, and expect d₂ well under Bélanger." },
     start: "a chute onto a level apron, with a tailwater control",
-    task: "Set your q and its paired tailwater, let the jump settle on the apron, then read Fr₁ and y₂/y₁ off the jump box over ~10 s.",
+    task: "Set your q and its paired tailwater, let the jump settle on the apron, then read Fr₁ and d₂/d₁ off the jump box over ~10 s.",
     settle: 35,
   },
 
@@ -175,7 +175,7 @@ const EXERCISES = [
     scene: "m3",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { channel: true, gaugeField: "head" },
+    viewParams: { channel: true, gaugeField: "h" },
     digitNote: "your window: x₀ = 5.0 + 0.5·(d mod 8) m, from x₀ to x₀ + 7, midpoint x₀ + 3.5",
     instruments: [
       { tool: "gauge", where: "x = x₀ (your own window's upstream end)", why: "head at the top of the reach" },
@@ -235,15 +235,15 @@ const EXERCISES = [
                  twOn: true, twLevel: 1.00, spoutOn: false, waveOn: false },
     rigWhy: { inLevel: "the reach is doubly controlled: the hump has nothing to choke against without both ends held.",
               twLevel: "the other half of that pair." },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "depth" },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
     digit: { label: "q", control: "inQ", unit: "m²/s",
              rule: "q = 0.15 + 0.05·d (d = 0…8; if your last digit is 9 use d = 8)",
              table: [0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.55] },
     instruments: [
-      { tool: "gauge", where: "x = 2.5 m, y = 0.75 m", why: "the upstream depth y₁ the prediction is built on" },
+      { tool: "gauge", where: "x = 2.5 m, z = 0.75 m", why: "the upstream depth d₁ the prediction is built on" },
     ],
     start: "a level reach held at both ends, and a hump to grow at x = 4.5 m",
-    task: "Read y₁ at the gauge and commit a prediction Δz = E₁ − 1.5·y_c. Then grow a 1 m flat-topped hump at x = 4.5 m in ~7 steps, jotting y₁ at each and re-settling, until the crest chokes — the y₁ from the LAST pre-choke step redoes the prediction as Δz_pred*.",
+    task: "Read d₁ at the gauge and commit a prediction Δz = E₁ − 1.5·d_c. Then grow a 1 m flat-topped hump at x = 4.5 m in ~7 steps, jotting d₁ at each and re-settling, until the crest chokes — the d₁ from the LAST pre-choke step redoes the prediction as Δz_pred*.",
     settle: 60,
   },
   {
@@ -255,19 +255,19 @@ const EXERCISES = [
     rig: "FB-2",
     rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
                  inflowOn: true, inFree: false, twOn: false, spoutOn: false, waveOn: false },
-    viewParams: { mode: "3", channel: false, labels: false, jumps: false, gaugeField: "depth" },
+    viewParams: { mode: "3", channel: false, labels: false, jumps: false, gaugeField: "d" },
     digit: { label: "q", control: "inQ", unit: "m²/s",
              rule: "q = 0.15 + 0.05·d (d = 0…8; 9 → use 8)",
              table: [0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.55],
              also: [{ label: "reservoir", control: "inLevel", unit: "m",
-                      rule: "level = 0.935 + 1.65·y_c + 0.03 — the pairing the pool needs at your q",
+                      rule: "level = 0.935 + 1.65·d_c + 0.03 — the pairing the pool needs at your q",
                       table: [1.182, 1.228, 1.271, 1.310, 1.348,
                               1.383, 1.417, 1.450, 1.482, 1.482] }] },
     instruments: [
-      { tool: "gauge", where: "x = 6.85 m, y ≈ 1.13 m", why: "on the broad crest — reads y_crest" },
+      { tool: "gauge", where: "x = 6.85 m, z ≈ 1.13 m", why: "on the broad crest — reads d_crest" },
     ],
     start: "a reservoir feeding a broad crest that spills over a brink",
-    task: "Set your q and its paired level, then read y_c off the q slider, y_crest at the gauge on the crest and y_brink at the last wet column on the lip, and order the three.",
+    task: "Set your q and its paired level, then read d_c off the q slider, d_crest at the gauge on the crest and d_brink at the last wet column on the lip, and order the three.",
     settle: 55,
   },
   {
@@ -279,7 +279,7 @@ const EXERCISES = [
     rig: "WE-1",
     rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
                  inflowOn: true, inFree: false, twOn: false, spoutOn: false, waveOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "depth" },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
     digit: { label: "q", control: "inQ", base: 0.10, step: 0.05, unit: "m²/s",
              rule: "q = 0.10 + 0.05·d",
              also: [{ label: "reservoir", control: "inLevel", unit: "m",
@@ -287,7 +287,7 @@ const EXERCISES = [
                       table: [1.152, 1.195, 1.233, 1.261, 1.304,
                               1.326, 1.362, 1.389, 1.412, 1.434] }] },
     instruments: [
-      { tool: "gauge", where: "x = 4.5 m, y ≈ 0.75 m", why: "the approach pool — H = h − 0.50" },
+      { tool: "gauge", where: "x = 4.5 m, z ≈ 0.75 m", why: "the approach pool — H = h − 0.50" },
       { tool: "cv", where: "Force box (9), optional: drag about (2.0, 0.3) → (6.7, 1.6) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
     ],
     start: "an approach pool behind a sharp-crested weir",
@@ -310,18 +310,18 @@ const EXERCISES = [
                  inflowOn: true, inFree: false, inQ: 0.33,
                  twOn: false, spoutOn: false, waveOn: false },
     rigWhy: { inQ: "the same q for the whole class — your gate opening and its level are the personalisation." },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "depth" },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
     digit: { label: "reservoir", control: "inLevel", unit: "m",
              rule: "the fixed point for q = 0.330 at YOUR gate opening",
              table: [1.7565, 1.7565, 1.4181, 1.4181, 1.4181,
                      1.2103, 1.2103, 1.2103, 1.0791, 1.0791] },
-    digitNote: "your gate opening is DRAWN: a = 5 + round(3d/9) cells, gate bottom y = 0.609 / 0.630 / 0.652 / 0.674 m",
+    digitNote: "your gate opening is DRAWN: a = 5 + round(3d/9) cells, gate bottom z = 0.609 / 0.630 / 0.652 / 0.674 m",
     instruments: [
-      { tool: "gauge", where: "x = 3.5 m, y ≈ 0.65 m", why: "the upstream pool — reads y₀" },
+      { tool: "gauge", where: "x = 3.5 m, z ≈ 0.65 m", why: "the upstream pool — reads d₀" },
       { tool: "cv", where: "Force box (9): drag (3.50, 0.30) → (5.63, 3.20) — gauge station to vena station, bottom face inside the bed", why: "measures the thrust F_R predicts, on the same control volume and without its two assumptions" },
     ],
     start: "a pool behind a drawn sluice gate — its opening is yours to adjust",
-    task: "Redraw the gate opening to your own row, set your reservoir level, then read y₀ at the gauge and y₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, and measure that thrust with the Force box on the same control volume.",
+    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, and measure that thrust with the Force box on the same control volume.",
     settle: 70,
   },
   {
@@ -335,7 +335,7 @@ const EXERCISES = [
     // same one — so the spout is part of the common starting point.
     rigParams: { budget: "Medium", openL: "0", openR: "0", openB: "1", openT: "0",
                  spoutOn: true, spoutR: 0.09, spoutVx: 4.5, spoutVy: 0 },
-    viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "head" },
+    viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "h" },
     digitNote: "no personalised parameter: everyone reads the same rig",
     instruments: [
       { tool: "cv", where: "Force box (9): drag (0.85, 1.55) → (2.05, 3.20) — it encloses all four shapes and clears the spout", why: "F→ is the force each turn actually delivers, to set against ρqv(1−cosθ)" },
@@ -366,8 +366,8 @@ const EXERCISES = [
     digit: { label: "reservoir level", control: "inLevel", base: 3.30, step: 0.13, unit: "m",
              rule: "level = 3.30 + 0.13·d" },
     instruments: [
-      { tool: "gauge", where: "x = 4.0 m, y = 2.20 m", why: "H₁, mid-height in the bore and clear of the entry region" },
-      { tool: "gauge", where: "x = 8.5 m, y = 2.20 m", why: "H₂ — L = 4.5 m, not 6 (README §5)" },
+      { tool: "gauge", where: "x = 4.0 m, z = 2.20 m", why: "H₁, mid-height in the bore and clear of the entry region" },
+      { tool: "gauge", where: "x = 8.5 m, z = 2.20 m", why: "H₂ — L = 4.5 m, not 6 (README §5)" },
     ],
     start: "a pressurised duct fed from a reservoir",
     task: "Raise the reservoir to your own level, place the two gauges for h_f = H₁ − H₂ and hover mid-pipe for the bore-mean V.",
@@ -389,8 +389,8 @@ const EXERCISES = [
     digit: { label: "reservoir level", control: "inLevel", base: 3.45, step: 0.035, unit: "m",
              rule: "level = 3.45 + 0.035·d" },
     instruments: [
-      { tool: "gauge", where: "x = 3.4 m, y = 2.20 m", why: "H₁, in the 0.40 m bore upstream of the step" },
-      { tool: "gauge", where: "x = 7.6 m, y = 2.10 m", why: "H₂ — LOW in the wide pipe; a centreline tap sign-flips the recovery" },
+      { tool: "gauge", where: "x = 3.4 m, z = 2.20 m", why: "H₁, in the 0.40 m bore upstream of the step" },
+      { tool: "gauge", where: "x = 7.6 m, z = 2.10 m", why: "H₂ — LOW in the wide pipe; a centreline tap sign-flips the recovery" },
     ],
     start: "a pressurised duct that steps 0.40 to 0.80 m at x = 3.80 m",
     task: "Set your reservoir level, hover either side of the step for V₁ and V₂ and read H₁ and H₂ off the gauges, then compare h_L with Borda–Carnot's (V₁−V₂)²/2g.",
@@ -413,7 +413,7 @@ const EXERCISES = [
     viewParams: { mode: "1", channel: false, labels: false, jumps: false },
     digitNote: "personalised by partner A's hidden stroke, not a digit: 2–3 cells tall, somewhere between x = 4.6 and 7.0 m",
     instruments: [
-      { tool: "gauge", where: "four gauges walked along the covered run, EVERY one at y = 2.35", why: "near the soffit — the HGL kink is what you are hunting" },
+      { tool: "gauge", where: "four gauges walked along the covered run, EVERY one at z = 2.35", why: "near the soffit — the HGL kink is what you are hunting" },
     ],
     start: "a covered pressurised pipe, the same head for every pair",
     task: "In pairs: A draws a hidden 2–3 cell obstruction in the covered run, B walks four gauges along it in three 20 s rounds to bracket the HGL kink and size k_L.",
@@ -442,8 +442,8 @@ const EXERCISES = [
             "Move the spout to (2.0, 0.60) and set its velocity to 2.2 m/s; leave it ~55 s until the tank spills. This shared step is not optional.",
             "Now set your own spout velocity and let it re-settle."],
     instruments: [
-      { tool: "gauge", where: "x = 3.0 m, y = 0.60 m", why: "the flange, 1.0 m downstream of the pump" },
-      { tool: "gauge", where: "x = 0.9 m, y = 1.0 m", why: "the sump's open water — H is gauge 1 minus gauge 2" },
+      { tool: "gauge", where: "x = 3.0 m, z = 0.60 m", why: "the flange, 1.0 m downstream of the pump" },
+      { tool: "gauge", where: "x = 0.9 m, z = 1.0 m", why: "the sump's open water — H is gauge 1 minus gauge 2" },
     ],
     start: "a sump, a drawn rising main and a delivery tank, spout off",
     task: "Prime the rising main as below, then set your own spout velocity and read Q by hovering the low-run bore and H as gauge 1 minus gauge 2.",
@@ -465,8 +465,8 @@ const EXERCISES = [
     digit: { label: "reservoir level", control: "inLevel", base: 3.30, step: 0.13, mod: 6, unit: "m",
              rule: "level = 3.30 + 0.13·(d mod 6)" },
     instruments: [
-      { tool: "gauge", where: "x = 3.7 m, y = 2.20 m", why: "upstream of the hump station" },
-      { tool: "gauge", where: "x = 8.0 m, y = 2.20 m", why: "downstream — interpolate the HGL at the crest between the two" },
+      { tool: "gauge", where: "x = 3.7 m, z = 2.20 m", why: "upstream of the hump station" },
+      { tool: "gauge", where: "x = 8.0 m, z = 2.20 m", why: "downstream — interpolate the HGL at the crest between the two" },
     ],
     start: "a flat pressurised duct with a crest you can lift mid-length",
     task: "Set your reservoir level, interpolate the HGL at the hump station from the two gauges, then walk the crest soffit up until the crown head drops below 0.02 m - that height is z_sep.",
@@ -485,7 +485,7 @@ const EXERCISES = [
     viewParams: { mode: "2" },
     digitNote: "your nozzle gap is DRAWN: gap = 0.42 / 0.70 / 0.84 / 0.97 / 1.10 m by d mod 5",
     start: "a 49 m penstock from a high reservoir, throttled at x = 8 m, with a 0.84 m nozzle at x = 56.5 m",
-    task: "Erase the nozzle plate at x = 56.5 m and redraw it at YOUR gap (two pieces about y = 3.5, ruler on), press R and wait out the 50 s, then hover mid-pipe for q and read the jet core speed in the Speed view at x ≈ 57 m.",
+    task: "Erase the nozzle plate at x = 56.5 m and redraw it at YOUR gap (two pieces about z = 3.5, ruler on), press R and wait out the 50 s, then hover mid-pipe for q and read the jet core speed in the Speed view at x ≈ 57 m.",
     note: "The green bar at x = 55 m is the scene's valve — it belongs to the water-hammer demos, not to this rig. Leave it open; if the pipe suddenly stops flowing you have pressed V and slammed it (press V again).",
     settle: 50,
   },
@@ -498,7 +498,7 @@ const EXERCISES = [
     rig: "HP-2",
     rigParams: { budget: "Medium", openL: "0", openR: "0", openB: "1", openT: "0",
                  spoutOn: true, spoutR: 0.09, spoutVx: 4.5, spoutVy: 0 },
-    viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "head" },
+    viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "h" },
     digitNote: "lecturer demo: no personalised parameter",
     instruments: [
       { tool: "cv", where: "Force box (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
@@ -518,10 +518,10 @@ const EXERCISES = [
     scene: "hammer",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { speed: 0.2, gaugeField: "head" },
-    digitNote: "your nozzle gap is DRAWN: gap = 0.14 × (1 + (d mod 6)) m, in two pieces about y = 3.5",
+    viewParams: { speed: 0.2, gaugeField: "h" },
+    digitNote: "your nozzle gap is DRAWN: gap = 0.14 × (1 + (d mod 6)) m, in two pieces about z = 3.5",
     instruments: [
-      { tool: "gauge", where: "x = 30 m, y = 3.5 m — expand its card (⤢) to read the trace", why: "mid-pipe, on the axis — reads H₀ then the plateau H₁" },
+      { tool: "gauge", where: "x = 30 m, z = 3.5 m — expand its card (⤢) to read the trace", why: "mid-pipe, on the axis — reads H₀ then the plateau H₁" },
       { tool: "rake", where: "mid-pipe, x ≈ 30 m", why: "the rake chip's V is the bore-mean — that is v₀" },
     ],
     start: "a 60 m pipe from a reservoir to a valve, running steadily",
@@ -540,7 +540,7 @@ const EXERCISES = [
     digit: { label: "reservoir level", control: "inLevel", base: 3.4, step: 0.1, unit: "m",
              rule: "level = 3.4 + 0.1·d" },
     instruments: [
-      { tool: "gauge", where: "mid-pipe, x = 14 m, y = 2.4 m — expand its card (⤢) to read the trace", why: "the speed trace u_max and t_75 are read on" },
+      { tool: "gauge", where: "mid-pipe, x = 14 m, z = 2.4 m — expand its card (⤢) to read the trace", why: "the speed trace u_max and t_75 are read on" },
     ],
     start: "a reservoir feeding a 23 m pipe, full and still behind a shut valve",
     task: "Set your level, press R, let it settle; open the valve (V) and read the settled band as u_max and the first crossing of 0.75·u_max as t_75, timed from where the trace leaves zero. Read the reservoir level off its marker while the pipe flows.",
@@ -548,7 +548,7 @@ const EXERCISES = [
   },
   {
     id: "UN-3",
-    title: "Surge tank: measure y_max against the ODE",
+    title: "Surge tank: measure z_max against the ODE",
     topic: "Water hammer",
     folder: "UN-3-surge-tank",
     scene: "hammer",
@@ -559,13 +559,13 @@ const EXERCISES = [
     rigWhy: { inLevel: "the scene default of 25 m fails containment: 31.7 m of head at b_s ≈ 1 m.",
               bulk: "the shipped value: 0.30 throttles the nozzle by 33% and corrupts the decay.",
               view: "Depth, because the Head channel's ±6 m Joukowsky wave buries the 3 m mass oscillation." },
-    viewParams: { gaugeField: "depth", speed: 2 },
+    viewParams: { gaugeField: "d", speed: 2 },
     digitNote: "your standpipe width is DRAWN: b_s = 0.70 + 0.14·d m, and it is the DELIVERED width you record",
     instruments: [
-      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, y ≈ 6 m", why: "the mass oscillation — y_max is its first crest minus h₀" },
+      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — z_max is its first crest minus h₀" },
     ],
     start: "the penstock with nozzle, tee and standpipe already built — the shaft width is yours",
-    task: "Redraw the standpipe shaft to your own width and gauge it, then slam the valve and read y_max (first crest minus h₀) and the crest-to-crest period T off the Depth trace.",
+    task: "Redraw the standpipe shaft to your own width and gauge it, then slam the valve and read z_max (first crest minus h₀) and the crest-to-crest period T off the Depth trace.",
     settle: 60,
   },
   {
@@ -576,10 +576,10 @@ const EXERCISES = [
     scene: "hammer",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { gaugeField: "head", speed: 0.3 },
+    viewParams: { gaugeField: "h", speed: 0.3 },
     digitNote: "your valve station is DRAWN: x_d = 12 + 4·d m, so L = x_d − 6 and your gauge goes at x_d − 3",
     instruments: [
-      { tool: "gauge", where: "x = x_d − 3 (three metres upstream of YOUR OWN valve), y ≈ 3.5 m", why: "read near the reservoir instead and the sponge smears the trace" },
+      { tool: "gauge", where: "x = x_d − 3 (three metres upstream of YOUR OWN valve), z ≈ 3.5 m", why: "read near the reservoir instead and the sponge smears the trace" },
     ],
     start: "the 60 m pipe — you add a valve at your own station and leave the shipped one alone",
     task: "Draw your own valve, check it seals, gauge 3 m upstream of it, then slam it and pause on four consecutive peaks: T is the median of the three gaps.",
@@ -593,13 +593,13 @@ const EXERCISES = [
     scene: "hammer",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { speed: 0.2, gaugeField: "head" },
+    viewParams: { speed: 0.2, gaugeField: "h" },
     studentParams: [
       { control: "cel", unit: "m/s", rule: "leg 1 at the scene's own c = 70, then set c = 140 for leg 2 — the celerity is the experiment, not a personalisation" },
     ],
     digitNote: "your nozzle gap is DRAWN: gap = 0.14 × (1 + (d mod 6)) m, exactly as UN-1. The celerity is not personalised",
     instruments: [
-      { tool: "gauge", where: "x = 30 m, y = 3.5 m", why: "mid-pipe — the same station for both legs" },
+      { tool: "gauge", where: "x = 30 m, z = 3.5 m", why: "mid-pipe — the same station for both legs" },
     ],
     secondScene: { scene: null, when: "the second leg is the same scene, not another one - scale the post-slam wait and the read window by 70/c." },
     start: "the 60 m pipe at the shipped celerity c = 70 m/s",
@@ -630,10 +630,10 @@ const EXERCISES = [
     scene: "jet",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { speed: 0.15, gaugeField: "head" },
+    viewParams: { speed: 0.15, gaugeField: "h" },
     digitNote: "your start level by digit: 1.98, 2.09, 2.20, 2.31, 2.62, 2.73, 2.84, 2.95, 3.04, 3.11 m. Stop at 1.80 m; depth h = level − 1.36 m",
     instruments: [
-      { tool: "gauge", where: "x = 1.0 m, y = 1.0 m", why: "low enough to stay submerged all the way down to η₂; on Head it reads the surface elevation directly" },
+      { tool: "gauge", where: "x = 1.0 m, z = 1.0 m", why: "low enough to stay submerged all the way down to η₂; on Head it reads the surface elevation directly" },
     ],
     start: "a tall tank draining through an orifice, in slow motion",
     task: "Predict the drain time on paper first, from t = (2A/(C_d·a·√2g))(√h₁ − √h₂) with A = 1.90 m, a = 0.12 m, C_d = 0.61 × 0.97. Then gauge low in the tank, switch the spout off and time the real fall on the status-bar clock.",
@@ -653,15 +653,15 @@ const EXERCISES = [
                  inflowOn: true, inQ: 0, inLevel: 2.00 },
     rigWhy: { cs: "at the stock 0.16 the tanks equalise in 2–6 s and there is nothing to time.",
               inLevel: "the fill source for step 2; step 3 unticks it again." },
-    viewParams: { gaugeField: "head", mode: "0" },
+    viewParams: { gaugeField: "h", mode: "0" },
     digitNote: "your tank 2 width is DRAWN: A₂ = 0.50 + 0.25·d m, so its far wall goes at x = 3.60 + A₂. Your target level h* = (3.96 + 1.25·A₂)/(1.978 + A₂)",
     setup: ["Move tank 2's far wall to x = 3.60 + your own A₂ (erase the shipped one first).",
             "With the valve OPEN, fill tank 1 to 2.00 m from the reservoir; shut it (V) as tank 2 reaches 0.50 m.",
             "Untick Upstream reservoir AND set the Left edge back to Wall, or it leaks through the run.",
             "Let it stand, read both cards while the water is still, then press V and time the fall."],
     instruments: [
-      { tool: "gauge", where: "x ≈ 0.9 m, y ≈ 0.30 m", why: "tank 1 — the fall you time" },
-      { tool: "gauge", where: "x ≈ 4.6 m, y ≈ 0.30 m", why: "tank 2 — the level it is finding" },
+      { tool: "gauge", where: "x ≈ 0.9 m, z ≈ 0.30 m", why: "tank 1 — the fall you time" },
+      { tool: "gauge", where: "x ≈ 4.6 m, z ≈ 0.30 m", why: "tank 2 — the level it is finding" },
     ],
     start: "twin tanks joined by a valved pipe, both empty",
     task: "Follow the steps to fill and isolate, then press V and time tank 1 falling from 2.00 m to your own h*.",
@@ -684,8 +684,8 @@ const EXERCISES = [
     digit: { label: "reservoir level", control: "inLevel", base: 1.70, step: 0.06, unit: "m",
              rule: "level = 1.70 + 0.06·d" },
     instruments: [
-      { tool: "gauge", where: "x = 2.4 m, y = 0.85 m", why: "the barrel" },
-      { tool: "gauge", where: "x = 5.0 m, y = 0.85 m", why: "the throat — SAME height, or Δh is not a pressure difference" },
+      { tool: "gauge", where: "x = 2.4 m, z = 0.85 m", why: "the barrel" },
+      { tool: "gauge", where: "x = 5.0 m, z = 0.85 m", why: "the throat — SAME height, or Δh is not a pressure difference" },
     ],
     start: "a venturi duct running full from a reservoir",
     task: "Set your reservoir level, put both gauges at the SAME height - barrel and throat - for the pressure difference, and hover the barrel for q.",
@@ -717,7 +717,7 @@ const EXERCISES = [
     // Turning them on is step 2 of the student's own sequence.
     rigParams: { budget: "Medium", spoutOn: false, cs: 0.40,
                  openL: "1", openR: "1", openB: "0", openT: "0", inQ: 0 },
-    viewParams: { gaugeField: "head", mode: "0" },
+    viewParams: { gaugeField: "h", mode: "0" },
     studentParams: [
       { control: "inflowOn", value: true, rule: "step 2 — reservoir A" },
       { control: "inLevel", value: 3.20, unit: "m", rule: "A's head, the same for everyone" },
@@ -730,10 +730,10 @@ const EXERCISES = [
             "Right-drag to pour tank B up to your own level, then wait 10 s and read what it settles to.",
             "Press V — all three branches release together — and read the junction gauge 3 s later."],
     instruments: [
-      { tool: "gauge", where: "x ≈ 0.75 m, y ≈ 0.20 m", why: "reservoir A" },
-      { tool: "gauge", where: "x ≈ 2.78 m, just ABOVE y = 1.0", why: "tank B — lower than that is inside the shut valve's solid and reads a false dry" },
-      { tool: "gauge", where: "x ≈ 5.05 m, y ≈ 0.20 m", why: "reservoir C" },
-      { tool: "gauge", where: "x ≈ 2.78 m, y ≈ 0.50 m", why: "the junction head, 3 s after the release" },
+      { tool: "gauge", where: "x ≈ 0.75 m, z ≈ 0.20 m", why: "reservoir A" },
+      { tool: "gauge", where: "x ≈ 2.78 m, just ABOVE z = 1.0", why: "tank B — lower than that is inside the shut valve's solid and reads a false dry" },
+      { tool: "gauge", where: "x ≈ 5.05 m, z ≈ 0.20 m", why: "reservoir C" },
+      { tool: "gauge", where: "x ≈ 2.78 m, z ≈ 0.50 m", why: "the junction head, 3 s after the release" },
     ],
     start: "three tanks on one junction, valve shut and both controls off",
     task: "Follow the steps to hold A and C and pour B to your own level, then press V and read B's direction and the junction head 3 s later.",
@@ -753,7 +753,7 @@ const EXERCISES = [
                  openL: "0", openR: "1", openB: "1", openT: "0",
                  spoutOn: true, spoutR: 0.10, spoutVx: 0.50, spoutVy: 0 },
     rigWhy: { spoutVx: "the dry-weather flow the 45 s pre-charge runs at — the storm ramp up from it is yours." },
-    viewParams: { gaugeField: "depth", dye: true, dyeDecay: 0 },
+    viewParams: { gaugeField: "d", dye: true, dyeDecay: 0 },
     digitNote: "your throttle is DRAWN: r = d mod 4 gives 2 / 4 / 6 / 8 cells erased straight down x = 4 m",
     setup: ["Press Z once — the rig ships with a 6-cell throttle already cut, and undo restores the whole floor so every rung starts equal (an erase stroke can widen a hole, never narrow it).",
             "Cut your own throttle: press [ twenty times to shrink the erase brush, then ] once / 3 / 5 / 6 times for r = 0 / 1 / 2 / 3, and erase down the x = 4 m line.",
@@ -761,7 +761,7 @@ const EXERCISES = [
             "Ramp the spout in 0.25 m/s steps held 10 s to bracket the spill, then 0.08 m/s steps held 20 s to pin it.",
             "First spill is the chamber gauge one cell over the crest with a continuous sheet; then hover the sewer at x ≈ 2 m for q."],
     instruments: [
-      { tool: "gauge", where: "x ≈ 4.25 m, y ≈ 1.62 m", why: "the chamber at crest level — first spill is this gauge ≥ crest + 1 cell" },
+      { tool: "gauge", where: "x ≈ 4.25 m, z ≈ 1.62 m", why: "the chamber at crest level — first spill is this gauge ≥ crest + 1 cell" },
     ],
     start: "a sewer feeding a CSO chamber with a spill crest",
     task: "Cut your own throttle, pre-charge at dry-weather flow, then ramp the storm inflow until the chamber first spills over the crest, and read q off the hover over the sewer.",
@@ -796,7 +796,7 @@ const EXERCISES = [
     scene: "wave",
     rig: null,
     rigParams: { budget: "Medium", waveOn: true },
-    viewParams: { gaugeField: "head" },
+    viewParams: { gaugeField: "h" },
     digit: { label: "period", control: "waveT", unit: "s",
              rule: "your row of the period table",
              table: [1.10, 1.10, 1.20, 1.30, 1.40, 1.50, 1.65, 1.85, 2.10, 2.10],
@@ -820,7 +820,7 @@ const EXERCISES = [
     scene: "wavesurge",
     rig: null,
     rigParams: { budget: "Medium", waveOn: true },
-    viewParams: { gaugeField: "depth" },
+    viewParams: { gaugeField: "d" },
     digit: { label: "period", control: "waveT", unit: "s",
              rule: "your row of the period table (digits pair up: 0,1 → 1.80 s and so on)",
              table: [1.80, 1.80, 2.40, 2.40, 3.00, 3.00, 3.60, 3.60, 4.20, 4.20],
@@ -880,7 +880,7 @@ const EXERCISES = [
     scene: "waveshallow",
     rig: null,
     rigParams: { budget: "Medium", waveOn: true },
-    viewParams: { gaugeField: "depth" },
+    viewParams: { gaugeField: "d" },
     digit: { label: "period", control: "waveT", unit: "s",
              rule: "your row of the period table",
              table: [3.0, 3.3, 3.6, 3.9, 4.2, 4.5, 4.8, 5.1, 5.5, 6.0],
@@ -888,8 +888,8 @@ const EXERCISES = [
                       rule: "the amplitude paired with YOUR period (it saturates at 0.30 m)",
                       table: [0.25, 0.265, 0.28, 0.29, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30] }] },
     instruments: [
-      { tool: "gauge", where: "x = 1.0 m, y = 0.20 m", why: "H crest-to-trough" },
-      { tool: "gauge", where: "x = 1.8 m, y = 0.20 m", why: "the second station — L comes from the lag between the two" },
+      { tool: "gauge", where: "x = 1.0 m, z = 0.20 m", why: "H crest-to-trough" },
+      { tool: "gauge", where: "x = 1.8 m, z = 0.20 m", why: "the second station — L comes from the lag between the two" },
     ],
     start: "a long shallow flume with a paddle and two gauge stations",
     task: "Set your period and stroke, then read H crest-to-trough and L from the lag between the two gauges over 20–30 s of cycles, and compute U_r = H·L²/h³ with h = 0.348 m. Read the crest/trough ratio — crest above the mean over trough below it — off the same trace.",
@@ -911,7 +911,7 @@ const EXERCISES = [
     rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
                  inflowOn: true, inFree: false, twOn: false,
                  spoutOn: false, waveOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "depth" },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
     digit: { label: "q (already scaled by λ^1.5)", control: "inQ", unit: "m²/s",
              rule: "q_base = 0.60 + 0.06·d, then scaled by λ^1.5 for your third",
              table: [0.600, 0.235, 0.090, 0.780, 0.295, 0.115, 0.960, 0.360, 0.135, 1.140],
@@ -921,7 +921,7 @@ const EXERCISES = [
                               1.975, 1.250, 0.880, 2.055] }] },
     digitNote: "your scale third is d mod 3: λ = 1, ½ or ¼, and the drawing loads with your digit",
     instruments: [
-      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼ (y ≈ 1.25 / 0.90 / 0.72)", why: "h, and H = h − P" },
+      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼ (z ≈ 1.25 / 0.90 / 0.72)", why: "h, and H = h − P" },
     ],
     start: "a broad-crested weir, drawn at your own scale",
     task: "Set your scaled q and its paired reservoir level, then read the gauge depth h and report the head over the crest, H = h − P.",
@@ -943,7 +943,7 @@ const EXERCISES = [
                  openL: "0", openR: "1", openB: "0", openT: "0",
                  twOn: true, twLevel: 0.04, inQ: 0 },
     rigWhy: { twLevel: "the apron must drain actively: a bare open edge ponds and chokes the orifice within ~27 s." },
-    viewParams: { gaugeField: "head", mode: "0" },
+    viewParams: { gaugeField: "h", mode: "0" },
     studentParams: [
       { control: "inflowOn", value: true, rule: "step 2 — the fill source, then untick it again for step 3" },
       { control: "inLevel", unit: "m", rule: "your own h_start: 1.80 / 1.35 / 0.90 / 0.45 m for λ = 1 / ¾ / ½ / ¼" },
@@ -955,7 +955,7 @@ const EXERCISES = [
             "Press V and time the fall to h_stop on the status-bar clock."],
     instruments: [
       { tool: "gauge", where: "in the tank, near the floor: x ≈ 2.25 / 1.69 / 1.13 / 0.56 m for λ = 1 / ¾ / ½ / ¼", why: "the falling level you time" },
-      { tool: "gauge", where: "on the apron beyond the plate (x ≈ 5.5 / 4.4 / 3.3 / 2.1 m, y ≈ 0.02 m)", why: "confirms the apron is draining, not ponding" },
+      { tool: "gauge", where: "on the apron beyond the plate (x ≈ 5.5 / 4.4 / 3.3 / 2.1 m, z ≈ 0.02 m)", why: "confirms the apron is draining, not ponding" },
     ],
     start: "a tank and orifice at your own scale, loaded empty",
     task: "Follow the steps to fill and isolate, then press V and time the fall from h_start to h_stop on the status-bar clock.",
@@ -978,7 +978,7 @@ const EXERCISES = [
     rigParams: { budget: "Medium", spoutOn: false,
                  openL: "1", openR: "1", openB: "1", openT: "0",
                  inflowOn: true, inFree: false, twOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "depth" },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
     digit: { label: "q", control: "inQ", unit: "m²/s",
              rule: "your own DA-1 row — q must not move when the resolution does",
              table: [0.600, 0.235, 0.090, 0.780, 0.295, 0.115, 0.960, 0.360, 0.135, 1.140],

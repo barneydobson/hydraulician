@@ -230,7 +230,7 @@ Consequences for scene design:
 - Mild vs steep needs S₀ chosen against the *delivered* roughness, not the
   nominal one. The steep scenes run at 1 in 4 with q ≈ 1.2 m²/s to get enough
   cells per depth. The critical-slope scene is the extreme case: d_n = d_c
-  lands at S₀ ≈ 1 in 9.5 with C_f ≈ 0.02 — found by measuring `ynGlobal`
+  lands at S₀ ≈ 1 in 9.5 with C_f ≈ 0.02 — found by measuring `dnGlobal`
   against d_c and iterating, because no closed-form C_f relation survives the
   wall function + eddy viscosity + bed staircase. A broad-crested weir ponds
   ~1.5 d_c of head above its crest, so a weir meant to make zone 1 without

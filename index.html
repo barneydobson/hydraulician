@@ -10,7 +10,19 @@
   html, body { height: 100%; overflow: hidden; background: #070b0f; }
   body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #dfe8f2; }
 
-  #view, #over { position: fixed; inset: 0; width: 100%; height: 100%; }
+  /* --dock is the width the docked side panel takes OUT of the viewport. The
+     canvases are inset by it, so the simulation is never drawn underneath the
+     panel — a docked panel that overlaps the water is just a floating card
+     with extra steps. Everything that centres on the water (the tips line, the
+     toast) centres on `100vw - var(--dock)` for the same reason. */
+  :root { --dock: 0px; }
+
+  /* Sized, not just inset: a <canvas> has an intrinsic 300 × 150, and a fixed
+     box with `width: auto` keeps it rather than stretching to the four edges. */
+  #view, #over {
+    position: fixed; top: 0; left: 0;
+    width: calc(100vw - var(--dock)); height: 100vh;
+  }
   #view { touch-action: none; cursor: crosshair; }
   #over { pointer-events: none; }
 
@@ -24,9 +36,9 @@
   }
 
   /* ------------------------------------------------ minimisable UI boxes */
-  /* Every floating box carries a small – in a corner; clicking it collapses
-     the box to a pill that restores it. The boxes are chrome and the water is
-     the point — a lecture wants the water. */
+  /* A floating box carries a small – in a corner; clicking it collapses the
+     box to a pill that restores it. The boxes are chrome and the water is the
+     point — a lecture wants the water. */
   .minbtn {
     appearance: none; border: 0; background: transparent; color: inherit;
     width: 20px; height: 20px; padding: 0; border-radius: 6px;
@@ -44,58 +56,125 @@
   .minpill:hover { opacity: 1; background: rgba(20, 30, 44, 0.72); }
   .minpill.show { display: block; }
 
+  /* ------------------------------------------------------------- top strip */
+  /* ONE horizontal bar across the top of the water: the mark, the icon groups,
+     and the scene chip at its right end. Everything that used to be a worded
+     button is an icon with a hover card carrying its name, what it does and
+     its shortcut — sixteen words of chrome became sixteen glyphs. */
   #bar {
-    position: fixed; top: 14px; left: 14px; z-index: 10;
-    display: flex; gap: 6px; padding: 6px; align-items: center; flex-wrap: wrap;
-    /* Leave the title/status box its corner: it runs ~370px wide once the
-       status line fills in, and at laptop widths it used to sit on top of the
-       bar's last few buttons. Wrapping beats burying. */
-    max-width: calc(100vw - 420px);
+    position: fixed; top: 10px; left: 12px; right: calc(var(--dock) + 12px);
+    z-index: 10; height: 52px; display: flex; align-items: center; gap: 4px;
+    padding: 0 8px 0 12px;
   }
-  #bar button, #bar select, #bar a {
-    appearance: none; border: 0; background: transparent; color: inherit;
-    font: inherit; font-size: 13.5px; padding: 8px 11px; border-radius: 10px;
-    cursor: pointer; transition: background .12s, transform .12s; white-space: nowrap;
-    text-decoration: none; display: inline-block;
+  #brand {
+    display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+    font-size: 13.5px; font-weight: 600; letter-spacing: .02em;
+    opacity: .92; padding-right: 4px; white-space: nowrap;
   }
-  #bar button:hover, #bar a:hover { background: rgba(255,255,255,0.10); transform: translateY(-1px); }
-  #bar button.active { background: rgba(77,195,255,0.20); box-shadow: inset 0 0 0 1px rgba(77,195,255,0.55); }
-  #bar select { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.13); font-weight: 600; }
-  #bar .sep { width: 1px; height: 22px; background: rgba(255,255,255,0.13); margin: 0 3px; }
-  #tools { display: flex; gap: 3px; }
-  #tools button { padding: 8px 10px; font-size: 12.5px; }
+  #brand svg { flex: 0 0 auto; }
+  /* The strip must never silently drop a control. It shrinks first (the two
+     media queries below), and if a window is narrower than even that, the
+     groups scroll sideways rather than being clipped away. */
+  #groups {
+    display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+  }
+  #groups::-webkit-scrollbar { display: none; }
+  .tgrp { display: flex; align-items: center; gap: 2px; }
+  .tbtn {
+    appearance: none; border: 0; background: transparent; padding: 0;
+    width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(223,232,242,0.78); cursor: pointer;
+    transition: background .12s, color .12s;
+  }
+  .tbtn:hover { background: rgba(255,255,255,0.10); color: #dfe8f2; }
+  .tbtn:focus-visible { outline: 2px solid rgba(77,195,255,0.7); outline-offset: -2px; }
+  /* `.active` is the class the two menus set on their own opener (see PICKER /
+     EX), so it is spelled the same as `.on` rather than teaching those modules
+     a second word for "lit". */
+  .tbtn.on, .tbtn.active {
+    background: rgba(77,195,255,0.20); color: #dfe8f2;
+    box-shadow: inset 0 0 0 1px rgba(77,195,255,0.55);
+  }
+  /* A held state that is NOT a tool choice (valves shut, the clock stopped) is
+     amber: "this rig is not in its normal condition" is a different kind of
+     fact from "this is the tool in your hand". */
+  .tbtn.hot {
+    background: rgba(255,182,72,0.18); color: #ffd9a0;
+    box-shadow: inset 0 0 0 1px rgba(255,182,72,0.50);
+  }
+  .tsep { width: 1px; height: 22px; background: rgba(255,255,255,0.13); margin: 0 4px; flex: 0 0 auto; }
 
-  /* The title box IS the scene picker's affordance — click it to choose.
-     `#status` inside it stays selectable-looking but the whole box is one
-     button, so the hit target is large and unmissable. */
+  /* The scene chip: still the scene picker's affordance, now the right end of
+     the strip. Two lines — what is loaded, and the live clock. */
+  /* `flex-shrink: 100` against the groups' 1: when the strip runs out of room
+     the SCENE NAME gives way (and ellipsizes), never a control. */
   #title {
-    position: fixed; top: 14px; right: 14px; z-index: 10;
-    padding: 9px 15px 9px 34px; text-align: right; cursor: pointer;
+    margin-left: auto; flex: 0 100 auto; max-width: 300px; min-width: 92px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: block; text-align: right; cursor: pointer; appearance: none;
+    background: transparent; border: 1px solid transparent; border-radius: 10px;
+    color: inherit; font: inherit; padding: 5px 10px;
     transition: background .12s, border-color .12s;
   }
-  #title:hover, #title.open { background: rgba(20, 30, 44, 0.72); border-color: rgba(77,195,255,0.45); }
-  #title:hover .caret, #title.open .caret { color: #7fd4ff; opacity: 1; }
+  #title:hover, #title.open { background: rgba(255,255,255,0.08); border-color: rgba(77,195,255,0.40); }
   #title:focus-visible { outline: 2px solid rgba(77,195,255,0.7); outline-offset: 2px; }
-  #title b { font-size: 14.5px; letter-spacing: .02em; }
-  #title .caret { display: inline; font-size: 10px; opacity: .5; margin-left: 6px; vertical-align: 1px; }
-  #title span:not(.caret) { display: block; font-size: 11px; opacity: .60; }
+  #title b { font-size: 13px; letter-spacing: .01em; }
+  #title .caret { font-size: 9px; opacity: .5; margin-left: 5px; vertical-align: 1.5px; }
+  #title:hover .caret, #title.open .caret { color: #7fd4ff; opacity: 1; }
+  #sceneKey { display: none; }
   #status {
-    display: block; font: 10.5px ui-monospace, SFMono-Regular, monospace;
-    opacity: .48; margin-top: 4px; font-variant-numeric: tabular-nums;
+    display: block; font: 10px ui-monospace, SFMono-Regular, monospace;
+    opacity: .48; margin-top: 1px; font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* Two steps of compaction, applied by `fitBar()` from a MEASUREMENT of the
+     strip rather than from a viewport media query — the side panel takes its
+     width out of the bar too, so the window size does not say whether the
+     icons fit. */
+  #bar.tight .tbtn { width: 32px; height: 32px; }
+  #bar.tight .tsep { margin: 0 2px; }
+  #bar.tight #brand .word { display: none; }
+  #bar.tighter .tbtn { width: 30px; height: 30px; }
+  #bar.tighter #groups { gap: 2px; }
+  #bar.tighter .tgrp { gap: 0; }
+  #bar.tighter #status { display: none; }
+  /* At this width the mark is the only thing on the strip that is decoration,
+     so it is the last thing to go before a control would have to. */
+  #bar.tighter #brand { display: none; }
+  #bar.tighter { padding: 0 6px; }
+
+  /* ---------------------------------------------------------- hover card */
+  /* Replaces every `title=` on the strip: a native tooltip cannot carry the
+     shortcut, waits half a second, and cannot be styled. */
+  #tip {
+    position: fixed; z-index: 40; display: none; padding: 7px 11px;
+    pointer-events: none; max-width: 320px;
+  }
+  #tip.show { display: flex; align-items: center; gap: 9px; }
+  #tip b { font: 600 12.5px system-ui, sans-serif; white-space: nowrap; }
+  #tip span { font-size: 11.5px; opacity: .62; }
+  #tip kbd {
+    font: 10.5px ui-monospace, monospace; background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 1px 5px;
+    flex: 0 0 auto; margin-left: auto;
   }
 
   #hint {
-    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-    z-index: 10; padding: 9px 34px 9px 18px; font-size: 13px; opacity: .92;
-    pointer-events: none; text-align: center; max-width: min(640px, 80vw);
+    position: fixed; bottom: 18px; z-index: 10; padding: 9px 34px 9px 18px;
+    left: calc((100vw - var(--dock)) / 2); transform: translateX(-50%);
+    font-size: 13px; opacity: .92; pointer-events: none; text-align: center;
+    max-width: min(640px, 70vw);
   }
   #hint b { color: #7fd4ff; }
   #hint .minbtn { pointer-events: auto; }
 
   #toast {
-    position: fixed; top: 66px; left: 50%; transform: translateX(-50%) translateY(-8px);
-    z-index: 11; padding: 12px 20px; text-align: center; opacity: 0;
-    transition: opacity .35s, transform .35s; pointer-events: none; max-width: min(560px, 90vw);
+    position: fixed; top: 76px; z-index: 11; padding: 12px 20px; text-align: center;
+    left: calc((100vw - var(--dock)) / 2); transform: translateX(-50%) translateY(-8px);
+    opacity: 0; transition: opacity .35s, transform .35s;
+    pointer-events: none; max-width: min(560px, 80vw);
   }
   /* An announcement is dismissable the moment it is readable. */
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0);
@@ -104,8 +183,8 @@
   #toastSub { font-size: 12.5px; opacity: .72; margin-top: 2px; }
 
   #panel {
-    position: fixed; top: 66px; left: 14px; z-index: 10; width: 340px;
-    padding: 14px 16px; display: none; max-height: calc(100vh - 96px); overflow: auto;
+    position: fixed; top: 72px; left: 14px; z-index: 10; width: 340px;
+    padding: 14px 16px; display: none; max-height: calc(100vh - 100px); overflow: auto;
   }
   #panel.open { display: block; }
   #panel::-webkit-scrollbar { width: 6px; }
@@ -229,9 +308,9 @@
   @media (max-width: 560px) { .ginsp { width: calc(100vw - 20px); } }
 
   /* ------------------------------------------------------------ scene picker */
-  /* One menu, three entry points (the title box, the bar button, the panel
-     row). It is built from the SCENES registry every time it opens, so a
-     scene added to js/scenes.js appears here with no further edit. */
+  /* One menu, three entry points (the strip's chip, its Scenes icon, the panel
+     row). It is built from the SCENES registry every time it opens, so a scene
+     added to js/scenes.js appears here with no further edit. */
   .gmenu {
     position: fixed; z-index: 30; width: 390px; max-width: calc(100vw - 24px);
     padding: 7px; display: none; max-height: calc(100vh - 96px); overflow: auto;
@@ -289,7 +368,7 @@
 
   /* ---------------------------------------------------------- exercises */
   /* The exercise menu is the scene menu's twin (.gmenu above) plus a filter
-     box and an id chip; the card below is the gauge inspector's twin. */
+     box and an id chip. Picking one loads it into the side panel below. */
   #exmenu { width: 428px; }
   .gmenu .smf {
     display: block; width: calc(100% - 6px); margin: 2px 3px 4px;
@@ -310,102 +389,227 @@
   }
   .gmenu .smnone { padding: 10px 9px; font-size: 12px; opacity: .5; }
 
-  .excard {
-    position: fixed; z-index: 22; width: 372px;
-    font-size: 12px; user-select: none; touch-action: none;
+  /* ------------------------------------------------------- keyboard sheet */
+  #keysmenu { width: 336px; }
+  #keysmenu .kline {
+    display: flex; align-items: baseline; gap: 9px; padding: 3px 9px; font-size: 11.5px;
   }
-  .excard-h {
-    display: flex; align-items: center; gap: 7px; padding: 8px 10px;
-    cursor: move; border-bottom: 1px solid rgba(255,255,255,0.08);
+  #keysmenu .kline span { opacity: .72; }
+  #keysmenu kbd {
+    background: rgba(255,255,255,0.10); border-radius: 4px; padding: 1px 5px;
+    font: 10.5px ui-monospace, monospace; border: 1px solid rgba(255,255,255,0.12);
+    flex: 0 0 auto; min-width: 62px; text-align: center;
   }
-  .excard-h .eid {
+
+  /* ============================================================ side panel */
+  /* The exercise lives HERE, not in a window over the water: the canvases are
+     inset by --dock, so the panel takes its width out of the viewport instead
+     of covering it. Below the width where there is anything to give away it
+     goes back to overlaying (`.over`) and the canvas keeps the whole window. */
+  #dock {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 348px; z-index: 14;
+    display: none; flex-direction: column;
+    background: rgba(12, 17, 26, 0.86);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-left: 1px solid rgba(255,255,255,0.09);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+  }
+  #dock.open { display: flex; }
+  #dock.over { width: min(348px, 100vw); box-shadow: -8px 0 48px rgba(0,0,0,0.6); }
+  .dock-h {
+    display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+    padding: 14px 12px 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .dock-h .eid {
     font: 700 11px ui-monospace, monospace; color: #7fd4ff; letter-spacing: .04em;
     background: rgba(77,195,255,0.14); border-radius: 6px; padding: 2px 6px; flex: 0 0 auto;
   }
-  .excard-h b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .excard-h .grow { flex: 1 1 auto; }
-  .excard-x {
-    appearance: none; border: 0; background: transparent; color: inherit;
-    font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 6px; cursor: pointer;
+  .dock-h .kind {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; opacity: .5;
   }
-  .excard-x:hover { background: rgba(255,255,255,0.12); }
-  .excard-body { padding: 9px 11px 11px; display: flex; flex-direction: column; gap: 7px; }
-  .excard .exd { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-  .excard .exd label { font-size: 11.5px; opacity: .72; white-space: nowrap; }
-  .excard .exd input {
+  .dock-h .grow { flex: 1 1 auto; }
+  .dock-x {
+    appearance: none; border: 0; background: transparent; color: inherit;
+    font-size: 16px; line-height: 1; padding: 3px 7px; border-radius: 7px;
+    cursor: pointer; opacity: .6;
+  }
+  .dock-x:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+  .dock-body {
+    flex: 1 1 auto; overflow: auto; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 11px; font-size: 12px;
+  }
+  .dock-body::-webkit-scrollbar { width: 6px; }
+  .dock-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+  .dock-foot {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+    padding: 10px 14px; border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  /* The seam handle: a tab straddling the panel's left edge that folds it away,
+     and the same tab parked on the window edge to bring it back. */
+  #dockfold, #docktab {
+    position: fixed; z-index: 15; appearance: none; cursor: pointer; color: #dfe8f2;
+    background: rgba(12,17,26,0.92); border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35); display: none; padding: 0;
+  }
+  #dockfold {
+    width: 26px; height: 52px; top: 50%; margin-top: -26px;
+    right: calc(var(--dock) - 13px); border-radius: 8px;
+    align-items: center; justify-content: center;
+  }
+  #dockfold.show { display: flex; }
+  #dockfold:hover, #docktab:hover { background: rgba(77,195,255,0.25); }
+  #docktab {
+    right: 0; top: 50%; margin-top: -60px; width: 30px; padding: 12px 4px;
+    border-right: 0; border-radius: 10px 0 0 10px;
+    flex-direction: column; align-items: center; gap: 8px;
+  }
+  #docktab.show { display: flex; }
+  #docktab .eid {
+    writing-mode: vertical-rl; font: 700 10.5px ui-monospace, monospace;
+    color: #7fd4ff; letter-spacing: .06em;
+  }
+  #docktab .kind {
+    writing-mode: vertical-rl; font-size: 9.5px; text-transform: uppercase;
+    letter-spacing: .08em; opacity: .5;
+  }
+
+  /* The exercise brief inside the panel. ONE neutral style: no green "your
+     values" block, no amber warning, no blue "you draw this" — a brief that
+     colour-codes six kinds of sentence is one nobody reads in a lecture.
+     Emphasis is a bold lead-in and nothing else. */
+  #dock .extitle { font-size: 14.5px; font-weight: 700; line-height: 1.3; }
+  #dock .exline { font-size: 12px; line-height: 1.5; user-select: text; }
+  #dock .exline b { font-weight: 700; opacity: .78; }
+  #dock .exyours { white-space: pre-line; }
+  #dock .exd { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  #dock .exd label { font-size: 11.5px; opacity: .72; white-space: nowrap; }
+  #dock .exd input {
     width: 52px; background: rgba(0,0,0,0.30); color: #dfe8f2; text-align: center;
     border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
     font: 700 13px ui-monospace, monospace; padding: 3px 5px;
   }
-  .excard .exd input:focus { outline: 1px solid rgba(77,195,255,0.55); }
-  /* The card is deliberately ONE neutral style: the panel's own text on the
-     panel's own glass. No green "your values" block, no amber warning, no blue
-     "you draw this" — a card that colour-codes six kinds of sentence is a card
-     nobody reads in a lecture. Emphasis is a bold lead-in and nothing else. */
-  .excard .exval {
-    font: 11.5px ui-monospace, SFMono-Regular, monospace; opacity: .85;
-    flex: 1 1 150px; text-align: right; user-select: text; line-height: 1.35;
+  #dock .exd input:focus { outline: 1px solid rgba(77,195,255,0.55); }
+  #dock .exval { font: 11.5px ui-monospace, monospace; opacity: .85; user-select: text; }
+  #dock .exsteps {
+    margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.45;
+    display: flex; flex-direction: column; gap: 3px; user-select: text;
   }
-  .excard .exline { font-size: 12px; line-height: 1.45; user-select: text; }
-  .excard .exline b { font-weight: 700; opacity: .78; }
-  /* One rule per line — the rules are printed, the arithmetic is the student's. */
-  .excard .exyours { white-space: pre-line; }
-  .excard .exrule, .excard .exstations, .excard .exalso, .excard .exmiss {
-    font-size: 11.5px; line-height: 1.4; opacity: .74;
-  }
-  .excard .exset { font-size: 11px; user-select: text; }
-  .excard .exset > summary {
+  #dock .exsteps li { opacity: .88; }
+  #dock .exset { font-size: 11px; user-select: text; }
+  #dock .exset > summary {
     cursor: pointer; opacity: .62; list-style: none;
     font: 10px ui-monospace, monospace; letter-spacing: .03em; padding: 2px 0;
   }
-  .excard .exset > summary::before { content: "▸ "; }
-  .excard .exset[open] > summary::before { content: "▾ "; }
-  .excard .exset > summary:hover { opacity: .95; }
-  .excard .exsetl {
-    display: flex; flex-direction: column; gap: 2px; padding: 5px 8px; margin-top: 3px;
-    background: rgba(255,255,255,0.05); border-radius: 7px; opacity: .75;
+  #dock .exset > summary::before { content: "▸ "; }
+  #dock .exset[open] > summary::before { content: "▾ "; }
+  #dock .exset > summary:hover { opacity: .95; }
+  #dock .exsetl {
+    display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; margin-top: 3px;
+    background: rgba(255,255,255,0.05); border-radius: 7px; opacity: .78;
     font: 10.5px ui-monospace, monospace;
   }
-  .excard .exsetl b { opacity: .9; font-weight: 700; }
-  .excard .exsetl i {
+  #dock .exsetl b { opacity: .9; font-weight: 700; }
+  #dock .exsetl i {
     display: block; font-style: normal; opacity: .7; padding-left: 9px;
     font: 10px system-ui, sans-serif; line-height: 1.35;
   }
-  .excard .exsteps { margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.4;
-    display: flex; flex-direction: column; gap: 2px; user-select: text; }
-  .excard .exsteps li { opacity: .85; }
-  .excard .exsettle { font: 10.5px ui-monospace, monospace; opacity: .6; }
-  .excard .exfoot { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-  .excard .exb {
+  #dock .exsettle { font: 10.5px ui-monospace, monospace; opacity: .6; }
+  .exb {
     appearance: none; background: rgba(255,255,255,0.07); color: inherit;
     border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
-    font: 600 11px system-ui, sans-serif; padding: 4px 9px; cursor: pointer; white-space: nowrap;
+    font: 600 11px system-ui, sans-serif; padding: 5px 10px; cursor: pointer; white-space: nowrap;
   }
-  .excard .exb:hover { background: rgba(77,195,255,0.20); }
-  .excard .exlink {
+  .exb:hover { background: rgba(77,195,255,0.20); }
+  .exlink {
     font: 10px ui-monospace, monospace; opacity: .5; margin-left: auto;
     color: inherit; text-decoration: none; user-select: text;
   }
-  .excard .exlink:hover { opacity: .9; color: #7fd4ff; text-decoration: underline; }
-  @media (max-width: 560px) { .excard { width: calc(100vw - 20px); } }
-  #panel .scenebtn {
-    appearance: none; background: rgba(255,255,255,0.07); color: inherit;
-    border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
-    font: 600 11.5px ui-monospace, SFMono-Regular, monospace;
-    padding: 3px 9px; cursor: pointer; max-width: 190px; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap;
-  }
-  #panel .scenebtn:hover { background: rgba(77,195,255,0.20); }
+  .exlink:hover { opacity: .9; color: #7fd4ff; text-decoration: underline; }
 
-  #keys {
-    position: fixed; left: 14px; bottom: 14px; z-index: 9; padding: 9px 34px 9px 13px;
-    font-size: 11px; opacity: .8; line-height: 1.85; max-width: 340px;
+  /* =========================================================== start screen */
+  /* This is a TEACHING tool, so it opens on the teaching pack: the exercises
+     are the front door and the sandbox is a deliberate choice beside them,
+     not the other way round. The simulation keeps running dimmed behind it —
+     the thing is alive before you have chosen anything. Any `?scene=`, `?ex=`
+     or `#rig=` link skips this screen entirely, so a lecture permalink lands
+     exactly where it always did. */
+  #start {
+    position: fixed; inset: 0; z-index: 60; display: none;
+    background: rgba(7, 11, 15, 0.74);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+    overflow: auto; padding: 40px 24px;
   }
-  #keys kbd {
-    background: rgba(255,255,255,0.10); border-radius: 4px; padding: 1px 5px;
-    font: 10.5px ui-monospace, monospace; border: 1px solid rgba(255,255,255,0.12);
+  #start.open { display: block; }
+  #startwrap { width: min(1180px, 100%); margin: 0 auto; }
+  #starthead { text-align: center; margin-bottom: 26px; }
+  #starthead .mark { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  #starthead h1 { font-size: 27px; font-weight: 700; letter-spacing: .01em; }
+  #starthead p { font-size: 13px; opacity: .6; margin-top: 6px; }
+  #startcols { display: flex; gap: 22px; align-items: flex-start; }
+  #startpack { flex: 1 1 auto; min-width: 0; padding: 0; overflow: hidden; }
+  #startside { flex: 0 0 320px; display: flex; flex-direction: column; gap: 14px; }
+  @media (max-width: 900px) { #startcols { flex-direction: column; } #startside { flex: 1 1 auto; width: 100%; } }
+
+  #startpack .ph {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 14px 16px 11px; border-bottom: 1px solid rgba(255,255,255,0.07);
   }
-  @media (max-height: 720px) { #keys { display: none; } }
+  #startpack .ph b { font-size: 13.5px; }
+  #startpack .ph i { font-style: normal; margin-left: auto; opacity: .45; font: 10.5px ui-monospace, monospace; }
+  #startpack .pf { padding: 10px 12px 4px; }
+  #startpack .pf input {
+    display: block; width: 100%; background: rgba(0,0,0,0.28); color: #dfe8f2;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+    font: 12.5px system-ui, sans-serif; padding: 7px 10px;
+  }
+  #startpack .pf input:focus { outline: 1px solid rgba(77,195,255,0.55); }
+  #startpack .pf input::placeholder { color: rgba(223,232,242,0.35); }
+  /* Two real columns, balanced in JS (see START.renderList). NOT CSS
+     `columns` — a multi-column box with a max-height lays its overflow out
+     SIDEWAYS, so the pack scrolled horizontally and two thirds of it could
+     not be reached — and not a grid either, whose rows are as tall as their
+     tallest group and leave the short one trailing white space. */
+  #startlist {
+    display: flex; gap: 18px; align-items: flex-start; padding: 8px 14px 16px;
+    max-height: min(52vh, 460px); overflow-y: auto; overflow-x: hidden;
+  }
+  #startlist .col { flex: 1 1 0; min-width: 0; }
+  @media (max-width: 700px) { #startlist { flex-direction: column; gap: 0; } }
+  #startlist::-webkit-scrollbar { width: 6px; }
+  #startlist::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
+  #startlist .g { break-inside: avoid; margin-bottom: 10px; }
+  #startlist .gh {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em;
+    opacity: .45; padding: 6px 8px 4px;
+  }
+  #startlist .si {
+    display: block; width: 100%; text-align: left; appearance: none;
+    background: transparent; color: inherit; font: inherit;
+    border: 1px solid transparent; border-radius: 8px;
+    padding: 5px 8px; cursor: pointer;
+  }
+  #startlist .si:hover, #startlist .si.hi { background: rgba(255,255,255,0.08); }
+  #startlist .si .eid {
+    display: inline-block; min-width: 38px;
+    font: 700 10.5px ui-monospace, monospace; color: #7fd4ff; letter-spacing: .04em;
+  }
+  #startlist .si .t { font-size: 12px; }
+  #startlist .none { padding: 10px 8px; font-size: 12px; opacity: .5; }
+
+  .startcard {
+    display: block; width: 100%; text-align: left; appearance: none;
+    color: inherit; font: inherit; cursor: pointer; padding: 15px 16px 14px;
+    transition: border-color .12s, background .12s;
+  }
+  .startcard:hover { background: rgba(20, 30, 44, 0.72); border-color: rgba(77,195,255,0.45); }
+  .startcard .r { display: flex; align-items: center; gap: 9px; }
+  .startcard b { font-size: 13.5px; }
+  .startcard .go { margin-left: auto; opacity: .5; }
+  .startcard p { font-size: 12px; line-height: 1.5; opacity: .65; margin: 7px 0 0; }
+  .startcard.primary { border-color: rgba(77,195,255,0.35); }
+  #startfoot { text-align: center; margin-top: 22px; font-size: 11.5px; opacity: .5; }
+  #startfoot a { color: inherit; text-decoration: none; }
+  #startfoot a:hover { color: #7fd4ff; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -413,29 +617,30 @@
 <canvas id="view"></canvas>
 <canvas id="over"></canvas>
 
+<!-- The top strip. `#groups` is generated from the TOOLBAR spec in main.js —
+     one icon per action, each with a hover card carrying its name, what it
+     does and its shortcut. -->
 <div id="bar" class="glass">
-  <button id="sceneBtn" title="Choose a scene (S)">Scenes ▾</button>
-  <button id="exBtn" title="Set up a teaching exercise (E)">Exercises ▾</button>
-  <div class="sep"></div>
-  <div id="tools"></div>
-  <div class="sep"></div>
-  <button id="valveBtn" title="Open / close every valve (V)">Valves</button>
-  <button id="playBtn" title="Pause (Space)">❚❚ Pause</button>
-  <button id="resetBtn" title="Reload the scene's water (R)">Reset water</button>
-  <button id="clearBtn" title="Remove everything you have drawn (C)">Clear drawing</button>
-  <button id="panelBtn" title="Controls">Controls</button>
-  <a id="aboutBtn" title="What the solver is actually doing — the numerics derivation"
-     target="_blank" rel="noopener">About</a>
+  <div id="brand">
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#4dc3ff"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M10 2.5c3 4 5 6.5 5 9a5 5 0 1 1-10 0c0-2.5 2-5 5-9z"></path>
+    </svg>
+    <span class="word">Hydraulician</span>
+  </div>
+  <div id="groups"></div>
+  <button id="title" type="button">
+    <b id="sceneName">Sandbox</b><span class="caret">▾</span>
+    <span id="sceneKey">Draw the hydraulics</span>
+    <span id="status"></span>
+  </button>
 </div>
 
-<div id="title" class="glass" role="button" tabindex="0" title="Choose a scene (S)">
-  <b id="sceneName">Sandbox</b><span class="caret">▾</span>
-  <span id="sceneKey">Draw the hydraulics</span>
-  <span id="status"></span>
-</div>
+<div id="tip" class="glass"></div>
 
 <div id="scenemenu" class="glass gmenu" role="menu" aria-label="Scenes"></div>
 <div id="exmenu" class="glass gmenu" role="menu" aria-label="Exercises"></div>
+<div id="keysmenu" class="glass gmenu" aria-label="Keyboard shortcuts"></div>
 
 <div id="toast" class="glass">
   <div id="toastTitle"></div>
@@ -446,13 +651,59 @@
 
 <div id="hint" class="glass"></div>
 
-<div id="keys" class="glass">
-  <kbd>left-drag</kbd> draw edge &nbsp; <kbd>right-drag</kbd> pour &nbsp; <kbd>shift</kbd> snap<br>
-  <kbd>wheel</kbd> zoom &nbsp; <kbd>middle-drag</kbd> pan &nbsp; <kbd>0</kbd> reset view<br>
-  <kbd>1</kbd>–<kbd>8</kbd> tools &nbsp; <kbd>[</kbd> <kbd>]</kbd> brush &nbsp; <kbd>Z</kbd> undo &nbsp; <kbd>C</kbd> clear<br>
-  <kbd>V</kbd> valve &nbsp; <kbd>space</kbd> pause &nbsp; <kbd>R</kbd> reset &nbsp; <kbd>G</kbd> field<br>
-  <kbd>P</kbd> particles &nbsp; <kbd>D</kbd> dye &nbsp; <kbd>N</kbd> channel overlay &nbsp; <kbd>M</kbd> ruler<br>
-  <kbd>S</kbd> scenes &nbsp; <kbd>E</kbd> exercises
+<!-- The docked side panel: the loaded exercise, never floating over the water.
+     Its contents are built in main.js (see EX.card). -->
+<aside id="dock" aria-label="Exercise">
+  <div class="dock-h">
+    <span class="eid"></span>
+    <span class="kind">Exercise</span>
+    <span class="grow"></span>
+    <button class="dock-x" data-a="close" aria-label="Close">×</button>
+  </div>
+  <div class="dock-body"></div>
+  <div class="dock-foot"></div>
+</aside>
+<button id="dockfold" type="button" aria-label="Fold the panel away">
+  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M7 4l6 6-6 6"></path>
+  </svg>
+</button>
+<button id="docktab" type="button" aria-label="Reopen the panel">
+  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor"
+       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M13 4l-6 6 6 6"></path>
+  </svg>
+  <span class="eid"></span>
+  <span class="kind">exercise</span>
+</button>
+
+<!-- The start screen. The pack list and the side doors are built in main.js
+     (see START) from the exercise register. -->
+<div id="start">
+  <div id="startwrap">
+    <div id="starthead">
+      <div class="mark">
+        <svg width="30" height="30" viewBox="0 0 20 20" fill="none" stroke="#4dc3ff"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 2.5c3 4 5 6.5 5 9a5 5 0 1 1-10 0c0-2.5 2-5 5-9z"></path>
+        </svg>
+        <h1>Hydraulician</h1>
+      </div>
+      <p>2D hydraulics in the vertical plane — pick an exercise, or draw your own</p>
+    </div>
+    <div id="startcols">
+      <div id="startpack" class="glass">
+        <div class="ph"><b>The exercise pack</b><i id="startcount"></i></div>
+        <div class="pf"><input id="startfilter" type="search" placeholder="Filter by id, title or topic…"></div>
+        <div id="startlist"></div>
+      </div>
+      <div id="startside"></div>
+    </div>
+    <div id="startfoot">
+      <a id="startabout" target="_blank" rel="noopener">What the solver is actually doing — the numerics ↗</a>
+    </div>
+  </div>
 </div>
 
 <script src="js/gl.js"></script>

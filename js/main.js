@@ -110,6 +110,16 @@ function zoomAt(px, py, factor) {
 
 function resetZoom() { state.zoom = 1; state.panC = null; state.vex = 1; }
 
+/** Case- and accent-folded, for the two exercise filters. Nobody types the
+ *  acute in "Bélanger", and a search box that only matches it is a search box
+ *  that says the demo is not in the pack. Both filters go through this so they
+ *  cannot drift apart. */
+function foldText(s) {
+  // The character class is the combining-marks block U+0300–U+036F, which NFD
+  // has just split the accents out into.
+  return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
 // ------------------------------------------------------------------ scenes
 function loadScene(id, keepDrawing) {
   const sc = SCENES.byId[id];
@@ -173,11 +183,11 @@ function switchScene(id) {
   state.gaugeField = "head";
   state.tracerN = 9;
   GINSP.closeAll();
-  if (state.paused) togglePause();    // via the toggle, so the button label follows
-  // The valve button's highlight is only ever set by `toggleValve`, so a fresh
-  // boot never has it lit whatever the scene's `valveOpen` says.
-  document.getElementById("valveBtn").classList.remove("active");
+  if (state.paused) togglePause();    // via the toggle, so the glyph follows
   loadScene(id, false);
+  // The strip reads the valve state off the new `sim`, so it has to be
+  // repainted after the rebuild, not before it.
+  syncToolbar();
   // `loadScene` resets the tip cycle but not the line itself, so without this
   // the previous scene's tip sits there for the first nine seconds.
   document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
@@ -417,7 +427,6 @@ const EX = (() => {
   let digit = null;            // the digit applied to it (null = none entered)
   const memo = {};             // exercise id -> digit, sticky for the session
   let lastDigit = null;        // ...and the last digit entered anywhere
-  const cardPos = {};          // "card" -> [left, top], so a re-pick lands home
   let settleTo = 0, settleWhat = "";
   let note = "";               // rig / unknown-control trouble, shown on the card
   let ready = Promise.resolve();  // resolves when the last pick has fully applied
@@ -737,10 +746,10 @@ const EX = (() => {
   const isOpen = () => !!(el && el.classList.contains("open"));
 
   function grouped() {
-    const order = [], by = new Map(), f = filter.trim().toLowerCase();
+    const order = [], by = new Map(), f = foldText(filter.trim());
     all().forEach((e) => {
-      if (f && !((e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
-                  (e.start || "")).toLowerCase().includes(f))) return;
+      if (f && !foldText(e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
+                         (e.start || "")).includes(f)) return;
       const g = e.topic || "Other";
       if (!by.has(g)) { by.set(g, []); order.push(g); }
       by.get(g).push(e);
@@ -914,8 +923,12 @@ const EX = (() => {
   }
 
   // ----------------------------------------------------------------- card
-  /** A small draggable panel, built to match the gauge inspector (same glass,
-   *  same header drag through `dragWindow`).
+  /** The brief, rendered into the DOCK (see the DOCK module) rather than into
+   *  a window floating over the water. Everything the old card carried is
+   *  still here in the same order; what changed is that the viewport gives way
+   *  to it, so nothing a student is trying to read is ever underneath it, and
+   *  a panel the height of the screen has room for the whole brief without a
+   *  scrollbar in a lecture.
    *
    *  DELIBERATELY TERSE, in one neutral style. Somebody reads this over a
    *  neighbour's shoulder in a lecture where the lecturer is already saying
@@ -926,87 +939,61 @@ const EX = (() => {
    *  personalisation, what gets handed in — lives in the README. Adding a
    *  coloured block here has been tried and was thrown out. */
   const card = (() => {
-    let box = null, digitEl = null, pill = null;
+    let box = null, digitEl = null;
     function build() {
       if (box) return box;
-      box = document.createElement("div");
-      box.className = "excard glass";
-      box.innerHTML =
-        '<div class="excard-h">' +
-          '<span class="eid"></span><b></b><span class="grow"></span>' +
-          '<button class="excard-x" data-a="min" title="Minimise">–</button>' +
-          '<button class="excard-x" title="Close">×</button>' +
-        '</div>' +
-        '<div class="excard-body">' +
-          '<div class="exline exyours"></div>' +
-          '<div class="exd"><label>student number ends in</label>' +
-            '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
-                   'title="The last digit of your student number">' +
-            '<span class="exval"></span></div>' +
-          '<div class="exline exrule"></div>' +
-          '<div class="exline exstart"></div>' +
-          '<div class="exline extask"></div>' +
-          '<div class="exline exnote"></div>' +
-          '<ol class="exsteps"></ol>' +
-          '<div class="exline exstations"></div>' +
-          '<div class="exline exalso"></div>' +
-          '<div class="exline exmiss"></div>' +
-          '<details class="exset"><summary>Already set</summary><div class="exsetl"></div></details>' +
-          '<div class="exfoot">' +
-            '<span class="exsettle"></span>' +
-            '<button class="exb" data-a="reset" title="Scene, Resolution, the rig and the ' +
-                   'load-bearing settings only. Your own values are not restored — they were ' +
-                   'never set for you.">↻ Reset to the starting point</button>' +
-            '<a class="exlink" target="_blank" rel="noopener"></a>' +
-          '</div>' +
-        '</div>';
-      document.body.appendChild(box);
+      box = document.getElementById("dock");
+      DOCK.body.innerHTML =
+        '<div class="extitle"></div>' +
+        '<div class="exline exyours"></div>' +
+        '<div class="exd"><label>student number ends in</label>' +
+          '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
+                 'aria-label="The last digit of your student number">' +
+          '<span class="exval"></span></div>' +
+        '<div class="exline exrule"></div>' +
+        '<div class="exline exstart"></div>' +
+        '<div class="exline extask"></div>' +
+        '<div class="exline exnote"></div>' +
+        '<ol class="exsteps"></ol>' +
+        '<div class="exline exstations"></div>' +
+        '<div class="exline exalso"></div>' +
+        '<div class="exline exmiss"></div>' +
+        '<details class="exset"><summary>Already set</summary><div class="exsetl"></div></details>';
+      DOCK.foot.innerHTML =
+        '<span class="exsettle"></span>' +
+        '<button class="exb" data-a="reset">↻ Reset to the starting point</button>' +
+        '<a class="exlink" target="_blank" rel="noopener"></a>';
       digitEl = box.querySelector(".exd input");
       digitEl.oninput = () => setDigit(digitEl.value);
-      // The card is a window, not the canvas: its keystrokes are its own.
+      // The panel is a form, not the canvas: its keystrokes are its own.
       digitEl.onkeydown = (e) => e.stopPropagation();
-      box.querySelector(".excard-x:not([data-a])").onclick = (e) => { e.currentTarget.blur(); hide(); };
-      box.querySelector('[data-a="min"]').onclick = (e) => { e.currentTarget.blur(); mini(); };
-      box.querySelector('[data-a="reset"]').onclick = (e) => { e.currentTarget.blur(); reset(); };
-      dragWindow(box, box.querySelector(".excard-h"), (L, T) => { cardPos.card = [L, T]; });
-      // Minimised, the card is a pill carrying the exercise id at the card's
-      // own position — one click brings the brief back.
-      pill = document.createElement("div");
-      pill.className = "minpill glass";
-      pill.title = "Restore the exercise card";
-      pill.onclick = () => show();
-      document.body.appendChild(pill);
+      const rb = box.querySelector('[data-a="reset"]');
+      rb.onclick = (e) => { e.currentTarget.blur(); reset(); };
+      rb.onpointerenter = () => TIP.show(rb, "Reset to the starting point",
+        "Scene, Resolution, the rig and the load-bearing settings only — your own " +
+        "values are not restored, because they were never set for you.");
+      rb.onpointerleave = () => TIP.hide();
+      // The × closes the BRIEF, not the exercise: the rig it set up is still on
+      // the bench, and the strip's Exercises icon brings the brief back.
+      box.querySelector('[data-a="close"]').onclick = (e) => { e.currentTarget.blur(); hide(); };
       return box;
     }
     function show() {
       build();
-      pill.classList.remove("show");
-      const p = cardPos.card || [Math.max(8, innerWidth - 386), 100];
-      box.style.left = p[0] + "px"; box.style.top = p[1] + "px";
-      box.style.display = "block";
+      DOCK.show("Exercise", cur ? cur.id : "");
       refresh();
       // A digit already in hand applies to the new exercise too; an empty
       // field means "not yet personalised", which is a legitimate state.
       digitEl.value = digit === null ? "" : String(digit);
     }
-    function mini() {
-      if (!box || box.style.display === "none") return;
-      pill.textContent = "▸ " + (cur ? cur.id : "exercise");
-      pill.style.left = box.offsetLeft + "px";
-      pill.style.top = box.offsetTop + "px";
-      box.style.display = "none";
-      pill.classList.add("show");
-    }
-    function hide() {
-      if (box) box.style.display = "none";
-      if (pill) pill.classList.remove("show");
-    }
-    function shown() { return !!(box && box.style.display !== "none"); }
+    function hide() { DOCK.hide(); }
+    function shown() { return DOCK.isShown(); }
     function refresh() {
       if (!box || !cur) return;
-      box.querySelector(".eid").textContent = cur.id;
-      const t = box.querySelector(".excard-h b");
-      t.textContent = cur.title; t.title = cur.title;
+      // Relabel only — a refresh must not unfold a panel somebody folded away.
+      DOCK.label("Exercise", cur.id);
+      const t = box.querySelector(".extitle");
+      t.textContent = cur.title;
       // The personalised rules are PRINTED, never computed: d is the last
       // digit of the student number, the lecturer owns explaining it, and
       // doing the arithmetic is the student's own first step. (An input that
@@ -1121,7 +1108,7 @@ const EX = (() => {
     /** The countdown while it settles, and nothing at all once it has: a card
      *  that keeps announcing it is ready is a card nobody reads. */
     function tick() {
-      if (!box || box.style.display === "none" || !cur) return;
+      if (!box || !DOCK.isOpen() || !cur) return;
       const s = box.querySelector(".exsettle");
       if (cur.settle && settleTo && sim.t < settleTo) {
         s.textContent = "settling — " + Math.max(0, settleTo - sim.t).toFixed(0) + " s";
@@ -1144,8 +1131,20 @@ const EX = (() => {
       (needsRig(cur) && !hasRig(cur) ? " · rig NOT loaded" : "");
   }
 
+  /** Forget the loaded exercise entirely — the brief goes, the settle target
+   *  goes, and `?ex=` stops claiming the address bar. The rig on the bench is
+   *  NOT touched: whoever is clearing it (a new sandbox, a scene switch) owns
+   *  that, and each of them rebuilds the domain anyway. */
+  function clear() {
+    if (!cur) return;
+    cur = null; settleTo = 0; settleWhat = "";
+    card.hide();
+    refresh();
+    syncPanel();
+  }
+
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
-           pick, reset, setDigit, all, byId, rules, ruleValue, digitSummary,
+           pick, reset, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,
            get ready() { return ready; },
@@ -1624,6 +1623,523 @@ const TOOLS = [
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
   ["cv", "Force box", "Left-drag a control volume — reads the force on what it encloses. Click to clear"],
 ];
+
+// ==========================================================================
+//  The top strip: icons, their hover card, and the groups they sit in.
+// ==========================================================================
+/** One entry per glyph, as the INNER markup of a 20 × 20 `viewBox`. Stroke
+ *  icons only, drawn on the same grid at the same weight, so the strip reads
+ *  as one set rather than a ransom note. `currentColor` everywhere — the
+ *  button's own state colours the glyph. */
+const ICONS = {
+  home:    '<path d="M3.5 9 10 3.5 16.5 9"/><path d="M5 8.2V16h10V8.2"/><path d="M8.4 16v-4h3.2v4"/>',
+  scenes:  '<rect x="3" y="5" width="9" height="7" rx="1"/><path d="M8 15h9V8h-2"/>',
+  ex:      '<path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H10v14H5.5A1.5 1.5 0 0 1 4 15.5Z"/>' +
+           '<path d="M10 3h4.5A1.5 1.5 0 0 1 16 4.5v11a1.5 1.5 0 0 1-1.5 1.5H10"/>' +
+           '<path d="M6.5 6.5H8M12 6.5h2"/>',
+  fresh:   '<path d="M10 4v12M4 10h12"/>',
+  wall:    '<path d="M3.5 16.5 16.5 3.5"/><circle cx="3.5" cy="16.5" r="1.4" fill="currentColor" stroke="none"/>' +
+           '<circle cx="16.5" cy="3.5" r="1.4" fill="currentColor" stroke="none"/>',
+  erase:   '<path d="M11.5 4.5 15.5 8.5 8.5 15.5H5.5L3.5 13.5Z"/><path d="M9 7l4 4"/>',
+  valve:   '<path d="M4 4v5M16 4v5M4 9h12M10 9v8M7.5 17h5"/>',
+  // The tool that DRAWS a gate and the button that OPERATES every gate are
+  // different jobs, so they get different glyphs: a gate in a pipe run, and
+  // the handwheel above it.
+  gate:    '<path d="M3 7.5h4.5M12.5 7.5H17M3 12.5h4.5M12.5 12.5H17"/>' +
+           '<rect x="7.5" y="4.5" width="5" height="11" rx="1"/><path d="M10 4.5V2.6"/>',
+  spout:   '<path d="M4 4h6v3l-3 2"/><path d="M13 10c1.6 2 2.6 3.4 2.6 4.8a2.9 2.9 0 1 1-5.8 0C9.8 13.4 11.2 12 13 10z"/>',
+  gauge:   '<path d="M4 14a6 6 0 1 1 12 0"/><path d="M10 14l3.2-4"/><path d="M4 14h1.5M14.5 14H16"/>',
+  rake:    '<path d="M6 3v14"/><path d="M6 6h7M6 10h9M6 14h6"/><path d="M13 6l-1.5-1.2M13 6l-1.5 1.2"/>',
+  tracer:  '<ellipse cx="10" cy="10" rx="6.5" ry="4.5" transform="rotate(-18 10 10)"/>' +
+           '<circle cx="15.4" cy="7.6" r="1.7" fill="currentColor" stroke="none"/>',
+  measure: '<rect x="3" y="7.5" width="14" height="5.5" rx="1"/><path d="M6.5 7.5v2.2M10 7.5v2.2M13.5 7.5v2.2"/>',
+  cv:      '<rect x="4" y="5" width="12" height="10" rx="1" stroke-dasharray="3 2.4"/>' +
+           '<path d="M10 8v4M8.4 10.4 10 12l1.6-1.6"/>',
+  pause:   '<rect x="5.2" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>' +
+           '<rect x="11.6" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>',
+  play:    '<path d="M6.5 4.2 15.5 10l-9 5.8Z" fill="currentColor" stroke="none"/>',
+  reset:   '<path d="M4.5 10a5.5 5.5 0 1 1 1.7 4"/><path d="M4.5 15v-5h5"/>',
+  clear:   '<path d="M5 6h10"/><path d="M8 6V4.5h4V6"/><path d="M6.5 6l.8 9h5.4l.8-9"/>',
+  sliders: '<path d="M4 6h12M4 10h12M4 14h12"/><circle cx="8" cy="6" r="1.9" fill="#070b0f"/>' +
+           '<circle cx="13" cy="10" r="1.9" fill="#070b0f"/><circle cx="6.5" cy="14" r="1.9" fill="#070b0f"/>',
+  keys:    '<rect x="2.5" y="6" width="15" height="8" rx="1.5"/><path d="M5.5 9h.01M8 9h.01M10.5 9h.01M13 9h.01M14.5 9h.01M6.5 11.6h7"/>',
+  about:   '<path d="M10 3.5 17 7l-7 3.5L3 7Z"/><path d="M3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5" opacity=".55"/>',
+};
+
+/** An `<svg>` for one icon id. */
+function iconEl(id) {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("viewBox", "0 0 20 20");
+  s.setAttribute("width", "20"); s.setAttribute("height", "20");
+  s.setAttribute("fill", "none"); s.setAttribute("stroke", "currentColor");
+  s.setAttribute("stroke-width", "1.6");
+  s.setAttribute("stroke-linecap", "round"); s.setAttribute("stroke-linejoin", "round");
+  s.setAttribute("aria-hidden", "true");
+  s.innerHTML = ICONS[id] || "";
+  return s;
+}
+
+/** The hover card. Every strip button would otherwise need a `title=`, which
+ *  cannot carry the shortcut on its own line, waits half a second before it
+ *  appears, and cannot be styled — and a bar of unlabelled glyphs lives or
+ *  dies on how good its tooltip is. */
+const TIP = (() => {
+  let el = null;
+  const box = () => (el || (el = document.getElementById("tip")));
+  function show(anchor, label, hint, key) {
+    const t = box();
+    t.textContent = "";
+    const b = document.createElement("b"); b.textContent = label; t.appendChild(b);
+    if (hint) { const s = document.createElement("span"); s.textContent = hint; t.appendChild(s); }
+    if (key) { const k = document.createElement("kbd"); k.textContent = key; t.appendChild(k); }
+    t.classList.add("show");
+    const r = anchor.getBoundingClientRect(), w = t.offsetWidth;
+    t.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
+    t.style.top = (r.bottom + 8) + "px";
+  }
+  function hide() { if (el) el.classList.remove("show"); }
+  return { show, hide };
+})();
+
+/** Open or close the Controls panel. Hoisted out of `boot` because the strip,
+ *  the keyboard and the panel's own – all need it. */
+function setPanel(open) {
+  document.getElementById("panel").classList.toggle("open", open);
+  const b = document.getElementById("panelBtn");
+  if (b) b.classList.toggle("active", open);
+}
+function togglePanel() {
+  setPanel(!document.getElementById("panel").classList.contains("open"));
+}
+
+/** A blank flume, from wherever you are. This is the sandbox's "new document":
+ *  `switchScene` already rebuilds the grid, drops the drawing and resets every
+ *  session knob, so the whole job here is refusing to do it silently. A drawn
+ *  rig gets one press to think about it — the same bargain the scene menu's
+ *  inline warning strikes, in the space a strip button has. */
+let newArmed = 0;
+function newSandbox() {
+  const n = sim && sim.segs ? sim.segs.length : 0;
+  const sandbox = state.scene && state.scene.id === "sandbox";
+  if (n && performance.now() - newArmed > 4000) {
+    newArmed = performance.now();
+    showToast("Press again to start over",
+      "That clears the " + n + " segment" + (n === 1 ? "" : "s") + " you have drawn" +
+      (sandbox ? "" : " and leaves " + state.scene.name) +
+      ". Save it first with Controls → Rig → ⇪ Share link.");
+    return;
+  }
+  newArmed = 0;
+  EX.clear();
+  switchScene("sandbox");     // announces itself — `loadScene` toasts the blurb
+}
+
+/** The strip, as data. Five groups, in the order a session uses them: what to
+ *  load, what to draw with, what to measure with, what the clock is doing, and
+ *  what to look at. `id` is set on the button where another module already
+ *  looks one up by name (PICKER and EX light their own opener). */
+const TOOLBAR = [
+  [
+    { id: "homeBtn", icon: "home", label: "Start", key: "H",
+      hint: "The exercise pack, the sandbox and the scenes",
+      act: () => START.open() },
+    { id: "sceneBtn", icon: "scenes", label: "Scenes", key: "S",
+      hint: "Ready-made flumes, tanks and pipe runs",
+      act: (b) => PICKER.toggle(b) },
+    { id: "exBtn", icon: "ex", label: "Exercises", key: "E",
+      hint: "Set up one of the teaching demos",
+      act: (b) => EX.toggle(b) },
+    { id: "newBtn", icon: "fresh", label: "New sandbox", key: "N",
+      hint: "A blank flume — clears what is drawn and starts over",
+      act: () => newSandbox() },
+  ],
+  TOOLS.slice(0, 4).map(toolItem),
+  TOOLS.slice(4).map(toolItem),
+  [
+    { id: "playBtn", icon: () => (state.paused ? "play" : "pause"), key: "space",
+      label: () => (state.paused ? "Run" : "Pause"),
+      hint: "Stop the clock — gauge histories freeze with it",
+      hot: () => state.paused, act: () => togglePause() },
+    { id: "resetBtn", icon: "reset", label: "Reset water", key: "R",
+      hint: "Reload the scene's water and clear the gauge histories",
+      act: () => { SIM.resetWater(); clearGaugeHistory(); } },
+    // Lit when the valves are OPEN, which is what the worded button meant.
+    // The other way round would light on almost every boot: a scene without an
+    // explicit `valveOpen` starts shut, valve drawn or not.
+    { id: "valveBtn", icon: "valve", label: "Valves", key: "V",
+      hint: "Open or slam every valve you have drawn",
+      on: () => !!sim && sim.p.valveClosed < 0.5, act: () => toggleValve() },
+    { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
+      hint: "Remove every segment you have drawn — the scene stays",
+      act: () => SIM.clearSegs() },
+  ],
+  [
+    { id: "panelBtn", icon: "sliders", label: "Controls",
+      hint: "Every slider: flow, boundaries, hydraulics, view, rig",
+      act: () => togglePanel() },
+    { id: "keysBtn", icon: "keys", label: "Keyboard", key: "?",
+      hint: "The shortcut sheet",
+      act: (b) => KEYS.toggle(b) },
+    { id: "aboutBtn", icon: "about", label: "About the solver",
+      hint: "What is actually being computed — the numerics derivation",
+      act: () => window.open(aboutHref(), "_blank", "noopener") },
+  ],
+];
+
+/** A drawing / instrument tool as a strip item. Its shortcut is its position
+ *  in TOOLS, which is exactly what the number keys do. */
+function toolItem([id, label, tip]) {
+  const n = TOOLS.findIndex((t) => t[0] === id) + 1;
+  return { icon: id === "valve" ? "gate" : id, label, hint: tip, key: String(n),
+           on: () => state.tool === id,
+           act: () => { state.tool = id; syncToolbar(); syncPanel(); } };
+}
+
+/** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
+ *  README.md, so jekyll-readme-index does not make it a folder index);
+ *  everywhere else — file://, a plain static host — the .md itself is right. */
+function aboutHref() {
+  return "docs/numerics" + (/\.github\.io$/i.test(location.hostname) ? ".html" : ".md");
+}
+
+function buildToolbar() {
+  const host = document.getElementById("groups");
+  host.textContent = "";
+  TOOLBAR.forEach((group, gi) => {
+    if (gi) { const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s); }
+    const g = document.createElement("div"); g.className = "tgrp";
+    group.forEach((it) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "tbtn";
+      if (it.id) b.id = it.id;
+      b.dataset.icon = "";
+      const label = typeof it.label === "function" ? it.label() : it.label;
+      b.setAttribute("aria-label", label);
+      b.appendChild(iconEl(typeof it.icon === "function" ? it.icon() : it.icon));
+      b.onclick = () => { b.blur(); it.act(b); syncToolbar(); };
+      b.onpointerenter = () => TIP.show(b, typeof it.label === "function" ? it.label() : it.label,
+                                        it.hint, it.key);
+      b.onpointerleave = () => TIP.hide();
+      b.onfocus = () => TIP.show(b, typeof it.label === "function" ? it.label() : it.label,
+                                 it.hint, it.key);
+      b.onblur = () => TIP.hide();
+      it.el = b;
+      g.appendChild(b);
+    });
+    host.appendChild(g);
+  });
+  syncToolbar();
+  fitBar();
+}
+
+/** Fit the strip to the width it actually has. A media query cannot do this:
+ *  the side panel takes its width out of the bar as well, so a 1440 px window
+ *  with the panel open has the room of an 1100 px one. Two steps — smaller
+ *  icons and no wordmark, then smaller still and no status line — and if even
+ *  that is not enough the groups scroll rather than losing a control. */
+function fitBar() {
+  const bar = document.getElementById("bar"), g = document.getElementById("groups");
+  if (!bar || !g) return;
+  // A couple of pixels of slack: flex lays out in fractions, so an exactly
+  // fitting strip reports a scrollWidth a pixel or two over its client width
+  // and would otherwise shrink itself for nothing.
+  const over = () => g.scrollWidth > g.clientWidth + 2;
+  bar.classList.remove("tight", "tighter");
+  if (over()) bar.classList.add("tight");
+  if (over()) bar.classList.add("tighter");
+}
+
+/** Repaint the strip from live state. Cheap enough to call from anywhere that
+ *  changes a tool, the clock or a valve; the icon only touches the DOM when it
+ *  actually differs, because the play/pause glyph swaps on every space bar. */
+function syncToolbar() {
+  TOOLBAR.forEach((group) => group.forEach((it) => {
+    const b = it.el;
+    if (!b || !b.isConnected) return;
+    if (it.on) b.classList.toggle("on", !!it.on());
+    if (it.hot) b.classList.toggle("hot", !!it.hot());
+    if (typeof it.icon === "function") {
+      const want = it.icon();
+      if (b.dataset.icon !== want) {
+        b.dataset.icon = want;
+        b.textContent = ""; b.appendChild(iconEl(want));
+        b.setAttribute("aria-label", typeof it.label === "function" ? it.label() : it.label);
+      }
+    }
+  }));
+}
+
+// ========================================================== keyboard sheet
+/** The old always-on key legend in the corner, folded into a popover. It was
+ *  six lines of chrome sitting on the water for the 99% of a session that
+ *  nobody is looking up a shortcut. */
+const KEYS = (() => {
+  let el = null, anchor = null;
+  const LINES = [
+    ["left-drag", "draw with the current tool"],
+    ["right-drag", "pour water"],
+    ["shift", "snap to horizontal / vertical / 45°"],
+    ["wheel", "zoom"],
+    ["middle-drag", "pan"],
+    ["0", "reset the view"],
+    ["1 – 9", "pick a tool"],
+    ["[ ]", "brush size"],
+    ["Z", "undo a stroke"],
+    ["C", "clear the drawing"],
+    ["V", "valves"],
+    ["space", "pause"],
+    ["R", "reset the water"],
+    ["G", "cycle the field"],
+    ["P", "particles"],
+    ["D", "dye"],
+    ["N", "open-channel overlay"],
+    ["M", "ruler"],
+    ["S", "scenes"],
+    ["E", "exercises"],
+    ["H", "the start screen"],
+  ];
+  const menu = () => (el || (el = document.getElementById("keysmenu")));
+  const isOpen = () => !!(el && el.classList.contains("open"));
+  function render() {
+    const m = menu();
+    m.textContent = "";
+    const head = document.createElement("div");
+    head.className = "smh";
+    const b = document.createElement("b"); b.textContent = "Keyboard";
+    const i = document.createElement("i"); i.textContent = "Esc closes";
+    head.appendChild(b); head.appendChild(i);
+    m.appendChild(head);
+    LINES.forEach(([k, what]) => {
+      const r = document.createElement("div"); r.className = "kline";
+      const kb = document.createElement("kbd"); kb.textContent = k;
+      const s = document.createElement("span"); s.textContent = what;
+      r.appendChild(kb); r.appendChild(s);
+      m.appendChild(r);
+    });
+  }
+  function place() {
+    const m = menu();
+    const a = anchor && anchor.isConnected ? anchor : document.getElementById("keysBtn");
+    if (!a) return;
+    const r = a.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + "px";
+    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
+  }
+  function open(a) {
+    PICKER.close(); EX.close();
+    anchor = a || document.getElementById("keysBtn");
+    render(); menu().classList.add("open"); place();
+    const b = document.getElementById("keysBtn");
+    if (b) b.classList.add("active");
+  }
+  function close() {
+    if (el) el.classList.remove("open");
+    const b = document.getElementById("keysBtn");
+    if (b) b.classList.remove("active");
+  }
+  function toggle(a) { if (isOpen()) close(); else open(a); }
+  function onDown(e) {
+    if (!isOpen()) return;
+    if (menu().contains(e.target)) return;
+    if (anchor && anchor.contains && anchor.contains(e.target)) return;
+    close();
+    if (e.target === canvas) { e.preventDefault(); e.stopPropagation(); }
+  }
+  return { open, close, toggle, isOpen, place, onDown };
+})();
+
+// ============================================================= side panel
+/** The dock: a panel down the right-hand edge that the VIEWPORT gives way to,
+ *  rather than one that sits on top of it. Opening it sets `--dock`, and both
+ *  canvases are inset by that in the stylesheet, so nothing is ever drawn
+ *  underneath the panel and `computeView` — which runs every frame off
+ *  `canvas.clientWidth` — re-letterboxes the domain into what is left with no
+ *  further help.
+ *
+ *  Under `MINW` there is no width to give away, so the panel goes back to
+ *  overlaying and the water keeps the whole window. Folding parks it as a tab
+ *  on the window edge: the exercise stays loaded, the screen goes back to
+ *  being all water, and one click brings the brief back. */
+const DOCK = (() => {
+  const W = 348, MINW = 900;
+  let shown = false, folded = false, kind = "Exercise", id = "";
+  const el = () => document.getElementById("dock");
+  const body = () => el().querySelector(".dock-body");
+  const foot = () => el().querySelector(".dock-foot");
+
+  function narrow() { return innerWidth < MINW; }
+  function sync() {
+    const open = shown && !folded;
+    el().classList.toggle("open", open);
+    el().classList.toggle("over", narrow());
+    document.documentElement.style.setProperty(
+      "--dock", (open && !narrow()) ? W + "px" : "0px");
+    fitBar();                    // the panel takes its width out of the strip
+    el().querySelector(".dock-h .eid").textContent = id;
+    el().querySelector(".dock-h .kind").textContent = kind;
+    const fold = document.getElementById("dockfold");
+    const tab = document.getElementById("docktab");
+    fold.classList.toggle("show", open);
+    tab.classList.toggle("show", shown && folded);
+    tab.querySelector(".eid").textContent = id;
+    tab.querySelector(".kind").textContent = kind.toLowerCase();
+  }
+  /** Show the panel with a header. `onClose` is what the × does — the caller
+   *  owns what closing MEANS (an exercise stays loaded; only its brief goes). */
+  function show(k, i) { kind = k || "Exercise"; id = i || ""; shown = true; folded = false; sync(); }
+  /** Rename what is in the panel without touching whether it is open — a
+   *  content refresh must not undo a fold. */
+  function label(k, i) { kind = k || kind; id = i === undefined ? id : i; sync(); }
+  function hide() { shown = false; folded = false; sync(); }
+  function fold(v) { folded = v === undefined ? !folded : !!v; sync(); }
+  function isShown() { return shown; }
+  function isOpen() { return shown && !folded; }
+  return { show, label, hide, fold, sync, isShown, isOpen,
+           get body() { return body(); }, get foot() { return foot(); } };
+})();
+
+// ============================================================ start screen
+/** What the app opens on. This is a teaching tool before it is a sandbox, so
+ *  the teaching pack is the front door and the sandbox is a card beside it —
+ *  not a blank flume you have to know to leave. The simulation keeps running
+ *  dimmed behind the screen, so the thing is visibly alive before anything is
+ *  chosen.
+ *
+ *  It is skipped entirely by `?scene=`, `?ex=` and `#rig=`, which is the whole
+ *  contract with the lecture slides: a permalink lands where it always did. */
+const START = (() => {
+  let filter = "", built = false;
+  const el = () => document.getElementById("start");
+  const isOpen = () => el().classList.contains("open");
+
+  const DOORS = [
+    { cls: "primary", icon: "wall", title: "Open the sandbox",
+      text: "A blank flume. Draw walls, pour water and plumb your own rig — " +
+            "everything an exercise sets up, you can build by hand.",
+      act: () => { close(); newSandbox(); } },
+    { icon: "scenes", title: "Scenes",
+      text: "Ready-made flumes, tanks and pipe runs — the geometry without the worksheet.",
+      act: () => { close(); PICKER.open(document.getElementById("sceneBtn")); } },
+    { icon: "sliders", title: "Controls",
+      text: "Every slider behind the picture: flow, boundaries, hydraulics, and the rig " +
+            "you can save or share as a link.",
+      act: () => { close(); setPanel(true); } },
+  ];
+
+  function buildSide() {
+    const host = document.getElementById("startside");
+    host.textContent = "";
+    DOORS.forEach((d) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "startcard glass" + (d.cls ? " " + d.cls : "");
+      const r = document.createElement("div"); r.className = "r";
+      const ic = iconEl(d.icon); ic.setAttribute("width", "20"); ic.setAttribute("height", "20");
+      const t = document.createElement("b"); t.textContent = d.title;
+      const go = document.createElement("span"); go.className = "go"; go.textContent = "›";
+      r.appendChild(ic); r.appendChild(t); r.appendChild(go);
+      const p = document.createElement("p"); p.textContent = d.text;
+      b.appendChild(r); b.appendChild(p);
+      b.onclick = () => { b.blur(); d.act(); };
+      host.appendChild(b);
+    });
+  }
+
+  /** The pack, grouped by the register's own `topic` in register order — the
+   *  same grouping the exercise menu uses, so the two never disagree. */
+  function grouped() {
+    const order = [], by = new Map(), f = foldText(filter.trim());
+    EX.all().forEach((e) => {
+      if (f && !foldText(e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
+                         (e.start || "")).includes(f)) return;
+      const g = e.topic || "Other";
+      if (!by.has(g)) { by.set(g, []); order.push(g); }
+      by.get(g).push(e);
+    });
+    return order.map((g) => [g, by.get(g)]);
+  }
+
+  function renderList() {
+    const host = document.getElementById("startlist");
+    host.textContent = "";
+    const n = EX.all().length;
+    document.getElementById("startcount").textContent =
+      n ? n + " verified demos" : "pack not loaded";
+    if (!n) {
+      const d = document.createElement("div");
+      d.className = "none";
+      d.textContent = "js/exercises.js is not loaded — the teaching pack is optional data, " +
+        "and the sandbox and the scenes work without it.";
+      host.appendChild(d);
+      return;
+    }
+    const groups = grouped();
+    if (!groups.length) {
+      const d = document.createElement("div");
+      d.className = "none"; d.textContent = "nothing matches “" + filter + "”.";
+      host.appendChild(d);
+      return;
+    }
+    // Balance the topics across two columns by their line count (a heading
+    // plus its rows), filling whichever column is currently shorter. Register
+    // order is preserved down each column, which is what someone scanning for
+    // "the jump one" is reading against.
+    const cols = [document.createElement("div"), document.createElement("div")];
+    const h = [0, 0];
+    cols.forEach((c) => { c.className = "col"; host.appendChild(c); });
+    groups.forEach(([g, list]) => {
+      const box = document.createElement("div"); box.className = "g";
+      const hd = document.createElement("div"); hd.className = "gh"; hd.textContent = g;
+      box.appendChild(hd);
+      list.forEach((e) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "si"; b.dataset.id = e.id;
+        const i = document.createElement("span"); i.className = "eid"; i.textContent = e.id;
+        const t = document.createElement("span"); t.className = "t"; t.textContent = e.title;
+        b.appendChild(i); b.appendChild(t);
+        b.onclick = () => { close(); EX.pick(e.id); };
+        box.appendChild(b);
+      });
+      const k = h[0] <= h[1] ? 0 : 1;
+      cols[k].appendChild(box);
+      h[k] += list.length + 1.6;      // the heading and its margin cost ~1.6 rows
+    });
+  }
+
+  function build() {
+    if (built) return;
+    built = true;
+    buildSide();
+    const f = document.getElementById("startfilter");
+    f.oninput = () => { filter = f.value; renderList(); };
+    f.onkeydown = (e) => {
+      e.stopPropagation();                    // not the global shortcuts
+      if (e.key === "Escape") { e.preventDefault(); close(); return; }
+      if (e.key === "Enter") {
+        const first = document.querySelector("#startlist .si");
+        if (first) { e.preventDefault(); first.click(); }
+      }
+    };
+    document.getElementById("startabout").href = aboutHref();
+  }
+
+  function open() {
+    build(); renderList();
+    el().classList.add("open");
+    PICKER.close(); EX.close(); KEYS.close();
+    const b = document.getElementById("homeBtn");
+    if (b) b.classList.add("active");
+    const f = document.getElementById("startfilter");
+    if (f) setTimeout(() => f.focus(), 0);
+  }
+  function close() {
+    el().classList.remove("open");
+    const b = document.getElementById("homeBtn");
+    if (b) b.classList.remove("active");
+  }
+  function toggle() { if (isOpen()) close(); else open(); }
+  return { open, close, toggle, isOpen, renderList };
+})();
 
 function snap(x0, y0, x1, y1) {
   const dx = x1 - x0, dy = y1 - y0;
@@ -2382,7 +2898,7 @@ const GINSP = (() => {
       el.style.zIndex = String(22 + open.length);
     }, true);
 
-    // ---- header drag (shared with the exercise card — see `dragWindow`)
+    // ---- header drag (see `dragWindow`)
     dragWindow(el, el.querySelector(".ginsp-h"), (L, T) => { posMemo[g.id] = [L, T]; });
     el.querySelector(".ginsp-x").onclick = (e) => { e.currentTarget.blur(); hide(o); };
 
@@ -3049,8 +3565,15 @@ function boot() {
     SIM[k] = (...a) => { const r = f(...a); OVERLAY.resetEstimates(sim); return r; };
   });
 
-  // The scene menu (see PICKER). Four ways in: the title box in the corner,
-  // the bar button, the panel's Scene row, and the S key below.
+  // The strip first: PICKER, EX and KEYS all light their own opener by id, so
+  // the buttons have to exist before anything asks for one.
+  buildToolbar();
+  // `syncTools` is the name the rest of the file (and the number keys) already
+  // uses for "repaint whatever shows the current tool".
+  window.syncTools = syncToolbar;
+
+  // The scene menu (see PICKER). Four ways in: the scene chip at the end of
+  // the strip, the strip's Scenes icon, the panel's Scene row, and the S key.
   const title = document.getElementById("title");
   title.onclick = (e) => PICKER.toggle(e.currentTarget);
   title.addEventListener("keydown", (e) => {
@@ -3058,31 +3581,25 @@ function boot() {
     e.preventDefault(); e.stopPropagation();          // not the global Space = pause
     PICKER.toggle(title);
   });
-  document.getElementById("sceneBtn").onclick = (e) => {
-    const b = e.currentTarget; b.blur(); PICKER.toggle(b);
-  };
   window.addEventListener("pointerdown", PICKER.onDown, true);
   addEventListener("resize", () => { if (PICKER.isOpen()) PICKER.place(); });
 
-  // The exercise menu (see EX). Three ways in: the bar button, the panel's
-  // Exercise row and the E key below; `?ex=<id>` boots straight into one.
-  document.getElementById("exBtn").onclick = (e) => {
-    const b = e.currentTarget; b.blur(); EX.toggle(b);
-  };
+  // The exercise menu (see EX). Three ways in: the strip's Exercises icon, the
+  // panel's Exercise row and the E key; `?ex=<id>` boots straight into one,
+  // and the start screen's list is a fourth door onto the same `pick`.
   window.addEventListener("pointerdown", EX.onDown, true);
   addEventListener("resize", () => { if (EX.isOpen()) EX.place(); });
 
-  const tb = document.getElementById("tools");
-  TOOLS.forEach(([id, label, tip]) => {
-    const b = document.createElement("button");
-    b.textContent = label; b.title = tip; b.dataset.tool = id;
-    b.onclick = () => { state.tool = id; syncTools(); };
-    tb.appendChild(b);
-  });
-  function syncTools() {
-    [...tb.children].forEach((b) => b.classList.toggle("active", b.dataset.tool === state.tool));
-  }
-  window.syncTools = syncTools;
+  window.addEventListener("pointerdown", KEYS.onDown, true);
+  addEventListener("resize", () => { if (KEYS.isOpen()) KEYS.place(); });
+
+  // The side panel's two handles. Wired here rather than when a brief is first
+  // built, so folding works whatever ends up in the panel.
+  document.getElementById("dockfold").onclick = (e) => { e.currentTarget.blur(); DOCK.fold(true); };
+  document.getElementById("docktab").onclick = (e) => { e.currentTarget.blur(); DOCK.fold(false); };
+  // The panel is inset by --dock, so a window resize can cross the width where
+  // docking stops being affordable and it has to go back to overlaying.
+  addEventListener("resize", () => { DOCK.sync(); fitBar(); });
 
   buildPanel();
   const q = new URLSearchParams(location.search);
@@ -3109,47 +3626,31 @@ function boot() {
     EX.ready.then(() => RIG.load(rigCode))
             .catch(() => { /* reported in the panel + a toast */ });
   }
-  syncTools();
+  syncToolbar();
+  // The status line is otherwise written on the half-second cadence in
+  // `tickFrame`, which leaves the chip half-empty for the first frames.
+  updateStatus();
   document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
 
-  const setPanel = (open) => {
-    document.getElementById("panel").classList.toggle("open", open);
-    document.getElementById("panelBtn").classList.toggle("active", open);
-  };
-  document.getElementById("panelBtn").onclick = () =>
-    setPanel(!document.getElementById("panel").classList.contains("open"));
-  // On the Pages build Jekyll renders numerics.md to numerics.html (it is not
-  // README.md, so jekyll-readme-index does not make it a folder index);
-  // everywhere else — file://, a plain static host — the .md itself is right.
-  document.getElementById("aboutBtn").href = "docs/numerics" +
-    (/\.github\.io$/i.test(location.hostname) ? ".html" : ".md");
+  // A BARE visit lands on the start screen: this is a teaching tool, so the
+  // pack is the front door and the sandbox is a card on it. Any address that
+  // already says what to show — `?scene=`, `?ex=`, `#rig=` — skips it, which
+  // is the whole contract with the lecture slides and the worksheet links.
+  if (!q.get("scene") && !exId && !rigCode) START.open();
 
-  // Every floating box minimises (see MINI): the bar, the title/status box,
-  // the tips line and the key list collapse to pills at their own anchors;
-  // Controls just closes — its bar button is the way back in — and an
-  // announcement toast dismisses on click.
-  MINI.add("bar", document.getElementById("bar"),
-    { corner: "inline", label: "☰", pill: { top: "14px", left: "14px" } });
-  MINI.add("title", document.getElementById("title"),
-    { corner: "cornerL", label: "▸ status", pill: { top: "14px", right: "14px" } });
+  // The tips line is the one box left that sits on the water, so it is the one
+  // box that still minimises (see MINI). Controls just closes — its strip icon
+  // is the way back in — and an announcement toast dismisses on click.
   MINI.add("hint", document.getElementById("hint"),
     { label: "▸ tips", pill: { bottom: "18px", left: "50%", transform: "translateX(-50%)" } });
-  MINI.add("keys", document.getElementById("keys"),
-    { label: "▸ keys", pill: { bottom: "14px", left: "14px" } });
-  [["panel", setPanel]].forEach(([id, close]) => {
-    const b = document.createElement("button");
-    b.className = "minbtn corner"; b.title = "Minimise"; b.textContent = "–";
-    b.onclick = () => close(false);
-    document.getElementById(id).appendChild(b);
-  });
+  const pmin = document.createElement("button");
+  pmin.className = "minbtn corner"; pmin.title = "Close"; pmin.textContent = "–";
+  pmin.onclick = () => setPanel(false);
+  document.getElementById("panel").appendChild(pmin);
   document.getElementById("toast").onclick = () => {
     clearTimeout(toastTimer);
     document.getElementById("toast").classList.remove("show");
   };
-  document.getElementById("playBtn").onclick = () => togglePause();
-  document.getElementById("valveBtn").onclick = () => toggleValve();
-  document.getElementById("resetBtn").onclick = () => { SIM.resetWater(); clearGaugeHistory(); };
-  document.getElementById("clearBtn").onclick = () => SIM.clearSegs();
 
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointermove", onMove);
@@ -3168,15 +3669,24 @@ function boot() {
 
   addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    // The start screen is modal: Esc leaves it, and nothing behind it is
+    // reachable from the keyboard while it is up.
+    if (START.isOpen()) {
+      if (e.key === "Escape") { e.preventDefault(); START.close(); }
+      return;
+    }
     // An open menu owns the keyboard: Esc/arrows/Enter are its own, and every
     // other shortcut is swallowed rather than fired behind it.
     if (PICKER.isOpen()) { PICKER.key(e); return; }
     if (EX.isOpen()) { EX.key(e); return; }
+    if (KEYS.isOpen() && e.key === "Escape") { e.preventDefault(); KEYS.close(); return; }
     const k = e.key.toLowerCase();
     if (k === " ") { e.preventDefault(); togglePause(); }
-    else if (k === "s") PICKER.open(MINI.anchor("title") || document.getElementById("title"));
-    else if (k === "e") EX.open(MINI.isMin("bar") ? MINI.anchor("bar")
-                                                  : document.getElementById("exBtn"));
+    else if (k === "escape") { KEYS.close(); DOCK.fold(true); }
+    else if (k === "?" || (k === "/" && e.shiftKey)) KEYS.toggle(document.getElementById("keysBtn"));
+    else if (k === "h") START.open();
+    else if (k === "s") PICKER.open(document.getElementById("sceneBtn"));
+    else if (k === "e") EX.open(document.getElementById("exBtn"));
     else if (k === "v") toggleValve();
     else if (k === "z") SIM.undoSeg();
     else if (k === "c") SIM.clearSegs();
@@ -3199,11 +3709,11 @@ function boot() {
 
 function togglePause() {
   state.paused = !state.paused;
-  document.getElementById("playBtn").textContent = state.paused ? "▶︎ Run" : "❚❚ Pause";
+  syncToolbar();               // the glyph itself is the play/pause state
 }
 function toggleValve() {
   sim.p.valveClosed = sim.p.valveClosed > 0.5 ? 0 : 1;
-  document.getElementById("valveBtn").classList.toggle("active", sim.p.valveClosed < 0.5);
+  syncToolbar();
   showToast(sim.p.valveClosed > 0.5 ? "Valve closed" : "Valve open",
     sim.p.valveClosed > 0.5
       ? "Watch the gauge: the surge should be ΔH = c·Δv/g."
@@ -3218,6 +3728,11 @@ window.APP = {
   switchScene,                             // load a scene as a fresh ?scene= boot would
   PICKER,                                  // the scene menu
   EX,                                      // the exercise picker (see ?ex=<id>)
+  TOOLS,                                   // the pointer tools, in number-key order
+  // The chrome, for headless work: test/ui-smoke.mjs drives the strip, the
+  // side panel and the start screen through here rather than by synthesising
+  // clicks at pixel positions.
+  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)

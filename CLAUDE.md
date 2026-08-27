@@ -445,6 +445,17 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   `APP.resetZoom()`.
 - `exercises/_runner/runner.py` is Linux-bound (`/proc`, X11 probe); the
   macOS shims and their two measured traps are in the runner's own HOWTO.md.
+- **`node test/ui-smoke.mjs`** covers the interface, cross-platform and with
+  no dependencies (Node 22+ for the global `WebSocket`; `$CHROME` overrides
+  the browser it finds). It boots the page four ways and asserts the layout
+  agreements — chiefly that the side panel is DOCKED, so `--dock` and
+  `canvas.clientWidth` always agree and nothing is drawn underneath the
+  panel. Every case in it is a bug that reached the working tree while the
+  strip was being built, so a failure there is a real regression rather than
+  a tightened expectation. Run it after touching `index.html`, the TOOLBAR
+  spec, `DOCK`, `START` or the boot wiring. It needs the GPU-backed
+  `--use-angle=d3d11`: the software rasteriser renders a full-window WebGL
+  canvas so slowly that a spin-up scene times the run out.
 - **The Force box is a momentum budget, not a dial.** A box enclosing a
   source (spout footprint, level-control sponge) is not measuring a force —
   `mdot` is the closure check and fails loudly there. Trust a number only

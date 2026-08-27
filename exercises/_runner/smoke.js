@@ -458,7 +458,7 @@ SUITES.scenes = async (B) => {
 
 SUITES.pack = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
-  const ids = await B.evaluate("EX.list.map(c => c.id)");
+  const ids = await B.evaluate("EX.all().map(c => c.id)");
   ok("PACK the register is populated", ids.length > 30, ids.length + " cards");
   for (const id of ids) {
     let r;

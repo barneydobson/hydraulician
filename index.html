@@ -546,6 +546,38 @@
   }
   #dock .exd input:focus { outline: 1px solid rgba(77,195,255,0.55); }
   #dock .exval { font: 11.5px ui-monospace, monospace; opacity: .85; user-select: text; }
+  /* "Yours": the printed rule, and the control the answer goes on. The field
+     is the Controls panel's own control, moved to where the rule is — before
+     this the only thing saying where q went was the words "· Inflow q slider"
+     trailing a run-on sentence, with the slider itself in a floating panel on
+     the far side of the screen. */
+  #dock .exrules { display: flex; flex-direction: column; gap: 7px; }
+  #dock .exrow {
+    display: flex; align-items: flex-start; gap: 9px;
+    padding: 8px 10px; border-radius: 9px;
+    background: rgba(255,255,255,0.05);
+  }
+  #dock .exrowt { flex: 1 1 auto; min-width: 0; font-size: 12px; line-height: 1.45; }
+  #dock .exrowt b { font-weight: 700; opacity: .9; }
+  #dock .exrowt i {
+    display: block; font-style: normal; font-size: 11px; opacity: .55; margin-top: 2px;
+  }
+  #dock .exrowf { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
+  #dock .exrowf input[type=number] {
+    width: 76px; background: rgba(0,0,0,0.32); color: #dfe8f2; text-align: right;
+    border: 1px solid rgba(255,255,255,0.20); border-radius: 7px;
+    font: 700 13px ui-monospace, SFMono-Regular, monospace; padding: 4px 6px;
+  }
+  #dock .exrowf input[type=number]:focus { outline: 1px solid rgba(77,195,255,0.65); }
+  #dock .exrowf input[type=checkbox] { width: 17px; height: 17px; accent-color: #4dc3ff; }
+  #dock .exrowf select {
+    background: rgba(0,0,0,0.32); color: inherit; border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 7px; padding: 3px 6px; font: inherit; font-size: 12px; max-width: 130px;
+  }
+  #dock .exunit {
+    font: 10.5px ui-monospace, monospace; opacity: .5; min-width: 26px;
+  }
+
   #dock .exsteps {
     margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.45;
     display: flex; flex-direction: column; gap: 3px; user-select: text;

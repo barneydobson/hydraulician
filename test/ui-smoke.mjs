@@ -179,7 +179,44 @@ async function main() {
       check("the brief carries the task", await tab.evaluate(
         `return document.querySelector("#dock .extask").textContent.length > 20;`));
       check("the brief carries the personalised rule", await tab.evaluate(
-        `return document.querySelector("#dock .exyours").textContent.includes("0.42");`));
+        `return document.querySelector("#dock .exrules").textContent.includes("0.42");`));
+
+      // "Where do I put q?" — in the brief, on the row that states the rule.
+      // The field must BE the Controls panel's control, not a copy of it.
+      const q = await tab.evaluate(`
+        // Matched on the RULE, which is stable; the row's own label is the
+        // register's ("q"), not the panel control's ("Inflow q").
+        const rows = [...document.querySelectorAll("#dock .exrow")];
+        const row = rows.find((r) => r.textContent.includes("0.42 + 0.03"));
+        if (!row) return { found: false };
+        const el = row.querySelector(".exrowf input");
+        if (!el) return { found: true, field: false };
+        el.value = "0.45";
+        el.dispatchEvent(new Event("input"));
+        return { found: true, field: true,
+                 sim: +APP.sim.p.inflow.q.toFixed(4),
+                 panel: +document.getElementById("c_inQ").value };
+      `);
+      check("the rule row for q is in the brief", q.found);
+      check("and it carries a field", q.field);
+      eq("typing in it sets the discharge", q.sim, 0.45);
+      eq("and the Controls slider follows", q.panel, 0.45);
+
+      // …and the other way round, so the two can never disagree.
+      const echoed = await tab.evaluate(`
+        APP.EX.card.syncValues();       // as syncPanel does
+        const s = document.getElementById("c_inQ");
+        s.value = "0.6"; s.dispatchEvent(new Event("input"));
+        const row = [...document.querySelectorAll("#dock .exrow")]
+                      .find((r) => r.textContent.includes("0.42 + 0.03"));
+        return +row.querySelector(".exrowf input").value;
+      `);
+      eq("moving the slider moves the field", echoed, 0.6);
+
+      // The line the pack draws: the rule is printed, the answer is not.
+      check("nothing pre-fills the answer", await tab.evaluate(`
+        return !document.querySelector("#dock .exrules").textContent.match(/=\\s*0\\.45\\b/);
+      `));
 
       // Folding: the exercise stays loaded, the water takes the width back.
       const folded = await tab.evaluate(`

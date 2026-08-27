@@ -634,6 +634,43 @@ const EX = (() => {
     });
     return ids.filter((v, i, a) => a.indexOf(v) === i);
   }
+  /** The "Yours" rows: one per value the worksheet asks the student to set,
+   *  in the order the register writes them — the digit's own rule first, then
+   *  its coupled `also` values, then `studentParams`.
+   *
+   *  `control` is filled in only when the value goes on a control the STUDENT
+   *  owns (see `studentControls`), which is what lets the brief carry the field
+   *  it goes in. A rule whose personalised thing is a drawn stroke or a station
+   *  on screen has no control and is printed as a sentence, exactly as before.
+   *
+   *  This does NOT move the line the pack draws. The RULE is printed and the
+   *  arithmetic is the student's; nothing is computed, pre-filled or applied.
+   *  What changes is only that the answer now has somewhere to go that is not
+   *  a different panel on the other side of the screen. */
+  function yourRows(ex) {
+    if (!ex) return [];
+    const owned = studentControls(ex), rows = [], seen = new Set();
+    const usable = (id) => id && owned.indexOf(id) >= 0 &&
+                           !!CONTROLS.find((c) => c.id === id && c.set);
+    rules(ex).forEach((r) => {
+      rows.push({ label: ruleLabel(r), unit: r.unit,
+                  text: r.rule || "see the brief",
+                  control: usable(r.control) ? r.control : null,
+                  where: r.control && !usable(r.control) ? ctlWhere(r.control) : "" });
+      if (r.control) seen.add(r.control);
+    });
+    (ex.studentParams || []).forEach((p) => {
+      if (!p.control || seen.has(p.control)) return;
+      seen.add(p.control);
+      rows.push({ label: ctlLabel(p.control), unit: p.unit,
+                  text: p.rule || (p.value !== undefined
+                          ? "set it to " + ctlText(p.control, p.value) : ""),
+                  control: usable(p.control) ? p.control : null,
+                  where: usable(p.control) ? "" : ctlWhere(p.control) });
+    });
+    return rows;
+  }
+
   /** THE SAME STARTING POINT FOR ALL TEN DIGITS. A rig payload carries whatever
    *  panel state the capture happened to have, and those captures were taken at
    *  a reference row — MO-1's snapshot sits on level 1.2103, which IS the
@@ -978,11 +1015,13 @@ const EX = (() => {
    *  coloured block here has been tried and was thrown out. */
   const card = (() => {
     let box = null, digitEl = null;
+    const fields = [];        // {id, el} — the live controls in the brief
     function build() {
       if (box) return box;
       box = document.getElementById("dock");
       DOCK.body.innerHTML =
         '<div class="extitle"></div>' +
+        '<div class="exrules"></div>' +
         '<div class="exline exyours"></div>' +
         '<div class="exd"><label>student number ends in</label>' +
           '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
@@ -1036,8 +1075,11 @@ const EX = (() => {
       // digit of the student number, the lecturer owns explaining it, and
       // doing the arithmetic is the student's own first step. (An input that
       // computed "your numbers" here was removed on lecturer feedback.)
+      buildYours();
+      // The sentence form is kept only for a pack with no rules at all to
+      // show; anything with rules now renders them as rows above.
       line(box.querySelector(".exyours"), "Yours (d = last digit of your student number):",
-           ruleLines(cur).join("\n"));
+           yourRows(cur).length ? "" : ruleLines(cur).join("\n"));
       // The one thing a digit still DOES is pick which captured drawing loads
       // (DA-1's λ = ¼ weir is a different rig, not a different number), so the
       // input survives only on those cards.
@@ -1077,6 +1119,137 @@ const EX = (() => {
       a.textContent = brief;
       tick();
     }
+    /** The "Yours" block: the printed rule, and beside it the control the
+     *  answer goes on.
+     *
+     *  The field IS the panel's control, relocated — it reads and writes the
+     *  same CONTROLS entry the Controls panel does, so the two can never
+     *  disagree. What it is NOT is a calculator: the rule is printed, the
+     *  arithmetic is the student's, and the field starts on whatever the rig
+     *  is actually set to, which is the same number the slider was already
+     *  showing. Nothing here is pre-filled with an answer.
+     *
+     *  Before this, the only thing telling a student where q went was the
+     *  words "· Inflow q slider" at the end of a run-on line, and the slider
+     *  itself was in a floating panel on the other side of the screen. */
+    function buildYours() {
+      const host = box.querySelector(".exrules");
+      host.textContent = "";
+      fields.length = 0;
+      const rows = yourRows(cur);
+      if (!rows.length) { host.style.display = "none"; return; }
+      host.style.display = "flex";
+
+      const h = document.createElement("div");
+      h.className = "exhead";
+      h.textContent = "Yours — d is the last digit of your student number";
+      host.appendChild(h);
+
+      rows.forEach((row) => {
+        const r = document.createElement("div");
+        r.className = "exrow";
+        const t = document.createElement("div");
+        t.className = "exrowt";
+        const b = document.createElement("b");
+        b.textContent = row.label + (row.unit ? " (" + row.unit + ")" : "");
+        t.appendChild(b);
+        if (row.text) t.appendChild(document.createTextNode(" " + row.text));
+        // A rule with no control of its own — a drawn stroke, a station — says
+        // where it goes in words, because there is nothing to put a field on.
+        if (row.where) {
+          const w = document.createElement("i");
+          w.textContent = "set it on the " + row.where;
+          t.appendChild(w);
+        }
+        r.appendChild(t);
+        const f = row.control ? fieldFor(row.control) : null;
+        if (f) r.appendChild(f);
+        host.appendChild(r);
+      });
+      syncValues();               // the fields open on what the rig is set to
+    }
+
+    /** The control, as a field. Numeric rows get a number box carrying the
+     *  panel's own min/max/step, so a value typed here is a value the slider
+     *  could have reached; a tickbox stays a tickbox and a menu a menu. */
+    function fieldFor(id) {
+      const c = CONTROLS.find((x) => x.id === id);
+      if (!c || !c.set) return null;
+      const wrap = document.createElement("div");
+      wrap.className = "exrowf";
+      let el;
+      if (c.type === "check") {
+        el = document.createElement("input");
+        el.type = "checkbox";
+        el.onchange = () => { c.set(el.checked); syncPanel(); };
+      } else if (c.type === "select") {
+        el = document.createElement("select");
+        (c.opts || []).forEach(([v, txt]) => {
+          const o = document.createElement("option");
+          o.value = v; o.textContent = txt; el.appendChild(o);
+        });
+        el.onchange = () => { c.set(el.value); syncPanel(); };
+      } else {
+        el = document.createElement("input");
+        el.type = "number";
+        el.inputMode = "decimal";
+        if (c.min !== undefined && !c.rel) el.min = c.min;
+        if (c.max !== undefined && !c.rel) el.max = c.max;
+        if (c.step !== undefined) el.step = c.step;
+        el.oninput = () => {
+          if (el.value === "") return;         // mid-edit, not a value yet
+          const v = +el.value;
+          if (isFinite(v)) { c.set(v); syncPanel(); }
+        };
+      }
+      // The brief is a form, not the canvas: its keystrokes are its own, or
+      // typing 0.45 would pick the Erase tool and reset the view on the way.
+      el.onkeydown = (e) => e.stopPropagation();
+      el.setAttribute("aria-label", c.label);
+      wrap.appendChild(el);
+      if (c.type !== "check" && c.type !== "select") {
+        const u = document.createElement("span");
+        u.className = "exunit";
+        u.textContent = unitOf(c);
+        wrap.appendChild(u);
+      }
+      fields.push({ id, el, type: c.type });
+      return wrap;
+    }
+
+    /** A short unit for the field, taken from the rule where the register
+     *  gives one and otherwise left blank — a guessed unit is worse than none. */
+    function unitOf(c) {
+      const r = rules(cur).find((x) => x.control === c.id);
+      if (r && r.unit) return r.unit;
+      const p = (cur.studentParams || []).find((x) => x.control === c.id);
+      return (p && p.unit) || "";
+    }
+
+    /** Keep the fields honest when the same control is moved from the Controls
+     *  panel. Never while it has focus — that would rewrite what is being
+     *  typed, and "0.4" on the way to "0.45" is a legitimate half-typed value. */
+    function syncValues() {
+      if (!box || !cur) return;
+      fields.forEach(({ id, el, type }) => {
+        if (!el.isConnected || el === document.activeElement) return;
+        const c = CONTROLS.find((x) => x.id === id);
+        if (!c || !c.get) return;
+        const v = c.get();
+        if (type === "check") el.checked = !!v;
+        else if (type === "select") el.value = v;
+        else {
+          const shown = el.value === "" ? NaN : +el.value;
+          if (!(Math.abs(shown - v) < 1e-9)) el.value = round4(v);
+        }
+      });
+    }
+    /** The panel prints 3 decimals; a field showing 0.4500000000000001 is the
+     *  same bug the rule values were rounded for. */
+    function round4(v) {
+      return typeof v === "number" ? String(Math.round(v * 1e4) / 1e4) : String(v);
+    }
+
     /** One plain line: a bold lead-in and the sentence. No line has a colour, a
      *  border or a background of its own — that is the point of the card. */
     function line(el, label, text) {
@@ -1155,7 +1328,7 @@ const EX = (() => {
         s.textContent = ""; s.style.display = "none";
       }
     }
-    return { show, hide, shown, refresh, tick, get el() { return box; } };
+    return { show, hide, shown, refresh, tick, syncValues, get el() { return box; } };
   })();
 
   function tick() { card.tick(); }
@@ -1563,6 +1736,10 @@ function buildPanel() {
 }
 
 function syncPanel() {
+  // The brief carries live controls of its own (the student's own values), so
+  // they follow the same sync as the panel's rows — move the Inflow q slider
+  // and the field in the brief moves with it.
+  if (typeof EX !== "undefined" && EX.card) EX.card.syncValues();
   CONTROLS.forEach((c) => {
     if (c.h) return;
     const input = document.getElementById("c_" + c.id);

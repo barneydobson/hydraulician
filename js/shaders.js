@@ -576,34 +576,63 @@ uniform sampler2D u_P, u_U;
 uniform vec2  u_pres, u_res;
 uniform vec4  u_rect;
 uniform float u_dx, u_psize;
-out float vSpeed;
 out float vFade;
 void main(){
   ivec2 c = ivec2(gl_VertexID % int(u_pres.x), gl_VertexID / int(u_pres.x));
   vec4 p = texelFetch(u_P, c, 0);
   vec2 dom = u_res * u_dx;
   vec2 uv  = p.xy / dom;
-  ivec2 g = ivec2(clamp(p.xy / u_dx, vec2(0.0), u_res - vec2(1.0)));
-  vec4 t  = texelFetch(u_U, g, 0);
-  vSpeed = length(t.rg);
+  // Fade IN over the first fraction of a life, and OUT over the last, so a
+  // particle neither pops into existence mid-flow nor vanishes at full
+  // brightness — either reads as a glitch rather than as a respawn.
   vFade  = smoothstep(0.0, 0.15, p.z) * (p.z > 0.0 ? 1.0 : 0.0);
   gl_Position  = vec4(mix(u_rect.xy, u_rect.zw, uv), 0.0, 1.0);
   gl_PointSize = u_psize;
 }`;
 
+  // ONE colour, not a speed ramp. Colour-by-speed put a second, unlabelled
+  // scale on screen competing with whatever the legend was explaining, and it
+  // washed out over the Water view, which is itself blue. Speed still reads —
+  // it is in the LENGTH of the trail each particle leaves.
   const FS_PART_DRAW = `#version 300 es
 precision highp float;
-in float vSpeed;
 in float vFade;
 out vec4 o;
-uniform float u_vmax;
 void main(){
-  vec2 d = gl_PointCoord - 0.5;
-  float a = smoothstep(0.5, 0.15, length(d) * 2.0) * vFade;
-  float t = clamp(vSpeed / max(u_vmax, 0.01), 0.0, 1.0);
-  vec3 col = mix(vec3(0.55, 0.80, 1.00), vec3(1.00, 0.94, 0.72), t);
-  o = vec4(col * (0.35 + 0.65 * t), a * 0.75);
+  float r = length(gl_PointCoord - 0.5) * 2.0;
+  // A bright core inside a soft halo. The halo is what makes a 5 px dot
+  // legible over a pale turbo field as well as over dark water; the core is
+  // what keeps it a POINT rather than a smudge.
+  float core = smoothstep(0.60, 0.15, r);
+  float glow = smoothstep(1.00, 0.15, r) * 0.30;
+  // Dim per dab, because the trail buffer is ADDITIVE: what you see at any
+  // pixel is every dab that has passed over it in the last second, and at full
+  // strength a busy reach saturates to flat white within a few frames.
+  float a = (core + glow) * vFade * 0.42;
+  o = vec4(vec3(1.00, 0.93, 0.76) * a, a);
 }`;
+
+  // ---------------------------------------------------- the particle trail
+  /** Two one-line passes over a screen-sized buffer that make the trails.
+   *
+   *  A per-frame streak cannot work: at 1 m/s a particle moves about two
+   *  pixels between frames, so the tail has to come from accumulated history.
+   *  The buffer is faded by a constant every frame and the particles are drawn
+   *  into it additively, which is one texture and two draws rather than a
+   *  history buffer per particle. */
+  const FS_FILL = `#version 300 es
+precision highp float;
+out vec4 o;
+uniform vec4 u_col;
+void main(){ o = u_col; }`;
+
+  const FS_TEX = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+in vec2 vUv;
+out vec4 o;
+uniform sampler2D u_T;
+void main(){ o = texture(u_T, vUv); }`;
 
   // ------------------------------------------------------------------ ramps
   /** The colour stops, in JS, because the legend has to paint the SAME bar the
@@ -857,5 +886,5 @@ void main(){
 }`;
 
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_COL, FS_PART, VS_PART, FS_PART_DRAW,
-           FS_DISP, RAMPS };
+           FS_DISP, FS_FILL, FS_TEX, RAMPS };
 })();

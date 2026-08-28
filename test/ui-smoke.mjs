@@ -586,6 +586,34 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------------------ particles
+    console.log("\nparticles travel at the water's speed, not the wall clock's");
+    {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // THE bug: particles were advanced by real elapsed time, while the
+      // solver advances by whatever it managed in the frame budget (0.3x real
+      // time on m2). They ran about three times too fast — and kept moving
+      // with the clock stopped, which is the same fault stated plainly.
+      const paused = await tab.evaluate(`
+        APP.state.particles = true;
+        APP.frames(30);
+        if (!APP.state.paused) APP.ui.TOOLBAR.find((g) => g.cap === "RUN")
+          .items.find((i) => i.id === "playBtn").el.click();
+        const before = APP.particlePos();
+        APP.frames(30);
+        const after = APP.particlePos();
+        let moved = 0;
+        for (let k = 0; k < before.length; k++) {
+          if (Math.abs(before[k] - after[k]) > 1e-9) moved++;
+        }
+        return { moved, n: before.length, paused: APP.state.paused };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("the clock is actually stopped", paused.paused);
+      eq("a paused clock freezes the particles", paused.moved, 0);
+      await tab.close();
+    }
+
     // -------------------------------------------------------- the UI profile
     console.log("\nan exercise can narrow the interface, and never lock it");
     {

@@ -3195,7 +3195,18 @@ function tickFrame(realDt) {
     }
   }
   const col = SIM.columns();
-  if (state.particles) SIM.advanceParticles(Math.min(realDt, 0.033) * Math.min(state.speed, 1.5));
+  // SIMULATED seconds, not wall-clock ones. Advancing by `realDt` made the
+  // particles a lie about the flow: the solver advances by whatever it fitted
+  // into the frame budget, which on m2 is about 0.3 × real time, so they
+  // travelled roughly three times faster than the water they were drawn in.
+  // The same fault the other way up: the clock stopped and they carried on.
+  // `advanceTracers` below has always taken `simAdvanced`, which is what the
+  // orbit tracers close their loops correctly and the particles did not.
+  //
+  // Capped because this is one explicit Euler step: during spin-up the solver
+  // runs flat out and a frame can advance half a second, which would teleport
+  // a particle through a wall rather than round it.
+  if (state.particles) SIM.advanceParticles(Math.min(simAdvanced, 0.05));
 
   const simMs = performance.now() - t0;
   // AIMD governor: creep up while there is headroom, back off hard when not
@@ -3216,6 +3227,9 @@ function tickFrame(realDt) {
   const rg = rangeFor(fieldFor(state.mode).id);
   SIM.render(view, {
     mode: state.mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1],
+    // The same simulated step the particles were advanced by, so the trail
+    // fades over a fixed span of FLOW rather than of wall clock.
+    pdt: Math.min(simAdvanced, 0.05),
     dye: state.dye, particles: state.particles,
     cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1 : state.brush * 0.55],
     guide: state.drag ? [state.drag.x0, state.drag.z0, state.drag.x1, state.drag.z1] : [0, 0, 0, 0],
@@ -4609,6 +4623,7 @@ window.APP = {
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
   frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
   probe: (x, z) => SIM.probe(x, z),
+  particlePos: (n) => SIM.particlePos(n),  // x, z pairs — headless only
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   placeCV,                                 // the Force box tool, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */

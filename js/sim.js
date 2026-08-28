@@ -12,6 +12,16 @@ const SIM = (() => {
 
   const CFL = 0.45;          // acoustic Courant number for the staggered update
   const UREF = 6.0;          // headroom for advective velocity in the dt estimate
+  // How long a particle's trail lives, in SIMULATED seconds. About a second of
+  // flow: long enough to read a path, short enough that a jet does not fill
+  // the screen with a solid wash.
+  const TRAIL_TAU = 0.6;
+  // How many of the 128 × 128 particles are actually DRAWN. All of them are
+  // advected — the update is one fullscreen pass either way — but drawing all
+  // 16384 with a trail each fills a flume with white and shows nothing at all.
+  // A few thousand distinct paths is what reads as flow visualisation; the
+  // count follows the width so a big window gets more of them, not fatter ones.
+  const TRAIL_N = (pxW) => Math.round(Math.max(700, Math.min(3200, pxW * 1.6)));
 
   let gl, quad, rect, points, prog = {};
   let S = null;              // the live grid
@@ -34,6 +44,8 @@ const SIM = (() => {
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
     prog.draw = GLH.createProgram(gl, Shaders.VS_RECT, Shaders.FS_DISP);
     prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
+    prog.fill = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_FILL);
+    prog.tex  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TEX);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     return gl;
@@ -119,6 +131,10 @@ const SIM = (() => {
     if (g.colTex) gl.deleteTexture(g.colTex);
     g.U = null; g.F = null; g.P = null;
     g.solid = null; g.colTex = null; g.colFbo = null;
+    // The trail belongs to the CANVAS, not to the grid, so it survives a
+    // rebuild — but what is drawn in it does not: those pixels are the old
+    // geometry's particles. Marking it undrawn clears it on the next frame.
+    trail.drawn = false;
   }
 
   function build(scene, budget, keepSegs) {
@@ -414,20 +430,81 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
     rect.draw();
 
-    if (opts.particles) {
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      gl.useProgram(prog.pdraw);
-      GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex]]);
-      gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
-      gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
-      gl.uniform4f(prog.pdraw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
-      gl.uniform1f(prog.pdraw.u("u_dx"), S.dx);
-      gl.uniform1f(prog.pdraw.u("u_psize"), Math.max(1.5, view.pxW / 420));
-      gl.uniform1f(prog.pdraw.u("u_vmax"), opts.vmax);
-      points.draw(S.pn * S.pn);
-      gl.disable(gl.BLEND);
+    if (opts.particles) drawParticles(view, opts, cw, ch);
+    else trail.drawn = false;
+  }
+
+  // ------------------------------------------------------- particle trails
+  /** A screen-sized buffer the particles accumulate into, faded a little every
+   *  frame. The tail cannot be drawn as a per-frame streak: at 1 m/s a
+   *  particle moves about two pixels between frames, so what makes a visible
+   *  trail is HISTORY, and one faded buffer is far cheaper than a ring of past
+   *  positions per particle.
+   *
+   *  Screen space, not domain space: the domain is up to 8× exaggerated
+   *  vertically, so a domain-aligned buffer would be smeared to nothing in z.
+   *  The price is that the trails belong to one view — pan, zoom or resize and
+   *  they are cleared, which reads as the trace starting again from where the
+   *  water is now. */
+  const trail = { tex: null, fbo: null, w: 0, h: 0, ndc: null, drawn: false };
+
+  function trailFor(cw, ch, view) {
+    if (trail.w !== cw || trail.h !== ch) {
+      if (trail.fbo) gl.deleteFramebuffer(trail.fbo);
+      if (trail.tex) gl.deleteTexture(trail.tex);
+      trail.tex = GLH.createTexture(gl, cw, ch, gl.RGBA8, gl.RGBA,
+                                    gl.UNSIGNED_BYTE, null, gl.LINEAR);
+      trail.fbo = GLH.createFBO(gl, trail.tex);
+      trail.w = cw; trail.h = ch; trail.ndc = null;
     }
+    // A view change invalidates every pixel in there, and so does a frame in
+    // which the particles were not drawn at all — otherwise switching them
+    // back on resumes a trace from wherever the water used to be.
+    const n = view.ndc, o = trail.ndc;
+    const moved = !o || !trail.drawn ||
+      n[0] !== o[0] || n[1] !== o[1] || n[2] !== o[2] || n[3] !== o[3];
+    trail.ndc = [n[0], n[1], n[2], n[3]];
+    return moved;
+  }
+
+  function drawParticles(view, opts, cw, ch) {
+    const clear = trailFor(cw, ch, view);
+    GLH.bindTarget(gl, trail.fbo, cw, ch);
+    if (clear) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+
+    gl.enable(gl.BLEND);
+    if (!clear) {
+      // Fade what is already there: dst *= k, in one draw and with no second
+      // buffer to ping-pong through. `k` is set from SIMULATED time, so the
+      // tail is a fixed span of FLOW — about a second of it — however fast or
+      // slow the frame rate happens to be.
+      const k = Math.exp(-Math.max(opts.pdt, 0) / TRAIL_TAU);
+      gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
+      gl.useProgram(prog.fill);
+      gl.uniform4f(prog.fill.u("u_col"), k, k, k, k);
+      quad.draw();
+    }
+
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.useProgram(prog.pdraw);
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
+    gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
+    gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
+    gl.uniform4f(prog.pdraw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
+    gl.uniform1f(prog.pdraw.u("u_dx"), S.dx);
+    // Big enough to see. The old 1.5-3 px dot disappeared over a pale field
+    // and read as sensor noise over a dark one.
+    gl.uniform1f(prog.pdraw.u("u_psize"), Math.max(3.0, view.pxW / 260));
+    points.draw(Math.min(S.pn * S.pn, TRAIL_N(view.pxW)));
+
+    // …and the whole trace, heads included, over the water in one composite.
+    GLH.bindTarget(gl, null, cw, ch);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // it is premultiplied
+    gl.useProgram(prog.tex);
+    GLH.bindTex(gl, prog.tex, [["u_T", trail.tex]]);
+    quad.draw();
+    gl.disable(gl.BLEND);
+    trail.drawn = true;
   }
 
   // -------------------------------------------------------------- readback
@@ -526,6 +603,19 @@ const SIM = (() => {
     v.sort((a, b) => a - b);
     const at = (p) => v[Math.min(v.length - 1, Math.max(0, Math.round(p * (v.length - 1))))];
     return { lo: at(0.01), hi: at(0.99), n: v.length };
+  }
+
+  /** The first `n` particle positions, as x, z pairs in metres. For headless
+   *  work only — the particles are a GPU-side buffer with no CPU copy, so
+   *  there is otherwise no way to ask where they are. */
+  function particlePos(n) {
+    const w = Math.max(1, Math.min(S.pn, n || 16));
+    const buf = new Float32Array(w * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.P.read.fbo);
+    gl.readPixels(0, 0, w, 1, gl.RGBA, gl.FLOAT, buf);
+    const out = [];
+    for (let k = 0; k < w; k++) out.push(buf[k * 4], buf[k * 4 + 1]);
+    return out;
   }
 
   /** A whole column of velocity — the vertical rake. Returns u(z) at cell centres. */
@@ -642,7 +732,7 @@ const SIM = (() => {
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
-           fieldStats,
+           fieldStats, particlePos,
            boxForce, dt, get, inletVel, bands, rescaleFill,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

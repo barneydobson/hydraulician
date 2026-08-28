@@ -240,7 +240,7 @@ ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12),
   const at = (i, j) => j * nx + i;
   fbar[at(3, 0)] = 1; fbar[at(3, 1)] = 1; fbar[at(3, 2)] = 0.4;
   fbar[at(1, 0)] = 1;                        // a one-cell body in another column
-  mask[at(0, 0)] = 255;                      // solid: must form no body
+  fbar[at(0, 0)] = 1; mask[at(0, 0)] = 255;   // WATER in a SOLID cell: the mask must win
   const R = RECON.reconstruct({ fbar, pbar, mask, nx, ny, dx, c });
   ok("C8 reconstruct returns one entry per column",
      R.d2d.length === nx && R.bed.length === nx && R.bodies.length === nx);
@@ -249,8 +249,9 @@ ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12),
      `d2d ${Array.from(R.d2d).join(",")}`);
   ok("C8 dry columns report zero depth and no NaN",
      R.d2d[2] === 0 && R.d2d[4] === 0 && Array.from(R.d2d).every(Number.isFinite));
-  ok("C8 a cell with mask >= 192 is solid and forms no body",
-     R.bodies[0].length === 0, JSON.stringify(R.bodies[0]));
+  ok("C8 a cell with mask >= 192 is solid even when its fill says water",
+     R.bodies[0].length === 0 && R.d2d[0] === 0,
+     `bodies0 ${JSON.stringify(R.bodies[0])} d2d0 ${R.d2d[0]}`);
 }
 // crossing() takes the FIRST crossing walking upward. That is the outer
 // surface for the monotone exceedance profile of a sharp interface, and it is

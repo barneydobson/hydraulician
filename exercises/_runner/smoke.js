@@ -428,6 +428,60 @@ SUITES.physics = async (B) => {
   ok("PHYSICS m1 runs subcritical (mild backwater)", flow.dMid > flow.dcMid,
     `d ${flow.dMid.toFixed(3)} vs d_c ${flow.dcMid.toFixed(3)}`);
   ok("PHYSICS the energy line falls downstream", flow.HFalls);
+
+  // The control-volume budget, on the same settled reach. These are the three
+  // conservation laws the Force box is FOR, so they are asserted where a scene
+  // is actually steady — an instantaneous integral on a wobbling free surface
+  // closes to only a few per cent, and one taken mid-spin-up does not close at
+  // all, because the reach is still filling.
+  const cv = await B.evaluate(`(() => {
+    const W = APP.sim.W, H = APP.sim.H;
+    const box = [0.35 * W, 0, 0.62 * W, H];
+    let sE = 0, n = 0;
+    for (let k = 0; k < 60; k++) { APP.frames(2); sE += APP.boxFlux.apply(null, box).total.E; n++; }
+    const f = APP.boxFlux.apply(null, box);
+    const g = APP.boxForce.apply(null, box);
+    return { E: sE / n, fx: f.fx, gx: g.fx,
+             // Both integrals walk the same faces: boxForce's mdot is the mass
+             // flux, boxFlux's Q the volume flux, and with nothing pressurised
+             // (f <= 1 everywhere on a free-surface reach) they are the same
+             // number over rho.
+             // Compared on the INFLOW face, not on the net: the net is a small
+             // residual of two large opposite numbers, so the sign of its
+             // difference says nothing. On one face every cell flows the same
+             // way and the inequality is exact.
+             Qin: f.edges.left.Q, mdotIn: f.edges.left.mdot / 1000,
+             bed: Math.abs(f.edges.bed.Q), left: f.edges.left.Q, right: f.edges.right.Q };
+  })()`);
+  // NOT an absolute closure test. How nearly m1's discharge balances over a
+  // window is a property of the SCENE — the neighbouring "discharge holds one
+  // value along the reach" check is what measures that, and it is marginal on
+  // this scene for the same reason. What must hold here is that the two face
+  // integrals agree with each other, which is a property of the CODE.
+  // They are NOT the same number, and the difference is the physics: Q is the
+  // geometric volume flux (min(f, 1)) and mdot the mass flux (f), and in this
+  // model f > 1 everywhere below the surface — that IS the pressure, via
+  // p/rho = c^2 (f - 1). So the water carries more mass than volume, by the
+  // compression p/(rho c^2), which is a fraction of a per cent at the usual
+  // celerity. Same sign, same size, ordered the one way round physics allows.
+  ok("PHYSICS volume flux and mass flux differ only by the compression",
+    cv.Qin * cv.mdotIn > 0 && Math.abs(cv.Qin) <= Math.abs(cv.mdotIn) * 1.0001 &&
+    Math.abs(cv.Qin - cv.mdotIn) < 0.05 * Math.abs(cv.mdotIn),
+    `Q ${cv.Qin.toFixed(5)} m²/s vs mdot/rho ${cv.mdotIn.toFixed(5)}` +
+    ` (${(100 * (cv.mdotIn - cv.Qin) / cv.mdotIn).toFixed(2)}% compressed)`);
+  ok("PHYSICS water crosses the box in at one end and out at the other",
+    cv.left < 0 && cv.right > 0,
+    `left ${cv.left.toFixed(4)}, right ${cv.right.toFixed(4)} m²/s`);
+  ok("PHYSICS the box's solid bed passes nothing", cv.bed < 1e-9, String(cv.bed));
+  // A reach with friction in it cannot gain energy. Outward-positive, so a
+  // loss is negative.
+  ok("PHYSICS the reach loses energy through the box", cv.E < 0,
+    cv.E.toFixed(1) + " W/m");
+  // The same face integral by two routes; if they drift, one has been edited
+  // and the other has not.
+  ok("PHYSICS boxFlux and boxForce report the same force",
+    Math.abs(cv.fx - cv.gx) < 1e-6 * Math.max(1, Math.abs(cv.gx)),
+    cv.fx + " vs " + cv.gx);
 };
 
 SUITES.scenes = async (B) => {

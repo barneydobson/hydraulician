@@ -586,6 +586,48 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------- the control-volume budget
+    // The BALANCES — continuity, the energy loss — are asserted in smoke.js,
+    // on a scene that has actually settled. This gate boots eight tabs and
+    // cannot afford a 90 s spin-up, and an unsettled reach is still filling,
+    // so it genuinely does not close. What belongs here is the wiring.
+    console.log("\nthe control volume reports every edge, and agrees with the force box");
+    {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      const r = await tab.evaluate(`
+        APP.frames(600);                        // let the reach establish itself
+        const box = [3.0, 0.0, 8.0, 0.95];
+        const flux = APP.boxFlux.apply(null, box);
+        const force = APP.boxForce.apply(null, box);
+        const e = flux.edges;
+        return {
+          keys: Object.keys(e).sort().join(","),
+          // Water enters on the left and leaves on the right, so the two have
+          // opposite signs under an outward-positive convention.
+          inLeft: e.left.Q, outRight: e.right.Q,
+          // The bed is solid, so no face of it is open: nothing crosses.
+          bedQ: e.bed.Q,
+          // M + Fp IS what boxForce reports. If these drift apart, one of the
+          // two integrals has been changed without the other.
+          fx: flux.fx, forceFx: force.fx,
+          fz: flux.fz, forceFzNoWeight: force.fz + 9.81 * force.mass,
+        };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("every edge is reported", r.keys, "bed,left,right,top");
+      check("water enters on the left", r.inLeft < 0, String(r.inLeft));
+      check("and leaves on the right", r.outRight > 0, String(r.outRight));
+      check("a solid bed passes nothing", Math.abs(r.bedQ) < 1e-9, String(r.bedQ));
+      // The same face integral, so this is exact bar floating-point order.
+      check("momentum + pressure is the force boxForce reports",
+            Math.abs(r.fx - r.forceFx) < 1e-6 * Math.max(1, Math.abs(r.forceFx)),
+            r.fx + " vs " + r.forceFx);
+      check("and the same vertically",
+            Math.abs(r.fz - r.forceFzNoWeight) < 1e-3 * Math.max(1, Math.abs(r.fz)),
+            r.fz + " vs " + r.forceFzNoWeight);
+      await tab.close();
+    }
+
     // ------------------------------------------------- placing and removing
     console.log("\nan instrument you can place is an instrument you can remove");
     {

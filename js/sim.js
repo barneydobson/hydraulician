@@ -673,6 +673,112 @@ const SIM = (() => {
    *  box that includes the spout's footprint fails it loudly, because the
    *  spout is a source — mass and momentum appear inside the box and the
    *  budget is not a force any more. */
+  /** The full control-volume budget, edge by edge, in ONE readback.
+   *
+   *  `boxForce` answers "what force does this box feel"; this answers the
+   *  three questions a control-volume analysis actually asks — does mass
+   *  balance, where does the momentum go, and how much energy is lost — with
+   *  the answer split across the four faces, because which face a flux
+   *  crosses is half of what a student is being asked to see.
+   *
+   *  Everything is OUTWARD-positive and per metre of width. Air contributes
+   *  nothing, and not by a threshold: every term carries the fill fraction, so
+   *  an empty cell adds zero and a half-full one adds half. `Q` uses
+   *  min(f, 1) — the geometric water volume — because f > 1 is water that has
+   *  been compressed, not extra volume of it; the mass-carrying terms use f
+   *  itself, which IS the density in this model.
+   *
+   *  `M` (the momentum the fluid carries through the face) and `Fp` (the
+   *  pressure the surroundings apply to it) are kept apart rather than summed.
+   *  Distinguishing them is the whole content of a control-volume question,
+   *  and their sum is `boxForce`'s answer — which the layout gate checks, so
+   *  the two can never quietly disagree.
+   *
+   *  Energy is per unit time: ρ f uₙ (gz + P + ½|u|²) — the Bernoulli sum, so
+   *  the total over the four faces is the rate of energy LOSS through the box.
+   *  A tilted-gravity scene carries its slope in gravity rather than in the
+   *  bed, so the elevation term is z − S₀x there, exactly as the head views
+   *  and the overlay compute it. */
+  function boxFlux(x0, z0, x1, z1) {
+    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
+    const closed = S.p.valveClosed > 0.5;
+    let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
+    let jB = Math.round(Math.min(z0, z1) / S.dx), jT = Math.round(Math.max(z0, z1) / S.dx);
+    iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
+    jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
+    const w = iR - iL + 2, h = jT - jB + 2;
+    const need = w * h * 4;
+    if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvU);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvF);
+    const U = S.cvU, F = S.cvF;
+    const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
+    const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
+    const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
+    const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
+
+    // x-faces: u lives ON the face, so the normal velocity needs no averaging.
+    for (const [i, n, key] of [[iL, -1, "left"], [iR, 1, "right"]]) {
+      const e = out[key];
+      for (let j = jB; j < jT; j++) {
+        if (sol(i - 1, j) || sol(i, j)) continue;
+        const a = k(i - 1, j), b = k(i, j);
+        const u = U[b];
+        const f = 0.5 * (F[a] + F[b]);
+        const P = 0.5 * (U[a + 2] + U[b + 2]);
+        const wv = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const un = u * n, z = (j + 0.5) * S.dx, x = i * S.dx;
+        e.Q += Math.min(f, 1) * un;
+        e.mdot += f * un;
+        e.Mx += f * u * un;   e.Mz += f * wv * un;
+        e.Fpx += f * P * n;
+        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
+        e.wet += Math.min(f, 1);
+      }
+    }
+    // z-faces: w lives ON the face.
+    for (const [j, n, key] of [[jB, -1, "bed"], [jT, 1, "top"]]) {
+      const e = out[key];
+      for (let i = iL; i < iR; i++) {
+        if (sol(i, j - 1) || sol(i, j)) continue;
+        const a = k(i, j - 1), b = k(i, j);
+        const wv = U[b + 1];
+        const f = 0.5 * (F[a] + F[b]);
+        const P = 0.5 * (U[a + 2] + U[b + 2]);
+        const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
+        const un = wv * n, z = j * S.dx, x = (i + 0.5) * S.dx;
+        e.Q += Math.min(f, 1) * un;
+        e.mdot += f * un;
+        e.Mx += f * u * un;   e.Mz += f * wv * un;
+        e.Fpz += f * P * n;
+        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
+        e.wet += Math.min(f, 1);
+      }
+    }
+
+    // …to physical units, and the totals.
+    const tot = edge();
+    let inQ = 0;
+    for (const key of ["left", "right", "bed", "top"]) {
+      const e = out[key];
+      e.Q *= S.dx;               e.wet *= S.dx;
+      e.mdot *= RHO * S.dx;
+      e.Mx *= RHO * S.dx;        e.Mz *= RHO * S.dx;
+      e.Fpx *= RHO * S.dx;       e.Fpz *= RHO * S.dx;
+      e.E *= RHO * S.dx;
+      for (const q of ["Q", "mdot", "Mx", "Mz", "Fpx", "Fpz", "E", "wet"]) tot[q] += e[q];
+      if (e.Q < 0) inQ -= e.Q;   // what came IN, for a relative closure error
+    }
+    // The force on what is inside is minus the flux of momentum out plus the
+    // pressure on the faces — the same sum `boxForce` reports, less the weight
+    // term, which is not a face quantity and is added by the caller if wanted.
+    return { edges: out, total: tot, inQ,
+             fx: -(tot.Mx + tot.Fpx), fz: -(tot.Mz + tot.Fpz),
+             iL, iR, jB, jT };
+  }
+
   function boxForce(x0, z0, x1, z1) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
     const closed = S.p.valveClosed > 0.5;
@@ -733,6 +839,6 @@ const SIM = (() => {
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
-           boxForce, dt, get, inletVel, bands, rescaleFill,
+           boxForce, boxFlux, dt, get, inletVel, bands, rescaleFill,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

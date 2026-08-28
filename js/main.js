@@ -27,7 +27,8 @@ const state = {
   ui: null,                   // the resolved UI profile; UIMODE.full() when absent
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
-  cv: null, cvDrag: null,          // the force control volume: box + EMA force
+  cv: null, cvDrag: null,          // the force control volume: box + EMA budget
+  cvShow: "Q",                     // which per-edge quantity the box labels
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   gauges: [], rakes: [], gaugeField: "h", tracers: null, tracerN: 9,
@@ -1702,6 +1703,28 @@ const CONTROLS = [
     fmt: () => state.measure ? OVERLAY.measureText(state.measure)
                              : "then left-drag between two points on the water",
     info: "A tape measure: left-drag between two points for the straight-line length, the horizontal and vertical legs, and the slope written as 1 : n. Shift snaps to horizontal / vertical / 45°; a click without a drag clears it. The 8 key picks the tool from the keyboard, and the numbers stay printed here." },
+  { id: "cvShow", type: "buttons", label: "Force box reads",
+    // The box reports a whole control-volume budget now, which is four edges
+    // times three quantities. One quantity at a time on the edges, chosen
+    // here or with B — the panel has to be able to reach it, because the
+    // sandbox must reproduce any scene by hand.
+    sync: (el) => {
+      el.textContent = "";
+      [["Q", "Q", "volume flow rate through each face, m²/s"],
+       ["M", "M→", "momentum flux plus pressure force on each face, N/m"],
+       ["E", "Ė", "energy flow rate through each face, W/m"]].forEach(([id, txt, why]) => {
+        const b = document.createElement("button");
+        b.textContent = txt; b.title = why;
+        b.className = state.cvShow === id ? "on" : "";
+        b.onclick = () => { b.blur(); state.cvShow = id; syncPanel(); };
+        el.appendChild(b);
+      });
+    },
+    fmt: () => !state.cv ? "left-drag a box on the water with the Force box tool (9)"
+      : !state.cv.flux ? "settling…"
+      : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s  ·  " +
+        "Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m",
+    info: "The box is a control volume, and every face of it carries a budget: the volume crossing it, the momentum it carries plus the pressure on it, and the energy going with them. Air contributes nothing — every term is weighted by the fill fraction, so an empty cell adds zero and a half-full one adds half. Read outward-positive: what leaves is positive wherever it leaves from, so Σ Q is continuity and Σ Ė is the loss." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
@@ -1997,7 +2020,7 @@ const TOOLS = [
   ["rake", "Rake", "Click for a velocity–depth profile — click it again to remove it"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
-  ["cv", "Force box", "Left-drag a control volume — reads the force on what it encloses. Click to clear"],
+  ["cv", "Force box", "Left-drag a control volume — the budget on every edge, and the force on what it encloses. Click to clear"],
   // Tenth, and deliberately last: the digits 1–9 already mean the nine above
   // them, in worksheets as well as in muscle memory. Pour has no digit; on a
   // desktop its shortcut is the right-drag that works in any tool.
@@ -2694,6 +2717,7 @@ const KEYS = (() => {
     ["R", "reset the water"],
     ["G", "cycle the field (the legend names it)"],
     ["L", "the legend — which field, over what range, in what units"],
+    ["B", "what the Force box reads on each edge: Q / momentum / energy"],
     ["P", "particles"],
     ["D", "dye"],
     ["N", "open-channel overlay"],
@@ -3317,7 +3341,7 @@ function placeCV(x0, z0, x1, z1) {
   state.cv = {
     x0: Math.min(x0, x1), z0: Math.min(z0, z1),
     x1: Math.max(x0, x1), z1: Math.max(z0, z1),
-    ema: null, hist: [], t0: sim.t,
+    ema: null, flux: null, hist: [], t0: sim.t,
   };
 }
 
@@ -3332,14 +3356,39 @@ function sampleCV() {
   if (sim.t < cv.t0) { cv.ema = null; cv.hist.length = 0; cv.t0 = sim.t; }
   if (!(sim.t > cv.t0) && cv.ema) return;
   const r = SIM.boxForce(cv.x0, cv.z0, cv.x1, cv.z1);
+  // The whole budget, from the same faces. One extra pair of readPixels per
+  // frame, which is the same cost the force alone already pays — and every
+  // number in it is smoothed by the SAME EMA, because a raw face integral on
+  // a wobbling free surface is a reading nobody can take.
+  const b = SIM.boxFlux(cv.x0, cv.z0, cv.x1, cv.z1);
   const a = 1 - Math.exp(-Math.min(sim.t - cv.t0, 0.25) / 1.0);
   cv.t0 = sim.t;
   cv.ema = cv.ema ? { fx: cv.ema.fx + (r.fx - cv.ema.fx) * a,
                       fz: cv.ema.fz + (r.fz - cv.ema.fz) * a }
                   : { fx: r.fx, fz: r.fz };
+  cv.flux = emaFlux(cv.flux, b, a);
   cv.hist.push({ t: sim.t, fx: r.fx });
   while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
   cv.last = r;
+}
+
+/** Smooth every scalar of a control-volume budget, edge by edge. Written as a
+ *  walk over the keys rather than by hand so that adding a quantity to
+ *  `boxFlux` cannot leave it unsmoothed and jittering while its neighbours
+ *  sit still. */
+const FLUX_KEYS = ["Q", "mdot", "Mx", "Mz", "Fpx", "Fpz", "E", "wet"];
+const CV_EDGES = ["left", "right", "bed", "top"];
+function emaFlux(prev, now, a) {
+  if (!prev) return JSON.parse(JSON.stringify({ edges: now.edges, total: now.total, inQ: now.inQ }));
+  const out = { edges: {}, total: {}, inQ: prev.inQ + (now.inQ - prev.inQ) * a };
+  CV_EDGES.forEach((e) => {
+    out.edges[e] = {};
+    FLUX_KEYS.forEach((k) => {
+      out.edges[e][k] = prev.edges[e][k] + (now.edges[e][k] - prev.edges[e][k]) * a;
+    });
+  });
+  FLUX_KEYS.forEach((k) => { out.total[k] = prev.total[k] + (now.total[k] - prev.total[k]) * a; });
+  return out;
 }
 
 /** What the reservoir is actually DELIVERING.
@@ -3467,7 +3516,7 @@ function drawOverlay(A) {
                                 z0: Math.min(state.cvDrag.z0, state.cvDrag.z1),
                                 x1: Math.max(state.cvDrag.x0, state.cvDrag.x1),
                                 z1: Math.max(state.cvDrag.z0, state.cvDrag.z1) });
-  } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv);
+  } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv, state.cvShow);
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -3530,6 +3579,10 @@ function placeRake(x) {
   state.rakes.push({ x, buf: null });
   syncPanel();
 }
+
+/** The order the Force box's per-edge quantity cycles in: what crosses the
+ *  face, then what force it carries, then what energy goes with it. */
+const CV_NEXT = { Q: "M", M: "E", E: "Q" };
 
 /** How recently a panel control with a placement was touched → 0..1 pulse. */
 function flashOf(key) {
@@ -4604,6 +4657,7 @@ function boot() {
       LEGEND.sync(); syncPanel();
     }
     else if (k === "l") LEGEND.toggle();
+    else if (k === "b") { state.cvShow = CV_NEXT[state.cvShow] || "Q"; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
@@ -4675,6 +4729,7 @@ window.APP = {
   particlePos: (n) => SIM.particlePos(n),  // x, z pairs — headless only
   placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
+  boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
   placeCV,                                 // the Force box tool, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {

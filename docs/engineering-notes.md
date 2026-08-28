@@ -424,6 +424,29 @@ picture saturated or flat is the symptom of the two having drifted apart.
   per metre, measured on LL-1), so keep boxes short; and a face inside a
   pressurised bore reads ρ·f·g·h, not ρgh (`f = 1 + gh/c²` — +4% at 21 m of
   head at c = 70).
+- **The same box also reports the whole budget, edge by edge** (`SIM.boxFlux`,
+  `B` cycles what the edges are labelled with). Everything is
+  outward-positive and per metre of width: `Q` volume, `M` momentum flux,
+  `Fp` pressure force, `Ė` energy. `M` and `Fp` are kept apart rather than
+  summed — distinguishing them is the content of a control-volume question —
+  and their sum is exactly what `boxForce` returns, which `smoke.js` asserts
+  so the two integrals cannot drift.
+- **`Q` and `ṁ/ρ` are not the same number, and the gap is the compression.**
+  `Q` uses `min(f, 1)`, the geometric volume; the mass terms use `f`, which
+  IS the density here. Below the surface `f > 1` — that is what the pressure
+  is — so the water always carries more mass than volume, by `p/(ρc²)`:
+  0.8% on m1 at the usual celerity, and more wherever a run is pressurised.
+  Never "fix" one to match the other.
+- **Air contributes nothing, by weighting rather than by a threshold.** Every
+  term in the budget carries `f`, so an empty cell adds zero and a half-full
+  one adds half. A cut-off would put a step in every reading taken across a
+  wavy surface, which is exactly where these boxes get drawn.
+- **The budget's own closure is a property of the SCENE, not of the integral.**
+  Σ Q over the four faces is continuity, and it only vanishes once the reach
+  is steady — mid-spin-up a box is still filling and closes to tens of per
+  cent. The card prints the residual as a percentage of what came in for that
+  reason. Do not gate on an absolute closure; gate on the two integrals
+  agreeing with each other, which is what the physics suite does.
 - A fast-math shader compiler is entitled to fold away `isnan()` and `x != x`.
   The NaN guards are written as explicit range tests for that reason.
 - `readPixels` from a float FBO must use `RGBA`/`FLOAT`, which is why `U` and `F`

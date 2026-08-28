@@ -753,7 +753,7 @@ const OVERLAY = (() => {
    *  is the standard deviation of the instantaneous integral over the last
    *  few seconds — the flutter is real (splash crossing the faces), not
    *  measurement noise, and hiding it would overstate the instrument. */
-  function drawCV(ctx, V, cv) {
+  function drawCV(ctx, V, cv, show) {
     const x0 = V.X(cv.x0), x1 = V.X(cv.x1);
     const y0 = V.Y(cv.z1), y1 = V.Y(cv.z0);          // screen y flips
     const col = "#ffd166";
@@ -783,12 +783,72 @@ const OVERLAY = (() => {
         ctx.closePath(); ctx.fill();
       }
       const fN = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
-      chip(ctx, x0, y0 - 12, "F→ " + fN(fx) + " ±" + fN(sd) +
-        " N/m · F↑ " + fN(fz), col);
+      drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN);
     } else {
-      chip(ctx, x0, y0 - 12, "force box · settling…", col);
+      chip(ctx, x0, y0 - 12, "control volume · settling…", col);
     }
     ctx.restore();
+  }
+
+  /** The per-edge budget, written ON the edges it crosses, and the three
+   *  totals under the box.
+   *
+   *  Numbers at the edges rather than in a table because WHICH face a flux
+   *  crosses is half of what a control-volume question is asking a student to
+   *  see; a table of four rows makes them map it back onto the picture
+   *  themselves. Outward-positive throughout, so a sign is a direction: what
+   *  leaves is positive wherever it leaves from. */
+  const CV_Q = {
+    Q:  { label: "Q",  unit: "m²/s", at: (e) => e.Q,  dp: 3,
+          total: "continuity", tUnit: "m²/s" },
+    M:  { label: "M→", unit: "N/m",  at: (e) => e.Mx + e.Fpx, dp: 1,
+          total: "force on what is inside", tUnit: "N/m" },
+    E:  { label: "Ė",  unit: "W/m",  at: (e) => e.E,  dp: 1,
+          total: "energy lost", tUnit: "W/m" },
+  };
+
+  function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
+    const F = cv.flux;
+    const q = CV_Q[show] || CV_Q.Q;
+    const n = (v) => (Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(q.dp));
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillStyle = "rgba(255,209,102,0.92)";
+    if (F) {
+      // Each edge, on its own side of the box. Placed just OUTSIDE, so the
+      // water inside stays readable.
+      const e = F.edges;
+      const mid = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(n(q.at(e.left)), x0 - 6, mid.y);
+      ctx.textAlign = "left";
+      ctx.fillText(n(q.at(e.right)), x1 + 6, mid.y);
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillText(n(q.at(e.top)), mid.x, y0 - 4);
+      ctx.textBaseline = "top";
+      ctx.fillText(n(q.at(e.bed)), mid.x, y1 + 4);
+    }
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    // …and the three conservation laws, in a row, under the box.
+    const head = "Force box · " + q.label + " per edge, " + q.unit + "  ·  B cycles Q / M / Ė";
+    chip(ctx, x0, y0 - 12, head, col);
+    if (!F) return;
+    const inQ = Math.max(F.inQ, 1e-9);
+    const lines = [
+      "Σ Q  " + F.total.Q.toFixed(4) + " m²/s   (" +
+        (100 * Math.abs(F.total.Q) / inQ).toFixed(1) + "% of what came in)",
+      "F→ " + fN(fx) + " ±" + fN(sd) + " N/m    F↑ " + fN(fz) + " N/m",
+      "Σ Ė  " + F.total.E.toFixed(1) + " W/m   (negative is a LOSS)",
+    ];
+    // INSIDE the box, under its header. Everything drawn here is clipped to
+    // the visible domain, so the natural place — under the box — is thrown
+    // away whenever the box reaches the bed, which is most of the time. The
+    // top of a control volume is drawn above the water anyway.
+    // Right-aligned to the box's downstream edge: a jump's own card anchors to
+    // the jump, which is upstream of any control volume drawn around it, and
+    // two cards in one corner is two cards nobody can read.
+    const tall = (y1 - y0) > 3 * 15 + 24;
+    const top = tall ? y0 + 18 : y0 - 12 - lines.length * 15;
+    lines.forEach((t, k) => chip(ctx, x1 - 6, top + k * 15, t, col, "right"));
   }
 
   /** Edge rulers in metres: ticks along the bottom (x stations) and left

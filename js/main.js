@@ -188,6 +188,10 @@ function loadScene(id, keepDrawing) {
   }
   computeView();
   syncPanel();
+  // The scene chose the field and cleared the ranges, so the card has to be
+  // repainted here — every path into a scene comes through this function, and
+  // syncing at the callers instead is how one of them gets missed.
+  LEGEND.sync();
   showToast(sc.name, sc.blurb);
   document.getElementById("sceneName").textContent = sc.name;
   document.getElementById("sceneKey").textContent = sc.key;
@@ -2219,7 +2223,7 @@ const LEGEND = (() => {
   function renderMenu() {
     const m = menu();
     m.textContent = "";
-    FIELDS.forEach((f) => {
+    UIMODE.fields().forEach((f) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "legopt" + (f.mode === state.mode ? " on" : "");
@@ -4522,8 +4526,11 @@ function boot() {
     else if (k === "r") { SIM.resetWater(); clearGaugeHistory(); }
     else if (k === "p") { state.particles = !state.particles; syncPanel(); }
     else if (k === "g") {
-      const i = FIELDS.findIndex((f) => f.mode === state.mode);
-      state.mode = FIELDS[(i + 1) % FIELDS.length].mode;
+      // Over the fields this profile OFFERS, so the key and the card's menu
+      // cannot disagree about what there is to cycle through.
+      const F = UIMODE.fields();
+      const i = F.findIndex((f) => f.mode === state.mode);
+      state.mode = F[(i + 1) % F.length].mode;
       LEGEND.sync(); syncPanel();
     }
     else if (k === "l") LEGEND.toggle();

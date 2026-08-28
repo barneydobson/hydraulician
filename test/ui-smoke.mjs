@@ -464,7 +464,12 @@ async function main() {
         const el = document.getElementById("legend");
         const r = el.getBoundingClientRect();
         const bar = document.getElementById("bar").getBoundingClientRect();
-        return { open: el.classList.contains("open"),
+        const live = APP.ui.FIELDS.find((f) => f.mode === APP.state.mode);
+        // m3 opens on the Froude view, so this also proves the card follows
+        // the SCENE's choice — it used to say "Water" whatever was painted.
+        const nameOk = document.getElementById("legName").textContent === live.name;
+        APP.state.mode = 0; APP.LEGEND.sync();
+        return { open: el.classList.contains("open"), nameOk, live: live.name,
                  name: document.getElementById("legName").textContent,
                  left: r.left, top: r.top, right: r.right, barBottom: bar.bottom,
                  inner: window.innerWidth,
@@ -475,7 +480,7 @@ async function main() {
       check("it clears the strip", p.top >= p.barBottom - 1,
             "legend top " + p.top + " vs bar bottom " + p.barBottom);
       check("it is inside the viewport", p.left >= 0 && p.right <= p.inner);
-      check("it names the live field", /water/i.test(p.name), p.name);
+      check("it names the field the scene chose", p.nameOk, p.live);
       // Water is a TWO-variable encoding — hue from depth, brightness from
       // speed — and a card that showed one bar would be lying about it.
       eq("water shows two keyed rows", p.rows, 2);
@@ -545,6 +550,33 @@ async function main() {
       `);
       check("L puts the legend away", !keyed.shut);
       check("and brings it back", keyed.open);
+
+      // A scene chooses its own field and clears the ranges, so the card has
+      // to follow it. It did not: every caller synced except the scene load.
+      const scened = await tab.evaluate(`
+        APP.switchScene("wave");
+        return { name: document.getElementById("legName").textContent,
+                 want: APP.ui.FIELDS.find((f) => f.mode === APP.state.mode).name };
+      `);
+      eq("a new scene repaints the card", scened.name, scened.want);
+
+      // A profile can narrow the fields on offer, and the menu and the G key
+      // are the two places that offer them — they must not disagree.
+      const narrowFields = await tab.evaluate(`
+        APP.UIMODE.apply({ fields: ["water", "head"] });
+        document.getElementById("legPick").click();
+        const listed = [...document.querySelectorAll("#legmenu .legopt")].length;
+        document.getElementById("legPick").click();
+        const seen = [];
+        for (let k = 0; k < 4; k++) {
+          dispatchEvent(new KeyboardEvent("keydown", { key: "g" }));
+          seen.push(APP.ui.FIELDS.find((f) => f.mode === APP.state.mode).id);
+        }
+        APP.UIMODE.reset();
+        return { listed, seen: [...new Set(seen)].sort().join(",") };
+      `);
+      eq("the menu offers only the profile's fields", narrowFields.listed, 2);
+      eq("and G cycles the same two", narrowFields.seen, "head,water");
       await tab.close();
     }
 

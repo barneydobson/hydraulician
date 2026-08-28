@@ -286,6 +286,46 @@ async function main() {
         return !document.querySelector("#dock .exrules").textContent.match(/=\\s*0\\.45\\b/);
       `));
 
+      // The brief narrows the strip, and says so with a way out.
+      const prof = await tab.evaluate(`
+        const labels = [...document.querySelectorAll("#groups .tbtn")]
+                         .map((b) => b.getAttribute("aria-label"));
+        return { labels, wall: labels.includes("Wall"),
+                 narrowed: APP.UIMODE.narrowed(),
+                 showAll: !!document.getElementById("showAllBtn"),
+                 panelHidden: [...document.querySelectorAll("#panel [data-sec]")]
+                                .filter((e) => e.classList.contains("off")).length,
+                 panelKept: [...document.querySelectorAll("#panel [data-sec]")]
+                                .filter((e) => !e.classList.contains("off")).length };
+      `);
+      check("an exercise puts the drawing tools away", !prof.wall, prof.labels.join(","));
+      check("and offers the way back", prof.showAll && prof.narrowed);
+      check("the panel is focused", prof.panelHidden > 0, prof.panelHidden + " hidden");
+      check("but not emptied", prof.panelKept > 0, prof.panelKept + " kept");
+
+      // Leaving the exercise gives the whole interface back.
+      const left = await tab.evaluate(`
+        APP.switchScene("sandbox");
+        const labels = [...document.querySelectorAll("#groups .tbtn")]
+                         .map((b) => b.getAttribute("aria-label"));
+        return { wall: labels.includes("Wall"), narrowed: APP.UIMODE.narrowed() };
+      `);
+      check("a new scene gives the interface back", left.wall && !left.narrowed);
+
+      // …and coming back re-applies it, even after a lift. `EX.ready` because
+      // pickExercise lands its rig a microtask later.
+      const again = await tab.evaluate(`
+        APP.pickExercise("HJ-1");
+        return APP.EX.ready
+          .then(() => { APP.UIMODE.lift(); APP.pickExercise("HJ-1"); return APP.EX.ready; })
+          .then(() => {
+            const labels = [...document.querySelectorAll("#groups .tbtn")]
+                             .map((b) => b.getAttribute("aria-label"));
+            return { wall: labels.includes("Wall"), narrowed: APP.UIMODE.narrowed() };
+          });
+      `);
+      check("re-picking re-applies the profile", !again.wall && again.narrowed);
+
       // Folding: the exercise stays loaded, the water takes the width back.
       const folded = await tab.evaluate(`
         document.getElementById("dockfold").click();

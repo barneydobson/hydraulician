@@ -222,6 +222,7 @@ function switchScene(id) {
   state.particles = false;            // scenes that want them set `sc.particles`
   state.gaugeField = "h";
   state.tracerN = 9;
+  UIMODE.reset();                     // a new scene is a whole interface again
   GINSP.closeAll();
   if (state.paused) togglePause();    // via the toggle, so the glyph follows
   loadScene(id, false);
@@ -620,6 +621,10 @@ const EX = (() => {
       if (!setControl(k, p[k])) miss.push(k);
     });
     Object.keys(v).forEach((k) => { if (!setControl(k, v[k])) miss.push(k); });
+    // …and how much of the interface this exercise wants in front of a
+    // student. Applied here rather than in `pick` so it lands with everything
+    // else the entry declares, including on a re-pick.
+    UIMODE.apply(UIMODE.fromExercise(ex));
     syncPanel();
     return miss;
   }
@@ -1352,6 +1357,7 @@ const EX = (() => {
     if (!cur) return;
     cur = null; settleTo = 0; settleWhat = "";
     card.hide();
+    UIMODE.reset();          // the exercise's focus goes with the exercise
     refresh();
     syncPanel();
   }

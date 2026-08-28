@@ -5,7 +5,10 @@
 **Scope:** phase A+B of the interface redesign in
 [issue #29](https://github.com/barneydobson/hydraulician/issues/29) and the
 Instrumentation section of the [exercise catalogue](https://claude.ai/code/artifact/77b7c5b5-55f3-4cee-8e22-8656eb463f01)
-(proposal 1, "a legend — objective 3, and the cheapest fix here").
+(proposal 1, "a legend — objective 3, and the cheapest fix here"). Three
+items from #29: *legend for field visualisation (and possibly a way to fix
+the heatmap?)*, the strip's build/measure distinction, and *simplify the UI
+when we are in exercise mode*.
 
 ## The problem
 
@@ -159,15 +162,98 @@ taken). Visible by default, including in exercise mode. On the phone branch
 (< 620 px, bottom sheet) the card sits above the sheet or hides with the
 other chrome, whichever the layout gate proves.
 
+## Exercise UI profiles
+
+Issue #29 also asks to "simplify the UI when we are in exercise mode", and
+the families above are what makes that expressible: an exercise can say
+*build nothing, measure with these two, look at these fields* in one line,
+because there is now a name for each of those things.
+
+Most of the data already exists. `NC-1` declares
+`instruments: [{ tool: "gauge", where: …, why: … }]` — a statement of the
+instruments that exercise needs. `viewParams` already sets view state.
+`studentControls(ex)` already knows which panel controls belong to the
+student. The profile is mostly a matter of *reading what the pack already
+says*.
+
+### The profile
+
+An optional `ui` key on an exercise entry in `js/exercises.js`:
+
+```js
+ui: {
+  build:    false,                  // true | false | ["wall", "erase"]
+  measure:  ["gauge", "rake"],      // true | false | list of tool ids
+  view:     true,                   // true | false | list of item ids
+  fields:   ["water", "head"],      // which of the seven the picker offers
+  legend:   true,
+  panel:    "focused",              // "full" | "focused" | "shut"
+  readouts: { gauges: true, cursor: false, status: true },
+}
+```
+
+`readouts` covers only what has no toggle already: the gauge corner cards,
+the hovering cursor readout, and the status line. Profile labels, jump boxes
+and the channel overlay stay with `viewParams`, which already sets them —
+two ways to say the same thing is how they come to disagree.
+
+### Resolution
+
+A profile is **derived, then overridden**. `UIMODE.fromExercise(ex)` builds
+the default:
+
+- **`measure`** — the tools named in `ex.instruments`, if it declares any;
+  otherwise every instrument, because an exercise that does not say cannot
+  be second-guessed.
+- **`build`** — hidden, unless `ex.instruments` names a build tool
+  (`wall`, `erase`, `valve`, `spout`, `pour`), which is how an exercise that
+  asks a student to draw says so.
+- **`panel`** — `"focused"`: the sections carrying the student's own
+  controls, the controls the exercise itself sets through `rigParams` and
+  `viewParams`, and View. This is a deliberate change of behaviour for the
+  whole pack, and it is safe because of the escape hatch below.
+- **`view`, `fields`, `legend`, `readouts`** — everything, unchanged.
+
+Anything the entry's own `ui` key states wins over the derived value. An
+exercise that declares nothing and lists no instruments therefore keeps
+today's interface exactly, except for the focused panel.
+
+### Always liftable
+
+A **⋯ Show everything** button sits at the end of the strip whenever a
+profile is hiding something, and at the head of the Controls panel. One
+click restores the full interface for the session; picking an exercise
+re-applies its profile.
+
+This is not decoration. The standing acceptance test is that the sandbox
+must be able to reproduce any scene by hand, and a profile that could not
+be lifted would break it. A profile is a considered default, never a cage.
+
+Hidden tools **keep their digit**. Worksheets say "press 5", and renumbering
+the tools under a profile would make the pack lie. Pressing a hidden tool's
+digit says why it is off and points at ⋯ rather than silently doing nothing.
+
+Leaving exercise mode — a new scene, `New sandbox`, closing the exercise —
+restores everything.
+
+### Not in the wire format
+
+Profiles live in `js/exercises.js`, which is code, not the rig JSON. `V` is
+not bumped and share links are unaffected. `check_pack.py` gains a
+validation pass over any `ui` key it finds: tool ids must exist in `TOOLS`,
+field ids in `FIELDS`, `panel` must be one of the three levels.
+
 ## Files
 
 | File | What changes |
 |---|---|
-| [index.html](../../../index.html) | legend markup and CSS; group-caption CSS |
-| [js/main.js](../../../js/main.js) | `FIELDS` registry; `TOOLBAR` regrouped and captioned; `LEGEND` module; `state.range`; `L` key; panel Field select reads the registry |
+| [index.html](../../../index.html) | legend markup and CSS; group-caption CSS; the ⋯ button and the panel's focus switch |
+| [js/main.js](../../../js/main.js) | `FIELDS` registry; `TOOLBAR` regrouped and captioned; `LEGEND` module; `UIMODE` module; `state.range`; `state.ui`; `L` key; panel Field select reads the registry; panel sections respect the profile |
 | [js/shaders.js](../../../js/shaders.js) | ramp control points as JS data; `u_lo` / `u_hi` |
 | [js/sim.js](../../../js/sim.js) | pass `lo` / `hi` through `render`; new `fieldStats(mode)` one-shot readback for Fit |
 | [js/overlay.js](../../../js/overlay.js) | untouched |
+| [js/exercises.js](../../../js/exercises.js) | optional `ui` key; no existing entry has to change |
+| [exercises/_runner/check_pack.py](../../../exercises/_runner/check_pack.py) | validate any `ui` key it finds |
 | [test/ui-smoke.mjs](../../../test/ui-smoke.mjs) | the cases below |
 
 `GINSP`'s closure-local `FIELDS` (a list of gauge *series*, not view fields)
@@ -193,6 +279,19 @@ that can silently break:
 8. **Each field keeps its own range** across a switch away and back.
 9. **Water mode shows two keyed rows**, not one bar.
 10. **The phone branch** keeps the legend clear of the bottom sheet.
+11. **A profile narrows the strip**: an exercise declaring
+    `instruments: [gauge]` shows the gauge and hides the drawing tools, and
+    the button count matches what the resolved profile allows.
+12. **⋯ Show everything restores every control**, and the button goes away
+    once it has.
+13. **A hidden tool's digit still means that tool** — pressing it does not
+    silently select a different one, and does not select the hidden one.
+14. **Leaving the exercise restores the full interface** (new scene, New
+    sandbox, closing the brief).
+15. **A profile survives a re-pick**: picking the same exercise again
+    re-applies it after a lift.
+16. **An exercise that declares nothing keeps the full strip** — the pack
+    cannot be narrowed by accident.
 
 Existing gates that must stay green:
 
@@ -200,7 +299,8 @@ Existing gates that must stay green:
   rig round-trip unchanged (the format is deliberately untouched);
 - `python3 exercises/_runner/check_notation.py` — registry symbols and units
   match the register;
-- `python3 exercises/_runner/check_pack.py` — unaffected, run anyway.
+- `python3 exercises/_runner/check_pack.py` — extended: any `ui` key names
+  tools that exist, fields that exist and a valid panel level.
 
 ## Risks
 
@@ -215,3 +315,13 @@ Existing gates that must stay green:
 - **Fit's `readPixels` stalls the pipeline** for one frame on a large grid.
   It happens on a click, never per frame, which is the same bargain
   `rescaleFill` and `boxForce` already make.
+- **A profile can hide a control an exercise needs.** The derived `panel:
+  "focused"` set is built from the controls the exercise itself touches, so
+  it cannot omit one the rig sets — but a brief whose prose asks for a
+  control nothing declares would send a student looking. ⋯ Show everything
+  is the escape, and the fix is to declare the control, which is worth
+  knowing about anyway.
+- **The pack-wide focused panel is a behaviour change** for all forty
+  exercises at once. It is the one change here that is not additive; the
+  escape hatch and `smoke.js`'s per-exercise pass are what make it
+  reversible in practice.

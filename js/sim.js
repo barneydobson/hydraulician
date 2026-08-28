@@ -406,7 +406,8 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_time"), S.t);
     gl.uniform1i(prog.draw.u("u_mode"), opts.mode);
     gl.uniform1f(prog.draw.u("u_vmax"), opts.vmax);
-    gl.uniform1f(prog.draw.u("u_hmax"), opts.hmax);
+    gl.uniform1f(prog.draw.u("u_lo"), opts.lo);
+    gl.uniform1f(prog.draw.u("u_hi"), opts.hi);
     gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : 0);
     gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
     gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);

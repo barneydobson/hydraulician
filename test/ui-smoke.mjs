@@ -191,6 +191,37 @@ async function main() {
       // A scene with no `valveOpen` starts shut, so an "is it closed?" light
       // would be on here — and on nearly every other boot too.
       check("the valve light is off on a scene with no valve", !p.valveHot);
+
+      // ---- one array of colours, two consumers. The stops used to be vec3
+      // literals inside FS_DISP, so a matching key could only be drawn by
+      // typing the numbers out again somewhere else.
+      const ramp = await tab.evaluate(`
+        const R = APP.ui.RAMPS;
+        const bad = Object.values(R).filter((r) =>
+          r.length !== 5 || r.some((c) => c.length !== 3 ||
+                                          c.some((v) => !(v >= 0 && v <= 1))));
+        return { keys: Object.keys(R).sort().join(","), bad: bad.length };
+      `);
+      eq("both ramps are published", ramp.keys, "divg,turbo");
+      eq("as five rgb stops in 0-1", ramp.bad, 0);
+
+      // Every field must actually render: a shader that fails to compile
+      // throws on the draw, and a mode with no mapping paints nothing.
+      const modes = await tab.evaluate(`
+        const out = [];
+        for (const f of APP.ui.FIELDS) {
+          APP.state.mode = f.mode;
+          APP.frames(1);
+          const r = APP.ui.rangeFor(f.id);
+          out.push([f.id, r[0], r[1]]);
+        }
+        APP.state.mode = 0;
+        return out;
+      `);
+      check("every field renders without error", tab.errors.length === 0, tab.errors[0]);
+      check("every field has a finite range",
+            modes.every(([, lo, hi]) => isFinite(lo) && isFinite(hi) && hi > lo),
+            JSON.stringify(modes));
       await tab.close();
     }
 

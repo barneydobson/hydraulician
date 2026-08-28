@@ -605,6 +605,26 @@ void main(){
   o = vec4(col * (0.35 + 0.65 * t), a * 0.75);
 }`;
 
+  // ------------------------------------------------------------------ ramps
+  /** The colour stops, in JS, because the legend has to paint the SAME bar the
+   *  water is painted with. They used to be `vec3` literals inside FS_DISP,
+   *  which meant the only way to draw a matching key was to type the numbers
+   *  out again somewhere else and hope. Interpolated into the shader source
+   *  below, so there is one array and two consumers.
+   *
+   *  `turbo` is sequential, for quantities with a floor (the heads, speed);
+   *  `divg` is diverging and pale in the middle, for quantities with a
+   *  meaningful centre (Fr = 1, ω = 0, momentum = 0). */
+  const RAMPS = {
+    turbo: [[0.19, 0.07, 0.23], [0.13, 0.56, 0.82], [0.20, 0.83, 0.48],
+            [0.95, 0.78, 0.15], [0.85, 0.14, 0.10]],
+    divg:  [[0.06, 0.24, 0.52], [0.25, 0.61, 0.85], [0.94, 0.95, 0.92],
+            [0.97, 0.63, 0.25], [0.72, 0.10, 0.09]],
+  };
+  const glsl3 = (c) => "vec3(" + c.map((v) => v.toFixed(4)).join(",") + ")";
+  const rampFn = (name, stops) =>
+    "vec3 " + name + "(float t){ return ramp(t," + stops.map(glsl3).join(",") + "); }";
+
   // ----------------------------------------------------------------- display
   const FS_DISP = `#version 300 es
 precision highp float;
@@ -618,7 +638,8 @@ uniform float u_dx, u_g, u_c2, u_valve, u_time;
 uniform float u_tilt;         // scene tiltS0: elevation is z − S₀x when set
 uniform int   u_mode;         // 0 water 1 head 2 speed 3 Froude 4 vorticity
                               // 5 momentum flux 6 piezometric head
-uniform float u_vmax, u_hmax; // colour-scale maxima
+uniform float u_vmax;         // speed scale: the particles and the Water sheen
+uniform float u_lo, u_hi;     // the CURRENT field's colour range, in its units
 uniform float u_dyeOn;
 uniform vec4  u_cursor;       // x, z (m), radius (m), tool tint
 uniform vec4  u_guide;        // preview line x0,z0,x1,z1 (m); w<0 = off
@@ -662,13 +683,21 @@ vec3 ramp(float t, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e){
   if (t < 3.0) return mix(c, d, t - 2.0);
   return mix(d, e, t - 3.0);
 }
-vec3 turbo(float t){
-  return ramp(t, vec3(0.19,0.07,0.23), vec3(0.13,0.56,0.82),
-                 vec3(0.20,0.83,0.48), vec3(0.95,0.78,0.15), vec3(0.85,0.14,0.10));
-}
-vec3 divg(float t){   // blue → pale → red, break at 0.5 (Froude = 1)
-  return ramp(t, vec3(0.06,0.24,0.52), vec3(0.25,0.61,0.85),
-                 vec3(0.94,0.95,0.92), vec3(0.97,0.63,0.25), vec3(0.72,0.10,0.09));
+// Both bodies come from RAMPS above — the legend paints its bar from the same
+// five stops, so the key on screen and the water cannot drift apart.
+${rampFn("turbo", RAMPS.turbo)}
+${rampFn("divg", RAMPS.divg)}   // blue → pale → red, break at 0.5
+
+// The colour range, in the FIELD's own units. Every mode maps through this
+// one pair rather than through a scale of its own, which is what lets the
+// legend's Fit reach the Froude, vorticity and momentum views at all — their
+// scales used to be constants in here that nothing outside could touch.
+float nrm(float v){ return clamp((v - u_lo) / max(u_hi - u_lo, 1e-6), 0.0, 1.0); }
+// Centred mapping: mid lands on the pale band whatever the two ends are.
+// Fr = 1 and ω = 0 are physics, not the midpoint of the range someone typed.
+float nrmMid(float v, float mid){
+  return v < mid ? 0.5 * clamp((v - u_lo) / max(mid - u_lo, 1e-6), 0.0, 1.0)
+                 : 0.5 + 0.5 * clamp((v - mid) / max(u_hi - mid, 1e-6), 0.0, 1.0);
 }
 
 float segDist(vec2 p, vec2 a, vec2 b){
@@ -728,13 +757,13 @@ void main(){
   if (u_mode == 0) {
     vec3 shallow = vec3(0.24, 0.56, 0.78);
     vec3 deep    = vec3(0.05, 0.20, 0.42);
-    water = mix(shallow, deep, clamp(sub / max(u_hmax, 0.05), 0.0, 1.0));
+    water = mix(shallow, deep, nrm(sub));
     water += vec3(0.10, 0.14, 0.16) * clamp(length(U.rg) / max(u_vmax, 0.01), 0.0, 1.0);
   } else if (u_mode == 1) {
     float head = U.b / max(abs(u_g), 1e-3);   // pressure head p/ρg: submergence below the surface (m)
-    water = turbo(head / max(u_hmax, 0.05));
+    water = turbo(nrm(head));
   } else if (u_mode == 2) {
-    water = turbo(length(U.rg) / max(u_vmax, 0.01));
+    water = turbo(nrm(length(U.rg)));
   } else if (u_mode == 3) {
     // STREAMWISE velocity, not the 2D speed magnitude. A Froude number is
     // u/√(gd) — the vertical component is not part of it, and including it
@@ -745,13 +774,13 @@ void main(){
     // where the reach is comfortably subcritical. The depth is per-column so
     // it cannot cause this; measured column-to-column jitter is under 5%.
     float fr = abs(U.r) / sqrt(max(abs(u_g) * dep, 1e-4));
-    water = divg(0.5 * clamp(fr, 0.0, 2.0));
+    water = divg(nrmMid(fr, 1.0));
   } else if (u_mode == 4) {
     ivec2 gi = ivec2(clamp(g, vec2(1.0), u_res - vec2(2.0)));
     float dwdx = texelFetch(u_U, gi + ivec2(1,0), 0).g - texelFetch(u_U, gi - ivec2(1,0), 0).g;
     float dudz = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;
     float vort = (dwdx - dudz) / (2.0 * u_dx);
-    water = divg(0.5 + 0.5 * clamp(vort / 40.0, -1.0, 1.0));
+    water = divg(nrmMid(vort, 0.0));
   } else if (u_mode == 6) {
     // Piezometric head h = z + p/ρg — the potential whose gradient drives the
     // flow. Constant over the depth wherever the flow is hydrostatic, so the
@@ -761,7 +790,7 @@ void main(){
     // A tilted-gravity scene draws a flat bed and carries S₀ in gravity, so the
     // elevation term is z − S₀x there.
     float hp = pm.y - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
-    water = turbo(hp / max(u_res.y * u_dx, 0.05));
+    water = turbo(nrm(hp));
   } else {
     // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
     // display pass runs once per FRAME, not once per substep — it is the two
@@ -771,7 +800,7 @@ void main(){
     // where the momentum actually goes in a jump or under a breaker.
     float sp = length(U.rg);
     float mom = f * U.r * sp;
-    water = divg(0.5 + 0.5 * clamp(mom / max(u_vmax * u_vmax * 0.5, 0.01), -1.0, 1.0));
+    water = divg(nrmMid(mom, 0.0));
   }
   c = mix(c, water, wet);
 
@@ -815,5 +844,6 @@ void main(){
   o = vec4(pow(clamp(c, 0.0, 1.0), vec3(0.95)), 1.0);
 }`;
 
-  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_COL, FS_PART, VS_PART, FS_PART_DRAW, FS_DISP };
+  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_COL, FS_PART, VS_PART, FS_PART_DRAW,
+           FS_DISP, RAMPS };
 })();

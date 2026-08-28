@@ -2732,8 +2732,9 @@ function tickFrame(realDt) {
   if (!state.tracers && state.scene.tracerX && sim.t > 0.5) seedTracers(state.scene.tracerX);
 
   const cur = state.inside ? state.cursor : [-99, -99];
+  const rg = rangeFor(fieldFor(state.mode).id);
   SIM.render(view, {
-    mode: state.mode, vmax: vmaxFor(), hmax: hmaxFor(analysis),
+    mode: state.mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1],
     dye: state.dye, particles: state.particles,
     cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1 : state.brush * 0.55],
     guide: state.drag ? [state.drag.x0, state.drag.z0, state.drag.x1, state.drag.z1] : [0, 0, 0, 0],
@@ -2753,11 +2754,10 @@ function tickFrame(realDt) {
   cycleTips(realDt);
 }
 
+/** The speed scale — the particle colouring and the Water view's brightness
+ *  term, both of which are speed whatever field is up. The FIELD's own range
+ *  is `rangeFor`, and the two are deliberately separate. */
 function vmaxFor() { return state.scene.vmax || 4; }
-function hmaxFor() {
-  return state.mode === 1 ? (state.scene.headMax || 3)
-                         : (state.scene.hmax || (state.scene.g ? 2.0 : 1));
-}
 
 /** One sample per gauge per rendered frame — but ONLY when the clock has moved.
  *
@@ -4088,7 +4088,8 @@ window.APP = {
   // The chrome, for headless work: test/ui-smoke.mjs drives the strip, the
   // side panel and the start screen through here rather than by synthesising
   // clicks at pixel positions.
-  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor },
+  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor,
+        RAMPS: Shaders.RAMPS },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)

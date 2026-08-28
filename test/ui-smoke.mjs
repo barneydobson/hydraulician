@@ -586,6 +586,55 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------- placing and removing
+    console.log("\nan instrument you can place is an instrument you can remove");
+    {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // Gauges and rakes were the only instruments with no way back: every
+      // click pushed another, and the only way to lose one was to place four
+      // more. The tape, the Force box and the tracers all clear on a click.
+      const g = await tab.evaluate(`
+        APP.state.tool = "gauge";
+        APP.placeGauge(3.0, 0.5);
+        APP.placeGauge(6.0, 0.5);
+        const placed = APP.state.gauges.length;
+        APP.placeGauge(6.0, 0.5);          // the same place again = remove it
+        const after = APP.state.gauges.length;
+        const left = APP.state.gauges.map((q) => +q.x.toFixed(2));
+        return { placed, after, left };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("two gauges go down", g.placed, 2);
+      eq("clicking one takes it away", g.after, 1);
+      eq("and it is the one that was clicked", g.left.join(","), "3");
+
+      const r = await tab.evaluate(`
+        APP.state.tool = "rake";
+        APP.placeRake(4.0);
+        const placed = APP.state.rakes.length;
+        APP.placeRake(4.02);               // within the grab radius = remove it
+        return { placed, after: APP.state.rakes.length };
+      `);
+      eq("a rake goes down", r.placed, 1);
+      eq("clicking it takes it away", r.after, 0);
+
+      // …and the panel says so too, for anyone who does not know the gesture.
+      const cleared = await tab.evaluate(`
+        APP.placeGauge(2.0, 0.5);
+        APP.placeGauge(8.0, 0.5);
+        const before = APP.state.gauges.length;
+        const btn = [...document.querySelectorAll("#c_gaugeInspect button")]
+                      .find((b) => /clear|✕/i.test(b.textContent));
+        if (!btn) return { before, found: false };
+        btn.click();
+        return { before, found: true, after: APP.state.gauges.length };
+      `);
+      check("the panel offers a clear-all", cleared.found);
+      check("and it empties them", cleared.found && cleared.after === 0,
+            "was " + cleared.before + ", now " + cleared.after);
+      await tab.close();
+    }
+
     // ------------------------------------------------------------ particles
     console.log("\nparticles travel at the water's speed, not the wall clock's");
     {

@@ -1745,6 +1745,19 @@ const CONTROLS = [
       c.disabled = !state.gauges.length;
       c.onclick = () => { c.blur(); GINSP.download(state.gauges, "gauges"); };
       el.appendChild(c);
+      // The gesture is to click a gauge with the Gauge tool, which nobody
+      // knows until they are told. This is where they are told.
+      const x = document.createElement("button");
+      x.textContent = "✕ Clear all";
+      x.title = "Remove every gauge — or click one with the Gauge tool to remove just that one";
+      x.disabled = !state.gauges.length;
+      x.onclick = () => {
+        x.blur();
+        GINSP.closeAll();
+        state.gauges.length = 0;
+        syncPanel();
+      };
+      el.appendChild(x);
     },
     fmt: () => state.gauges.length
       ? state.gauges.length + " gauge" + (state.gauges.length > 1 ? "s" : "") +
@@ -1980,8 +1993,8 @@ const TOOLS = [
   ["erase", "Erase", "Left-drag to remove"],
   ["valve", "Valve", "Draw a gate you can slam with V"],
   ["spout", "Spout", "Click or drag to move the falling inflow"],
-  ["gauge", "Gauge", "Click to log head / depth"],
-  ["rake", "Rake", "Click for a velocity–depth profile"],
+  ["gauge", "Gauge", "Click to log head / depth — click one again to remove it"],
+  ["rake", "Rake", "Click for a velocity–depth profile — click it again to remove it"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
   ["cv", "Force box", "Left-drag a control volume — reads the force on what it encloses. Click to clear"],
@@ -3013,18 +3026,8 @@ function onDown(e) {
     syncPanel();
     return;
   }
-  if (state.tool === "gauge") {
-    if (state.gauges.length >= 4) state.gauges.shift();
-    state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
-                        colour: CONFIG.gaugeColours[state.gauges.length % 4] });
-    syncPanel();                      // the inspector row lists the live gauges
-    return;
-  }
-  if (state.tool === "rake") {
-    if (state.rakes.length >= 2) state.rakes.shift();
-    state.rakes.push({ x, buf: null });
-    return;
-  }
+  if (state.tool === "gauge") { placeGauge(x, z); return; }
+  if (state.tool === "rake") { placeRake(x); return; }
   if (state.tool === "tracer") {
     // Click anywhere in the water to hang a fresh column of tracers there;
     // click on dry ground to clear them.
@@ -3487,6 +3490,47 @@ function drawOverlay(A) {
   }
 }
 
+/** Screen distance, in CSS pixels, between a domain point and a place on the
+ *  view. Hit-testing an instrument has to happen in PIXELS: the vertical
+ *  exaggeration is up to 8×, so a radius in metres is a tall thin ellipse on
+ *  screen and a gauge you are plainly pointing at is a miss. */
+function pxApart(x0, z0, x1, z1) {
+  const dx = (x1 - x0) * view.w / sim.W;
+  const dz = (z1 - z0) * view.h / sim.H;
+  return Math.hypot(dx, dz);
+}
+const GRAB_PX = 16;      // a finger is 44 px; this is for a pointed-at marker
+
+/** Place a gauge — or take away the one you just pointed at.
+ *
+ *  Gauges and rakes were the only instruments with no way back: every click
+ *  pushed another one, and the only way to lose one was to place four more.
+ *  The tape, the Force box and the orbit tracers all already clear on a click,
+ *  so this is the convention the rest of the toolbox was using. */
+function placeGauge(x, z) {
+  const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < GRAB_PX);
+  if (hit >= 0) {
+    const gone = state.gauges.splice(hit, 1)[0];
+    GINSP.closeFor(gone);
+    syncPanel();
+    return;
+  }
+  if (state.gauges.length >= 4) state.gauges.shift();
+  state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
+                      colour: CONFIG.gaugeColours[state.gauges.length % 4] });
+  syncPanel();                      // the inspector row lists the live gauges
+}
+
+/** Place a rake — or take away the one at that station. A rake is a whole
+ *  column, so only the station is compared. */
+function placeRake(x) {
+  const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < GRAB_PX);
+  if (hit >= 0) { state.rakes.splice(hit, 1); syncPanel(); return; }
+  if (state.rakes.length >= 2) state.rakes.shift();
+  state.rakes.push({ x, buf: null });
+  syncPanel();
+}
+
 /** How recently a panel control with a placement was touched → 0..1 pulse. */
 function flashOf(key) {
   if (state.flashKey !== key) return 0;
@@ -3817,6 +3861,11 @@ const GINSP = (() => {
     o.el.remove();
   }
   function closeAll() { while (open.length) hide(open[0]); }
+  /** Close the window belonging to a gauge that has just been removed —
+   *  otherwise it hangs about plotting a series nothing is feeding. */
+  function closeFor(g) {
+    for (let k = open.length - 1; k >= 0; k--) if (open[k].g === g) hide(open[k]);
+  }
 
   // ---- time-axis helpers
   function span(o) { return Math.max(o.t1 - o.t0, 1e-6); }
@@ -4024,7 +4073,7 @@ const GINSP = (() => {
     return { name, text };
   }
 
-  return { show, hide, closeAll, tick, csv, download, open, draw };
+  return { show, hide, closeAll, closeFor, tick, csv, download, open, draw };
 })();
 
 // ------------------------------------------------------- rig save / share
@@ -4624,6 +4673,7 @@ window.APP = {
   frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
   probe: (x, z) => SIM.probe(x, z),
   particlePos: (n) => SIM.particlePos(n),  // x, z pairs — headless only
+  placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   placeCV,                                 // the Force box tool, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */

@@ -65,7 +65,7 @@
      its shortcut — sixteen words of chrome became sixteen glyphs. */
   #bar {
     position: fixed; top: 10px; left: 12px; right: calc(var(--dock) + 12px);
-    z-index: 10; height: 52px; display: flex; align-items: center; gap: 4px;
+    z-index: 10; height: 63px; display: flex; align-items: center; gap: 4px;
     padding: 0 8px 0 12px;
   }
   #brand {
@@ -82,7 +82,24 @@
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
   }
   #groups::-webkit-scrollbar { display: none; }
-  .tgrp { display: flex; align-items: center; gap: 2px; }
+  /* A group is a captioned COLUMN. The caption names the family — build the
+     rig, measure it, look at it — which is the distinction the strip could not
+     make when the families were adjacent rows split by a hairline: nothing on
+     screen said that Wall changes the rig and Gauge does not. */
+  .tgrp { display: flex; flex-direction: column; align-items: stretch; gap: 1px; }
+  .trow { display: flex; align-items: center; gap: 2px; }
+  .tcap {
+    font: 600 8.5px ui-monospace, SFMono-Regular, monospace;
+    letter-spacing: .13em; text-align: center; line-height: 10px; height: 10px;
+    opacity: .75; user-select: none; white-space: nowrap;
+    color: rgba(223,232,242,0.55);
+  }
+  /* One accent per family, on the caption only: the buttons keep the single
+     "this is in your hand" blue, because two colour languages on one glyph is
+     one too many. */
+  .fam-build   .tcap { color: rgba(255,207,148,0.78); }
+  .fam-measure .tcap { color: rgba(127,212,255,0.78); }
+  .fam-view    .tcap { color: rgba(169,230,192,0.78); }
   .tbtn {
     appearance: none; border: 0; background: transparent; padding: 0;
     width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px;
@@ -106,7 +123,10 @@
     background: rgba(255,182,72,0.18); color: #ffd9a0;
     box-shadow: inset 0 0 0 1px rgba(255,182,72,0.50);
   }
-  .tsep { width: 1px; height: 22px; background: rgba(255,255,255,0.13); margin: 0 4px; flex: 0 0 auto; }
+  /* The hairline and the caption do the same job, so only one of them is ever
+     shown: captions while there is room for them, the rule once they go. */
+  .tsep { width: 1px; height: 32px; background: rgba(255,255,255,0.13);
+          margin: 0 3px; flex: 0 0 auto; display: none; }
 
   /* The scene chip: still the scene picker's affordance, now the right end of
      the strip. Two lines — what is loaded, and the live clock. */
@@ -135,13 +155,25 @@
      strip rather than from a viewport media query — the side panel takes its
      width out of the bar too, so the window size does not say whether the
      icons fit. */
+  /* The caption is decoration before it is information, so it is the first
+     thing dropped when the strip runs out of room — never a control. The
+     hairline comes back in its place, and the bar loses the row's height. */
+  #bar.tight .tcap { display: none; }
+  #bar.tight .tsep { display: block; }
+  #bar.tight { height: 52px; }
   #bar.tight .tbtn { width: 32px; height: 32px; }
-  #bar.tight .tsep { margin: 0 2px; }
+  #bar.tight .tsep { margin: 0 2px; height: 22px; }
   #bar.tight #brand .word { display: none; }
   #bar.tighter .tbtn { width: 30px; height: 30px; }
   #bar.tighter #groups { gap: 2px; }
-  #bar.tighter .tgrp { gap: 0; }
+  #bar.tighter .trow { gap: 0; }
   #bar.tighter #status { display: none; }
+  /* The last rung before the groups have to scroll. Twenty-six glyphs at
+     26 px still fit an 1100 px strip, which is what a 1440 px window with the
+     exercise panel open actually has. */
+  #bar.tightest .tbtn { width: 26px; height: 26px; }
+  #bar.tightest .tsep { display: none; }
+  #bar.tightest #groups { gap: 1px; }
   /* At this width the mark is the only thing on the strip that is decoration,
      so it is the last thing to go before a control would have to. */
   #bar.tighter #brand { display: none; }
@@ -152,6 +184,69 @@
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
     mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
   }
+
+  /* ------------------------------------------------------------- the legend */
+  /* Seven colourings existed long before anything on screen said which one was
+     up, over what range, in what units — so a screenshot pasted into a
+     worksheet carried no statement of what it showed. Top left, because the
+     gauge cards stack bottom-right and the ruler owns the edges. */
+  #legend {
+    position: fixed; z-index: 12; left: 12px; top: 84px; width: 236px;
+    display: none; padding: 9px 11px 8px; gap: 5px; flex-direction: column;
+    font: 11.5px system-ui, sans-serif;
+  }
+  #legend.open { display: flex; }
+  #legPick {
+    appearance: none; background: transparent; border: 1px solid transparent;
+    border-radius: 8px; color: inherit; cursor: pointer; text-align: left;
+    padding: 2px 30px 2px 4px; margin: -2px -4px 0;   /* clears the corner - */
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  #legPick:hover, #legPick.open { background: rgba(255,255,255,0.08); border-color: rgba(77,195,255,0.40); }
+  #legPick b { font-size: 12.5px; font-weight: 600; }
+  #legPick i { font: 11px ui-monospace, monospace; opacity: .60; font-style: normal; }
+  #legPick .caret { font-size: 9px; opacity: .5; margin-left: auto; }
+  #legPick:hover .caret, #legPick.open .caret { color: #7fd4ff; opacity: 1; }
+  .legrow { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
+  .legbar { height: 10px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.10); }
+  .legcap {
+    font: 10px ui-monospace, monospace; opacity: .58;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  #legFoot, #legActs { display: flex; align-items: center; gap: 6px; }
+  #legFoot { font: 10.5px ui-monospace, monospace; opacity: .82; margin-top: 2px; }
+  #legFoot .grow { flex: 1 1 auto; }
+  .legnum {
+    padding: 1px 4px; border-radius: 5px; cursor: text; outline: none;
+    border: 1px solid transparent; font-variant-numeric: tabular-nums;
+  }
+  .legnum:hover { background: rgba(255,255,255,0.08); }
+  .legnum:focus { background: rgba(12,17,26,0.92); border-color: rgba(77,195,255,0.55); }
+  #legActs button {
+    appearance: none; background: rgba(255,255,255,0.07); color: inherit;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;
+    padding: 2px 9px; font: 10.5px system-ui, sans-serif; cursor: pointer;
+  }
+  #legActs button:hover { background: rgba(77,195,255,0.22); }
+  #legmenu {
+    position: fixed; z-index: 40; display: none; padding: 6px; width: 312px;
+    max-height: 70vh; overflow: auto;
+  }
+  #legmenu.open { display: block; }
+  .legopt {
+    display: block; width: 100%; text-align: left; appearance: none;
+    background: transparent; border: 0; border-radius: 8px; color: inherit;
+    padding: 6px 9px; cursor: pointer;
+  }
+  .legopt:hover { background: rgba(255,255,255,0.09); }
+  .legopt.on { background: rgba(77,195,255,0.18); }
+  .legopt b { font: 600 12px system-ui, sans-serif; }
+  .legopt i { font: 10.5px ui-monospace, monospace; opacity: .6; font-style: normal; margin-left: 6px; }
+  .legopt span { display: block; font-size: 11px; opacity: .62; margin-top: 2px; }
+  /* On a phone the bottom sheet owns the lower half and the strip the top, so
+     there is no room for a floating card as well. The field stays reachable
+     from Controls. */
+  @media (max-width: 620px) { #legend.open { display: none; } }
 
   /* ---------------------------------------------------------- hover card */
   /* Replaces every `title=` on the strip: a native tooltip cannot carry the
@@ -518,6 +613,11 @@
     .tbtn { width: 44px; height: 44px; }
     #bar.tight .tbtn { width: 42px; height: 42px; }
     #bar.tighter .tbtn { width: 40px; height: 40px; }
+    #bar.tightest .tbtn { width: 38px; height: 38px; }
+    /* A 44 px target and a caption do not both fit a strip this tall, and the
+       target is the one that cannot be given up. */
+    .tcap { display: none; }
+    .tsep { display: block; }
     #bar { height: 58px; }
     #panel { top: 78px; }
     /* Shortcuts are for machines with keys. */
@@ -733,6 +833,30 @@
   </button>
 </div>
 
+<!-- The colour key, and the field picker, because they are the same question.
+     DOM rather than part of the overlay canvas: it carries a menu, a button
+     and two editable numbers, which is hit-testing and text entry the 2D
+     context would have to be taught from scratch. A window or CDP screenshot
+     captures it either way, which is the point — a screenshot in a worksheet
+     should say what it is showing. -->
+<div id="legend" class="glass">
+  <button id="legPick" type="button" title="Which variable the colour shows">
+    <b id="legName">Water</b><i id="legSym"></i><span class="caret">▾</span>
+  </button>
+  <div id="legBars"></div>
+  <div id="legFoot">
+    <span id="legLo" class="legnum" contenteditable="true" spellcheck="false">0</span>
+    <span class="grow"></span>
+    <span id="legHi" class="legnum" contenteditable="true" spellcheck="false">1</span>
+    <span id="legUnit"></span>
+  </div>
+  <div id="legActs">
+    <button id="legFit" type="button" title="Rescale once to this frame — the 99th percentile over wet cells">Fit</button>
+    <button id="legDef" type="button" title="Back to the scene's own scale">⟲ scene</button>
+  </div>
+  <button class="minbtn corner" id="legX" title="Put the legend away (L)">–</button>
+</div>
+<div id="legmenu" class="glass"></div>
 <div id="tip" class="glass"></div>
 
 <div id="scenemenu" class="glass gmenu" role="menu" aria-label="Scenes"></div>

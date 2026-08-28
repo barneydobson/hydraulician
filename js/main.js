@@ -1399,13 +1399,13 @@ const FIELDS = [
     ramp: "water", def: () => [0, hmaxScene()],
     blurb: "Depth below the local free surface as hue, with speed added on top as brightness. Two variables at once — read the legend's two rows, not the colour alone." },
   { mode: 1, id: "phead", name: "Pressure head", sym: "p/ρg", unit: "m",
-    ramp: "turbo", def: () => [0, state.scene.headMax || 3],
+    ramp: "turbo", def: () => [0, sceneNow().headMax || 3],
     blurb: "The pressure alone. In still water it is simply the depth below the surface, so it climbs down every column and is not comparable between cells at different heights." },
   { mode: 6, id: "head", name: "Piezometric head", sym: "h = z + p/ρg", unit: "m",
     ramp: "turbo", def: () => [0, sim ? sim.H : 1],
     blurb: "The potential whose gradient drives the flow. Its bands stand vertical wherever the flow is hydrostatic and bend exactly where vertical accelerations matter — crests, brinks, a chute toe, a gate contraction, a jump roller." },
   { mode: 2, id: "speed", name: "Speed", sym: "|u|", unit: "m/s",
-    ramp: "turbo", def: () => [0, state.scene.vmax || 4],
+    ramp: "turbo", def: () => [0, sceneNow().vmax || 4],
     blurb: "The magnitude of the velocity, √(u² + w²) — the direction is not in it. Particles and dye are what show where the water is going." },
   { mode: 3, id: "froude", name: "Froude number", sym: "Fr", unit: "",
     ramp: "divg", mid: 1, def: () => [0, 2],
@@ -1418,10 +1418,14 @@ const FIELDS = [
     blurb: "Momentum per unit volume, signed by the streamwise direction, so a returning roller or an undertow reads opposite to the flow that drives it." },
 ];
 
+/** The live scene, or an empty stand-in. The legend is built before the first
+ *  scene is loaded — it is what the start screen sits on top of — so every
+ *  default here has to survive `state.scene` being null. */
+function sceneNow() { return state.scene || {}; }
 /** The scene's own maximum for the Water view's depth hue. */
-function hmaxScene() { return state.scene.hmax || (state.scene.g ? 2.0 : 1); }
+function hmaxScene() { const s = sceneNow(); return s.hmax || (s.g ? 2.0 : 1); }
 /** The momentum-flux scale, as the display pass has always computed it. */
-function momScene() { return 0.5 * Math.pow(state.scene.vmax || 4, 2); }
+function momScene() { return 0.5 * Math.pow(sceneNow().vmax || 4, 2); }
 
 /** The registry entry for a shader mode integer. */
 function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }
@@ -1660,7 +1664,7 @@ const CONTROLS = [
   { id: "mode", type: "select", label: "Field",
     opts: FIELDS.map((f) => [String(f.mode), f.name]),
     get: () => String(state.mode),
-    set: (v) => { state.mode = +v; },
+    set: (v) => { state.mode = +v; LEGEND.sync(); },
     fmt: () => fieldFor(state.mode).blurb },
   { id: "ruler", type: "check", label: "Ruler",
     get: () => state.ruler, set: (v) => state.ruler = v,
@@ -1954,6 +1958,17 @@ const ICONS = {
            '<circle cx="13" cy="10" r="1.9" fill="#070b0f"/><circle cx="6.5" cy="14" r="1.9" fill="#070b0f"/>',
   keys:    '<rect x="2.5" y="6" width="15" height="8" rx="1.5"/><path d="M5.5 9h.01M8 9h.01M10.5 9h.01M13 9h.01M14.5 9h.01M6.5 11.6h7"/>',
   about:   '<path d="M10 3.5 17 7l-7 3.5L3 7Z"/><path d="M3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5" opacity=".55"/>',
+  // ---- VIEW: what the water is painted with, and what is drawn over it.
+  // A colour bar with its ticks; the dashes ARE the numbers under a legend.
+  legend:  '<rect x="3" y="5.5" width="14" height="4.5" rx="1"/>' +
+           '<path d="M3 13h3M8.5 13h3M14 13h3"/>',
+  particles: '<circle cx="5" cy="7" r="1.3"/><circle cx="11" cy="5.5" r="1.3"/>' +
+             '<circle cx="15" cy="9.5" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/>' +
+             '<circle cx="13" cy="15" r="1.3"/>',
+  dye:     '<path d="M10 3.5c3 3.6 4.5 5.9 4.5 8a4.5 4.5 0 0 1-9 0c0-2.1 1.5-4.4 4.5-8Z"/>',
+  // The two grade lines over a wavy surface: what the overlay actually draws.
+  channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
+           '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
 };
 
 /** An `<svg>` for one icon id. */
@@ -1995,6 +2010,193 @@ const TIP = (() => {
   return { show, hide, hoverable };
 })();
 
+/** The colour key — and the field picker, because they are the same question.
+ *
+ *  The seven colourings existed long before anything on screen said which one
+ *  was up, over what range, or in what units; a screenshot pasted into a
+ *  worksheet therefore carried no statement of what it showed. Worse, the
+ *  default Water view is a TWO-variable encoding — hue from submergence,
+ *  brightness added from speed — so "dark blue" was ambiguous between deep and
+ *  fast and nothing said so.
+ *
+ *  The card is built from FIELDS, so a field cannot be added without its
+ *  legend arriving with it, and its bar is painted from `Shaders.RAMPS` — the
+ *  same five stops the water is painted with. */
+const LEGEND = (() => {
+  let open = true, menuOpen = false;
+  const el = () => document.getElementById("legend");
+  const menu = () => document.getElementById("legmenu");
+
+  /** A CSS gradient from the ramp the shader itself uses. */
+  function css(stops) {
+    return "linear-gradient(to right," + stops.map((c, k) =>
+      "rgb(" + c.map((v) => Math.round(v * 255)).join(",") + ") " +
+      (100 * k / (stops.length - 1)).toFixed(0) + "%").join(",") + ")";
+  }
+  const RAMP_CSS = {
+    turbo: () => css(Shaders.RAMPS.turbo),
+    divg:  () => css(Shaders.RAMPS.divg),
+    // The Water view's own hue ramp, shallow → deep, as FS_DISP mixes it.
+    water: () => css([[0.24, 0.56, 0.78], [0.05, 0.20, 0.42]]),
+  };
+
+  function build() {
+    document.getElementById("legPick").onclick = (e) => { e.stopPropagation(); toggleMenu(); };
+    document.getElementById("legX").onclick = () => close();
+    document.getElementById("legFit").onclick = (e) => { e.target.blur(); fit(); };
+    document.getElementById("legDef").onclick = (e) => {
+      e.target.blur();
+      const f = fieldFor(state.mode);
+      state.range[f.id] = f.def();
+      sync();
+    };
+    ["legLo", "legHi"].forEach((id, k) => {
+      const box = document.getElementById(id);
+      box.addEventListener("blur", () => commit(k, box.textContent));
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); box.blur(); }
+        if (e.key === "Escape") { e.preventDefault(); sync(); box.blur(); }
+        e.stopPropagation();      // the app's one-key shortcuts are not for a text box
+      });
+    });
+    el().classList.toggle("open", open);
+    sync();
+  }
+
+  /** A typed end of the range. A pair that is not strictly increasing divides
+   *  by zero in the shader's mapping, so it is refused rather than clamped —
+   *  the box simply goes back to what it was showing. */
+  function commit(k, text) {
+    const f = fieldFor(state.mode), r = rangeFor(f.id).slice();
+    const v = parseFloat(String(text).replace(/[^\d.eE+-]/g, ""));
+    if (isFinite(v)) { r[k] = v; if (r[1] > r[0]) state.range[f.id] = r; }
+    sync();
+  }
+
+  /** Rescale to the frame this was clicked on, and then hold. */
+  function fit() {
+    const f = fieldFor(state.mode);
+    const s = SIM.fieldStats(state.mode);
+    if (!s) {
+      showToast("Nothing to fit",
+                "No wet cells on screen yet — pour some water in first.");
+      return;
+    }
+    if (f.mid !== undefined) {
+      // A diverging ramp keeps its centre: Fr = 1 and ω = 0 are physics, not
+      // the midpoint of whatever the reading happened to be.
+      const m = Math.max(f.mid - s.lo, s.hi - f.mid, 1e-6);
+      state.range[f.id] = [f.mid - m, f.mid + m];
+    } else {
+      state.range[f.id] = [Math.min(0, s.lo), Math.max(s.hi, s.lo + 1e-3)];
+    }
+    sync();
+  }
+
+  /** Repaint from live state. Cheap enough to call from the panel, the G key
+   *  and every open or close. */
+  function sync() {
+    if (!el()) return;
+    const f = fieldFor(state.mode), r = rangeFor(f.id);
+    document.getElementById("legName").textContent = f.name;
+    document.getElementById("legSym").textContent = f.sym;
+    document.getElementById("legUnit").textContent = f.unit;
+    document.getElementById("legLo").textContent = fmtNum(r[0]);
+    document.getElementById("legHi").textContent = fmtNum(r[1]);
+    const bars = document.getElementById("legBars");
+    bars.textContent = "";
+    if (f.id === "water") {
+      // TWO variables, and the card has to say so: a reader told only "blue"
+      // cannot tell deep water from fast water. The right-hand word is which
+      // CHANNEL of the colour carries it, which is the part nothing said.
+      bars.appendChild(row(RAMP_CSS.water(), "depth below surface", "hue"));
+      bars.appendChild(row("linear-gradient(to right, rgba(255,255,255,0.05), rgba(255,255,255,0.55))",
+                           "speed, 0 – " + fmtNum(vmaxFor()) + " m/s", "brightness"));
+    } else {
+      // The numbers are on the foot row, where they can be typed into; the
+      // caption carries the symbol so the bar is not an anonymous smear.
+      bars.appendChild(row(RAMP_CSS[f.ramp](), f.sym || f.name,
+                           f.mid !== undefined ? "pale = " + f.sym + " " + f.mid : ""));
+    }
+    const b = document.getElementById("legendBtn");
+    if (b) b.classList.toggle("on", open);
+    if (menuOpen) renderMenu();
+  }
+
+  function row(gradient, left, right) {
+    const d = document.createElement("div"); d.className = "legrow";
+    const bar = document.createElement("div"); bar.className = "legbar";
+    bar.style.background = gradient;
+    const cap = document.createElement("div"); cap.className = "legcap";
+    const a = document.createElement("span"); a.textContent = left;
+    const c = document.createElement("span"); c.textContent = right;
+    cap.appendChild(a); cap.appendChild(c);
+    d.appendChild(bar); d.appendChild(cap);
+    return d;
+  }
+
+  /** Three figures that read, without exponent soup on a 0.0004 range. */
+  function fmtNum(v) {
+    if (!isFinite(v)) return "—";
+    const a = Math.abs(v);
+    return a >= 100 ? v.toFixed(0)
+         : a >= 1 ? v.toFixed(2)
+         : a >= 0.01 ? v.toFixed(3)
+         : v === 0 ? "0" : v.toExponential(1);
+  }
+
+  function renderMenu() {
+    const m = menu();
+    m.textContent = "";
+    FIELDS.forEach((f) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "legopt" + (f.mode === state.mode ? " on" : "");
+      b.dataset.mode = String(f.mode);
+      const t = document.createElement("b"); t.textContent = f.name;
+      const s = document.createElement("i"); s.textContent = f.sym;
+      const w = document.createElement("span"); w.textContent = f.blurb;
+      b.appendChild(t); b.appendChild(s); b.appendChild(w);
+      b.onclick = () => { state.mode = f.mode; closeMenu(); sync(); syncPanel(); };
+      m.appendChild(b);
+    });
+    const a = document.getElementById("legPick").getBoundingClientRect();
+    m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, a.left)) + "px";
+    m.style.top = Math.max(8, Math.min(innerHeight - m.offsetHeight - 8, a.bottom + 6)) + "px";
+  }
+  function toggleMenu() { if (menuOpen) closeMenu(); else openMenu(); }
+  function openMenu() {
+    menuOpen = true; menu().classList.add("open");
+    document.getElementById("legPick").classList.add("open");
+    renderMenu();
+  }
+  function closeMenu() {
+    menuOpen = false;
+    if (menu()) menu().classList.remove("open");
+    const p = document.getElementById("legPick");
+    if (p) p.classList.remove("open");
+  }
+  function onDown(e) {
+    if (!menuOpen) return;
+    if (menu().contains(e.target)) return;
+    if (document.getElementById("legPick").contains(e.target)) return;
+    closeMenu();
+  }
+
+  function setOpen(v) {
+    open = v;
+    if (el()) el().classList.toggle("open", open);
+    closeMenu();
+    sync();
+    syncToolbar();
+  }
+  return { build, sync, fit, onDown,
+           isOpen: () => open,
+           open: () => setOpen(true),
+           close: () => setOpen(false),
+           toggle: () => setOpen(!open) };
+})();
+
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
  *  the keyboard and the panel's own – all need it. */
 function setPanel(open) {
@@ -2028,12 +2230,23 @@ function newSandbox() {
   switchScene("sandbox");     // announces itself — `loadScene` toasts the blurb
 }
 
-/** The strip, as data. Five groups, in the order a session uses them: what to
- *  load, what to draw with, what to measure with, what the clock is doing, and
- *  what to look at. `id` is set on the button where another module already
- *  looks one up by name (PICKER and EX light their own opener). */
+/** The strip, as data. Five captioned families, in the order a session uses
+ *  them: what to LOAD, what to BUILD the rig with, what to MEASURE it with,
+ *  how to VIEW the water, and what the clock is doing.
+ *
+ *  The caption is the point of the regrouping. Build and Measure used to be
+ *  adjacent groups separated by a hairline, and nothing on screen said that
+ *  Wall changes the rig and Gauge does not — which is the whole difference
+ *  between setting an experiment up and taking a reading from it. VIEW is a
+ *  third family rather than part of Measure: it changes how the water is
+ *  DRAWN and nothing about what is being measured, which is also why the
+ *  averaging toggle and streamlines will belong there rather than among the
+ *  instruments.
+ *
+ *  `id` is set on the button where another module already looks one up by
+ *  name (PICKER and EX light their own opener). */
 const TOOLBAR = [
-  [
+  { cap: "SESSION", family: "session", items: [
     { id: "homeBtn", icon: "home", label: "Start", key: "H",
       hint: "The exercise pack, the sandbox and the scenes",
       act: () => START.open() },
@@ -2046,17 +2259,43 @@ const TOOLBAR = [
     { id: "newBtn", icon: "fresh", label: "New sandbox", key: "N",
       hint: "A blank flume — clears what is drawn and starts over",
       act: () => newSandbox() },
-  ],
-  // Draw: the four drawing tools, Pour beside them, and Undo — which was the
-  // Z key and nothing else, so on a touch screen a mis-drawn stroke could not
-  // be taken back at all.
-  TOOLS.slice(0, 4).map(toolItem).concat(
-    [toolItem(TOOLS[TOOLS.length - 1])],
-    [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
-       hint: "Take back the last thing you drew",
-       act: () => SIM.undoSeg() }]),
-  TOOLS.slice(4, TOOLS.length - 1).map(toolItem),
-  [
+  ] },
+  // BUILD: the four drawing tools, Pour beside them, Undo — which was the Z
+  // key and nothing else, so on a touch screen a mis-drawn stroke could not be
+  // taken back at all — and Clear, which used to sit with the clock although
+  // it edits the rig rather than running it.
+  { cap: "BUILD", family: "build", items:
+    TOOLS.slice(0, 4).map(toolItem).concat(
+      [toolItem(TOOLS[TOOLS.length - 1])],
+      [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
+         hint: "Take back the last thing you drew",
+         act: () => SIM.undoSeg() },
+       { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
+         hint: "Remove every segment you have drawn — the scene stays",
+         act: () => SIM.clearSegs() }]) },
+  { cap: "MEASURE", family: "measure",
+    items: TOOLS.slice(4, TOOLS.length - 1).map(toolItem) },
+  // VIEW: how the water is DRAWN. The three toggles were reachable only from
+  // the P / D / N keys or from a scroll of the Controls panel, which on a
+  // touch screen meant not at all.
+  { cap: "VIEW", family: "view", items: [
+    { id: "legendBtn", icon: "legend", label: "Field & legend", key: "L",
+      hint: "Which variable the colour shows, its range and its units",
+      on: () => LEGEND.isOpen(), act: () => LEGEND.toggle() },
+    { id: "partBtn", icon: "particles", label: "Particles", key: "P",
+      hint: "Massless tracers — the clearest way to see orbits and jets",
+      on: () => state.particles,
+      act: () => { state.particles = !state.particles; syncPanel(); } },
+    { id: "dyeBtn", icon: "dye", label: "Dye", key: "D",
+      hint: "Dye and the dye timelines injected at the inlet",
+      on: () => state.dye,
+      act: () => { state.dye = !state.dye; syncPanel(); } },
+    { id: "chanBtn", icon: "channel", label: "Open-channel overlay", key: "N",
+      hint: "Critical depth, normal depth and the energy grade line",
+      on: () => state.channel,
+      act: () => { state.channel = !state.channel; syncPanel(); } },
+  ] },
+  { cap: "RUN", family: "run", items: [
     { id: "playBtn", icon: () => (state.paused ? "play" : "pause"), key: "space",
       label: () => (state.paused ? "Run" : "Pause"),
       hint: "Stop the clock — gauge histories freeze with it",
@@ -2070,11 +2309,10 @@ const TOOLBAR = [
     { id: "valveBtn", icon: "valve", label: "Valves", key: "V",
       hint: "Open or slam every valve you have drawn",
       on: () => !!sim && sim.p.valveClosed < 0.5, act: () => toggleValve() },
-    { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
-      hint: "Remove every segment you have drawn — the scene stays",
-      act: () => SIM.clearSegs() },
-  ],
-  [
+  ] },
+  // Chrome, not a family: captioning it would put it in the same taxonomy as
+  // the four above, which is exactly what it is not.
+  { cap: "", family: "meta", items: [
     { id: "panelBtn", icon: "sliders", label: "Controls",
       hint: "Every slider: flow, boundaries, hydraulics, view, rig",
       act: () => togglePanel() },
@@ -2084,7 +2322,7 @@ const TOOLBAR = [
     { id: "aboutBtn", icon: "about", label: "About the solver",
       hint: "What is actually being computed — the numerics derivation",
       act: () => window.open(aboutHref(), "_blank", "noopener") },
-  ],
+  ] },
 ];
 
 /** A drawing / instrument tool as a strip item. Its shortcut is its position
@@ -2109,8 +2347,18 @@ function buildToolbar() {
   host.textContent = "";
   TOOLBAR.forEach((group, gi) => {
     if (gi) { const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s); }
-    const g = document.createElement("div"); g.className = "tgrp";
-    group.forEach((it) => {
+    // A group is a captioned COLUMN: the caption names the family, the row
+    // holds the glyphs. The caption is aria-hidden — every button already
+    // carries its own label, and a screen reader does not need the heading
+    // read out once per button.
+    const g = document.createElement("div");
+    g.className = "tgrp fam-" + group.family;
+    const cap = document.createElement("div");
+    cap.className = "tcap"; cap.textContent = group.cap;
+    cap.setAttribute("aria-hidden", "true");
+    g.appendChild(cap);
+    const row = document.createElement("div"); row.className = "trow";
+    group.items.forEach((it) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "tbtn";
       if (it.id) b.id = it.id;
@@ -2130,8 +2378,9 @@ function buildToolbar() {
       b.onfocus = () => { if (TIP.hoverable()) tip(); };
       b.onblur = () => TIP.hide();
       it.el = b;
-      g.appendChild(b);
+      row.appendChild(b);
     });
+    g.appendChild(row);
     host.appendChild(g);
   });
   syncToolbar();
@@ -2140,9 +2389,10 @@ function buildToolbar() {
 
 /** Fit the strip to the width it actually has. A media query cannot do this:
  *  the side panel takes its width out of the bar as well, so a 1440 px window
- *  with the panel open has the room of an 1100 px one. Two steps — smaller
- *  icons and no wordmark, then smaller still and no status line — and if even
- *  that is not enough the groups scroll rather than losing a control. */
+ *  with the panel open has the room of an 1100 px one. Three steps — the
+ *  family captions and the wordmark go, then the status line, then the icons
+ *  shrink again and the group rules go with them — and if even that is not
+ *  enough the groups scroll rather than losing a control. */
 function fitBar() {
   const bar = document.getElementById("bar"), g = document.getElementById("groups");
   if (!bar || !g) return;
@@ -2151,9 +2401,10 @@ function fitBar() {
   // would otherwise shrink itself for nothing. Two pixels of slack is already
   // too much — it leaves the last button clipped along its edge.
   const over = () => g.scrollWidth > g.clientWidth + 1;
-  bar.classList.remove("tight", "tighter");
+  bar.classList.remove("tight", "tighter", "tightest");
   if (over()) bar.classList.add("tight");
   if (over()) bar.classList.add("tighter");
+  if (over()) bar.classList.add("tightest");
   // Still too many for the room: the groups scroll, and the last one visible
   // is faded so that it looks like it continues rather than like it ends.
   bar.classList.toggle("scrolls", over());
@@ -2163,7 +2414,7 @@ function fitBar() {
  *  changes a tool, the clock or a valve; the icon only touches the DOM when it
  *  actually differs, because the play/pause glyph swaps on every space bar. */
 function syncToolbar() {
-  TOOLBAR.forEach((group) => group.forEach((it) => {
+  TOOLBAR.forEach((group) => group.items.forEach((it) => {
     const b = it.el;
     if (!b || !b.isConnected) return;
     if (it.on) b.classList.toggle("on", !!it.on());
@@ -2199,7 +2450,8 @@ const KEYS = (() => {
     ["V", "valves"],
     ["space", "pause"],
     ["R", "reset the water"],
-    ["G", "cycle the field"],
+    ["G", "cycle the field (the legend names it)"],
+    ["L", "the legend — which field, over what range, in what units"],
     ["P", "particles"],
     ["D", "dye"],
     ["N", "open-channel overlay"],
@@ -2757,7 +3009,7 @@ function tickFrame(realDt) {
 /** The speed scale — the particle colouring and the Water view's brightness
  *  term, both of which are speed whatever field is up. The FIELD's own range
  *  is `rangeFor`, and the two are deliberately separate. */
-function vmaxFor() { return state.scene.vmax || 4; }
+function vmaxFor() { return sceneNow().vmax || 4; }
 
 /** One sample per gauge per rendered frame — but ONLY when the clock has moved.
  *
@@ -3916,6 +4168,8 @@ function boot() {
   // The strip first: PICKER, EX and KEYS all light their own opener by id, so
   // the buttons have to exist before anything asks for one.
   buildToolbar();
+  // …then the legend, which lights the strip's own Field button.
+  LEGEND.build();
   // `syncTools` is the name the rest of the file (and the number keys) already
   // uses for "repaint whatever shows the current tool".
   window.syncTools = syncToolbar;
@@ -3939,6 +4193,7 @@ function boot() {
   addEventListener("resize", () => { if (EX.isOpen()) EX.place(); });
 
   window.addEventListener("pointerdown", KEYS.onDown, true);
+  window.addEventListener("pointerdown", LEGEND.onDown, true);
   addEventListener("resize", () => { if (KEYS.isOpen()) KEYS.place(); });
 
   // The side panel's two handles. Wired here rather than when a brief is first
@@ -4045,8 +4300,9 @@ function boot() {
     else if (k === "g") {
       const i = FIELDS.findIndex((f) => f.mode === state.mode);
       state.mode = FIELDS[(i + 1) % FIELDS.length].mode;
-      syncPanel();
+      LEGEND.sync(); syncPanel();
     }
+    else if (k === "l") LEGEND.toggle();
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
@@ -4091,6 +4347,7 @@ window.APP = {
   ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor,
         RAMPS: Shaders.RAMPS },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
+  LEGEND,                                  // the colour key and field picker
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)
   inspect: (k) => GINSP.show(k || 0),

@@ -83,7 +83,7 @@ const PROBE = `
     startItems: document.querySelectorAll("#startlist .si").length,
     startSideways: (() => { const l = document.getElementById("startlist");
                             return l.scrollWidth > l.clientWidth + 1; })(),
-    specCount: APP.ui.TOOLBAR.reduce((n, grp) => n + grp.length, 0),
+    specCount: APP.ui.TOOLBAR.reduce((n, grp) => n + grp.items.length, 0),
     toolCount: APP.TOOLS.length,
     litTools: [...document.querySelectorAll("#groups .tbtn.on")].length,
     valveHot: document.getElementById("valveBtn").classList.contains("on") ||
@@ -332,9 +332,12 @@ async function main() {
         const before = APP.state.tool;
         // Pick the last tool from the strip and confirm the strip agrees.
         const id = APP.TOOLS[APP.TOOLS.length - 1][0];
-        const spec = APP.ui.TOOLBAR.flat().find((it) => it.label === APP.TOOLS[APP.TOOLS.length - 1][1]);
+        const spec = APP.ui.TOOLBAR.flatMap((g) => g.items)
+                      .find((it) => it.label === APP.TOOLS[APP.TOOLS.length - 1][1]);
         spec.el.click();
-        const lit = [...document.querySelectorAll("#groups .tbtn.on")].length;
+        const toolLabels = APP.TOOLS.map((t) => t[1]);
+        const lit = [...document.querySelectorAll("#groups .tbtn.on")]
+                      .filter((b) => toolLabels.includes(b.getAttribute("aria-label"))).length;
         const play = document.getElementById("playBtn");
         const wasPaused = APP.state.paused;
         play.click();
@@ -346,11 +349,162 @@ async function main() {
       check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("clicking a tool picks it", r.after, r.want);
       check("the tool moved", r.before !== r.after);
-      // Exactly one tool is in your hand, plus whatever non-tool toggles are
-      // lit; the tools themselves must not double up.
-      check("only one tool is lit", r.lit >= 1 && r.lit <= 2, "lit " + r.lit);
+      // Exactly one tool is in your hand. Counted over the TOOLS only: the
+      // VIEW family's toggles are lit whenever they are on, which is most of
+      // the time, and they are not tools.
+      eq("exactly one tool is lit", r.lit, 1);
       eq("pausing swaps the glyph", r.pausedIcon, r.wasPaused ? "pause" : "play");
       eq("pausing is a toggle", r.backTo, r.wasPaused);
+      await tab.close();
+    }
+
+    // -------------------------------------------------- the strip's families
+    console.log("\nthe strip says which family a tool belongs to");
+    {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const caps = [...document.querySelectorAll("#groups .tcap")].map((c) => c.textContent);
+        const spec = APP.ui.TOOLBAR;
+        return {
+          caps, specCaps: spec.map((g) => g.cap),
+          groups: document.querySelectorAll("#groups .tgrp").length,
+          orphans: [...document.querySelectorAll("#groups .tbtn")]
+                     .filter((b) => !b.closest(".tgrp")).length,
+          buttons: document.querySelectorAll("#groups .tbtn").length,
+          specCount: spec.reduce((n, g) => n + g.items.length, 0),
+          viewGroup: spec.find((g) => g.cap === "VIEW").items.map((i) =>
+            typeof i.label === "function" ? i.label() : i.label),
+          buildGroup: spec.find((g) => g.cap === "BUILD").items.map((i) =>
+            typeof i.label === "function" ? i.label() : i.label),
+        };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("every group is captioned", r.caps.length, r.groups);
+      eq("the captions are the spec's", r.caps.join(","), r.specCaps.join(","));
+      eq("no button is outside a group", r.orphans, 0);
+      eq("the strip still renders the whole spec", r.buttons, r.specCount);
+      check("VIEW carries the field picker",
+            r.viewGroup.some((l) => /field/i.test(l)), r.viewGroup.join(","));
+      // Clear edits the rig, so it belongs with the tools that draw one — it
+      // used to sit with the clock.
+      check("BUILD owns Clear drawing",
+            r.buildGroup.includes("Clear drawing"), r.buildGroup.join(","));
+
+      // The panel is still the authority: the strip's toggle moves the state
+      // the panel's checkbox reads, and the other way round.
+      const parity = await tab.evaluate(`
+        const it = APP.ui.TOOLBAR.find((g) => g.cap === "VIEW").items
+                     .find((i) => /particles/i.test(
+                       typeof i.label === "function" ? i.label() : i.label));
+        const before = APP.state.particles;
+        it.el.click();
+        const after = APP.state.particles;
+        const box = document.getElementById("c_particles").checked;
+        it.el.click();
+        return { before, after, box };
+      `);
+      check("the strip toggle moves the state", parity.before !== parity.after);
+      eq("and the panel checkbox agrees", parity.box, parity.after);
+
+      // Captions are decoration before they are information: they are the
+      // first thing to go when the strip runs out of room, never a control.
+      const tight = await tab.evaluate(`
+        document.getElementById("bar").classList.add("tight");
+        return getComputedStyle(document.querySelector("#groups .tcap")).display === "none";
+      `);
+      check("captions drop at .tight", tight);
+      await tab.close();
+    }
+
+    // ------------------------------------------------------------ the legend
+    console.log("\nthe legend says what the colour means, and changes it");
+    {
+      const tab = await browser.open(INDEX + "?scene=m3");
+      const p = await tab.evaluate(`
+        const el = document.getElementById("legend");
+        const r = el.getBoundingClientRect();
+        const bar = document.getElementById("bar").getBoundingClientRect();
+        return { open: el.classList.contains("open"),
+                 name: document.getElementById("legName").textContent,
+                 left: r.left, top: r.top, right: r.right, barBottom: bar.bottom,
+                 inner: window.innerWidth,
+                 rows: el.querySelectorAll(".legrow").length };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("the legend is up by default", p.open);
+      check("it clears the strip", p.top >= p.barBottom - 1,
+            "legend top " + p.top + " vs bar bottom " + p.barBottom);
+      check("it is inside the viewport", p.left >= 0 && p.right <= p.inner);
+      check("it names the live field", /water/i.test(p.name), p.name);
+      // Water is a TWO-variable encoding — hue from depth, brightness from
+      // speed — and a card that showed one bar would be lying about it.
+      eq("water shows two keyed rows", p.rows, 2);
+
+      // Picking from the card moves the field, and the panel agrees.
+      const picked = await tab.evaluate(`
+        APP.LEGEND.open();
+        document.getElementById("legPick").click();      // …and open its menu
+        [...document.querySelectorAll("#legmenu .legopt")]
+          .find((b) => b.dataset.mode === "2").click();
+        return { mode: APP.state.mode,
+                 name: document.getElementById("legName").textContent,
+                 panel: document.getElementById("c_mode").value,
+                 unit: document.getElementById("legUnit").textContent,
+                 rows: document.querySelectorAll("#legend .legrow").length };
+      `);
+      eq("the card picks the field", picked.mode, 2);
+      eq("and the panel follows", picked.panel, "2");
+      check("the card renames itself", /speed/i.test(picked.name), picked.name);
+      eq("and prints the unit", picked.unit, "m/s");
+      eq("a single-variable field shows one row", picked.rows, 1);
+
+      // Fit rescales once, from the frame it was clicked on, and then HOLDS.
+      // A range that tracked the flow would mean the same colour was a
+      // different number from second to second.
+      const fit = await tab.evaluate(`
+        APP.frames(40);
+        const before = APP.ui.rangeFor("speed").slice();
+        APP.LEGEND.fit();
+        const after = APP.ui.rangeFor("speed").slice();
+        APP.frames(40);
+        const later = APP.ui.rangeFor("speed").slice();
+        return { before, after, later,
+                 printed: document.getElementById("legHi").textContent };
+      `);
+      check("Fit moves the range", fit.after[1] !== fit.before[1],
+            JSON.stringify(fit.before) + " -> " + JSON.stringify(fit.after));
+      eq("and then holds it", fit.later.join(","), fit.after.join(","));
+      check("the printed number is the range",
+            Math.abs(parseFloat(fit.printed) - fit.after[1]) < 0.01,
+            fit.printed + " vs " + fit.after[1]);
+
+      // A typed range takes it over and survives a frame.
+      const typed = await tab.evaluate(`
+        const box = document.getElementById("legHi");
+        box.textContent = "1.25";
+        box.dispatchEvent(new Event("blur"));
+        APP.frames(5);
+        return APP.ui.rangeFor("speed")[1];
+      `);
+      near("typing a range takes it over", typed, 1.25, 1e-6);
+
+      // Each field keeps its own pair across a switch away and back.
+      const kept = await tab.evaluate(`
+        APP.state.mode = 1; APP.LEGEND.sync();
+        APP.state.mode = 2; APP.LEGEND.sync();
+        return APP.ui.rangeFor("speed")[1];
+      `);
+      near("each field keeps its own range", kept, 1.25, 1e-6);
+
+      // L puts it away and brings it back.
+      const keyed = await tab.evaluate(`
+        dispatchEvent(new KeyboardEvent("keydown", { key: "l" }));
+        const shut = APP.LEGEND.isOpen();
+        dispatchEvent(new KeyboardEvent("keydown", { key: "l" }));
+        return { shut, open: APP.LEGEND.isOpen() };
+      `);
+      check("L puts the legend away", !keyed.shut);
+      check("and brings it back", keyed.open);
       await tab.close();
     }
 
@@ -441,7 +595,7 @@ async function main() {
       const tab = await browser.open(INDEX + "?scene=sandbox");
       const r = await tab.evaluate(`
         const ids = APP.TOOLS.map((t) => t[0]);
-        const strip = APP.ui.TOOLBAR.flat();
+        const strip = APP.ui.TOOLBAR.flatMap((g) => g.items);
         const labels = strip.map((it) => typeof it.label === "function" ? it.label() : it.label);
         // Pour must be a TOOL, so a finger can select it; the old path was
         // right-click, or touch + a Shift key no phone has.
@@ -499,6 +653,21 @@ async function main() {
         // Without the fitted view this is the 14%-of-the-screen sliver.
         check("the flume is still worth looking at", r.fill >= 45,
               "fills " + r.fill + "% at vex " + r.vex.toFixed(1));
+        // The sheet owns the lower half and the strip the top, so there is no
+        // room for a floating card as well: the legend stands down and the
+        // field stays reachable from Controls.
+        const leg = await tab.evaluate(`
+          const el = document.getElementById("legend");
+          const shown = getComputedStyle(el).display !== "none";
+          const r = el.getBoundingClientRect();
+          const d = document.getElementById("dock").getBoundingClientRect();
+          return { shown, bottom: r.bottom, sheetTop: d.top, right: r.right,
+                   inner: window.innerWidth };
+        `);
+        check("the legend clears the bottom sheet",
+              !leg.shown || leg.bottom <= leg.sheetTop + 1,
+              "legend bottom " + leg.bottom + " vs sheet top " + leg.sheetTop);
+        check("and stays inside the width", !leg.shown || leg.right <= leg.inner);
         await tab.close();
       } finally { await phone.close(); }
     }

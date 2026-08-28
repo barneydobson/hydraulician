@@ -474,6 +474,59 @@ const SIM = (() => {
              solid: S.mask[j * S.nx + i] };
   }
 
+  /** The 1st and 99th percentile of a display field over WET cells, for the
+   *  legend's Fit button. One readPixels of each state texture — the same
+   *  bargain `rescaleFill` and `boxForce` already make, and it happens on a
+   *  click, never per frame.
+   *
+   *  Percentiles rather than min/max because one cell at a jet's lip, or one
+   *  cell of a bad column, otherwise sets the scale for the whole picture and
+   *  everything else renders as a single flat colour. Wet cells only, because
+   *  a dry cell is not water: its stored pressure is zero and averaging it in
+   *  drags every scale towards the floor.
+   *
+   *  `mode` is the display mode, so the arithmetic here has to agree with the
+   *  branch of FS_DISP that paints it. The two are checked against each other
+   *  by eye and by the legend: a Fit that leaves the picture saturated or flat
+   *  means they have drifted apart. */
+  function fieldStats(mode) {
+    const n = S.nx * S.ny;
+    const U = new Float32Array(n * 4), F = new Float32Array(n * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, F);
+    const g = Math.abs(S.p.g) || 9.81, tilt = S.scene.tiltS0 || 0;
+    const col = columns();                  // per-column depth, for the Froude number
+    const v = [];
+    const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && S.mask[j * S.nx + i] < 192;
+    for (let j = 0; j < S.ny; j++) {
+      for (let i = 0; i < S.nx; i++) {
+        if (!wet(i, j)) continue;
+        const k = (j * S.nx + i) * 4;
+        const u = U[k], w = U[k + 1], P = U[k + 2];
+        const x = (i + 0.5) * S.dx, z = (j + 0.5) * S.dx;
+        let q = null;
+        if (mode === 0 || mode === 1) q = P / g;
+        else if (mode === 6) q = z - tilt * x + P / g;
+        else if (mode === 2) q = Math.hypot(u, w);
+        else if (mode === 3) q = Math.abs(u) / Math.sqrt(Math.max(g * col[i * 4 + 1], 1e-4));
+        else if (mode === 5) q = F[k] * u * Math.hypot(u, w);
+        else if (mode === 4 && i > 0 && j > 0 && i < S.nx - 1 && j < S.ny - 1) {
+          // Vorticity is a stencil, not a cell: ∂w/∂x − ∂u/∂z, as FS_DISP does it.
+          const dwdx = U[(j * S.nx + i + 1) * 4 + 1] - U[(j * S.nx + i - 1) * 4 + 1];
+          const dudz = U[((j + 1) * S.nx + i) * 4] - U[((j - 1) * S.nx + i) * 4];
+          q = (dwdx - dudz) / (2 * S.dx);
+        }
+        if (q !== null && isFinite(q)) v.push(q);
+      }
+    }
+    if (!v.length) return null;
+    v.sort((a, b) => a - b);
+    const at = (p) => v[Math.min(v.length - 1, Math.max(0, Math.round(p * (v.length - 1))))];
+    return { lo: at(0.01), hi: at(0.99), n: v.length };
+  }
+
   /** A whole column of velocity — the vertical rake. Returns u(z) at cell centres. */
   function rake(x, out) {
     const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
@@ -588,6 +641,7 @@ const SIM = (() => {
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
+           fieldStats,
            boxForce, dt, get, inletVel, bands, rescaleFill,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

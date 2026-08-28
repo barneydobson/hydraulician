@@ -48,10 +48,26 @@ const RECON = (() => {
     return g < 0 ? 0 : (g > 1 ? 1 : g);
   }
 
-  /** Depth of one connected body: the geometric fill integrated over it. */
+  /** Depth of one connected body: the geometric fill integrated over it.
+   *  This is the UNMASKED integral — it credits all cells, including those
+   *  below WET that are bridged but not accumulated by the shader. See
+   *  `bodyDepth` for the masked version that matches `FS_COL`. */
   function columnDepth(gcol, j0, j1, dx) {
     let d = 0;
     for (let j = j0; j <= j1; j++) d += gcol[j];
+    return d * dx;
+  }
+
+  /** Depth of one connected body, masked exactly as `FS_COL` masks it: a cell
+   *  below WET is bridged by the walk but `continue`s past the accumulation,
+   *  so it contributes no depth. `columnDepth` is the UNMASKED integral and
+   *  stays that way — the exceedance profiles in C1/C6 run continuously below
+   *  WET, and masking them would cost the volume-preserving property that
+   *  makes the mean fill integrate to the mean level. Two different questions,
+   *  two functions. */
+  function bodyDepth(gcol, j0, j1, dx) {
+    let d = 0;
+    for (let j = j0; j <= j1; j++) if (gcol[j] >= WET) d += gcol[j];
     return d * dx;
   }
 
@@ -64,7 +80,9 @@ const RECON = (() => {
   /** Connected water bodies in one column, lowest first — the same walk
    *  FS_COL does, applied here to the MEAN fill. Gaps of one and two dry
    *  cells are BRIDGED; three ends the body. That asymmetry is the shader's
-   *  and is load-bearing: see docs/averaging.md §7.2 and test D2. */
+   *  and is load-bearing: see docs/averaging.md §7.2 and test D2. Ghost rows
+   *  (solid or out-of-domain cells) arrive as solid[j]=1 — the function scans
+   *  the full column where FS_COL walks only [1, NY-2). */
   function bodies(gcol, solid, ny) {
     const out = [];
     let j = 0;
@@ -75,7 +93,9 @@ const RECON = (() => {
       let last = j, dry = 0;
       for (; j < ny; j++) {
         if (solid[j]) break;
-        if (gcol[j] <= WET) { if (++dry >= DRY_BREAK) break; continue; }
+        // Dry test is strict `f < WET` to match FS_COL's `if (f < 0.25)`.
+        // This asymmetry (bed-find uses `>`, walk uses `<`) is the shader's own.
+        if (gcol[j] < WET) { if (++dry >= DRY_BREAK) break; continue; }
         dry = 0; last = j;
       }
       out.push({ j0, j1: last });
@@ -83,5 +103,5 @@ const RECON = (() => {
     return out;
   }
 
-  return { accumStep, welford, sigma, geomFill, columnDepth, WET, DRY_BREAK, SURF, bodies };
+  return { accumStep, welford, sigma, geomFill, columnDepth, bodyDepth, WET, DRY_BREAK, SURF, bodies };
 })();

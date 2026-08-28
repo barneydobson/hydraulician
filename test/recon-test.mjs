@@ -158,6 +158,32 @@ for (const [gap, sep] of [[1, false], [2, false], [3, true], [4, true]]) {
   ok("E3 lower body starts at the lowest WET cell, not the lowest open one",
      b[0].j0 === 4, `j0 ${b[0].j0}`);
 }
+// ---- Group D continued: masking and the asymmetry -----------------------
+// D6: a bridged gap holding sub-threshold fill. FS_COL bridges the gap but
+// `continue`s past it without adding to d, so the masked body depth must too.
+// The unmasked integral deliberately does credit it — that is the difference
+// between the two functions.
+{
+  const ny = 12, g = new Float64Array(ny), solid = new Uint8Array(ny);
+  for (let j = 0; j < 5; j++) g[j] = 1;
+  g[5] = 0.1;                                   // bridged, below WET
+  for (let j = 6; j < 10; j++) g[j] = 0.6;
+  const b = RECON.bodies(g, solid, ny);
+  ok("D6 the gap is bridged into one body",
+     b.length === 1 && b[0].j0 === 0 && b[0].j1 === 9, JSON.stringify(b));
+  ok("D6 bodyDepth masks the sub-threshold cell, as FS_COL does",
+     near(RECON.bodyDepth(g, 0, 9, 0.01), (5 * 1 + 4 * 0.6) * 0.01, 1e-12));
+  ok("D6 columnDepth deliberately does NOT mask it",
+     near(RECON.columnDepth(g, 0, 9, 0.01), (5 * 1 + 0.1 + 4 * 0.6) * 0.01, 1e-12));
+}
+// D7: at exactly f = WET the shader's walk keeps the body whole (its dry test
+// is strict `f < 0.25`). The bed-find is the other way round; that asymmetry
+// is the shader's own and is deliberate.
+{
+  const g = new Float64Array([1, 1, 0.25, 0.25, 0.25, 1, 1]);
+  ok("D7 a run at exactly WET does not split the body",
+     RECON.bodies(g, new Uint8Array(7), 7).length === 1);
+}
 
 console.log(`${passed} passed, ${failures.length} failed`);
 if (failures.length) { for (const f of failures) console.error("  FAIL " + f); process.exit(1); }

@@ -101,5 +101,63 @@ ok("B4 dry column has zero depth and no NaN",
      `naive ${naive} welford ${RECON.sigma(M2, T)} exact ${exact}`);
 }
 
+// ---- Group D: falling jets and connectivity ------------------------------
+// Build a column: pool 0..9, gap of `gap` dry cells, then a 6-cell nappe.
+function poolAndNappe(gap, nappeFill) {
+  const ny = 40, g = new Float64Array(ny), solid = new Uint8Array(ny);
+  for (let j = 0; j < 10; j++) g[j] = 1;
+  for (let j = 10 + gap; j < 16 + gap; j++) g[j] = nappeFill;
+  return { g, solid, ny };
+}
+// D2: the shader breaks only after three successive dry cells.
+for (const [gap, sep] of [[1, false], [2, false], [3, true], [4, true]]) {
+  const { g, solid, ny } = poolAndNappe(gap, 0.6);
+  const b = RECON.bodies(g, solid, ny);
+  ok(`D2 gap of ${gap} dry cells ${sep ? "separates" : "is bridged"}`,
+     (b.length > 1) === sep, `got ${b.length} bodies`);
+}
+// D1: with a clear gap the pool depth excludes the nappe entirely.
+{
+  const { g, solid, ny } = poolAndNappe(4, 0.6);
+  const b = RECON.bodies(g, solid, ny);
+  ok("D1 pool depth excludes the nappe",
+     near(RECON.columnDepth(g, b[0].j0, b[0].j1, 0.01), 0.10, 1e-12));
+  ok("D1 nappe thickness is its own integral",
+     near(RECON.columnDepth(g, b[1].j0, b[1].j1, 0.01), 6 * 0.6 * 0.01, 1e-12));
+}
+// D4: a flapping nappe smeared to fbar = 0.2 over 5x its thickness. The
+// segmentation threshold drops it — which is the point. The mean THICKNESS
+// is the integral over the jet's own region and survives the smear, even
+// though the body walk correctly declines to call it a connected body.
+{
+  const ny = 40, g = new Float64Array(ny), solid = new Uint8Array(ny);
+  for (let j = 20; j < 30; j++) g[j] = 0.2;
+  ok("D4 smeared jet keeps its mean thickness",
+     near(RECON.columnDepth(g, 20, 29, 0.01), 10 * 0.2 * 0.01, 1e-12));
+  ok("D4 sub-threshold fill is not selected as a connected body",
+     RECON.bodies(g, solid, ny).length === 0);
+}
+// D5: isolated spray above the band is not part of the pool.
+{
+  const ny = 40, g = new Float64Array(ny), solid = new Uint8Array(ny);
+  for (let j = 0; j < 10; j++) g[j] = 1;
+  g[25] = 0.01; g[31] = 0.01;
+  const b = RECON.bodies(g, solid, ny);
+  ok("D5 sub-threshold spray does not join the pool", b[0].j1 === 9, `j1 ${b[0].j1}`);
+}
+// ---- Group E: geometry ---------------------------------------------------
+// E1/E3: a perched pool above a lower one, split by solid, on a raised bed.
+{
+  const ny = 40, g = new Float64Array(ny), solid = new Uint8Array(ny);
+  for (let j = 0; j < 4; j++) solid[j] = 1;              // bed raised off z=0
+  for (let j = 4; j < 12; j++) g[j] = 1;
+  for (let j = 12; j < 14; j++) solid[j] = 1;            // the shelf
+  for (let j = 14; j < 18; j++) g[j] = 1;
+  const b = RECON.bodies(g, solid, ny);
+  ok("E1 solid splits the column into two bodies", b.length === 2, `got ${b.length}`);
+  ok("E3 lower body starts at the lowest WET cell, not the lowest open one",
+     b[0].j0 === 4, `j0 ${b[0].j0}`);
+}
+
 console.log(`${passed} passed, ${failures.length} failed`);
 if (failures.length) { for (const f of failures) console.error("  FAIL " + f); process.exit(1); }

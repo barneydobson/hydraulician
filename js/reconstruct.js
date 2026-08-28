@@ -55,5 +55,33 @@ const RECON = (() => {
     return d * dx;
   }
 
-  return { accumStep, welford, sigma, geomFill, columnDepth };
+  // FS_COL's own thresholds, exported so that nothing restates them. A second
+  // definition of "wet" anywhere would put two different surfaces on one screen.
+  const WET = 0.25;         // a cell counts as water above this fill
+  const DRY_BREAK = 3;       // this many successive dry cells ends the body
+  const SURF = 0.5;          // the fill that marks the top-cell surface
+
+  /** Connected water bodies in one column, lowest first — the same walk
+   *  FS_COL does, applied here to the MEAN fill. Gaps of one and two dry
+   *  cells are BRIDGED; three ends the body. That asymmetry is the shader's
+   *  and is load-bearing: see docs/averaging.md §7.2 and test D2. */
+  function bodies(gcol, solid, ny) {
+    const out = [];
+    let j = 0;
+    while (j < ny) {
+      while (j < ny && (solid[j] || gcol[j] <= WET)) j++;   // find the next wet cell
+      if (j >= ny) break;
+      const j0 = j;
+      let last = j, dry = 0;
+      for (; j < ny; j++) {
+        if (solid[j]) break;
+        if (gcol[j] <= WET) { if (++dry >= DRY_BREAK) break; continue; }
+        dry = 0; last = j;
+      }
+      out.push({ j0, j1: last });
+    }
+    return out;
+  }
+
+  return { accumStep, welford, sigma, geomFill, columnDepth, WET, DRY_BREAK, SURF, bodies };
 })();

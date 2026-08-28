@@ -78,7 +78,7 @@
      media queries below), and if a window is narrower than even that, the
      groups scroll sideways rather than being clipped away. */
   #groups {
-    display: flex; align-items: center; gap: 4px; flex: 0 1 auto; min-width: 0;
+    display: flex; align-items: center; gap: 1px; flex: 0 1 auto; min-width: 0;
     overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
   }
   #groups::-webkit-scrollbar { display: none; }
@@ -86,7 +86,19 @@
      rig, measure it, look at it — which is the distinction the strip could not
      make when the families were adjacent rows split by a hairline: nothing on
      screen said that Wall changes the rig and Gauge does not. */
-  .tgrp { display: flex; flex-direction: column; align-items: stretch; gap: 1px; }
+  /* Each family gets a tinted bed as well as a caption. The caption names the
+     family but only at full width — it is the first thing the compaction
+     ladder drops — whereas the tint survives every rung, so the distinction
+     that matters most on a cramped strip is the one that is still there. */
+  .tgrp {
+    display: flex; flex-direction: column; align-items: stretch; gap: 1px;
+    /* The bed costs width, and the strip had about a hundred pixels of slack
+       at 1440 — so it is paid for out of the gap BETWEEN groups, which the bed
+       now provides visually. Spend more and the captions are the thing that
+       gets dropped, which defeats the point of tinting them. */
+    border-radius: 10px; padding: 1px 2px 2px;
+    background: rgba(255,255,255,0.045);
+  }
   .trow { display: flex; align-items: center; gap: 2px; }
   .tcap {
     font: 600 8.5px ui-monospace, SFMono-Regular, monospace;
@@ -97,9 +109,17 @@
   /* One accent per family, on the caption only: the buttons keep the single
      "this is in your hand" blue, because two colour languages on one glyph is
      one too many. */
-  .fam-build   .tcap { color: rgba(255,207,148,0.78); }
-  .fam-measure .tcap { color: rgba(127,212,255,0.78); }
-  .fam-view    .tcap { color: rgba(169,230,192,0.78); }
+  .fam-build   .tcap { color: rgba(255,207,148,0.85); }
+  .fam-measure .tcap { color: rgba(127,212,255,0.85); }
+  .fam-view    .tcap { color: rgba(169,230,192,0.85); }
+  /* The three families that mean something get their own bed; SESSION and RUN
+     keep the neutral one, because "load a thing" and "run the clock" are not
+     part of the build / measure / view distinction. `meta` is chrome and gets
+     no bed at all. */
+  .fam-build   { background: rgba(255,190,110,0.10); }
+  .fam-measure { background: rgba(110,200,255,0.10); }
+  .fam-view    { background: rgba(140,225,175,0.09); }
+  .fam-meta    { background: transparent; }
   .tbtn {
     appearance: none; border: 0; background: transparent; padding: 0;
     width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px;
@@ -159,7 +179,6 @@
      thing dropped when the strip runs out of room — never a control. The
      hairline comes back in its place, and the bar loses the row's height. */
   #bar.tight .tcap { display: none; }
-  #bar.tight .tsep { display: block; }
   #bar.tight { height: 52px; }
   #bar.tight .tbtn { width: 32px; height: 32px; }
   #bar.tight .tsep { margin: 0 2px; height: 22px; }
@@ -330,6 +349,10 @@
   }
   #panel .btnrow button:hover:not(:disabled) { background: rgba(77,195,255,0.20); }
   #panel .btnrow button:disabled { opacity: .35; cursor: default; }
+  /* A chosen one of several, as opposed to a button that DOES something. */
+  #panel .btnrow button.on {
+    background: rgba(77,195,255,0.22); border-color: rgba(77,195,255,0.55); color: #dfe8f2;
+  }
 
   /* ------------------------------------------------------ rig save / share */
   #panel .row.stack { flex-wrap: wrap; }

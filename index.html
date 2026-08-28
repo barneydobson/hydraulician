@@ -97,7 +97,7 @@
        now provides visually. Spend more and the captions are the thing that
        gets dropped, which defeats the point of tinting them. */
     border-radius: 10px; padding: 1px 2px 2px;
-    background: rgba(255,255,255,0.045);
+    background: rgba(255,255,255,0.07);
   }
   .trow { display: flex; align-items: center; gap: 2px; }
   .tcap {
@@ -116,9 +116,9 @@
      keep the neutral one, because "load a thing" and "run the clock" are not
      part of the build / measure / view distinction. `meta` is chrome and gets
      no bed at all. */
-  .fam-build   { background: rgba(255,190,110,0.10); }
-  .fam-measure { background: rgba(110,200,255,0.10); }
-  .fam-view    { background: rgba(140,225,175,0.09); }
+  .fam-build   { background: rgba(255,178,84,0.20);  box-shadow: inset 0 0 0 1px rgba(255,178,84,0.24); }
+  .fam-measure { background: rgba(88,190,255,0.20);  box-shadow: inset 0 0 0 1px rgba(88,190,255,0.24); }
+  .fam-view    { background: rgba(112,222,158,0.18); box-shadow: inset 0 0 0 1px rgba(112,222,158,0.22); }
   .fam-meta    { background: transparent; }
   .tbtn {
     appearance: none; border: 0; background: transparent; padding: 0;

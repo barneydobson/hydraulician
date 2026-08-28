@@ -773,13 +773,32 @@ const OVERLAY = (() => {
       }
       const fx = cv.ema.fx, fz = cv.ema.fz;
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      const L = Math.min(Math.abs(fx) * 0.018, (x1 - x0) * 0.44);
-      if (L > 6) {                                   // the force arrow, x only
-        const s = Math.sign(fx), ax = cx - s * L / 2, bx = cx + s * L / 2;
+      // The arrow is the FORCE, both components. It used to be drawn from fx
+      // alone, so a box on a weir crest or an apron — where the vertical
+      // component is the whole point — showed an arrow that flatly ignored it.
+      //
+      // The two components are scaled by the same number of newtons per pixel,
+      // or the arrow would report an angle the force does not have. That one
+      // scale is set by whichever component is larger, so the arrow always
+      // fills a sensible fraction of the box whichever way it points. The
+      // SCREEN is stretched vertically, though (vex), and the arrow is a force
+      // rather than something in the water, so it is drawn in true proportion
+      // and reads as an angle you can measure with the tape.
+      const fMag = Math.hypot(fx, fz);
+      const room = Math.min(x1 - x0, Math.abs(y1 - y0)) * 0.42;
+      const L = Math.min(fMag * 0.018, room);
+      if (L > 6) {
+        const ux = fx / fMag, uz = fz / fMag;          // unit force, z up
+        const hx = ux * L / 2, hy = -uz * L / 2;       // screen y is down
+        const ax = cx - hx, ay = cy - hy, bx = cx + hx, by = cy + hy;
         ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(ax, cy); ctx.lineTo(bx, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        // The head, built on the arrow's own axis rather than on x.
+        const px = -hy / (L / 2), py = hx / (L / 2);   // unit perpendicular
         ctx.beginPath();
-        ctx.moveTo(bx + s * 9, cy); ctx.lineTo(bx, cy - 5); ctx.lineTo(bx, cy + 5);
+        ctx.moveTo(bx + hx / (L / 2) * 9, by + hy / (L / 2) * 9);
+        ctx.lineTo(bx + px * 5, by + py * 5);
+        ctx.lineTo(bx - px * 5, by - py * 5);
         ctx.closePath(); ctx.fill();
       }
       const fN = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
@@ -798,54 +817,92 @@ const OVERLAY = (() => {
    *  see; a table of four rows makes them map it back onto the picture
    *  themselves. Outward-positive throughout, so a sign is a direction: what
    *  leaves is positive wherever it leaves from. */
+  /** What a face can be labelled with.
+   *
+   *  `through` quantities (volume, energy) cross the face, so the honest way
+   *  to show one is an ARROW and a magnitude: a first-year reading "in" and
+   *  "out" off the picture never has to be told what an outward normal is,
+   *  and the sign convention stops being a thing they can get wrong. The
+   *  momentum column is not a through quantity — its sign is which way the
+   *  face pushes — so it keeps a left/right arrow instead.
+   *
+   *  The energy column is deliberately not given a letter: `E` is specific
+   *  energy in the register and stays that way (the E–d diagram is a named
+   *  teaching object), and `ρgQH` says exactly what the quantity is. */
   const CV_Q = {
-    Q:  { label: "Q",  unit: "m²/s", at: (e) => e.Q,  dp: 3,
-          total: "continuity", tUnit: "m²/s" },
-    M:  { label: "M→", unit: "N/m",  at: (e) => e.Mx + e.Fpx, dp: 1,
-          total: "force on what is inside", tUnit: "N/m" },
-    E:  { label: "Ė",  unit: "W/m",  at: (e) => e.E,  dp: 1,
-          total: "energy lost", tUnit: "W/m" },
+    Q: { label: "Q", unit: "m²/s", through: true, dp: 3,
+         at: (e) => e.Q, fmt: (v) => v.toFixed(3) },
+    M: { label: "momentum + pressure", unit: "N/m", through: false, dp: 1,
+         at: (e) => e.Mx + e.Fpx, fmt: (v) => fmtBig(v, "N/m") },
+    E: { label: "ρgQH", unit: "W/m", through: true, dp: 0,
+         at: (e) => e.E, fmt: (v) => fmtBig(v, "W/m") },
+  };
+  /** Watts per metre run to thousands once a reach is doing any work at all. */
+  function fmtBig(v, unit) {
+    const a = Math.abs(v);
+    if (a >= 1000) return (v / 1000).toFixed(a >= 10000 ? 0 : 2) + " k" + unit;
+    return (a >= 100 ? v.toFixed(0) : v.toFixed(1)) + " " + unit;
+  }
+
+  /** Which way a through-quantity actually crosses this face, as the reader
+   *  sees it: the arrow points the way the water goes, so "into the box" and
+   *  "out of the box" are read off the picture rather than off a sign. */
+  const CV_ARROW = {
+    left:  (v) => (v < 0 ? "▶" : "◀"),   // outward-positive: v < 0 is INTO the box
+    right: (v) => (v < 0 ? "◀" : "▶"),
+    bed:   (v) => (v < 0 ? "▲" : "▼"),
+    top:   (v) => (v < 0 ? "▼" : "▲"),
   };
 
   function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
     const F = cv.flux;
     const q = CV_Q[show] || CV_Q.Q;
-    const n = (v) => (Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(q.dp));
     ctx.font = "10px ui-monospace, monospace";
-    ctx.fillStyle = "rgba(255,209,102,0.92)";
     if (F) {
-      // Each edge, on its own side of the box. Placed just OUTSIDE, so the
-      // water inside stays readable.
       const e = F.edges;
       const mid = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
-      ctx.textAlign = "right"; ctx.textBaseline = "middle";
-      ctx.fillText(n(q.at(e.left)), x0 - 6, mid.y);
-      ctx.textAlign = "left";
-      ctx.fillText(n(q.at(e.right)), x1 + 6, mid.y);
-      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-      ctx.fillText(n(q.at(e.top)), mid.x, y0 - 4);
-      ctx.textBaseline = "top";
-      ctx.fillText(n(q.at(e.bed)), mid.x, y1 + 4);
+      const put = (key, x, y, ha, va) => {
+        const v = q.at(e[key]);
+        const txt = q.through
+          ? CV_ARROW[key](v) + " " + q.fmt(Math.abs(v))
+          : (v < 0 ? "◀ " : "▶ ") + q.fmt(Math.abs(v));
+        // In is cool, out is warm — the same distinction the arrow makes,
+        // said twice, because this is the thing that gets misread.
+        const into = q.through ? v < 0 : false;
+        ctx.fillStyle = into ? "rgba(127,212,255,0.95)" : "rgba(255,209,102,0.95)";
+        ctx.textAlign = ha; ctx.textBaseline = va;
+        ctx.fillText(txt, x, y);
+      };
+      put("left",  x0 - 6, mid.y, "right", "middle");
+      put("right", x1 + 6, mid.y, "left", "middle");
+      put("top",   mid.x, y0 - 4, "center", "bottom");
+      put("bed",   mid.x, y1 + 4, "center", "top");
     }
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-    // …and the three conservation laws, in a row, under the box.
-    const head = "Control volume · " + q.label + " per edge, " + q.unit + "  ·  B cycles Q / M / Ė";
-    chip(ctx, x0, y0 - 12, head, col);
+    chip(ctx, x0, y0 - 12,
+         "Control volume · " + q.label + " across each face  ·  B cycles", col);
     if (!F) return;
-    const inQ = Math.max(F.inQ, 1e-9);
+
+    // The three conservation laws, said as arithmetic a first-year can check:
+    // what went in, what came out, and what the difference means. "Σ over the
+    // outward normal" is the same statement and teaches nobody anything.
+    const gross = (pick) => {
+      let inn = 0, out = 0;
+      ["left", "right", "bed", "top"].forEach((k) => {
+        const v = pick(F.edges[k]);
+        if (v < 0) inn -= v; else out += v;
+      });
+      return { inn, out };
+    };
+    const Q = gross((e) => e.Q), E = gross((e) => e.E);
     const lines = [
-      "Σ Q  " + F.total.Q.toFixed(4) + " m²/s   (" +
-        (100 * Math.abs(F.total.Q) / inQ).toFixed(1) + "% of what came in)",
-      "F→ " + fN(fx) + " ±" + fN(sd) + " N/m    F↑ " + fN(fz) + " N/m",
-      "Σ Ė  " + F.total.E.toFixed(1) + " W/m   (negative is a LOSS)",
+      "water    in " + Q.inn.toFixed(3) + "   out " + Q.out.toFixed(3) +
+        "   net " + (Q.out - Q.inn).toFixed(3) + " m²/s" +
+        (Q.inn > 1e-9 ? "  (" + (100 * Math.abs(Q.out - Q.inn) / Q.inn).toFixed(1) + "%, should be 0)" : ""),
+      "force    on what is inside:  →  " + fN(fx) + " ±" + fN(sd) + " N/m    ↑ " + fN(fz) + " N/m",
+      "energy   in " + fmtBig(E.inn, "W/m") + "   out " + fmtBig(E.out, "W/m") +
+        "   lost " + fmtBig(E.inn - E.out, "W/m"),
     ];
-    // INSIDE the box, under its header. Everything drawn here is clipped to
-    // the visible domain, so the natural place — under the box — is thrown
-    // away whenever the box reaches the bed, which is most of the time. The
-    // top of a control volume is drawn above the water anyway.
-    // Right-aligned to the box's downstream edge: a jump's own card anchors to
-    // the jump, which is upstream of any control volume drawn around it, and
-    // two cards in one corner is two cards nobody can read.
     const tall = (y1 - y0) > 3 * 15 + 24;
     const top = tall ? y0 + 18 : y0 - 12 - lines.length * 15;
     lines.forEach((t, k) => chip(ctx, x1 - 6, top + k * 15, t, col, "right"));

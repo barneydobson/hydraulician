@@ -3036,11 +3036,6 @@ function drawSpout(ctx) {
 }
 
 function updateStatus() {
-  // The chip shares the strip with the icons and is allowed to shrink them,
-  // so the fit has to be rechecked whenever what it says changes — a boot-time
-  // measurement is taken while it still reads "Sandbox" with no clock, and a
-  // long scene name would then push a whole group out of sight.
-  fitBar();
   document.getElementById("status").textContent =
     sim.nx + "×" + sim.ny + " · Δx " + (sim.dx * 1000).toFixed(0) + " mm · " +
     "t " + sim.t.toFixed(1) + " s · ×" + state.rt.toFixed(2) + " RT · " +
@@ -3052,6 +3047,13 @@ function updateStatus() {
   // The delivered numbers move on their own, so their notes are refreshed on
   // this cadence rather than only when a slider is touched.
   if (state.deliv) { refreshNote("inQ"); refreshNote("inLevel"); }
+  // AFTER the text, never before. The chip shares the strip with the icons and
+  // is allowed to shrink them, so the fit has to be rechecked whenever what it
+  // says changes — and measuring first measures the PREVIOUS string. The clock
+  // crossing t = 10 s widens the chip by a digit, which squeezed the groups two
+  // pixels past their content and clipped the last button until something else
+  // happened to re-measure: the strip was chronically one update behind.
+  fitBar();
 }
 
 function refreshNote(id) {

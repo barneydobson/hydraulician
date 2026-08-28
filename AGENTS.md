@@ -27,6 +27,7 @@ shallow water); this one resolves the depth.
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
+| `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
 | `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
@@ -94,20 +95,27 @@ to look fine for a minute and explode in an exercise.
   (`u_lo`/`u_hi`) and **held**, never tracked — see the engineering notes.
 - **Zero dependencies, classic scripts** — no modules, no bundlers, no fetch,
   and no YAML front matter in `index.html` or `js/*` (the Pages build copies
-  them verbatim only because there is none). Any published page carrying
+  them verbatim only because there is none). Those three are one rule wearing
+  three hats: **the app boots with no server**. A browser refuses both `fetch`
+  of a file beside it and an ES module under `file://`, and double-clicking
+  `index.html` is a real way this gets used. The rule binds the APP; the docs
+  reader (`docs/view.html`) does fetch the markdown it renders, because
+  nothing about running a simulation depends on it and it degrades to a
+  message and two working links when it cannot. Any published page carrying
   `math` code fences must end with a `<script>` tag loading `docs/math.js` —
   stripped on github.com, live on the Pages build, where it rewrites the
   fences for MathJax (README.md and docs/numerics.md show the pattern).
 
 ## Testing
 
-Four gates, all zero-dependency and all non-zero on failure:
+Five gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 |---|---|---|
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
+| `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
 | `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing

@@ -628,6 +628,32 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------------------ the docs
+    console.log("\nthe docs reader says what it needs when it cannot read");
+    {
+      // file:// refuses a page's request for the file beside it, and there is
+      // nothing docs/view.html can do about that. What it must not do is show
+      // a broken screen: the app is DOUBLE-CLICKABLE by design, so this is a
+      // path real readers take. Whether it renders is checked in smoke.js,
+      // which has a server.
+      const url = pathToFileURL(join(ROOT, "docs", "view.html")).href + "?doc=numerics.md";
+      const tab = await browser.open(url,
+        { ready: "return !!document.querySelector('#doc h1, #doc .note');" });
+      const r = await tab.evaluate(`
+        const note = document.querySelector("#doc .note");
+        return { note: !!note,
+                 text: note ? note.textContent : "",
+                 // Both ways out are offered, and both actually work.
+                 github: !!document.querySelector('#doc .note a[href*="github.com"]'),
+                 back: !!document.querySelector('a.back') };
+      `);
+      check("it explains itself instead of showing nothing", r.note);
+      check("it names the server that would work", /http\.server/.test(r.text), r.text.slice(0, 90));
+      check("and offers GitHub, which renders the same file", r.github);
+      check("the way back to the app is there either way", r.back);
+      await tab.close();
+    }
+
     // ---------------------------------------------------------- flux sections
     console.log("\na section reads what crosses it, and two of them compare");
     {

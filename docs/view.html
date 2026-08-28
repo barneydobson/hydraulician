@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydraulician — docs</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
+<!--
+  A reader for the repo's own markdown, in the app's clothes.
+
+  WHY THIS EXISTS. `docs/*.md` renders three different ways depending on where
+  you are: GitHub renders it, the Pages build renders it through Jekyll, and
+  everywhere else — a local `http.server`, a plain static host — the browser
+  shows the raw source, which is what the About button used to open. This page
+  is the third case, and it is styled like the app rather than like a theme so
+  that following "About the solver" does not feel like leaving.
+
+  ONE SOURCE OF TRUTH. The markdown is fetched at runtime, never duplicated —
+  `?doc=numerics.md` reads the same file GitHub and Jekyll read. That fetch is
+  the reason this is a separate page: AGENTS.md's "no fetch" rule is about the
+  APP, which must keep working from a `file://` double-click with no server at
+  all. A docs reader may ask for a file; when it cannot get one (file://, where
+  the fetch is blocked as a cross-origin read) it says so and offers the two
+  places that do render it.
+
+  ZERO DEPENDENCIES still holds: the renderer below is the subset of markdown
+  the repo's own documents actually use, and the only outside thing is MathJax,
+  from the same CDN `docs/math.js` already uses on the Pages build.
+-->
+<style>
+  /* The app's palette, so the docs read as part of the same thing. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: #070b0f; }
+  body {
+    background: #070b0f; color: #dfe8f2; padding: 40px 24px 120px;
+    font: 15px/1.68 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { width: min(860px, 100%); margin: 0 auto; }
+
+  header.top { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  header.top .mark { display: flex; align-items: center; gap: 10px; }
+  header.top b { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+  header.top .grow { flex: 1 1 auto; }
+  .back {
+    display: inline-block; padding: 6px 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
+    color: #dfe8f2; text-decoration: none; font-size: 12.5px; white-space: nowrap;
+  }
+  .back:hover { background: rgba(77,195,255,0.20); border-color: rgba(77,195,255,0.45); }
+
+  /* The document itself sits on the same glass card the app's boxes use. */
+  main {
+    background: rgba(12, 17, 26, 0.60);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+    padding: 34px 38px 44px;
+  }
+  main :is(h1,h2,h3,h4) { line-height: 1.25; font-weight: 700; }
+  main h1 { font-size: 27px; margin: 0 0 6px; letter-spacing: .01em; }
+  main h2 {
+    font-size: 19px; margin: 34px 0 10px; padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.09);
+  }
+  main h3 { font-size: 15.5px; margin: 22px 0 8px; color: #bfe6ff; }
+  main h4 { font-size: 14px; margin: 18px 0 6px; opacity: .9; }
+  main p, main ul, main ol, main blockquote, main table { margin: 0 0 13px; }
+  main ul, main ol { padding-left: 22px; }
+  main li { margin: 4px 0; }
+  main a { color: #7fd4ff; text-decoration: none; }
+  main a:hover { text-decoration: underline; }
+  main strong { font-weight: 700; color: #f2f7fc; }
+  main hr { border: 0; border-top: 1px solid rgba(255,255,255,0.09); margin: 26px 0; }
+  main blockquote {
+    border-left: 3px solid rgba(127,212,255,0.45); padding: 2px 0 2px 14px;
+    opacity: .85;
+  }
+  main code {
+    font: 12.5px ui-monospace, SFMono-Regular, Consolas, monospace;
+    background: rgba(255,255,255,0.07); border-radius: 5px; padding: 1px 5px;
+  }
+  main pre {
+    background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 12px 14px; overflow-x: auto; margin: 0 0 14px;
+  }
+  main pre code { background: none; padding: 0; font-size: 12.5px; line-height: 1.55; }
+  /* Wide tables scroll inside their own box rather than pushing the page. */
+  .tablewrap { overflow-x: auto; margin: 0 0 15px; }
+  main table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  main th, main td {
+    border: 1px solid rgba(255,255,255,0.10); padding: 7px 10px; text-align: left;
+    vertical-align: top;
+  }
+  main th { background: rgba(255,255,255,0.05); font-weight: 600; }
+  main .mathblock { margin: 16px 0; overflow-x: auto; }
+
+  .note {
+    border: 1px solid rgba(255,182,72,0.35); background: rgba(255,182,72,0.10);
+    border-radius: 12px; padding: 16px 18px; font-size: 13.5px;
+  }
+  .note b { display: block; margin-bottom: 6px; font-size: 14.5px; }
+  .note code { font: 12.5px ui-monospace, monospace; background: rgba(0,0,0,0.30);
+               border-radius: 5px; padding: 1px 5px; }
+  footer { text-align: center; margin-top: 22px; font-size: 11.5px; opacity: .5; }
+  footer a { color: inherit; }
+  @media (max-width: 720px) {
+    body { padding: 18px 12px 60px; }
+    main { padding: 20px 18px 28px; }
+    main h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="mark">
+      <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#7fd4ff"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M10 3.2c3.1 3.9 4.7 6.3 4.7 8.4a4.7 4.7 0 0 1-9.4 0c0-2.1 1.6-4.5 4.7-8.4Z"/>
+      </svg>
+      <b>Hydraulician</b>
+    </span>
+    <span class="grow"></span>
+    <a class="back" href="../index.html">← back to the app</a>
+  </header>
+  <main id="doc"><p style="opacity:.6">Loading…</p></main>
+  <footer id="foot"></footer>
+</div>
+
+<script>
+"use strict";
+/* Which document. Restricted to a bare filename in this folder: a viewer that
+   will render any path it is handed is a viewer that will render anything the
+   address bar asks for. */
+var DOC = (function () {
+  var q = new URLSearchParams(location.search).get("doc") || "numerics.md";
+  return /^[a-z0-9-]+\.md$/i.test(q) ? q : "numerics.md";
+})();
+
+var esc = function (s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+};
+
+/* Inline markdown, applied to already-escaped text. Code spans are pulled out
+   first and put back last, so a backtick span containing an asterisk is not
+   also read as emphasis — which the notation register does constantly. */
+function inline(s) {
+  var code = [];
+  s = s.replace(/`([^`]+)`/g, function (_, c) {
+    code.push(c); return "\u0000" + (code.length - 1) + "\u0000";
+  });
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g,
+                function (_, alt, src) { return '<img alt="' + alt + '" src="' + link(src) + '">'; });
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)[^)]*\)/g,
+                function (_, t, href) { return '<a href="' + link(href) + '">' + t + "</a>"; });
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>");
+  return s.replace(/\u0000(\d+)\u0000/g,
+                   function (_, i) { return "<code>" + code[+i] + "</code>"; });
+}
+
+/* A link to a sibling markdown file comes back through this viewer, so the
+   documents stay navigable instead of dumping raw source at the second hop.
+   Anchors, absolute URLs and anything else are left exactly as written. */
+function link(href) {
+  var m = /^([a-z0-9-]+)\.md(#.*)?$/i.exec(href);
+  if (m) return "view.html?doc=" + m[1] + ".md" + (m[2] || "");
+  return href;
+}
+
+/* An id a heading link can reach, matching GitHub's own slugs closely enough
+   for the tables of contents in these documents to work. */
+function slug(s) {
+  return s.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^\w\s-]/g, "")
+          .trim().replace(/\s+/g, "-");
+}
+
+/** The subset of markdown these documents actually use. Not a general parser:
+ *  a general parser is a dependency, and the rule here is that there are
+ *  none. Block level first, inline within each block. */
+function render(md) {
+  var out = [], lines = md.replace(/\r\n?/g, "\n").split("\n");
+  var i = 0;
+  while (i < lines.length) {
+    var L = lines[i];
+
+    if (/^\s*$/.test(L)) { i++; continue; }
+
+    // Fenced code — and ```math becomes display TeX for MathJax, exactly as
+    // docs/math.js does it for the Pages build.
+    var fence = /^```\s*(\S*)/.exec(L);
+    if (fence) {
+      var lang = fence[1], body = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i])) body.push(lines[i++]);
+      i++;
+      if (lang === "math") {
+        out.push('<div class="mathblock">\\[' + esc(body.join("\n")) + "\\]</div>");
+      } else {
+        out.push("<pre><code>" + esc(body.join("\n")) + "</code></pre>");
+      }
+      continue;
+    }
+
+    var h = /^(#{1,6})\s+(.*)$/.exec(L);
+    if (h) {
+      var n = h[1].length, txt = inline(esc(h[2]));
+      out.push("<h" + n + ' id="' + slug(h[2]) + '">' + txt + "</h" + n + ">");
+      i++; continue;
+    }
+
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(L)) { out.push("<hr>"); i++; continue; }
+
+    // Tables: a header row, a dashed rule, then rows until a blank line.
+    if (/^\s*\|/.test(L) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|?\s*$/.test(lines[i + 1])) {
+      var cells = function (row) {
+        return row.trim().replace(/^\||\|$/g, "").split("|").map(function (c) { return c.trim(); });
+      };
+      var head = cells(L), rows = [];
+      i += 2;
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(cells(lines[i++]));
+      var t = "<table><thead><tr>" + head.map(function (c) {
+        return "<th>" + inline(esc(c)) + "</th>";
+      }).join("") + "</tr></thead><tbody>";
+      t += rows.map(function (r) {
+        return "<tr>" + r.map(function (c) { return "<td>" + inline(esc(c)) + "</td>"; }).join("") + "</tr>";
+      }).join("");
+      out.push('<div class="tablewrap">' + t + "</tbody></table></div>");
+      continue;
+    }
+
+    if (/^\s*>/.test(L)) {
+      var quote = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) {
+        quote.push(lines[i++].replace(/^\s*>\s?/, ""));
+      }
+      out.push("<blockquote>" + render(quote.join("\n")) + "</blockquote>");
+      continue;
+    }
+
+    var bullet = /^(\s*)([-*+]|\d+\.)\s+(.*)$/.exec(L);
+    if (bullet) {
+      var ordered = /\d/.test(bullet[2]);
+      var items = [], cur = null, baseIndent = bullet[1].length;
+      while (i < lines.length) {
+        var b = /^(\s*)([-*+]|\d+\.)\s+(.*)$/.exec(lines[i]);
+        if (b && b[1].length <= baseIndent + 1) { cur = [b[3]]; items.push(cur); i++; continue; }
+        // A continuation line, or a nested bullet, belongs to the item above.
+        if (cur && /^\s+\S/.test(lines[i])) { cur.push(lines[i].trim()); i++; continue; }
+        if (cur && /^\s*$/.test(lines[i]) &&
+            i + 1 < lines.length && /^\s{2,}\S/.test(lines[i + 1])) { i++; continue; }
+        break;
+      }
+      out.push("<" + (ordered ? "ol" : "ul") + ">" +
+        items.map(function (it) { return "<li>" + inline(esc(it.join(" "))) + "</li>"; }).join("") +
+        "</" + (ordered ? "ol" : "ul") + ">");
+      continue;
+    }
+
+    // A paragraph runs to the next blank line or block opener.
+    var para = [];
+    while (i < lines.length && !/^\s*$/.test(lines[i]) &&
+           !/^(#{1,6}\s|```|\s*\||\s*>|\s*([-*+]|\d+\.)\s)/.test(lines[i])) {
+      para.push(lines[i++]);
+    }
+    if (para.length) out.push("<p>" + inline(esc(para.join(" "))) + "</p>");
+    else i++;
+  }
+  return out.join("\n");
+}
+
+function mathjax() {
+  if (!document.querySelector(".mathblock")) return;
+  var s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js";
+  s.async = true;
+  document.head.appendChild(s);
+}
+
+/* file:// blocks this as a cross-origin read, and there is nothing a page can
+   do about that — so say which two ways DO work rather than showing a broken
+   screen. */
+function cannotRead(why) {
+  document.getElementById("doc").innerHTML =
+    '<div class="note"><b>This page needs a server to read ' + DOC + "</b>" +
+    "<p>A browser will not let a page opened from <code>file://</code> read a " +
+    "file beside it. The document itself is fine — it is right there in " +
+    "<code>docs/" + DOC + "</code>.</p>" +
+    "<p>Either serve the folder — <code>python3 -m http.server 8124</code>, then " +
+    'open <code>localhost:8124/docs/view.html?doc=' + DOC + "</code> — or read it " +
+    'on <a href="https://github.com/barneydobson/hydraulician/blob/main/docs/' +
+    DOC + '">GitHub</a>, which renders the same file.</p>' +
+    '<p style="opacity:.7">(' + why + ")</p></div>";
+}
+
+fetch(DOC, { cache: "no-cache" })
+  .then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.text();
+  })
+  .then(function (md) {
+    document.getElementById("doc").innerHTML = render(md);
+    var t = document.querySelector("#doc h1");
+    if (t) document.title = t.textContent + " — Hydraulician";
+    document.getElementById("foot").innerHTML =
+      "docs/" + DOC + ' · <a href="https://github.com/barneydobson/hydraulician/blob/main/docs/' +
+      DOC + '">source on GitHub</a>';
+    mathjax();
+    // A deep link (#section) has to be re-applied: the anchor did not exist
+    // when the browser first went looking for it.
+    if (location.hash) {
+      var el = document.getElementById(location.hash.slice(1));
+      if (el) el.scrollIntoView();
+    }
+  })
+  .catch(function (e) { cannotRead(String(e.message || e)); });
+</script>
+</body>
+</html>

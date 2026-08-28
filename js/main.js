@@ -2579,10 +2579,17 @@ function toolItem([id, label, tip]) {
 }
 
 /** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
- *  README.md, so jekyll-readme-index does not make it a folder index);
- *  everywhere else — file://, a plain static host — the .md itself is right. */
+ *  README.md, so jekyll-readme-index does not make it a folder index) and does
+ *  NOT publish the .md source, so the reader below has nothing to fetch there
+ *  — the themed page is the right answer.
+ *
+ *  Everywhere else the browser used to be handed raw markdown, which is not a
+ *  document so much as its source code. `docs/view.html` renders it in the
+ *  app's own clothes instead. */
 function aboutHref() {
-  return "docs/numerics" + (/\.github\.io$/i.test(location.hostname) ? ".html" : ".md");
+  return /\.github\.io$/i.test(location.hostname)
+    ? "docs/numerics.html"
+    : "docs/view.html?doc=numerics.md";
 }
 
 function buildToolbar() {

@@ -167,13 +167,17 @@ async function browser() {
     return r.result.value;
   }
 
-  async function goto(url) {
+  /** `ready` is the expression that says the page has arrived. It defaults to
+   *  the app booting, because almost every page here IS the app — the docs
+   *  reader is the exception, and it has no APP to wait for. */
+  async function goto(url, ready) {
     await send("Page.navigate", { url });
+    const cond = ready || "!!(window.APP && window.APP.sim)";
     for (let i = 0; i < 160; i++) {                 // software GL boots slowly
       await new Promise((r) => setTimeout(r, 250));
       try {
-        if (await evaluate("!!(window.APP && window.APP.sim)")) {
-          await evaluate(HELPERS + "true");
+        if (await evaluate(cond)) {
+          if (!ready) await evaluate(HELPERS + "true");
           return;
         }
       } catch (_) { /* mid-navigation */ }
@@ -195,7 +199,7 @@ async function browser() {
         });
       })()`);
     } catch (_) { /* the page may be wedged */ }
-    throw new Error("window.APP never appeared at " + url + " — " + why +
+    throw new Error("the page never became ready at " + url + " — " + why +
       (pageErrors.length
         ? "\n      page threw: " + pageErrors.slice(0, 3).join(" | ")
         : "\n      page threw nothing"));
@@ -530,6 +534,42 @@ SUITES.scenes = async (B) => {
       r.t > 0 && r.finite && r.dOk && Number.isFinite(r.vol),
       JSON.stringify(r));
   }
+};
+
+SUITES.docs = async (B) => {
+  // The About button opens docs/view.html off the Pages build, and a page that
+  // renders markdown either renders it or hands the reader its source code.
+  await B.goto(`http://localhost:${PORT}/docs/view.html?doc=numerics.md`,
+    "!!document.querySelector('#doc h1, #doc .note')");
+  const d = await B.evaluate(`(() => new Promise((done) => {
+    const check = () => {
+      if (document.querySelector("#doc h1") || document.querySelector("#doc .note")) {
+        done({
+          h1: (document.querySelector("#doc h1") || {}).textContent || null,
+          h2: document.querySelectorAll("#doc h2").length,
+          tables: document.querySelectorAll("#doc table").length,
+          math: document.querySelectorAll("#doc .mathblock").length,
+          note: !!document.querySelector("#doc .note"),
+          // A link to a sibling document comes back through the reader, or the
+          // second hop dumps raw markdown after the first one rendered.
+          hops: [...document.querySelectorAll("#doc a")]
+                  .filter((a) => /view[.]html[?]doc=/.test(a.getAttribute("href") || "")).length,
+          raw: [...document.querySelectorAll("#doc a")]
+                  .filter((a) => /^[a-z0-9-]+[.]md$/i.test(a.getAttribute("href") || "")).length,
+          title: document.title,
+        });
+      } else setTimeout(check, 100);
+    };
+    check();
+  }))()`);
+  ok("DOCS the reader renders numerics.md rather than showing its source",
+    !d.note && d.h1 === "Numerics", d.note ? "fell back to the note" : "h1 = " + d.h1);
+  ok("DOCS its sections, tables and equations all come through",
+    d.h2 > 5 && d.tables > 0 && d.math > 10,
+    `${d.h2} sections, ${d.tables} tables, ${d.math} equations`);
+  ok("DOCS a link to a sibling document stays inside the reader",
+    d.hops > 0 && d.raw === 0, `${d.hops} through the reader, ${d.raw} raw`);
+  ok("DOCS the page takes the document's own title", /Numerics/.test(d.title), d.title);
 };
 
 SUITES.pack = async (B) => {

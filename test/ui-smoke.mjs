@@ -116,6 +116,29 @@ async function main() {
       // How the digits map to the tools is checked under "touch parity".
       check("the pack has tools at all", p.toolCount > 0);
 
+      // ---- the field registry is the single description of a field. Before
+      // it, a field was described in three disconnected places — a u_mode
+      // integer in the GLSL, an opts pair in the panel spec, and prose in an
+      // info string — so a unit could be added to one and not the others.
+      const reg = await tab.evaluate(`
+        const F = APP.ui.FIELDS;
+        return { n: F.length,
+                 modes: F.map((f) => f.mode),
+                 bare: F.filter((f) => !f.name || f.unit === undefined || !f.ramp ||
+                                       typeof f.def !== "function").length,
+                 blurbless: F.filter((f) => !f.blurb || f.blurb.length < 20).length,
+                 opts: [...document.getElementById("c_mode").options].map((o) => o.value) };
+      `);
+      eq("the registry has all seven fields", reg.n, 7);
+      check("every mode 0-6 is described once",
+            [...reg.modes].sort((a, b) => a - b).join(",") === "0,1,2,3,4,5,6", reg.modes.join(","));
+      check("every field is fully described", reg.bare === 0, reg.bare + " incomplete");
+      check("every field carries a blurb", reg.blurbless === 0, reg.blurbless + " unexplained");
+      // The panel select is BUILT from the registry, so it cannot fall behind it.
+      eq("the panel select lists the registry", reg.opts.join(","),
+         reg.modes.map(String).join(","));
+
+
       // Filtering the pack, and the side door out of it.
       const filtered = await tab.evaluate(`
         const f = document.getElementById("startfilter");
@@ -133,6 +156,20 @@ async function main() {
       `);
       check("the sandbox door closes the start screen", !sandbox.open);
       eq("the sandbox door loads the sandbox", sandbox.scene, "sandbox");
+
+      // G walks the whole registry and comes back to where it started. Only
+      // once the start screen is down: it is modal, and swallows the key.
+      const cycled = await tab.evaluate(`
+        APP.state.mode = APP.ui.FIELDS[0].mode;
+        const seen = [];
+        for (let k = 0; k < APP.ui.FIELDS.length; k++) {
+          dispatchEvent(new KeyboardEvent("keydown", { key: "g" }));
+          seen.push(APP.state.mode);
+        }
+        return { seen, back: APP.state.mode };
+      `);
+      eq("G visits every field", new Set(cycled.seen).size, reg.n);
+      eq("and wraps to where it started", cycled.back, reg.modes[0]);
       await tab.close();
     }
 

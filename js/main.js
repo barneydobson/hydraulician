@@ -23,7 +23,7 @@ const CONFIG = {
 const state = {
   scene: null, budget: CONFIG.defaultBudget,
   tool: "wall", brush: 0.055,
-  mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
+  mode: 0, range: {}, particles: false, dye: true, channel: true, labels: true, jumps: true,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the force control volume: box + EMA force
@@ -162,6 +162,7 @@ function loadScene(id, keepDrawing) {
   state.scene = sc;
   sim = SIM.build(sc, CONFIG.budgets[state.budget], keepDrawing);
   state.mode = sc.mode;
+  state.range = {};              // each scene sets its own colour scales
   state.channel = !!sc.chan;
   state.labels = sc.labels === undefined ? true : !!sc.labels;
   // A scene whose whole subject is the particle motion should not open with
@@ -1376,6 +1377,67 @@ function syncURLEx(id) {
   } catch (_) { /* file:// refuses — harmless */ }
 }
 
+// ==========================================================================
+//  The fields the water can be painted with.
+// ==========================================================================
+/** The seven colourings, as data.
+ *
+ *  A field used to be described in three disconnected places — a `u_mode`
+ *  integer in the GLSL, an `opts` pair in the panel spec, and prose in an
+ *  `info` string — so giving one a unit was three edits and a chance to
+ *  disagree with itself. `mode` is the shader's own integer and stays the
+ *  value a rig link already carries; the ORDER here is the order the picker
+ *  lists them, which is the order a session wants them: what the water is
+ *  doing, then the two heads, then the numbers derived from them.
+ *
+ *  `def()` is the range the ramp is painted over, in the field's own units.
+ *  `mid`, where a field has one, is the value that must land on the pale band
+ *  of a diverging ramp however lopsided the two ends are — Fr = 1 and ω = 0
+ *  are physics, not the midpoint of whatever range happens to be set. */
+const FIELDS = [
+  { mode: 0, id: "water", name: "Water", sym: "", unit: "m",
+    ramp: "water", def: () => [0, hmaxScene()],
+    blurb: "Depth below the local free surface as hue, with speed added on top as brightness. Two variables at once — read the legend's two rows, not the colour alone." },
+  { mode: 1, id: "phead", name: "Pressure head", sym: "p/ρg", unit: "m",
+    ramp: "turbo", def: () => [0, state.scene.headMax || 3],
+    blurb: "The pressure alone. In still water it is simply the depth below the surface, so it climbs down every column and is not comparable between cells at different heights." },
+  { mode: 6, id: "head", name: "Piezometric head", sym: "h = z + p/ρg", unit: "m",
+    ramp: "turbo", def: () => [0, sim ? sim.H : 1],
+    blurb: "The potential whose gradient drives the flow. Its bands stand vertical wherever the flow is hydrostatic and bend exactly where vertical accelerations matter — crests, brinks, a chute toe, a gate contraction, a jump roller." },
+  { mode: 2, id: "speed", name: "Speed", sym: "|u|", unit: "m/s",
+    ramp: "turbo", def: () => [0, state.scene.vmax || 4],
+    blurb: "The magnitude of the velocity, √(u² + w²) — the direction is not in it. Particles and dye are what show where the water is going." },
+  { mode: 3, id: "froude", name: "Froude number", sym: "Fr", unit: "",
+    ramp: "divg", mid: 1, def: () => [0, 2],
+    blurb: "Fr = u/√(gd), from the streamwise velocity and the column depth. Pale is critical; blue is subcritical and red supercritical." },
+  { mode: 4, id: "vort", name: "Vorticity", sym: "ω", unit: "1/s",
+    ramp: "divg", mid: 0, def: () => [-40, 40],
+    blurb: "∂w/∂x − ∂u/∂z: the local spin. Shear layers, the roller of a jump and the separation off a step each show as sheets of one sign." },
+  { mode: 5, id: "mom", name: "Momentum flux", sym: "ρu|u|", unit: "kg/m/s²",
+    ramp: "divg", mid: 0, def: () => [-momScene(), momScene()],
+    blurb: "Momentum per unit volume, signed by the streamwise direction, so a returning roller or an undertow reads opposite to the flow that drives it." },
+];
+
+/** The scene's own maximum for the Water view's depth hue. */
+function hmaxScene() { return state.scene.hmax || (state.scene.g ? 2.0 : 1); }
+/** The momentum-flux scale, as the display pass has always computed it. */
+function momScene() { return 0.5 * Math.pow(state.scene.vmax || 4, 2); }
+
+/** The registry entry for a shader mode integer. */
+function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }
+
+/** The live colour range for a field, in its own units. Seeded from the
+ *  registry default the first time it is asked for, then owned by whatever
+ *  Fit or the legend's typed boxes last set. It does NOT track the flow:
+ *  colour that drifts while you watch cannot be compared between two frames,
+ *  let alone between two students' screenshots, which is the whole reason for
+ *  printing a scale at all. */
+function rangeFor(id) {
+  const f = FIELDS.find((q) => q.id === id) || FIELDS[0];
+  if (!state.range[id]) state.range[id] = f.def();
+  return state.range[id];
+}
+
 // ------------------------------------------------------------------- panel
 const CONTROLS = [
   { h: "Scene" },
@@ -1593,11 +1655,13 @@ const CONTROLS = [
     fmt: (v) => (v < 1.05 ? "true scale (1 : 1)" : "× " + v.toFixed(1) + " vertical") +
                 (state.vexAuto ? "  ·  fitted to the window" : ""),
     info: "Stretches the view vertically. A 12 m × 1.5 m flume is a thin strip at true scale, so a 0.1 m wave is a few pixels — every long-section in hydraulics is drawn exaggerated for the same reason. You can also drag the empty band above or below the domain." },
+  // Built from FIELDS, so the menu cannot fall behind the registry, and the
+  // note under it is the field's own one-line explanation.
   { id: "mode", type: "select", label: "Field",
-    opts: [["0", "Water"], ["1", "Pressure head"], ["6", "Piezometric head"],
-           ["2", "Speed"], ["3", "Froude number"],
-           ["4", "Vorticity"], ["5", "Momentum flux"]],
-    get: () => String(state.mode), set: (v) => state.mode = +v },
+    opts: FIELDS.map((f) => [String(f.mode), f.name]),
+    get: () => String(state.mode),
+    set: (v) => { state.mode = +v; },
+    fmt: () => fieldFor(state.mode).blurb },
   { id: "ruler", type: "check", label: "Ruler",
     get: () => state.ruler, set: (v) => state.ruler = v,
     info: "Metre ticks along the bottom and left edges of the view, with faint grid lines at the major ticks. They follow the zoom, so drawn geometry can be placed at a stated station — \"the plate goes at x = 8.0 m\" — without counting scale bars. M toggles it." },
@@ -3107,12 +3171,16 @@ function dragWindow(el, handle, onPlace) {
  *  canvas because the things it needs (drag, wheel-zoom over a small target,
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
+  // The gauge's own traces — what a gauge RECORDS over time, which is a
+  // different register from the FIELDS the water is painted with, and named
+  // apart from it for that reason.
+  //
   // Symbols follow free-surface convention: h is the piezometric head, d the
   // depth and η the water level, leaving H free for the energy head (the full
   // rationale, texts included, is in docs/notation.md). Since rig format v2
   // the KEYS are the symbols; older wire formats are rejected, not migrated —
   // prototype, no back-compat.
-  const FIELDS = [
+  const SERIES = [
     ["h",     "h", "m",   "piezometric head, h = z + p/ρg"],
     ["d",     "d", "m",   "water depth of the column"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],
@@ -3179,7 +3247,7 @@ const GINSP = (() => {
     // ---- value rows (built once; only the numbers are rewritten per frame)
     const vals = el.querySelector(".ginsp-vals");
     o.vb = {};
-    FIELDS.forEach(([f, sym, unit, note]) => {
+    SERIES.forEach(([f, sym, unit, note]) => {
       const d = document.createElement("div"); d.dataset.f = f;
       d.innerHTML = "<span>" + sym + "</span><b>—</b><i>" + note + "</i>";
       vals.appendChild(d);
@@ -3188,9 +3256,9 @@ const GINSP = (() => {
 
     // ---- field tabs
     const tabs = el.querySelector(".ginsp-tabs");
-    FIELDS.forEach(([f, sym]) => {
+    SERIES.forEach(([f, sym]) => {
       const b = document.createElement("button");
-      b.textContent = sym; b.dataset.f = f; b.title = FIELDS.find((q) => q[0] === f)[3];
+      b.textContent = sym; b.dataset.f = f; b.title = SERIES.find((q) => q[0] === f)[3];
       b.onclick = () => { o.field = f; b.blur(); draw(o); };
       tabs.appendChild(b);
     });
@@ -3276,7 +3344,7 @@ const GINSP = (() => {
     el.querySelector(".ginsp-pos").textContent =
       "x " + g.x.toFixed(2) + " · z " + g.z.toFixed(2) + " m";
     const last = L.length ? L[L.length - 1] : null;
-    FIELDS.forEach(([f]) => {
+    SERIES.forEach(([f]) => {
       const V = o.vb[f];
       V.b.textContent = (last ? last[f].toFixed(3) : "—") + " " + V.unit;
       V.row.classList.toggle("on", f === o.field);
@@ -3365,7 +3433,7 @@ const GINSP = (() => {
       c.setLineDash([]);
       c.fillStyle = g.colour;
       c.beginPath(); c.arc(X, Y, 2.5, 0, 6.2832); c.fill();
-      const F = FIELDS.find((q) => q[0] === o.field);
+      const F = SERIES.find((q) => q[0] === o.field);
       const txt = "t " + L[i].t.toFixed(3) + " s   " + F[1] + " " +
                   L[i][o.field].toFixed(4) + " " + F[2];
       c.font = "700 10.5px ui-monospace, monospace";
@@ -3974,7 +4042,11 @@ function boot() {
     else if (k === "c") SIM.clearSegs();
     else if (k === "r") { SIM.resetWater(); clearGaugeHistory(); }
     else if (k === "p") { state.particles = !state.particles; syncPanel(); }
-    else if (k === "g") { state.mode = (state.mode + 1) % 7; syncPanel(); }
+    else if (k === "g") {
+      const i = FIELDS.findIndex((f) => f.mode === state.mode);
+      state.mode = FIELDS[(i + 1) % FIELDS.length].mode;
+      syncPanel();
+    }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
@@ -4016,7 +4088,7 @@ window.APP = {
   // The chrome, for headless work: test/ui-smoke.mjs drives the strip, the
   // side panel and the start screen through here rather than by synthesising
   // clicks at pixel positions.
-  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar },
+  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)

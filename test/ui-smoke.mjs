@@ -662,7 +662,11 @@ async function main() {
         APP.frames(400);
         APP.state.tool = "flux";
         APP.placeFlux(4.0, 0.0, 4.0, 1.0);
+        // One section is a reading; two are an answer. The interface has to
+        // say so at the point where there is one.
+        const oneNote = document.getElementById("n_fluxList").textContent;
         APP.placeFlux(9.0, 0.0, 9.0, 1.0);
+        const twoNote = document.getElementById("n_fluxList").textContent;
         APP.frames(120);
         const L = APP.state.flux;
         return { n: L.length,
@@ -677,6 +681,7 @@ async function main() {
                  allFour: ["Q", "Mx", "Mz", "Fpx", "Fpz", "E"]
                             .every((k) => Number.isFinite(L[0].ema[k])) &&
                           Math.abs(L[0].ema.Fpx) > 0 && Math.abs(L[0].ema.Mx) > 0,
+                 oneNote, twoNote,
                  inMeasure: APP.ui.TOOLBAR.find((g) => g.cap === "MEASURE").items
                               .some((i) => i.tool === "flux") };
       `);
@@ -692,6 +697,8 @@ async function main() {
       check("every section reports all four quantities", r.allFour,
             JSON.stringify(r.keys));
       check("the tool is in MEASURE", r.inMeasure);
+      check("one section asks for a second", /second/i.test(r.oneNote), r.oneNote);
+      check("two sections say they are compared", /compare/i.test(r.twoNote), r.twoNote);
 
       // Same bargain as every other instrument: click it to take it away.
       const gone = await tab.evaluate(`

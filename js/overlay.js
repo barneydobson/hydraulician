@@ -978,6 +978,14 @@ const OVERLAY = (() => {
       const cx = mx + hx * 1.9 * 1 + side * 8, cy = my - 22;
       rows.forEach((t, i) => chip(ctx, cx, cy + i * 15, t, col,
                                   side > 0 ? "left" : "right"));
+      // One section is a reading; two are an ANSWER. Said here, next to the
+      // one section that exists, because that is the moment it is useful —
+      // and it goes away by itself the moment it has been acted on.
+      if (lines.length === 1) {
+        chip(ctx, cx, cy + rows.length * 15 + 3,
+             "draw a second section for the balance between them",
+             "rgba(140,225,176,0.62)", side > 0 ? "left" : "right");
+      }
     });
 
     // …and the momentum theorem between the last two, which is the whole

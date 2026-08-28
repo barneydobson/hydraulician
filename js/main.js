@@ -1727,6 +1727,22 @@ const CONTROLS = [
       : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s  ·  " +
         "Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m",
     info: "The box is a control volume, and every face of it carries a budget: the volume crossing it, the momentum it carries plus the pressure on it, and the energy going with them. Air contributes nothing — every term is weighted by the fill fraction, so an empty cell adds zero and a half-full one adds half. Read outward-positive: what leaves is positive wherever it leaves from, so Σ Q is continuity and Σ Ė is the loss." },
+  { id: "fluxList", type: "buttons", label: "Flux sections",
+    sync: (el) => {
+      el.textContent = "";
+      const x = document.createElement("button");
+      x.textContent = "✕ Clear all";
+      x.title = "Remove every section — or click one with the Flux line tool to remove just that one";
+      x.disabled = !state.flux.length;
+      x.onclick = () => { x.blur(); state.flux.length = 0; syncPanel(); };
+      el.appendChild(x);
+    },
+    fmt: () => !state.flux.length
+        ? "pick the Flux line tool and left-drag a section across the flow"
+      : state.flux.length === 1
+        ? "1 section · draw a SECOND one for the balance between them"
+        : state.flux.length + " sections · the last two are compared",
+    info: "A section reads what crosses it: the volume Q, the momentum flux M, the pressure force F and the energy ρgQH, all four at once and all normal to the line. M and F are kept apart because telling them apart is what a control-volume question asks. <b>Two sections are the point</b> — between them you get continuity, the energy lost, and the force on whatever lies in between, which is the momentum theorem without drawing a box. Drawn bottom-to-top puts the positive side downstream." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
@@ -2031,7 +2047,7 @@ const TOOLS = [
   // line renumbers a digit, and a worksheet that says "press 5" would start
   // arming the wrong tool. New tools go on the end, whatever group they
   // belong to on the strip.
-  ["flux", "Flux line", "Left-drag a section — reads what crosses it (Shift snaps). Click a line to remove it"],
+  ["flux", "Flux line", "Left-drag a section — reads what crosses it. Draw TWO for the balance between them (Shift snaps; click a line to remove it)"],
 ];
 
 /** The tools the number keys can reach. */

@@ -103,5 +103,63 @@ const RECON = (() => {
     return out;
   }
 
-  return { accumStep, welford, sigma, geomFill, columnDepth, bodyDepth, WET, DRY_BREAK, SURF, bodies };
+  /** The level where the mean fill crosses `th`, interpolated linearly
+   *  between cell centres. Returns NaN if the profile never crosses. */
+  function crossing(gcol, j0, j1, dx, th) {
+    for (let j = j0; j < j1; j++) {
+      if (gcol[j] >= th && gcol[j + 1] < th) {
+        const t = (gcol[j] - th) / (gcol[j] - gcol[j + 1]);
+        return (j + 0.5 + t) * dx;
+      }
+    }
+    return NaN;
+  }
+
+  /** The excursion band, from the level sets of the mean fill.
+   *
+   *  Where the interface is sharp, fbar(z) = Pr(eta > z), so the level sets
+   *  ARE the percentiles of the surface — and they are INVERTED: few frames
+   *  reached the top of the band, so `fbar = 0.05` is the HIGH edge. Reading
+   *  it the other way draws a band upside down without looking wrong, which
+   *  is why test C4 asserts the orientation directly. */
+  function bandLevels(gcol, j0, j1, dx) {
+    return { eta95: crossing(gcol, j0, j1, dx, 0.05),
+             eta05: crossing(gcol, j0, j1, dx, 0.95) };
+  }
+
+  /** The aeration / partial-fill gap: how far the visible mean surface stands
+   *  above the level the same water would reach compacted. Positive is void
+   *  inside the connected envelope; negative is sub-threshold fill above the
+   *  top cell FS_COL selected. Published rather than hidden, because the line
+   *  is drawn at eta_bar while the depth reading is d_bar and the two are not
+   *  the same number — docs/averaging.md §7.3. */
+  const aerationGap = (etaBar, bed, dBar) => etaBar - (bed + dBar);
+
+  /** Whole-grid reconstruction. One entry per column; `mask >= 192` is solid,
+   *  matching SIM's rasterised mask. `d2d` uses `bodyDepth`, NOT `columnDepth`:
+   *  it exists to cross-check the GPU's own column reduction (`FS_COL` in
+   *  js/shaders.js), which `continue`s past sub-threshold cells without
+   *  accumulating depth. Using the unmasked integral here would make d2d
+   *  disagree with the shader by construction — measuring the shader's own
+   *  bridging bug instead of checking against it. */
+  function reconstruct(o) {
+    const { fbar, pbar, mask, nx, ny, dx, c } = o;
+    const bed = new Float64Array(nx), d2d = new Float64Array(nx), all = [];
+    const gcol = new Float64Array(ny), solid = new Uint8Array(ny);
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        const k = j * nx + i;
+        solid[j] = mask[k] >= 192 ? 1 : 0;
+        gcol[j] = solid[j] ? 0 : geomFill(fbar[k], pbar[k], c);
+      }
+      const b = bodies(gcol, solid, ny);
+      all.push(b);
+      bed[i] = b.length ? b[0].j0 * dx : 0;
+      d2d[i] = b.length ? bodyDepth(gcol, b[0].j0, b[0].j1, dx) : 0;
+    }
+    return { bed, d2d, bodies: all };
+  }
+
+  return { accumStep, welford, sigma, geomFill, columnDepth, bodyDepth, WET, DRY_BREAK, SURF, bodies,
+           bandLevels, aerationGap, reconstruct };
 })();

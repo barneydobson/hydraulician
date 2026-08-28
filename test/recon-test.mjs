@@ -185,5 +185,48 @@ for (const [gap, sep] of [[1, false], [2, false], [3, true], [4, true]]) {
      RECON.bodies(g, new Uint8Array(7), 7).length === 1);
 }
 
+// ---- Group C: a wobbling surface, known statistics ------------------------
+// eta = eta0 + a sin(wt) over whole periods. The exceedance profile is the
+// arcsine law: fbar(z) = 1/2 - asin((z-eta0)/a)/pi.
+{
+  const eta0 = 1.0, a = 0.05, dx = 0.0025, ny = 600;
+  const g = new Float64Array(ny), solid = new Uint8Array(ny);
+  for (let j = 0; j < ny; j++) {
+    const s = ((j + 0.5) * dx - eta0) / a;
+    g[j] = s <= -1 ? 1 : s >= 1 ? 0 : 0.5 - Math.asin(s) / Math.PI;
+  }
+  const b = RECON.bodies(g, solid, ny)[0];
+  // C1: integrating the exceedance profile returns the MEAN level. This is
+  // the volume-preserving property, and it is exact.
+  ok("C1 exceedance integral is the mean level",
+     near(RECON.columnDepth(g, 0, ny - 1, dx), eta0, 1e-9));
+  const { eta05, eta95 } = RECON.bandLevels(g, b.j0, ny - 1, dx);
+  // C3: the arcsine percentiles, to the linear-interpolation error.
+  ok("C3 eta95 = eta0 + 0.98769a", near(eta95, eta0 + 0.98769 * a, 5e-4), `got ${eta95}`);
+  ok("C3 eta05 = eta0 - 0.98769a", near(eta05, eta0 - 0.98769 * a, 5e-4), `got ${eta05}`);
+  // C4: the inversion. fbar = 0.05 is the HIGH edge.
+  ok("C4 the fbar=0.05 crossing is the HIGH edge", eta95 > eta05);
+  // C5: the band agrees with sigma. 2.7936 for a sinusoid, 3.2897 Gaussian.
+  ok("C5 band/sigma is the sinusoid's 2.7936, not the Gaussian's 3.2897",
+     near((eta95 - eta05) / (a / Math.SQRT2), 2.7936, 0.02));
+}
+// C6: a skewed surface. eta_hi for 30% of the window, eta_lo otherwise. The
+// mean and the median differ, and only the mean conserves volume. Every
+// symmetric case above passes either way; this one does not.
+{
+  const dx = 0.01, ny = 200, lo = 1.0, hi = 1.4, p = 0.3;
+  const g = new Float64Array(ny), solid = new Uint8Array(ny);
+  for (let j = 0; j < ny; j++) {
+    const z = (j + 0.5) * dx;
+    g[j] = z < lo ? 1 : z < hi ? p : 0;          // exceedance of a two-state eta
+  }
+  const mean = p * hi + (1 - p) * lo, median = lo;
+  ok("C6 the volume integral gives the MEAN, not the median",
+     near(RECON.columnDepth(g, 0, ny - 1, dx), mean, 1e-9) &&
+     !near(mean, median, 1e-6), `got ${RECON.columnDepth(g, 0, ny - 1, dx)}`);
+}
+// The aeration gap reconciles the drawn line with the reported depth.
+ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12), 0.28, 1e-12));
+
 console.log(`${passed} passed, ${failures.length} failed`);
 if (failures.length) { for (const f of failures) console.error("  FAIL " + f); process.exit(1); }

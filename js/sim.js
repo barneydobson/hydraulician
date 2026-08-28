@@ -509,6 +509,7 @@ const SIM = (() => {
         let q = null;
         if (mode === 0 || mode === 1) q = P / g;
         else if (mode === 6) q = z - tilt * x + P / g;
+        else if (mode === 7) q = z - tilt * x + P / g + (u * u + w * w) / (2 * g);
         else if (mode === 2) q = Math.hypot(u, w);
         else if (mode === 3) q = Math.abs(u) / Math.sqrt(Math.max(g * col[i * 4 + 1], 1e-4));
         else if (mode === 5) q = F[k] * u * Math.hypot(u, w);

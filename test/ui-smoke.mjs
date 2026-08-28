@@ -124,14 +124,20 @@ async function main() {
         const F = APP.ui.FIELDS;
         return { n: F.length,
                  modes: F.map((f) => f.mode),
+                 ids: F.map((f) => f.id),
                  bare: F.filter((f) => !f.name || f.unit === undefined || !f.ramp ||
                                        typeof f.def !== "function").length,
                  blurbless: F.filter((f) => !f.blurb || f.blurb.length < 20).length,
                  opts: [...document.getElementById("c_mode").options].map((o) => o.value) };
       `);
-      eq("the registry has all seven fields", reg.n, 7);
-      check("every mode 0-6 is described once",
-            [...reg.modes].sort((a, b) => a - b).join(",") === "0,1,2,3,4,5,6", reg.modes.join(","));
+      eq("the registry has every field", reg.n, 8);
+      check("every mode 0-7 is described once",
+            [...reg.modes].sort((a, b) => a - b).join(",") === "0,1,2,3,4,5,6,7", reg.modes.join(","));
+      // The ORDER is a decision, not an accident: Water first because it is
+      // the default, then speed, then the three heads in the order they nest
+      // (H contains h contains p/rho.g), then the two derived numbers.
+      eq("the picker lists them in the agreed order", reg.ids.join(","),
+         "water,speed,ehead,head,phead,vort,froude,mom");
       check("every field is fully described", reg.bare === 0, reg.bare + " incomplete");
       check("every field carries a blurb", reg.blurbless === 0, reg.blurbless + " unexplained");
       // The panel select is BUILT from the registry, so it cannot fall behind it.

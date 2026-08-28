@@ -130,7 +130,7 @@ def main():
     #    its own task asks for, or name something that does not exist.
     TOOL_IDS = {"wall", "erase", "valve", "spout", "gauge", "rake", "tracer",
                 "measure", "cv", "pour"}
-    FIELD_IDS = {"water", "phead", "head", "speed", "froude", "vort", "mom"}
+    FIELD_IDS = {"water", "speed", "ehead", "head", "phead", "vort", "froude", "mom"}
     PANEL = {"full", "focused", "shut"}
     BUILD_TOOLS = {"wall", "erase", "valve", "spout", "pour"}
     DRAWS = re.compile(r"\b(draw|draws|redraw|redraws|erase|sketch)\b", re.I)

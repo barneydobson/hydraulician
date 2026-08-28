@@ -636,8 +636,9 @@ uniform sampler2D u_F, u_U, u_S, u_C;
 uniform vec2  u_res, u_canvas;
 uniform float u_dx, u_g, u_c2, u_valve, u_time;
 uniform float u_tilt;         // scene tiltS0: elevation is z − S₀x when set
-uniform int   u_mode;         // 0 water 1 head 2 speed 3 Froude 4 vorticity
-                              // 5 momentum flux 6 piezometric head
+uniform int   u_mode;         // 0 water 1 pressure head 2 speed 3 Froude
+                              // 4 vorticity 5 momentum flux
+                              // 6 piezometric head 7 energy head
 uniform float u_vmax;         // speed scale: the particles and the Water sheen
 uniform float u_lo, u_hi;     // the CURRENT field's colour range, in its units
 uniform float u_dyeOn;
@@ -791,6 +792,17 @@ void main(){
     // elevation term is z − S₀x there.
     float hp = pm.y - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
     water = turbo(nrm(hp));
+  } else if (u_mode == 7) {
+    // Energy head H = z + p/ρg + |u|²/2g — the piezometric head plus the
+    // velocity head, so it is the SAME picture as mode 6 with the kinetic
+    // term added back. Along a streamline it can only fall, which is what
+    // makes a drop between two stations a loss you can point at: friction
+    // down a reach, the roller of a jump, the separation in a diffuser.
+    // No α here — that coefficient is what a depth-AVERAGED profile needs
+    // because the point values differ; these are the point values.
+    float g2 = max(abs(u_g), 1e-3);
+    float He = pm.y - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
+    water = turbo(nrm(He));
   } else {
     // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
     // display pass runs once per FRAME, not once per substep — it is the two

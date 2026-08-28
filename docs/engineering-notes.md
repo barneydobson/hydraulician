@@ -449,6 +449,13 @@ picture saturated or flat is the symptom of the two having drifted apart.
   staggered velocities, the same thing the rake and the orbit tracers do.
   `smoke.js` checks a vertical section against the control-volume face it lies
   on, which is the only way to know the two integrals still agree.
+- **A section reports all four at once** — Q, the momentum flux M, the
+  pressure force F and ρgQH — with M and F kept apart, because telling them
+  apart is the control-volume question. Two sections then give the momentum
+  theorem directly: the force on whatever lies between them is
+  `(M₁ − M₂) + (F₁ − F₂)`, both sections carrying their own normal, so the
+  upstream one flips when they are read as the two ends of a control volume.
+  That is the same number `boxForce` reports for a box drawn between them.
 - **New tools are APPENDED to `TOOLS`, whatever group they belong to.** The
   digit a tool answers to is its index, and every worksheet in the pack refers
   to tools by digit — inserting one renumbers the rest and makes the printed

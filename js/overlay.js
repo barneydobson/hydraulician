@@ -932,7 +932,6 @@ const OVERLAY = (() => {
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    const q = CV_Q[show] || CV_Q.Q;
     lines.forEach((L, k) => {
       const ax = V.X(L.x0), ay = V.Y(L.z0), bx = V.X(L.x1), by = V.Y(L.z1);
       ctx.strokeStyle = col; ctx.lineWidth = 2;
@@ -949,52 +948,84 @@ const OVERLAY = (() => {
       const e = L.ema;
       const mx = (ax + bx) / 2, my = (ay + by) / 2;
       if (!e) { chip(ctx, mx + 8, my, "section " + (k + 1) + " · settling…", col); return; }
-      const v = q.at(e);
-      // The arrow sits ON the section, pointing the way the water crosses it.
-      // `n` is in domain coordinates and the screen flips z, so the arrow is
-      // built from the drawn perpendicular rather than from n directly.
-      const dir = v >= 0 ? 1 : -1;
-      const hx = px * 14 * dir, hy = py * 14 * dir;   // across the section
-      const lx = ux / ln, ly = uy / ln;               // along it
+
+      // The arrow shows which way the water crosses, so no reading anywhere on
+      // this tool is a bare sign.
+      const dir = e.Q >= 0 ? 1 : -1;
+      const hx = px * 14 * dir, hy = py * 14 * dir;
+      const lx = ux / ln, ly = uy / ln;
       ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(mx - hx, my - hy); ctx.lineTo(mx + hx, my + hy); ctx.stroke();
       ctx.fillStyle = col;
       ctx.beginPath();
-      ctx.moveTo(mx + hx * 1.6, my + hy * 1.6);                    // the tip
+      ctx.moveTo(mx + hx * 1.6, my + hy * 1.6);
       ctx.lineTo(mx + hx + lx * 5, my + hy + ly * 5);
       ctx.lineTo(mx + hx - lx * 5, my + hy - ly * 5);
       ctx.closePath(); ctx.fill();
-      chip(ctx, mx + hx * 1.7 + (dir > 0 ? 6 : -6), my + hy * 1.7,
-           (k + 1) + "  " + q.fmt(Math.abs(v)) + (q.through ? " " + q.unit : ""),
-           col, dir > 0 ? "left" : "right");
+
+      // All four, together. A section is a whole reading, not one number at a
+      // time: continuity, the momentum it carries, the pressure the water
+      // either side puts on it, and the energy going through — and momentum
+      // and pressure are separate columns because telling them apart IS the
+      // control-volume question.
+      const rows = [
+        (k + 1) + "   Q      " + e.Q.toFixed(3) + " m²/s",
+        "    M      " + vec(e.Mx, e.Mz, "N/m"),
+        "    F      " + vec(e.Fpx, e.Fpz, "N/m"),
+        "    ρgQH   " + fmtBig(e.E, "W/m"),
+      ];
+      const side = dir > 0 ? 1 : -1;
+      const cx = mx + hx * 1.9 * 1 + side * 8, cy = my - 22;
+      rows.forEach((t, i) => chip(ctx, cx, cy + i * 15, t, col,
+                                  side > 0 ? "left" : "right"));
     });
 
-    // …and what happened BETWEEN the last two, which is the reading two
-    // sections exist to give.
+    // …and the momentum theorem between the last two, which is the whole
+    // reason two sections are usually enough.
     if (lines.length >= 2) {
       const A = lines[lines.length - 2], B = lines[lines.length - 1];
       if (A.ema && B.ema) {
-        const dQ = Math.abs(B.ema.Q) - Math.abs(A.ema.Q);
-        const dE = Math.abs(A.ema.E) - Math.abs(B.ema.E);
-        const inQ = Math.max(Math.abs(A.ema.Q), 1e-9);
-        const x = Math.min(V.X(A.x0), V.X(A.x1), V.X(B.x0), V.X(B.x1));
-        // Anchored to the LOWER end of the sections and stacked upward. The
-        // control volume's own card hangs from the top of its box, and a
-        // section pair drawn across the same reach put the two on top of each
-        // other — which is exactly when you want to read both.
-        const y = Math.max(V.Y(A.z0), V.Y(A.z1), V.Y(B.z0), V.Y(B.z1));
+        const a = A.ema, b = B.ema;
+        const inQ = Math.max(Math.abs(a.Q), 1e-9);
+        // Both sections carry their OWN normal. Treating them as the two ends
+        // of a control volume flips the upstream one, which is where each of
+        // these differences comes from.
+        const dQ = Math.abs(b.Q) - Math.abs(a.Q);
+        const fx = (a.Mx - b.Mx) + (a.Fpx - b.Fpx);
+        const fz = (a.Mz - b.Mz) + (a.Fpz - b.Fpz);
+        const dE = Math.abs(a.E) - Math.abs(b.E);
         const rows = [
           "sections " + (lines.length - 1) + " → " + lines.length,
-          "water   " + q0(Math.abs(A.ema.Q)) + " → " + q0(Math.abs(B.ema.Q)) +
+          "water     " + Math.abs(a.Q).toFixed(3) + " → " + Math.abs(b.Q).toFixed(3) +
             " m²/s   (" + (100 * dQ / inQ).toFixed(1) + "%, should be 0)",
-          "energy  lost " + fmtBig(dE, "W/m") + " between them",
+          "momentum  " + fmtBig(a.Mx, "N/m") + " → " + fmtBig(b.Mx, "N/m"),
+          "pressure  " + fmtBig(a.Fpx, "N/m") + " → " + fmtBig(b.Fpx, "N/m"),
+          "force on what is between them:  " + vec(fx, fz, "N/m"),
+          "energy    lost " + fmtBig(dE, "W/m"),
         ];
+        const x = Math.min(V.X(A.x0), V.X(A.x1), V.X(B.x0), V.X(B.x1));
+        const y = Math.max(V.Y(A.z0), V.Y(A.z1), V.Y(B.z0), V.Y(B.z1));
         rows.forEach((t, i) => chip(ctx, x + 6, y - 12 - (rows.length - 1 - i) * 15, t, col));
       }
     }
     ctx.restore();
   }
-  const q0 = (v) => v.toFixed(3);
+
+  /** A vector as two signed components with their directions spelled out, so
+   *  nothing on this tool is read off a bare sign. */
+  function vec(vx, vz, unit) {
+    // ONE scale for the pair, and the unit written once at the end. Scaling
+    // each component on its own produced "1.51 k  0.0 N/m", where the k had
+    // come adrift from the unit it belonged to.
+    const big = Math.max(Math.abs(vx), Math.abs(vz)) >= 1000;
+    const d = (v) => {
+      const a = Math.abs(v) / (big ? 1000 : 1);
+      return big || a < 100 ? a.toFixed(a >= 10 ? 1 : 2) : a.toFixed(0);
+    };
+    return (vx >= 0 ? "→ " : "← ") + d(vx) +
+           "   " + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
+           " " + (big ? "k" : "") + unit;
+  }
 
   /** Edge rulers in metres: ticks along the bottom (x stations) and left
    *  (elevations above the datum) of the VISIBLE domain, with faint grid

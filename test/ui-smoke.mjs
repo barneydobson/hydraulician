@@ -672,6 +672,11 @@ async function main() {
                  // A section drawn bottom-to-top has its normal downstream, so
                  // a reach flowing left to right reads positive on both.
                  sameSign: L[0].ema.Q * L[1].ema.Q > 0,
+                 keys: ["Q", "Mx", "Mz", "Fpx", "Fpz", "E"]
+                         .map((k) => [k, L[0].ema[k]]),
+                 allFour: ["Q", "Mx", "Mz", "Fpx", "Fpz", "E"]
+                            .every((k) => Number.isFinite(L[0].ema[k])) &&
+                          Math.abs(L[0].ema.Fpx) > 0 && Math.abs(L[0].ema.Mx) > 0,
                  inMeasure: APP.ui.TOOLBAR.find((g) => g.cap === "MEASURE").items
                               .some((i) => i.tool === "flux") };
       `);
@@ -681,6 +686,11 @@ async function main() {
       check("water crosses both the same way", r.sameSign,
             r.q1 + " and " + r.q2);
       check("a section carries energy too", Math.abs(r.e1) > 0, String(r.e1));
+      // All four, not one at a time: continuity, the momentum it carries, the
+      // pressure either side puts on it, and the energy going through. M and F
+      // stay apart because telling them apart is the whole question.
+      check("every section reports all four quantities", r.allFour,
+            JSON.stringify(r.keys));
       check("the tool is in MEASURE", r.inMeasure);
 
       // Same bargain as every other instrument: click it to take it away.

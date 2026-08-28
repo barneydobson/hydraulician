@@ -65,7 +65,9 @@ void main(){
 precision highp float;
 precision highp sampler2D;
 in vec2 vUv;
-out vec4 o;
+// NB: the fragment output is declared by each pass, not here — the vof pass
+// needs a location-qualified pair (MRT) when ACCUM is on, and a name can only
+// be declared once.
 
 uniform sampler2D u_U, u_F, u_S;
 uniform vec2  u_res;          // NX, NY
@@ -107,6 +109,7 @@ float SO(ivec2 c){
   // in one draw. Everything is explicit; the staggered arrangement is what
   // makes the acoustic update stable without a Poisson solve.
   const FS_VEL = SIM_HEAD + `
+out vec4 o;
 uniform float u_nu;      // background kinematic viscosity (m²/s)
 uniform float u_cs;      // Smagorinsky constant (0 = laminar)
 uniform float u_cf;      // bed friction coefficient
@@ -298,6 +301,18 @@ void main(){
   // identical face flux, total volume is conserved to machine precision —
   // that is what makes the mass-balance readout trustworthy.
   const FS_VOF = SIM_HEAD + `
+layout(location = 0) out vec4 o;
+#ifdef ACCUM
+// The transport accumulator: running means of the pass's OWN face fluxes.
+// (<F^E>, <F^N>, <S>, unused). Written here, never read by any pass that
+// influences the solution — it is a diagnostic, not a state variable.
+layout(location = 1) out vec4 oA;
+uniform sampler2D u_A;
+uniform float u_Tacc;                  // window BEFORE this substep
+#define ACC_KEEP  oA = texelFetch(u_A, c, 0);
+#else
+#define ACC_KEEP
+#endif
 uniform float u_ca;        // interface compression strength
 uniform float u_dyeDecay;  // 1/s
 uniform vec2  u_dyeLine;   // period (s), on — pulsed dye timelines at the inlet
@@ -315,6 +330,49 @@ float faceVal(float fmm, float fm, float fp, float fpp, float a){
   else          return fp + 0.5 * lim((fp - fpp) / -d) * -d;
 }
 
+// One face's limited flux, as ONE expression. Both neighbours of a face call
+// this with the same arguments, so F^E(i,j) IS F^W(i+1,j) by construction
+// rather than by coincidence — which is what lets the transport accumulator
+// store each face once, and what the Conservation section of
+// docs/engineering-notes.md requires. Nothing here is new arithmetic; it is
+// the same code, lifted: fluxX(i,j) is the old FE, fluxX(i-1,j) the old FW,
+// fluxZ(i,j) the old FN, fluxZ(i,j-1) the old FS, term for term.
+// fluxX and fluxZ stay separate near-duplicates on purpose: the x and z
+// gradient stencils are genuinely asymmetric and unifying them would only
+// hide that behind a swizzle.
+float fluxX(int i, int j, float lim4){
+  float fm = TF(ivec2(i,j)).r, fp = TF(ivec2(i+1,j)).r;
+  float a  = TU(ivec2(i+1,j)).r;
+  float ff = faceVal(TF(ivec2(i-1,j)).r, fm, fp, TF(ivec2(i+2,j)).r, a);
+  float cf = 0.0;
+  if (u_ca > 0.0) {
+    float aC = min(fm,1.0), aE = min(fp,1.0);
+    float aN  = min(TF(ivec2(i,  j+1)).r,1.0), aS  = min(TF(ivec2(i,  j-1)).r,1.0);
+    float aNE = min(TF(ivec2(i+1,j+1)).r,1.0), aSE = min(TF(ivec2(i+1,j-1)).r,1.0);
+    float gx = (aE - aC) / u_dx;
+    float gz = ((aN + aNE) - (aS + aSE)) / (4.0*u_dx);
+    float gm = sqrt(gx*gx + gz*gz) + 1e-8, am = 0.5*(aE + aC);
+    cf = u_ca * abs(a) * am * (1.0 - am) * gx / gm;
+  }
+  return clamp(a*ff + cf, -lim4 * fp, lim4 * fm);
+}
+float fluxZ(int i, int j, float lim4){
+  float fm = TF(ivec2(i,j)).r, fp = TF(ivec2(i,j+1)).r;
+  float a  = TU(ivec2(i,j+1)).g;
+  float ff = faceVal(TF(ivec2(i,j-1)).r, fm, fp, TF(ivec2(i,j+2)).r, a);
+  float cf = 0.0;
+  if (u_ca > 0.0) {
+    float aC = min(fm,1.0), aN = min(fp,1.0);
+    float aE  = min(TF(ivec2(i+1,j  )).r,1.0), aW  = min(TF(ivec2(i-1,j  )).r,1.0);
+    float aNE = min(TF(ivec2(i+1,j+1)).r,1.0), aNW = min(TF(ivec2(i-1,j+1)).r,1.0);
+    float gz = (aN - aC) / u_dx;
+    float gx = ((aNE + aE) - (aNW + aW)) / (4.0*u_dx);
+    float gm = sqrt(gx*gx + gz*gz) + 1e-8, am = 0.5*(aN + aC);
+    cf = u_ca * abs(a) * am * (1.0 - am) * gz / gm;
+  }
+  return clamp(a*ff + cf, -lim4 * fp, lim4 * fm);
+}
+
 void main(){
   NXY = ivec2(u_res);
   ivec2 c = ivec2(gl_FragCoord.xy);
@@ -323,7 +381,11 @@ void main(){
   float x = (float(i) + 0.5) * dx, z = (float(j) + 0.5) * dx;
   float gMag = abs(u_g);
 
-  if (SO(c) > 0.5) { o = vec4(0.0); return; }
+  // A solid cell has no transport of its own, but the accumulator must be
+  // PASSED THROUGH, not zeroed: writing vec4(0) here would erase the history
+  // of a cell the mask later reopens, and MRT has no way to leave an
+  // attachment untouched.
+  if (SO(c) > 0.5) { o = vec4(0.0); ACC_KEEP return; }
 
   // --- ghost ring: zero-gradient outflow, or a Dirichlet level control
   bool gL = (i == 0), gR = (i == NXY.x - 1), gB = (j == 0), gT = (j == NXY.y - 1);
@@ -349,49 +411,34 @@ void main(){
     // to through-flow but it will happily let a still pond sit against it.
     if (gB && u_openMode.z > 1.5) m = vec4(0.0);
     if (gT && u_openMode.w > 1.5) m = vec4(0.0);
+#ifdef ACCUM
+    // Ghost fill is boundary state, not conserved storage — but the flux
+    // through its inner face is real, and interior column 1 / row 1 cannot
+    // store it (each cell owns only its EAST and NORTH face). Same
+    // fluxX/fluxZ call the interior neighbour makes, so it is the same
+    // number, not an approximation of it. The corner texel (0,0) is never
+    // read back: interior cells start at (1,1), whose west face lives at
+    // (0,1) and whose south face lives at (1,0).
+    vec4 Ag = texelFetch(u_A, c, 0);
+    float lim4g = 0.25 * dx / dt;
+    float kg = dt / max(u_Tacc + dt, 1e-9);
+    if (gL) Ag.r = Ag.r + kg * (fluxX(i, j, lim4g) - Ag.r);
+    if (gB) Ag.g = Ag.g + kg * (fluxZ(i, j, lim4g) - Ag.g);
+    oA = Ag;
+#endif
     o = m; return;
   }
 
-  // --- stencil (f in .r, dyes in .g/.b — one fetch serves both)
+  // --- stencil (f in .r, dyes in .g/.b — one fetch serves both). The wider
+  //     f stencil the advection needs is fetched inside fluxX/fluxZ; what is
+  //     left here is what the dye transport and the divergence still use.
   vec4 F0 = TF(c);
   vec4 Fw = TF(ivec2(i-1,j  )), Fe = TF(ivec2(i+1,j  ));
   vec4 Fs = TF(ivec2(i,  j-1)), Fn = TF(ivec2(i,  j+1));
-  float fWW = TF(ivec2(i-2,j)).r, fEE = TF(ivec2(i+2,j)).r;
-  float fSS = TF(ivec2(i,j-2)).r, fNN = TF(ivec2(i,j+2)).r;
-  float aNW = min(TF(ivec2(i-1,j+1)).r, 1.0), aSW = min(TF(ivec2(i-1,j-1)).r, 1.0);
-  float aNE = min(TF(ivec2(i+1,j+1)).r, 1.0), aSE = min(TF(ivec2(i+1,j-1)).r, 1.0);
 
   float fC = F0.r;
   float uW = TU(c).r, uE = TU(ivec2(i+1,j)).r;
   float wS = TU(c).g, wN = TU(ivec2(i,j+1)).g;
-
-  // --- limited upwind face values
-  float ffW = faceVal(fWW, Fw.r, fC,   Fe.r, uW);
-  float ffE = faceVal(Fw.r, fC,  Fe.r, fEE,  uE);
-  float ffS = faceVal(fSS, Fs.r, fC,   Fn.r, wS);
-  float ffN = faceVal(Fs.r, fC,  Fn.r, fNN,  wN);
-
-  // --- interface compression: an artificial velocity c_α|u| along ∇α that
-  //     pushes the smeared interface back together. α(1−α) switches it off
-  //     everywhere except the free surface itself.
-  float aC = min(fC, 1.0), aW = min(Fw.r, 1.0), aE = min(Fe.r, 1.0);
-  float aS = min(Fs.r, 1.0), aN = min(Fn.r, 1.0);
-  float cW = 0.0, cE = 0.0, cS = 0.0, cN = 0.0;
-  if (u_ca > 0.0) {
-    float gx, gz, gm, am;
-    gx = (aC - aW) / dx;  gz = ((aNW + aN) - (aSW + aS)) / (4.0*dx);
-    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aC + aW);
-    cW = u_ca * abs(uW) * am * (1.0 - am) * gx / gm;
-    gx = (aE - aC) / dx;  gz = ((aN + aNE) - (aS + aSE)) / (4.0*dx);
-    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aE + aC);
-    cE = u_ca * abs(uE) * am * (1.0 - am) * gx / gm;
-    gz = (aC - aS) / dx;  gx = ((aSE + aE) - (aSW + aW)) / (4.0*dx);
-    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aC + aS);
-    cS = u_ca * abs(wS) * am * (1.0 - am) * gz / gm;
-    gz = (aN - aC) / dx;  gx = ((aNE + aE) - (aNW + aW)) / (4.0*dx);
-    gm = sqrt(gx*gx + gz*gz) + 1e-8;  am = 0.5*(aN + aC);
-    cN = u_ca * abs(wN) * am * (1.0 - am) * gz / gm;
-  }
 
   // Donor-cell positivity limiter. A cell can only lose through four faces,
   // so capping each outgoing flux at a quarter of the donor's contents
@@ -400,15 +447,18 @@ void main(){
   // and at a few thousand substeps a second across every surface and spray
   // cell in the domain it invents a *lot* of it. This version is exactly
   // conservative because both neighbours of a face pick the same donor from
-  // the sign of the same flux, and therefore agree on the same limit.
+  // the sign of the same flux, and therefore agree on the same limit — which
+  // is now literally the same call: this cell's FW is its west neighbour's
+  // FE, argument for argument.
   float lim4 = 0.25 * dx / dt;
-  float FW = uW*ffW + cW, FE = uE*ffE + cE;
-  float FS = wS*ffS + cS, FN = wN*ffN + cN;
-  FW = clamp(FW, -lim4 * fC,   lim4 * Fw.r);
-  FE = clamp(FE, -lim4 * Fe.r, lim4 * fC);
-  FS = clamp(FS, -lim4 * fC,   lim4 * Fs.r);
-  FN = clamp(FN, -lim4 * Fn.r, lim4 * fC);
-  float fNew = min(fC - dt * ((FE - FW) + (FN - FS)) / dx, 8.0);
+  float FW = fluxX(i-1, j, lim4), FE = fluxX(i, j, lim4);
+  float FS = fluxZ(i, j-1, lim4), FN = fluxZ(i, j, lim4);
+  // The conservative candidate, kept UNCLAMPED: everything below (the range
+  // cap, the sponges, the point sources) is a source term, and <S> is exactly
+  // what they add. Clamp first and the balance loses the term it is meant to
+  // report.
+  float fCons = fC - dt * ((FE - FW) + (FN - FS)) / dx;
+  float fNew  = min(fCons, 8.0);
 
   // --- relaxation sponge at level-controlled edges. A one-cell Dirichlet is
   //     a hard impedance step: pond slosh reflects off it, and with the
@@ -466,7 +516,30 @@ void main(){
 
   fNew = (fNew > 0.0 && fNew < 8.0) ? fNew : (fNew >= 8.0 ? 8.0 : 0.0);
   o = vec4(fNew, dNew, 0.0);
+#ifdef ACCUM
+  // Running means over the window, weight h/(T+h) with T the window BEFORE
+  // this substep — so after n substeps each channel is the exact
+  // time-weighted mean of what the pass actually did.
+  //
+  // S is a RATE, not an increment: the balance of docs/averaging.md §5 has
+  // units of fill per second, so it is (fNew − fCons)/dt. Weighting the
+  // increment (fNew − fCons) by h instead would put an extra factor of time
+  // in the balance — RECON test A6 pins this convention on the JS side.
+  vec4 A = texelFetch(u_A, c, 0);
+  float k = dt / max(u_Tacc + dt, 1e-9);
+  float Srate = (fNew - fCons) / dt;
+  oA = vec4(A.r + k * (FE - A.r),
+            A.g + k * (FN - A.g),
+            A.b + k * (Srate - A.b), 0.0);
+#endif
 }`;
+
+  // The #define must follow #version, which has to be the first line of the
+  // source. Compiled as a separate program so a session that never opens
+  // Average pays exactly today's cost: an MRT bound to a dummy target still
+  // costs the bandwidth of a second full-resolution RGBA32F write per substep.
+  const withAccum = (src) => src.replace(/^(#version[^\n]*\n)/, "$1#define ACCUM 1\n");
+  const FS_VOF_ACC = withAccum(FS_VOF);
 
   // ------------------------------------------------- pass 3: column reduce
   // One texel per grid column: bed level, depth, unit discharge, surface.
@@ -815,5 +888,6 @@ void main(){
   o = vec4(pow(clamp(c, 0.0, 1.0), vec3(0.95)), 1.0);
 }`;
 
-  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_COL, FS_PART, VS_PART, FS_PART_DRAW, FS_DISP };
+  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_PART, VS_PART,
+           FS_PART_DRAW, FS_DISP };
 })();

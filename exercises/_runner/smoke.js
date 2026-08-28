@@ -482,6 +482,117 @@ SUITES.pack = async (B) => {
   }
 };
 
+// Group F — the transport accumulator. The vof pass emits its own limited
+// face fluxes on a second render target, so the discrete mass balance can be
+// certified with the numbers the scheme actually used rather than with a
+// cell-centred reconstruction of them.
+//
+// The residual floor is NOT arbitrary and is not accumulation noise: f is
+// stored in float32, so an update smaller than half an ulp of f rounds to a
+// no-op, and the flux the pass computed is then unrepresentable in f. That
+// caps the residual at ½·ulp(f)/Δt regardless of how long the window runs.
+//
+// Measured on h23 at Low (dx = 16.3 mm, Δt = 2.626e-4 s), substeps → max:
+//     1 → 2.2697448730469e-4      512  → 1.09e-4
+//     8 → 1.72e-4                 4096 → 5.88e-4
+//    64 → 6.22e-5
+// and ½·ulp(1.007)/Δt = 2.2697448730469e-4 — the 1-substep maximum to 13
+// significant figures. The 4096 case reaches the f≈8 (fully pressurised) end
+// of the same bound, ½·ulp(8)/Δt = 1.8e-3.
+//
+// Against that, the divergence term the balance cancels runs to 135 s⁻¹ (mean
+// 0.05–0.16 s⁻¹): a single mis-tiled face would land five orders of magnitude
+// above this floor, not just above 1e-5.
+const AVG_FLOOR = (dt) => 0.5 * 1.1920929e-7 * 8 / dt;
+
+SUITES.avg = async (B) => {
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);
+  const r = await B.evaluate(`(() => {
+    __low(); APP.tick(600);                    // settle before the window opens
+    APP.SIM.avgStart();
+    APP.frames(120);
+    const res = APP.SIM.transportResidual();
+    const T   = APP.SIM.avgT();
+    APP.frames(240);
+    const res2 = APP.SIM.transportResidual();
+    return { T, active: APP.SIM.avgActive(), max: res.max, max2: res2.max,
+             mean: res.mean, n: res.n, dt: APP.SIM.dt() };
+  })()`);
+  const floor = AVG_FLOOR(r.dt);
+  ok("avg accumulator reports a positive window", r.T > 0, JSON.stringify(r));
+  ok("avg residual has interior cells to report on", r.n > 100, JSON.stringify(r));
+  // F1: the transport balance is an IDENTITY of the scheme, so all that is
+  // left is the float32 quantisation of f itself.
+  ok("F1 transport residual is at the f-quantisation floor", r.max < floor,
+     `max ${r.max} floor ${floor}`);
+  ok("F1 residual does not grow with T", r.max2 < r.max * 4 + 1e-9,
+     `max ${r.max} -> ${r.max2}`);
+
+  // The accumulator must not perturb the solution: the ACCUM variant is the
+  // same source with one extra output, and the flux extraction is a pure
+  // refactor. Same scene, same substeps, f must match BIT FOR BIT — a
+  // tolerance here would just hide the ulp that a faithless extraction costs.
+  const s = await B.evaluate(`(() => {
+    const gl = document.querySelector("canvas").getContext("webgl2");
+    const snap = () => {
+      const n = APP.sim.nx * APP.sim.ny, b = new Float32Array(n * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, APP.sim.F.read.fbo);
+      gl.readPixels(0, 0, APP.sim.nx, APP.sim.ny, gl.RGBA, gl.FLOAT, b);
+      return b;
+    };
+    APP.SIM.avgStop();
+    APP.SIM.resetWater(); APP.tick(60); const plain = snap();
+    APP.SIM.resetWater(); APP.SIM.avgStart(); APP.tick(60); const acc = snap();
+    APP.SIM.avgStop();
+    let diff = 0, bad = 0;
+    for (let i = 0; i < plain.length; i += 4) {
+      const d = Math.abs(plain[i] - acc[i]);
+      if (d !== 0) { bad++; if (d > diff) diff = d; }
+    }
+    return { diff, bad, n: plain.length / 4 };
+  })()`);
+  ok("F1 the ACCUM variant does not move the solution",
+     s.bad === 0, JSON.stringify(s));
+
+  // The MRT selector must compare TEXTURE IDENTITY, not `S.F.write === S.F.b`
+  // — that is a tautology (the double buffer's getter returns b), so a wrong
+  // selector keeps picking the same framebuffer and, after the first swap,
+  // writes f and the accumulator into mismatched textures. It only shows up
+  // once the ping-pong has flipped, so read back after an ODD substep count.
+  const p = await B.evaluate(`(() => {
+    APP.SIM.avgStart();
+    APP.tick(37);                                 // odd: the two buffers end flipped
+    const res = APP.SIM.transportResidual();
+    const T = APP.SIM.avgT();
+    APP.SIM.avgStop();
+    return { T, max: res.max, mean: res.mean, n: res.n, dt: APP.SIM.dt(),
+             act: APP.SIM.avgActive() };
+  })()`);
+  ok("avg ping-pongs stay in phase across an odd substep count",
+     p.T > 0 && p.max < AVG_FLOOR(p.dt) && p.n > 100, JSON.stringify(p));
+  ok("avgStop releases the accumulator", p.act === false, JSON.stringify(p));
+
+  // R must restart the window — and it also respecifies the f textures the
+  // MRT framebuffers attach, so this is the invalid-framebuffer case too.
+  const q = await B.evaluate(`(() => {
+    const gl = document.querySelector("canvas").getContext("webgl2");
+    APP.SIM.avgStart();
+    APP.tick(30);
+    const before = APP.SIM.avgT();
+    APP.SIM.resetWater();
+    const after = APP.SIM.avgT();
+    APP.tick(30);
+    const res = APP.SIM.transportResidual();
+    const err = gl.getError();
+    APP.SIM.avgStop();
+    return { before, after, max: res.max, n: res.n, err, dt: APP.SIM.dt(),
+             active: APP.SIM.avgActive() };
+  })()`);
+  ok("avg resetWater restarts the window and rebuilds the MRT targets",
+     q.before > 0 && q.after === 0 && q.err === 0 && q.max < AVG_FLOOR(q.dt) && q.n > 100,
+     JSON.stringify(q));
+};
+
 // -------------------------------------------------------------------- main
 (async () => {
   let srv, B;

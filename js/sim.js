@@ -30,6 +30,11 @@ const SIM = (() => {
     points = GLH.makePoints(gl);
     prog.vel  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VEL);
     prog.vof  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF);
+    // The same source with ACCUM defined — a separate program, not a uniform
+    // branch: an MRT bound to a dummy target still writes a second
+    // full-resolution RGBA32F every substep, and a session that never opens
+    // Average must pay exactly what it paid before this existed.
+    prog.vofA = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF_ACC);
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
     prog.draw = GLH.createProgram(gl, Shaders.VS_RECT, Shaders.FS_DISP);
@@ -113,6 +118,15 @@ const SIM = (() => {
    *  `build` has already copied them across by the time this runs. */
   function release(g) {
     if (!g || g === S) return;                 // never free the live grid
+    // The accumulator's framebuffers attach g.F's textures, so it has to go
+    // before them. avgStop does NOT come through here: this is the grid
+    // RETIREMENT path — it tears down U, F, P, the solid texture and the
+    // column target, and the `g === S` guard above is what stops it doing
+    // that to the live grid. Handing it a synthetic { avg } object to free
+    // one accumulator would walk straight past that guard (a literal is never
+    // === S) and tie the accumulator's lifetime to a rebuild. Both callers
+    // share disposeAvg instead.
+    if (g.avg) { disposeAvg(g.avg); g.avg = null; }
     for (const b of [g.U, g.F, g.P]) if (b && b.dispose) b.dispose();
     if (g.colFbo) gl.deleteFramebuffer(g.colFbo);
     if (g.solid) gl.deleteTexture(g.solid);
@@ -185,6 +199,7 @@ const SIM = (() => {
 
     S.colBuf = new Float32Array(nx * 4);
     S.pxBuf = new Float32Array(4);
+    S.avg = null;                   // transport accumulator, allocated on demand
 
     rasterise();
     resetWater();
@@ -212,6 +227,129 @@ const SIM = (() => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, zero);
     }
     S.t = 0;
+    // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex, whose
+    // storage the loop above just RESPECIFIED — the same hazard rescaleFill
+    // sidesteps with texSubImage2D. Rebuild rather than gamble on those
+    // attachments surviving. It also gives R the window reset the averaging
+    // mode wants: a reloaded scene shares nothing with the run being averaged.
+    if (S.avg) { avgStop(); avgStart(); }
+  }
+
+  // ------------------------------------------------------------- averaging
+  // The transport accumulator of docs/averaging.md §4.2. The vof pass emits
+  // its OWN limited face fluxes on a second render target, so the mass
+  // balance is certified with the numbers the scheme actually advanced f by —
+  // not with a cell-centred reconstruction of them. (For fills (0, 0.2, 0.8,
+  // 1) the van-Leer face value is 0.35 against an upwind product of 0.20,
+  // before the compression flux and the donor clamp, so the two are not
+  // interchangeable.)
+  //
+  // Channel contract, per cell: r = <F^E>, g = <F^N>, b = <S>, a unused.
+  // Each cell owns its EAST and NORTH face only; F^E(i,j) IS F^W(i+1,j) by
+  // construction (one fluxX call, same arguments), so the two channels tile
+  // every face exactly once. The left ghost column and the bottom ghost row
+  // carry the two faces their interior neighbours cannot.
+  //
+  // Nothing in the solution ever reads this. It is a diagnostic.
+
+  function disposeAvg(a) {
+    if (!a) return;
+    if (a.T) a.T.dispose();
+    if (a.fboA) gl.deleteFramebuffer(a.fboA);
+    if (a.fboB) gl.deleteFramebuffer(a.fboB);
+    if (a.f0) gl.deleteTexture(a.f0);
+  }
+
+  /** Lazily allocated: a session that never opens Average pays nothing.
+   *  `t` is the window in SIMULATED seconds and lives here, not in a texture —
+   *  it is the same number in every cell, which is why four channels suffice. */
+  function avgStart() {
+    if (S.avg) return;
+    const F = gl.RGBA32F, RGBA = gl.RGBA, FL = gl.FLOAT;
+    const T = GLH.createDoubleBuffer(gl, S.nx, S.ny, F, RGBA, FL, null);
+    // The vof pass writes f and the accumulator together, so both halves of
+    // each ping-pong need a framebuffer that carries both attachments — and
+    // the two ping-pongs must stay in phase, which is what `fA` is for.
+    // Selecting on `S.F.write === S.F.b` would be a tautology (the double
+    // buffer's `write` getter simply RETURNS `b`), so after the first swap it
+    // would keep picking fboA and write f and the accumulator into mismatched
+    // textures — silent corruption of exactly what this exists to detect.
+    // Identity of the attached texture is the only honest test.
+    const fboA = GLH.createFBO2(gl, S.F.b.tex, T.b.tex);
+    const fboB = GLH.createFBO2(gl, S.F.a.tex, T.a.tex);
+    const f0 = GLH.createTexture(gl, S.nx, S.ny, F, RGBA, FL, null);
+    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0, f0buf: null, t: 0 };
+    snapshotF0();
+  }
+  function avgStop() { if (S.avg) { disposeAvg(S.avg); S.avg = null; } }
+  function avgReset() { if (S.avg) { avgStop(); avgStart(); } }
+  const avgActive = () => !!(S && S.avg);
+  const avgT = () => (S && S.avg ? S.avg.t : 0);
+
+  /** f(0) for the endpoint term of the balance. One copy, taken when the
+   *  window opens; f(T) is simply the live field. Read back to the CPU and
+   *  uploaded rather than copyTexSubImage2D'd: the residual wants it CPU-side
+   *  anyway, and CopyTexSubImage into an RGBA32F target is not something the
+   *  ES3 format tables promise. */
+  function snapshotF0() {
+    const buf = new Float32Array(S.nx * S.ny * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    gl.bindTexture(gl.TEXTURE_2D, S.avg.f0);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    S.avg.f0buf = buf;
+  }
+
+  /** The discrete transport balance of docs/averaging.md §5, over interior
+   *  cells with no source.
+   *
+   *      (f(T) − f(0))/T  +  [(<F^E> − <F^W>) + (<F^N> − <F^S>)]/Δx  −  <S>  =  0
+   *
+   *  It is an IDENTITY of the scheme, not an approximation: every term is the
+   *  running mean of a number the pass computed. What is left is the float32
+   *  QUANTISATION OF f, not accumulation noise — `f` is stored in float32, so
+   *  a substep whose `dt·div` is under half an ulp of `f` rounds to a no-op
+   *  and that flux can never appear in the storage term. The residual is
+   *  therefore capped at ½·ulp(f)/Δt whatever the window length. Measured on
+   *  h23 at Low (Δx = 16.3 mm, Δt = 2.63e-4 s): the 1-substep maximum is
+   *  2.2697448730469e-4 against ½·ulp(1.007)/Δt = 2.2697448730469e-4 — 13
+   *  significant figures — and 4096 substeps reach 5.9e-4 against the f = 8
+   *  end of the same bound, 1.8e-3. For scale, the divergence term those
+   *  cancel from runs to 135 s⁻¹.
+   *
+   *  Cells where <S> is nonzero are the sponge, the Dirichlet bands and the
+   *  point sources; they are excluded here and reported separately. Solid
+   *  cells are excluded too — they early-return in the shader and merely pass
+   *  their accumulator through. */
+  function transportResidual() {
+    if (!S.avg || !(S.avg.t > 0)) return { max: 0, mean: 0, n: 0 };
+    const n = S.nx * S.ny;
+    const A = new Float32Array(n * 4), fT = new Float32Array(n * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.T.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, A);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, fT);
+    const f0 = S.avg.f0buf;
+    // 255 = wall, 128 = valve (solid only while closed), 0 = open.
+    const solidLo = S.p.valveClosed > 0.5 ? 64 : 192;
+    const T = S.avg.t, nx = S.nx;
+    let max = 0, sum = 0, cnt = 0;
+    for (let j = 1; j < S.ny - 1; j++) {
+      for (let i = 1; i < nx - 1; i++) {
+        const k = (j * nx + i) * 4;
+        if (S.mask[j * nx + i] >= solidLo) continue;
+        if (Math.abs(A[k + 2]) > 1e-9) continue;              // source cell
+        // West face = the west neighbour's stored east face; south face = the
+        // south neighbour's stored north face. Both are the same number, not
+        // a copy of it.
+        const div = ((A[k] - A[k - 4]) + (A[k + 1] - A[((j - 1) * nx + i) * 4 + 1])) / S.dx;
+        const r = (fT[k] - f0[k]) / T + div - A[k + 2];
+        const a = Math.abs(r);
+        if (a > max) max = a;
+        sum += a; cnt++;
+      }
+    }
+    return { max, mean: cnt ? sum / cnt : 0, n: cnt };
   }
 
   // ------------------------------------------------------------------ step
@@ -330,15 +468,31 @@ const SIM = (() => {
       S.U.swap();
 
       // --- volume: conservative limited advection of f (+ dye)
-      gl.useProgram(prog.vof);
-      GLH.bindTex(gl, prog.vof, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
-      simUniforms(prog.vof, h);
-      gl.uniform1f(prog.vof.u("u_ca"), p.ca);
-      gl.uniform1f(prog.vof.u("u_dyeDecay"), p.dyeDecay);
-      gl.uniform2f(prog.vof.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
-      GLH.bindTarget(gl, S.F.write.fbo, S.nx, S.ny);
+      const useAcc = !!S.avg;
+      const pv = useAcc ? prog.vofA : prog.vof;
+      gl.useProgram(pv);
+      GLH.bindTex(gl, pv, useAcc
+        ? [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
+           ["u_A", S.avg.T.read.tex]]
+        : [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+      simUniforms(pv, h);
+      gl.uniform1f(pv.u("u_ca"), p.ca);
+      gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
+      gl.uniform2f(pv.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
+      if (useAcc) {
+        // T BEFORE this substep — the running-mean weight is h/(T+h).
+        gl.uniform1f(pv.u("u_Tacc"), S.avg.t);
+        // The MRT fbo whose attachments are the two WRITE halves. Compared by
+        // texture identity, not by `S.F.write === S.F.b`: see avgStart.
+        GLH.bindTarget(gl, S.F.write.tex === S.avg.fA ? S.avg.fboA : S.avg.fboB,
+          S.nx, S.ny);
+      } else {
+        GLH.bindTarget(gl, S.F.write.fbo, S.nx, S.ny);
+      }
       quad.draw();
       S.F.swap();
+      // Both ping-pongs advance together or they fall out of phase.
+      if (useAcc) { S.avg.T.swap(); S.avg.t += h; }
 
       S.t += h;
     }
@@ -588,5 +742,6 @@ const SIM = (() => {
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            boxForce, dt, get, inletVel, bands, rescaleFill,
+           avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

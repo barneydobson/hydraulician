@@ -718,6 +718,100 @@ const SIM = (() => {
    *  A tilted-gravity scene carries its slope in gravity rather than in the
    *  bed, so the elevation term is z − S₀x there, exactly as the head views
    *  and the overlay compute it. */
+  /** What crosses one SECTION: the same integrand as a control-volume face,
+   *  over a line you drew rather than over a box.
+   *
+   *  Two sections answer most of what a control volume answers — continuity
+   *  between them, the momentum they carry, the energy lost between one and
+   *  the next — without asking a student to reason about four faces at once,
+   *  and a section is what a textbook draws anyway.
+   *
+   *  The normal is the drawing direction turned a quarter-turn clockwise, so a
+   *  line drawn UP has its positive side downstream: draw across the flow the
+   *  way you would draw a section on paper and the sign comes out the way you
+   *  expect. Nothing is shown as a bare sign regardless — the overlay says
+   *  which way the water actually goes.
+   *
+   *  Exact on the grid only for a section along a cell face; anything at an
+   *  angle interpolates the staggered velocities, which is the same thing the
+   *  rake and the orbit tracers already do. Air contributes nothing: every
+   *  term carries the fill fraction, and `Q` uses min(f, 1) because f > 1 is
+   *  water that has been compressed rather than more of it. */
+  function lineFlux(x0, z0, x1, z1) {
+    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
+    const closed = S.p.valveClosed > 0.5;
+    const dx = x1 - x0, dz = z1 - z0;
+    const len = Math.hypot(dx, dz);
+    const out = { Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0,
+                  wet: 0, len, nx: 0, nz: 0, n: 0 };
+    if (!(len > 1e-6)) return out;
+    const tx = dx / len, tz = dz / len;
+    const nx = tz, nz = -tx;                    // a quarter-turn clockwise
+    out.nx = nx; out.nz = nz;
+
+    // One sample per cell along the section, and never fewer than a handful:
+    // a section shorter than a cell is still a section.
+    const ns = Math.max(8, Math.min(4096, Math.ceil(len / S.dx) * 2));
+    const ds = len / ns;
+
+    // The whole bounding rect in one readback, with a cell of margin for the
+    // staggered interpolation.
+    const iL = Math.max(0, Math.floor(Math.min(x0, x1) / S.dx) - 2);
+    const iR = Math.min(S.nx - 1, Math.ceil(Math.max(x0, x1) / S.dx) + 2);
+    const jB = Math.max(0, Math.floor(Math.min(z0, z1) / S.dx) - 2);
+    const jT = Math.min(S.ny - 1, Math.ceil(Math.max(z0, z1) / S.dx) + 2);
+    const w = iR - iL + 1, h = jT - jB + 1;
+    const need = w * h * 4;
+    if (!S.lnU || S.lnU.length < need) { S.lnU = new Float32Array(need); S.lnF = new Float32Array(need); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnU);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnF);
+    const U = S.lnU, F = S.lnF;
+    const at = (buf, i, j, c) =>
+      buf[((Math.min(Math.max(j, jB), jT) - jB) * w +
+           (Math.min(Math.max(i, iL), iR) - iL)) * 4 + c];
+    /** Bilinear over cell CENTRES, which is where f and P live. */
+    const centre = (buf, x, z, c) => {
+      const gx = x / S.dx - 0.5, gz = z / S.dx - 0.5;
+      const i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j;
+      return (at(buf, i, j, c) * (1 - fx) + at(buf, i + 1, j, c) * fx) * (1 - fz)
+           + (at(buf, i, j + 1, c) * (1 - fx) + at(buf, i + 1, j + 1, c) * fx) * fz;
+    };
+
+    for (let k = 0; k < ns; k++) {
+      const s = (k + 0.5) * ds;
+      const x = x0 + tx * s, z = z0 + tz * s;
+      const ci = Math.min(S.nx - 1, Math.max(0, Math.floor(x / S.dx)));
+      const cj = Math.min(S.ny - 1, Math.max(0, Math.floor(z / S.dx)));
+      const m = S.mask[cj * S.nx + ci];
+      if (m > 192 || (closed && m > 64)) continue;      // a section through rock
+      // u lives on x-faces and w on z-faces, so each is offset half a cell.
+      const gx = x / S.dx, gz = z / S.dx;
+      const ui = Math.floor(gx), uj = Math.floor(gz - 0.5);
+      const ax = gx - ui, az = gz - 0.5 - uj;
+      const u = (at(U, ui, uj, 0) * (1 - ax) + at(U, ui + 1, uj, 0) * ax) * (1 - az)
+              + (at(U, ui, uj + 1, 0) * (1 - ax) + at(U, ui + 1, uj + 1, 0) * ax) * az;
+      const wi = Math.floor(gx - 0.5), wj = Math.floor(gz);
+      const bx = gx - 0.5 - wi, bz = gz - wj;
+      const wv = (at(U, wi, wj, 1) * (1 - bx) + at(U, wi + 1, wj, 1) * bx) * (1 - bz)
+               + (at(U, wi, wj + 1, 1) * (1 - bx) + at(U, wi + 1, wj + 1, 1) * bx) * bz;
+      const f = centre(F, x, z, 0);
+      const P = centre(U, x, z, 2);
+      const un = u * nx + wv * nz;
+      out.Q += Math.min(f, 1) * un * ds;
+      out.mdot += RHO * f * un * ds;
+      out.Mx += RHO * f * u * un * ds;
+      out.Mz += RHO * f * wv * un * ds;
+      out.Fpx += RHO * f * P * nx * ds;
+      out.Fpz += RHO * f * P * nz * ds;
+      out.E += RHO * f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv)) * ds;
+      out.wet += Math.min(f, 1) * ds;
+      out.n++;
+    }
+    return out;
+  }
+
   function boxFlux(x0, z0, x1, z1) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
@@ -858,6 +952,6 @@ const SIM = (() => {
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
-           boxForce, boxFlux, dt, get, inletVel, bands, rescaleFill,
+           boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

@@ -908,6 +908,94 @@ const OVERLAY = (() => {
     lines.forEach((t, k) => chip(ctx, x1 - 6, top + k * 15, t, col, "right"));
   }
 
+  /** The flux sections: what crosses each line, and what happened between
+   *  two of them.
+   *
+   *  A section is the instrument a textbook actually draws, and two of them
+   *  answer most of what a control volume answers — continuity between them,
+   *  the momentum they carry, the energy lost from one to the next — without
+   *  asking a first-year to reason about four faces at once.
+   *
+   *  Direction is shown, never a sign: an arrow across the line points the way
+   *  the water is going through it, and the number beside it is a magnitude.
+   *  Which side of the line counts as positive is the tool's business, not the
+   *  reader's. */
+  function drawFlux(ctx, V, lines, show, drag) {
+    const col = "#8ce1b0";
+    ctx.save();
+    if (drag) {
+      ctx.strokeStyle = "rgba(140,225,176,0.75)"; ctx.lineWidth = 1.6;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(V.X(drag.x0), V.Y(drag.z0));
+      ctx.lineTo(V.X(drag.x1), V.Y(drag.z1));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const q = CV_Q[show] || CV_Q.Q;
+    lines.forEach((L, k) => {
+      const ax = V.X(L.x0), ay = V.Y(L.z0), bx = V.X(L.x1), by = V.Y(L.z1);
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      // End ticks, so a section reads as a measured extent rather than as a
+      // stray line somebody drew.
+      const ux = bx - ax, uy = by - ay, ln = Math.hypot(ux, uy) || 1;
+      const px = -uy / ln, py = ux / ln;
+      ctx.beginPath();
+      ctx.moveTo(ax - px * 5, ay - py * 5); ctx.lineTo(ax + px * 5, ay + py * 5);
+      ctx.moveTo(bx - px * 5, by - py * 5); ctx.lineTo(bx + px * 5, by + py * 5);
+      ctx.stroke();
+
+      const e = L.ema;
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      if (!e) { chip(ctx, mx + 8, my, "section " + (k + 1) + " · settling…", col); return; }
+      const v = q.at(e);
+      // The arrow sits ON the section, pointing the way the water crosses it.
+      // `n` is in domain coordinates and the screen flips z, so the arrow is
+      // built from the drawn perpendicular rather than from n directly.
+      const dir = v >= 0 ? 1 : -1;
+      const hx = px * 14 * dir, hy = py * 14 * dir;   // across the section
+      const lx = ux / ln, ly = uy / ln;               // along it
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(mx - hx, my - hy); ctx.lineTo(mx + hx, my + hy); ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(mx + hx * 1.6, my + hy * 1.6);                    // the tip
+      ctx.lineTo(mx + hx + lx * 5, my + hy + ly * 5);
+      ctx.lineTo(mx + hx - lx * 5, my + hy - ly * 5);
+      ctx.closePath(); ctx.fill();
+      chip(ctx, mx + hx * 1.7 + (dir > 0 ? 6 : -6), my + hy * 1.7,
+           (k + 1) + "  " + q.fmt(Math.abs(v)) + (q.through ? " " + q.unit : ""),
+           col, dir > 0 ? "left" : "right");
+    });
+
+    // …and what happened BETWEEN the last two, which is the reading two
+    // sections exist to give.
+    if (lines.length >= 2) {
+      const A = lines[lines.length - 2], B = lines[lines.length - 1];
+      if (A.ema && B.ema) {
+        const dQ = Math.abs(B.ema.Q) - Math.abs(A.ema.Q);
+        const dE = Math.abs(A.ema.E) - Math.abs(B.ema.E);
+        const inQ = Math.max(Math.abs(A.ema.Q), 1e-9);
+        const x = Math.min(V.X(A.x0), V.X(A.x1), V.X(B.x0), V.X(B.x1));
+        // Anchored to the LOWER end of the sections and stacked upward. The
+        // control volume's own card hangs from the top of its box, and a
+        // section pair drawn across the same reach put the two on top of each
+        // other — which is exactly when you want to read both.
+        const y = Math.max(V.Y(A.z0), V.Y(A.z1), V.Y(B.z0), V.Y(B.z1));
+        const rows = [
+          "sections " + (lines.length - 1) + " → " + lines.length,
+          "water   " + q0(Math.abs(A.ema.Q)) + " → " + q0(Math.abs(B.ema.Q)) +
+            " m²/s   (" + (100 * dQ / inQ).toFixed(1) + "%, should be 0)",
+          "energy  lost " + fmtBig(dE, "W/m") + " between them",
+        ];
+        rows.forEach((t, i) => chip(ctx, x + 6, y - 12 - (rows.length - 1 - i) * 15, t, col));
+      }
+    }
+    ctx.restore();
+  }
+  const q0 = (v) => v.toFixed(3);
+
   /** Edge rulers in metres: ticks along the bottom (x stations) and left
    *  (elevations above the datum) of the VISIBLE domain, with faint grid
    *  lines at the major ticks. They follow zoom and pan, so a drawn plate
@@ -974,5 +1062,5 @@ const OVERLAY = (() => {
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
-           drawMeasure, drawCV, measureText, chip, fmt };
+           drawMeasure, drawCV, drawFlux, measureText, chip, fmt };
 })();

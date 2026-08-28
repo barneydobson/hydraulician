@@ -479,6 +479,28 @@ SUITES.physics = async (B) => {
     cv.E.toFixed(1) + " W/m");
   // The same face integral by two routes; if they drift, one has been edited
   // and the other has not.
+  // A SECTION at the box's own left face is the same integral over the same
+  // line, reached a different way — one walks grid faces, the other samples an
+  // arbitrary line. If they disagree by more than the discretisation, one of
+  // them is wrong.
+  const sec = await B.evaluate(`(() => {
+    const W = APP.sim.W, H = APP.sim.H;
+    const x = 0.35 * W;
+    const line = APP.SIM.lineFlux(x, 0, x, H);
+    const box = APP.SIM.boxFlux(x, 0, 0.62 * W, H);
+    return { lineQ: Math.abs(line.Q), faceQ: Math.abs(box.edges.left.Q),
+             lineE: Math.abs(line.E), faceE: Math.abs(box.edges.left.E),
+             n: line.n, len: line.len };
+  })()`);
+  ok("PHYSICS a section samples the water at all", sec.n > 10 && sec.lineQ > 0,
+    sec.n + " samples over " + sec.len.toFixed(2) + " m");
+  ok("PHYSICS a section agrees with the control-volume face it lies on",
+    Math.abs(sec.lineQ - sec.faceQ) < 0.06 * Math.max(sec.faceQ, 1e-9),
+    `line ${sec.lineQ.toFixed(4)} vs face ${sec.faceQ.toFixed(4)} m²/s`);
+  ok("PHYSICS and carries the same energy across it",
+    Math.abs(sec.lineE - sec.faceE) < 0.10 * Math.max(sec.faceE, 1e-9),
+    `line ${sec.lineE.toFixed(1)} vs face ${sec.faceE.toFixed(1)} W/m`);
+
   ok("PHYSICS boxFlux and boxForce report the same force",
     Math.abs(cv.fx - cv.gx) < 1e-6 * Math.max(1, Math.abs(cv.gx)),
     cv.fx + " vs " + cv.gx);

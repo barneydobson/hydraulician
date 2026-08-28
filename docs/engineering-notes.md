@@ -441,6 +441,19 @@ picture saturated or flat is the symptom of the two having drifted apart.
   term in the budget carries `f`, so an empty cell adds zero and a half-full
   one adds half. A cut-off would put a step in every reading taken across a
   wavy surface, which is exactly where these boxes get drawn.
+- **The flux tool is the same integrand over a line you drew** (`SIM.lineFlux`).
+  Its normal is the drawing direction turned a quarter-turn clockwise, so a
+  section drawn UP has its positive side downstream — draw across the flow the
+  way you would draw a section on paper and the sign comes out as expected.
+  It is exact only along a cell face; at an angle it interpolates the
+  staggered velocities, the same thing the rake and the orbit tracers do.
+  `smoke.js` checks a vertical section against the control-volume face it lies
+  on, which is the only way to know the two integrals still agree.
+- **New tools are APPENDED to `TOOLS`, whatever group they belong to.** The
+  digit a tool answers to is its index, and every worksheet in the pack refers
+  to tools by digit — inserting one renumbers the rest and makes the printed
+  sheets wrong. The strip's groups name their tools explicitly (`toolItems`)
+  precisely so the two orders can differ.
 - **The budget's own closure is a property of the SCENE, not of the integral.**
   Σ Q over the four faces is continuity, and it only vanishes once the reach
   is steady — mid-spin-up a box is still filling and closes to tens of per

@@ -628,6 +628,54 @@ async function main() {
       await tab.close();
     }
 
+    // ---------------------------------------------------------- flux sections
+    console.log("\na section reads what crosses it, and two of them compare");
+    {
+      const tab = await browser.open(INDEX + "?scene=m1");
+      const r = await tab.evaluate(`
+        APP.frames(400);
+        APP.state.tool = "flux";
+        APP.placeFlux(4.0, 0.0, 4.0, 1.0);
+        APP.placeFlux(9.0, 0.0, 9.0, 1.0);
+        APP.frames(120);
+        const L = APP.state.flux;
+        return { n: L.length,
+                 read: !!(L[0].ema && L[1].ema),
+                 q1: L[0].ema.Q, q2: L[1].ema.Q,
+                 e1: L[0].ema.E,
+                 // A section drawn bottom-to-top has its normal downstream, so
+                 // a reach flowing left to right reads positive on both.
+                 sameSign: L[0].ema.Q * L[1].ema.Q > 0,
+                 inMeasure: APP.ui.TOOLBAR.find((g) => g.cap === "MEASURE").items
+                              .some((i) => i.tool === "flux") };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("two sections go down", r.n, 2);
+      check("each one reads", r.read);
+      check("water crosses both the same way", r.sameSign,
+            r.q1 + " and " + r.q2);
+      check("a section carries energy too", Math.abs(r.e1) > 0, String(r.e1));
+      check("the tool is in MEASURE", r.inMeasure);
+
+      // Same bargain as every other instrument: click it to take it away.
+      const gone = await tab.evaluate(`
+        // The gesture the tool uses: a click ON a section takes it away.
+        const took = APP.removeFluxAt(4.02, 0.5);   // within the grab radius of #1
+        return { took, n: APP.state.flux.length };
+      `);
+      check("clicking a section removes it", gone.took && gone.n === 1,
+            "took " + gone.took + ", " + gone.n + " left");
+
+      // THE promise the digits make. A tool appended to TOOLS must not
+      // renumber the nine a worksheet already refers to by digit.
+      const digits = await tab.evaluate(`
+        return APP.TOOLS.slice(0, 9).map((t) => t[0]).join(",");
+      `);
+      eq("the nine digits still mean what the worksheets say", digits,
+         "wall,erase,valve,spout,gauge,rake,tracer,measure,cv");
+      await tab.close();
+    }
+
     // ------------------------------------------------- placing and removing
     console.log("\nan instrument you can place is an instrument you can remove");
     {

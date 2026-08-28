@@ -18,7 +18,7 @@ shallow water); this one resolves the depth.
 | `index.html` | markup + all CSS, classic script tags; the control panel is generated from a spec in `main.js` |
 | `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
 | `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
-| `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` |
+| `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
 | `js/main.js` | boot, panel spec, pointer tools, view transform, `window.APP`, rig save/load (`RIG`) |

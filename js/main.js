@@ -27,7 +27,8 @@ const state = {
   ui: null,                   // the resolved UI profile; UIMODE.full() when absent
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
-  cv: null, cvDrag: null,          // the force control volume: box + EMA budget
+  cv: null, cvDrag: null,          // the control volume: box + EMA budget
+  flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
   cvShow: "Q",                     // which per-edge quantity the box labels
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
@@ -173,6 +174,7 @@ function loadScene(id, keepDrawing) {
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.measure = null; state.measDrag = null;
   state.cv = null; state.cvDrag = null;
+  state.flux.length = 0; state.fluxDrag = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -2025,6 +2027,11 @@ const TOOLS = [
   // them, in worksheets as well as in muscle memory. Pour has no digit; on a
   // desktop its shortcut is the right-drag that works in any tool.
   ["pour", "Pour", "Drag to pour water — or right-drag with any tool"],
+  // ELEVENTH, and appended for the same reason: anything inserted above this
+  // line renumbers a digit, and a worksheet that says "press 5" would start
+  // arming the wrong tool. New tools go on the end, whatever group they
+  // belong to on the strip.
+  ["flux", "Flux line", "Left-drag a section — reads what crosses it (Shift snaps). Click a line to remove it"],
 ];
 
 /** The tools the number keys can reach. */
@@ -2059,6 +2066,9 @@ const ICONS = {
   tracer:  '<ellipse cx="10" cy="10" rx="6.5" ry="4.5" transform="rotate(-18 10 10)"/>' +
            '<circle cx="15.4" cy="7.6" r="1.7" fill="currentColor" stroke="none"/>',
   measure: '<rect x="3" y="7.5" width="14" height="5.5" rx="1"/><path d="M6.5 7.5v2.2M10 7.5v2.2M13.5 7.5v2.2"/>',
+  // A section with the flow crossing it — the thing the tool measures.
+  flux:    '<path d="M6.5 3.5v13"/><path d="M10.5 10h6"/><path d="M14.5 7.5 17 10l-2.5 2.5"/>' +
+           '<path d="M2.5 10h2.2"/>',
   cv:      '<rect x="4" y="5" width="12" height="10" rx="1" stroke-dasharray="3 2.4"/>' +
            '<path d="M10 8v4M8.4 10.4 10 12l1.6-1.6"/>',
   pause:   '<rect x="5.2" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>' +
@@ -2490,8 +2500,7 @@ const TOOLBAR = [
   // taken back at all — and Clear, which used to sit with the clock although
   // it edits the rig rather than running it.
   { cap: "BUILD", family: "build", items:
-    TOOLS.slice(0, 4).map(toolItem).concat(
-      [toolItem(TOOLS[TOOLS.length - 1])],
+    toolItems("wall", "erase", "valve", "spout", "pour").concat(
       [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
          hint: "Take back the last thing you drew",
          act: () => SIM.undoSeg() },
@@ -2499,7 +2508,7 @@ const TOOLBAR = [
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
   { cap: "MEASURE", family: "measure",
-    items: TOOLS.slice(4, TOOLS.length - 1).map(toolItem) },
+    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux") },
   // VIEW: how the water is DRAWN. The three toggles were reachable only from
   // the P / D / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
@@ -2552,6 +2561,13 @@ const TOOLBAR = [
 
 /** A drawing / instrument tool as a strip item. Its shortcut is its position
  *  in TOOLS, which is exactly what the number keys do. */
+/** Strip items for the named tools, in the order given. The strip's ORDER is
+ *  not the TOOLS order: TOOLS is the digit order, which is fixed by every
+ *  worksheet ever printed, so a new tool is appended there and placed here. */
+function toolItems(...ids) {
+  return ids.map((id) => toolItem(TOOLS.find((t) => t[0] === id)));
+}
+
 function toolItem([id, label, tip]) {
   const n = TOOLS.findIndex((t) => t[0] === id) + 1;
   // `tool` is the item's own name for the thing it arms, and it is what a UI
@@ -3010,7 +3026,8 @@ function onDown(e) {
   const [x, z] = pointerPos(e);
   state.cursor = [x, z];
   if (pointers.size === 2) {         // second finger: abandon tools, pinch
-    state.drag = null; state.spoutDrag = false; state.measDrag = null; state.cvDrag = null;
+    state.drag = null; state.spoutDrag = false; state.measDrag = null;
+    state.cvDrag = null; state.fluxDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
     const ps = [...pointers.values()];
     state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
@@ -3063,6 +3080,13 @@ function onDown(e) {
     // A tape, not a wall: the drag never reaches SIM.addSeg. A bare click
     // (see onUp) clears the tape instead of leaving a zero-length one.
     state.measDrag = { x0: x, z0: z, x1: x, z1: z };
+    return;
+  }
+  if (state.tool === "flux") {
+    // Same bargain as every other instrument: a click on one takes it away, a
+    // drag places a new one.
+    if (removeFluxAt(x, z)) return;
+    state.fluxDrag = { x0: x, z0: z, x1: x, z1: z };
     return;
   }
   if (state.tool === "cv") {
@@ -3124,6 +3148,12 @@ function onMove(e) {
     else { d.x1 = x; d.z1 = z; }
     return;
   }
+  if (state.fluxDrag) {
+    const d = state.fluxDrag;
+    if (e.shiftKey) { const s = snap(d.x0, d.z0, x, z); d.x1 = s[0]; d.z1 = s[1]; }
+    else { d.x1 = x; d.z1 = z; }
+    return;
+  }
   if (state.cvDrag) {
     state.cvDrag.x1 = x; state.cvDrag.z1 = z;
     return;
@@ -3147,6 +3177,13 @@ function onUp(e) {
     state.measure = Math.hypot(d.x1 - d.x0, d.z1 - d.z0) < sim.dx ? null : d;
     state.measDrag = null;
     syncPanel();                      // the panel's Measure row prints the numbers
+    return;
+  }
+  if (state.fluxDrag) {
+    const d = state.fluxDrag;
+    state.fluxDrag = null;
+    if (Math.hypot(d.x1 - d.x0, d.z1 - d.z0) >= 2 * sim.dx) placeFlux(d.x0, d.z0, d.x1, d.z1);
+    syncPanel();
     return;
   }
   if (state.cvDrag) {
@@ -3244,6 +3281,7 @@ function tickFrame(realDt) {
   sampleGauges(analysis);
   sampleRakes();
   sampleCV();
+  sampleFlux();
   sampleInlet(analysis);
   advanceTracers(simAdvanced);
   // Scenes whose subject is the orbital motion seed their own tracer rake as
@@ -3337,6 +3375,43 @@ function sampleRakes() {
 /** Place (or move) the force control volume. Corners are normalised and the
  *  running force estimate starts afresh — a moved box is a new measurement,
  *  and blending it with the old one would print a number no box ever read. */
+/** Take away the section under the pointer, if there is one. Named rather
+ *  than inlined because a click and a drag are different gestures on this
+ *  tool: removal happens on the way DOWN, placement on the way up. */
+function removeFluxAt(x, z) {
+  const hit = state.flux.findIndex((L) => nearSegment(L, x, z) < GRAB_PX);
+  if (hit < 0) return false;
+  state.flux.splice(hit, 1);
+  syncPanel();
+  return true;
+}
+
+/** Put a section down. Four is the ceiling for the same reason gauges stop at
+ *  four: past that nobody can tell them apart, and the questions these answer
+ *  need two. The oldest gives way, so the pair you are looking at is the pair
+ *  you drew last. */
+function placeFlux(x0, z0, x1, z1) {
+  if (state.flux.length >= 4) state.flux.shift();
+  state.flux.push({ x0, z0, x1, z1, ema: null, t0: sim.t });
+  syncPanel();
+}
+
+/** Every section, smoothed the same way the control volume is. A raw section
+ *  integral on a wobbling free surface is not a reading — it carries every
+ *  wave that crosses it — which is the whole reason the box grew an EMA. */
+function sampleFlux() {
+  if (!state.flux.length || state.paused) return;
+  state.flux.forEach((L) => {
+    if (sim.t < L.t0) { L.ema = null; L.t0 = sim.t; }
+    const r = SIM.lineFlux(L.x0, L.z0, L.x1, L.z1);
+    const a = 1 - Math.exp(-Math.min(Math.max(sim.t - L.t0, 0), 0.25) / 1.0);
+    L.t0 = sim.t;
+    if (!L.ema) { L.ema = r; return; }
+    FLUX_KEYS.forEach((k) => { L.ema[k] += (r[k] - L.ema[k]) * a; });
+    L.ema.nx = r.nx; L.ema.nz = r.nz; L.ema.len = r.len;
+  });
+}
+
 function placeCV(x0, z0, x1, z1) {
   state.cv = {
     x0: Math.min(x0, x1), z0: Math.min(z0, z1),
@@ -3517,6 +3592,9 @@ function drawOverlay(A) {
                                 x1: Math.max(state.cvDrag.x0, state.cvDrag.x1),
                                 z1: Math.max(state.cvDrag.z0, state.cvDrag.z1) });
   } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv, state.cvShow);
+  if (state.flux.length || state.fluxDrag) {
+    OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
+  }
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -3549,6 +3627,15 @@ function pxApart(x0, z0, x1, z1) {
   return Math.hypot(dx, dz);
 }
 const GRAB_PX = 16;      // a finger is 44 px; this is for a pointed-at marker
+
+/** Screen distance from a point to a drawn section, in pixels. */
+function nearSegment(L, x, z) {
+  const ax = (L.x1 - L.x0) * view.w / sim.W, az = (L.z1 - L.z0) * view.h / sim.H;
+  const px = (x - L.x0) * view.w / sim.W, pz = (z - L.z0) * view.h / sim.H;
+  const len2 = ax * ax + az * az;
+  const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, (px * ax + pz * az) / len2));
+  return Math.hypot(px - ax * t, pz - az * t);
+}
 
 /** Place a gauge — or take away the one you just pointed at.
  *
@@ -4730,7 +4817,8 @@ window.APP = {
   placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
-  placeCV,                                 // the Control volume tool, headless
+  placeCV,                                 // the control volume, headless
+  placeFlux, removeFluxAt,                 // a flux section, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {
     const c = SIM.columns(); let v = 0;

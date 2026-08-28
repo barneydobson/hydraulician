@@ -82,7 +82,16 @@ to look fine for a minute and explode in an exercise.
   changes); outfall edges (`open` = 2) are for brinks, never ponds.
 - **The panel toggles are self-configuring** — the sandbox must be able to
   reproduce any scene by hand; that is the acceptance test for control
-  changes.
+  changes. An exercise may narrow the interface (`UIMODE`), but never lock
+  it: the `⋯` on the strip and at the head of the panel puts everything back
+  in one click, which is what keeps that acceptance test true.
+- **A field is described once.** The seven colourings live in `FIELDS` in
+  `main.js` — mode integer, name, symbol, unit, ramp and default range — and
+  the legend, the Controls select and the `G` key all read it. The ramp
+  colours themselves are `Shaders.RAMPS`, interpolated into the display
+  shader, so the key on screen and the water cannot drift apart. Adding a
+  field is a row, not three edits. Each field's colour range is explicit
+  (`u_lo`/`u_hi`) and **held**, never tracked — see the engineering notes.
 - **Zero dependencies, classic scripts** — no modules, no bundlers, no fetch,
   and no YAML front matter in `index.html` or `js/*` (the Pages build copies
   them verbatim only because there is none). Any published page carrying
@@ -96,10 +105,10 @@ Four gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 |---|---|---|
-| `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders) | instant |
+| `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
-| `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it | 8 boots |
+| `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing
 anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
@@ -107,7 +116,8 @@ anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
 
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
-`index.html`, the TOOLBAR spec, `DOCK`, `START` or the boot wiring. Every
+`index.html`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
+`START` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
 expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
@@ -141,6 +151,18 @@ history. Briefs carry the minimum needed to run the demo; statistics and
 methodology live in each folder's uncommitted `_archive/`. Coordinates in a
 recipe are exact — rounding them makes a new geometry; re-measure before
 shipping. `spinup` values are measured settle times, not guesses.
+
+An entry may also carry a **`ui` profile** — which strip families and
+instruments it wants in front of a student, how focused the Controls panel
+opens, which fields the legend offers, and which on-canvas readouts it
+withholds. What it does not spell out is derived from what it already
+declares: `instruments` narrows MEASURE, an entry naming no build tool loses
+BUILD, and the panel opens on the sections its own controls live in. So a
+card whose task tells a student to draw something **must** say
+`ui: { build: true }` or name a build tool in `instruments` —
+`check_pack.py` fails the pack otherwise, because the alternative is a tool
+that is silently not there. Hidden tools keep their digit: worksheets say
+"press 5", so the key explains itself rather than arming something else.
 
 ## Gotchas worth knowing on day one
 

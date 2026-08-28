@@ -370,6 +370,32 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 
 ## The view
 
+### The colour range is held, not tracked
+
+Every field is painted over an explicit `[lo, hi]` in its own units
+(`u_lo` / `u_hi` in the display pass), seeded from the scene's own value and
+printed on the legend. The range does **not** follow the flow: `Fit`
+rescales once, from the frame it was clicked on, to the 1st–99th percentile
+over wet cells, and then holds.
+
+That is deliberate. A range that tracked the water would mean the same
+colour was a different number from second to second, so two frames could not
+be compared and neither could two students' screenshots — which is the
+entire reason for printing a scale. Percentiles rather than min/max because
+one cell at a jet's lip otherwise sets the scale for the whole picture and
+everything else renders as a single flat colour; wet cells only (`f ≥ 0.5`)
+because a dry cell is not water — its stored pressure is zero and averaging
+it in drags every scale towards the floor.
+
+The diverging fields keep their meaningful centre when they are rescaled:
+`nrmMid` maps the two halves separately, so Fr = 1 and ω = 0 stay on the pale
+band whatever the ends are. A midpoint taken from the range would move the
+critical line, which is the one thing that view exists to show.
+
+`SIM.fieldStats(mode)` does the readback, and its arithmetic has to agree
+with the branch of `FS_DISP` that paints that mode. A `Fit` that leaves the
+picture saturated or flat is the symptom of the two having drifted apart.
+
 - **The vertical exaggeration is fitted to the window, not 1:1.** `autoVex()`
   picks the stretch that makes the domain fill `VEX_FILL` (62%) of the canvas,
   clamped to [1, 8]; `state.vexAuto` says nobody has taken the number over

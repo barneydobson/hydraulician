@@ -24,6 +24,7 @@ const state = {
   scene: null, budget: CONFIG.defaultBudget,
   tool: "wall", brush: 0.055,
   mode: 0, range: {}, particles: false, dye: true, channel: true, labels: true, jumps: true,
+  ui: null,                   // the resolved UI profile; UIMODE.full() when absent
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the force control volume: box + EMA force
@@ -1357,6 +1358,7 @@ const EX = (() => {
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
            pick, reset, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
+           studentControls,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,
            get ready() { return ready; },
@@ -1748,8 +1750,25 @@ const CONTROLS = [
 
 function buildPanel() {
   const p = document.getElementById("panel");
+  // The way out of a focused panel, at its head where a reader meets it first.
+  const head = document.createElement("div");
+  head.className = "panelfocus";
+  const sw = document.createElement("button");
+  sw.type = "button"; sw.id = "panelAll";
+  sw.onclick = () => { sw.blur(); UIMODE.lift(); };
+  head.appendChild(sw);
+  p.appendChild(head);
+  // Every row remembers the section it is under, so a level can hide sections
+  // without the panel being rebuilt — and without the rows themselves knowing
+  // anything about exercises.
+  let section = "";
   CONTROLS.forEach((c) => {
-    if (c.h) { const el = document.createElement("h3"); el.textContent = c.h; p.appendChild(el); return; }
+    if (c.h) {
+      section = c.h;
+      const el = document.createElement("h3");
+      el.textContent = c.h; el.dataset.sec = section;
+      p.appendChild(el); return;
+    }
     // A custom row is a DIV, not a LABEL: a <label> forwards stray clicks to
     // its first labelable child, which would fire the file picker.
     const row = document.createElement(c.type === "custom" ? "div" : "label");
@@ -1797,8 +1816,10 @@ function buildPanel() {
     row.appendChild(input);
     if (infoEl && c.type !== "custom") row.appendChild(infoEl);
     if (c.type === "custom") c.build(input);
+    row.dataset.sec = section;
     p.appendChild(row);
     const note = document.createElement("div"); note.className = "notes"; note.id = "n_" + c.id;
+    note.dataset.sec = section;
     p.appendChild(note);
   });
 }
@@ -1829,6 +1850,47 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
+  applyPanelFocus();
+}
+
+/** The Controls sections a focused panel keeps: the ones carrying the
+ *  student's own controls, the ones the exercise itself sets through
+ *  `rigParams` / `viewParams`, and View — which holds the field, the legend
+ *  and the overlays, and is wanted in every exercise there is.
+ *
+ *  Derived from what the entry declares rather than from its prose: a brief
+ *  that asks for a control nothing declares would send a student looking, and
+ *  the fix for that is to declare the control, which is worth knowing anyway. */
+function focusedSections() {
+  const ex = EX.current;
+  const secs = ["View"];
+  if (!ex) return secs;
+  const ids = Object.keys(ex.rigParams || {})
+    .concat(Object.keys(ex.viewParams || {}))
+    .concat(EX.studentControls ? EX.studentControls(ex) : []);
+  let section = "";
+  CONTROLS.forEach((c) => {
+    if (c.h) { section = c.h; return; }
+    if (ids.indexOf(c.id) >= 0 && secs.indexOf(section) < 0) secs.push(section);
+  });
+  return secs;
+}
+
+/** Hide the sections a focused profile does not want. A first-year hunting
+ *  one slider through eleven sections is being asked the wrong question — and
+ *  everything is one click away, always. */
+function applyPanelFocus() {
+  const u = state.ui || UIMODE.full();
+  const level = u.lifted ? "full" : u.panel;
+  const keep = level === "full" ? null : focusedSections();
+  document.querySelectorAll("#panel [data-sec]").forEach((el) => {
+    el.classList.toggle("off", !!keep && keep.indexOf(el.dataset.sec) < 0);
+  });
+  const sw = document.getElementById("panelAll");
+  if (sw) {
+    sw.textContent = keep ? "⋯ Show every control" : "";
+    sw.parentElement.classList.toggle("on", !!keep);
+  }
 }
 
 // ------------------------------------------------------------------ toasts
@@ -1960,6 +2022,9 @@ const ICONS = {
   about:   '<path d="M10 3.5 17 7l-7 3.5L3 7Z"/><path d="M3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5" opacity=".55"/>',
   // ---- VIEW: what the water is painted with, and what is drawn over it.
   // A colour bar with its ticks; the dashes ARE the numbers under a legend.
+  all:     '<circle cx="4.5" cy="10" r="1.45" fill="currentColor" stroke="none"/>' +
+           '<circle cx="10" cy="10" r="1.45" fill="currentColor" stroke="none"/>' +
+           '<circle cx="15.5" cy="10" r="1.45" fill="currentColor" stroke="none"/>',
   legend:  '<rect x="3" y="5.5" width="14" height="4.5" rx="1"/>' +
            '<path d="M3 13h3M8.5 13h3M14 13h3"/>',
   particles: '<circle cx="5" cy="7" r="1.3"/><circle cx="11" cy="5.5" r="1.3"/>' +
@@ -2197,6 +2262,113 @@ const LEGEND = (() => {
            toggle: () => setOpen(!open) };
 })();
 
+/** What of the interface an exercise wants in front of a student.
+ *
+ *  The strip's families are what makes this expressible at all: "no build
+ *  tools, these two instruments" is one line because there is now a name for
+ *  each of those things. Most of the data was already in the pack — an entry's
+ *  `instruments` list has always been a statement of the tools that exercise
+ *  needs, and `studentControls` has always known which panel controls belong
+ *  to the student — so a profile is largely a matter of reading what the pack
+ *  already says.
+ *
+ *  A profile is NEVER a cage. `⋯ Show everything` puts the lot back in one
+ *  click, and the standing acceptance test — the sandbox must be able to
+ *  reproduce any scene by hand — is why it has to. */
+const UIMODE = (() => {
+  const BUILD_TOOLS = ["wall", "erase", "valve", "spout", "pour"];
+
+  function full() {
+    return { build: true, measure: true, view: true, fields: true,
+             legend: true, panel: "full",
+             readouts: { gauges: true, cursor: true, status: true },
+             lifted: false };
+  }
+
+  /** The profile an exercise gets when it does not spell one out, plus
+   *  whatever it does spell out on top. An exercise that lists no instruments
+   *  keeps every instrument: one that does not say cannot be second-guessed. */
+  function fromExercise(ex) {
+    const p = full();
+    if (!ex) return p;
+    const tools = (ex.instruments || []).map((i) => i.tool).filter(Boolean);
+    if (tools.length) {
+      const measure = tools.filter((t) => BUILD_TOOLS.indexOf(t) < 0);
+      const build = tools.filter((t) => BUILD_TOOLS.indexOf(t) >= 0);
+      p.measure = measure.length ? measure : false;
+      p.build = build.length ? build : false;
+    } else {
+      p.build = false;             // an exercise arrives with its rig already built
+    }
+    p.panel = "focused";
+    return Object.assign(p, ex.ui || {});
+  }
+
+  /** Is this item allowed? A family's entry is `true` (everything), `false`
+   *  (nothing) or the ids that survive. Tools are matched on the tool id, and
+   *  anything else on its button id, so a profile can name `legendBtn` as
+   *  readily as `gauge`. */
+  function allows(family, it) {
+    const u = state.ui || full();
+    if (u.lifted) return true;
+    const list = u[family];
+    if (list === undefined || list === true) return true;
+    if (list === false) return false;
+    return list.indexOf(it.tool) >= 0 || list.indexOf(it.id) >= 0;
+  }
+
+  /** Whether anything at all is hidden — what puts ⋯ on the strip. */
+  function narrowed() {
+    const u = state.ui;
+    if (!u || u.lifted) return false;
+    return ["build", "measure", "view"].some((f) => u[f] !== true) ||
+           u.fields !== true || u.panel !== "full" || u.legend !== true ||
+           Object.keys(u.readouts || {}).some((k) => u.readouts[k] === false);
+  }
+
+  function apply(profile) {
+    state.ui = Object.assign(full(), profile || {});
+    if (state.ui.legend === false) LEGEND.close(); else LEGEND.open();
+    // A profile that hides the live field would leave the legend naming
+    // something its own picker cannot reach, so the field moves to the first
+    // one the profile does offer.
+    if (Array.isArray(state.ui.fields) && state.ui.fields.length &&
+        state.ui.fields.indexOf(fieldFor(state.mode).id) < 0) {
+      const f = FIELDS.find((q) => q.id === state.ui.fields[0]);
+      if (f) state.mode = f.mode;
+    }
+    buildToolbar();
+    LEGEND.sync();
+    syncPanel();
+  }
+  function lift() {
+    if (!state.ui) state.ui = full();
+    state.ui.lifted = true;
+    buildToolbar(); LEGEND.sync(); syncPanel();
+  }
+  function reset() { apply(full()); }
+
+  /** The fields the picker offers — the whole registry unless narrowed. */
+  function fields() {
+    const u = state.ui;
+    if (!u || u.lifted || !Array.isArray(u.fields)) return FIELDS;
+    return FIELDS.filter((f) => u.fields.indexOf(f.id) >= 0);
+  }
+
+  /** Is this on-canvas readout wanted? Gauge cards, the hovering cursor
+   *  readout and the status line have no toggle of their own; the profile
+   *  labels, jump boxes and channel overlay stay with `viewParams`, which
+   *  already sets them — two ways to say the same thing is how they come to
+   *  disagree. */
+  function shows(what) {
+    const u = state.ui;
+    if (!u || u.lifted || !u.readouts) return true;
+    return u.readouts[what] !== false;
+  }
+
+  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows };
+})();
+
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
  *  the keyboard and the panel's own – all need it. */
 function setPanel(open) {
@@ -2329,7 +2501,9 @@ const TOOLBAR = [
  *  in TOOLS, which is exactly what the number keys do. */
 function toolItem([id, label, tip]) {
   const n = TOOLS.findIndex((t) => t[0] === id) + 1;
-  return { icon: id === "valve" ? "gate" : id, label, hint: tip,
+  // `tool` is the item's own name for the thing it arms, and it is what a UI
+  // profile names — an exercise says `measure: ["gauge"]`, not "Gauge".
+  return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
            key: n <= TOOL_KEYS ? String(n) : "",
            on: () => state.tool === id,
            act: () => { state.tool = id; syncToolbar(); syncPanel(); } };
@@ -2345,8 +2519,16 @@ function aboutHref() {
 function buildToolbar() {
   const host = document.getElementById("groups");
   host.textContent = "";
-  TOOLBAR.forEach((group, gi) => {
-    if (gi) { const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s); }
+  TOOLBAR.forEach((group) => {
+    // A profile can empty a family altogether. An empty captioned column would
+    // read as a family with nothing in it, so the group goes with its last
+    // button — and the rule keys off what has actually been appended, or a
+    // hidden first group leaves a leading hairline.
+    const items = group.items.filter((it) => UIMODE.allows(group.family, it));
+    if (!items.length) return;
+    if (host.children.length) {
+      const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
+    }
     // A group is a captioned COLUMN: the caption names the family, the row
     // holds the glyphs. The caption is aria-hidden — every button already
     // carries its own label, and a screen reader does not need the heading
@@ -2358,7 +2540,7 @@ function buildToolbar() {
     cap.setAttribute("aria-hidden", "true");
     g.appendChild(cap);
     const row = document.createElement("div"); row.className = "trow";
-    group.items.forEach((it) => {
+    items.forEach((it) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "tbtn";
       if (it.id) b.id = it.id;
@@ -2383,8 +2565,38 @@ function buildToolbar() {
     g.appendChild(row);
     host.appendChild(g);
   });
+  if (UIMODE.narrowed()) host.appendChild(showAllGroup());
   syncToolbar();
   fitBar();
+}
+
+/** The way back out of a profile. It exists whenever anything is hidden, and
+ *  it is the reason a profile is allowed to hide anything at all: the sandbox
+ *  must be able to reproduce any scene by hand, and a narrowing that could not
+ *  be lifted would break that outright. */
+function showAllGroup() {
+  const g = document.createElement("div"); g.className = "tgrp fam-meta";
+  const cap = document.createElement("div");
+  cap.className = "tcap"; cap.textContent = ""; cap.setAttribute("aria-hidden", "true");
+  const row = document.createElement("div"); row.className = "trow";
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "tbtn"; b.id = "showAllBtn";
+  b.setAttribute("aria-label", "Show everything");
+  b.appendChild(iconEl("all"));
+  b.onclick = () => {
+    b.blur(); TIP.hide(); UIMODE.lift();
+    showToast("Every control is back",
+              "This exercise had narrowed the interface. Pick it again to get its focus back.");
+  };
+  b.onpointerenter = (e) => {
+    if (e.pointerType !== "touch") {
+      TIP.show(b, "Show everything",
+               "This exercise hides some controls — this brings them all back", "");
+    }
+  };
+  b.onpointerleave = () => TIP.hide();
+  row.appendChild(b); g.appendChild(cap); g.appendChild(row);
+  return g;
 }
 
 /** Fit the strip to the width it actually has. A media query cannot do this:
@@ -3227,11 +3439,16 @@ function drawOverlay(A) {
   ctx.restore();
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
   const fld = state.gaugeField;
-  const cards = OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-    fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
-    fld === "speed" ? "m/s" : "m");
+  // The MARKS always stay — a gauge you cannot see is a gauge you place twice.
+  // What a profile can withhold is the card that reads it out, for an exercise
+  // that wants a prediction before a number.
+  const cards = UIMODE.shows("gauges")
+    ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
+        fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
+        fld === "speed" ? "m/s" : "m")
+    : [];
   GINSP.tick(cards);
-  if (state.inside && !state.drag) {
+  if (state.inside && !state.drag && UIMODE.shows("cursor")) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
     if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1]); }
@@ -3352,6 +3569,7 @@ function drawSpout(ctx) {
 }
 
 function updateStatus() {
+  document.getElementById("status").style.display = UIMODE.shows("status") ? "" : "none";
   document.getElementById("status").textContent =
     sim.nx + "×" + sim.ny + " · Δx " + (sim.dx * 1000).toFixed(0) + " mm · " +
     "t " + sim.t.toFixed(1) + " s · ×" + state.rt.toFixed(2) + " RT · " +
@@ -4308,7 +4526,21 @@ function boot() {
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
     // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
     // so a tenth tool would have made "9" fail ("9" > "10" lexically).
-    else if (+k >= 1 && +k <= TOOL_KEYS) { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }
+    //
+    // A hidden tool keeps its digit. Worksheets say "press 5", and renumbering
+    // the tools under a profile would make the pack lie — so the key says why
+    // the tool is not there rather than silently arming a different one.
+    else if (+k >= 1 && +k <= TOOL_KEYS) {
+      const t = TOOLS[+k - 1];
+      const fam = TOOLS.slice(0, 4).concat([TOOLS[TOOLS.length - 1]]).indexOf(t) >= 0
+                    ? "build" : "measure";
+      if (UIMODE.allows(fam, { tool: t[0], id: t[0] })) {
+        state.tool = t[0]; window.syncTools();
+      } else {
+        showToast(t[1] + " is off for this exercise",
+                  "The ⋯ button at the end of the strip brings every control back.");
+      }
+    }
     else if (k === "[") state.brush = Math.max(0.015, state.brush / 1.3);
     else if (k === "]") state.brush = Math.min(0.5, state.brush * 1.3);
     else if (k === "0") resetZoom();
@@ -4348,6 +4580,7 @@ window.APP = {
         RAMPS: Shaders.RAMPS },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   LEGEND,                                  // the colour key and field picker
+  UIMODE,                                  // the exercise UI profile
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)
   inspect: (k) => GINSP.show(k || 0),

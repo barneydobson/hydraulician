@@ -508,6 +508,60 @@ async function main() {
       await tab.close();
     }
 
+    // -------------------------------------------------------- the UI profile
+    console.log("\nan exercise can narrow the interface, and never lock it");
+    {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const base = await tab.evaluate(`
+        return { buttons: document.querySelectorAll("#groups .tbtn").length,
+                 narrowed: APP.UIMODE.narrowed() };
+      `);
+      check("the sandbox is not narrowed", !base.narrowed);
+
+      const narrow = await tab.evaluate(`
+        APP.UIMODE.apply({ build: false, measure: ["gauge"], panel: "focused" });
+        const labels = [...document.querySelectorAll("#groups .tbtn")]
+                         .map((b) => b.getAttribute("aria-label"));
+        return { labels, n: labels.length,
+                 narrowed: APP.UIMODE.narrowed(),
+                 showAll: !!document.getElementById("showAllBtn"),
+                 wall: labels.includes("Wall"), gauge: labels.includes("Gauge"),
+                 rake: labels.includes("Rake"),
+                 stillRuns: labels.includes("Reset water") };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("the drawing tools go", !narrow.wall, narrow.labels.join(","));
+      check("the declared instrument stays", narrow.gauge);
+      check("the undeclared instrument goes", !narrow.rake);
+      check("the clock is untouched", narrow.stillRuns);
+      check("fewer buttons than before", narrow.n < base.buttons,
+            narrow.n + " vs " + base.buttons);
+      check("the profile knows it is narrowing", narrow.narrowed);
+      check("and offers a way out", narrow.showAll);
+
+      // A hidden tool's DIGIT still means that tool: worksheets say "press 5",
+      // and renumbering the tools under a profile would make the pack lie.
+      const digit = await tab.evaluate(`
+        APP.state.tool = "gauge";
+        dispatchEvent(new KeyboardEvent("keydown", { key: "1" }));   // Wall, hidden
+        return APP.state.tool;
+      `);
+      eq("a hidden tool's digit selects nothing else", digit, "gauge");
+
+      const lifted = await tab.evaluate(`
+        document.getElementById("showAllBtn").click();
+        const labels = [...document.querySelectorAll("#groups .tbtn")]
+                         .map((b) => b.getAttribute("aria-label"));
+        return { n: labels.length, wall: labels.includes("Wall"),
+                 narrowed: APP.UIMODE.narrowed(),
+                 showAll: !!document.getElementById("showAllBtn") };
+      `);
+      check("Show everything brings the tools back", lifted.wall);
+      eq("every control is back", lifted.n, base.buttons);
+      check("and the way out goes away", !lifted.showAll && !lifted.narrowed);
+      await tab.close();
+    }
+
     // ------------------------------------------------- the narrow fallback
     console.log("\na narrow window overlays the panel instead of insetting it");
     {

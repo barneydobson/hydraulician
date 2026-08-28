@@ -185,6 +185,19 @@
     mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
   }
 
+  /* An exercise can open the panel FOCUSED: only the sections it actually
+     touches, with the way back to everything at its head. */
+  #panel [data-sec].off { display: none; }
+  .panelfocus { display: none; padding: 0 0 8px; }
+  .panelfocus.on { display: block; }
+  #panelAll {
+    appearance: none; width: 100%; text-align: left; cursor: pointer;
+    background: rgba(77,195,255,0.10); color: #bfe6ff;
+    border: 1px solid rgba(77,195,255,0.30); border-radius: 8px;
+    padding: 6px 10px; font: 11px system-ui, sans-serif;
+  }
+  #panelAll:hover { background: rgba(77,195,255,0.20); }
+
   /* ------------------------------------------------------------- the legend */
   /* Seven colourings existed long before anything on screen said which one was
      up, over what range, in what units — so a screenshot pasted into a

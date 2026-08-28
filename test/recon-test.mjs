@@ -7,7 +7,7 @@ import vm from "node:vm";
 const src = readFileSync(new URL("../js/reconstruct.js", import.meta.url), "utf8");
 const ctx = { console };
 vm.createContext(ctx);
-vm.runInContext(src, ctx);
+vm.runInContext(src + "\n;globalThis.RECON = RECON;", ctx);
 const RECON = ctx.RECON;
 
 let passed = 0;
@@ -27,13 +27,55 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok("A2 dt-weighted mean is 3, not 2", near(m, 3, 1e-12), `got ${m}`);
 }
 
-// A6: a source RATE is h-weighted; an INCREMENT is not. dfS = 2h with h=1,3
-// gives rate 2 everywhere. Weighting the increment by h would give 5.
+// A6: a source RATE is h-weighted; an INCREMENT is not. Increments 2 and 18
+// over h = 1 and 3 are rates 2 and 6, whose h-weighted mean is 5 — which is
+// also sum(increments)/T. Weighting the INCREMENTS by h instead gives 14.
 {
   let m = 0, T = 0;
-  for (const h of [1, 3]) { const rate = (2 * h) / h; m = RECON.accumStep(m, rate, T, h); T += h; }
-  ok("A6 source rate averages to 2, not 5", near(m, 2, 1e-12), `got ${m}`);
+  const H = [1, 3], INC = [2, 18];
+  for (let n = 0; n < H.length; n++) {
+    m = RECON.accumStep(m, INC[n] / H[n], T, H[n]); T += H[n];
+  }
+  ok("A6 source rate averages to 5, not 14 or 6", near(m, 5, 1e-12), `got ${m}`);
 }
+
+// ---- Group B: compaction and compressibility ----------------------------
+// A hydrostatic column: f = 1 + g(eta-z)/c^2 below the surface, so the stored
+// fill exceeds the geometric depth by the slot storage. B1/B2 build the fill
+// and the BARE EOS pressure consistently, so there is no lag here.
+function hydrostatic(eta, c, dx, ny, g = 9.81) {
+  const f = new Float64Array(ny), P = new Float64Array(ny);
+  for (let j = 0; j < ny; j++) {
+    const z = (j + 0.5) * dx;
+    if (z >= eta) { f[j] = 0; P[j] = 0; continue; }
+    f[j] = 1 + g * (eta - z) / (c * c);
+    P[j] = c * c * Math.max(f[j] - 1, 0);      // the bare one-sided EOS
+  }
+  return { f, P };
+}
+for (const [c, rawExpect] of [[25, 1.00785], [8, 1.07664]]) {
+  const dx = 0.002, ny = 700, eta = 1.0;
+  const { f, P } = hydrostatic(eta, c, dx, ny);
+  const g = new Float64Array(ny);
+  let raw = 0;
+  for (let j = 0; j < ny; j++) { g[j] = RECON.geomFill(f[j], P[j], c); raw += f[j] * dx; }
+  const d = RECON.columnDepth(g, 0, ny - 1, dx);
+  ok(`B c=${c} compacted depth is 1.0`, near(d, eta, 1e-9), `got ${d}`);
+  ok(`B c=${c} uncompacted would read ${rawExpect}`, near(raw, rawExpect, 5e-4), `got ${raw}`);
+}
+// B3: pressurised throughout — the identity on its f > 1 branch.
+{
+  const c = 25, dx = 0.01, ny = 50;
+  let worst = 0;
+  for (let j = 0; j < ny; j++) {
+    const f = 1 + 0.03 * (ny - j) / ny;
+    worst = Math.max(worst, Math.abs(RECON.geomFill(f, c * c * (f - 1), c) - 1));
+  }
+  ok("B3 pressurised cells compact to exactly 1", worst < 1e-12, `worst ${worst}`);
+}
+// B4: dry column.
+ok("B4 dry column has zero depth and no NaN",
+   RECON.columnDepth(new Float64Array(20), 0, 19, 0.01) === 0);
 
 // ---- Group G: numerical robustness --------------------------------------
 // G1: 5 mm wobble on a 1 m datum. The naive <eta^2>-<eta>^2 in float32 keeps

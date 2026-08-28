@@ -11,11 +11,13 @@
  *
  * Second, the surface reconstruction (Tasks 2-4). See docs/averaging.md.
  */
-var RECON = (() => {
+const RECON = (() => {
 
   /** One running weighted-mean update. `T` is the window BEFORE this sample.
    *  docs/averaging.md §4.4. */
   function accumStep(mean, phi, T, dt) {
+    // Guard against division by zero: T + dt can be exactly zero on the first call
+    // with dt = 0 (though it should not happen in practice).
     const k = dt / Math.max(T + dt, 1e-30);
     return mean + k * (phi - mean);
   }
@@ -25,7 +27,33 @@ var RECON = (() => {
     return M2 + dt * (phi - meanOld) * (phi - meanNew);
   }
 
-  const sigma = (M2, T) => (T > 0 ? Math.sqrt(Math.max(0, M2 / T)) : 0);
+  const sigma = (M2, T) => {
+    // Guard against float round-off producing a tiny negative variance from
+    // the accumulated second moment, which can happen when the signal is near
+    // the rounding limit.
+    return T > 0 ? Math.sqrt(Math.max(0, M2 / T)) : 0;
+  };
 
-  return { accumStep, welford, sigma };
+  /** Geometric fill from the stored channels — the compaction of
+   *  docs/averaging.md §7.1. `min(f,1) = f - P/c^2` holds identically on both
+   *  EOS branches, so removing slot storage is a subtraction, not an
+   *  iteration. Clamped because the stored P is the DIAGNOSTIC pressure (it
+   *  carries the bulk-damping term and lags the fill by one substep), so the
+   *  difference can stray a little outside [0,1].
+   *
+   *  Skipping it is not a rounding error: the slot excess is g*d/2c^2 of the
+   *  depth — 7.9 mm on 1 m at c = 25, and 77 mm at c = 8. */
+  function geomFill(fbar, pbar, c) {
+    const g = fbar - pbar / Math.max(c * c, 1e-12);
+    return g < 0 ? 0 : (g > 1 ? 1 : g);
+  }
+
+  /** Depth of one connected body: the geometric fill integrated over it. */
+  function columnDepth(gcol, j0, j1, dx) {
+    let d = 0;
+    for (let j = j0; j <= j1; j++) d += gcol[j];
+    return d * dx;
+  }
+
+  return { accumStep, welford, sigma, geomFill, columnDepth };
 })();

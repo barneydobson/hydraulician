@@ -15,13 +15,15 @@ const SIM = (() => {
   // How long a particle's trail lives, in SIMULATED seconds. About a second of
   // flow: long enough to read a path, short enough that a jet does not fill
   // the screen with a solid wash.
-  const TRAIL_TAU = 0.6;
+  // Long enough that a streak reads as a PATH — thin and drawn out, tapering
+  // behind the head — rather than as a dot with a smudge after it.
+  const TRAIL_TAU = 1.5;
   // How many of the 128 × 128 particles are actually DRAWN. All of them are
   // advected — the update is one fullscreen pass either way — but drawing all
   // 16384 with a trail each fills a flume with white and shows nothing at all.
   // A few thousand distinct paths is what reads as flow visualisation; the
   // count follows the width so a big window gets more of them, not fatter ones.
-  const TRAIL_N = (pxW) => Math.round(Math.max(700, Math.min(3200, pxW * 1.6)));
+  const TRAIL_N = (pxW) => Math.round(Math.max(500, Math.min(2200, pxW * 1.1)));
 
   let gl, quad, rect, points, prog = {};
   let S = null;              // the live grid
@@ -494,15 +496,32 @@ const SIM = (() => {
     gl.uniform1f(prog.pdraw.u("u_dx"), S.dx);
     // Big enough to see. The old 1.5-3 px dot disappeared over a pale field
     // and read as sensor noise over a dark one.
-    gl.uniform1f(prog.pdraw.u("u_psize"), Math.max(3.0, view.pxW / 260));
-    points.draw(Math.min(S.pn * S.pn, TRAIL_N(view.pxW)));
+    // Fine. The streak's LENGTH is the reading; its width is only noise.
+    const n = Math.min(S.pn * S.pn, TRAIL_N(view.pxW));
+    const tail = Math.max(2.0, view.pxW / 620);
+    gl.uniform1f(prog.pdraw.u("u_psize"), tail);
+    gl.uniform1f(prog.pdraw.u("u_amp"), 0.30);
+    points.draw(n);
 
-    // …and the whole trace, heads included, over the water in one composite.
+    // The tail, composited under everything that follows.
     GLH.bindTarget(gl, null, cw, ch);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // it is premultiplied
     gl.useProgram(prog.tex);
     GLH.bindTex(gl, prog.tex, [["u_T", trail.tex]]);
     quad.draw();
+
+    // …then the heads, once, straight to the screen at full strength. Drawn
+    // outside the trail buffer on purpose: inside it they would fade with
+    // everything else and there would be no particle, only a smear.
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.useProgram(prog.pdraw);
+    // Re-bind: the composite above pointed texture unit 0 at the trail, and
+    // `u_P` still names unit 0 — without this the heads read the trail as
+    // their own positions and land nowhere.
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
+    gl.uniform1f(prog.pdraw.u("u_psize"), tail + 1.6);
+    gl.uniform1f(prog.pdraw.u("u_amp"), 1.0);
+    points.draw(n);
     gl.disable(gl.BLEND);
     trail.drawn = true;
   }

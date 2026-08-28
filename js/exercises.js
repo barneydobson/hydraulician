@@ -291,10 +291,10 @@ const EXERCISES = [
                               1.326, 1.362, 1.389, 1.412, 1.434] }] },
     instruments: [
       { tool: "gauge", where: "x = 4.5 m, z ≈ 0.75 m", why: "the approach pool — H = h − 0.50" },
-      { tool: "cv", where: "Force box (9), optional: drag about (2.0, 0.3) → (6.7, 1.6) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
+      { tool: "cv", where: "Control volume (9), optional: drag about (2.0, 0.3) → (6.7, 1.6) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
     ],
     start: "an approach pool behind a sharp-crested weir",
-    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Force box round the plate reads F→ a few percent above ρgP(h − P/2).",
+    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Control volume round the plate reads F→ a few percent above ρgP(h − P/2).",
     settle: 60,
   },
 
@@ -321,11 +321,11 @@ const EXERCISES = [
     digitNote: "your gate opening is DRAWN: a = 5 + round(3d/9) cells, gate bottom z = 0.609 / 0.630 / 0.652 / 0.674 m",
     instruments: [
       { tool: "gauge", where: "x = 3.5 m, z ≈ 0.65 m", why: "the upstream pool — reads d₀" },
-      { tool: "cv", where: "Force box (9): drag (3.50, 0.30) → (5.63, 3.20) — gauge station to vena station, bottom face inside the bed", why: "measures the thrust F_R predicts, on the same control volume and without its two assumptions" },
+      { tool: "cv", where: "Control volume (9): drag (3.50, 0.30) → (5.63, 3.20) — gauge station to vena station, bottom face inside the bed", why: "measures the thrust F_R predicts, on the same control volume and without its two assumptions" },
     ],
     ui: { build: true },
     start: "a pool behind a drawn sluice gate — its opening is yours to adjust",
-    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, and measure that thrust with the Force box on the same control volume.",
+    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, and measure that thrust with the Control volume on the same control volume.",
     settle: 70,
   },
   {
@@ -342,13 +342,13 @@ const EXERCISES = [
     viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "h" },
     digitNote: "no personalised parameter: everyone reads the same rig",
     instruments: [
-      { tool: "cv", where: "Force box (9): drag (0.85, 1.55) → (2.05, 3.20) — it encloses all four shapes and clears the spout", why: "F→ is the force each turn actually delivers, to set against ρqv(1−cosθ)" },
+      { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20) — it encloses all four shapes and clears the spout", why: "F→ is the force each turn actually delivers, to set against ρqv(1−cosθ)" },
       { tool: "gauge", where: "in the free jet, ~0.25 m clear of the plate (README uses 0.95, 2.50)", why: "the approach head" },
       { tool: "gauge", where: "on the stagnation point, ~0.03 m off the plate face (README uses 1.32, 2.46)", why: "the stagnation head — the ratio is the answer" },
     ],
     ui: { build: true },
     start: "a horizontal jet from a spout striking a flat plate",
-    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Force box for each. The deep-V under-delivers because it floods.",
+    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each. The deep-V under-delivers because it floods.",
     settle: 5,
   },
 
@@ -508,12 +508,12 @@ const EXERCISES = [
     viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "h" },
     digitNote: "lecturer demo: no personalised parameter",
     instruments: [
-      { tool: "cv", where: "Force box (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
+      { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
       { tool: "gauge", where: "optionally in the free jet and on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
     ],
     ui: { build: true },
     start: "the jet-on-a-plate rig, as a lecturer demonstration",
-    task: "Read F→ off the Force box: about 4 kN/m on the flat plate; redraw as the 6-stroke cup (README table) and the same box reads about 7 — close to the factor of two. The textbook deep-V reads only about 5 because it floods.",
+    task: "Read F→ off the Control volume: about 4 kN/m on the flat plate; redraw as the 6-stroke cup (README table) and the same box reads about 7 — close to the factor of two. The textbook deep-V reads only about 5 because it floods.",
     settle: 5,
   },
 

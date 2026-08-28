@@ -598,18 +598,20 @@ void main(){
 precision highp float;
 in float vFade;
 out vec4 o;
+uniform float u_amp;          // 1 = a head, drawn once; < 1 = a tail dab
 void main(){
   float r = length(gl_PointCoord - 0.5) * 2.0;
-  // A bright core inside a soft halo. The halo is what makes a 5 px dot
-  // legible over a pale turbo field as well as over dark water; the core is
-  // what keeps it a POINT rather than a smudge.
-  float core = smoothstep(0.60, 0.15, r);
-  float glow = smoothstep(1.00, 0.15, r) * 0.30;
-  // Dim per dab, because the trail buffer is ADDITIVE: what you see at any
-  // pixel is every dab that has passed over it in the last second, and at full
-  // strength a busy reach saturates to flat white within a few frames.
-  float a = (core + glow) * vFade * 0.42;
-  o = vec4(vec3(1.00, 0.93, 0.76) * a, a);
+  // A small hard dab with only a hint of edge. The tail is what carries the
+  // reading, and a tail is only fine if the thing drawing it is: a fat glowing
+  // dab lays down a fat glowing stripe and the reach turns into a wash.
+  float core = smoothstep(0.80, 0.25, r);
+  // Tail dabs are DIM because the trail buffer is additive — what you see at a
+  // pixel is every dab that has crossed it within the fade time — while a head
+  // is drawn once, straight to the screen, at full strength. That is what
+  // makes a comet rather than a smear: a definite particle, and behind it the
+  // tapering record of where it has been.
+  float a = core * vFade * u_amp;
+  o = vec4(vec3(1.00, 0.95, 0.86) * a, a);
 }`;
 
   // ---------------------------------------------------- the particle trail

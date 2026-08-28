@@ -413,7 +413,7 @@ picture saturated or flat is the symptom of the two having drifted apart.
 
 ## Measurement gotchas
 
-- **The Force box is a momentum budget, not a dial.** The control-volume
+- **The Control volume is a momentum budget, not a dial.** The control-volume
   integral takes its faces on grid lines, skips solid-adjacent face segments,
   and carries no gravity term in F→. A box enclosing a
   source (spout footprint, level-control sponge) is not measuring a force —

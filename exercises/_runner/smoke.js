@@ -430,7 +430,7 @@ SUITES.physics = async (B) => {
   ok("PHYSICS the energy line falls downstream", flow.HFalls);
 
   // The control-volume budget, on the same settled reach. These are the three
-  // conservation laws the Force box is FOR, so they are asserted where a scene
+  // conservation laws the Control volume is FOR, so they are asserted where a scene
   // is actually steady — an instantaneous integral on a wobbling free surface
   // closes to only a few per cent, and one taken mid-spin-up does not close at
   // all, because the reach is still filling.

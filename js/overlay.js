@@ -829,7 +829,7 @@ const OVERLAY = (() => {
     }
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
     // …and the three conservation laws, in a row, under the box.
-    const head = "Force box · " + q.label + " per edge, " + q.unit + "  ·  B cycles Q / M / Ė";
+    const head = "Control volume · " + q.label + " per edge, " + q.unit + "  ·  B cycles Q / M / Ė";
     chip(ctx, x0, y0 - 12, head, col);
     if (!F) return;
     const inQ = Math.max(F.inQ, 1e-9);

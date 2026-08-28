@@ -63,7 +63,7 @@ are just the crest plus the head the weir is about to produce.
    last digit; that reading is your `h` — take **H = h − 0.50**, and submit **q, H**.
 4. **Optional — what the plate carries.** The rating counts only the water
    *above* the crest; the rest of the pool just presses on the plate. Pick the
-   **Force box** (`9`) and drag one from about **(2.0, 0.3)** to **(6.7, 1.6)**
+   **Control volume** (`9`) and drag one from about **(2.0, 0.3)** to **(6.7, 1.6)**
    — bottom face inside the bed (rest it on top of the bed instead and it
    misses the plate's foot, reading about 10% low), right face short of where
    the nappe lands. Give the card a few seconds, then read **F→** against the

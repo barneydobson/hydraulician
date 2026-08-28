@@ -178,7 +178,7 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   ruler, scale bar and ∇ markers follow the same rect, so nothing on screen
   stops being true; details in
   [docs/engineering-notes.md](docs/engineering-notes.md).
-- The Force box, the Froude view, and surface-wave damping all have
+- The Control volume, the Froude view, and surface-wave damping all have
   non-obvious failure modes — read their sections in
   [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"
   anything they show.

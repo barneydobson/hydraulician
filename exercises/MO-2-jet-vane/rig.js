@@ -11,7 +11,7 @@
  *   JETRIG.flat()           // draw the flat plate (stagnation demo)
  *   JETRIG.d45(); JETRIG.d90()  // the 45 deg ramp and the 90 deg corner
  *   JETRIG.deepV()          // swap to the deep-V splitter (theta ~165 deg)
- *   JETRIG.box()            // place the turning series' Force box (tool 9)
+ *   JETRIG.box()            // place the turning series' Control volume (tool 9)
  *   JETRIG.prime()          // settle ~5 sim-s -- call repeatedly (runner pump)
  *   JETRIG.stagnationGauges()   // drop the two gauges used for the head check
  *
@@ -113,7 +113,7 @@
  *     is what moved: the first build put the apex at x=1.60, which lands the
  *     MOUTH at x=0.731, almost on top of the spout at x=0.70. That was known
  *     to contaminate probe readings with the raw Dirichlet source value
- *     (u=4.5,v=0 exactly); with the Force box it is fatal, because no CV face
+ *     (u=4.5,v=0 exactly); with the Control volume it is fatal, because no CV face
  *     fits between source and vane at all and a face cut through the
  *     pressurised cavity reads its P term as force (8.0-9.5 kN/m, and the
  *     number changes with the box). Apex moved to (1.90, 2.40): mouth at
@@ -142,10 +142,10 @@ window.JETRIG = {
   // Apex moved from the original (1.60, 2.45): at 1.60 the mouth lands at
   // x = 0.73, inside the spout's own footprint [0.61, 0.79], and NO
   // control-volume face fits between source and vane. At 1.90 the mouth sits
-  // at 1.031 and the Force box below encloses the whole V. See the DEEP-V
+  // at 1.031 and the Control volume below encloses the whole V. See the DEEP-V
   // GEOMETRY note above.
   V_APEX: [1.90, 2.40], V_HALF_DEG: 15, V_ARM: 0.9,
-  // The turning series' Force box: encloses the flat plate, the 45 deg ramp,
+  // The turning series' Control volume: encloses the flat plate, the 45 deg ramp,
   // the 90 deg corner AND the (moved) deep-V, with the upstream face at 0.85
   // clear of the spout footprint edge (0.79) — a box that swallows the spout
   // encloses a SOURCE and stops reading a force.
@@ -180,7 +180,7 @@ window.JETRIG = {
     return { kind: 'flat', x: JETRIG.FLAT_X };
   },
 
-  /** The turning series' Force box (control-volume instrument, tool 9). */
+  /** The turning series' Control volume (control-volume instrument, tool 9). */
   box: function () {
     var B = JETRIG.BOX;
     APP.placeCV(B[0], B[1], B[2], B[3]);
@@ -252,9 +252,9 @@ window.JETRIG = {
    JETRIG.flat(); JETRIG.prime(5); JETRIG.stagnationGauges(); JETRIG.prime(3);
    JETRIG.deepV();  // theta -> 165 deg splitter, apex (1.90, 2.40)
    JETRIG.d45(); JETRIG.d90();  // the other two turning-series shapes (MO-2)
-   JETRIG.box();    // the Force box the whole series is read with
+   JETRIG.box();    // the Control volume the whole series is read with
 
-   THE TURNING SERIES, MEASURED (2026-08-19, Medium, force box
+   THE TURNING SERIES, MEASURED (2026-08-19, Medium, control volume
    (0.85,1.55)-(2.05,3.20); mean +/- sd of 40 raw SIM.boxForce integrals
    0.25 sim-s apart, two such 10 s windows per shape, after >=10 s settle):
 

@@ -1703,7 +1703,7 @@ const CONTROLS = [
     fmt: () => state.measure ? OVERLAY.measureText(state.measure)
                              : "then left-drag between two points on the water",
     info: "A tape measure: left-drag between two points for the straight-line length, the horizontal and vertical legs, and the slope written as 1 : n. Shift snaps to horizontal / vertical / 45°; a click without a drag clears it. The 8 key picks the tool from the keyboard, and the numbers stay printed here." },
-  { id: "cvShow", type: "buttons", label: "Force box reads",
+  { id: "cvShow", type: "buttons", label: "Control volume reads",
     // The box reports a whole control-volume budget now, which is four edges
     // times three quantities. One quantity at a time on the edges, chosen
     // here or with B — the panel has to be able to reach it, because the
@@ -1720,7 +1720,7 @@ const CONTROLS = [
         el.appendChild(b);
       });
     },
-    fmt: () => !state.cv ? "left-drag a box on the water with the Force box tool (9)"
+    fmt: () => !state.cv ? "left-drag a box on the water with the Control volume tool (9)"
       : !state.cv.flux ? "settling…"
       : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s  ·  " +
         "Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m",
@@ -2020,7 +2020,7 @@ const TOOLS = [
   ["rake", "Rake", "Click for a velocity–depth profile — click it again to remove it"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
-  ["cv", "Force box", "Left-drag a control volume — the budget on every edge, and the force on what it encloses. Click to clear"],
+  ["cv", "Control volume", "Left-drag a control volume — the budget on every edge, and the force on what it encloses. Click to clear"],
   // Tenth, and deliberately last: the digits 1–9 already mean the nine above
   // them, in worksheets as well as in muscle memory. Pour has no digit; on a
   // desktop its shortcut is the right-drag that works in any tool.
@@ -2717,7 +2717,7 @@ const KEYS = (() => {
     ["R", "reset the water"],
     ["G", "cycle the field (the legend names it)"],
     ["L", "the legend — which field, over what range, in what units"],
-    ["B", "what the Force box reads on each edge: Q / momentum / energy"],
+    ["B", "what the Control volume reads on each edge: Q / momentum / energy"],
     ["P", "particles"],
     ["D", "dye"],
     ["N", "open-channel overlay"],
@@ -3554,7 +3554,7 @@ const GRAB_PX = 16;      // a finger is 44 px; this is for a pointed-at marker
  *
  *  Gauges and rakes were the only instruments with no way back: every click
  *  pushed another one, and the only way to lose one was to place four more.
- *  The tape, the Force box and the orbit tracers all already clear on a click,
+ *  The tape, the Control volume and the orbit tracers all already clear on a click,
  *  so this is the convention the rest of the toolbox was using. */
 function placeGauge(x, z) {
   const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < GRAB_PX);
@@ -3580,7 +3580,7 @@ function placeRake(x) {
   syncPanel();
 }
 
-/** The order the Force box's per-edge quantity cycles in: what crosses the
+/** The order the Control volume's per-edge quantity cycles in: what crosses the
  *  face, then what force it carries, then what energy goes with it. */
 const CV_NEXT = { Q: "M", M: "E", E: "Q" };
 
@@ -4291,7 +4291,7 @@ const RIG = (() => {
              (state.gauges.length === 1 ? "" : "s") : "") +
            (state.rakes.length ? " · " + state.rakes.length + " rake" +
              (state.rakes.length === 1 ? "" : "s") : "") +
-           (state.cv ? " · force box" : "") +
+           (state.cv ? " · control volume" : "") +
            " · scene " + id + (swapped ? " (unknown scene “" + o.scene + "”)" : "");
     return note;
   }
@@ -4730,7 +4730,7 @@ window.APP = {
   placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
-  placeCV,                                 // the Force box tool, headless
+  placeCV,                                 // the Control volume tool, headless
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {
     const c = SIM.columns(); let v = 0;

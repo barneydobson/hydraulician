@@ -14,7 +14,7 @@
  *   JETRIG.deepV()          // the textbook deep-V splitter -- kept as the
  *                           //   "why shape matters" act: it FLOODS (see the
  *                           //   force-box notes at the bottom of this file)
- *   JETRIG.box()            // place the demo's Force box (the CV instrument)
+ *   JETRIG.box()            // place the demo's Control volume (the CV instrument)
  *   JETRIG.prime()          // settle ~5 sim-s -- call repeatedly (runner pump)
  *   JETRIG.stagnationGauges()   // drop the two gauges used for the head check
  *
@@ -137,7 +137,7 @@ window.JETRIG = {
   // x = 0.73, inside the spout's own footprint, and NO control-volume face
   // fits between source and vane — a face through the pressurised cavity
   // reads its P term as force (9.5k, box-dependent, meaningless). At 1.90
-  // the mouth sits at 1.03 and the shipped Force box encloses the whole V.
+  // the mouth sits at 1.03 and the shipped Control volume encloses the whole V.
   V_APEX: [1.90, 2.40], V_HALF_DEG: 15, V_ARM: 0.9,
   // One half of a Pelton bucket in section, drawn on the MEASURED jet
   // trajectory (arrival core 2.37–2.57 at x = 1.1, u ≈ 4.4): entry lip above
@@ -150,7 +150,7 @@ window.JETRIG = {
   // the same "about 7 kN/m", so the round coordinates ship.
   CUP: [[1.10, 2.65], [1.30, 2.60], [1.40, 2.40], [1.45, 2.20],
         [1.35, 2.05], [1.15, 1.95], [1.00, 1.90]],
-  // The demo's canonical Force box: encloses plate, cup AND the (moved) V;
+  // The demo's canonical Control volume: encloses plate, cup AND the (moved) V;
   // upstream face at 0.85 clears the spout footprint (edge at 0.79) — a box
   // that swallows the spout encloses a SOURCE and stops reading a force.
   BOX: [0.85, 1.55, 2.05, 3.20],
@@ -193,7 +193,7 @@ window.JETRIG = {
     return { kind: 'cup', strokes: P.length - 1 };
   },
 
-  /** The demo's Force box (control-volume instrument, tool 9). */
+  /** The demo's Control volume (control-volume instrument, tool 9). */
   box: function () {
     var B = JETRIG.BOX;
     APP.placeCV(B[0], B[1], B[2], B[3]);

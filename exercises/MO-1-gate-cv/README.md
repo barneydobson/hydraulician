@@ -7,7 +7,7 @@ accelerating jet) and the panel's own discharge, each student computes two
 numbers a first-year formula sheet already gives them: a discharge coefficient
 and a control-volume thrust. Pooled, the C_d's land in a tight cluster around
 0.6 across openings that differ by 60% — a constant nobody typed in anywhere.
-A **Force box** then measures the thrust on the same control volume, so both
+A **Control volume** then measures the thrust on the same control volume, so both
 formula-sheet estimates can be compared with the force the flow delivers.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
@@ -30,7 +30,7 @@ personalisation. The bed's top face is at **z = 0.50 m** above the datum and
 the gate stands at **x = 5.50 m**, so your opening is `a` = (gate bottom
 − 0.50). Compute `naive` as well as `F_R`.
 
-The **Force box** (tool `9`) evaluates the momentum theorem on the box you
+The **Control volume** (tool `9`) evaluates the momentum theorem on the box you
 drag: the flux and pressure integral over its four faces, time-averaged, with
 the real flutter printed after the ±. **F→** is the number to read; gravity
 never enters the horizontal budget. Put its upstream face at the gauge station
@@ -71,14 +71,14 @@ q = 0.330 at that opening, so it needs no iteration.
 5. Read **d₀** off the gauge card's `d`, then hover at **x = 5.63 m** and read
    the box's *depth d* as **d₁** — do not hover closer to the gate, where the
    box smooths across the opening and reads far too deep.
-6. Pick the **Force box** (`9`) and drag from **(3.50, 0.30)** to **(5.63,
+6. Pick the **Control volume** (`9`) and drag from **(3.50, 0.30)** to **(5.63,
    3.20)**: upstream face at the gauge station, downstream face at the vena
    station, bottom face inside the bed, top face clear of the gate. Give the
    card a few seconds to fill its average, then read **F→**. Drag a second box
    — **(4.50, 0.50) → (5.63, 2.00)** — and check the reading holds. Submit
    **a, d₀, d₁, C_d, F_R, F→** (with your digit `d`).
 
-![the Force box on the shipped 7-cell rig, reading about 1.6 kN/m](shots/04-force-box.png)
+![the Control volume on the shipped 7-cell rig, reading about 1.6 kN/m](shots/04-force-box.png)
 
 Face rules: top anywhere above the water, bottom on or inside the bed,
 downstream clear of the gate plate, upstream clear of the reservoir edge.

@@ -104,7 +104,18 @@ const RECON = (() => {
   }
 
   /** The level where the mean fill crosses `th`, interpolated linearly
-   *  between cell centres. Returns NaN if the profile never crosses. */
+   *  between cell centres. Returns NaN if the profile never crosses.
+   *
+   *  Takes the FIRST crossing walking upward from j0. For the monotone
+   *  exceedance profile of a sharp interface — what this is for — that is
+   *  the only crossing, and it is the outer surface. It is deliberately NOT
+   *  the outer envelope of a non-monotone column: spray sitting above a gap
+   *  (fill dips then rises again before falling for good) reports the LOWER
+   *  excursion, understating the band's high edge with no error and no NaN
+   *  (measured: 54% low on [1,1,1,0.8,0.3,0.02,0.5,0.2,0.01], test C9). No
+   *  caller needs the outer envelope: `reconstruct()` never calls
+   *  `bandLevels`, and its own caller passes one body's bounds, where the
+   *  profile is close to monotone by construction. */
   function crossing(gcol, j0, j1, dx, th) {
     for (let j = j0; j < j1; j++) {
       if (gcol[j] >= th && gcol[j + 1] < th) {

@@ -228,5 +228,41 @@ for (const [gap, sep] of [[1, false], [2, false], [3, true], [4, true]]) {
 // The aeration gap reconciles the drawn line with the reported depth.
 ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12), 0.28, 1e-12));
 
+// The whole-grid entry point, on a deliberately RECTANGULAR grid (nx != ny),
+// so an i/j transpose in the row-major index k = j*nx + i shows up as wrong
+// columns rather than as no difference at all. The real grids reach nx ~ 3400
+// against a few hundred rows, where a transpose would be catastrophic — and
+// on a square fixture it would be invisible.
+{
+  const nx = 5, ny = 3, dx = 0.01, c = 25;
+  const fbar = new Float64Array(nx * ny), pbar = new Float64Array(nx * ny);
+  const mask = new Uint8Array(nx * ny);
+  const at = (i, j) => j * nx + i;
+  fbar[at(3, 0)] = 1; fbar[at(3, 1)] = 1; fbar[at(3, 2)] = 0.4;
+  fbar[at(1, 0)] = 1;                        // a one-cell body in another column
+  mask[at(0, 0)] = 255;                      // solid: must form no body
+  const R = RECON.reconstruct({ fbar, pbar, mask, nx, ny, dx, c });
+  ok("C8 reconstruct returns one entry per column",
+     R.d2d.length === nx && R.bed.length === nx && R.bodies.length === nx);
+  ok("C8 depth lands in the column it was written to, not its transpose",
+     near(R.d2d[3], (1 + 1 + 0.4) * dx, 1e-12) && near(R.d2d[1], 1 * dx, 1e-12),
+     `d2d ${Array.from(R.d2d).join(",")}`);
+  ok("C8 dry columns report zero depth and no NaN",
+     R.d2d[2] === 0 && R.d2d[4] === 0 && Array.from(R.d2d).every(Number.isFinite));
+  ok("C8 a cell with mask >= 192 is solid and forms no body",
+     R.bodies[0].length === 0, JSON.stringify(R.bodies[0]));
+}
+// crossing() takes the FIRST crossing walking upward. That is the outer
+// surface for the monotone exceedance profile of a sharp interface, and it is
+// deliberately NOT the outer envelope of a non-monotone column: spray above a
+// gap reports the lower excursion. Pinned so the contract is a decision rather
+// than an accident — callers pass a single body's bounds.
+{
+  const g = new Float64Array([1, 1, 1, 0.8, 0.3, 0.02, 0.5, 0.2, 0.01]);
+  const L = RECON.bandLevels(g, 0, g.length - 1, 0.01);
+  ok("C9 crossing takes the first threshold crossing, not the outer envelope",
+     L.eta95 < 0.06, `eta95 ${L.eta95}`);
+}
+
 console.log(`${passed} passed, ${failures.length} failed`);
 if (failures.length) { for (const f of failures) console.error("  FAIL " + f); process.exit(1); }

@@ -27,6 +27,7 @@ shallow water); this one resolves the depth.
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
+| `docs/averaging.md` | time averaging: the discrete mass balance the mean must satisfy, and how the free surface is reconstructed from it (phase C design; not yet built) |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
 | `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |

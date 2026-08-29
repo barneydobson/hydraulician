@@ -482,56 +482,90 @@ SUITES.pack = async (B) => {
   }
 };
 
-// Group F — the transport accumulator. The vof pass emits its own limited
-// face fluxes on a second render target, so the discrete mass balance can be
+// Group F — the transport accumulator. The vof pass emits its own limited face
+// fluxes on a second render target, so the discrete mass balance can be
 // certified with the numbers the scheme actually used rather than with a
 // cell-centred reconstruction of them.
 //
-// The residual floor is NOT arbitrary and is not accumulation noise: f is
-// stored in float32, so an update smaller than half an ulp of f rounds to a
-// no-op, and the flux the pass computed is then unrepresentable in f. That
-// caps the residual at ½·ulp(f)/Δt regardless of how long the window runs.
+// The residual is NOT bounded by a constant: it is the running-mean
+// recursion's own float32 drift and GROWS as √T. Each substep does
+// ⟨F⟩ ← ⟨F⟩ + k(F − ⟨F⟩) in float32, so each face mean carries a random walk
+// of about ½·ulp⟨F⟩ per step; over n = T/Δt steps that is ≈ ½·ulp⟨F⟩·√n, and
+// the residual divides a face DIFFERENCE by Δx:
 //
-// Measured on h23 at Low (dx = 16.3 mm, Δt = 2.626e-4 s), substeps → max:
-//     1 → 2.2697448730469e-4      512  → 1.09e-4
-//     8 → 1.72e-4                 4096 → 5.88e-4
-//    64 → 6.22e-5
-// and ½·ulp(1.007)/Δt = 2.2697448730469e-4 — the 1-substep maximum to 13
-// significant figures. The 4096 case reaches the f≈8 (fully pressurised) end
-// of the same bound, ½·ulp(8)/Δt = 1.8e-3.
+//     R_max  ≈  C · ε · ‖⟨F⟩‖∞ · √(T/Δt) / Δx,        ε = 2⁻²³
 //
-// Against that, the divergence term the balance cancels runs to 135 s⁻¹ (mean
-// 0.05–0.16 s⁻¹): a single mis-tiled face would land five orders of magnitude
-// above this floor, not just above 1e-5.
-const AVG_FLOOR = (dt) => 0.5 * 1.1920929e-7 * 8 / dt;
+// Measured on h23 at Low (Δx = 16.3 mm, Δt = 2.626e-4 s) over a 256× range in
+// substep count — log-log slope 0.472 for the max and 0.464 for the mean, so
+// it is the whole field drifting, not a few outlier cells:
+//
+//        n      T (s)      max         C
+//      200     0.0525   2.067e-4    0.439
+//      800     0.2101   4.633e-4    0.538
+//     3200     0.8403   7.830e-4    0.472
+//    12800     3.3613   1.297e-3    0.399
+//    51200    13.4454   3.253e-3    0.513
+//
+// C sits in 0.40–0.54 here and reaches 0.745 on an ANGLE/D3D11 ladder, so the
+// gate uses C = 3.0 — 4× the worst measured. The margin is scale-invariant
+// because both sides grow as √T, which is the whole point: a constant
+// tolerance is only ever right at one window length. For contrast, a mis-tiled
+// face would put the residual at the scale of the divergence itself, which
+// runs to 135 s⁻¹ here — five orders of magnitude clear.
+//
+// Below n ≈ 100 a different and smaller regime takes over, the storage term's
+// ½·ulp(f)/Δt quantisation floor (2.2697448730469e-4 measured against
+// 2.2697448730469e-4 predicted at n = 1). The windows below are well past it.
+const AVG_C = 3.0;
+const avgBound = (Fmax, T, dt, dx) =>
+  AVG_C * 1.1920929e-7 * Fmax * Math.sqrt(T / dt) / dx;
 
 SUITES.avg = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=h23`);
   const r = await B.evaluate(`(() => {
-    __low(); APP.tick(600);                    // settle before the window opens
+    __low();
+    APP.tick(600);                       // settle a little before the window opens
     APP.SIM.avgStart();
-    APP.frames(120);
-    const res = APP.SIM.transportResidual();
-    const T   = APP.SIM.avgT();
-    APP.frames(240);
-    const res2 = APP.SIM.transportResidual();
-    return { T, active: APP.SIM.avgActive(), max: res.max, max2: res2.max,
-             mean: res.mean, n: res.n, dt: APP.SIM.dt() };
+    // APP.tick(n) is EXACTLY n substeps, so T = n*dt is reproducible on every
+    // machine. APP.frames() is NOT: the substep governor picks a
+    // machine-dependent count per frame, so T — and with it the √T
+    // residual -- would scale with how fast the box is, and the gate would sit
+    // wherever that left it.
+    APP.tick(1200);
+    const res = APP.SIM.transportResidual(), T = APP.SIM.avgT();
+    APP.tick(2400);                      // 3x the window
+    const res2 = APP.SIM.transportResidual(), T2 = APP.SIM.avgT();
+    const active = APP.SIM.avgActive();
+    APP.SIM.avgStop();
+    return { T, T2, active, dt: APP.SIM.dt(), dx: APP.sim.dx,
+             max: res.max, mean: res.mean, n: res.n, nSrc: res.nSrc, Fmax: res.Fmax,
+             max2: res2.max, Fmax2: res2.Fmax };
   })()`);
-  const floor = AVG_FLOOR(r.dt);
-  ok("avg accumulator reports a positive window", r.T > 0, JSON.stringify(r));
+  const b1 = avgBound(r.Fmax, r.T, r.dt, r.dx);
+  const b2 = avgBound(r.Fmax2, r.T2, r.dt, r.dx);
+  console.log(`\n    T=${r.T.toFixed(4)}s->${r.T2.toFixed(4)}s dt=${r.dt.toExponential(3)}s` +
+    ` Fmax=${r.Fmax.toFixed(3)} max=${r.max.toExponential(3)}->${r.max2.toExponential(3)}` +
+    ` bound=${b1.toExponential(3)}->${b2.toExponential(3)}` +
+    ` margin=${(b1 / r.max).toFixed(1)}x/${(b2 / r.max2).toFixed(1)}x` +
+    ` cells=${r.n} src=${r.nSrc}`);
+  ok("avg accumulator reports a positive window", r.T > 0 && r.active, JSON.stringify(r));
   ok("avg residual has interior cells to report on", r.n > 100, JSON.stringify(r));
   // F1: the transport balance is an IDENTITY of the scheme, so all that is
-  // left is the float32 quantisation of f itself.
-  ok("F1 transport residual is at the f-quantisation floor", r.max < floor,
-     `max ${r.max} floor ${floor}`);
-  ok("F1 residual does not grow with T", r.max2 < r.max * 4 + 1e-9,
-     `max ${r.max} -> ${r.max2}`);
+  // left is the recursion's own drift — which the bound tracks as √T.
+  ok("F1 transport residual is at the sqrt(T) drift bound",
+     r.max < b1 && r.max2 < b2,
+     `max ${r.max} / bound ${b1}   max2 ${r.max2} / bound2 ${b2}`);
+  // Growth must be sub-linear in T. Over a 3× window √T predicts 1.73×.
+  ok("F1 residual grows no faster than sqrt(T)", r.max2 < r.max * 4 + 1e-9,
+     `max ${r.max} -> ${r.max2} over T ${r.T} -> ${r.T2}`);
 
-  // The accumulator must not perturb the solution: the ACCUM variant is the
-  // same source with one extra output, and the flux extraction is a pure
-  // refactor. Same scene, same substeps, f must match BIT FOR BIT — a
-  // tolerance here would just hide the ulp that a faithless extraction costs.
+  // What this does and does NOT prove: prog.vof is built from FS_VOF and
+  // prog.vofA from withAccum(FS_VOF) — the SAME source, both already using the
+  // extracted fluxX/fluxZ. An unfaithful extraction would move both fields
+  // identically and `bad` would still be 0, so this is NOT a guard on the
+  // extraction. It guards the property it names: adding the second render
+  // target does not perturb the solution. The extraction itself is guarded by
+  // the physics suite and by the offline float32 replay of both revisions.
   const s = await B.evaluate(`(() => {
     const gl = document.querySelector("canvas").getContext("webgl2");
     const snap = () => {
@@ -551,7 +585,7 @@ SUITES.avg = async (B) => {
     }
     return { diff, bad, n: plain.length / 4 };
   })()`);
-  ok("F1 the ACCUM variant does not move the solution",
+  ok("F1 the ACCUM variant does not perturb the solution",
      s.bad === 0, JSON.stringify(s));
 
   // The MRT selector must compare TEXTURE IDENTITY, not `S.F.write === S.F.b`
@@ -561,36 +595,58 @@ SUITES.avg = async (B) => {
   // once the ping-pong has flipped, so read back after an ODD substep count.
   const p = await B.evaluate(`(() => {
     APP.SIM.avgStart();
-    APP.tick(37);                                 // odd: the two buffers end flipped
-    const res = APP.SIM.transportResidual();
-    const T = APP.SIM.avgT();
+    APP.tick(1201);                               // odd: the two buffers end flipped
+    const res = APP.SIM.transportResidual(), T = APP.SIM.avgT();
+    const act = APP.SIM.avgActive();
     APP.SIM.avgStop();
-    return { T, max: res.max, mean: res.mean, n: res.n, dt: APP.SIM.dt(),
-             act: APP.SIM.avgActive() };
+    return { T, max: res.max, n: res.n, Fmax: res.Fmax, dt: APP.SIM.dt(),
+             dx: APP.sim.dx, act, actAfter: APP.SIM.avgActive() };
   })()`);
   ok("avg ping-pongs stay in phase across an odd substep count",
-     p.T > 0 && p.max < AVG_FLOOR(p.dt) && p.n > 100, JSON.stringify(p));
-  ok("avgStop releases the accumulator", p.act === false, JSON.stringify(p));
+     p.T > 0 && p.n > 100 && p.max < avgBound(p.Fmax, p.T, p.dt, p.dx),
+     JSON.stringify(p));
+  ok("avgStop releases the accumulator", p.act === true && p.actAfter === false,
+     JSON.stringify(p));
 
-  // R must restart the window — and it also respecifies the f textures the
-  // MRT framebuffers attach, so this is the invalid-framebuffer case too.
+  // R must restart the window — and it also respecifies the f textures the MRT
+  // framebuffers attach, so this is the invalid-framebuffer case too.
   const q = await B.evaluate(`(() => {
     const gl = document.querySelector("canvas").getContext("webgl2");
     APP.SIM.avgStart();
-    APP.tick(30);
+    APP.tick(300);
     const before = APP.SIM.avgT();
     APP.SIM.resetWater();
     const after = APP.SIM.avgT();
-    APP.tick(30);
+    APP.tick(300);
     const res = APP.SIM.transportResidual();
     const err = gl.getError();
+    const stillOn = APP.SIM.avgActive();
     APP.SIM.avgStop();
-    return { before, after, max: res.max, n: res.n, err, dt: APP.SIM.dt(),
-             active: APP.SIM.avgActive() };
+    return { before, after, stillOn, max: res.max, n: res.n, Fmax: res.Fmax,
+             err, dt: APP.SIM.dt(), dx: APP.sim.dx };
   })()`);
   ok("avg resetWater restarts the window and rebuilds the MRT targets",
-     q.before > 0 && q.after === 0 && q.err === 0 && q.max < AVG_FLOOR(q.dt) && q.n > 100,
+     q.before > 0 && q.after === 0 && q.stillOn && q.err === 0 && q.n > 100 &&
+     q.max < avgBound(q.Fmax, 300 * q.dt, q.dt, q.dx),
      JSON.stringify(q));
+
+  // A rebuild is a RESET condition, not a stop condition (docs/averaging.md
+  // section 9): averaging must survive a resolution change, zeroed.
+  const g = await B.evaluate(`(() => {
+    APP.SIM.avgStart();
+    APP.tick(300);
+    const before = APP.SIM.avgT();
+    const c = CONTROLS.find((x) => x.id === "budget");
+    c.set("Medium"); c.set("Low");                 // two rebuilds
+    const after = APP.SIM.avgT(), on = APP.SIM.avgActive();
+    APP.tick(300);
+    const res = APP.SIM.transportResidual();
+    APP.SIM.avgStop();
+    return { before, after, on, max: res.max, n: res.n };
+  })()`);
+  ok("avg survives a resolution rebuild, zeroed",
+     g.before > 0 && g.on === true && g.after === 0 && g.n > 100,
+     JSON.stringify(g));
 };
 
 // -------------------------------------------------------------------- main

@@ -335,11 +335,52 @@ Telescoping the substep update over the window and using
 \boxed{\;\frac{f(T)-f(0)}{T} \;+\; \nabla_h\!\cdot\!\left\langle \mathbf{F}\right\rangle \;-\; \left\langle S \right\rangle \;=\; 0\;}
 ```
 
-up to float32 accumulation error, with `f(0)` copied when Average is switched
-on. The identity applies in source cells as well as source-free cells because
-`S` contains the complete difference between the conservative candidate and
-the final interior fill. Boundary exchange appears through the four boundary
-faces of `Ω`.
+with `f(0)` copied when Average is switched on. The identity applies in source
+cells as well as source-free cells because `S` contains the complete difference
+between the conservative candidate and the final interior fill. Boundary
+exchange appears through the four boundary faces of `Ω`.
+
+### The residual is not bounded — it grows as `√T`
+
+The identity is exact in exact arithmetic, so what a run actually reports is
+float32 error. Naming the mechanism matters, because it sets the shape of the
+tolerance and an earlier draft of this section got it wrong.
+
+It is **not** a fixed floor. The running means of §4.4 are built by the
+recursion `⟨φ⟩ ← ⟨φ⟩ + k(φ − ⟨φ⟩)`, evaluated in float32, so each of the four
+face means carries a rounding step of about `½ ulp⟨F⟩` per substep. Those steps
+accumulate as a random walk, and the residual divides a *difference* of face
+means by `Δx`:
+
+```math
+\mathcal{R}_{\max}\;\approx\;C\,\varepsilon\,\bigl\lVert\langle F\rangle\bigr\rVert_\infty\,\frac{\sqrt{T/\Delta t}}{\Delta x},\qquad \varepsilon = 2^{-23}
+```
+
+Measured on `h23` at Low (`Δx = 16.3 mm`, `Δt = 2.626×10⁻⁴ s`) across a 256×
+range in substep count — log-log slope **0.472** for `‖𝓡‖∞` and **0.464** for
+the mean, so this is the whole field drifting, not a few outlier cells:
+
+| substeps `n` | `T` (s) | `‖𝓡‖∞` | mean residual | `C` |
+|---|---|---|---|---|
+| 200 | 0.0525 | 2.067×10⁻⁴ | 7.25×10⁻⁶ | 0.439 |
+| 800 | 0.2101 | 4.633×10⁻⁴ | 1.30×10⁻⁵ | 0.538 |
+| 3 200 | 0.8403 | 7.830×10⁻⁴ | 2.47×10⁻⁵ | 0.472 |
+| 12 800 | 3.3613 | 1.297×10⁻³ | 4.67×10⁻⁵ | 0.399 |
+| 51 200 | 13.4454 | 3.253×10⁻³ | 9.54×10⁻⁵ | 0.513 |
+
+`C` stays inside `0.40–0.54` over that whole range, and reaches `0.745` on an
+ANGLE/D3D11 path, which is what makes the law usable as a gate: scale by
+`√(T/Δt)` and the margin stops moving.
+
+One substep is a **different and smaller** regime. There the storage term
+dominates: `f` is stored in float32, so an update below half an ulp of `f`
+rounds to a no-op and that flux can never reach `f(T) − f(0)`. The measured
+`n = 1` maximum is `2.2697448730469×10⁻⁴` against `½ ulp(1.007)/Δt =
+2.2697448730469×10⁻⁴` — thirteen significant figures. That is the **floor**,
+not the ceiling; a constant tolerance drawn from it is right at one window
+length and wrong at every other. For scale, `∇ₕ·⟨F⟩` itself runs to `135 s⁻¹`
+on this scene, so a genuinely mis-tiled face sits five orders of magnitude
+above either regime.
 
 It buys two things beyond the check itself:
 
@@ -600,16 +641,32 @@ the nappe and bridge contributions selected by §7.2's fixed rule.
 
 ### Group F — conservation, end to end (GPU)
 
-For F1, define the relative cancellation residual as
-`r_𝓡 = ‖𝓡‖∞/max(‖storage‖∞+‖∇ₕ·F̄‖∞+‖S̄‖∞, 10⁻¹² s⁻¹)`.
-The target tolerance is provisional until measured on each supported GPU path.
+F1 is gated on the **window-scaled** bound of §5, not on a constant and not on
+a ratio. An earlier draft defined a relative residual
+`r_𝓡 = ‖𝓡‖∞/max(‖storage‖∞+‖∇ₕ·F̄‖∞+‖S̄‖∞, 10⁻¹² s⁻¹)` with a `10⁻⁶` target;
+measurement retired it. That denominator collapses exactly when the run is
+working — a converged steady reach drives `∇ₕ·⟨F⟩ → ⟨S⟩` and the storage term
+to zero by construction — while the numerator grows as `√T`, so `r_𝓡` rises
+from `8×10⁻⁷` to `3×10⁻⁴` across a single ladder and reads worst on the most
+converged run. It is `0/0` in the limit.
+
+The gate is therefore
+
+```math
+\mathcal{R}_{\max}\;<\;C_{\text{gate}}\,\varepsilon\,\bigl\lVert\langle F\rangle\bigr\rVert_\infty\,\frac{\sqrt{T/\Delta t}}{\Delta x}
+```
+
+with `C_gate = 3.0` — 4× the worst `C` measured on any path (§5) — and the
+averaging window pinned to a fixed substep count so `T = nΔt` is reproducible
+across machines. Advancing it by rendered frames instead makes `T`, and hence
+the residual, a function of how fast the box is.
 
 | # | Case | Expected |
 |---|---|---|
-| F1 | Local transport residual in source-free interior cells | `r_𝓡` remains below the measured float32 tolerance; design target `10⁻⁶` |
-| F2 | `Q̄_F = ΔxΣ_j⟨F^E⟩` along a steady source-free reach with closed vertical boundaries | one value across every section within the F1 tolerance |
+| F1 | Local transport residual in source-free interior cells | `‖𝓡‖∞` below the §5 window-scaled bound; measured margin ≈ 5–6× at `n = 1200` and `n = 3600`, and scale-invariant in `T` |
+| F2 | `Q̄_F = ΔxΣ_j⟨F^E⟩` along a steady source-free reach with closed vertical boundaries | one value across every section within the F1 bound |
 | F3 | Source-free draining domain with `f(T) ≠ f(0)` | storage-change rate plus signed outward boundary flux is zero |
-| F4 | Sponge, each point source, and each safety clamp | residual including `⟨S⟩` meets F1; recomputing with `S=0` gives `𝓡=⟨S⟩` |
+| F4 | Sponge, each point source, and each safety clamp | residual including `⟨S⟩` meets F1; recomputing with `S=0` gives `𝓡=⟨S⟩`. The `⟨S⟩ ≠ 0` population also carries every positivity-clamp event, so it is **counted and reported** (`nSrc`) rather than silently excluded — an invented-water regression shows up as that count moving |
 | F5 | Left and bottom open-boundary exchange | storage-change rate plus all signed outward boundary fluxes minus integrated `S` is zero |
 | F6 | Display residual `𝓡_disp` on `⟨f u_c⟩` | approaches an `O(Δt_frame, Δx^p)` floor; frame-rate and resolution sweeps measure each dependence |
 | F7 | Source-free whole-period wave window | endpoint storage term returns to its initial value within solver tolerance; transport balance closes, while `𝓡_disp` retains its discretisation floor |

@@ -136,6 +136,11 @@ const SIM = (() => {
   }
 
   function build(scene, budget, keepSegs) {
+    // docs/averaging.md §9 lists a scene change and a resolution rebuild as
+    // RESET conditions, not stop conditions: the window restarts from zero,
+    // but Average does not switch itself off under the caller. Captured
+    // before release(old) frees the outgoing accumulator.
+    const wasAvg = !!(S && S.avg);
     const aspect = scene.W / scene.H;
     // The hard cap is the driver's texture limit, not a number picked here.
     // A fixed 1400 silently swallowed the top resolutions on exactly the
@@ -203,6 +208,7 @@ const SIM = (() => {
 
     rasterise();
     resetWater();
+    if (wasAvg) avgStart();         // zeroed against the new grid, f(0) = the reset water
     return S;
   }
 
@@ -257,7 +263,6 @@ const SIM = (() => {
     if (a.T) a.T.dispose();
     if (a.fboA) gl.deleteFramebuffer(a.fboA);
     if (a.fboB) gl.deleteFramebuffer(a.fboB);
-    if (a.f0) gl.deleteTexture(a.f0);
   }
 
   /** Lazily allocated: a session that never opens Average pays nothing.
@@ -277,8 +282,7 @@ const SIM = (() => {
     // Identity of the attached texture is the only honest test.
     const fboA = GLH.createFBO2(gl, S.F.b.tex, T.b.tex);
     const fboB = GLH.createFBO2(gl, S.F.a.tex, T.a.tex);
-    const f0 = GLH.createTexture(gl, S.nx, S.ny, F, RGBA, FL, null);
-    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0, f0buf: null, t: 0 };
+    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0 };
     snapshotF0();
   }
   function avgStop() { if (S.avg) { disposeAvg(S.avg); S.avg = null; } }
@@ -287,42 +291,64 @@ const SIM = (() => {
   const avgT = () => (S && S.avg ? S.avg.t : 0);
 
   /** f(0) for the endpoint term of the balance. One copy, taken when the
-   *  window opens; f(T) is simply the live field. Read back to the CPU and
-   *  uploaded rather than copyTexSubImage2D'd: the residual wants it CPU-side
-   *  anyway, and CopyTexSubImage into an RGBA32F target is not something the
-   *  ES3 format tables promise. */
+   *  window opens; f(T) is simply the live field. Kept on the CPU: it is only
+   *  ever read back, so a texture for it would be write-only. If a later pass
+   *  wants f(0) on the GPU it is one texSubImage2D from here. */
   function snapshotF0() {
     const buf = new Float32Array(S.nx * S.ny * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
     gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
-    gl.bindTexture(gl.TEXTURE_2D, S.avg.f0);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
     S.avg.f0buf = buf;
   }
 
   /** The discrete transport balance of docs/averaging.md §5, over interior
    *  cells with no source.
    *
-   *      (f(T) − f(0))/T  +  [(<F^E> − <F^W>) + (<F^N> − <F^S>)]/Δx  −  <S>  =  0
+   *      (f(T) − f(0))/T  +  [(⟨F^E⟩ − ⟨F^W⟩) + (⟨F^N⟩ − ⟨F^S⟩)]/Δx  −  ⟨S⟩  =  0
    *
    *  It is an IDENTITY of the scheme, not an approximation: every term is the
    *  running mean of a number the pass computed. What is left is the float32
-   *  QUANTISATION OF f, not accumulation noise — `f` is stored in float32, so
-   *  a substep whose `dt·div` is under half an ulp of `f` rounds to a no-op
-   *  and that flux can never appear in the storage term. The residual is
-   *  therefore capped at ½·ulp(f)/Δt whatever the window length. Measured on
-   *  h23 at Low (Δx = 16.3 mm, Δt = 2.63e-4 s): the 1-substep maximum is
-   *  2.2697448730469e-4 against ½·ulp(1.007)/Δt = 2.2697448730469e-4 — 13
-   *  significant figures — and 4096 substeps reach 5.9e-4 against the f = 8
-   *  end of the same bound, 1.8e-3. For scale, the divergence term those
-   *  cancel from runs to 135 s⁻¹.
+   *  rounding drift of the running-mean recursion itself, and it is NOT
+   *  bounded — it GROWS as √T.
    *
-   *  Cells where <S> is nonzero are the sponge, the Dirichlet bands and the
-   *  point sources; they are excluded here and reported separately. Solid
-   *  cells are excluded too — they early-return in the shader and merely pass
-   *  their accumulator through. */
+   *  Each substep does ⟨F⟩ ← ⟨F⟩ + k(F − ⟨F⟩) in float32, so each of the four
+   *  face means carries a random walk of about ½·ulp⟨F⟩ per step. Over
+   *  n = T/Δt steps that is ≈ ½·ulp⟨F⟩·√n, and the residual divides a face
+   *  DIFFERENCE by Δx, so
+   *
+   *      R_max  ≈  C · ε · ‖⟨F⟩‖∞ · √(T/Δt) / Δx,        ε = 2⁻²³
+   *
+   *  Measured on h23 at Low (Δx = 16.3 mm, Δt = 2.626e-4 s) over a 256× range
+   *  in substep count — log-log slope 0.472 for the max and 0.464 for the
+   *  mean, so it is the whole field drifting, not a few outlier cells:
+   *
+   *      n =   200, T = 0.0525 s → 2.067e-4      C = 0.439
+   *      n =   800, T = 0.2101 s → 4.633e-4      C = 0.538
+   *      n =  3200, T = 0.8403 s → 7.830e-4      C = 0.472
+   *      n = 12800, T = 3.3613 s → 1.297e-3      C = 0.399
+   *      n = 51200, T = 13.445 s → 3.253e-3      C = 0.513
+   *
+   *  C stays inside 0.40–0.54 over that whole range (0.745 on an ANGLE/D3D11
+   *  path), which is what makes the law usable as a gate: scale by √(T/Δt) and
+   *  the margin stops moving. `Fmax` is returned so a caller can do exactly
+   *  that — see `avgBound` in exercises/_runner/smoke.js.
+   *
+   *  A one-substep window is a DIFFERENT and smaller regime: there the storage
+   *  term dominates, because f is stored in float32 and an update below half an
+   *  ulp of f rounds to a no-op. The n = 1 maximum measures 2.2697448730469e-4
+   *  against ½·ulp(1.007)/Δt = 2.2697448730469e-4 — thirteen significant
+   *  figures. That is the FLOOR, not the ceiling; a constant tolerance drawn
+   *  from it is right at one window length and wrong at every other. For scale,
+   *  ∇ₕ·⟨F⟩ itself runs to 135 s⁻¹ here.
+   *
+   *  Cells where ⟨S⟩ is nonzero are the sponge, the Dirichlet bands, the point
+   *  sources AND every positivity-clamp event — the invented-water signature
+   *  the Conservation notes warn about — so `nSrc` is reported separately
+   *  rather than silently folded into the exclusion. Solid cells are excluded
+   *  too: they early-return in the shader and merely pass their accumulator
+   *  through. */
   function transportResidual() {
-    if (!S.avg || !(S.avg.t > 0)) return { max: 0, mean: 0, n: 0 };
+    if (!S.avg || !(S.avg.t > 0)) return { max: 0, mean: 0, n: 0, nSrc: 0, Fmax: 0 };
     const n = S.nx * S.ny;
     const A = new Float32Array(n * 4), fT = new Float32Array(n * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.T.read.fbo);
@@ -333,12 +359,18 @@ const SIM = (() => {
     // 255 = wall, 128 = valve (solid only while closed), 0 = open.
     const solidLo = S.p.valveClosed > 0.5 ? 64 : 192;
     const T = S.avg.t, nx = S.nx;
-    let max = 0, sum = 0, cnt = 0;
+    let max = 0, sum = 0, cnt = 0, nSrc = 0, Fmax = 0;
     for (let j = 1; j < S.ny - 1; j++) {
       for (let i = 1; i < nx - 1; i++) {
         const k = (j * nx + i) * 4;
         if (S.mask[j * nx + i] >= solidLo) continue;
-        if (Math.abs(A[k + 2]) > 1e-9) continue;              // source cell
+        // The scale of the drift, over every interior fluid cell — source
+        // cells included, because their face means still feed a source-free
+        // neighbour's divergence.
+        const aE = Math.abs(A[k]), aN = Math.abs(A[k + 1]);
+        if (aE > Fmax) Fmax = aE;
+        if (aN > Fmax) Fmax = aN;
+        if (Math.abs(A[k + 2]) > 1e-9) { nSrc++; continue; }   // source cell
         // West face = the west neighbour's stored east face; south face = the
         // south neighbour's stored north face. Both are the same number, not
         // a copy of it.
@@ -349,7 +381,7 @@ const SIM = (() => {
         sum += a; cnt++;
       }
     }
-    return { max, mean: cnt ? sum / cnt : 0, n: cnt };
+    return { max, mean: cnt ? sum / cnt : 0, n: cnt, nSrc, Fmax };
   }
 
   // ------------------------------------------------------------------ step

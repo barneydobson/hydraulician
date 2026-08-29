@@ -94,19 +94,22 @@ to look fine for a minute and explode in an exercise.
 
 ## Testing
 
-Six gates, all zero-dependency and all non-zero on failure:
+Seven gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 |---|---|---|
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
-| `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 41 assertions, no browser | instant |
+| `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
+| `node test/mutation-test.mjs` | that `recon-test.mjs` can actually FAIL: fifteen known bugs patched into `RECON` one at a time, each required to kill the assertion it targets | ~9 s |
 | `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, the reset conditions, the Favre display field, the mean columns and the overlay — 35 assertions | ~4 min |
 | `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it | 8 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing
-anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
+anything that touches `js/`. Run `mutation-test.mjs` after touching
+`js/reconstruct.js` or its suite — it is the only gate that fails when a *test*
+stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
 
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
@@ -117,6 +120,18 @@ built, so a failure there is a real regression rather than a tightened
 expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
 `--use-angle=d3d11` itself, because the software rasteriser renders a
 full-window WebGL canvas so slowly that a spin-up scene times the run out.
+
+**Why there is a mutation gate.** Eleven assertions written during the averaging
+work passed while asserting nothing — a constant fed where a varying value was
+needed, a cell marked solid with no water in it, a `Number.isFinite` check that
+survived a deliberately broken variance, a bed compared against the very buffer
+it was copied from. Every one was caught by breaking the code and watching the
+suite stay green; none by reading it. `test/mutation-test.mjs` runs that
+practice on every commit for the pure numerics. For the shader and sim code it
+cannot reach, `smoke.js --mutate=<id>` patches one known bug into a served file
+in flight — never touching the working tree — so the same control can be run by
+hand: `node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds`.
+Each catalogue entry carries what was measured when the control was performed.
 
 The two checkers are complements: `check_notation.py` greps for *names*,
 `smoke.js` proves the names are *connected* — a field renamed at the write

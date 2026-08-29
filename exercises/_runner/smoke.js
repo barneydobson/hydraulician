@@ -35,6 +35,86 @@ const KEEP = process.argv.includes("--keep");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
   .replace("--only=", "").split(",").filter(Boolean);
 
+/** --mutate=<id> patches ONE known bug into a served file, in flight, so the
+ *  suite can be watched going red. It is the GPU half of test/mutation-test.mjs:
+ *  the same negative-control practice that caught eleven assertions which
+ *  passed while asserting nothing, for the shader and sim code that harness
+ *  cannot reach without a browser.
+ *
+ *  Never touches the working tree — `serve()` rewrites the bytes on their way
+ *  out. The manual version of this required editing a file and restoring it,
+ *  and one implementer had to restore from a byte-exact copy and diff to be
+ *  sure nothing was left behind.
+ *
+ *  Not a gate: each run costs a full boot (~4 min for --only=avg), so this is
+ *  run deliberately, one at a time. `measured` is what was actually observed
+ *  when the control was performed by hand.
+ *
+ *      node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds
+ *
+ *  Expect the named assertion to FAIL. If it passes, that assertion is not
+ *  guarding what it claims to guard. */
+const GPU_MUTANTS = [
+  { id: "favre-reynolds", file: "/js/shaders.js",
+    why: "FS_ACC stores the plain velocity, so the mean is Reynolds, not Favre",
+    find: "vec4 phi = vec4(f * uc, f * wc, f, U.b);",
+    replace: "vec4 phi = vec4(uc, wc, f, U.b);",
+    kills: "avg Favre mean, not Reynolds",
+    measured: "dFavre 2e-7 -> 3.46e-2 against a 1.15e-3 bound. Note a NEARNESS "
+            + "comparison does not catch this — ubar stayed nearer Favre in 25/25 "
+            + "cells; the shipped gate asserts agreement" },
+
+  { id: "collocation-west-face", file: "/js/shaders.js",
+    why: "f weighted by the west-face velocity instead of the cell-centred one",
+    find: "float uc = 0.5 * (U.r + texelFetch(u_U, CL(c + ivec2(1,0)), 0).r);",
+    replace: "float uc = U.r;",
+    kills: "avg collocation",
+    measured: "run end to end: ubar lands ON the face value — dFace 3.3e-6 "
+            + "against dCentred 3.35e-1. The Favre assertion fires too, as a "
+            + "real consequence: dFavre 4.27e-2 against a 9.0e-4 bound" },
+
+  { id: "welford-naive", file: "/js/shaders.js",
+    why: "the column accumulator's second moment loses its time weight",
+    find: "o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
+    replace: "o = vec4(dN, qN, eN, A.w + (C.w - eO) * (C.w - eN));",
+    kills: "avg sigma_eta",
+    measured: "a finite-only check stayed GREEN against this; the shipped gate "
+            + "compares against an independent float64 Welford, 4.8e-6 vs 1.6e-2" },
+
+  { id: "ynk-ema-not-bypassed", file: "/js/overlay.js",
+    why: "the averaged path re-runs the global normal-depth EMA, averaging an average",
+    find: "      if (AVG) S._ynK = k;",
+    replace: "      if (AVG) S._ynK = isFinite(S._ynK) ? S._ynK + EMA * (k - S._ynK) : k;",
+    kills: "H2c",
+    measured: "two successive 6% steps toward the clean value: k lands at "
+            + "0.0696/0.0737 against a clean 0.1377" },
+
+  { id: "rescale-no-reset", file: "/js/sim.js",
+    why: "the celerity slider rewrites f under the window with no reset",
+    find: "    // at the old one.\n    if (S.avg) avgReset();",
+    replace: "    // at the old one.",
+    kills: "F1 transport residual",
+    measured: "c 22 -> 11 gives a residual of 4.13e-1 against a 1.28e-3 bound, 323x over" },
+
+  { id: "setvalve-no-reset", file: "/js/sim.js",
+    why: "a valve toggle changes the solid set with no reset, so frozen cells resume mid-window",
+    find: "    S.p.valveClosed = v;\n    if (S.avg) avgReset();",
+    replace: "    S.p.valveClosed = v;",
+    kills: "avg a valve toggle resets the window",
+    measured: "T runs straight through the toggle instead of returning to zero" },
+];
+
+const MUTATE = (process.argv.find((a) => a.startsWith("--mutate=")) || "")
+  .replace("--mutate=", "");
+const MUTANT = MUTATE ? GPU_MUTANTS.find((m) => m.id === MUTATE) : null;
+if (MUTATE && !MUTANT) {
+  console.error("no such mutation: " + MUTATE + "\nknown: "
+    + GPU_MUTANTS.map((m) => m.id).join(", "));
+  process.exit(2);
+}
+if (MUTANT) console.log("MUTATION " + MUTANT.id + " — " + MUTANT.why
+  + "\nexpect to fail: " + MUTANT.kills + "\nmeasured by hand: " + MUTANT.measured + "\n");
+
 const CHROMES = [
   process.env.CHROME_PATH,
   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -96,6 +176,18 @@ function serve() {
     if (!f.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
     fs.readFile(f, (err, data) => {
       if (err) { res.writeHead(404); res.end("not found"); return; }
+      if (MUTANT && p === MUTANT.file) {
+        const before = data.toString("utf8");
+        // A pattern that no longer matches would serve untouched source and
+        // let the suite pass, reporting success while testing nothing — the
+        // exact failure this mechanism exists to catch. Never a silent skip.
+        if (!before.includes(MUTANT.find)) {
+          console.error("MUTATION " + MUTANT.id + " is STALE: its pattern is no "
+            + "longer in " + MUTANT.file + ". Fix the catalogue entry.");
+          process.exit(2);
+        }
+        data = Buffer.from(before.replace(MUTANT.find, MUTANT.replace), "utf8");
+      }
       res.writeHead(200, { "Content-Type": MIME[path.extname(f)] || "application/octet-stream" });
       res.end(data);
     });
@@ -1082,8 +1174,7 @@ SUITES.avg = async (B) => {
   // shows up as a jump broadened by the filter rather than by the flow.
   //
   // Feeding the SAME column buffer to the SAME call twice, with a reset
-  // right before both calls, does NOT distinguish "bypassed" from "filtered
-  // but converged": resetEstimates() nulls _hA, so the first call
+  // right before both calls, does NOT distinguish "bypassed" from "filtered\n// but converged": resetEstimates() nulls _hA, so the first call
   // initialises _hA to a bit-exact copy of the smoothed input, and that same
   // call's own EMA step is then `x += 0.10*(x-x) = 0` — the filter reaches
   // its fixed point in ONE call whenever the input never changes. A second
@@ -1104,8 +1195,7 @@ SUITES.avg = async (B) => {
   //   H2b: the LIVE path does NOT ignore history. The same current input D,
   //        reached via two different histories (no history vs. seeded with
   //        C), must give two DIFFERENT outputs — proof the live EMA is
-  //        actually carrying state between calls, which is what "the
-  //        bypass is real" requires the live path to keep doing.
+  //        actually carrying state between calls, which is what "the\n//        bypass is real" requires the live path to keep doing.
   //   H2c: the fourth filter — the global d_n estimate `_ynK` — gets the
   //        same treatment. Seed it via a live call on D (D's median
   //        candidate measured at 0.0653 m against C's 0.1544 m — a factor

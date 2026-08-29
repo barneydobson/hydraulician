@@ -4,7 +4,11 @@
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
-const src = readFileSync(new URL("../js/reconstruct.js", import.meta.url), "utf8");
+// RECON_SRC points this suite at a deliberately broken copy of the module —
+// that is how test/mutation-test.mjs proves each assertion below can fail.
+// Unset, it reads the real module, which is every other invocation.
+const src = readFileSync(process.env.RECON_SRC
+  || new URL("../js/reconstruct.js", import.meta.url), "utf8");
 const ctx = { console };
 vm.createContext(ctx);
 vm.runInContext(src + "\n;globalThis.RECON = RECON;", ctx);
@@ -72,6 +76,18 @@ for (const [c, rawExpect] of [[25, 1.00785], [8, 1.07664]]) {
     worst = Math.max(worst, Math.abs(RECON.geomFill(f, c * c * (f - 1), c) - 1));
   }
   ok("B3 pressurised cells compact to exactly 1", worst < 1e-12, `worst ${worst}`);
+}
+// B5: the compaction only differs from a plain clamp against the DIAGNOSTIC
+// pressure. For an EOS-consistent pair the identity min(f,1) = f - P/c^2 IS
+// clamp(f, 0, 1) — every pressurised cell lands on 1 either way — so B1-B3
+// all pass with the subtraction deleted outright (measured: 41 passed, 0
+// failed). U.b carries the bulk-damping term and lags the fill by a substep,
+// so it can exceed the bare EOS value; that is the case the subtraction is
+// actually for, and the only one that pins it.
+{
+  const c = 25, f = 1.02, P = c * c * 0.05;   // P above the bare EOS c^2*(f-1)
+  ok("B5 compaction subtracts the diagnostic pressure, not just a clamp",
+     near(RECON.geomFill(f, P, c), 0.97, 1e-12), `got ${RECON.geomFill(f, P, c)}`);
 }
 // B4: dry column.
 ok("B4 dry column has zero depth and no NaN",
@@ -275,24 +291,37 @@ ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12),
 // against a few hundred rows, where a transpose would be catastrophic — and
 // on a square fixture it would be invisible.
 {
-  const nx = 5, ny = 3, dx = 0.01, c = 25;
+  const nx = 5, ny = 5, dx = 0.01, c = 25;
   const fbar = new Float64Array(nx * ny), pbar = new Float64Array(nx * ny);
   const mask = new Uint8Array(nx * ny);
   const at = (i, j) => j * nx + i;
-  fbar[at(3, 0)] = 1; fbar[at(3, 1)] = 1; fbar[at(3, 2)] = 0.4;
+  // j=2 is BELOW WET but bridged (one dry cell, DRY_BREAK = 3), so it is
+  // inside the body while contributing no depth. That is what separates
+  // bodyDepth from columnDepth — without it, swapping one for the other
+  // in reconstruct() passes the whole suite (measured: 42 passed).
+  fbar[at(3, 0)] = 1; fbar[at(3, 1)] = 1;
+  fbar[at(3, 2)] = 0.1; fbar[at(3, 3)] = 0.6;
   fbar[at(1, 0)] = 1;                        // a one-cell body in another column
   fbar[at(0, 0)] = 1; mask[at(0, 0)] = 255;   // WATER in a SOLID cell: the mask must win
   const R = RECON.reconstruct({ fbar, pbar, mask, nx, ny, dx, c });
   ok("C8 reconstruct returns one entry per column",
      R.d2d.length === nx && R.bed.length === nx && R.bodies.length === nx);
   ok("C8 depth lands in the column it was written to, not its transpose",
-     near(R.d2d[3], (1 + 1 + 0.4) * dx, 1e-12) && near(R.d2d[1], 1 * dx, 1e-12),
+     near(R.d2d[3], (1 + 1 + 0.6) * dx, 1e-12) && near(R.d2d[1], 1 * dx, 1e-12),
      `d2d ${Array.from(R.d2d).join(",")}`);
   ok("C8 dry columns report zero depth and no NaN",
      R.d2d[2] === 0 && R.d2d[4] === 0 && Array.from(R.d2d).every(Number.isFinite));
   ok("C8 a cell with mask >= 192 is solid even when its fill says water",
      R.bodies[0].length === 0 && R.d2d[0] === 0,
      `bodies0 ${JSON.stringify(R.bodies[0])} d2d0 ${R.d2d[0]}`);
+  // d2d exists to cross-check the GPU's own column reduction, which `continue`s
+  // past sub-threshold cells without accumulating depth. Built from the
+  // unmasked integral it would disagree with FS_COL by construction — measuring
+  // the shader's bridging rather than checking against it (ruling R8).
+  ok("C8 d2d masks bridged sub-threshold cells, as FS_COL does",
+     near(R.d2d[3], (1 + 1 + 0.6) * dx, 1e-12) &&
+     !near(R.d2d[3], (1 + 1 + 0.1 + 0.6) * dx, 1e-12),
+     `d2d[3] ${R.d2d[3]}`);
 }
 // crossing() takes the FIRST crossing walking upward. That is the outer
 // surface for the monotone exceedance profile of a sharp interface, and it is

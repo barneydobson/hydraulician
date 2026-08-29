@@ -647,6 +647,32 @@ SUITES.avg = async (B) => {
   ok("avg survives a resolution rebuild, zeroed",
      g.before > 0 && g.on === true && g.after === 0 && g.n > 100,
      JSON.stringify(g));
+
+  // A geometry edit is a RESET condition too (docs/averaging.md §9): the
+  // walls the mean was accumulated through are no longer the walls on
+  // screen. The reset lives in rasterise(), which is the choke point for
+  // every mask-changing path — the drawing tools and the boundary-open
+  // toggles in main.js — so drawing one wall exercises all of them.
+  const e = await B.evaluate(`(() => {
+    APP.SIM.avgStart();
+    APP.tick(300);
+    const before = APP.SIM.avgT(), segs0 = APP.sim.segs.length;
+    const S = APP.sim;                       // a short wall, clear of the water
+    APP.SIM.addSeg(0.35 * S.W, 0.85 * S.H, 0.35 * S.W, 0.95 * S.H, 0.02, 255);
+    const after = APP.SIM.avgT(), on = APP.SIM.avgActive();
+    APP.tick(300);
+    const res = APP.SIM.transportResidual();
+    const r = { before, after, on, segs0, segs1: APP.sim.segs.length,
+                max: res.max, n: res.n, Fmax: res.Fmax,
+                dt: APP.SIM.dt(), dx: APP.sim.dx };
+    APP.SIM.clearSegs(); APP.SIM.avgStop();
+    return r;
+  })()`);
+  ok("avg a geometry edit resets the window",
+     e.before > 0 && e.after === 0 && e.on === true &&
+     e.segs1 === e.segs0 + 1 && e.n > 100 &&
+     e.max < avgBound(e.Fmax, 300 * e.dt, e.dt, e.dx),
+     JSON.stringify(e));
 };
 
 // -------------------------------------------------------------------- main

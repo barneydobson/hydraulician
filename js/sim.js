@@ -96,6 +96,16 @@ const SIM = (() => {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
 
     S.bandKey = null;                  // invalidate the cached control bands
+
+    // Any change to the mask invalidates the window being averaged: the walls
+    // the mean was accumulated through are no longer the walls on screen, and
+    // §9 of docs/averaging.md lists a geometry edit as a reset condition. This
+    // is the choke point for every path that moves a wall — the drawing tools
+    // here, and the boundary-open toggles in main.js — so one reset covers
+    // them all. A no-op during build(), which nulls S.avg before it calls
+    // this, so it can neither double-start nor fight build()'s own wasAvg
+    // restore.
+    if (S.avg) avgReset();
   }
 
   /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */

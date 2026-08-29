@@ -10,12 +10,12 @@ panel's *Average the flow* row and `APP.avg.toggle()`, all of which go through
 `setAverage` in `main.js`. This document remains the binding specification:
 averaged quantities, discrete balances, reconstruction and acceptance tests.
 
-Two things §9 asks the legend for are **not** on it, and deliberately: the
-residuals of §5 and the 1D/2D depth discrepancy of §7.2. `transportResidual()`
-is two full-field readbacks and measures ~1.2 s, so it cannot be a per-frame
-readout; it is reachable as `APP.avg.residual()` and is what the `--only=avg`
-gate reads. The card carries `T`, `f̄`, `d̄`, `δ_a` and `σ_η` — the excursion
-band's own estimate — instead.
+The legend card carries `T`, `f̄`, `d̄`, `δ_a` and `σ_η`. Two things an earlier
+draft asked it for — the residuals of §5 and the 1D/2D depth discrepancy of
+§7.2 — are deliberately not on it, because both need `transportResidual()` and
+that is two full-field readbacks at about 1.2 s; they live at
+`APP.avg.residual()` instead. §9 states the reasoning where a reader of the
+reset conditions will meet it.
 
 The VIEW family provides a **Live / Average** toggle. In Average mode the solver
 continues to advance while diagnostic accumulators collect the flow. Live mode
@@ -738,11 +738,33 @@ initialisation interval rather than part of the reported flow state.
 
 While paused, `Δt_n = 0`; accumulators and averaging duration remain unchanged.
 
-The legend prints `T`, the elapsed averaging time, and `f̄` under the cursor. It
-also reports the excursion-band width, the residuals of §5, and the 1D/2D depth
-discrepancy of §7.2. The cursor readout reports `δ_a` whenever the surface line
-and equivalent water depth differ. No generic convergence time is imposed
-because several scene timescales are emergent rather than prescribed.
+The legend prints `T`, the elapsed averaging time, and under the cursor the mean
+fill `f̄`, the equivalent water depth `d̄`, the aeration gap `δ_a` and the surface
+standard deviation `σ_η` — the excursion band's own estimate from §7.3. `δ_a` is
+printed with `d̄` wherever the cursor is, and not only where the surface line and
+the equivalent depth part: a reading that appeared and vanished as the pointer
+moved would read as a glitch, and `δ_a = 0` is itself the statement that the two
+agree in that column.
+
+It must also say what ends a window. Every condition above is one a reader can
+reason about from the thing they just did, except one: the four boundary-open
+checkboxes in the Controls panel read as settings rather than as edits, and
+they go through `rasterise`, so ticking one mid-window sends `T` back to zero
+with nothing on screen to connect the two. The card names them among the reset
+conditions for that reason.
+
+**Two things this section previously asked the legend for are deliberately not
+on it.** The residuals of §5 and the 1D/2D depth discrepancy of §7.2 both go
+through `transportResidual()`, which is two full-field readbacks and measures
+about 1.2 s — eighty times the 15 ms frame budget, so it cannot be a per-frame
+readout at any grid size, and throttling it would only make the stall
+intermittent. Both are reachable on demand as `APP.avg.residual()`, which is
+what the group F gate reads, and neither is affected by its absence from the
+card: the residual is computed from the same stored means whenever it is asked
+for. `σ_η` carries the band on the card in their place.
+
+No generic convergence time is imposed because several scene timescales are
+emergent rather than prescribed.
 
 ---
 

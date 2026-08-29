@@ -3,10 +3,16 @@
 **Average** (VIEW → **A** on the strip, the `A` key, or the Controls panel's
 *Average the flow* row) is a measurement mode, not a blur filter. While it is
 on, the solver keeps running and accumulators collect the flow: the colour,
-the free-surface line, the channel overlay and every number derived from them
-describe **one averaging window**, so a screenshot never mixes two flow
-states. No simulation pass reads an accumulator — switching Average on or off
-cannot alter the solution.
+the free-surface line, the channel overlay, the particle tracers and every
+instrument — probe, gauges, rake, flux sections, control volume — describe
+**one averaging window**, so a screenshot never mixes two flow states. No
+simulation pass reads an accumulator — switching Average on or off cannot
+alter the solution.
+
+Switching Average on also switches the particle tracers on: they are advected
+by `û`, so over a mean picture they draw the mean flow's paths — for a steady
+mean, its streamlines. Dye is the one live tracer with no accumulator, so it
+stands down while a window is open and returns with Live.
 
 Two principles fix everything below:
 
@@ -19,7 +25,8 @@ Two principles fix everything below:
 
 The legend card shows the elapsed window `T` and, under the cursor, the mean
 fill `f̄`, the equivalent water depth `d̄`, the aeration gap `δ_a` and the
-surface standard deviation `σ_η`. The conservation residual of §5 and the
+surface standard deviation `σ_η` — printed on the card in plain words (fill,
+depth, gap, spread); the symbols live here and in [notation.md](notation.md). The conservation residual of §5 and the
 1D/2D depth cross-check of §7 are not on the card — each needs full-field
 readbacks far too slow for a per-frame readout — and are available on demand
 as `APP.avg.residual()`.
@@ -81,10 +88,17 @@ field displays (§6).
 cell centres once per frame, while the conserved transport is the per-substep
 face flux of §1. The two are accumulated separately (§4).
 
-Likewise, fields of the mean flow do not close a mean *momentum* budget —
-that would need the unresolved fluctuation stresses. The control-volume and
-flux instruments therefore keep their own running averages of their complete
-instantaneous budgets rather than re-deriving them from the mean field.
+**Every instrument measures the mean flow while Average is on** — probe,
+gauges, rake, flux sections, control volume, tracers all read `(f̄, û, ŵ, p̄)`
+or the mean columns. The window is the instrument's aggregate, so no second
+filter sits on top of it; in Live mode the same instruments smooth their
+instantaneous samples over about a second instead, and switching modes
+restarts the reading in both directions. One caveat carries over from the
+physics: a *nonlinear* budget computed from mean values — a momentum flux, an
+energy flux — is the budget **of the mean flow**, and the Favre fluctuation
+stress `⟨f u″u″⟩` is not in it. A force balance that closes on the live flow
+can therefore show a gap under Average near a jump or a jet; the gap is the
+fluctuations' contribution, not an error.
 
 ---
 
@@ -111,7 +125,10 @@ Reynolds-averaged, not Favre-averaged, because it is read as `−∇p̄`; the
 stored channel is kinematic pressure `p/ρ_w`, so pressure head is that
 channel divided by `g` — never divided by density a second time.
 
-This accumulator serves the colouring, the heads and the excursion band.
+This accumulator serves the colouring, the heads, the excursion band, the
+particle advection and every instrument readback (§3). The instruments unpack
+it into the live layout — `û` at cell centres, so face samples average the
+two adjacent centres rather than reading the staggered offsets.
 
 ### 4.2 The exact transport accumulator — per substep
 
@@ -364,7 +381,11 @@ surface with known answers, **D** jets and connectivity, **E** geometry,
 overlay consistency. Groups A–E and G live in `node test/recon-test.mjs`;
 `node test/mutation-test.mjs` proves those tests can fail; groups F and H run
 on the GPU in `node exercises/_runner/smoke.js --only=avg`, which gates the
-transport residual on the window-scaled bound of §5.
+transport residual on the window-scaled bound of §5 — in the source-free
+interior (F1) and in the `⟨S⟩ ≠ 0` population (F4: the sponge, the Dirichlet
+bands and every clamp event, counted rather than silently excluded; its
+drift does not follow the √T law cleanly, so it is gated on separation from
+the source scale instead).
 
 ---
 
@@ -388,6 +409,10 @@ All three accumulators are zeroed, `T ← 0`, and `f(0)` re-copied, on:
   field, which invalidates `f(0)` and the compaction of §7.1;
 - a scene change, and the rebuild a resolution change performs;
 - the end of spin-up, which is initialisation rather than reported flow.
+
+Switching between Live and Average also restarts every instrument's reading
+in both directions (§3): an Average window must not open on a live estimate,
+and Live must not resume from a window mean.
 
 While paused, no time passes: accumulators and `T` hold, and the window
 resumes with the clock.

@@ -211,8 +211,11 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"
   anything they show.
 - **Average** (VIEW → A) is a measurement mode, not a blur. While it is up the
-  colour, the free-surface line, the channel overlay and every number derived
-  from it come from ONE window, and the window restarts on each of
+  colour, the free-surface line, the channel overlay, the particle tracers
+  (switched on with the mode, advected by the mean) and EVERY instrument
+  reading — probe, gauges, rake, sections, control volume — come from ONE
+  window, with no per-instrument smoothing layered on top; dye is the one
+  live tracer with no accumulator and stands down. The window restarts on each of
   [docs/averaging.md](docs/averaging.md) §9's conditions — including the
   boundary-open switches in Controls, which look like view settings and are a
   change of control volume. The velocity stored is the FAVRE mean, so `H`,

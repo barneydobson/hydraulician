@@ -814,7 +814,9 @@ SUITES.avg = async (B) => {
     APP.SIM.avgStop();
     return { T, T2, active, dt: APP.SIM.dt(), dx: APP.sim.dx,
              max: res.max, mean: res.mean, n: res.n, nSrc: res.nSrc, Fmax: res.Fmax,
-             max2: res2.max, Fmax2: res2.Fmax };
+             maxSrc: res.maxSrc, Smax: res.Smax,
+             max2: res2.max, Fmax2: res2.Fmax,
+             maxSrc2: res2.maxSrc, Smax2: res2.Smax };
   })()`);
   const b1 = avgBound(r.Fmax, r.T, r.dt, r.dx);
   const b2 = avgBound(r.Fmax2, r.T2, r.dt, r.dx);
@@ -840,6 +842,33 @@ SUITES.avg = async (B) => {
   ok("F1 residual grows no faster than sqrt(T)", r.max2 < r.max * 2.6 + 1e-9,
      `max ${r.max} -> ${r.max2} (ratio ${(r.max2 / r.max).toFixed(3)})` +
      ` over T ${r.T} -> ${r.T2}`);
+
+  // F4: the sponge, the Dirichlet bands and every positivity-clamp event live
+  // in the ⟨S⟩ ≠ 0 population — counted, never silently excluded — and the §5
+  // identity holds there too, because ⟨S⟩ carries the whole non-conservative
+  // difference.
+  //
+  // This population does NOT follow F1's √T drift law cleanly: measured
+  // 9.466e-4 → 2.987e-3 over the 3× window below (ratio 3.16 — nearer linear
+  // than the 1.73 √T predicts). The per-substep rate is a DIFFERENCE of two
+  // O(1) fills over h, so each sample carries an absolute rounding of about
+  // ½·ulp(f)/h ≈ 2.3e-4 s⁻¹ here, and the max over a 305-cell heavy-tailed
+  // population is a noisier statistic than F1's 34k-cell one. So the gate is
+  // a SEPARATION, not a drift law: a broken source accounting — an h-weighted
+  // increment (the A6 bug class), a missed clamp event, a dropped sponge term
+  // — errs at the scale of ⟨S⟩ itself (Smax = 1.44 s⁻¹ here), three orders
+  // above the measured drift. Gate at 1% of that scale; measured margin
+  // 15.2x / 4.8x at n = 1200 / 3600 on this ANGLE/D3D11 path.
+  const s1 = 0.01 * Math.max(r.Smax, 1);
+  const s2 = 0.01 * Math.max(r.Smax2, 1);
+  console.log(`    F4: src=${r.nSrc} Smax=${r.Smax.toFixed(3)}` +
+    ` maxSrc=${r.maxSrc.toExponential(3)}->${r.maxSrc2.toExponential(3)}` +
+    ` gate=${s1.toExponential(3)}->${s2.toExponential(3)}` +
+    ` margin=${(s1 / r.maxSrc).toFixed(1)}x/${(s2 / r.maxSrc2).toFixed(1)}x`);
+  ok("F4 source cells are counted, not lost", r.nSrc > 100, `nSrc ${r.nSrc}`);
+  ok("F4 balance including <S> holds in sponge and source cells",
+     r.maxSrc < s1 && r.maxSrc2 < s2,
+     `maxSrc ${r.maxSrc} / gate ${s1}   maxSrc2 ${r.maxSrc2} / gate2 ${s2}`);
 
   // What this does and does NOT prove: prog.vof is built from FS_VOF and
   // prog.vofA from withAccum(FS_VOF) — the SAME source, both already using the

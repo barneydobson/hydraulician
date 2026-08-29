@@ -462,6 +462,7 @@ const SIM = (() => {
     const solidLo = S.p.valveClosed > 0.5 ? 64 : 192;
     const T = S.avg.t, nx = S.nx;
     let max = 0, sum = 0, cnt = 0, nSrc = 0, Fmax = 0;
+    let maxSrc = 0, sumSrc = 0, Smax = 0;
     for (let j = 1; j < S.ny - 1; j++) {
       for (let i = 1; i < nx - 1; i++) {
         const k = (j * nx + i) * 4;
@@ -472,18 +473,31 @@ const SIM = (() => {
         const aE = Math.abs(A[k]), aN = Math.abs(A[k + 1]);
         if (aE > Fmax) Fmax = aE;
         if (aN > Fmax) Fmax = aN;
-        if (Math.abs(A[k + 2]) > 1e-9) { nSrc++; continue; }   // source cell
         // West face = the west neighbour's stored east face; south face = the
         // south neighbour's stored north face. Both are the same number, not
         // a copy of it.
         const div = ((A[k] - A[k - 4]) + (A[k + 1] - A[((j - 1) * nx + i) * 4 + 1])) / S.dx;
         const r = (fT[k] - f0[k]) / T + div - A[k + 2];
         const a = Math.abs(r);
+        if (Math.abs(A[k + 2]) > 1e-9) {
+          // Source cell — the sponge, a Dirichlet band, a point source, or a
+          // positivity-clamp event. §5's identity holds HERE TOO because ⟨S⟩
+          // carries the whole non-conservative difference; kept as its own
+          // population (F4) with its own scale, since the drift in these
+          // cells rides on ‖⟨S⟩‖ as well as ‖⟨F⟩‖/Δx.
+          nSrc++;
+          const aS = Math.abs(A[k + 2]);
+          if (aS > Smax) Smax = aS;
+          if (a > maxSrc) maxSrc = a;
+          sumSrc += a;
+          continue;
+        }
         if (a > max) max = a;
         sum += a; cnt++;
       }
     }
-    return { max, mean: cnt ? sum / cnt : 0, n: cnt, nSrc, Fmax };
+    return { max, mean: cnt ? sum / cnt : 0, n: cnt, nSrc, Fmax,
+             maxSrc, meanSrc: nSrc ? sumSrc / nSrc : 0, Smax };
   }
 
   // ------------------------------------------------- averaging: display field
@@ -787,10 +801,17 @@ const SIM = (() => {
     return S.colBuf;
   }
 
-  function advanceParticles(realDt) {
+  function advanceParticles(realDt, avg) {
+    // Under an open window the particles ride the FAVRE MEAN: u_U becomes the
+    // accumulator texture and the shader's u_avg branch divides <f u>/f-bar at
+    // cell centres. A steady mean makes their paths the mean flow's
+    // streamlines, which is what a tracer over a mean picture should draw.
+    const useAvg = !!(avg && S.avg);
     gl.useProgram(prog.part);
-    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex],
+    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex],
+      ["u_U", useAvg ? S.avg.fld.read.tex : S.U.read.tex],
       ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform1f(prog.part.u("u_avg"), useAvg ? 1 : 0);
     gl.uniform2f(prog.part.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.part.u("u_pres"), S.pn, S.pn);
     gl.uniform1f(prog.part.u("u_dx"), S.dx);
@@ -888,16 +909,27 @@ const SIM = (() => {
     if (clear) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
 
     gl.enable(gl.BLEND);
-    if (!clear) {
+    if (!clear && opts.pdt > 0) {
       // Fade what is already there: dst *= k, in one draw and with no second
       // buffer to ping-pong through. `k` is set from SIMULATED time, so the
       // tail is a fixed span of FLOW — about a second of it — however fast or
-      // slow the frame rate happens to be.
+      // slow the frame rate happens to be. Skipped entirely while the clock
+      // is stopped, so a paused picture keeps its trails frozen.
       const k = Math.exp(-Math.max(opts.pdt, 0) / TRAIL_TAU);
       gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
       gl.useProgram(prog.fill);
       gl.uniform4f(prog.fill.u("u_col"), k, k, k, k);
       quad.draw();
+      // The multiply alone never finishes on an 8-bit buffer: once a texel
+      // falls below 0.5/(1−k) — tens of counts at typical k — k·v rounds
+      // back to v and the residue stands for ever, a grey web of everywhere
+      // a particle has been. One subtractive step guarantees every texel
+      // reaches zero.
+      gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.uniform4f(prog.fill.u("u_col"), 1 / 255, 1 / 255, 1 / 255, 1 / 255);
+      quad.draw();
+      gl.blendEquation(gl.FUNC_ADD);
     }
 
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
@@ -979,9 +1011,44 @@ const SIM = (() => {
    *  h = z + p/ρg; add the elevation yourself (see the gauge sampler in
    *  main.js). Renamed from `head` with rig format v2 — the old name kept
    *  being read as piezometric, which it never was. */
-  function probe(x, z) {
+  /** One readPixels serving every instrument: the (u, w, P) and (f) rects in
+   *  the LIVE layout, from the live textures or — when `avg` is passed and a
+   *  window is open — from the Favre accumulator, unpacked in place. The mean
+   *  velocities are CELL-CENTRED (the accumulator collocates before
+   *  weighting), so callers that interpolate the staggered layout read them
+   *  half a cell off; instruments that sample faces average the two adjacent
+   *  centres instead (see boxFlux). The dye channels have no accumulator, so
+   *  under `avg` they read zero. */
+  function readState(i0, j0, w, h, Ubuf, Fbuf, avg) {
+    if (avg && S.avg) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
+      for (let k = 0; k < w * h; k++) {
+        const f = Ubuf[k * 4 + 2], d = Math.max(f, 1e-6);
+        Fbuf[k * 4] = f; Fbuf[k * 4 + 1] = 0; Fbuf[k * 4 + 2] = 0; Fbuf[k * 4 + 3] = 0;
+        Ubuf[k * 4] /= d; Ubuf[k * 4 + 1] /= d; Ubuf[k * 4 + 2] = Ubuf[k * 4 + 3];
+      }
+      return true;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Fbuf);
+    return false;
+  }
+
+  function probe(x, z, avg) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
+    if (avg && S.avg) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+      const f = S.pxBuf[2], d = Math.max(f, 1e-6);
+      const u = S.pxBuf[0] / d, w = S.pxBuf[1] / d, p = S.pxBuf[3];
+      const g = Math.abs(S.p.g) || 9.81;
+      return { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w),
+               solid: S.mask[j * S.nx + i] };
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const u = S.pxBuf[0], w = S.pxBuf[1], p = S.pxBuf[2];
@@ -1014,23 +1081,10 @@ const SIM = (() => {
     // live field's 99th percentile is drawn from excursions the mean does not
     // contain, so fitting to it under a mean picture sets a scale nothing
     // reaches and every colour reads low.
+    // readState unpacks the mean into the LIVE layout the loop below already
+    // speaks: (u, w, P) in U and f in F.r, with u the Favre mean <f u_c>/f-bar.
     const A = avg && S.avg;
-    if (A) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, A.fld.read.fbo);
-      gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
-      // Unpacked into the LIVE layout the loop below already speaks:
-      // (u, w, P) in U and f in F.r, with u the Favre mean <f u_c>/f-bar.
-      for (let k = 0; k < n; k++) {
-        const fb = U[k * 4 + 2], d = Math.max(fb, 1e-6);
-        F[k * 4] = fb;
-        U[k * 4] /= d; U[k * 4 + 1] /= d; U[k * 4 + 2] = U[k * 4 + 3];
-      }
-    } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-      gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-      gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, F);
-    }
+    readState(0, 0, S.nx, S.ny, U, F, A);
     const g = Math.abs(S.p.g) || 9.81, tilt = S.scene.tiltS0 || 0;
     // The Froude number needs a depth, and under Average it is the mean
     // column's <d> - the same number FS_DISP divides by (docs/averaging.md §6).
@@ -1078,31 +1132,63 @@ const SIM = (() => {
     return out;
   }
 
-  /** A whole column of velocity — the vertical rake. Returns u(z) at cell centres. */
-  function rake(x, out) {
+  /** A whole column of velocity — the vertical rake. Returns u(z) at cell
+   *  centres; under `avg` the column comes from the Favre accumulator,
+   *  unpacked to the same (u, w, P) layout. */
+  function rake(x, out, avg) {
     const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
     const buf = out && out.length >= S.ny * 4 ? out : new Float32Array(S.ny * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+    if (avg && S.avg) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      for (let k = 0; k < S.ny; k++) {
+        const d = Math.max(buf[k * 4 + 2], 1e-6);
+        buf[k * 4] /= d; buf[k * 4 + 1] /= d; buf[k * 4 + 2] = buf[k * 4 + 3];
+      }
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+    }
     return { i, buf };
   }
 
   /** A rectangular strip of the velocity field, pulled back in ONE readPixels
    *  so a handful of CPU-side tracers can be advected without a sync each.
    *  Probing them individually would be one pipeline stall per tracer. */
-  function patch(x0, x1, out) {
+  function patch(x0, x1, out, avg) {
     const a = Math.max(0, Math.min(S.nx - 1, Math.floor(x0 / S.dx)));
     const b = Math.max(a + 1, Math.min(S.nx, Math.ceil(x1 / S.dx)));
     const w = b - a;
     const buf = out && out.length >= w * S.ny * 4 ? out : new Float32Array(w * S.ny * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
-    return { i0: a, w, ny: S.ny, dx: S.dx, buf };
+    const on = !!(avg && S.avg);
+    if (on) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+      for (let k = 0; k < w * S.ny; k++) {
+        const d = Math.max(buf[k * 4 + 2], 1e-6);
+        buf[k * 4] /= d; buf[k * 4 + 1] /= d;
+      }
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+    }
+    return { i0: a, w, ny: S.ny, dx: S.dx, buf, centred: on };
   }
 
   /** Bilinear (u, w) at a point, from a patch. u lives on x-faces, w on
-   *  z-faces, so each is offset half a cell from the centre. */
+   *  z-faces, so each is offset half a cell from the centre — except a
+   *  `centred` (averaged) patch, where both live at cell centres. */
   function patchVel(p, x, z) {
+    if (p.centred) {
+      const cx = Math.max(0, Math.min(p.w - 1.001, x / p.dx - p.i0 - 0.5));
+      const cz = Math.max(0, Math.min(p.ny - 1.001, z / p.dx - 0.5));
+      const i = Math.floor(cx), j = Math.floor(cz), fx = cx - i, fz = cz - j;
+      const at = (ii, jj, c) => p.buf[((jj * p.w) + Math.min(ii, p.w - 1)) * 4 + c];
+      const lerp = (c) =>
+        (at(i, j, c) * (1 - fx) + at(i + 1, j, c) * fx) * (1 - fz)
+        + (at(i, j + 1, c) * (1 - fx) + at(i + 1, j + 1, c) * fx) * fz;
+      return [lerp(0), lerp(1)];
+    }
     const gx = x / p.dx - p.i0, gz = z / p.dx;
     const sx = Math.max(0, Math.min(p.w - 1.001, gx));
     const sz = Math.max(0, Math.min(p.ny - 1.001, gz - 0.5));
@@ -1178,7 +1264,7 @@ const SIM = (() => {
    *  rake and the orbit tracers already do. Air contributes nothing: every
    *  term carries the fill fraction, and `Q` uses min(f, 1) because f > 1 is
    *  water that has been compressed rather than more of it. */
-  function lineFlux(x0, z0, x1, z1) {
+  function lineFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
     const dx = x1 - x0, dz = z1 - z0;
@@ -1204,10 +1290,7 @@ const SIM = (() => {
     const w = iR - iL + 1, h = jT - jB + 1;
     const need = w * h * 4;
     if (!S.lnU || S.lnU.length < need) { S.lnU = new Float32Array(need); S.lnF = new Float32Array(need); }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnU);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnF);
+    const cen = readState(iL, jB, w, h, S.lnU, S.lnF, avg);
     const U = S.lnU, F = S.lnF;
     const at = (buf, i, j, c) =>
       buf[((Math.min(Math.max(j, jB), jT) - jB) * w +
@@ -1227,16 +1310,23 @@ const SIM = (() => {
       const cj = Math.min(S.ny - 1, Math.max(0, Math.floor(z / S.dx)));
       const m = S.mask[cj * S.nx + ci];
       if (m > 192 || (closed && m > 64)) continue;      // a section through rock
-      // u lives on x-faces and w on z-faces, so each is offset half a cell.
+      // u lives on x-faces and w on z-faces, so each is offset half a cell —
+      // unless the mean state is being read, where both are cell-centred.
       const gx = x / S.dx, gz = z / S.dx;
-      const ui = Math.floor(gx), uj = Math.floor(gz - 0.5);
-      const ax = gx - ui, az = gz - 0.5 - uj;
-      const u = (at(U, ui, uj, 0) * (1 - ax) + at(U, ui + 1, uj, 0) * ax) * (1 - az)
-              + (at(U, ui, uj + 1, 0) * (1 - ax) + at(U, ui + 1, uj + 1, 0) * ax) * az;
-      const wi = Math.floor(gx - 0.5), wj = Math.floor(gz);
-      const bx = gx - 0.5 - wi, bz = gz - wj;
-      const wv = (at(U, wi, wj, 1) * (1 - bx) + at(U, wi + 1, wj, 1) * bx) * (1 - bz)
-               + (at(U, wi, wj + 1, 1) * (1 - bx) + at(U, wi + 1, wj + 1, 1) * bx) * bz;
+      let u, wv;
+      if (cen) {
+        u = centre(U, x, z, 0);
+        wv = centre(U, x, z, 1);
+      } else {
+        const ui = Math.floor(gx), uj = Math.floor(gz - 0.5);
+        const ax = gx - ui, az = gz - 0.5 - uj;
+        u = (at(U, ui, uj, 0) * (1 - ax) + at(U, ui + 1, uj, 0) * ax) * (1 - az)
+          + (at(U, ui, uj + 1, 0) * (1 - ax) + at(U, ui + 1, uj + 1, 0) * ax) * az;
+        const wi = Math.floor(gx - 0.5), wj = Math.floor(gz);
+        const bx = gx - 0.5 - wi, bz = gz - wj;
+        wv = (at(U, wi, wj, 1) * (1 - bx) + at(U, wi + 1, wj, 1) * bx) * (1 - bz)
+           + (at(U, wi, wj + 1, 1) * (1 - bx) + at(U, wi + 1, wj + 1, 1) * bx) * bz;
+      }
       const f = centre(F, x, z, 0);
       const P = centre(U, x, z, 2);
       const un = u * nx + wv * nz;
@@ -1253,7 +1343,7 @@ const SIM = (() => {
     return out;
   }
 
-  function boxFlux(x0, z0, x1, z1) {
+  function boxFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
     let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
@@ -1263,26 +1353,26 @@ const SIM = (() => {
     const w = iR - iL + 2, h = jT - jB + 2;
     const need = w * h * 4;
     if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvU);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvF);
+    const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
     const U = S.cvU, F = S.cvF;
     const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
     const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
     const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
     const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
 
-    // x-faces: u lives ON the face, so the normal velocity needs no averaging.
+    // x-faces: u lives ON the face, so the normal velocity needs no averaging
+    // — except from the mean state, whose velocities are cell-centred: there
+    // the face value is the mean of the two adjacent centres.
     for (const [i, n, key] of [[iL, -1, "left"], [iR, 1, "right"]]) {
       const e = out[key];
       for (let j = jB; j < jT; j++) {
         if (sol(i - 1, j) || sol(i, j)) continue;
         const a = k(i - 1, j), b = k(i, j);
-        const u = U[b];
+        const u = cen ? 0.5 * (U[a] + U[b]) : U[b];
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const wv = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const wv = cen ? 0.5 * (U[a + 1] + U[b + 1])
+                       : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
         const un = u * n, z = (j + 0.5) * S.dx, x = i * S.dx;
         e.Q += Math.min(f, 1) * un;
         e.mdot += f * un;
@@ -1292,16 +1382,17 @@ const SIM = (() => {
         e.wet += Math.min(f, 1);
       }
     }
-    // z-faces: w lives ON the face.
+    // z-faces: w lives ON the face (same centred-mean exception as above).
     for (const [j, n, key] of [[jB, -1, "bed"], [jT, 1, "top"]]) {
       const e = out[key];
       for (let i = iL; i < iR; i++) {
         if (sol(i, j - 1) || sol(i, j)) continue;
         const a = k(i, j - 1), b = k(i, j);
-        const wv = U[b + 1];
+        const wv = cen ? 0.5 * (U[a + 1] + U[b + 1]) : U[b + 1];
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
+        const u = cen ? 0.5 * (U[a] + U[b])
+                      : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
         const un = wv * n, z = j * S.dx, x = (i + 0.5) * S.dx;
         e.Q += Math.min(f, 1) * un;
         e.mdot += f * un;
@@ -1333,7 +1424,7 @@ const SIM = (() => {
              iL, iR, jB, jT };
   }
 
-  function boxForce(x0, z0, x1, z1) {
+  function boxForce(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
     const closed = S.p.valveClosed > 0.5;
     let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
@@ -1343,10 +1434,7 @@ const SIM = (() => {
     const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL−1..iR] × [jB−1..jT]
     const need = w * h * 4;
     if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvU);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvF);
+    const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
     const U = S.cvU, F = S.cvF;
     const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
     const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
@@ -1356,10 +1444,11 @@ const SIM = (() => {
       for (let j = jB; j < jT; j++) {
         if (sol(i - 1, j) || sol(i, j)) continue;
         const a = k(i - 1, j), b = k(i, j);
-        const u = U[b];                              // u at the west face of cell i
+        const u = cen ? 0.5 * (U[a] + U[b]) : U[b];  // face value; centred means average
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const w = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const w = cen ? 0.5 * (U[a + 1] + U[b + 1])
+                      : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
         const un = u * nx_;
         dFx += f * (u * un + P * nx_);
         dFz += f * (w * un);
@@ -1370,10 +1459,11 @@ const SIM = (() => {
       for (let i = iL; i < iR; i++) {
         if (sol(i, j - 1) || sol(i, j)) continue;
         const a = k(i, j - 1), b = k(i, j);
-        const w = U[b + 1];                          // w at the south face of cell j
+        const w = cen ? 0.5 * (U[a + 1] + U[b + 1]) : U[b + 1];
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
+        const u = cen ? 0.5 * (U[a] + U[b])
+                      : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
         const wn = w * nz_;
         dFx += f * (u * wn);
         dFz += f * (w * wn + P * nz_);

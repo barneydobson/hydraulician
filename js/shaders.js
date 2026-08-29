@@ -603,12 +603,23 @@ out vec4 o;
 uniform sampler2D u_P, u_U, u_F, u_S;
 uniform vec2  u_res, u_pres;
 uniform float u_dx, u_pdt, u_plife, u_time, u_valve;
+uniform float u_avg;          // 1 = u_U is the Favre accumulator (<fu>, <fw>, fbar, Pbar)
 
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
 vec2 velAt(vec2 pos){
   vec2 g = pos / u_dx;
   vec2 lo = vec2(0.0), hi = u_res - vec2(1.001);
+  if (u_avg > 0.5) {
+    // Mean state: both components live at cell CENTRES, and the stored
+    // channels are fill-weighted — interpolate <fu>, <fw> and fbar first,
+    // then divide, so the Favre mean is taken of the interpolated state.
+    vec2 pc = clamp(g - 0.5, lo, hi);
+    ivec2 ic = ivec2(pc); vec2 fc = pc - vec2(ic);
+    vec4 a = mix(mix(texelFetch(u_U, ic,            0), texelFetch(u_U, ic+ivec2(1,0), 0), fc.x),
+                 mix(texelFetch(u_U, ic+ivec2(0,1), 0), texelFetch(u_U, ic+ivec2(1,1), 0), fc.x), fc.y);
+    return a.rg / max(a.b, 1e-3);
+  }
   vec2 pu = clamp(vec2(g.x,       g.y - 0.5), lo, hi);   // u lives on x-faces
   vec2 pw = clamp(vec2(g.x - 0.5, g.y      ), lo, hi);
   ivec2 iu = ivec2(pu); vec2 fu = pu - vec2(iu);
@@ -631,7 +642,10 @@ void main(){
   ivec2 g = ivec2(clamp(p.xy / u_dx, vec2(0.0), u_res - vec2(1.0)));
   float s = texelFetch(u_S, g, 0).r;
   bool solid = s > 0.75 || (s > 0.25 && u_valve > 0.5);
-  bool wet   = texelFetch(u_F, g, 0).r > 0.35;
+  // Wet against the field the particle is riding: the MEAN fill under an open
+  // window (u_U.b is fbar there), so tracers live in the painted mean body.
+  float fill = u_avg > 0.5 ? texelFetch(u_U, g, 0).b : texelFetch(u_F, g, 0).r;
+  bool wet   = fill > 0.35;
 
   if (p.z > u_plife || solid || !wet ||
       p.x < 0.0 || p.y < 0.0 || p.x > dom.x || p.y > dom.y) {
@@ -773,7 +787,9 @@ vec4 fAt(ivec2 c){
   vec4 F = texelFetch(u_F, c, 0);
   // Only the FILL has a mean. The two dye channels are a live tracer with no
   // accumulator behind them - §4.1 stores four channels and dye is not among
-  // them - so they go on saying what the dye is doing now.
+  // them - so main.js keeps u_dyeOn OFF while a window is open: what they
+  // carry is live, and a live tracer over a mean picture would put two flow
+  // states in one screenshot.
   if (u_avg > 0.5) F.r = texelFetch(u_AF, c, 0).b;
   return F;
 }

@@ -1,0 +1,5 @@
+{
+  "comment": "MD033: any published page carrying math fences MUST end with a <script> tag loading docs/math.js (see AGENTS.md, 'Zero dependencies'), so script is a sanctioned element, not an accident. MD013: table rows cannot wrap, and the file tables in AGENTS.md and the docs are the house index style.",
+  "MD033": { "allowed_elements": ["script"] },
+  "MD013": false
+}

@@ -10,7 +10,7 @@ The literatures this solver sits between do not agree, and the letter `h` in
 particular carries three incompatible meanings across them:
 
 | Community | depth | level / head | energy |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Chow and the US open-channel canon ([Chow 1959](https://web.itu.edu.tr/~bulu/hydraulics_files/lecture_notes_05.pdf); Henderson, French; the open-channel chapters of White, Munson, Çengel) | `y`, `y_c`, `y_n` | datum `z`, total head `H` | `E` specific energy |
 | Saint-Venant / [shallow-water equations](https://en.wikipedia.org/wiki/Shallow_water_equations) | `h` | — | — |
 | Wave mechanics ([Dean & Dalrymple](https://books.google.com/books/about/Water_Wave_Mechanics_for_Engineers_and_S.html?id=7GUYAQAAIAAJ); the Coastal Engineering Manual uses `d`) | `h` or `d` | `η` surface elevation | `H` = **wave height** |

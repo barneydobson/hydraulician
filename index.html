@@ -260,6 +260,26 @@
     padding: 2px 9px; font: 10.5px system-ui, sans-serif; cursor: pointer;
   }
   #legActs button:hover { background: rgba(77,195,255,0.22); }
+  /* The Average block. Present in the markup and revealed by a class rather
+     than built on demand: the card above it is painted from the ramps, and a
+     section that rebuilt the card to appear would be one more way for the key
+     and the water to drift apart. */
+  #legAvg {
+    display: none; flex-direction: column; gap: 3px; margin-top: 5px;
+    padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.14);
+  }
+  #legend.avg #legAvg { display: flex; }
+  .legahd { display: flex; align-items: baseline; gap: 8px; }
+  .legahd b { font: 600 11px system-ui, sans-serif; color: #7fd4ff; }
+  .legahd span {
+    margin-left: auto; font: 10.5px ui-monospace, monospace;
+    font-variant-numeric: tabular-nums; opacity: .85;
+  }
+  #legAvgRead {
+    font: 10.5px ui-monospace, monospace; opacity: .88;
+    font-variant-numeric: tabular-nums;
+  }
+  .legnote { font-size: 10px; line-height: 1.35; opacity: .58; }
   #legmenu {
     position: fixed; z-index: 40; display: none; padding: 6px; width: 312px;
     max-height: 70vh; overflow: auto;
@@ -890,6 +910,27 @@
     <button id="legFit" type="button" title="Rescale once to this frame — the 99th percentile over wet cells">Fit</button>
     <button id="legDef" type="button" title="Back to the scene's own scale">⟲ scene</button>
   </div>
+  <!-- Average: docs/averaging.md §6 (what the nonlinear fields become), §7.3
+       (the line is η̄, the depth is d̄, and δ_a is the difference) and §9 (what
+       ends a window). The reset note names the boundary switches explicitly
+       because they are the surprising one: they are cheap UI toggles in the
+       Controls panel, but they re-rasterise the mask, which is a change of
+       control volume — a student who flips one mid-average would otherwise
+       watch T drop to zero and read it as a bug. -->
+  <div id="legAvg">
+    <div class="legahd"><b>Average</b><span id="legAvgT">T = 0.00 s</span></div>
+    <div id="legAvgRead">— hover the water for the averaged column</div>
+    <div id="legAvgWhat" class="legnote"></div>
+    <div class="legnote">Everything on screen is averaged over this window —
+      the colour, the surface line, the overlay and every instrument. The line
+      sits at the averaged surface level; the depth is the averaged water
+      depth. In an aerated column the two disagree, and the gap printed above
+      is the difference.</div>
+    <div class="legnote">The window restarts on R, a drawn edit, a valve, a
+      celerity change and the end of spin-up — and on anything that opens or
+      closes an edge, under Controls → Flow or → Boundaries. Those read as
+      settings, but an edge is a wall of the control volume.</div>
+  </div>
   <button class="minbtn corner" id="legX" title="Put the legend away (L)">–</button>
 </div>
 <div id="legmenu" class="glass"></div>
@@ -964,6 +1005,7 @@
 </div>
 
 <script src="js/gl.js"></script>
+<script src="js/reconstruct.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/scenes.js"></script>
 <script src="js/sim.js"></script>

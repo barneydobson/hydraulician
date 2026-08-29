@@ -42,8 +42,21 @@ const SIM = (() => {
     points = GLH.makePoints(gl);
     prog.vel  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VEL);
     prog.vof  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF);
+    // The same source with ACCUM defined — a separate program, not a uniform
+    // branch: an MRT bound to a dummy target still writes a second
+    // full-resolution RGBA32F every substep, and a session that never opens
+    // Average must pay exactly what it paid before this existed.
+    prog.vofA = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF_ACC);
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
+    // The Favre display accumulator (§4.1 of docs/averaging.md) — a separate
+    // pass from prog.vofA's transport accumulator, and a separate program
+    // because it runs once per FRAME, not once per substep.
+    prog.acc  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_ACC);
+    // The column-reading accumulator (§4.3) — averages FS_COL's own output
+    // (bed, d, q, top), not the raw fields, so connectivity is decided on the
+    // sharp per-frame column and only the resulting scalars are smoothed.
+    prog.acol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_ACOL);
     prog.draw = GLH.createProgram(gl, Shaders.VS_RECT, Shaders.FS_DISP);
     prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
     prog.fill = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_FILL);
@@ -105,6 +118,16 @@ const SIM = (() => {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
 
     S.bandKey = null;                  // invalidate the cached control bands
+
+    // Any change to the mask invalidates the window being averaged: the walls
+    // the mean was accumulated through are no longer the walls on screen, and
+    // §9 of docs/averaging.md lists a geometry edit as a reset condition. This
+    // is the choke point for every path that moves a wall — the drawing tools
+    // here, and the boundary-open toggles in main.js — so one reset covers
+    // them all. A no-op during build(), which nulls S.avg before it calls
+    // this, so it can neither double-start nor fight build()'s own wasAvg
+    // restore.
+    if (S.avg) avgReset();
   }
 
   /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */
@@ -114,6 +137,28 @@ const SIM = (() => {
   }
   function undoSeg() { if (S.segs.length) { S.segs.pop(); rasterise(); } }
   function clearSegs() { S.segs.length = 0; rasterise(); }
+
+  /** The single writer for the valve flag — every caller routes through here.
+   *
+   *  Flipping it changes the SOLID SET without touching the mask: `SO()` in
+   *  the shaders and `solidLo` in `transportResidual` both read `p.valveClosed`
+   *  and reclassify every valve texel on the spot. That is a geometry edit in
+   *  everything but name, so it carries the same reset (docs/averaging.md §9).
+   *  Without it, a texel that was solid for part of the window had its
+   *  accumulator frozen by ACC_KEEP while `T` kept running, so when it reopens
+   *  the running-mean weight k = dt/(T+dt) is drawn from the FULL window and
+   *  ⟨F⟩ there is neither a window mean nor an open-portion mean — the
+   *  residual around the valve jumps with no physical cause, on h23 and every
+   *  other scene where the valve IS the exercise.
+   *
+   *  Unchanged is a no-op: pressing V twice must not cost two windows, and the
+   *  rig-apply path writes the flag on every load whether or not it moved. */
+  function setValve(closed) {
+    const v = closed ? 1 : 0;
+    if (S.p.valveClosed === v) return;
+    S.p.valveClosed = v;
+    if (S.avg) avgReset();
+  }
 
   // ------------------------------------------------------------ allocation
   /** Hand a superseded grid's GL objects back to the driver.
@@ -127,6 +172,15 @@ const SIM = (() => {
    *  `build` has already copied them across by the time this runs. */
   function release(g) {
     if (!g || g === S) return;                 // never free the live grid
+    // The accumulator's framebuffers attach g.F's textures, so it has to go
+    // before them. avgStop does NOT come through here: this is the grid
+    // RETIREMENT path — it tears down U, F, P, the solid texture and the
+    // column target, and the `g === S` guard above is what stops it doing
+    // that to the live grid. Handing it a synthetic { avg } object to free
+    // one accumulator would walk straight past that guard (a literal is never
+    // === S) and tie the accumulator's lifetime to a rebuild. Both callers
+    // share disposeAvg instead.
+    if (g.avg) { disposeAvg(g.avg); g.avg = null; }
     for (const b of [g.U, g.F, g.P]) if (b && b.dispose) b.dispose();
     if (g.colFbo) gl.deleteFramebuffer(g.colFbo);
     if (g.solid) gl.deleteTexture(g.solid);
@@ -140,6 +194,11 @@ const SIM = (() => {
   }
 
   function build(scene, budget, keepSegs) {
+    // docs/averaging.md §9 lists a scene change and a resolution rebuild as
+    // RESET conditions, not stop conditions: the window restarts from zero,
+    // but Average does not switch itself off under the caller. Captured
+    // before release(old) frees the outgoing accumulator.
+    const wasAvg = !!(S && S.avg);
     const aspect = scene.W / scene.H;
     // The hard cap is the driver's texture limit, not a number picked here.
     // A fixed 1400 silently swallowed the top resolutions on exactly the
@@ -202,10 +261,18 @@ const SIM = (() => {
     S.P = GLH.createDoubleBuffer(gl, pn, pn, F, RGBA, FL, pd);
 
     S.colBuf = new Float32Array(nx * 4);
+    // Whether the LAST columns() call actually pulled its buffer back, or
+    // handed out the one from up to two frames ago. avgColumns() rides this:
+    // its readback is the same nx x 1 pipeline sync, so refreshing on the same
+    // frames costs nothing extra and refreshing on the others would double the
+    // stall this throttle exists to avoid.
+    S.colFresh = false;
     S.pxBuf = new Float32Array(4);
+    S.avg = null;                   // transport accumulator, allocated on demand
 
     rasterise();
     resetWater();
+    if (wasAvg) avgStart();         // zeroed against the new grid, f(0) = the reset water
     return S;
   }
 
@@ -230,6 +297,339 @@ const SIM = (() => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, zero);
     }
     S.t = 0;
+    // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex, whose
+    // storage the loop above just RESPECIFIED — the same hazard rescaleFill
+    // sidesteps with texSubImage2D. Rebuild rather than gamble on those
+    // attachments surviving. It also gives R the window reset the averaging
+    // mode wants: a reloaded scene shares nothing with the run being averaged.
+    if (S.avg) { avgStop(); avgStart(); }
+  }
+
+  // ------------------------------------------------------------- averaging
+  // The transport accumulator of docs/averaging.md §4.2. The vof pass emits
+  // its OWN limited face fluxes on a second render target, so the mass
+  // balance is certified with the numbers the scheme actually advanced f by —
+  // not with a cell-centred reconstruction of them. (For fills (0, 0.2, 0.8,
+  // 1) the van-Leer face value is 0.35 against an upwind product of 0.20,
+  // before the compression flux and the donor clamp, so the two are not
+  // interchangeable.)
+  //
+  // Channel contract, per cell: r = <F^E>, g = <F^N>, b = <S>, a unused.
+  // Each cell owns its EAST and NORTH face only; F^E(i,j) IS F^W(i+1,j) by
+  // construction (one fluxX call, same arguments), so the two channels tile
+  // every face exactly once. The left ghost column and the bottom ghost row
+  // carry the two faces their interior neighbours cannot.
+  //
+  // Nothing in the solution ever reads this. It is a diagnostic.
+
+  function disposeAvg(a) {
+    if (!a) return;
+    if (a.T) a.T.dispose();
+    if (a.fboA) gl.deleteFramebuffer(a.fboA);
+    if (a.fboB) gl.deleteFramebuffer(a.fboB);
+    if (a.fld) a.fld.dispose();
+    if (a.col) a.col.dispose();
+    // The two CPU snapshots are plain arrays, so they go with the dropped
+    // S.avg object either way — nulled here so this reads as the complete
+    // teardown it is, and so a stale bed cannot outlive its window.
+    a.f0buf = null; a.bedbuf = null; a.buf = null; a.out = null;
+  }
+
+  /** Lazily allocated: a session that never opens Average pays nothing.
+   *  `t` is the window in SIMULATED seconds and lives here, not in a texture —
+   *  it is the same number in every cell, which is why four channels suffice. */
+  function avgStart() {
+    if (S.avg) return;
+    const F = gl.RGBA32F, RGBA = gl.RGBA, FL = gl.FLOAT;
+    const T = GLH.createDoubleBuffer(gl, S.nx, S.ny, F, RGBA, FL, null);
+    // The vof pass writes f and the accumulator together, so both halves of
+    // each ping-pong need a framebuffer that carries both attachments — and
+    // the two ping-pongs must stay in phase, which is what `fA` is for.
+    // Selecting on `S.F.write === S.F.b` would be a tautology (the double
+    // buffer's `write` getter simply RETURNS `b`), so after the first swap it
+    // would keep picking fboA and write f and the accumulator into mismatched
+    // textures — silent corruption of exactly what this exists to detect.
+    // Identity of the attached texture is the only honest test.
+    const fboA = GLH.createFBO2(gl, S.F.b.tex, T.b.tex);
+    const fboB = GLH.createFBO2(gl, S.F.a.tex, T.a.tex);
+    // The Favre display accumulator (§4.1) — its own ping-pong, because it is
+    // a plain single-attachment target updated once per FRAME by prog.acc,
+    // not once per substep by the vof pass's MRT. `tf` is its own clock for
+    // the same reason: `t` advances inside SIM.step (per substep, transport),
+    // `tf` advances in avgStepField (per frame, display) — mixing them would
+    // feed the running-mean weight a window that does not match the sample.
+    const fld = GLH.createDoubleBuffer(gl, S.nx, S.ny, F, RGBA, FL, null);
+    // The column-reading accumulator (§4.3) — nx × 1, its own ping-pong and
+    // its own clock `tc`: it advances once per FRAME like `tf`, but it is a
+    // separate sample (FS_COL's output, not the raw field), so it gets a
+    // separate window. Do not fold it into `tf` — see the module note above.
+    const col = GLH.createDoubleBuffer(gl, S.nx, 1, F, RGBA, FL, null);
+    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0,
+              col, tc: 0, bedbuf: null, buf: null, out: null };
+    snapshotF0();
+    snapshotBed();
+  }
+  function avgStop() { if (S.avg) { disposeAvg(S.avg); S.avg = null; } }
+  function avgReset() { if (S.avg) { avgStop(); avgStart(); } }
+  const avgActive = () => !!(S && S.avg);
+  const avgT = () => (S && S.avg ? S.avg.t : 0);
+
+  /** f(0) for the endpoint term of the balance. One copy, taken when the
+   *  window opens; f(T) is simply the live field. Kept on the CPU: it is only
+   *  ever read back, so a texture for it would be write-only. If a later pass
+   *  wants f(0) on the GPU it is one texSubImage2D from here. */
+  function snapshotF0() {
+    const buf = new Float32Array(S.nx * S.ny * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    S.avg.f0buf = buf;
+  }
+
+  /** The bed as it stands when the window opens — one forced column readback,
+   *  here rather than on every avgColumns() call.
+   *
+   *  Valid because the bed cannot move while a window is open: every path that
+   *  moves a wall goes through `rasterise`, and `rasterise` calls `avgReset`,
+   *  which closes this window and opens a new one. A live re-read could only
+   *  ever return what is already in here. Do NOT "fix" this back into a
+   *  `columns()` call inside avgColumns: `columns()` drives the shared
+   *  `colTick` throttle in front of a synchronous readPixels that costs two
+   *  thirds of a frame at 1200 columns (see its own comment), and the overlay
+   *  calls avgColumns once per frame — a second call would halve the throttle
+   *  period on exactly that path. */
+  function snapshotBed() {
+    const c = columns(true), bed = new Float32Array(S.nx);
+    for (let i = 0; i < S.nx; i++) bed[i] = c[i * 4];
+    S.avg.bedbuf = bed;
+  }
+
+  /** The discrete transport balance of docs/averaging.md §5, over interior
+   *  cells with no source.
+   *
+   *      (f(T) − f(0))/T  +  [(⟨F^E⟩ − ⟨F^W⟩) + (⟨F^N⟩ − ⟨F^S⟩)]/Δx  −  ⟨S⟩  =  0
+   *
+   *  It is an IDENTITY of the scheme, not an approximation: every term is the
+   *  running mean of a number the pass computed. What is left is the float32
+   *  rounding drift of the running-mean recursion itself, and it is NOT
+   *  bounded — it GROWS as √T.
+   *
+   *  Each substep does ⟨F⟩ ← ⟨F⟩ + k(F − ⟨F⟩) in float32, so each of the four
+   *  face means carries a random walk of about ½·ulp⟨F⟩ per step. Over
+   *  n = T/Δt steps that is ≈ ½·ulp⟨F⟩·√n, and the residual divides a face
+   *  DIFFERENCE by Δx, so
+   *
+   *      R_max  ≈  C · ε · ‖⟨F⟩‖∞ · √(T/Δt) / Δx,        ε = 2⁻²³
+   *
+   *  Measured on h23 at Low (Δx = 16.3 mm, Δt = 2.626e-4 s) over a 256× range
+   *  in substep count — log-log slope 0.472 for the max and 0.464 for the
+   *  mean, so it is the whole field drifting, not a few outlier cells:
+   *
+   *      n =   200, T = 0.0525 s → 2.067e-4      C = 0.439
+   *      n =   800, T = 0.2101 s → 4.633e-4      C = 0.538
+   *      n =  3200, T = 0.8403 s → 7.830e-4      C = 0.472
+   *      n = 12800, T = 3.3613 s → 1.297e-3      C = 0.399
+   *      n = 51200, T = 13.445 s → 3.253e-3      C = 0.513
+   *
+   *  C stays inside 0.40–0.54 over that whole range (0.745 on an ANGLE/D3D11
+   *  path), which is what makes the law usable as a gate: scale by √(T/Δt) and
+   *  the margin stops moving. `Fmax` is returned so a caller can do exactly
+   *  that — see `avgBound` in exercises/_runner/smoke.js.
+   *
+   *  A one-substep window is a DIFFERENT and smaller regime: there the storage
+   *  term dominates, because f is stored in float32 and an update below half an
+   *  ulp of f rounds to a no-op. The n = 1 maximum measures 2.2697448730469e-4
+   *  against ½·ulp(1.007)/Δt = 2.2697448730469e-4 — thirteen significant
+   *  figures. That is the FLOOR, not the ceiling; a constant tolerance drawn
+   *  from it is right at one window length and wrong at every other. For scale,
+   *  ∇ₕ·⟨F⟩ itself runs to 135 s⁻¹ here.
+   *
+   *  Cells where ⟨S⟩ is nonzero are the sponge, the Dirichlet bands, the point
+   *  sources AND every positivity-clamp event — the invented-water signature
+   *  the Conservation notes warn about — so `nSrc` is reported separately
+   *  rather than silently folded into the exclusion. Solid cells are excluded
+   *  too: they early-return in the shader and merely pass their accumulator
+   *  through. */
+  function transportResidual() {
+    if (!S.avg || !(S.avg.t > 0)) return { max: 0, mean: 0, n: 0, nSrc: 0, Fmax: 0 };
+    const n = S.nx * S.ny;
+    const A = new Float32Array(n * 4), fT = new Float32Array(n * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.T.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, A);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, fT);
+    const f0 = S.avg.f0buf;
+    // 255 = wall, 128 = valve (solid only while closed), 0 = open.
+    const solidLo = S.p.valveClosed > 0.5 ? 64 : 192;
+    const T = S.avg.t, nx = S.nx;
+    let max = 0, sum = 0, cnt = 0, nSrc = 0, Fmax = 0;
+    let maxSrc = 0, sumSrc = 0, Smax = 0;
+    for (let j = 1; j < S.ny - 1; j++) {
+      for (let i = 1; i < nx - 1; i++) {
+        const k = (j * nx + i) * 4;
+        if (S.mask[j * nx + i] >= solidLo) continue;
+        // The scale of the drift, over every interior fluid cell — source
+        // cells included, because their face means still feed a source-free
+        // neighbour's divergence.
+        const aE = Math.abs(A[k]), aN = Math.abs(A[k + 1]);
+        if (aE > Fmax) Fmax = aE;
+        if (aN > Fmax) Fmax = aN;
+        // West face = the west neighbour's stored east face; south face = the
+        // south neighbour's stored north face. Both are the same number, not
+        // a copy of it.
+        const div = ((A[k] - A[k - 4]) + (A[k + 1] - A[((j - 1) * nx + i) * 4 + 1])) / S.dx;
+        const r = (fT[k] - f0[k]) / T + div - A[k + 2];
+        const a = Math.abs(r);
+        if (Math.abs(A[k + 2]) > 1e-9) {
+          // Source cell — the sponge, a Dirichlet band, a point source, or a
+          // positivity-clamp event. §5's identity holds HERE TOO because ⟨S⟩
+          // carries the whole non-conservative difference; kept as its own
+          // population (F4) with its own scale, since the drift in these
+          // cells rides on ‖⟨S⟩‖ as well as ‖⟨F⟩‖/Δx.
+          nSrc++;
+          const aS = Math.abs(A[k + 2]);
+          if (aS > Smax) Smax = aS;
+          if (a > maxSrc) maxSrc = a;
+          sumSrc += a;
+          continue;
+        }
+        if (a > max) max = a;
+        sum += a; cnt++;
+      }
+    }
+    return { max, mean: cnt ? sum / cnt : 0, n: cnt, nSrc, Fmax,
+             maxSrc, meanSrc: nSrc ? sumSrc / nSrc : 0, Smax };
+  }
+
+  // ------------------------------------------------- averaging: display field
+  // §4.1 of docs/averaging.md. This is a DIFFERENT object from the transport
+  // accumulator above: that one stores the scheme's own limited face fluxes,
+  // certified against the discrete mass balance; this one stores a physically
+  // meaningful mean velocity for the picture the app will eventually paint.
+  // One field cannot do both jobs — see docs/averaging.md §3.
+
+  /** One frame's accumulation of the display field. Called BEFORE `S.avg.tf`
+   *  is advanced, because the running-mean weight needs the window as it was. */
+  function avgStepField(dtSim) {
+    if (!S.avg || !(dtSim > 0)) return;
+    gl.useProgram(prog.acc);
+    GLH.bindTex(gl, prog.acc, [["u_A", S.avg.fld.read.tex],
+                               ["u_U", S.U.read.tex], ["u_F", S.F.read.tex]]);
+    gl.uniform2f(prog.acc.u("u_res"), S.nx, S.ny);
+    gl.uniform1f(prog.acc.u("u_T"), S.avg.tf);
+    gl.uniform1f(prog.acc.u("u_dt"), dtSim);
+    GLH.bindTarget(gl, S.avg.fld.write.fbo, S.nx, S.ny);
+    quad.draw();
+    S.avg.fld.swap();
+    S.avg.tf += dtSim;
+  }
+
+  /** The mean state, normalised. `ubar`/`wbar` are FAVRE velocities:
+   *  <f u_c>/f-bar, not <u_c> — the density-weighted mean is the one that
+   *  leaves the equations looking like themselves in the heavy-fluid limit. */
+  function avgField() {
+    const n = S.nx * S.ny, buf = new Float32Array(n * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    const fbar = new Float32Array(n), pbar = new Float32Array(n);
+    const ubar = new Float32Array(n), wbar = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const f = buf[k * 4 + 2];
+      fbar[k] = f; pbar[k] = buf[k * 4 + 3];
+      const d = Math.max(f, 1e-6);
+      ubar[k] = buf[k * 4] / d; wbar[k] = buf[k * 4 + 1] / d;
+    }
+    return { fbar, pbar, ubar, wbar };
+  }
+
+  // ------------------------------------------------ averaging: column readings
+  // §4.3 of docs/averaging.md — the authoritative readings (mean depth, mean
+  // discharge, mean surface level, and the surface's standard deviation).
+  //
+  // This accumulator averages FS_COL's OWN OUTPUT, not the raw U/F fields it
+  // was built from. FS_COL already walks the connected wet run correctly on
+  // sharp data every frame; a nappe touching a pool for any fraction of the
+  // window would leave mean fill all the way between them, so deciding
+  // connectivity on the MEAN field would report a connected body that existed
+  // at no instant. Averaging the scalars FS_COL already resolved keeps every
+  // connectivity decision on data where it is well posed.
+
+  /** One frame's accumulation of the column readings. Must run AFTER
+   *  `SIM.columns()` has refreshed `S.colTex` for this frame — `columns()`
+   *  runs its GPU pass every call regardless of the readback throttle, so
+   *  this is safe to call once per frame right after it. */
+  function avgStepColumns(dtSim) {
+    if (!S.avg || !(dtSim > 0)) return;
+    gl.useProgram(prog.acol);
+    GLH.bindTex(gl, prog.acol, [["u_A", S.avg.col.read.tex], ["u_C", S.colTex]]);
+    gl.uniform1f(prog.acol.u("u_T"), S.avg.tc);
+    gl.uniform1f(prog.acol.u("u_dt"), dtSim);
+    GLH.bindTarget(gl, S.avg.col.write.fbo, S.nx, 1);
+    quad.draw();
+    S.avg.col.swap();
+    S.avg.tc += dtSim;
+  }
+
+  /** The mean columns, in SIM.columns' own layout so OVERLAY.analyse takes
+   *  them unchanged: (bed, d, q, surface). The bed is static within a window
+   *  (any geometry edit resets via avgReset), so it comes from the snapshot
+   *  taken when the window opened rather than from an averaged channel — and
+   *  this function makes no call into columns(); see snapshotBed.
+   *
+   *  `force` bypasses the throttle below. The frame path never passes it; a
+   *  caller that wants THIS frame's numbers and is not inside the loop does. */
+  function avgColumns(force) {
+    const A = S.avg;
+    // The readback is the SAME nx x 1 full pipeline sync that columns() pays
+    // for its own buffer, and the Live/Average toggle is what makes it run
+    // every frame. So it refreshes exactly when columns() did, which costs one
+    // stall per frame instead of two AND makes the two buffers describe the
+    // same frame. Marginal cost over a bare columns(), interleaved A/B on
+    // h23, ANGLE/D3D11, two runs:
+    //
+    //     Medium,  667 columns:  +0.29 / +0.35 ms   against  +0.97 / +1.42 ms
+    //     Ultra,  1811 columns:  +0.36 / +0.40 ms   against  +1.36 / +1.60 ms
+    //
+    // i.e. riding the throttle takes about a quarter of the unthrottled cost,
+    // and saves a full millisecond of a 15 ms frame budget at Ultra. The
+    // staleness it buys is the same <= 2 frames the LIVE overlay has always
+    // had from the same throttle, so both paths lag alike.
+    //
+    // The first call in a window always reads: A.out belongs to the S.avg
+    // object, so a new window can never be served a closed one's numbers.
+    if (force || !A.out || S.colFresh) {
+      if (!A.buf) { A.buf = new Float32Array(S.nx * 4);
+                    A.out = { C: new Float32Array(S.nx * 4),
+                              sigma: new Float32Array(S.nx) }; }
+      const buf = A.buf, C = A.out.C, sigma = A.out.sigma, bed = A.bedbuf;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, A.col.read.fbo);
+      gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, buf);
+      for (let i = 0; i < S.nx; i++) {
+        C[i * 4]     = bed[i];                   // bed, from the window snapshot
+        C[i * 4 + 1] = buf[i * 4];               // d̄
+        C[i * 4 + 2] = buf[i * 4 + 1];           // q̄
+        C[i * 4 + 3] = buf[i * 4 + 2];           // η̄
+        sigma[i] = RECON.sigma(buf[i * 4 + 3], A.tc);
+      }
+    }
+    return A.out;
+  }
+
+  /** The mean state in ONE cell, for the legend's cursor readout: f-bar and
+   *  the Favre velocity where the pointer is. A 1x1 readPixels, the same
+   *  bargain `probe` already makes twice a frame. Null when no window is
+   *  open, because there is nothing to read. */
+  function avgProbe(x, z) {
+    if (!S.avg) return null;
+    const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
+    const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    const f = S.pxBuf[2], d = Math.max(f, 1e-6);
+    const g = Math.abs(S.p.g) || 9.81;
+    // U.b is KINEMATIC pressure p/rho, so the head is that over g -- it must
+    // not be divided by density a second time (docs/averaging.md §4.1).
+    return { i, j, fbar: f, ubar: S.pxBuf[0] / d, wbar: S.pxBuf[1] / d,
+             pbar: S.pxBuf[3], phead: S.pxBuf[3] / g };
   }
 
   // ------------------------------------------------------------------ step
@@ -348,15 +748,31 @@ const SIM = (() => {
       S.U.swap();
 
       // --- volume: conservative limited advection of f (+ dye)
-      gl.useProgram(prog.vof);
-      GLH.bindTex(gl, prog.vof, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
-      simUniforms(prog.vof, h);
-      gl.uniform1f(prog.vof.u("u_ca"), p.ca);
-      gl.uniform1f(prog.vof.u("u_dyeDecay"), p.dyeDecay);
-      gl.uniform2f(prog.vof.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
-      GLH.bindTarget(gl, S.F.write.fbo, S.nx, S.ny);
+      const useAcc = !!S.avg;
+      const pv = useAcc ? prog.vofA : prog.vof;
+      gl.useProgram(pv);
+      GLH.bindTex(gl, pv, useAcc
+        ? [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
+           ["u_A", S.avg.T.read.tex]]
+        : [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+      simUniforms(pv, h);
+      gl.uniform1f(pv.u("u_ca"), p.ca);
+      gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
+      gl.uniform2f(pv.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
+      if (useAcc) {
+        // T BEFORE this substep — the running-mean weight is h/(T+h).
+        gl.uniform1f(pv.u("u_Tacc"), S.avg.t);
+        // The MRT fbo whose attachments are the two WRITE halves. Compared by
+        // texture identity, not by `S.F.write === S.F.b`: see avgStart.
+        GLH.bindTarget(gl, S.F.write.tex === S.avg.fA ? S.avg.fboA : S.avg.fboB,
+          S.nx, S.ny);
+      } else {
+        GLH.bindTarget(gl, S.F.write.fbo, S.nx, S.ny);
+      }
       quad.draw();
       S.F.swap();
+      // Both ping-pongs advance together or they fall out of phase.
+      if (useAcc) { S.avg.T.swap(); S.avg.t += h; }
 
       S.t += h;
     }
@@ -377,17 +793,25 @@ const SIM = (() => {
     gl.uniform1f(prog.col.u("u_valve"), S.p.valveClosed);
     GLH.bindTarget(gl, S.colFbo, S.nx, 1);
     quad.draw();
-    if (force || colTick-- <= 0) {
+    S.colFresh = force || colTick-- <= 0;
+    if (S.colFresh) {
       colTick = readEvery - 1;
       gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, S.colBuf);
     }
     return S.colBuf;
   }
 
-  function advanceParticles(realDt) {
+  function advanceParticles(realDt, avg) {
+    // Under an open window the particles ride the FAVRE MEAN: u_U becomes the
+    // accumulator texture and the shader's u_avg branch divides <f u>/f-bar at
+    // cell centres. A steady mean makes their paths the mean flow's
+    // streamlines, which is what a tracer over a mean picture should draw.
+    const useAvg = !!(avg && S.avg);
     gl.useProgram(prog.part);
-    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex],
+    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex],
+      ["u_U", useAvg ? S.avg.fld.read.tex : S.U.read.tex],
       ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform1f(prog.part.u("u_avg"), useAvg ? 1 : 0);
     gl.uniform2f(prog.part.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.part.u("u_pres"), S.pn, S.pn);
     gl.uniform1f(prog.part.u("u_dx"), S.dx);
@@ -411,8 +835,18 @@ const SIM = (() => {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(prog.draw);
+    // Average paints the same seven branches from the mean state, so the two
+    // accumulator textures go in beside the live ones and `u_avg` picks. With
+    // no window open they are BOUND TO THE LIVE TEXTURES rather than left
+    // dangling: an unbound sampler2D reads unit 0, which is whatever the last
+    // pass left there. Costing one extra bindTexture on a session that never
+    // opens Average, and nothing else.
+    const A = S.avg, useAvg = !!(opts.avg && A);
     GLH.bindTex(gl, prog.draw, [["u_F", S.F.read.tex], ["u_U", S.U.read.tex],
-      ["u_S", S.solid], ["u_C", S.colTex]]);
+      ["u_S", S.solid], ["u_C", S.colTex],
+      ["u_AF", useAvg ? A.fld.read.tex : S.F.read.tex],
+      ["u_AC", useAvg ? A.col.read.tex : S.colTex]]);
+    gl.uniform1f(prog.draw.u("u_avg"), useAvg ? 1 : 0);
     gl.uniform4f(prog.draw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
     gl.uniform2f(prog.draw.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.draw.u("u_canvas"), view.w, view.h);   // drawn rect, so zoom keeps px/m honest
@@ -475,16 +909,27 @@ const SIM = (() => {
     if (clear) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
 
     gl.enable(gl.BLEND);
-    if (!clear) {
+    if (!clear && opts.pdt > 0) {
       // Fade what is already there: dst *= k, in one draw and with no second
       // buffer to ping-pong through. `k` is set from SIMULATED time, so the
       // tail is a fixed span of FLOW — about a second of it — however fast or
-      // slow the frame rate happens to be.
+      // slow the frame rate happens to be. Skipped entirely while the clock
+      // is stopped, so a paused picture keeps its trails frozen.
       const k = Math.exp(-Math.max(opts.pdt, 0) / TRAIL_TAU);
       gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
       gl.useProgram(prog.fill);
       gl.uniform4f(prog.fill.u("u_col"), k, k, k, k);
       quad.draw();
+      // The multiply alone never finishes on an 8-bit buffer: once a texel
+      // falls below 0.5/(1−k) — tens of counts at typical k — k·v rounds
+      // back to v and the residue stands for ever, a grey web of everywhere
+      // a particle has been. One subtractive step guarantees every texel
+      // reaches zero.
+      gl.blendEquation(gl.FUNC_REVERSE_SUBTRACT);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.uniform4f(prog.fill.u("u_col"), 1 / 255, 1 / 255, 1 / 255, 1 / 255);
+      quad.draw();
+      gl.blendEquation(gl.FUNC_ADD);
     }
 
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
@@ -547,6 +992,15 @@ const SIM = (() => {
     // and respecifying its storage would invalidate it.
     gl.bindTexture(gl.TEXTURE_2D, S.F.read.tex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    // Same shape as the reset in rasterise(), for the same reason: this
+    // REWRITES f under an open window. f(0) is snapshotted on the CPU, so the
+    // endpoint term (f(T) - f(0))/T would absorb the whole rescale increment
+    // with nothing in <F> or <S> to answer it. Measured on h23 at Low with
+    // this line removed: halving c put the residual at 4.13e-1 s^-1 against
+    // an F1 bound of 1.28e-3 — 323x over the gate, from a slider drag.
+    // §7.1's compaction would also then apply the NEW c to a mean accumulated
+    // at the old one.
+    if (S.avg) avgReset();
   }
 
   /** One cell: {f, dye, u, w, p, phead}. Used by gauges and the hover readout.
@@ -557,9 +1011,44 @@ const SIM = (() => {
    *  h = z + p/ρg; add the elevation yourself (see the gauge sampler in
    *  main.js). Renamed from `head` with rig format v2 — the old name kept
    *  being read as piezometric, which it never was. */
-  function probe(x, z) {
+  /** One readPixels serving every instrument: the (u, w, P) and (f) rects in
+   *  the LIVE layout, from the live textures or — when `avg` is passed and a
+   *  window is open — from the Favre accumulator, unpacked in place. The mean
+   *  velocities are CELL-CENTRED (the accumulator collocates before
+   *  weighting), so callers that interpolate the staggered layout read them
+   *  half a cell off; instruments that sample faces average the two adjacent
+   *  centres instead (see boxFlux). The dye channels have no accumulator, so
+   *  under `avg` they read zero. */
+  function readState(i0, j0, w, h, Ubuf, Fbuf, avg) {
+    if (avg && S.avg) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
+      for (let k = 0; k < w * h; k++) {
+        const f = Ubuf[k * 4 + 2], d = Math.max(f, 1e-6);
+        Fbuf[k * 4] = f; Fbuf[k * 4 + 1] = 0; Fbuf[k * 4 + 2] = 0; Fbuf[k * 4 + 3] = 0;
+        Ubuf[k * 4] /= d; Ubuf[k * 4 + 1] /= d; Ubuf[k * 4 + 2] = Ubuf[k * 4 + 3];
+      }
+      return true;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Fbuf);
+    return false;
+  }
+
+  function probe(x, z, avg) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
+    if (avg && S.avg) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+      const f = S.pxBuf[2], d = Math.max(f, 1e-6);
+      const u = S.pxBuf[0] / d, w = S.pxBuf[1] / d, p = S.pxBuf[3];
+      const g = Math.abs(S.p.g) || 9.81;
+      return { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w),
+               solid: S.mask[j * S.nx + i] };
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const u = S.pxBuf[0], w = S.pxBuf[1], p = S.pxBuf[2];
@@ -585,15 +1074,21 @@ const SIM = (() => {
    *  branch of FS_DISP that paints it. The two are checked against each other
    *  by eye and by the legend: a Fit that leaves the picture saturated or flat
    *  means they have drifted apart. */
-  function fieldStats(mode) {
+  function fieldStats(mode, avg) {
     const n = S.nx * S.ny;
     const U = new Float32Array(n * 4), F = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, F);
+    // Average mode fits to the MEAN, because that is what is on screen. The
+    // live field's 99th percentile is drawn from excursions the mean does not
+    // contain, so fitting to it under a mean picture sets a scale nothing
+    // reaches and every colour reads low.
+    // readState unpacks the mean into the LIVE layout the loop below already
+    // speaks: (u, w, P) in U and f in F.r, with u the Favre mean <f u_c>/f-bar.
+    const A = avg && S.avg;
+    readState(0, 0, S.nx, S.ny, U, F, A);
     const g = Math.abs(S.p.g) || 9.81, tilt = S.scene.tiltS0 || 0;
-    const col = columns();                  // per-column depth, for the Froude number
+    // The Froude number needs a depth, and under Average it is the mean
+    // column's <d> - the same number FS_DISP divides by (docs/averaging.md §6).
+    const col = A ? avgColumns(true).C : columns();
     const v = [];
     const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && S.mask[j * S.nx + i] < 192;
     for (let j = 0; j < S.ny; j++) {
@@ -637,31 +1132,63 @@ const SIM = (() => {
     return out;
   }
 
-  /** A whole column of velocity — the vertical rake. Returns u(z) at cell centres. */
-  function rake(x, out) {
+  /** A whole column of velocity — the vertical rake. Returns u(z) at cell
+   *  centres; under `avg` the column comes from the Favre accumulator,
+   *  unpacked to the same (u, w, P) layout. */
+  function rake(x, out, avg) {
     const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
     const buf = out && out.length >= S.ny * 4 ? out : new Float32Array(S.ny * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+    if (avg && S.avg) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      for (let k = 0; k < S.ny; k++) {
+        const d = Math.max(buf[k * 4 + 2], 1e-6);
+        buf[k * 4] /= d; buf[k * 4 + 1] /= d; buf[k * 4 + 2] = buf[k * 4 + 3];
+      }
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+    }
     return { i, buf };
   }
 
   /** A rectangular strip of the velocity field, pulled back in ONE readPixels
    *  so a handful of CPU-side tracers can be advected without a sync each.
    *  Probing them individually would be one pipeline stall per tracer. */
-  function patch(x0, x1, out) {
+  function patch(x0, x1, out, avg) {
     const a = Math.max(0, Math.min(S.nx - 1, Math.floor(x0 / S.dx)));
     const b = Math.max(a + 1, Math.min(S.nx, Math.ceil(x1 / S.dx)));
     const w = b - a;
     const buf = out && out.length >= w * S.ny * 4 ? out : new Float32Array(w * S.ny * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
-    return { i0: a, w, ny: S.ny, dx: S.dx, buf };
+    const on = !!(avg && S.avg);
+    if (on) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+      for (let k = 0; k < w * S.ny; k++) {
+        const d = Math.max(buf[k * 4 + 2], 1e-6);
+        buf[k * 4] /= d; buf[k * 4 + 1] /= d;
+      }
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+    }
+    return { i0: a, w, ny: S.ny, dx: S.dx, buf, centred: on };
   }
 
   /** Bilinear (u, w) at a point, from a patch. u lives on x-faces, w on
-   *  z-faces, so each is offset half a cell from the centre. */
+   *  z-faces, so each is offset half a cell from the centre — except a
+   *  `centred` (averaged) patch, where both live at cell centres. */
   function patchVel(p, x, z) {
+    if (p.centred) {
+      const cx = Math.max(0, Math.min(p.w - 1.001, x / p.dx - p.i0 - 0.5));
+      const cz = Math.max(0, Math.min(p.ny - 1.001, z / p.dx - 0.5));
+      const i = Math.floor(cx), j = Math.floor(cz), fx = cx - i, fz = cz - j;
+      const at = (ii, jj, c) => p.buf[((jj * p.w) + Math.min(ii, p.w - 1)) * 4 + c];
+      const lerp = (c) =>
+        (at(i, j, c) * (1 - fx) + at(i + 1, j, c) * fx) * (1 - fz)
+        + (at(i, j + 1, c) * (1 - fx) + at(i + 1, j + 1, c) * fx) * fz;
+      return [lerp(0), lerp(1)];
+    }
     const gx = x / p.dx - p.i0, gz = z / p.dx;
     const sx = Math.max(0, Math.min(p.w - 1.001, gx));
     const sz = Math.max(0, Math.min(p.ny - 1.001, gz - 0.5));
@@ -737,7 +1264,7 @@ const SIM = (() => {
    *  rake and the orbit tracers already do. Air contributes nothing: every
    *  term carries the fill fraction, and `Q` uses min(f, 1) because f > 1 is
    *  water that has been compressed rather than more of it. */
-  function lineFlux(x0, z0, x1, z1) {
+  function lineFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
     const dx = x1 - x0, dz = z1 - z0;
@@ -763,10 +1290,7 @@ const SIM = (() => {
     const w = iR - iL + 1, h = jT - jB + 1;
     const need = w * h * 4;
     if (!S.lnU || S.lnU.length < need) { S.lnU = new Float32Array(need); S.lnF = new Float32Array(need); }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnU);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnF);
+    const cen = readState(iL, jB, w, h, S.lnU, S.lnF, avg);
     const U = S.lnU, F = S.lnF;
     const at = (buf, i, j, c) =>
       buf[((Math.min(Math.max(j, jB), jT) - jB) * w +
@@ -786,16 +1310,23 @@ const SIM = (() => {
       const cj = Math.min(S.ny - 1, Math.max(0, Math.floor(z / S.dx)));
       const m = S.mask[cj * S.nx + ci];
       if (m > 192 || (closed && m > 64)) continue;      // a section through rock
-      // u lives on x-faces and w on z-faces, so each is offset half a cell.
+      // u lives on x-faces and w on z-faces, so each is offset half a cell —
+      // unless the mean state is being read, where both are cell-centred.
       const gx = x / S.dx, gz = z / S.dx;
-      const ui = Math.floor(gx), uj = Math.floor(gz - 0.5);
-      const ax = gx - ui, az = gz - 0.5 - uj;
-      const u = (at(U, ui, uj, 0) * (1 - ax) + at(U, ui + 1, uj, 0) * ax) * (1 - az)
-              + (at(U, ui, uj + 1, 0) * (1 - ax) + at(U, ui + 1, uj + 1, 0) * ax) * az;
-      const wi = Math.floor(gx - 0.5), wj = Math.floor(gz);
-      const bx = gx - 0.5 - wi, bz = gz - wj;
-      const wv = (at(U, wi, wj, 1) * (1 - bx) + at(U, wi + 1, wj, 1) * bx) * (1 - bz)
-               + (at(U, wi, wj + 1, 1) * (1 - bx) + at(U, wi + 1, wj + 1, 1) * bx) * bz;
+      let u, wv;
+      if (cen) {
+        u = centre(U, x, z, 0);
+        wv = centre(U, x, z, 1);
+      } else {
+        const ui = Math.floor(gx), uj = Math.floor(gz - 0.5);
+        const ax = gx - ui, az = gz - 0.5 - uj;
+        u = (at(U, ui, uj, 0) * (1 - ax) + at(U, ui + 1, uj, 0) * ax) * (1 - az)
+          + (at(U, ui, uj + 1, 0) * (1 - ax) + at(U, ui + 1, uj + 1, 0) * ax) * az;
+        const wi = Math.floor(gx - 0.5), wj = Math.floor(gz);
+        const bx = gx - 0.5 - wi, bz = gz - wj;
+        wv = (at(U, wi, wj, 1) * (1 - bx) + at(U, wi + 1, wj, 1) * bx) * (1 - bz)
+           + (at(U, wi, wj + 1, 1) * (1 - bx) + at(U, wi + 1, wj + 1, 1) * bx) * bz;
+      }
       const f = centre(F, x, z, 0);
       const P = centre(U, x, z, 2);
       const un = u * nx + wv * nz;
@@ -812,7 +1343,7 @@ const SIM = (() => {
     return out;
   }
 
-  function boxFlux(x0, z0, x1, z1) {
+  function boxFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
     let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
@@ -822,26 +1353,26 @@ const SIM = (() => {
     const w = iR - iL + 2, h = jT - jB + 2;
     const need = w * h * 4;
     if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvU);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvF);
+    const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
     const U = S.cvU, F = S.cvF;
     const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
     const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
     const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
     const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
 
-    // x-faces: u lives ON the face, so the normal velocity needs no averaging.
+    // x-faces: u lives ON the face, so the normal velocity needs no averaging
+    // — except from the mean state, whose velocities are cell-centred: there
+    // the face value is the mean of the two adjacent centres.
     for (const [i, n, key] of [[iL, -1, "left"], [iR, 1, "right"]]) {
       const e = out[key];
       for (let j = jB; j < jT; j++) {
         if (sol(i - 1, j) || sol(i, j)) continue;
         const a = k(i - 1, j), b = k(i, j);
-        const u = U[b];
+        const u = cen ? 0.5 * (U[a] + U[b]) : U[b];
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const wv = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const wv = cen ? 0.5 * (U[a + 1] + U[b + 1])
+                       : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
         const un = u * n, z = (j + 0.5) * S.dx, x = i * S.dx;
         e.Q += Math.min(f, 1) * un;
         e.mdot += f * un;
@@ -851,16 +1382,17 @@ const SIM = (() => {
         e.wet += Math.min(f, 1);
       }
     }
-    // z-faces: w lives ON the face.
+    // z-faces: w lives ON the face (same centred-mean exception as above).
     for (const [j, n, key] of [[jB, -1, "bed"], [jT, 1, "top"]]) {
       const e = out[key];
       for (let i = iL; i < iR; i++) {
         if (sol(i, j - 1) || sol(i, j)) continue;
         const a = k(i, j - 1), b = k(i, j);
-        const wv = U[b + 1];
+        const wv = cen ? 0.5 * (U[a + 1] + U[b + 1]) : U[b + 1];
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
+        const u = cen ? 0.5 * (U[a] + U[b])
+                      : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
         const un = wv * n, z = j * S.dx, x = (i + 0.5) * S.dx;
         e.Q += Math.min(f, 1) * un;
         e.mdot += f * un;
@@ -892,7 +1424,7 @@ const SIM = (() => {
              iL, iR, jB, jT };
   }
 
-  function boxForce(x0, z0, x1, z1) {
+  function boxForce(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
     const closed = S.p.valveClosed > 0.5;
     let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
@@ -902,10 +1434,7 @@ const SIM = (() => {
     const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL−1..iR] × [jB−1..jT]
     const need = w * h * 4;
     if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvU);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvF);
+    const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
     const U = S.cvU, F = S.cvF;
     const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
     const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
@@ -915,10 +1444,11 @@ const SIM = (() => {
       for (let j = jB; j < jT; j++) {
         if (sol(i - 1, j) || sol(i, j)) continue;
         const a = k(i - 1, j), b = k(i, j);
-        const u = U[b];                              // u at the west face of cell i
+        const u = cen ? 0.5 * (U[a] + U[b]) : U[b];  // face value; centred means average
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const w = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const w = cen ? 0.5 * (U[a + 1] + U[b + 1])
+                      : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
         const un = u * nx_;
         dFx += f * (u * un + P * nx_);
         dFz += f * (w * un);
@@ -929,10 +1459,11 @@ const SIM = (() => {
       for (let i = iL; i < iR; i++) {
         if (sol(i, j - 1) || sol(i, j)) continue;
         const a = k(i, j - 1), b = k(i, j);
-        const w = U[b + 1];                          // w at the south face of cell j
+        const w = cen ? 0.5 * (U[a + 1] + U[b + 1]) : U[b + 1];
         const f = 0.5 * (F[a] + F[b]);
         const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
+        const u = cen ? 0.5 * (U[a] + U[b])
+                      : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
         const wn = w * nz_;
         dFx += f * (u * wn);
         dFz += f * (w * wn + P * nz_);
@@ -953,5 +1484,8 @@ const SIM = (() => {
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
+           setValve,
+           avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
+           avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

@@ -73,8 +73,13 @@ const OVERLAY = (() => {
    */
   const CLIFF = 2.5;                                 // cells per column
 
-  function analyse(sim, col) {
+  function analyse(sim, col, opts) {
     const S = sim, g = Math.abs(S.p.g) || 9.81, nx = S.nx, dx = S.dx;
+    // Average mode hands in mean columns. They have already been averaged over
+    // the window, so the prefilters below must NOT run: sm() would smooth in
+    // space and _hA/_qA/_ynK would smooth in time a second time, which shows
+    // up as a jump broadened by the filter rather than by the flow.
+    const AVG = !!(opts && opts.averaged);
     const out = { bed: [], d: [], q: [], surf: [], dc: [], dn: [], S0: [], V: [], Fr: [] };
 
     const win = Math.max(5, Math.round(nx * 0.09));
@@ -141,18 +146,27 @@ const OVERLAY = (() => {
       }
       return a;
     };
-    const dS = sm(1), qS = sm(2);
-
-    // Then average in TIME, per column. Roll waves and surface ripples travel,
-    // so they average out; an M3 reach or a jump stands still, so it survives.
-    // Doing this spatially instead needs a window wide enough to swallow a
-    // roll wave, which is also wide enough to erase the short reaches that
-    // matter most.
-    if (!S._hA || S._hA.length !== nx) { S._hA = new Float32Array(dS); S._qA = new Float32Array(qS); }
-    for (let i = 0; i < nx; i++) {
-      S._hA[i] += 0.10 * (dS[i] - S._hA[i]);
-      S._qA[i] += 0.10 * (qS[i] - S._qA[i]);
-      dS[i] = S._hA[i]; qS[i] = S._qA[i];
+    // Average mode's columns are already the mean over the whole window —
+    // spatial smoothing and the temporal EMA below would filter that mean a
+    // second time, which reads on screen as a jump broadened by the filter
+    // rather than by the flow. Take the accumulated columns verbatim instead.
+    let dS, qS;
+    if (AVG) {
+      dS = new Float32Array(nx); qS = new Float32Array(nx);
+      for (let i = 0; i < nx; i++) { dS[i] = col[i * 4 + 1]; qS[i] = col[i * 4 + 2]; }
+    } else {
+      dS = sm(1); qS = sm(2);
+      // Then average in TIME, per column. Roll waves and surface ripples
+      // travel, so they average out; an M3 reach or a jump stands still, so
+      // it survives. Doing this spatially instead needs a window wide enough
+      // to swallow a roll wave, which is also wide enough to erase the short
+      // reaches that matter most.
+      if (!S._hA || S._hA.length !== nx) { S._hA = new Float32Array(dS); S._qA = new Float32Array(qS); }
+      for (let i = 0; i < nx; i++) {
+        S._hA[i] += 0.10 * (dS[i] - S._hA[i]);
+        S._qA[i] += 0.10 * (qS[i] - S._qA[i]);
+        dS[i] = S._hA[i]; qS[i] = S._qA[i];
+      }
     }
     out.dRaw = []; out.qRaw = [];
 
@@ -210,7 +224,11 @@ const OVERLAY = (() => {
     if (cand.length > 8) {
       cand.sort((a, b) => a - b);
       const k = cand[cand.length >> 1];
-      S._ynK = isFinite(S._ynK) ? S._ynK + EMA * (k - S._ynK) : k;
+      // Average mode's candidates are already drawn from a mean field, so the
+      // window's answer IS the estimate — EMA'ing it against whatever the
+      // live path last left behind would blend two different flow states.
+      if (AVG) S._ynK = k;
+      else S._ynK = isFinite(S._ynK) ? S._ynK + EMA * (k - S._ynK) : k;
     }
     out.dn = new Array(nx).fill(NaN);
     let anyDn = 0, sumDn = 0;

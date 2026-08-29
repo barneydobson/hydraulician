@@ -32,6 +32,13 @@ const state = {
   cvShow: "Q",                     // which per-edge quantity the box labels
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
+  // Average is a measurement mode, not a blur filter (docs/averaging.md
+  // §4.3): while it is up, the field, the channel overlay and every number
+  // derived from it must describe the SAME averaging window. `setAverage` is
+  // the single writer — the strip's A, the panel checkbox and APP.avg.toggle
+  // all go through it, because switching modes has to open or release the
+  // accumulators and reset the overlay's EMAs in BOTH directions.
+  avg: false,
   gauges: [], rakes: [], gaugeField: "h", tracers: null, tracerN: 9,
   gaugeT: -1,                 // sim time of the last gauge sample — see sampleGauges
   gaugeSeq: 0,                // ever-increasing gauge id, for inspector identity
@@ -1408,35 +1415,50 @@ function syncURLEx(id) {
  *  `def()` is the range the ramp is painted over, in the field's own units.
  *  `mid`, where a field has one, is the value that must land on the pale band
  *  of a diverging ramp however lopsided the two ends are — Fr = 1 and ω = 0
- *  are physics, not the midpoint of whatever range happens to be set. */
+ *  are physics, not the midpoint of whatever range happens to be set.
+ *
+ *  `mean` is what the field becomes under Average, and it belongs here for the
+ *  same reason everything else does. The accumulator stores only (f̄, û, ŵ, p̄),
+ *  so H, Fr, |u| and ρu|u| come out as fields OF the mean flow rather than
+ *  means of the field, and the gap between the two is a real fluctuation term
+ *  (docs/averaging.md §6). A reader who is not told reads H̃ as a time-averaged
+ *  energy head, which it is not. */
 const FIELDS = [
   { mode: 0, id: "water", name: "Water", sym: "", unit: "m",
     ramp: "water", def: () => [0, hmaxScene()],
+    mean: "The pressure is a true average; the brightness on top is the speed OF the mean flow.",
     blurb: "Depth below the local free surface as hue, with speed added on top as brightness. Two variables at once — read the legend's two rows, not the colour alone." },
   { mode: 2, id: "speed", name: "Speed", sym: "|u|", unit: "m/s",
     ramp: "turbo", def: () => [0, sceneNow().vmax || 4],
+    mean: "The speed OF the mean flow — never more than the averaged speed.",
     blurb: "The magnitude of the velocity, √(u² + w²) — the direction is not in it. Particles and dye are what show where the water is going." },
   // The three heads, in the order they nest: H contains h contains p/ρg. Read
   // down the list and each one is the previous with a term taken off.
   { mode: 7, id: "ehead", name: "Energy head", sym: "H", unit: "m",
     ramp: "turbo", def: () => [0, sim ? sim.H : 1],
+    mean: "The energy head OF the mean flow — the kinetic energy of the fluctuations is not in it, and the difference is real, not rounding.",
     blurb: "H = z + p/ρg + |u|²/2g — the whole head a cell carries. It can only fall downstream, so a drop along a reach IS the loss — friction, a jump's roller, a diffuser's separation. Point values, so α is 1 by construction; the depth-averaged α belongs to a profile, not a cell." },
   { mode: 6, id: "head", name: "Piezometric head", sym: "h", unit: "m",
     ramp: "turbo", def: () => [0, sim ? sim.H : 1],
+    mean: "Exact: h is linear in pressure, so the head of the mean flow IS the averaged head.",
     blurb: "h = z + p/ρg — the potential whose gradient drives the flow. Its bands stand vertical wherever the flow is hydrostatic and bend exactly where vertical accelerations matter — crests, brinks, a chute toe, a gate contraction, a jump roller." },
   { mode: 1, id: "phead", name: "Pressure head", sym: "p/ρg", unit: "m",
     ramp: "turbo", def: () => [0, sceneNow().headMax || 3],
+    mean: "A true average of the pressure.",
     blurb: "The pressure alone. In still water it is simply the depth below the surface, so it climbs down every column and is not comparable between cells at different heights." },
   { mode: 4, id: "vort", name: "Vorticity", sym: "ω", unit: "1/s",
     ramp: "divg", mid: 0, def: () => [-40, 40],
+    mean: "The spin OF the mean flow — it matches the averaged spin only where the fill holds steady.",
     blurb: "∂w/∂x − ∂u/∂z: the local spin. Shear layers, the roller of a jump and the separation off a step each show as sheets of one sign." },
   { mode: 3, id: "froude", name: "Froude number", sym: "Fr", unit: "",
     ramp: "divg", mid: 1, def: () => [0, 2],
+    mean: "Built from the averaged velocity and depth: a Froude number OF the mean flow, not an averaged Froude number.",
     blurb: "Fr = u/√(gd), from the streamwise velocity and the column depth. Pale is critical; blue is subcritical and red supercritical." },
   // Last, and kept: MO-2's task and its README both say "Field → Momentum
   // flux" in so many words, so removing it would break a shipped brief.
   { mode: 5, id: "mom", name: "Momentum flux", sym: "ρu|u|", unit: "kg/m/s²",
     ramp: "divg", mid: 0, def: () => [-momScene(), momScene()],
+    mean: "A momentum flux OF the mean flow — the Reynolds stress is not in it.",
     blurb: "Momentum per unit volume, signed by the streamwise direction, so a returning roller or an undertow reads opposite to the flow that drives it." },
 ];
 
@@ -1688,6 +1710,14 @@ const CONTROLS = [
     get: () => String(state.mode),
     set: (v) => { state.mode = +v; LEGEND.sync(); },
     fmt: () => fieldFor(state.mode).blurb },
+  // The same toggle as the strip's A. The sandbox must be able to reproduce
+  // any scene by hand, so every strip toggle needs a panel row as well.
+  { id: "avg", type: "check", label: "Average the flow",
+    get: () => state.avg, set: (v) => setAverage(v),
+    fmt: () => state.avg
+      ? "window " + SIM.avgT().toFixed(2) + " s — the legend carries T, f̄ and δ_a"
+      : "off — the field and the overlay show the instant",
+    info: "Time-averages the flow while the solver goes on running: the colour, the free-surface line, the channel overlay and every number it prints come from one averaging window. The velocity is the Favre (fill-weighted) mean, so H, Fr, |u| and ρu|u| are fields <b>of the mean flow</b> rather than means of the field — the legend says so per field. Nothing here touches the solution; the accumulators are diagnostics. The window restarts on R, a geometry edit, a valve, a celerity change, a boundary switch and the end of spin-up." },
   { id: "ruler", type: "check", label: "Ruler",
     get: () => state.ruler, set: (v) => state.ruler = v,
     info: "Metre ticks along the bottom and left edges of the view, with faint grid lines at the major ticks. They follow the zoom, so drawn geometry can be placed at a stated station — \"the plate goes at x = 8.0 m\" — without counting scale bars. M toggles it." },
@@ -2110,6 +2140,11 @@ const ICONS = {
              '<circle cx="15" cy="9.5" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/>' +
              '<circle cx="13" cy="15" r="1.3"/>',
   dye:     '<path d="M10 3.5c3 3.6 4.5 5.9 4.5 8a4.5 4.5 0 0 1-9 0c0-2.1 1.5-4.4 4.5-8Z"/>',
+  // Average: a wobbling trace with the mean line drawn flat through it. The
+  // glyph is the claim — the line is not the signal, it is what the signal
+  // spent the window doing.
+  average: '<path d="M2.5 12.5c2-5 3.2 3.5 5 0s2.5-8.5 4.5-5 3.5 6 5.5 2.5" opacity=".55"/>' +
+           '<path d="M2.5 10h15"/>',
   // The two grade lines over a wavy surface: what the overlay actually draws.
   channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
            '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
@@ -2220,7 +2255,9 @@ const LEGEND = (() => {
   /** Rescale to the frame this was clicked on, and then hold. */
   function fit() {
     const f = fieldFor(state.mode);
-    const s = SIM.fieldStats(state.mode);
+    // Fit to what is PAINTED: under Average that is the mean state, whose
+    // range is the narrower of the two.
+    const s = SIM.fieldStats(state.mode, state.avg && SIM.avgActive());
     if (!s) {
       showToast("Nothing to fit",
                 "No wet cells on screen yet — pour some water in first.");
@@ -2264,7 +2301,54 @@ const LEGEND = (() => {
     }
     const b = document.getElementById("legendBtn");
     if (b) b.classList.toggle("on", open);
+    // What THIS field becomes under Average. §6: only (f̄, û, ŵ, p̄) is stored,
+    // so H, Fr, |u| and ρu|u| are fields OF the mean flow and the reader has
+    // to be told, or H̃ gets read as a time-averaged energy head.
+    el().classList.toggle("avg", !!state.avg);
+    const what = document.getElementById("legAvgWhat");
+    if (what) put(what, state.avg ? (f.mean || "") : "");
     if (menuOpen) renderMenu();
+  }
+
+  /** Only when it moved. At 60 fps an unconditional textContent write is a
+   *  layout every frame for a number that changes in the second decimal. */
+  function put(el, text) { if (el && el.textContent !== text) el.textContent = text; }
+
+  let probeTick2 = 0, hov = null;      // the cursor probe's own 1-in-3 throttle
+  /** The Average block's live half: the elapsed window, and what the mean
+   *  reads under the cursor. Called once per frame while Average is up and
+   *  never otherwise, from `tickFrame`, which already holds the mean columns.
+   *
+   *  δ_a = η̄ − (z_b + d̄) is the reconciliation §7.3 asks for. The line is
+   *  drawn at η̄ because that is where the visible surface stood on average;
+   *  the depth reported is d̄, an integral. In an aerated or intermittently
+   *  connected column those are not the same number, and printing the gap is
+   *  what stops one of them reading as a fault in the other. σ_η comes from
+   *  the column accumulator's Welford moment and is the excursion band's
+   *  independent estimate (§7.3). */
+  function avgTick(avgCols) {
+    const t = document.getElementById("legAvgT");
+    if (!t) return;
+    put(t, "T = " + SIM.avgT().toFixed(2) + " s");
+    const r = document.getElementById("legAvgRead");
+    if (!state.inside || !avgCols) { put(r, "— hover the water for the averaged column"); return; }
+    const C = avgCols.C;
+    const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(state.cursor[0] / sim.dx)));
+    const dBar = C[i * 4 + 1];
+    const da = RECON.aerationGap(C[i * 4 + 3], C[i * 4], dBar);
+    // One readPixels sync, on the same 1-in-3 throttle the live hover readout
+    // uses and for the same reason: this is a number a reader looks at, not
+    // one anything is computed from, and a sync every frame puts the loop on
+    // the GPU's critical path for the third decimal of f̄.
+    if (--probeTick2 <= 0) { probeTick2 = 3; hov = SIM.avgProbe(state.cursor[0], state.cursor[1]); }
+    // Plain words, not decorated symbols: the card is the interface, and a
+    // student should not need the notation register to read it. The doc keeps
+    // the accurate names (docs/averaging.md §7.3).
+    const p = hov;
+    put(r, "fill " + (p ? p.fbar.toFixed(2) : "—") +
+           "  depth " + dBar.toFixed(3) + " m" +
+           "  gap " + (da < 0 ? "−" : "+") + (Math.abs(da) * 1000).toFixed(0) + " mm" +
+           "  spread " + (avgCols.sigma[i] * 1000).toFixed(0) + " mm");
   }
 
   function row(gradient, left, right) {
@@ -2334,7 +2418,7 @@ const LEGEND = (() => {
     sync();
     syncToolbar();
   }
-  return { build, sync, fit, onDown,
+  return { build, sync, fit, onDown, avgTick,
            isOpen: () => open,
            open: () => setOpen(true),
            close: () => setOpen(false),
@@ -2544,6 +2628,16 @@ const TOOLBAR = [
       hint: "Critical depth, normal depth and the energy grade line",
       on: () => state.channel,
       act: () => { state.channel = !state.channel; syncPanel(); } },
+    // VIEW and not MEASURE, deliberately, although it is the one toggle here
+    // that changes what the numbers say: it changes how the water is DRAWN,
+    // and everything else follows the picture — the overlay, the instruments
+    // and the particle tracers all read the averaged flow while the window is
+    // open (docs/averaging.md §3), because a screenshot that mixed a mean
+    // field with live markers would carry two flow states at once.
+    { id: "avgBtn", icon: "average", label: "Average", key: "A",
+      hint: "Time-average the flow — the field and every reading over one window",
+      on: () => state.avg,
+      act: () => setAverage(!state.avg) },
   ] },
   { cap: "RUN", family: "run", items: [
     { id: "playBtn", icon: () => (state.paused ? "play" : "pause"), key: "space",
@@ -2570,7 +2664,7 @@ const TOOLBAR = [
       hint: "The shortcut sheet",
       act: (b) => KEYS.toggle(b) },
     { id: "aboutBtn", icon: "about", label: "About the solver",
-      hint: "What is actually being computed — the numerics derivation",
+      hint: "What is actually being computed — the numerics, and the rest of the documentation",
       act: () => window.open(aboutHref(), "_blank", "noopener") },
   ] },
 ];
@@ -2760,6 +2854,7 @@ const KEYS = (() => {
     ["P", "particles"],
     ["D", "dye"],
     ["N", "open-channel overlay"],
+    ["A", "average the flow — the mean field, over one window"],
     ["M", "ruler"],
     ["S", "scenes"],
     ["E", "exercises"],
@@ -3236,6 +3331,9 @@ function onUp(e) {
 
 // -------------------------------------------------------------------- loop
 let lastT = performance.now(), acc = 0, fpsAcc = 0, fpsN = 0, probeTick = 0;
+// Whether the previous frame was still warming up, so the end of spin-up can
+// be caught as an edge rather than as a state — see tickFrame.
+let wasWarming = false;
 
 function frame(now) {
   requestAnimationFrame(frame);
@@ -3262,6 +3360,14 @@ function tickFrame(realDt) {
     const exWarm = EX.settleTarget();
     const warmTo = Math.max(state.scene.spinup || 0, exWarm);
     const warming = sim.t < warmTo;
+    // The last of §9's reset conditions. Spin-up is an initialisation
+    // interval, not part of the reported flow state — a pipe filling, a
+    // channel finding its depth — and a window opened across it carries the
+    // fill in every mean it reports. On the EDGE only: resetting while
+    // `!warming` holds would zero T on every frame afterwards and there would
+    // be no window at all. A no-op when no window is open.
+    if (wasWarming && !warming) SIM.avgReset();
+    wasWarming = warming;
     let want = warming ? state.nsubMax : Math.round(state.speed * realDt / h);
     // nsubMax is fractional (the AIMD governor creeps it), so round at the
     // point of use — a substep count is an integer, and the panel prints it.
@@ -3282,6 +3388,12 @@ function tickFrame(realDt) {
     }
   }
   const col = SIM.columns();
+  // Averaging samples the frame the solver just advanced, weighted by the
+  // simulated time it advanced — not by the frame, which is not a unit of
+  // anything physical. Both must follow `columns()` above: the column
+  // accumulator reads the texture that call refreshes. See docs/averaging.md §4.4.
+  SIM.avgStepField(simAdvanced);
+  SIM.avgStepColumns(simAdvanced);
   // SIMULATED seconds, not wall-clock ones. Advancing by `realDt` made the
   // particles a lie about the flow: the solver advances by whatever it fitted
   // into the frame budget, which on m2 is about 0.3 × real time, so they
@@ -3293,14 +3405,23 @@ function tickFrame(realDt) {
   // Capped because this is one explicit Euler step: during spin-up the solver
   // runs flat out and a frame can advance half a second, which would teleport
   // a particle through a wall rather than round it.
-  if (state.particles) SIM.advanceParticles(Math.min(simAdvanced, 0.05));
+  if (state.particles) SIM.advanceParticles(Math.min(simAdvanced, 0.05), measuringAvg());
 
   const simMs = performance.now() - t0;
   // AIMD governor: creep up while there is headroom, back off hard when not
   if (simMs > CONFIG.frameBudgetMs * 1.6) state.nsubMax = Math.max(2, state.nsubMax * 0.82);
   else if (simMs < CONFIG.frameBudgetMs * 0.75) state.nsubMax = Math.min(4000, state.nsubMax * 1.05 + 1);
 
-  const analysis = OVERLAY.analyse(sim, col);
+  // Average mode must describe ONE window: the field, the overlay and every
+  // number derived from it. Mixing a mean field with live markers would put
+  // two flow states in one screenshot.
+  const avgCols = state.avg && SIM.avgActive() ? SIM.avgColumns() : null;
+  const analysis = avgCols
+    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true })
+    : OVERLAY.analyse(sim, col);
+  // T and the cursor readouts, which move every frame. Behind the same flag,
+  // so a session with Average off pays one boolean for all of it.
+  if (avgCols) LEGEND.avgTick(avgCols);
   sampleGauges(analysis);
   sampleRakes();
   sampleCV();
@@ -3318,7 +3439,11 @@ function tickFrame(realDt) {
     // The same simulated step the particles were advanced by, so the trail
     // fades over a fixed span of FLOW rather than of wall clock.
     pdt: Math.min(simAdvanced, 0.05),
-    dye: state.dye, particles: state.particles,
+    // Dye has no accumulator, so a live tracer over a mean picture would put
+    // two flow states in one screenshot: under an open window it stands down.
+    dye: state.dye && !measuringAvg(), particles: state.particles,
+    // One window, one picture: the same flag the overlay above was built with.
+    avg: state.avg,
     cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1 : state.brush * 0.55],
     guide: state.drag ? [state.drag.x0, state.drag.z0, state.drag.x1, state.drag.z1] : [0, 0, 0, 0],
     guideOn: !!state.drag,
@@ -3365,8 +3490,9 @@ function sampleGauges(A) {
   if (sim.t < state.gaugeT) clearGaugeHistory();
   if (!(sim.t > state.gaugeT)) return;
   state.gaugeT = sim.t;
+  const av = measuringAvg();
   state.gauges.forEach((gg) => {
-    const pr = SIM.probe(gg.x, gg.z);
+    const pr = SIM.probe(gg.x, gg.z, av);
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(gg.x / sim.dx)));
     // Piezometric head h = z + p/ρg. For a scene whose bed is real geometry
     // z is just the gauge's own z, but a tilted-gravity scene (m2) draws a FLAT
@@ -3391,8 +3517,14 @@ function clearGaugeHistory() {
   state.gauges.forEach((g) => { g.hist.length = 0; if (g.log) g.log.length = 0; });
   state.gaugeT = -1;
 }
+/** True while measurements should come from the averaging window: Average is
+ *  up AND a window is open. Every instrument asks this one question, so what
+ *  "one window, one picture" means for the numbers is decided in one place. */
+function measuringAvg() { return state.avg && SIM.avgActive(); }
+
 function sampleRakes() {
-  state.rakes.forEach((rk) => { const r = SIM.rake(rk.x, rk.buf); rk.buf = r.buf; rk.i = r.i; });
+  const av = measuringAvg();
+  state.rakes.forEach((rk) => { const r = SIM.rake(rk.x, rk.buf, av); rk.buf = r.buf; rk.i = r.i; });
 }
 
 /** Place (or move) the force control volume. Corners are normalised and the
@@ -3424,9 +3556,13 @@ function placeFlux(x0, z0, x1, z1) {
  *  wave that crosses it — which is the whole reason the box grew an EMA. */
 function sampleFlux() {
   if (!state.flux.length || state.paused) return;
+  const av = measuringAvg();
   state.flux.forEach((L) => {
     if (sim.t < L.t0) { L.ema = null; L.t0 = sim.t; }
-    const r = SIM.lineFlux(L.x0, L.z0, L.x1, L.z1);
+    const r = SIM.lineFlux(L.x0, L.z0, L.x1, L.z1, av);
+    // Under an open window the integral is over the WINDOW MEAN, which is its
+    // own aggregate — smoothing it again would put a second filter on it.
+    if (av) { L.ema = r; L.t0 = sim.t; return; }
     const a = 1 - Math.exp(-Math.min(Math.max(sim.t - L.t0, 0), 0.25) / 1.0);
     L.t0 = sim.t;
     if (!L.ema) { L.ema = r; return; }
@@ -3453,18 +3589,28 @@ function sampleCV() {
   if (!cv || state.paused) return;
   if (sim.t < cv.t0) { cv.ema = null; cv.hist.length = 0; cv.t0 = sim.t; }
   if (!(sim.t > cv.t0) && cv.ema) return;
-  const r = SIM.boxForce(cv.x0, cv.z0, cv.x1, cv.z1);
+  const av = measuringAvg();
+  const r = SIM.boxForce(cv.x0, cv.z0, cv.x1, cv.z1, av);
   // The whole budget, from the same faces. One extra pair of readPixels per
   // frame, which is the same cost the force alone already pays — and every
   // number in it is smoothed by the SAME EMA, because a raw face integral on
   // a wobbling free surface is a reading nobody can take.
-  const b = SIM.boxFlux(cv.x0, cv.z0, cv.x1, cv.z1);
-  const a = 1 - Math.exp(-Math.min(sim.t - cv.t0, 0.25) / 1.0);
-  cv.t0 = sim.t;
-  cv.ema = cv.ema ? { fx: cv.ema.fx + (r.fx - cv.ema.fx) * a,
-                      fz: cv.ema.fz + (r.fz - cv.ema.fz) * a }
-                  : { fx: r.fx, fz: r.fz };
-  cv.flux = emaFlux(cv.flux, b, a);
+  const b = SIM.boxFlux(cv.x0, cv.z0, cv.x1, cv.z1, av);
+  if (av) {
+    // The window mean is the instrument's aggregate: no second filter. The
+    // flutter history still fills, and its shrinking band is the visible
+    // statement that the mean is converging.
+    cv.ema = { fx: r.fx, fz: r.fz };
+    cv.flux = b;
+    cv.t0 = sim.t;
+  } else {
+    const a = 1 - Math.exp(-Math.min(sim.t - cv.t0, 0.25) / 1.0);
+    cv.t0 = sim.t;
+    cv.ema = cv.ema ? { fx: cv.ema.fx + (r.fx - cv.ema.fx) * a,
+                        fz: cv.ema.fz + (r.fz - cv.ema.fz) * a }
+                    : { fx: r.fx, fz: r.fz };
+    cv.flux = emaFlux(cv.flux, b, a);
+  }
   cv.hist.push({ t: sim.t, fx: r.fx });
   while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
   cv.last = r;
@@ -3568,7 +3714,7 @@ function advanceTracers(dtSim) {
   let x0 = Infinity, x1 = -Infinity;
   T.list.forEach((t) => { x0 = Math.min(x0, t.x); x1 = Math.max(x1, t.x); });
   const pad = 6 * sim.dx;
-  const P = SIM.patch(x0 - pad, x1 + pad, T.buf);
+  const P = SIM.patch(x0 - pad, x1 + pad, T.buf, measuringAvg());
   T.buf = P.buf;
   // Sub-step: an orbit is a rotation, and one big explicit step spirals out.
   const nsub = Math.max(1, Math.min(8, Math.ceil(dtSim / 0.02)));
@@ -3635,7 +3781,7 @@ function drawOverlay(A) {
   if (state.inside && !state.drag && UIMODE.shows("cursor")) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
-    if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1]); }
+    if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1], measuringAvg()); }
     OVERLAY.drawCursorReadout(ctx, view, A, sim, state.cursor[0], state.cursor[1], state.hover);
   }
 }
@@ -4350,7 +4496,9 @@ const RIG = (() => {
 
     if (Array.isArray(o.open)) for (let k = 0; k < 4; k++) p.open[k] = o.open[k] | 0;
     p.autoL = 0; p.autoR = 0;                // the rig owns its edges outright
-    if (o.valveClosed !== undefined) p.valveClosed = b01(o.valveClosed);
+    // Through SIM.setValve, not p.valveClosed: the flag is part of the solid
+    // set, so it carries the averaging reset (js/sim.js, docs/averaging.md §9).
+    if (o.valveClosed !== undefined) SIM.setValve(b01(o.valveClosed));
     // Merge onto the scene's own objects: a key the rig does not carry (a
     // scene that pins an inlet velocity, say) keeps the scene's value.
     ["inflow", "tailwater", "source", "wave"].forEach((k) => {
@@ -4770,6 +4918,7 @@ function boot() {
     else if (k === "b") { state.cvShow = CV_NEXT[state.cvShow] || "Q"; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
+    else if (k === "a") setAverage(!state.avg);
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
     // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
     // so a tenth tool would have made "9" fail ("9" > "10" lexically).
@@ -4802,8 +4951,40 @@ function togglePause() {
   state.paused = !state.paused;
   syncToolbar();               // the glyph itself is the play/pause state
 }
+
+/** Live ↔ Average. The single writer of `state.avg`, because the flag alone
+ *  is not the mode: the accumulators have to be opened or released with it,
+ *  and the overlay's temporal estimates have to be dropped in BOTH directions
+ *  (docs/averaging.md §4.3). Average bypasses the live depth/discharge
+ *  prefilters and the `_ynK` EMA, so a mode that inherited the other's state
+ *  would be reading one window through the other's filter.
+ *
+ *  Nothing here is serialised: the rig wire format is v2 and stays v2. A
+ *  shared link restores the rig, not what the person sharing it was watching. */
+function setAverage(on) {
+  const want = !!on;
+  if (want === state.avg) return;
+  state.avg = want;
+  if (want) SIM.avgStart(); else SIM.avgStop();
+  // Average is the measuring mode, and the particle tracers are part of the
+  // reading: over a mean picture they draw the mean flow's streamlines. On,
+  // not toggled — a student who already has them keeps them, and switching
+  // back to Live never takes a tool away.
+  if (want && !state.particles) state.particles = true;
+  // A mode switch is a new measurement. The instruments' running estimates
+  // belong to the mode that made them: an Average window must not open on a
+  // live EMA, and Live must not resume from a window mean.
+  if (state.cv) { state.cv.ema = null; state.cv.flux = null; state.cv.hist.length = 0; state.cv.t0 = sim.t; }
+  state.flux.forEach((L) => { L.ema = null; L.t0 = sim.t; });
+  OVERLAY.resetEstimates(sim);
+  LEGEND.sync(); syncPanel(); syncToolbar();
+}
 function toggleValve() {
-  sim.p.valveClosed = sim.p.valveClosed > 0.5 ? 0 : 1;
+  // SIM.setValve is the choke point: flipping the flag reclassifies every
+  // valve texel as solid or open, which is a geometry edit as far as the
+  // averaging window is concerned. Writing sim.p.valveClosed here directly
+  // would skip that reset — see the comment on setValve.
+  SIM.setValve(sim.p.valveClosed <= 0.5);
   syncToolbar();
   showToast(sim.p.valveClosed > 0.5 ? "Valve closed" : "Valve open",
     sim.p.valveClosed > 0.5
@@ -4842,6 +5023,16 @@ window.APP = {
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
   placeCV,                                 // the control volume, headless
   placeFlux, removeFluxAt,                 // a flux section, headless
+  // The averaging mode's public surface.
+  avg: { start: SIM.avgStart, stop: SIM.avgStop, field: SIM.avgField, T: SIM.avgT,
+         // The MODE, as the strip's A sets it — start/stop above are the bare
+         // accumulators, which headless tests drive without touching the view.
+         toggle: () => { setAverage(!state.avg); return state.avg; },
+         set: setAverage, on: () => state.avg,
+         columns: () => (SIM.avgActive() ? SIM.avgColumns(true) : null),
+         probe: (x, z) => SIM.avgProbe(x, z),
+         // Two full-field readbacks, ~1.2 s. Never on the frame path.
+         residual: () => SIM.transportResidual() },
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {
     const c = SIM.columns(); let v = 0;

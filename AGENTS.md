@@ -14,9 +14,10 @@ shallow water); this one resolves the depth.
 ## Where things live
 
 | Path | What it is |
-|---|---|
+| --- | --- |
 | `index.html` | markup + all CSS, classic script tags; the control panel is generated from a spec in `main.js` |
 | `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
+| `js/reconstruct.js` | `RECON` — the averaging numerics with no WebGL in them: running mean, Welford, geometric fill, connected bodies, column compaction, band level sets |
 | `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
 | `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
@@ -27,11 +28,13 @@ shallow water); this one resolves the depth.
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
+| `docs/averaging.md` | time averaging, user-facing: what Average shows, the Favre mean, the discrete balance it satisfies, surface reconstruction, reset conditions — section numbers are load-bearing (code and tests cite them) |
+| `docs/boundary-conditions.md` | every boundary in one place: the solid mask, wall mechanisms, the tri-state outer ring, level controls with their sponges and clamps, edge ownership |
 | `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
 | `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
-| `test/` | `ui-smoke.mjs` layout gate and `cdp.mjs`, its portable headless-Chrome client |
+| `test/` | `ui-smoke.mjs` layout gate, `recon-test.mjs` (RECON's unit tests, no browser) and `cdp.mjs`, its portable headless-Chrome client |
 | `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
 
 ## The model, in one paragraph
@@ -108,29 +111,46 @@ to look fine for a minute and explode in an exercise.
 
 ## Testing
 
-Five gates, all zero-dependency and all non-zero on failure:
+Eight gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
-|---|---|---|
+| --- | --- | --- |
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
 | `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
+| `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
+| `node test/mutation-test.mjs` | that `recon-test.mjs` can actually FAIL: fifteen known bugs patched into `RECON` one at a time, each required to kill the assertion it targets | ~9 s |
+| `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, every reset condition, the Favre display field, the mean columns, the overlay, the display pass painting the mean and the legend's Fit — 46 assertions | ~4 min |
 | `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing
-anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
+anything that touches `js/`. Run `mutation-test.mjs` after touching
+`js/reconstruct.js` or its suite — it is the only gate that fails when a *test*
+stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
 
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
 `index.html`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
-`START` or the boot wiring. Every
+`START`, `setAverage` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
 expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
 `--use-angle=d3d11` itself, because the software rasteriser renders a
 full-window WebGL canvas so slowly that a spin-up scene times the run out.
+
+**Why there is a mutation gate.** Eleven assertions written during the averaging
+work passed while asserting nothing — a constant fed where a varying value was
+needed, a cell marked solid with no water in it, a `Number.isFinite` check that
+survived a deliberately broken variance, a bed compared against the very buffer
+it was copied from. Every one was caught by breaking the code and watching the
+suite stay green; none by reading it. `test/mutation-test.mjs` runs that
+practice on every commit for the pure numerics. For the shader and sim code it
+cannot reach, `smoke.js --mutate=<id>` patches one known bug into a served file
+in flight — never touching the working tree — so the same control can be run by
+hand: `node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds`.
+Each catalogue entry carries what was measured when the control was performed.
 
 The two checkers are complements: `check_notation.py` greps for *names*,
 `smoke.js` proves the names are *connected* — a field renamed at the write
@@ -190,3 +210,16 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   non-obvious failure modes — read their sections in
   [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"
   anything they show.
+- **Average** (VIEW → A) is a measurement mode, not a blur. While it is up the
+  colour, the free-surface line, the channel overlay, the particle tracers
+  (switched on with the mode, advected by the mean) and EVERY instrument
+  reading — probe, gauges, rake, sections, control volume — come from ONE
+  window, with no per-instrument smoothing layered on top; dye is the one
+  live tracer with no accumulator and stands down. The window restarts on each of
+  [docs/averaging.md](docs/averaging.md) §9's conditions — including the
+  boundary-open switches in Controls, which look like view settings and are a
+  change of control volume. The velocity stored is the FAVRE mean, so `H`,
+  `Fr`, `|u|` and `ρu|u|` are fields **of the mean flow**; each field's `mean`
+  string in `FIELDS` is what the legend prints to say so. `setAverage` is the
+  single writer: the flag alone is not the mode, because the accumulators
+  (~22 MB apiece at Ultra) have to be opened and released with it.

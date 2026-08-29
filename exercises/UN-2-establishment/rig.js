@@ -41,10 +41,10 @@
  *
  * HEADLESS RECIPE (exercises/_runner/runner.py, HOWTO.md):
  *   launch --scene estab; then per digit:
- *     APP.sim.p.inflow.level = 3.4 + 0.1*d; APP.sim.p.valveClosed = 1;
+ *     APP.sim.p.inflow.level = 3.4 + 0.1*d; APP.SIM.setValve(true);
  *     APP.SIM.resetWater();            // prefill + sponge adjust
  *     pump --sim-seconds 30
- *     APP.sim.p.valveClosed = 0;       // t = 0
+ *     APP.SIM.setValve(false);         // t = 0
  *     ...sample APP.probe(14, 2.4).u every 0.05 sim-s for 40 s; u_max =
  *     mean of the last 10 s, t75 = first crossing of 0.75*u_max; read the
  *     flowing level off OVERLAY.analyse's surf at x ~ 1.5.

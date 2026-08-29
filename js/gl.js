@@ -57,6 +57,25 @@ const GLH = (() => {
     return fb;
   }
 
+  /** Two colour attachments, for a pass that emits a second texture. The
+   *  drawBuffers call is the part that is easy to forget: without it the
+   *  second output is silently discarded and everything still runs.
+   *  drawBuffers state belongs to the framebuffer object, so it survives every
+   *  later bindFramebuffer and the single-attachment FBOs keep their default. */
+  function createFBO2(gl, texA, texB) {
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texA, 0);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, texB, 0);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (status !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error("MRT framebuffer incomplete: 0x" + status.toString(16));
+    }
+    return fb;
+  }
+
   /** Ping-pong pair of textures + FBOs. read = current state, write = next. */
   function createDoubleBuffer(gl, w, h, internalFormat, format, type, data) {
     function one(d) {
@@ -132,7 +151,7 @@ const GLH = (() => {
   }
 
   return {
-    createProgram, createTexture, createFBO, createDoubleBuffer,
+    createProgram, createTexture, createFBO, createFBO2, createDoubleBuffer,
     bindTarget, bindTex, makeQuad, makeRect, makePoints,
   };
 })();

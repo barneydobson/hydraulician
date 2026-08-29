@@ -155,6 +155,23 @@ const RECON = (() => {
    *  bridging bug instead of checking against it. */
   function reconstruct(o) {
     const { fbar, pbar, mask, nx, ny, dx, c } = o;
+    // Gravity, because compaction only means anything where the EOS is
+    // one-sided. `g` is optional and defaults to the scene default; a caller
+    // reading it off a live sim should pass `g: sim.p.g` so a zero-gravity
+    // scene lands in the refusal below rather than in a plausible answer.
+    const g = o.g === undefined ? 9.81 : o.g;
+    // docs/averaging.md §7.1 / test E4: the g = 0 scene is excluded by
+    // construction. Its EOS is TWO-SIDED, so P_diag goes negative, and
+    // geomFill's clamp(g, 0, 1) would silently absorb that and hand back a
+    // fill that looks like water — the failure mode with no symptom. There is
+    // also no free surface there to reconstruct. Refuse loudly instead.
+    if (!(Math.abs(g) > 0)) {
+      throw new Error(
+        "RECON.reconstruct: refusing g = " + g + " — the zero-gravity scene has "
+        + "a two-sided EOS (p may be negative) and no free surface, so the "
+        + "min(f,1) = f - P/c^2 compaction of docs/averaging.md §7.1 does not "
+        + "hold. Reconstruction is not defined there.");
+    }
     const bed = new Float64Array(nx), d2d = new Float64Array(nx), all = [];
     const gcol = new Float64Array(ny), solid = new Uint8Array(ny);
     for (let i = 0; i < nx; i++) {

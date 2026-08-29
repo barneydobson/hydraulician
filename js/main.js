@@ -3584,7 +3584,9 @@ const RIG = (() => {
 
     if (Array.isArray(o.open)) for (let k = 0; k < 4; k++) p.open[k] = o.open[k] | 0;
     p.autoL = 0; p.autoR = 0;                // the rig owns its edges outright
-    if (o.valveClosed !== undefined) p.valveClosed = b01(o.valveClosed);
+    // Through SIM.setValve, not p.valveClosed: the flag is part of the solid
+    // set, so it carries the averaging reset (js/sim.js, docs/averaging.md §9).
+    if (o.valveClosed !== undefined) SIM.setValve(b01(o.valveClosed));
     // Merge onto the scene's own objects: a key the rig does not carry (a
     // scene that pins an inlet velocity, say) keeps the scene's value.
     ["inflow", "tailwater", "source", "wave"].forEach((k) => {
@@ -4011,7 +4013,11 @@ function togglePause() {
   syncToolbar();               // the glyph itself is the play/pause state
 }
 function toggleValve() {
-  sim.p.valveClosed = sim.p.valveClosed > 0.5 ? 0 : 1;
+  // SIM.setValve is the choke point: flipping the flag reclassifies every
+  // valve texel as solid or open, which is a geometry edit as far as the
+  // averaging window is concerned. Writing sim.p.valveClosed here directly
+  // would skip that reset — see the comment on setValve.
+  SIM.setValve(sim.p.valveClosed <= 0.5);
   syncToolbar();
   showToast(sim.p.valveClosed > 0.5 ? "Valve closed" : "Valve open",
     sim.p.valveClosed > 0.5

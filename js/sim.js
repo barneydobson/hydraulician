@@ -124,6 +124,28 @@ const SIM = (() => {
   function undoSeg() { if (S.segs.length) { S.segs.pop(); rasterise(); } }
   function clearSegs() { S.segs.length = 0; rasterise(); }
 
+  /** The single writer for the valve flag — every caller routes through here.
+   *
+   *  Flipping it changes the SOLID SET without touching the mask: `SO()` in
+   *  the shaders and `solidLo` in `transportResidual` both read `p.valveClosed`
+   *  and reclassify every valve texel on the spot. That is a geometry edit in
+   *  everything but name, so it carries the same reset (docs/averaging.md §9).
+   *  Without it, a texel that was solid for part of the window had its
+   *  accumulator frozen by ACC_KEEP while `T` kept running, so when it reopens
+   *  the running-mean weight k = dt/(T+dt) is drawn from the FULL window and
+   *  ⟨F⟩ there is neither a window mean nor an open-portion mean — the
+   *  residual around the valve jumps with no physical cause, on h23 and every
+   *  other scene where the valve IS the exercise.
+   *
+   *  Unchanged is a no-op: pressing V twice must not cost two windows, and the
+   *  rig-apply path writes the flag on every load whether or not it moved. */
+  function setValve(closed) {
+    const v = closed ? 1 : 0;
+    if (S.p.valveClosed === v) return;
+    S.p.valveClosed = v;
+    if (S.avg) avgReset();
+  }
+
   // ------------------------------------------------------------ allocation
   /** Hand a superseded grid's GL objects back to the driver.
    *  `build` allocates a complete new set every time it is called — 8 textures
@@ -782,6 +804,15 @@ const SIM = (() => {
     // and respecifying its storage would invalidate it.
     gl.bindTexture(gl.TEXTURE_2D, S.F.read.tex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    // Same shape as the reset in rasterise(), for the same reason: this
+    // REWRITES f under an open window. f(0) is snapshotted on the CPU, so the
+    // endpoint term (f(T) - f(0))/T would absorb the whole rescale increment
+    // with nothing in <F> or <S> to answer it. Measured on h23 at Low with
+    // this line removed: halving c put the residual at 4.13e-1 s^-1 against
+    // an F1 bound of 1.28e-3 — 323x over the gate, from a slider drag.
+    // §7.1's compaction would also then apply the NEW c to a mean accumulated
+    // at the old one.
+    if (S.avg) avgReset();
   }
 
   /** One cell: {f, dye, u, w, p, phead}. Used by gauges and the hover readout.
@@ -919,7 +950,7 @@ const SIM = (() => {
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
-           boxForce, dt, get, inletVel, bands, rescaleFill,
+           boxForce, dt, get, inletVel, bands, rescaleFill, setValve,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

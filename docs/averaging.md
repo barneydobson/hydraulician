@@ -1,7 +1,14 @@
 # Time averaging: discrete conservation and free-surface reconstruction
 
-**Status: phase C design; not implemented.** This document specifies the
-averaged quantities, discrete balances, reconstruction and acceptance tests.
+**Status: the engine is implemented.** The three accumulators (§4), the
+reconstruction numerics (§7, `js/reconstruct.js`) and the channel overlay's
+mean-column path (§4.3) are on the branch and under test — `node
+test/recon-test.mjs` and `node exercises/_runner/smoke.js --only=avg`. The
+display path and the Live / Average toggle described below are **deferred**:
+they collide with open PR #47, so `state.avg` exists and is always `false` and
+`SIM.avgStart()` is reachable only from headless tests. This document remains
+the binding specification for all of it: averaged quantities, discrete
+balances, reconstruction and acceptance tests.
 
 The VIEW family provides a **Live / Average** toggle. In Average mode the solver
 continues to advance while diagnostic accumulators collect the flow. Live mode
@@ -697,6 +704,19 @@ All three accumulators are zeroed, `T ← 0`, and `f(0)` re-copied, on:
 - switching Average on;
 - `R` / `resetWater`;
 - any geometry edit — `addSeg`, `undoSeg`, `clearSegs`;
+- a **valve toggle**. The flag does not touch the rasterised mask, but every
+  shader's `SO()` and the residual's own `solidLo` read it, so flipping it
+  reclassifies every valve texel between solid and open. That is a change of
+  control-volume set, and the cells that were solid had their accumulator
+  frozen while `T` went on running: their running-mean weight would afterwards
+  be drawn from a window they were absent for. `SIM.setValve` is the single
+  writer, so the reset covers the toolbar, the key and the rig-apply path
+  alike;
+- a **celerity change**. `rescaleFill` rewrites `f` in place to hold
+  `P = c²(f−1)` fixed, and `f(0)` was snapshotted before it. The endpoint term
+  `(f(T)−f(0))/T` would absorb the whole injected step with nothing in `⟨F⟩`
+  or `⟨S⟩` to answer it, and §7.1's compaction would apply the new `c` to a
+  mean accumulated at the old one;
 - a scene change, and the rebuild a resolution change performs;
 - the end of spin-up.
 
@@ -705,8 +725,8 @@ direction. Average mode bypasses the live depth/discharge prefilters and the
 overlay's temporal EMAs; resetting on entry and exit prevents live-mode state
 from crossing the mode boundary.
 
-These events change the geometry, initial condition or sampling population and
-therefore define a new averaging window. Spin-up is excluded because it is an
+These events change the geometry, the solid set, the initial condition or the
+sampling population and therefore define a new averaging window. Spin-up is excluded because it is an
 initialisation interval rather than part of the reported flow state.
 
 While paused, `Δt_n = 0`; accumulators and averaging duration remain unchanged.

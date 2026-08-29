@@ -763,6 +763,122 @@ SUITES.avg = async (B) => {
      JSON.stringify(cl));
   ok("avgField's ubar sits on the CENTRED velocity, not the bare west face",
      cl.dCentred < cl.dFace, JSON.stringify(cl));
+
+  // The column-reading accumulator (Task 7): averages FS_COL's OWN OUTPUT
+  // (bed, d, q, top), not the raw field — connectivity stays decided on the
+  // sharp per-frame column. Laid out exactly as SIM.columns() so the overlay
+  // can take it unchanged.
+  const cc = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    // The bed as it stood when the window OPENED, kept as an independent copy.
+    // Comparing C's bed channel against the LIVE buffer would be a tautology --
+    // avgColumns assigns it verbatim, so |C[0] - live[0]| is exactly 0 whatever
+    // avgColumns does. Against a snapshot taken BEFORE the window it is a real
+    // check: of the claim that the bed does not move while a window is open,
+    // and of channel 0 carrying the bed rather than a neighbouring channel.
+    const bed0 = Float32Array.from(APP.SIM.columns(true));
+    APP.SIM.avgStart(); APP.frames(300);
+    const { C, sigma } = APP.SIM.avgColumns();
+    const S = APP.sim, nx = S.nx;
+    let dOK = 0, bedOK = 0, sigOK = 0;
+    for (let i = 0; i < nx; i++) {
+      if (C[i*4+1] >= 0 && Number.isFinite(C[i*4+1])) dOK++;
+      if (Math.abs(C[i*4] - bed0[i*4]) < S.dx * 2) bedOK++;   // bed is static
+      if (sigma[i] >= 0 && Number.isFinite(sigma[i])) sigOK++;
+    }
+    APP.SIM.avgStop();
+    return { nx, len: C.length, dOK, bedOK, sigOK };
+  })()`);
+  ok("avgColumns is laid out like SIM.columns", cc.len === cc.nx * 4);
+  ok("mean depth is finite and non-negative in every column", cc.dOK === cc.nx);
+  ok("the bed does not move within a window", cc.bedOK === cc.nx);
+  ok("sigma_eta is finite everywhere", cc.sigOK === cc.nx);
+
+  // The three checks above only prove the array LENGTH matches SIM.columns()
+  // and that each channel is finite/non-negative -- they do not prove which
+  // channel is which, and Task 8 depends on that order being EXACT. This
+  // compares the accumulated mean depth against the live instantaneous depth,
+  // averaged over every reliably-wet column: close to 1 in a settled reach
+  // (measured 0.99-1.09 over six independent runs), and sharply violated by a
+  // d/q channel swap (measured 1.62 -- q and d differ enough in scale here
+  // that the ratio jumps outside the band).
+  //
+  // What this ratio does NOT catch is a clock swap: wiring avgStepColumns to
+  // `tf` or to the transport `t` left it at 1.02 / 0.99 / 1.03, well inside
+  // the band. The clocks are pinned apart by the sigma_eta check below
+  // instead. Every negative control is recorded in task-7-report.md.
+  const cd = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    APP.SIM.avgStart(); APP.frames(300);
+    const { C } = APP.SIM.avgColumns();
+    const live = APP.SIM.columns(true);
+    const S = APP.sim, nx = S.nx;
+    let wet = 0, sum = 0;
+    for (let i = 0; i < nx; i++) {
+      if (live[i*4+1] > 0.02) { wet++; sum += C[i*4+1] / live[i*4+1]; }
+    }
+    APP.SIM.avgStop();
+    return { wet, ratio: wet ? sum / wet : -1 };
+  })()`);
+  console.log(`\n    columns: dbar/d = ${cd.ratio.toFixed(4)} over ${cd.wet} wet columns`);
+  ok("mean depth tracks the live depth in a settled reach",
+     cd.ratio > 0.7 && cd.ratio < 1.5, `ratio ${cd.ratio.toFixed(4)} over ${cd.wet} wet columns`);
+
+  // sigma_eta: "finite and non-negative" cannot tell a weighted Welford moment
+  // from the naive <eta^2> - <eta>^2 -- swapping the shader for the naive form
+  // passes every assertion above unchanged (negative control, task-7-report.md).
+  // Naive is what the design rejected: for a small wobble on a metre datum the
+  // subtraction is a ratio near float32 eps, so it keeps about two digits.
+  //
+  // So this compares the GPU sigma against an INDEPENDENT float64 Welford,
+  // hand-rolled here from the SAME per-frame column readback the accumulator
+  // samples (columns(true) straight after frames(1) re-runs the pass on the
+  // unchanged U/F, so it is the very same sample), over the SAME window and
+  // with the same dt weights. Two independently-computed sigmas agreeing to
+  // a tight relative tolerance is what discriminates the formula. Measured:
+  // 5.3e-6 with the Welford moment, 1.6e-2 with the naive one -- three orders
+  // of magnitude apart, and the bound below sits between them.
+  const cs = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    const S = APP.sim, nx = S.nx;
+    APP.SIM.avgStart();
+    const mean = new Float64Array(nx), M2 = new Float64Array(nx);
+    let T = 0;
+    for (let s = 0; s < 80; s++) {
+      const t0 = S.t;
+      APP.frames(1);
+      const dt = S.t - t0;
+      if (!(dt > 0)) continue;
+      const C = APP.SIM.columns(true);
+      const k = dt / (T + dt);
+      for (let i = 0; i < nx; i++) {
+        const phi = C[i*4+3], m0 = mean[i], m1 = m0 + k * (phi - m0);
+        M2[i] += dt * (phi - m0) * (phi - m1);
+        mean[i] = m1;
+      }
+      T += dt;
+    }
+    const { sigma } = APP.SIM.avgColumns();
+    const live = APP.SIM.columns(true);
+    let n = 0, worst = -1, at = -1, ref0 = 0, got0 = 0, sMax = 0;
+    for (let i = 2; i < nx - 2; i++) {
+      if (!(live[i*4+1] > 0.02)) continue;          // wet columns only
+      const ref = Math.sqrt(Math.max(0, M2[i] / T));
+      if (ref > sMax) sMax = ref;
+      if (ref < 1e-4) continue;                     // no signal to compare to
+      n++;
+      const rel = Math.abs(sigma[i] - ref) / ref;
+      if (rel > worst) { worst = rel; at = i; ref0 = ref; got0 = sigma[i]; }
+    }
+    APP.SIM.avgStop();
+    return { n, worst, at, ref: ref0, got: got0, sMax, T, nx };
+  })()`);
+  console.log(`    sigma_eta: ${cs.n} columns with signal (max sigma ${cs.sMax.toExponential(3)})` +
+    ` over T=${cs.T.toFixed(4)}s; worst rel gap ${cs.worst.toExponential(3)} at i=${cs.at}` +
+    ` (gpu ${cs.got.toExponential(4)} vs cpu ${cs.ref.toExponential(4)})`);
+  ok("sigma_eta has something to measure", cs.n > 10, JSON.stringify(cs));
+  ok("sigma_eta matches an independent float64 weighted Welford",
+     cs.worst < 1e-3, JSON.stringify(cs));
 };
 
 

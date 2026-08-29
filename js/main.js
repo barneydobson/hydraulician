@@ -2654,6 +2654,7 @@ function tickFrame(realDt) {
   // simulated time it advanced — not by the frame, which is not a unit of
   // anything physical. See docs/averaging.md §4.4.
   SIM.avgStepField(simAdvanced);
+  SIM.avgStepColumns(simAdvanced);
   if (state.particles) SIM.advanceParticles(Math.min(realDt, 0.033) * Math.min(state.speed, 1.5));
 
   const simMs = performance.now() - t0;

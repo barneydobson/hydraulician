@@ -920,6 +920,34 @@ void main(){
   o = A + k * (phi - A);
 }`;
 
+  // ---------------------------------------------- averaging: column readings
+  /** Running means of FS_COL's own output, plus a weighted Welford moment for
+   *  the surface. Connectivity is decided per frame on the SHARP field, where
+   *  it is well posed; only the resulting scalars are averaged. Deciding it on
+   *  the mean fill instead would let a nappe that touches a pool 30% of the
+   *  time report a connected column that existed at no instant.
+   *
+   *  Welford rather than <eta^2> - <eta>^2: for a 5 mm wobble on a 1 m datum
+   *  that subtraction keeps about two digits in float32. */
+  const FS_ACOL = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 o;
+uniform sampler2D u_A, u_C;
+uniform float u_T, u_dt;
+
+void main(){
+  ivec2 c = ivec2(int(gl_FragCoord.x), 0);
+  vec4 A = texelFetch(u_A, c, 0);        // (dbar, qbar, etabar, M2)
+  vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)
+  float k = u_dt / max(u_T + u_dt, 1e-9);
+  float dN = A.x + k * (C.y - A.x);
+  float qN = A.y + k * (C.z - A.y);
+  float eO = A.z;
+  float eN = eO + k * (C.w - eO);
+  o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));
+}`;
+
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_PART, VS_PART,
-           FS_PART_DRAW, FS_DISP, FS_ACC };
+           FS_PART_DRAW, FS_DISP, FS_ACC, FS_ACOL };
 })();

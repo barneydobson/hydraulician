@@ -41,6 +41,10 @@ const SIM = (() => {
     // pass from prog.vofA's transport accumulator, and a separate program
     // because it runs once per FRAME, not once per substep.
     prog.acc  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_ACC);
+    // The column-reading accumulator (§4.3) — averages FS_COL's own output
+    // (bed, d, q, top), not the raw fields, so connectivity is decided on the
+    // sharp per-frame column and only the resulting scalars are smoothed.
+    prog.acol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_ACOL);
     prog.draw = GLH.createProgram(gl, Shaders.VS_RECT, Shaders.FS_DISP);
     prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
     gl.disable(gl.DEPTH_TEST);
@@ -278,6 +282,7 @@ const SIM = (() => {
     if (a.fboA) gl.deleteFramebuffer(a.fboA);
     if (a.fboB) gl.deleteFramebuffer(a.fboB);
     if (a.fld) a.fld.dispose();
+    if (a.col) a.col.dispose();
   }
 
   /** Lazily allocated: a session that never opens Average pays nothing.
@@ -304,7 +309,12 @@ const SIM = (() => {
     // `tf` advances in avgStepField (per frame, display) — mixing them would
     // feed the running-mean weight a window that does not match the sample.
     const fld = GLH.createDoubleBuffer(gl, S.nx, S.ny, F, RGBA, FL, null);
-    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0 };
+    // The column-reading accumulator (§4.3) — nx × 1, its own ping-pong and
+    // its own clock `tc`: it advances once per FRAME like `tf`, but it is a
+    // separate sample (FS_COL's output, not the raw field), so it gets a
+    // separate window. Do not fold it into `tf` — see the module note above.
+    const col = GLH.createDoubleBuffer(gl, S.nx, 1, F, RGBA, FL, null);
+    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0, col, tc: 0 };
     snapshotF0();
   }
   function avgStop() { if (S.avg) { disposeAvg(S.avg); S.avg = null; } }
@@ -445,6 +455,54 @@ const SIM = (() => {
       ubar[k] = buf[k * 4] / d; wbar[k] = buf[k * 4 + 1] / d;
     }
     return { fbar, pbar, ubar, wbar };
+  }
+
+  // ------------------------------------------------ averaging: column readings
+  // §4.3 of docs/averaging.md — the authoritative readings (mean depth, mean
+  // discharge, mean surface level, and the surface's standard deviation).
+  //
+  // This accumulator averages FS_COL's OWN OUTPUT, not the raw U/F fields it
+  // was built from. FS_COL already walks the connected wet run correctly on
+  // sharp data every frame; a nappe touching a pool for any fraction of the
+  // window would leave mean fill all the way between them, so deciding
+  // connectivity on the MEAN field would report a connected body that existed
+  // at no instant. Averaging the scalars FS_COL already resolved keeps every
+  // connectivity decision on data where it is well posed.
+
+  /** One frame's accumulation of the column readings. Must run AFTER
+   *  `SIM.columns()` has refreshed `S.colTex` for this frame — `columns()`
+   *  runs its GPU pass every call regardless of the readback throttle, so
+   *  this is safe to call once per frame right after it. */
+  function avgStepColumns(dtSim) {
+    if (!S.avg || !(dtSim > 0)) return;
+    gl.useProgram(prog.acol);
+    GLH.bindTex(gl, prog.acol, [["u_A", S.avg.col.read.tex], ["u_C", S.colTex]]);
+    gl.uniform1f(prog.acol.u("u_T"), S.avg.tc);
+    gl.uniform1f(prog.acol.u("u_dt"), dtSim);
+    GLH.bindTarget(gl, S.avg.col.write.fbo, S.nx, 1);
+    quad.draw();
+    S.avg.col.swap();
+    S.avg.tc += dtSim;
+  }
+
+  /** The mean columns, in SIM.columns' own layout so OVERLAY.analyse takes
+   *  them unchanged: (bed, d, q, surface). The bed is static within a window
+   *  (any geometry edit resets via avgReset), so it is copied from the live
+   *  buffer rather than averaged. */
+  function avgColumns() {
+    const buf = new Float32Array(S.nx * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.col.read.fbo);
+    gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, buf);
+    const live = columns();
+    const C = new Float32Array(S.nx * 4), sigma = new Float32Array(S.nx);
+    for (let i = 0; i < S.nx; i++) {
+      C[i * 4]     = live[i * 4];              // bed
+      C[i * 4 + 1] = buf[i * 4];               // d̄
+      C[i * 4 + 2] = buf[i * 4 + 1];           // q̄
+      C[i * 4 + 3] = buf[i * 4 + 2];           // η̄
+      sigma[i] = RECON.sigma(buf[i * 4 + 3], S.avg.tc);
+    }
+    return { C, sigma };
   }
 
   // ------------------------------------------------------------------ step
@@ -838,6 +896,6 @@ const SIM = (() => {
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            boxForce, dt, get, inletVel, bands, rescaleFill,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
-           avgStepField, avgField,
+           avgStepField, avgField, avgStepColumns, avgColumns,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

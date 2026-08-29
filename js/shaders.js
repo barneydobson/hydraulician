@@ -888,6 +888,38 @@ void main(){
   o = vec4(pow(clamp(c, 0.0, 1.0), vec3(0.95)), 1.0);
 }`;
 
+  // ------------------------------------------------ averaging: Favre field
+  /** One running weighted-mean update of (f u_c, f w_c, f, P).
+   *
+   *  Collocation is the trap here: u lives on the west face and w on the
+   *  south face, so both are averaged to the CENTRE before being weighted by
+   *  f — exactly as FS_COL does it. Weighting f by the west-face velocity
+   *  alone puts a directional bias in every mean.
+   *
+   *  The weight is h/(T+h) with T held on the CPU, so this is the same
+   *  formula as RECON.accumStep and is tested there. */
+  const FS_ACC = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 o;
+uniform sampler2D u_A, u_U, u_F;
+uniform vec2  u_res;
+uniform float u_T, u_dt;
+
+ivec2 CL(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
+
+void main(){
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 A = texelFetch(u_A, c, 0);
+  vec4 U = texelFetch(u_U, c, 0);
+  float f  = texelFetch(u_F, c, 0).r;
+  float uc = 0.5 * (U.r + texelFetch(u_U, CL(c + ivec2(1,0)), 0).r);
+  float wc = 0.5 * (U.g + texelFetch(u_U, CL(c + ivec2(0,1)), 0).g);
+  vec4 phi = vec4(f * uc, f * wc, f, U.b);
+  float k = u_dt / max(u_T + u_dt, 1e-9);
+  o = A + k * (phi - A);
+}`;
+
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_PART, VS_PART,
-           FS_PART_DRAW, FS_DISP };
+           FS_PART_DRAW, FS_DISP, FS_ACC };
 })();

@@ -2650,6 +2650,10 @@ function tickFrame(realDt) {
     }
   }
   const col = SIM.columns();
+  // Averaging samples the frame the solver just advanced, weighted by the
+  // simulated time it advanced — not by the frame, which is not a unit of
+  // anything physical. See docs/averaging.md §4.4.
+  SIM.avgStepField(simAdvanced);
   if (state.particles) SIM.advanceParticles(Math.min(realDt, 0.033) * Math.min(state.speed, 1.5));
 
   const simMs = performance.now() - t0;
@@ -4026,6 +4030,8 @@ window.APP = {
   probe: (x, z) => SIM.probe(x, z),
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   placeCV,                                 // the Force box tool, headless
+  // The averaging mode's public surface — Task 6's Favre display field.
+  avg: { start: SIM.avgStart, stop: SIM.avgStop, field: SIM.avgField, T: SIM.avgT },
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {
     const c = SIM.columns(); let v = 0;

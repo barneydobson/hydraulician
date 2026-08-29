@@ -37,6 +37,10 @@ const SIM = (() => {
     prog.vofA = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF_ACC);
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
+    // The Favre display accumulator (§4.1 of docs/averaging.md) — a separate
+    // pass from prog.vofA's transport accumulator, and a separate program
+    // because it runs once per FRAME, not once per substep.
+    prog.acc  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_ACC);
     prog.draw = GLH.createProgram(gl, Shaders.VS_RECT, Shaders.FS_DISP);
     prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
     gl.disable(gl.DEPTH_TEST);
@@ -273,6 +277,7 @@ const SIM = (() => {
     if (a.T) a.T.dispose();
     if (a.fboA) gl.deleteFramebuffer(a.fboA);
     if (a.fboB) gl.deleteFramebuffer(a.fboB);
+    if (a.fld) a.fld.dispose();
   }
 
   /** Lazily allocated: a session that never opens Average pays nothing.
@@ -292,7 +297,14 @@ const SIM = (() => {
     // Identity of the attached texture is the only honest test.
     const fboA = GLH.createFBO2(gl, S.F.b.tex, T.b.tex);
     const fboB = GLH.createFBO2(gl, S.F.a.tex, T.a.tex);
-    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0 };
+    // The Favre display accumulator (§4.1) — its own ping-pong, because it is
+    // a plain single-attachment target updated once per FRAME by prog.acc,
+    // not once per substep by the vof pass's MRT. `tf` is its own clock for
+    // the same reason: `t` advances inside SIM.step (per substep, transport),
+    // `tf` advances in avgStepField (per frame, display) — mixing them would
+    // feed the running-mean weight a window that does not match the sample.
+    const fld = GLH.createDoubleBuffer(gl, S.nx, S.ny, F, RGBA, FL, null);
+    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0 };
     snapshotF0();
   }
   function avgStop() { if (S.avg) { disposeAvg(S.avg); S.avg = null; } }
@@ -392,6 +404,47 @@ const SIM = (() => {
       }
     }
     return { max, mean: cnt ? sum / cnt : 0, n: cnt, nSrc, Fmax };
+  }
+
+  // ------------------------------------------------- averaging: display field
+  // §4.1 of docs/averaging.md. This is a DIFFERENT object from the transport
+  // accumulator above: that one stores the scheme's own limited face fluxes,
+  // certified against the discrete mass balance; this one stores a physically
+  // meaningful mean velocity for the picture the app will eventually paint.
+  // One field cannot do both jobs — see docs/averaging.md §3.
+
+  /** One frame's accumulation of the display field. Called BEFORE `S.avg.tf`
+   *  is advanced, because the running-mean weight needs the window as it was. */
+  function avgStepField(dtSim) {
+    if (!S.avg || !(dtSim > 0)) return;
+    gl.useProgram(prog.acc);
+    GLH.bindTex(gl, prog.acc, [["u_A", S.avg.fld.read.tex],
+                               ["u_U", S.U.read.tex], ["u_F", S.F.read.tex]]);
+    gl.uniform2f(prog.acc.u("u_res"), S.nx, S.ny);
+    gl.uniform1f(prog.acc.u("u_T"), S.avg.tf);
+    gl.uniform1f(prog.acc.u("u_dt"), dtSim);
+    GLH.bindTarget(gl, S.avg.fld.write.fbo, S.nx, S.ny);
+    quad.draw();
+    S.avg.fld.swap();
+    S.avg.tf += dtSim;
+  }
+
+  /** The mean state, normalised. `ubar`/`wbar` are FAVRE velocities:
+   *  <f u_c>/f-bar, not <u_c> — the density-weighted mean is the one that
+   *  leaves the equations looking like themselves in the heavy-fluid limit. */
+  function avgField() {
+    const n = S.nx * S.ny, buf = new Float32Array(n * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    const fbar = new Float32Array(n), pbar = new Float32Array(n);
+    const ubar = new Float32Array(n), wbar = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const f = buf[k * 4 + 2];
+      fbar[k] = f; pbar[k] = buf[k * 4 + 3];
+      const d = Math.max(f, 1e-6);
+      ubar[k] = buf[k * 4] / d; wbar[k] = buf[k * 4 + 1] / d;
+    }
+    return { fbar, pbar, ubar, wbar };
   }
 
   // ------------------------------------------------------------------ step
@@ -785,5 +838,6 @@ const SIM = (() => {
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            boxForce, dt, get, inletVel, bands, rescaleFill,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
+           avgStepField, avgField,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

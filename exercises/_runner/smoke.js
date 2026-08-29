@@ -673,6 +673,29 @@ SUITES.avg = async (B) => {
      e.segs1 === e.segs0 + 1 && e.n > 100 &&
      e.max < avgBound(e.Fmax, 300 * e.dt, e.dt, e.dx),
      JSON.stringify(e));
+
+  // The Favre display field (Task 6): a per-FRAME accumulator, distinct from
+  // the transport accumulator exercised above — APP.frames() drives tickFrame
+  // (and with it SIM.avgStepField), where APP.tick() drives SIM.step alone.
+  const g2 = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    APP.SIM.avgStart(); APP.frames(180);
+    const A = APP.SIM.avgField();
+    const S = APP.sim, nx = S.nx, ny = S.ny;
+    let wet = 0, finite = true, fmax = 0;
+    for (let k = 0; k < nx*ny; k++) {
+      if (!Number.isFinite(A.fbar[k]) || !Number.isFinite(A.ubar[k])) { finite = false; break; }
+      if (A.fbar[k] > 0.5) wet++;
+      if (A.fbar[k] > fmax) fmax = A.fbar[k];
+    }
+    APP.SIM.avgStop();
+    return { keys: Object.keys(A).sort(), wet, finite, fmax, n: nx*ny };
+  })()`);
+  ok("avgField returns the four mean-state arrays",
+     g2.keys.join(",") === "fbar,pbar,ubar,wbar", g2.keys.join(","));
+  ok("avgField is finite everywhere", g2.finite);
+  ok("avgField finds the water", g2.wet > 0.05 * g2.n, `wet ${g2.wet}/${g2.n}`);
+  ok("mean fill is a fill (slot storage excepted)", g2.fmax < 1.5, `fmax ${g2.fmax}`);
 };
 
 // -------------------------------------------------------------------- main

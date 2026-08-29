@@ -1,166 +1,94 @@
-# Time averaging: discrete conservation and free-surface reconstruction
+# Time averaging: the Average mode
 
-**Status: implemented, and reachable.** The three accumulators (§4), the
-reconstruction numerics (§7, `js/reconstruct.js`), the channel overlay's
-mean-column path (§4.3) and the display path (§6) are all on the branch and
-under test — `node test/recon-test.mjs`, `node test/mutation-test.mjs`,
-`node exercises/_runner/smoke.js --only=avg` and `node test/ui-smoke.mjs`.
-The mode is the VIEW family's **Average** button, the `A` key, the Controls
-panel's *Average the flow* row and `APP.avg.toggle()`, all of which go through
-`setAverage` in `main.js`. This document remains the binding specification:
-averaged quantities, discrete balances, reconstruction and acceptance tests.
+**Average** (VIEW → **A** on the strip, the `A` key, or the Controls panel's
+*Average the flow* row) is a measurement mode, not a blur filter. While it is
+on, the solver keeps running and accumulators collect the flow: the colour,
+the free-surface line, the channel overlay and every number derived from them
+describe **one averaging window**, so a screenshot never mixes two flow
+states. No simulation pass reads an accumulator — switching Average on or off
+cannot alter the solution.
 
-The legend card carries `T`, `f̄`, `d̄`, `δ_a` and `σ_η`. Two things an earlier
-draft asked it for — the residuals of §5 and the 1D/2D depth discrepancy of
-§7.2 — are deliberately not on it, because both need `transportResidual()` and
-that is two full-field readbacks at about 1.2 s; they live at
-`APP.avg.residual()` instead. §9 states the reasoning where a reader of the
-reset conditions will meet it.
+Two principles fix everything below:
 
-The VIEW family provides a **Live / Average** toggle. In Average mode the solver
-continues to advance while diagnostic accumulators collect the flow. Live mode
-displays the instantaneous field. No simulation pass reads an accumulator, so
-the averaging mode does not alter the numerical solution.
+1. **The mean satisfies the solver's own discrete conservation law**, not a
+   continuum approximation to it: conservation diagnostics use the numerical
+   flux the VOF pass actually advanced (§1, §5).
+2. **The interface may smear in storage, but is reassembled on readout**: the
+   stored mean fill describes where the surface spent the window, and the
+   displayed surface and reported depths are reconstructed from it (§7).
 
-Average is a measurement mode, not a blur filter. While it is active, the field,
-the channel overlay and every number derived from that overlay must describe the
-same averaging window. Otherwise a single screenshot would combine two
-different flow states.
-
-Two requirements fix the design, and everything below follows from them:
-
-1. **The mean must satisfy the solver's own discrete conservation law**, not a
-   continuum approximation to it. Conservation diagnostics and conservative
-   discharge must use the numerical flux advanced by the VOF pass.
-2. **The interface may smear in storage, but must be reassembled on readout.**
-   The stored mean fill describes the surface distribution; displayed surfaces
-   and reported depths require a separate reconstruction.
-
-The hard part is that the quantity this solver conserves is not the quantity
-that makes a good picture. The numerical transport flux and the velocity used
-for visualisation are different finite-grid quantities, so §§3–4 keep them
-separate.
+The legend card shows the elapsed window `T` and, under the cursor, the mean
+fill `f̄`, the equivalent water depth `d̄`, the aeration gap `δ_a` and the
+surface standard deviation `σ_η`. The conservation residual of §5 and the
+1D/2D depth cross-check of §7 are not on the card — each needs full-field
+readbacks far too slow for a per-frame readout — and are available on demand
+as `APP.avg.residual()`.
 
 ---
 
-## 1 · Conservative flux and source operators
+## 1 · What the solver conserves
 
-From [numerics.md](numerics.md): in the heavy-fluid limit the fill fraction *is*
-the density, `ρ = f ρ_w`, and the continuum statement the vof pass approximates
-is
-
-```math
-\frac{\partial f}{\partial t} + \nabla\cdot(f\mathbf{u}) = 0
-```
-
-What it actually advances is a discrete flux-form update with a **van Leer face
-reconstruction**, an **interface-compression flux**, and a **donor-cell
-positivity limiter**:
+From [numerics.md](numerics.md): in the heavy-fluid limit the fill fraction
+*is* the density, and the VOF pass advances a discrete flux-form update — a
+van Leer face reconstruction, an interface-compression flux, and a donor-cell
+positivity limiter:
 
 ```math
-f^{m+1}_{ij} = f^{m}_{ij} - \frac{h_m}{\Delta x}\Bigl[(F^{E}-F^{W}) + (F^{N}-F^{S})\Bigr]^{m}_{ij}, \qquad
-F = \operatorname{donorClamp}\bigl(u_f\,f_f^{\mathrm{vL}} + F_{\mathrm{comp}}\bigr)
+f^{m+1}_{ij} = f^{m}_{ij} - \frac{h_m}{\Delta x}\Bigl[(F^{E}-F^{W}) + (F^{N}-F^{S})\Bigr]^{m}_{ij}
 ```
 
-**The cell-centred product `f u` is not this flux.** For
-fills `(0, 0.2, 0.8, 1)` with positive face velocity, `faceVal` returns
-`f_face = 0.35` where the upwind cell value is `0.20` — a factor of **1.75**,
-before compression or clamping is applied at all. The compression flux
-`c_α|u|·α(1−α)·∇α/|∇α|` is deliberately artificial: it conserves `f` while
-sharpening the interface, and it cannot be represented as fluid travelling at
-the displayed velocity.
+**The cell-centred product `f u` is not this flux**: the face reconstruction
+and the compression term cannot be written as fluid travelling at the
+displayed velocity. That is why display and conservation use separate
+accumulators (§4).
 
-The pass also applies non-conservative updates after flux divergence. These are
-represented by a source term in the discrete balance:
-
-- the **relaxation sponge** at level-controlled edges, which represents
-  exchange with an external reservoir — in the shader's words, *"Mass
-  conservation is intentionally given up inside the sponge: it IS the
-  reservoir"*;
-- the two point-volume sources;
-- the initial `min(f_new, 8.0)` and final range safety clamps.
-
-The ghost ring supplies boundary values and is excluded from the set of
-conserved control volumes. Flux through its interfaces is retained as boundary
-flux. Section 5 includes the post-advection source term for every interior cell.
-
-Both interior neighbours of a face compute the identical flux. Face velocity,
-van Leer reconstruction, compression and donor limiting therefore give
-`F^E_{i-1,j}=F^W_{i,j}` and `F^N_{i,j-1}=F^S_{i,j}`. Emitting `(F^E,F^N)` stores
-each interior face once. The left and bottom boundary faces require explicit
-handling because their owner texels lie in the early-return ghost ring; §4.2
-specifies that handling.
+Updates the pass applies *after* the flux divergence — the relaxation sponges
+at level-controlled edges (see
+[boundary-conditions.md](boundary-conditions.md)), the two point sources, and
+the range safety clamps — enter the balance as a source term `S`. Both
+neighbours of a face compute the identical flux, so each interior face has one
+well-defined value; the ghost ring supplies boundary state, and flux through
+its inner faces is boundary exchange.
 
 ---
 
-## 2 · Why a conditional average is the wrong tool
+## 2 · Why not a wet-cells-only average
 
-A conditional average accumulates `u` only where the cell is wet
-(`χ = 𝓗(f − ½)`), divides by wet duration, and stores the wet fraction. Its
-result does not recover the fill-weighted transport:
-
-```math
-\gamma\,\bar{u} \;\neq\; \langle f u\rangle
-```
-
-The difference is the correlation between fill and velocity. The threshold also
-introduces a discontinuity within the surface-excursion band and makes the
-result depend on a numerical cut-off.
-
-Both objections are answered by weighting with `f` itself.
+Averaging the velocity only over the moments a cell is wet does not recover
+the fill-weighted transport (`γ ū ≠ ⟨f u⟩` — the difference is the
+correlation between fill and velocity), and it hangs the result on an
+arbitrary wet/dry threshold. Weighting by `f` itself does the same job
+continuously: a frame in which the cell held air contributes `f ≈ 0` and
+cannot drag the mean toward zero.
 
 ---
 
-## 3 · The Favre average — a continuum argument, and its limits
+## 3 · The Favre average
 
-Since `f` is the density, the average that leaves the *continuum* equations
-looking like their instantaneous forms is the density-weighted (Favre) average:
+Since `f` is the density, the velocity Average stores is the density-weighted
+(**Favre**) mean:
 
 ```math
 \bar{f} = \langle f \rangle, \qquad
 \hat{\mathbf{u}} = \frac{\langle f\,\mathbf{u}\rangle}{\langle f\rangle}
 ```
 
-with `⟨·⟩` a plain time average over the window — no conditioning, no threshold.
-The Favre weight does continuously what `χ` did with a step: a frame in which
-the cell held air contributes `f ≈ 0` and cannot drag the mean toward zero.
+with `⟨·⟩` a plain time average over the window — no conditioning, no
+threshold. `û` is the physical mean velocity and is what every velocity-based
+field displays (§6).
 
-In the continuum, averaging the conservation law telescopes on the left and
-gives `∇·⟨f u⟩ = −[f(T)−f(0)]/T`, so the mean flux is divergence-free to
-`O(1/T)`.
+`û` is a display quantity, not a conservation certificate: it is sampled at
+cell centres once per frame, while the conserved transport is the per-substep
+face flux of §1. The two are accumulated separately (§4).
 
-**That statement does not transfer to the accumulator.** `⟨f u_c⟩` sampled at
-cell centres once per frame differs from the scheme's `⟨F⟩` by three distinct
-errors: temporal quadrature (one sample per frame representing many substeps),
-spatial reconstruction (§1's factor of 1.75 at the interface), and model flux
-(compression and donor limiting are absent). Thus `û` is the physical mean
-velocity used for display, but it does not certify the discrete mass balance.
-Sections 4.1 and 4.2 use separate accumulators.
-
-**Momentum.** Favre-averaging the momentum equation gives
-
-```math
-\frac{\partial (\bar{f}\hat{\mathbf{u}})}{\partial t}
-+ \nabla\cdot\left(\bar{f}\,\hat{\mathbf{u}}\hat{\mathbf{u}}\right)
-+ \nabla\cdot\left(\bar{f}\,\mathbf{R}\right)
-= -\frac{\nabla \bar{p}}{\rho_w} + \bar{f}\,\mathbf{g} + \dots,
-\qquad
-\mathbf{R} = \frac{\langle f\,\mathbf{u}''\mathbf{u}''\rangle}{\langle f\rangle}
-```
-
-This is a continuum interpretation, not a discrete law satisfied by the solver:
-the velocity pass advances momentum in advective rather than conservative form,
-and its clamps, source overwrites, wall function and staggered interpolation do
-not commute with averaging. A field of the mean flow does not close a mean
-momentum budget without the fluctuation stress `R`. The control-volume and flux
-instruments therefore retain separate EMAs of their complete instantaneous
-budgets.
+Likewise, fields of the mean flow do not close a mean *momentum* budget —
+that would need the unresolved fluctuation stresses. The control-volume and
+flux instruments therefore keep their own running averages of their complete
+instantaneous budgets rather than re-deriving them from the mean field.
 
 ---
 
 ## 4 · Three accumulators
-
-The three accumulators have distinct definitions and uses.
 
 | Product | Accumulated | Cadence | Answers |
 | --- | --- | --- | --- |
@@ -170,252 +98,138 @@ The three accumulators have distinct definitions and uses.
 
 ### 4.1 The Favre display accumulator — `nx × nz`
 
-One `RGBA32F` ping-pong, one fullscreen pass per frame, storing **running
-weighted means** rather than raw sums (§4.4):
+One full-grid buffer, advanced once per frame, storing running means of
 
 ```math
 \bigl(\overline{f u_c},\; \overline{f w_c},\; \bar f,\; \overline{p/\rho_w}\bigr)
 ```
 
-from which `û = \overline{f u_c}/\max(\bar f, ε)` and `ŵ` likewise. Pressure is
-Reynolds-averaged, not Favre-averaged, because it enters the mean momentum
-equation as `−∇p̄`; it cannot be recovered from `f̄` either, since the EOS is
-nonlinear.
+from which `û = \overline{f u_c}/\max(\bar f, ε)` and `ŵ` likewise. Velocity
+is interpolated from the staggered faces to the cell centre *before* being
+weighted by `f`, exactly as the live column reduction does. Pressure is
+Reynolds-averaged, not Favre-averaged, because it is read as `−∇p̄`; the
+stored channel is kinematic pressure `p/ρ_w`, so pressure head is that
+channel divided by `g` — never divided by density a second time.
 
-The shader channel `U.b` stores kinematic pressure `p/ρ_w` in `m²/s²`.
-Implementation code therefore obtains pressure head as `U.b/g`; it must not
-divide that channel by density a second time.
+This accumulator serves the colouring, the heads and the excursion band.
 
-**Collocation.** `u` lives on the west face, `w` on the south face, and `f` at
-the centre. The accumulator interpolates velocity to the centre before
-weighting it by `f`:
+### 4.2 The exact transport accumulator — per substep
 
-```math
-u_c = \tfrac{1}{2}\bigl(u_{i} + u_{i+1}\bigr), \qquad
-w_c = \tfrac{1}{2}\bigl(w_{j} + w_{j+1}\bigr)
-```
-
-exactly as `FS_COL` already does — and accumulate `f·u_c`. Multiplying `f` by
-the west-face velocity alone introduces a directional bias and still does not
-reproduce the VOF flux.
-
-This accumulator serves the **colouring, the heads and the excursion band**.
-
-### 4.2 The exact transport accumulator — per substep, via MRT
-
-`FS_VOF` gains a **second render target**. It emits the fluxes it has already
-computed, so no flux arithmetic changes and the identical-flux rule of §1 is
-untouched:
+The VOF pass writes a second output: the face fluxes it has just computed,
+and the source rate, as running means —
 
 ```math
 \bigl\langle F^{E}\bigr\rangle,\quad
 \bigl\langle F^{N}\bigr\rangle,\quad
-\bigl\langle S \bigr\rangle
+\bigl\langle S \bigr\rangle, \qquad
+S^m = \frac{f_{\mathrm{final}}^{m+1}-f_{\mathrm{cons}}^{m+1}}{h_m}
 ```
 
-as running `h`-weighted means. For each interior cell, preserve the unclamped
-conservative candidate
-
-```math
-f_{\mathrm{cons}}^{m+1}
-= f^m-h_m
-  \left[(F^E-F^W)+(F^N-F^S)\right]^m/\Delta x.
-```
-
-apply the safety clamps, sponges and point sources to obtain `f_final`, and
-define the source **rate**
-
-```math
-S^m = \frac{f_{\mathrm{final}}^{m+1}-f_{\mathrm{cons}}^{m+1}}{h_m}.
-```
-
-The third channel stores the running mean of this rate. Equivalently, an
-implementation may accumulate the unweighted increments
-`f_final−f_cons` and divide their sum by `T`; it must not apply an additional
-factor of `h` to those increments.
-
-For interior cells, the red and green channels store `F^E` and `F^N`. The
-divergence is evaluated as
-
-```math
-(F^E_{ij}-F^E_{i-1,j}+F^N_{ij}-F^N_{i,j-1})/\Delta x.
-```
-
-This layout requires two boundary cases. Texels in the left ghost column store
-the flux through the face between columns 0 and 1, evaluated with exactly the
-same expression as `F^W` in interior column 1. Texels in the bottom ghost row
-store the corresponding `F^S` of interior row 1. Right and top boundary fluxes
-are already stored as `F^E` and `F^N` by the last interior column and row. Ghost
-fill is boundary state, not conserved storage, and has no `S` entry.
-
-Five details matter:
-
-- solid-cell returns pass all accumulator channels through unchanged;
-- ghost-cell returns update only the required left or bottom boundary-flux
-  channel and preserve the other channels;
-- `F` and the transport accumulator ping-pongs swap together every substep;
-- the transport duration is advanced every substep. If `T_m` is the duration
-  before a substep, its running-mean weight is `h_m/(T_m+h_m)`;
-- separate `vof` and `vof+accum` program variants avoid MRT bandwidth when
-  Average is inactive.
+where `f_cons` is the purely conservative update of §1 and `f_final` is the
+fill after sponges, sources and clamps. `S` is a **rate** (fill per second):
+everything non-conservative the pass does is captured in it, so the balance
+of §5 holds in every interior cell, source or not. Each interior face is
+stored once (a cell owns its east and north faces); the left and bottom
+boundary fluxes are held by the ghost texels, computed by the same expression
+the interior neighbour uses. Solid cells pass their accumulator through
+unchanged.
 
 ### 4.3 The column and overlay accumulator — `nx × 1`
 
-`FS_COL` already runs every frame and already resolves nappes, spray, soffits
-and perched pools by walking the *connected* wet run on sharp data. Its output
-is accumulated in a second, tiny ping-pong:
+The per-column reduction already runs every frame and already resolves
+nappes, spray, soffits and perched pools by walking the *connected* wet run
+on the sharp instantaneous field. Average accumulates its **output**:
 
 ```math
 \bigl(\bar d,\; \bar q,\; \bar\eta,\; M_2^{\eta}\bigr)
 ```
 
-giving `⟨d⟩`, `⟨q⟩`, `⟨η⟩` and `σ_η = √(M₂/T)`. The bed is static within a
-window (any geometry edit resets), so it needs no channel.
+giving `⟨d⟩`, `⟨q⟩`, `⟨η⟩` and `σ_η = √(M₂/T)`. Connectivity is decided on
+each instantaneous field before its scalars are averaged, never on the mean
+(§7.2).
 
-Connectivity is decided on each instantaneous field before the resulting
-scalars are averaged. This prevents the mean fill from defining a connected
-body that was not present instantaneously (§7.2).
+These are the **authoritative readings**. `⟨d⟩` and `⟨q⟩` are geometric,
+built on `min(f,1)` — what a flume measures — deliberately distinct from the
+conserved `f` balance, whose slot excess is storage but not geometric water.
+`⟨η⟩` is where the surface line is drawn; the conservation claim belongs to
+`⟨d⟩`, an integral.
 
-These are the **authoritative readings**. Note what they are and are not: `⟨d⟩`
-and `⟨q⟩` are geometric, built on `min(f,1)`, which is what a flume measures and
-is deliberately *not* the conserved `f` balance — the slot excess is conserved
-storage but not geometric water. And `⟨η⟩` is the mean of a top-cell selection,
-so the surface *line* may properly be drawn at it while the conservation claim
-belongs to `⟨d⟩`, an integral.
-
-**The channel overlay consumes the mean columns too.** While Average is active,
-assemble the same four-channel buffer that `OVERLAY.analyse` receives live,
-
-```math
-\bar C_i = \left(z_{b,i},\;\bar d_i,\;\bar q_i,\;\bar\eta_i\right),
-```
-
-and derive the displayed `d`, `d_c`, `d_n`, `V`, `Fr`, energy grade line,
-profile class and jump boxes from `C̄`. Thus `d_c=(q̄²/g)^{1/3}`, the EGL and
-`d_n` are quantities **from the mean column**, not time averages of their
-instantaneous values. `findJumps` likewise receives the analysis built from
-`C̄`, so its `d₁`, `d₂` and conjugate-depth comparison agree with the plotted
-profile. No channel-overlay quantity may fall back to the live column buffer
-while Average is active.
-
-`OVERLAY.analyse` already prefilters live `d` and `q` in space and time, then
-applies an EMA to its global `d_n` estimate. Average mode uses `d̄` and `q̄`
-directly: it bypasses the initial `sm()` prefilter, `_hA`, `_qA` and the `_ynK`
-EMA. The geometry guards, bed-slope calculation and the documented windows used
-to differentiate the EGL remain in place. Applying the live prefilters to `C̄`
-would introduce a second averaging operation and would broaden the mean jump.
-`OVERLAY.resetEstimates(sim)` runs on both transitions between Live and Average
-so neither mode inherits the other's temporal state.
+**The channel overlay consumes the mean columns too.** While Average is
+active, the overlay's `d`, `d_c`, `d_n`, `V`, `Fr`, energy grade line,
+profile class and jump boxes are all derived from the mean column buffer
+`C̄ = (z_b, d̄, q̄, η̄)` — so `d_c = (q̄²/g)^{1/3}` and friends are quantities
+*of the mean column*, and the jump boxes agree with the plotted profile. No
+overlay quantity falls back to the live columns while Average is on. The
+overlay's live-mode spatial prefilters and temporal EMAs are bypassed —
+applying them to `C̄` would average twice and broaden the mean jump — and its
+temporal estimates are reset on every switch between Live and Average, so
+neither mode inherits the other's state.
 
 ### 4.4 Sampling and online statistics
 
-The display and reading accumulators advance **once per rendered frame**, by
-`Δt_n = Σ_k h_k` — the `simAdvanced` that `tickFrame` already computes. A
-full-grid accumulation per substep would add a separate pass while `nsub` can
-reach 400. The transport accumulator advances per substep within `FS_VOF`
-because the exact numerical flux is available there.
+The display and column accumulators advance once per rendered frame, weighted
+by the simulated time that frame actually advanced; the transport accumulator
+advances every substep, weighted by the substep `h`. Weighting is by time,
+not by sample count — frames advance unequal `Δt`, and a per-frame average
+would bias toward the slow frames.
 
-Weighting uses `Δt`, not frame count. Since `Δt_n` varies between frames,
-`(1/N)Σ` is a rendered-frame average rather than a time average. Their
-difference is `−cov(φ_n,Δt_n)/Δt̄`; adaptive workload can correlate `Δt_n` with
-the sampled state.
-
-**Store running means, not sums.** With `T` held on the CPU as a uniform,
+Everything is stored as **running means**,
 
 ```math
 \bar\phi_{n+1} = \bar\phi_n + \frac{\Delta t_n}{T_n + \Delta t_n}\left(\phi_n - \bar\phi_n\right)
 ```
 
-and weighted Welford for the variance,
-
-```math
-M_2^{n+1} = M_2^{n} + \Delta t_n\,(\phi_n - \bar\phi_n)(\phi_n - \bar\phi_{n+1})
-```
-
-In `RGBA32F`, raw sums lose small `Δt` increments as `T` grows. In addition,
-`⟨η²⟩ − ⟨η⟩²` for a 5 mm wobble on a 1 m datum is a ratio of
-`2.5×10⁻⁵` against float32's `1.2×10⁻⁷` eps — about **two surviving digits of
-σ²**. Welford `M₂` occupies the same channel and avoids this subtraction.
+with a Welford second moment for the surface variance — forms that stay
+accurate in 32-bit floats over arbitrarily long windows, where raw sums and
+the naive `⟨η²⟩ − ⟨η⟩²` would not.
 
 ---
 
-## 5 · The discrete mass balance, and two residuals
+## 5 · The discrete mass balance
 
-Let `Ω` denote the interior control-volume cells; the ghost ring is excluded.
-Telescoping the substep update over the window and using
-`F^E_{i-1,j}=F^W_{i,j}` gives
+Telescoping the substep update over the window gives, in every interior cell,
 
 ```math
-\boxed{\;\frac{f(T)-f(0)}{T} \;+\; \nabla_h\!\cdot\!\left\langle \mathbf{F}\right\rangle \;-\; \left\langle S \right\rangle \;=\; 0\;}
+\boxed{\;\frac{f(T)-f(0)}{T}
+\;+\; \nabla_h\!\cdot\!\left\langle \mathbf{F}\right\rangle
+\;-\; \left\langle S \right\rangle \;=\; 0\;}
 ```
 
-with `f(0)` copied when Average is switched on. The identity applies in source
-cells as well as source-free cells because `S` contains the complete difference
-between the conservative candidate and the final interior fill. Boundary
-exchange appears through the four boundary faces of `Ω`.
+with `f(0)` copied when the window opens. Storage change, mean flux
+divergence and mean source close exactly — in source cells as well as
+source-free ones, because `S` carries the complete non-conservative
+difference. Boundary exchange appears through the ring faces.
 
-### The residual is not bounded — it grows as `√T`
+Two derived quantities:
 
-The identity is exact in exact arithmetic, so what a run actually reports is
-float32 error. Naming the mechanism matters, because it sets the shape of the
-tolerance and an earlier draft of this section got it wrong.
+- **A conservative transport discharge.** `Q̄_F = Δx Σ_j ⟨F^E⟩_{ij}` is
+  constant between vertical sections of a steady, source-free reach. It
+  includes the artificial interface-compression flux, and is therefore
+  distinguished from the geometric discharge `q̄` of §4.3.
+- **A display residual.** The same balance evaluated on `⟨f u_c⟩` instead of
+  `⟨F⟩` does not vanish: it measures the gap between the display
+  reconstruction and the conserved transport field, and it settles on a
+  discretisation floor rather than shrinking with `T`.
 
-It is **not** a fixed floor. The running means of §4.4 are built by the
-recursion `⟨φ⟩ ← ⟨φ⟩ + k(φ − ⟨φ⟩)`, evaluated in float32, so each of the four
-face means carries a rounding step of about `½ ulp⟨F⟩` per substep. Those steps
-accumulate as a random walk, and the residual divides a *difference* of face
-means by `Δx`:
+The identity is exact in exact arithmetic; what a run reports is float32
+rounding, which accumulates as a random walk. The transport residual
+therefore **grows as `√T`**,
 
 ```math
-\mathcal{R}_{\max}\;\approx\;C\,\varepsilon\,\bigl\lVert\langle F\rangle\bigr\rVert_\infty\,\frac{\sqrt{T/\Delta t}}{\Delta x},\qquad \varepsilon = 2^{-23}
+\mathcal{R}_{\max}\;\lesssim\;C\,\varepsilon\,\bigl\lVert\langle F\rangle\bigr\rVert_\infty\,\frac{\sqrt{T/\Delta t}}{\Delta x},\qquad \varepsilon = 2^{-23},
 ```
 
-Measured on `h23` at Low (`Δx = 16.3 mm`, `Δt = 2.626×10⁻⁴ s`) across a 256×
-range in substep count — log-log slope **0.472** for `‖𝓡‖∞` and **0.464** for
-the mean, so this is the whole field drifting, not a few outlier cells:
-
-| substeps `n` | `T` (s) | `‖𝓡‖∞` | mean residual | `C` |
-| --- | --- | --- | --- | --- |
-| 200 | 0.0525 | 2.067×10⁻⁴ | 7.25×10⁻⁶ | 0.439 |
-| 800 | 0.2101 | 4.633×10⁻⁴ | 1.30×10⁻⁵ | 0.538 |
-| 3 200 | 0.8403 | 7.830×10⁻⁴ | 2.47×10⁻⁵ | 0.472 |
-| 12 800 | 3.3613 | 1.297×10⁻³ | 4.67×10⁻⁵ | 0.399 |
-| 51 200 | 13.4454 | 3.253×10⁻³ | 9.54×10⁻⁵ | 0.513 |
-
-`C` stays inside `0.40–0.54` over that whole range, and reaches `0.745` on an
-ANGLE/D3D11 path, which is what makes the law usable as a gate: scale by
-`√(T/Δt)` and the margin stops moving.
-
-One substep is a **different and smaller** regime. There the storage term
-dominates: `f` is stored in float32, so an update below half an ulp of `f`
-rounds to a no-op and that flux can never reach `f(T) − f(0)`. The measured
-`n = 1` maximum is `2.2697448730469×10⁻⁴` against `½ ulp(1.007)/Δt =
-2.2697448730469×10⁻⁴` — thirteen significant figures. That is the **floor**,
-not the ceiling; a constant tolerance drawn from it is right at one window
-length and wrong at every other. For scale, `∇ₕ·⟨F⟩` itself runs to `135 s⁻¹`
-on this scene, so a genuinely mis-tiled face sits five orders of magnitude
-above either regime.
-
-It buys two things beyond the check itself:
-
-- **A conservative numerical transport discharge.**
-  `Q̄_F = Δx Σ_j ⟨F^E⟩_{ij}` is constant between vertical sections when the
-  intervening reach has zero mean storage change, zero integrated source, and
-  no net flux through its top or bottom boundaries. `Q̄_F` includes the
-  artificial interface-compression flux and is therefore distinguished from
-  the geometric discharge `q̄` of §4.3.
-- **A display-field conservation diagnostic.** The same expression evaluated
-  on `⟨f u_c⟩` instead of `⟨F⟩` gives a second, larger residual `𝓡_disp`. It does
-  not tend to zero with `T`: it settles on an `O(Δt_frame, Δx^p)` floor set by
-  the quadrature and reconstruction errors of §3. It quantifies the difference
-  between the display reconstruction and the conserved transport field.
+and any tolerance on it must scale the same way — the conservation gate in
+the test suite does. A genuinely broken flux sits orders of magnitude above
+this bound. `APP.avg.residual()` computes the residual from the stored means
+on demand.
 
 ---
 
 ## 6 · The fields, all derived from the mean state
 
-Only `(f̄, û, ŵ, p̄)` is accumulated for display; each colouring is computed from
-it by the same display-pass branch that draws it live:
+Only `(f̄, û, ŵ, p̄)` is accumulated for display; each colouring is computed
+from it by the same display-pass branch that draws it live:
 
 ```math
 \frac{\bar{p}}{\rho g}, \qquad
@@ -429,34 +243,30 @@ it by the same display-pass branch that draws it live:
 \tilde{m} = \bar{f}\,\hat{u}\,|\hat{\mathbf{u}}|
 ```
 
-One accumulator serves all seven fields. Changing the displayed field does not
-restart the averaging window.
+One accumulator serves all seven fields, so changing the displayed field does
+not restart the averaging window.
 
 ### What may and may not be claimed
 
-`h` is linear in pressure and elevation, and elevation is fixed. Therefore
-`h̃ = h̄` wherever the accumulator and the live display use the same pressure
-definition. This equality does not require uniform `f`.
+`h` is linear in pressure and elevation, so `h̃ = h̄`: the piezometric head of
+the mean flow *is* the mean piezometric head.
 
-`ω̃` is the vorticity of the Favre mean. It equals `⟨ω⟩` where `f` is constant
-over time and across the derivative stencil. Elsewhere the two differ through
+`ω̃` is the vorticity of the Favre mean. It equals the mean vorticity where
+`f` is steady across the stencil; elsewhere the two differ through
 fill–velocity correlation.
 
-`H`, `Fr` and `m` are nonlinear: each is the field **of the mean flow**, not the
-mean of the field. If `H̄` denotes a Reynolds time average using the same
-pressure definition, then
+`H`, `Fr` and `m` are nonlinear: each is the field **of the mean flow**, not
+the time average of the instantaneous field. For the energy head the
+difference is the unresolved fluctuation energy,
 
 ```math
 \bar H-\widetilde H
 = \frac{\langle|\mathbf u|^2\rangle-|\hat{\mathbf u}|^2}{2g},
 ```
 
-which is not generally the Favre turbulent kinetic energy `k/g`. A Reynolds
-mean energy head would require the additional channel `⟨|u|²⟩`. A consistently
-Favre-averaged energy head would instead require `⟨f|u|²⟩` and `⟨fp⟩`. Neither
-quantity is part of this design.
-
-The legend therefore labels `H̃`, `Fr̃` and `m̃` **"from the mean flow"**.
+which is not stored. The legend therefore labels `H̃`, `Fr̃` and `m̃`
+**"from the mean flow"** — quote them as properties of the mean flow, not as
+mean properties of the flow.
 
 ---
 
@@ -464,243 +274,97 @@ The legend therefore labels `H̃`, `Fr̃` and `m̃` **"from the mean flow"**.
 
 ### 7.1 Compaction is a closed form, not an iteration
 
-Storing `f̄` distributes the interface across the surface-excursion band.
-Geometric reconstruction must remove compressible slot storage before
-integrating depth.
-
-Define the bare one-sided kinematic EOS pressure
-`P_EOS = p_EOS/ρ_w = c² max(f−1,0)`. The following identity then holds on both
-branches:
+Storing `f̄` distributes the interface across the band the surface moved
+through, and a full column under gravity holds a little more than `f = 1` of
+slot storage — `g d/2c²` of it, 0.78% at `c = 25` and 7.7% at the celerity
+slider's low end. Integrating raw `f̄` would overread the depth by exactly
+that, so reconstruction first removes the compressible excess. The EOS gives
+the identity
 
 ```math
-\min(f,1) \;\equiv\; f - \frac{P_{\mathrm{EOS}}}{c^{2}}.
+\min(f,1) \;\equiv\; f - \frac{P_{\mathrm{EOS}}}{c^{2}},
 ```
 
-For a hydrostatic column, the slot excess relative to geometric depth is
-`g d / 2c²`:
-**0.78% — 7.9 mm on 1 m — at `c = 25`, and 7.7%, 77 mm, at `c = 8`**, the
-celerity slider's low end.
-
-`U.b` is not `P_EOS`. `press()` subtracts a bulk-divergence term
-`β(∇·u)·smoothstep(0.90,1,f)`, clamps at zero, and is evaluated from the
-pre-update `f`, so it lags the fill by one substep. Let `P_diag=U.b`. The stored
-channels therefore give the approximate geometric fill and 2D depth
+so the stored mean fill and mean pressure yield an approximate geometric fill
 
 ```math
 \bar g_{\mathrm{diag},ij}
 = \operatorname{clamp}
-  \left(\bar f_{ij}-\frac{\bar P_{\mathrm{diag},ij}}{c^2},0,1\right),
+  \left(\bar f_{ij}-\frac{\bar P_{ij}}{c^2},0,1\right),
 \qquad
 \bar{d}^{\,\text{2D}}_i
 = \Delta x \sum_{j\in\text{body}}
-  \bar g_{\mathrm{diag},ij}.
+  \bar g_{\mathrm{diag},ij}
 ```
 
-with column error bounded by
+— *approximate* because the stored pressure is the diagnostic channel, which
+lags the fill by one substep and carries the wave-damping term. §4.3's `⟨d⟩`
+is therefore the authoritative depth; the 2D reconstruction is a diagnostic
+cross-check, reachable through `APP.avg.residual()`.
 
-```math
-\left|\delta d_i\right|
-\le \frac{\Delta x}{c^2}
-\sum_{j\in\text{body}}
-\left\langle\left|P_{\mathrm{EOS},ij}-P_{\mathrm{diag},ij}\right|\right\rangle .
-```
-
-An exact sampled geometric fill would need `min(f,1)` accumulated in its own
-right, or the bare EOS pressure evaluated from the same sampled `f`. The four
-display channels cannot hold `f u`, `f w`, `f`, a diagnostic pressure and an
-exact geometric fill. Section 4.3's `⟨d⟩` is therefore the authoritative depth.
-The 2D reconstruction is a diagnostic cross-check. Its acceptance tolerance is
-established by end-to-end tests over the supported `c`, bulk damping and
-resolution ranges.
-
-The `g = 0` scene is excluded by construction: its EOS is two-sided, `p` can be
-negative, and it has no free surface to reconstruct.
+The `g = 0` scene is excluded by construction: its EOS is two-sided, its
+pressure can be negative, and it has no free surface to reconstruct.
 
 ### 7.2 Connectivity must not be decided on the mean
 
-Compaction requires selecting the cells that belong to the column's lower water
-body. Time averaging does not preserve instantaneous connectivity.
-
-A nappe that intermittently contacts a pool can leave nonzero mean fill
-throughout the intervening gap. A connectivity test on that mean field can then
-join bodies that are separate during part of the averaging window.
-
-Section 4.3 applies `FS_COL`'s connected-run walk to every instantaneous field:
-start at the lowest open cell with `min(f,1)>0.25`, walk upward, stop at a solid
-or after three consecutive cells with `min(f,1)<0.25`, and integrate only the
-selected run. Averaging its output gives `⟨d⟩`, `⟨q⟩`, `⟨η⟩` and `σ_η`.
-
-The 2D diagnostic applies the same operational rule to `ḡ_diag`: start at the
-lowest open cell with `ḡ_diag>0.25`, allow at most two consecutive cells with
-`ḡ_diag<0.25`, and stop at a solid. This fixed rule defines the `mask` input to
-`SIM.reconstruct`. A discrepancy between `d̄²ᴰ` and `⟨d⟩` beyond the validated
-§7.1 tolerance identifies connectivity introduced by averaging.
+Time averaging does not preserve connectivity: a nappe that touches a pool
+for part of the window leaves mean fill all the way between them, so a
+connectivity test on the mean would join bodies that were never joined at any
+instant. The column readings avoid this entirely — §4.3 walks the connected
+run on each instantaneous field and averages the result. The 2D cross-check
+applies the same fixed rule to `ḡ_diag` (start at the lowest open cell above
+threshold, tolerate at most two dry cells, stop at a solid); a discrepancy
+between `d̄²ᴰ` and `⟨d⟩` beyond tolerance is the signature of connectivity
+introduced by averaging.
 
 ### 7.3 The line is the mean; the band is the level sets
 
-`η̄ = ⟨η⟩` is the elevation of the displayed line. The `f̄ = ½` level set is the
-median and differs from the mean for a skewed surface-elevation distribution.
+The displayed surface line sits at `η̄ = ⟨η⟩`, the mean position of the
+visible surface.
 
-Mean level and equivalent water depth are not interchangeable in an aerated or
-intermittently connected column. Average mode keeps the line at `η̄`, because
-that is the mean position of the visible upper surface, and reports the signed
-surface–volume gap
-
-```math
-\delta_{\mathrm{a},i}
-= \bar\eta_i-\left(z_{b,i}+\bar d_i\right).
-```
-
-The overlay labels `d̄` as equivalent water depth and `δ_a` as the
-**aeration / partial-fill gap**. A positive value is the void height that would
-be removed by compacting the connected envelope to `min(f,1)=1`; a negative
-value records sub-threshold partial fill above the top-cell level selected by
-`FS_COL`. The line is not moved to `z_b+d̄`: doing so would make it disagree
-with the visible surface. Instead, the reported identity
-`η̄−z_b=d̄+δ_a` makes the two readings explicit.
-
-Where the interface is sharp, `f` is an indicator and `f̄(z) = Pr(η > z)` is the
-exceedance function, so the level sets of `f̄` are the percentiles of `η`:
+Where the interface is sharp, `f̄(z)` is the fraction of the window the
+surface stood above `z` — an exceedance function — so the level sets of `f̄`
+are the percentiles of `η`:
 
 ```math
 \bar f = 0.05 \iff z = \eta_{95}, \qquad
 \bar f = 0.95 \iff z = \eta_{05}
 ```
 
-Thus **`f̄ = 0.05` is the high edge** and `f̄ = 0.95` is the low edge. Section 8
-tests this orientation explicitly.
+**`f̄ = 0.05` is the high edge.** The translucent band `0.05 ≤ f̄ < 0.95` is
+the 5th-to-95th percentile range: the surface spent 90% of the window inside
+it. `σ_η` from §4.3 is an independent estimate of the same excursion.
+Colour is drawn where `f̄ ≥ ½`, the band where `0.05 ≤ f̄ < 0.95`, nothing
+where `f̄ < 0.05`.
 
-The band `0.05 ≤ f̄ < 0.95` is the 5th-to-95th percentile of `η`: the surface
-stood inside it for 90% of the window. It has an independent estimate in `σ_η`
-from §4.3, and the two must agree — for a sinusoidal surface
-`(η₉₅−η₀₅)/σ_η = 2.7936` exactly, against `3.2897` for a Gaussian one. The
-percentile levels and `σ_η` provide independent checks from the field and column
-accumulators.
+In an aerated or intermittently connected column, mean level and equivalent
+water depth are different objects, and Average reports both rather than
+choosing: the line stays at `η̄`, the depth readout is `d̄`, and the signed gap
 
-**Masking.** Colour where `f̄ ≥ ½`; a translucent wedge where `0.05 ≤ f̄ < 0.95`;
-nothing where `f̄ < 0.05`. Cells inside the band render *inside the band*,
-deliberately.
+```math
+\delta_{\mathrm{a},i}
+= \bar\eta_i-\left(z_{b,i}+\bar d_i\right)
+```
+
+is printed with them — the **aeration / partial-fill gap**, positive for void
+held below the surface line, zero where line and depth agree. The identity
+`η̄ − z_b = d̄ + δ_a` makes the two readings explicit. `δ_a` is shown wherever
+the cursor is, so a zero is itself the statement that the column is simple.
 
 ---
 
-## 8 · The synthetic test battery
+## 8 · How this is verified
 
-Reconstruction is implemented as a pure function,
-`SIM.reconstruct(fbar, pbar, mask, c, dx)`, where `pbar` contains the mean of
-the kinematic-pressure channel `U.b`. The application and synthetic-array tests
-use the same function.
-
-Groups A–E are pure-function tests. Their fill and pressure arrays are
-constructed at the same sample time, so no velocity/VOF lag is present. Group F
-is end-to-end and uses the validated §7.1 tolerance. Group G tests numerical
-robustness.
-
-### Group A — accumulator arithmetic
-
-| # | Case | Expected | Catches |
-| --- | --- | --- | --- |
-| A1 | Constant field, N frames | `f̄ = f`, `û = u`, `P̄_diag = P_diag` exactly | wiring, normalisation by `T` |
-| A2 | Alternating `Δt = 1, 3` with `φ = 0, 4` | mean `= 3`, not `2` | frame-count averaging |
-| A3 | Alternating `f = 1, 0` with `u = 10, 0` | `û = 10`, not `5` | Reynolds-averaged velocity |
-| A4 | Same as A3 | `f̄ = 0.5` | Favre/Reynolds confusion in the fill |
-| A5 | Linear `u` field on the staggered grid | `û` equals the cell-centred value | multiplying `f` by the west face alone (§4.1) |
-| A6 | Source increments `Δf_S = 2h` with `h = 1, 3` | `S̄ = 2`, and `ΣΔf_S/T = 2` | treating an increment as an `h`-weighted rate |
-
-### Group B — compaction and compressibility
-
-| # | Case | Expected | Catches |
-| --- | --- | --- | --- |
-| B1 | Hydrostatic column, `η = 1.0`, `c = 25`, consistent `P_EOS` | `d = 1.0` to float precision; raw `Σf̄Δx = 1.00785` | missing `−P̄_EOS/c²`, error 7.9 mm |
-| B2 | Same at `c = 8` | `d = 1.0`; raw `= 1.0766` | missing correction at low celerity |
-| B3 | Pressurised column under a soffit | `f̄ − P̄_EOS/c² = 1` in **every** cell | the identity on its `f > 1` branch |
-| B4 | Dry column | `d = 0`, bed reported, no NaN | division by `max(f̄, ε)` |
-
-### Group C — a wobbling surface, known statistics
-
-`η(t) = η₀ + a sin ωt` over a whole number of periods, sharp interface.
-
-| # | Case | Expected | Catches |
-| --- | --- | --- | --- |
-| C1 | Mean depth | `⟨d⟩ = η₀ − z_b` exactly | bias in the window |
-| C2 | Variance via Welford | `σ_η = a/√2 = 0.70711a` | the `M₂` channel |
-| C3 | Band level sets | `η₉₅ = η₀ + 0.98769a`, `η₀₅ = η₀ − 0.98769a` | the arcsine law |
-| C4 | **Band orientation** | `f̄ = 0.05` is the **high** edge | the inversion of §7.3 |
-| C5 | Cross-check | `(η₉₅−η₀₅)/σ_η = 2.7936` (vs 3.2897 Gaussian) | the two routes disagreeing |
-| C6 | **Skewed surface**: `η_hi` for 30% of the window, else `η_lo` | line at `0.3η_hi + 0.7η_lo` (mean), **not** `η_lo` (median) | drawing the median for the mean |
-| C7 | Window of 1.25 periods | the computed part-period bias | §4.4's quadrature story |
-
-C6 verifies that the line uses the mean rather than the median.
-
-### Group D — falling jets and connectivity
-
-| # | Case | Expected | Catches |
-| --- | --- | --- | --- |
-| D1 | Pool + 4-cell air gap + steady nappe (`f = 0.6`) | two bodies; pool depth exact; nappe **excluded** | folding the nappe into the depth |
-| D2 | Gap of 1, 2, 3, 4 dry cells | **bridged, bridged, separated, separated** | the `dry > 2` rule, in both directions |
-| D3 | **Intermittent contact**: nappe bridges for 30% of the window | `⟨d⟩` and `d̄²ᴰ` both computed from the specified fill arrays — including nappe and bridge mass — and asserted to differ by that computed amount | §7.2's manufactured connectivity |
-| D4 | Flapping nappe, `f̄ = 0.2` over 5× its thickness | unmasked integral over the prescribed jet region equals its true mean thickness | thresholding a smeared jet away |
-| D5 | Spray: isolated `f̄ = 0.01` cells above the band | excluded from the body | spray inflating the depth |
-
-D3 expected values are computed directly from the specified arrays, including
-the nappe and bridge contributions selected by §7.2's fixed rule.
-
-### Group E — geometry
-
-| # | Case | Expected |
-| --- | --- | --- |
-| E1 | Perched pool above a lower pool, separated by solid | two bodies, each compacted separately |
-| E2 | Tilted-bed (`S₀`) scene | the reduction is bed-relative and unaffected |
-| E3 | Bed raised above `z = 0` | body found from the lowest **wet** cell, not the lowest non-solid |
-| E4 | `g = 0` scene | reconstruction refuses, with a reason — two-sided EOS |
-
-### Group F — conservation, end to end (GPU)
-
-F1 is gated on the **window-scaled** bound of §5, not on a constant and not on
-a ratio. An earlier draft defined a relative residual
-`r_𝓡 = ‖𝓡‖∞/max(‖storage‖∞+‖∇ₕ·F̄‖∞+‖S̄‖∞, 10⁻¹² s⁻¹)` with a `10⁻⁶` target;
-measurement retired it. That denominator collapses exactly when the run is
-working — a converged steady reach drives `∇ₕ·⟨F⟩ → ⟨S⟩` and the storage term
-to zero by construction — while the numerator grows as `√T`, so `r_𝓡` rises
-from `8×10⁻⁷` to `3×10⁻⁴` across a single ladder and reads worst on the most
-converged run. It is `0/0` in the limit.
-
-The gate is therefore
-
-```math
-\mathcal{R}_{\max}\;<\;C_{\text{gate}}\,\varepsilon\,\bigl\lVert\langle F\rangle\bigr\rVert_\infty\,\frac{\sqrt{T/\Delta t}}{\Delta x}
-```
-
-with `C_gate = 3.0` — 4× the worst `C` measured on any path (§5) — and the
-averaging window pinned to a fixed substep count so `T = nΔt` is reproducible
-across machines. Advancing it by rendered frames instead makes `T`, and hence
-the residual, a function of how fast the box is.
-
-| # | Case | Expected |
-| --- | --- | --- |
-| F1 | Local transport residual in source-free interior cells | `‖𝓡‖∞` below the §5 window-scaled bound; measured margin ≈ 5–6× at `n = 1200` and `n = 3600`, and scale-invariant in `T` |
-| F2 | `Q̄_F = ΔxΣ_j⟨F^E⟩` along a steady source-free reach with closed vertical boundaries | one value across every section within the F1 bound |
-| F3 | Source-free draining domain with `f(T) ≠ f(0)` | storage-change rate plus signed outward boundary flux is zero |
-| F4 | Sponge, each point source, and each safety clamp | residual including `⟨S⟩` meets F1; recomputing with `S=0` gives `𝓡=⟨S⟩`. The `⟨S⟩ ≠ 0` population also carries every positivity-clamp event, so it is **counted and reported** (`nSrc`) rather than silently excluded — an invented-water regression shows up as that count moving |
-| F5 | Left and bottom open-boundary exchange | storage-change rate plus all signed outward boundary fluxes minus integrated `S` is zero |
-| F6 | Display residual `𝓡_disp` on `⟨f u_c⟩` | approaches an `O(Δt_frame, Δx^p)` floor; frame-rate and resolution sweeps measure each dependence |
-| F7 | Source-free whole-period wave window | endpoint storage term returns to its initial value within solver tolerance; transport balance closes, while `𝓡_disp` retains its discretisation floor |
-
-### Group G — numerical robustness
-
-| # | Case | Expected |
-| --- | --- | --- |
-| G1 | 5 mm wobble on a 1 m datum, `10⁶` increments | Welford `M₂` gives `σ_η` to 3 digits; raw `⟨η²⟩−⟨η⟩²` demonstrably loses it |
-| G2 | Window of `10⁴` s at 60 fps | running mean unbiased; raw sums show drift |
-
-### Group H — overlay consistency
-
-| # | Case | Expected |
-| --- | --- | --- |
-| H1 | Average active with a fixed `C̄` and a deliberately different live column buffer | `d`, `d_c`, `d_n`, `V`, `Fr`, EGL and profile class use only `C̄` |
-| H2 | Two sample histories with the same final `C̄` but different ordering | Average-mode overlay values are identical; no `sm()`, `_hA`, `_qA` or `_ynK` prefilter remains |
-| H3 | Mean profile containing a hydraulic jump | jump-box position, `d₁`, `d₂` and conjugate-depth result come from `C̄` |
-| H4 | Aerated connected column | line at `η̄`, depth readout `d̄`, gap readout `δ_a`, and `η̄−z_b=d̄+δ_a` |
-| H5 | Switch Average → Live → Average | each transition resets overlay temporal estimates; neither mode inherits the other's state |
+The reconstruction numerics are a pure function with no WebGL in it
+(`RECON`, `js/reconstruct.js`), so most of the above is pinned by closed-form
+tests. The battery is organised in groups: **A** accumulator arithmetic,
+**B** compaction and compressibility, **C** surface statistics on a wobbling
+surface with known answers, **D** jets and connectivity, **E** geometry,
+**F** end-to-end conservation on the GPU, **G** float32 robustness, **H**
+overlay consistency. Groups A–E and G live in `node test/recon-test.mjs`;
+`node test/mutation-test.mjs` proves those tests can fail; groups F and H run
+on the GPU in `node exercises/_runner/smoke.js --only=avg`, which gates the
+transport residual on the window-scaled bound of §5.
 
 ---
 
@@ -710,92 +374,37 @@ All three accumulators are zeroed, `T ← 0`, and `f(0)` re-copied, on:
 
 - switching Average on;
 - `R` / `resetWater`;
-- any geometry edit — `addSeg`, `undoSeg`, `clearSegs`;
-- **anything that opens or closes an edge.** This is the same reset by the same
-  route — `rasterise` is the choke point for both — but it is reached from a
-  different part of the interface, so it is listed separately rather than read
-  into the bullet above. Two paths lead here: the per-edge menus in the
-  Boundaries section, which set the edge outright, and the upstream-reservoir
-  and downstream-tailwater controls in the Flow section, each of which opens
-  its own edge when switched on and closes it again when switched off. An
-  opened or closed edge is a different control volume, so the window that was
-  accumulating across the old one has ended;
-- a **valve toggle**. The flag does not touch the rasterised mask, but every
-  shader's `SO()` and the residual's own `solidLo` read it, so flipping it
-  reclassifies every valve texel between solid and open. That is a change of
-  control-volume set, and the cells that were solid had their accumulator
-  frozen while `T` went on running: their running-mean weight would afterwards
-  be drawn from a window they were absent for. `SIM.setValve` is the single
-  writer, so the reset covers the toolbar, the key and the rig-apply path
-  alike;
-- a **celerity change**. `rescaleFill` rewrites `f` in place to hold
-  `P = c²(f−1)` fixed, and `f(0)` was snapshotted before it. The endpoint term
-  `(f(T)−f(0))/T` would absorb the whole injected step with nothing in `⟨F⟩`
-  or `⟨S⟩` to answer it, and §7.1's compaction would apply the new `c` to a
-  mean accumulated at the old one;
+- any geometry edit — drawing, undoing or clearing walls;
+- **anything that opens or closes an edge**, under Controls → Flow or
+  → Boundaries: the per-edge Wall / Open / Outfall selects, and the Upstream
+  reservoir and Tailwater control toggles, which open their edge when
+  switched on and close it again when switched off. An edge is a wall of the
+  control volume, so changing one ends the window that was accumulating
+  across the old one. These read as settings rather than edits, which is why
+  the legend card names them among the reset conditions;
+- a **valve toggle** — it reclassifies every valve cell between solid and
+  open, which changes the set of cells being averaged;
+- a **celerity change** — it rewrites `f` in place to keep the pressure
+  field, which invalidates `f(0)` and the compaction of §7.1;
 - a scene change, and the rebuild a resolution change performs;
-- the end of spin-up.
+- the end of spin-up, which is initialisation rather than reported flow.
 
-`OVERLAY.resetEstimates(sim)` is also called whenever the mode changes in either
-direction. Average mode bypasses the live depth/discharge prefilters and the
-overlay's temporal EMAs; resetting on entry and exit prevents live-mode state
-from crossing the mode boundary.
+While paused, no time passes: accumulators and `T` hold, and the window
+resumes with the clock.
 
-These events change the geometry, the solid set, the initial condition or the
-sampling population and therefore define a new averaging window. Spin-up is excluded because it is an
-initialisation interval rather than part of the reported flow state.
-
-While paused, `Δt_n = 0`; accumulators and averaging duration remain unchanged.
-
-The legend prints `T`, the elapsed averaging time, and under the cursor the mean
-fill `f̄`, the equivalent water depth `d̄`, the aeration gap `δ_a` and the surface
-standard deviation `σ_η` — the excursion band's own estimate from §7.3. `δ_a` is
-printed with `d̄` wherever the cursor is, and not only where the surface line and
-the equivalent depth part: a reading that appeared and vanished as the pointer
-moved would read as a glitch, and `δ_a = 0` is itself the statement that the two
-agree in that column.
-
-It must also say what ends a window. Every condition in the list above is one a
-reader can connect to the thing they just did, with one exception: anything
-that opens or closes an edge. Those controls read as settings rather than as
-edits — nothing about picking *Outfall* from a menu, or switching a tailwater
-on, looks like moving a wall — and yet each of them goes through `rasterise`
-and sends `T` back to zero. The card names that whole class for that reason,
-rather than naming the individual controls, which would date.
-
-**Two things this section previously asked the legend for are deliberately not
-on it.** The residuals of §5 and the 1D/2D depth discrepancy of §7.2 both go
-through `transportResidual()`, which is two full-field readbacks and measures
-about 1.2 s — eighty times the 15 ms frame budget, so it cannot be a per-frame
-readout at any grid size, and throttling it would only make the stall
-intermittent. Both are reachable on demand as `APP.avg.residual()`, which is
-what the group F gate reads, and neither is affected by its absence from the
-card: the residual is computed from the same stored means whenever it is asked
-for. `σ_η` carries the band on the card in their place.
-
-No generic convergence time is imposed because several scene timescales are
-emergent rather than prescribed.
+No convergence time is imposed — how long a window needs is set by the flow
+being measured, and several scene timescales are emergent. `T` on the legend
+card is the number to quote with any averaged reading.
 
 ---
 
 ## 10 · Cost
 
-| | Per frame | Per substep | Memory |
-| --- | --- | --- | --- |
-| Favre display | 1 fullscreen pass | — | `RGBA32F` ping-pong, 22 MB at Ultra |
-| Exact transport | — | 1 texture read + write inside `FS_VOF` | `RGBA32F` ping-pong, 22 MB at Ultra |
-| Column and overlay | 1 pass on `nx × 1` | — | negligible |
-| Residual | — | — | one copy of `f(0)` |
-
-The per-frame passes are expected to add less than 0.5% at representative
-`nsub`. The transport accumulator adds one texture read and write per cell per
-substep. Its provisional cost estimate is **20–35% of simulation time** while
-Average is active and must be replaced by measurements on the supported GPU
-paths. The `vof` / `vof+accum` variants avoid this cost while Average is
-inactive.
-
-All buffers are allocated lazily on first use, released when Average is switched
-off, and included in `release()`.
+The two full-grid accumulators cost about 22 MB apiece at Ultra resolution,
+plus a tiny column buffer and one copy of `f(0)`. Everything is allocated
+when Average is switched on and released when it is switched off; a session
+that never opens Average pays nothing. The transport accumulator adds one
+texture read and write per cell per substep — only while Average is active.
 
 ---
 
@@ -804,14 +413,12 @@ off, and included in `release()`.
 Symbols follow [notation.md](notation.md): depth `d`, level `η`, piezometric
 head `h = z + p/ρg`, energy head `H`, velocity `u = (u, w)` with `w` the
 vertical component, `z` the domain vertical, pressure head always spelled
-`p/ρg`. New here: `⟨·⟩` and an overbar for a time average over the window, `^`
-for a Favre (fill-weighted) average, `u″ = u − û` the Favre fluctuation, `R` the
-Favre Reynolds stress, `k` its trace as turbulent kinetic energy per unit mass,
-`F` the limited VOF face flux, `S` the post-advection source rate,
-`P_EOS=p_EOS/ρ_w` the bare kinematic EOS pressure, `P_diag=U.b` the diagnostic
-kinematic pressure, `T` the averaging-window duration, `M₂` the Welford second
-moment, `σ_η` the surface standard deviation, and `𝓡` the conservation residual
-of §5. A tilde marks a field computed from the mean state and distinguishes it
+`p/ρg`. New here: `⟨·⟩` and an overbar for a time average over the window,
+`^` for a Favre (fill-weighted) average, `F` the limited VOF face flux, `S`
+the post-advection source rate, `P_EOS = p_EOS/ρ_w` the bare kinematic EOS
+pressure, `T` the averaging-window duration, `M₂` the Welford second moment,
+`σ_η` the surface standard deviation, and `𝓡` the conservation residual of
+§5. A tilde marks a field computed from the mean state and distinguishes it
 from a time average of the corresponding instantaneous field.
 
 <!-- Pages build only: github.com strips this tag and renders the math fences

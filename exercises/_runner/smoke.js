@@ -1141,8 +1141,9 @@ SUITES.avg = async (B) => {
   // which is the REYNOLDS mean. Where fbar > 0.9 the Favre and Reynolds means
   // coincide to within the noise, so a shader storing vec4(uc, wc, f, U.b)
   // instead of vec4(f*uc, f*wc, f, U.b) passes it, and so does an avgField()
-  // that forgets to divide by fbar. docs/averaging.md §8 A3/A4 exist for
-  // exactly this ("alternating f = 1,0 with u = 10,0 gives 10, not 5").
+  // that forgets to divide by fbar. The Favre mean of averaging.md §3 is the
+  // thing at stake: alternating f = 1,0 with u = 10,0 must average to 10,
+  // not 5.
   //
   // So: run the same idea on PARTIALLY FILLED cells, 0.3 < fbar < 0.7, where
   // <f u_c>/fbar and <u_c> genuinely differ, and compute BOTH references on

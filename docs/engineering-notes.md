@@ -370,6 +370,32 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 
 ## The view
 
+### The colour range is held, not tracked
+
+Every field is painted over an explicit `[lo, hi]` in its own units
+(`u_lo` / `u_hi` in the display pass), seeded from the scene's own value and
+printed on the legend. The range does **not** follow the flow: `Fit`
+rescales once, from the frame it was clicked on, to the 1st–99th percentile
+over wet cells, and then holds.
+
+That is deliberate. A range that tracked the water would mean the same
+colour was a different number from second to second, so two frames could not
+be compared and neither could two students' screenshots — which is the
+entire reason for printing a scale. Percentiles rather than min/max because
+one cell at a jet's lip otherwise sets the scale for the whole picture and
+everything else renders as a single flat colour; wet cells only (`f ≥ 0.5`)
+because a dry cell is not water — its stored pressure is zero and averaging
+it in drags every scale towards the floor.
+
+The diverging fields keep their meaningful centre when they are rescaled:
+`nrmMid` maps the two halves separately, so Fr = 1 and ω = 0 stay on the pale
+band whatever the ends are. A midpoint taken from the range would move the
+critical line, which is the one thing that view exists to show.
+
+`SIM.fieldStats(mode)` does the readback, and its arithmetic has to agree
+with the branch of `FS_DISP` that paints that mode. A `Fit` that leaves the
+picture saturated or flat is the symptom of the two having drifted apart.
+
 - **The vertical exaggeration is fitted to the window, not 1:1.** `autoVex()`
   picks the stretch that makes the domain fill `VEX_FILL` (62%) of the canvas,
   clamped to [1, 8]; `state.vexAuto` says nobody has taken the number over
@@ -387,7 +413,7 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 
 ## Measurement gotchas
 
-- **The Force box is a momentum budget, not a dial.** The control-volume
+- **The Control volume is a momentum budget, not a dial.** The control-volume
   integral takes its faces on grid lines, skips solid-adjacent face segments,
   and carries no gravity term in F→. A box enclosing a
   source (spout footprint, level-control sponge) is not measuring a force —
@@ -398,6 +424,49 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
   per metre, measured on LL-1), so keep boxes short; and a face inside a
   pressurised bore reads ρ·f·g·h, not ρgh (`f = 1 + gh/c²` — +4% at 21 m of
   head at c = 70).
+- **The same box also reports the whole budget, edge by edge** (`SIM.boxFlux`,
+  `B` cycles what the edges are labelled with). Everything is
+  outward-positive and per metre of width: `Q` volume, `M` momentum flux,
+  `Fp` pressure force, `Ė` energy. `M` and `Fp` are kept apart rather than
+  summed — distinguishing them is the content of a control-volume question —
+  and their sum is exactly what `boxForce` returns, which `smoke.js` asserts
+  so the two integrals cannot drift.
+- **`Q` and `ṁ/ρ` are not the same number, and the gap is the compression.**
+  `Q` uses `min(f, 1)`, the geometric volume; the mass terms use `f`, which
+  IS the density here. Below the surface `f > 1` — that is what the pressure
+  is — so the water always carries more mass than volume, by `p/(ρc²)`:
+  0.8% on m1 at the usual celerity, and more wherever a run is pressurised.
+  Never "fix" one to match the other.
+- **Air contributes nothing, by weighting rather than by a threshold.** Every
+  term in the budget carries `f`, so an empty cell adds zero and a half-full
+  one adds half. A cut-off would put a step in every reading taken across a
+  wavy surface, which is exactly where these boxes get drawn.
+- **The flux tool is the same integrand over a line you drew** (`SIM.lineFlux`).
+  Its normal is the drawing direction turned a quarter-turn clockwise, so a
+  section drawn UP has its positive side downstream — draw across the flow the
+  way you would draw a section on paper and the sign comes out as expected.
+  It is exact only along a cell face; at an angle it interpolates the
+  staggered velocities, the same thing the rake and the orbit tracers do.
+  `smoke.js` checks a vertical section against the control-volume face it lies
+  on, which is the only way to know the two integrals still agree.
+- **A section reports all four at once** — Q, the momentum flux M, the
+  pressure force F and ρgQH — with M and F kept apart, because telling them
+  apart is the control-volume question. Two sections then give the momentum
+  theorem directly: the force on whatever lies between them is
+  `(M₁ − M₂) + (F₁ − F₂)`, both sections carrying their own normal, so the
+  upstream one flips when they are read as the two ends of a control volume.
+  That is the same number `boxForce` reports for a box drawn between them.
+- **New tools are APPENDED to `TOOLS`, whatever group they belong to.** The
+  digit a tool answers to is its index, and every worksheet in the pack refers
+  to tools by digit — inserting one renumbers the rest and makes the printed
+  sheets wrong. The strip's groups name their tools explicitly (`toolItems`)
+  precisely so the two orders can differ.
+- **The budget's own closure is a property of the SCENE, not of the integral.**
+  Σ Q over the four faces is continuity, and it only vanishes once the reach
+  is steady — mid-spin-up a box is still filling and closes to tens of per
+  cent. The card prints the residual as a percentage of what came in for that
+  reason. Do not gate on an absolute closure; gate on the two integrals
+  agreeing with each other, which is what the physics suite does.
 - A fast-math shader compiler is entitled to fold away `isnan()` and `x != x`.
   The NaN guards are written as explicit range tests for that reason.
 - `readPixels` from a float FBO must use `RGBA`/`FLOAT`, which is why `U` and `F`

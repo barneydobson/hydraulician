@@ -576,34 +576,85 @@ uniform sampler2D u_P, u_U;
 uniform vec2  u_pres, u_res;
 uniform vec4  u_rect;
 uniform float u_dx, u_psize;
-out float vSpeed;
 out float vFade;
 void main(){
   ivec2 c = ivec2(gl_VertexID % int(u_pres.x), gl_VertexID / int(u_pres.x));
   vec4 p = texelFetch(u_P, c, 0);
   vec2 dom = u_res * u_dx;
   vec2 uv  = p.xy / dom;
-  ivec2 g = ivec2(clamp(p.xy / u_dx, vec2(0.0), u_res - vec2(1.0)));
-  vec4 t  = texelFetch(u_U, g, 0);
-  vSpeed = length(t.rg);
+  // Fade IN over the first fraction of a life, and OUT over the last, so a
+  // particle neither pops into existence mid-flow nor vanishes at full
+  // brightness — either reads as a glitch rather than as a respawn.
   vFade  = smoothstep(0.0, 0.15, p.z) * (p.z > 0.0 ? 1.0 : 0.0);
   gl_Position  = vec4(mix(u_rect.xy, u_rect.zw, uv), 0.0, 1.0);
   gl_PointSize = u_psize;
 }`;
 
+  // ONE colour, not a speed ramp. Colour-by-speed put a second, unlabelled
+  // scale on screen competing with whatever the legend was explaining, and it
+  // washed out over the Water view, which is itself blue. Speed still reads —
+  // it is in the LENGTH of the trail each particle leaves.
   const FS_PART_DRAW = `#version 300 es
 precision highp float;
-in float vSpeed;
 in float vFade;
 out vec4 o;
-uniform float u_vmax;
+uniform float u_amp;          // 1 = a head, drawn once; < 1 = a tail dab
 void main(){
-  vec2 d = gl_PointCoord - 0.5;
-  float a = smoothstep(0.5, 0.15, length(d) * 2.0) * vFade;
-  float t = clamp(vSpeed / max(u_vmax, 0.01), 0.0, 1.0);
-  vec3 col = mix(vec3(0.55, 0.80, 1.00), vec3(1.00, 0.94, 0.72), t);
-  o = vec4(col * (0.35 + 0.65 * t), a * 0.75);
+  float r = length(gl_PointCoord - 0.5) * 2.0;
+  // A small hard dab with only a hint of edge. The tail is what carries the
+  // reading, and a tail is only fine if the thing drawing it is: a fat glowing
+  // dab lays down a fat glowing stripe and the reach turns into a wash.
+  float core = smoothstep(0.80, 0.25, r);
+  // Tail dabs are DIM because the trail buffer is additive — what you see at a
+  // pixel is every dab that has crossed it within the fade time — while a head
+  // is drawn once, straight to the screen, at full strength. That is what
+  // makes a comet rather than a smear: a definite particle, and behind it the
+  // tapering record of where it has been.
+  float a = core * vFade * u_amp;
+  o = vec4(vec3(1.00, 0.95, 0.86) * a, a);
 }`;
+
+  // ---------------------------------------------------- the particle trail
+  /** Two one-line passes over a screen-sized buffer that make the trails.
+   *
+   *  A per-frame streak cannot work: at 1 m/s a particle moves about two
+   *  pixels between frames, so the tail has to come from accumulated history.
+   *  The buffer is faded by a constant every frame and the particles are drawn
+   *  into it additively, which is one texture and two draws rather than a
+   *  history buffer per particle. */
+  const FS_FILL = `#version 300 es
+precision highp float;
+out vec4 o;
+uniform vec4 u_col;
+void main(){ o = u_col; }`;
+
+  const FS_TEX = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+in vec2 vUv;
+out vec4 o;
+uniform sampler2D u_T;
+void main(){ o = texture(u_T, vUv); }`;
+
+  // ------------------------------------------------------------------ ramps
+  /** The colour stops, in JS, because the legend has to paint the SAME bar the
+   *  water is painted with. They used to be `vec3` literals inside FS_DISP,
+   *  which meant the only way to draw a matching key was to type the numbers
+   *  out again somewhere else and hope. Interpolated into the shader source
+   *  below, so there is one array and two consumers.
+   *
+   *  `turbo` is sequential, for quantities with a floor (the heads, speed);
+   *  `divg` is diverging and pale in the middle, for quantities with a
+   *  meaningful centre (Fr = 1, ω = 0, momentum = 0). */
+  const RAMPS = {
+    turbo: [[0.19, 0.07, 0.23], [0.13, 0.56, 0.82], [0.20, 0.83, 0.48],
+            [0.95, 0.78, 0.15], [0.85, 0.14, 0.10]],
+    divg:  [[0.06, 0.24, 0.52], [0.25, 0.61, 0.85], [0.94, 0.95, 0.92],
+            [0.97, 0.63, 0.25], [0.72, 0.10, 0.09]],
+  };
+  const glsl3 = (c) => "vec3(" + c.map((v) => v.toFixed(4)).join(",") + ")";
+  const rampFn = (name, stops) =>
+    "vec3 " + name + "(float t){ return ramp(t," + stops.map(glsl3).join(",") + "); }";
 
   // ----------------------------------------------------------------- display
   const FS_DISP = `#version 300 es
@@ -616,9 +667,11 @@ uniform sampler2D u_F, u_U, u_S, u_C;
 uniform vec2  u_res, u_canvas;
 uniform float u_dx, u_g, u_c2, u_valve, u_time;
 uniform float u_tilt;         // scene tiltS0: elevation is z − S₀x when set
-uniform int   u_mode;         // 0 water 1 head 2 speed 3 Froude 4 vorticity
-                              // 5 momentum flux 6 piezometric head
-uniform float u_vmax, u_hmax; // colour-scale maxima
+uniform int   u_mode;         // 0 water 1 pressure head 2 speed 3 Froude
+                              // 4 vorticity 5 momentum flux
+                              // 6 piezometric head 7 energy head
+uniform float u_vmax;         // speed scale: the particles and the Water sheen
+uniform float u_lo, u_hi;     // the CURRENT field's colour range, in its units
 uniform float u_dyeOn;
 uniform vec4  u_cursor;       // x, z (m), radius (m), tool tint
 uniform vec4  u_guide;        // preview line x0,z0,x1,z1 (m); w<0 = off
@@ -662,13 +715,21 @@ vec3 ramp(float t, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e){
   if (t < 3.0) return mix(c, d, t - 2.0);
   return mix(d, e, t - 3.0);
 }
-vec3 turbo(float t){
-  return ramp(t, vec3(0.19,0.07,0.23), vec3(0.13,0.56,0.82),
-                 vec3(0.20,0.83,0.48), vec3(0.95,0.78,0.15), vec3(0.85,0.14,0.10));
-}
-vec3 divg(float t){   // blue → pale → red, break at 0.5 (Froude = 1)
-  return ramp(t, vec3(0.06,0.24,0.52), vec3(0.25,0.61,0.85),
-                 vec3(0.94,0.95,0.92), vec3(0.97,0.63,0.25), vec3(0.72,0.10,0.09));
+// Both bodies come from RAMPS above — the legend paints its bar from the same
+// five stops, so the key on screen and the water cannot drift apart.
+${rampFn("turbo", RAMPS.turbo)}
+${rampFn("divg", RAMPS.divg)}   // blue → pale → red, break at 0.5
+
+// The colour range, in the FIELD's own units. Every mode maps through this
+// one pair rather than through a scale of its own, which is what lets the
+// legend's Fit reach the Froude, vorticity and momentum views at all — their
+// scales used to be constants in here that nothing outside could touch.
+float nrm(float v){ return clamp((v - u_lo) / max(u_hi - u_lo, 1e-6), 0.0, 1.0); }
+// Centred mapping: mid lands on the pale band whatever the two ends are.
+// Fr = 1 and ω = 0 are physics, not the midpoint of the range someone typed.
+float nrmMid(float v, float mid){
+  return v < mid ? 0.5 * clamp((v - u_lo) / max(mid - u_lo, 1e-6), 0.0, 1.0)
+                 : 0.5 + 0.5 * clamp((v - mid) / max(u_hi - mid, 1e-6), 0.0, 1.0);
 }
 
 float segDist(vec2 p, vec2 a, vec2 b){
@@ -728,13 +789,13 @@ void main(){
   if (u_mode == 0) {
     vec3 shallow = vec3(0.24, 0.56, 0.78);
     vec3 deep    = vec3(0.05, 0.20, 0.42);
-    water = mix(shallow, deep, clamp(sub / max(u_hmax, 0.05), 0.0, 1.0));
+    water = mix(shallow, deep, nrm(sub));
     water += vec3(0.10, 0.14, 0.16) * clamp(length(U.rg) / max(u_vmax, 0.01), 0.0, 1.0);
   } else if (u_mode == 1) {
     float head = U.b / max(abs(u_g), 1e-3);   // pressure head p/ρg: submergence below the surface (m)
-    water = turbo(head / max(u_hmax, 0.05));
+    water = turbo(nrm(head));
   } else if (u_mode == 2) {
-    water = turbo(length(U.rg) / max(u_vmax, 0.01));
+    water = turbo(nrm(length(U.rg)));
   } else if (u_mode == 3) {
     // STREAMWISE velocity, not the 2D speed magnitude. A Froude number is
     // u/√(gd) — the vertical component is not part of it, and including it
@@ -745,13 +806,13 @@ void main(){
     // where the reach is comfortably subcritical. The depth is per-column so
     // it cannot cause this; measured column-to-column jitter is under 5%.
     float fr = abs(U.r) / sqrt(max(abs(u_g) * dep, 1e-4));
-    water = divg(0.5 * clamp(fr, 0.0, 2.0));
+    water = divg(nrmMid(fr, 1.0));
   } else if (u_mode == 4) {
     ivec2 gi = ivec2(clamp(g, vec2(1.0), u_res - vec2(2.0)));
     float dwdx = texelFetch(u_U, gi + ivec2(1,0), 0).g - texelFetch(u_U, gi - ivec2(1,0), 0).g;
     float dudz = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;
     float vort = (dwdx - dudz) / (2.0 * u_dx);
-    water = divg(0.5 + 0.5 * clamp(vort / 40.0, -1.0, 1.0));
+    water = divg(nrmMid(vort, 0.0));
   } else if (u_mode == 6) {
     // Piezometric head h = z + p/ρg — the potential whose gradient drives the
     // flow. Constant over the depth wherever the flow is hydrostatic, so the
@@ -761,7 +822,18 @@ void main(){
     // A tilted-gravity scene draws a flat bed and carries S₀ in gravity, so the
     // elevation term is z − S₀x there.
     float hp = pm.y - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
-    water = turbo(hp / max(u_res.y * u_dx, 0.05));
+    water = turbo(nrm(hp));
+  } else if (u_mode == 7) {
+    // Energy head H = z + p/ρg + |u|²/2g — the piezometric head plus the
+    // velocity head, so it is the SAME picture as mode 6 with the kinetic
+    // term added back. Along a streamline it can only fall, which is what
+    // makes a drop between two stations a loss you can point at: friction
+    // down a reach, the roller of a jump, the separation in a diffuser.
+    // No α here — that coefficient is what a depth-AVERAGED profile needs
+    // because the point values differ; these are the point values.
+    float g2 = max(abs(u_g), 1e-3);
+    float He = pm.y - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
+    water = turbo(nrm(He));
   } else {
     // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
     // display pass runs once per FRAME, not once per substep — it is the two
@@ -771,7 +843,7 @@ void main(){
     // where the momentum actually goes in a jump or under a breaker.
     float sp = length(U.rg);
     float mom = f * U.r * sp;
-    water = divg(0.5 + 0.5 * clamp(mom / max(u_vmax * u_vmax * 0.5, 0.01), -1.0, 1.0));
+    water = divg(nrmMid(mom, 0.0));
   }
   c = mix(c, water, wet);
 
@@ -815,5 +887,6 @@ void main(){
   o = vec4(pow(clamp(c, 0.0, 1.0), vec3(0.95)), 1.0);
 }`;
 
-  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_COL, FS_PART, VS_PART, FS_PART_DRAW, FS_DISP };
+  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_COL, FS_PART, VS_PART, FS_PART_DRAW,
+           FS_DISP, FS_FILL, FS_TEX, RAMPS };
 })();

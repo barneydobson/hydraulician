@@ -23,7 +23,7 @@ A vane that turns a jet through θ takes the whole change in momentum flux:
 
     F = ρ·q·v·(1 − cos θ)        per metre of width
 
-The Force box (tool `9`) evaluates the momentum theorem on the box you drag —
+The Control volume (tool `9`) evaluates the momentum theorem on the box you drag —
 the flux and pressure integral over its faces, time-averaged. F→ is the
 number to read; gravity never enters the horizontal budget. Moving the box
 does not change the reading, as long as it still encloses the whole deflector
@@ -42,7 +42,7 @@ Measured where the jet crosses the box's upstream face: **q ≈ 0.78 m²/s** at
 
 Lecturer demonstration, ~10 min. The card counts each settle down.
 
-1. Pick the **Force box** tool (`9`) and drag a box from **(0.85, 1.55) to
+1. Pick the **Control volume** tool (`9`) and drag a box from **(0.85, 1.55) to
    (2.05, 3.20)** around the flat plate: **F→ ≈ 4 kN/m**. Drag a different
    box around the same plate — the reading holds. Keep the upstream face
    right of x ≈ 0.8: a box that contains the spout contains a source, and
@@ -81,11 +81,11 @@ Lecturer demonstration, ~10 min. The card counts each settle down.
    slow spill instead of a fast sheet. That is a fact about drawing a
    splitter side-on, not about splitters — see below.
 
-![flat plate: force box reading about 4 kN/m](shots/06-plate-forcebox.png)
+![flat plate: control volume reading about 4 kN/m](shots/06-plate-forcebox.png)
 
-![cup: jet in, sheet out down-back, force box about 7 kN/m](shots/07-cup-forcebox.png)
+![cup: jet in, sheet out down-back, control volume about 7 kN/m](shots/07-cup-forcebox.png)
 
-![deep-V: flooded wedge, force box about 5 kN/m](shots/08-deepV-forcebox.png)
+![deep-V: flooded wedge, control volume about 5 kN/m](shots/08-deepV-forcebox.png)
 
 ## What this rig does not show
 

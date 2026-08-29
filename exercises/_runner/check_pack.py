@@ -43,12 +43,18 @@ def cards():
 
         m = re.search(r'\bsettle:\s*(\d+)', blk)
         d = re.search(r'digit:\s*\{.*?base:\s*(-?[\d.]+).*?step:\s*(-?[\d.]+)', blk, re.S)
+        u = re.search(r'\bui:\s*\{([^}]*)\}', blk)
         out.append({
             "id": s("id"), "title": s("title"), "folder": s("folder"),
             "scene": s("scene"),
             "settle": int(m.group(1)) if m else None,
             "base": float(d.group(1)) if d else None,
             "step": float(d.group(2)) if d else None,
+            # The UI profile (see UIMODE in js/main.js), the instruments the
+            # card declares, and the prose that says what a student must do.
+            "ui": u.group(1) if u else None,
+            "tools": re.findall(r'\{\s*tool:\s*"([^"]+)"', blk),
+            "prose": " ".join(re.findall(r'\b(?:task|start):\s*"((?:[^"\\]|\\.)*)"', blk)),
         })
     return out
 
@@ -118,6 +124,49 @@ def main():
                 if vals != want:
                     fail.append("%-5s digit ladder differs\n        rule:   %s\n        README: %s"
                                 % (i, want, vals))
+
+    # 7. the UI profile. An exercise may narrow the interface a student meets
+    #    (see UIMODE in js/main.js); what it must not do is narrow away a tool
+    #    its own task asks for, or name something that does not exist.
+    TOOL_IDS = {"wall", "erase", "valve", "spout", "gauge", "rake", "tracer",
+                "measure", "cv", "pour"}
+    FIELD_IDS = {"water", "speed", "ehead", "head", "phead", "vort", "froude", "mom"}
+    PANEL = {"full", "focused", "shut"}
+    BUILD_TOOLS = {"wall", "erase", "valve", "spout", "pour"}
+    DRAWS = re.compile(r"\b(draw|draws|redraw|redraws|erase|sketch)\b", re.I)
+    for e in ex:
+        i, ui = e["id"], e["ui"]
+        if ui:
+            checked += 1
+            for fam in ("build", "measure", "view"):
+                m = re.search(r'\b%s:\s*\[([^\]]*)\]' % fam, ui)
+                if m:
+                    bad = [t for t in re.findall(r'"([^"]+)"', m.group(1))
+                           if t not in TOOL_IDS]
+                    if bad:
+                        fail.append("%-5s ui.%s names tools that do not exist: %s"
+                                    % (i, fam, ", ".join(bad)))
+            m = re.search(r'\bfields:\s*\[([^\]]*)\]', ui)
+            if m:
+                bad = [f for f in re.findall(r'"([^"]+)"', m.group(1))
+                       if f not in FIELD_IDS]
+                if bad:
+                    fail.append("%-5s ui.fields names fields that do not exist: %s"
+                                % (i, ", ".join(bad)))
+            m = re.search(r'\bpanel:\s*"([^"]+)"', ui)
+            if m and m.group(1) not in PANEL:
+                fail.append("%-5s ui.panel is %r, not one of %s"
+                            % (i, m.group(1), sorted(PANEL)))
+        # The derived profile hides BUILD unless the card declares a build tool
+        # or says so outright. A task that tells a student to draw something and
+        # then takes the drawing tools away is the failure this catches, and it
+        # is silent in the browser — the tool is simply not there.
+        declares_build = bool(set(e["tools"]) & BUILD_TOOLS) or \
+                         bool(ui and re.search(r'\bbuild:\s*(true|\[)', ui))
+        if DRAWS.search(e["prose"] or "") and not declares_build:
+            checked += 1
+            fail.append("%-5s task asks the student to draw, but its profile hides "
+                        "BUILD -- add `ui: { build: true }` or an instruments entry" % i)
 
     # 6. orphans
     for i in sorted(index_ids - {e["id"] for e in ex}):

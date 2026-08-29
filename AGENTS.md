@@ -18,7 +18,7 @@ shallow water); this one resolves the depth.
 | `index.html` | markup + all CSS, classic script tags; the control panel is generated from a spec in `main.js` |
 | `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
 | `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
-| `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` |
+| `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
 | `js/main.js` | boot, panel spec, pointer tools, view transform, `window.APP`, rig save/load (`RIG`) |
@@ -27,6 +27,7 @@ shallow water); this one resolves the depth.
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
+| `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
 | `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
@@ -82,24 +83,40 @@ to look fine for a minute and explode in an exercise.
   changes); outfall edges (`open` = 2) are for brinks, never ponds.
 - **The panel toggles are self-configuring** — the sandbox must be able to
   reproduce any scene by hand; that is the acceptance test for control
-  changes.
+  changes. An exercise may narrow the interface (`UIMODE`), but never lock
+  it: the `⋯` on the strip and at the head of the panel puts everything back
+  in one click, which is what keeps that acceptance test true.
+- **A field is described once.** The seven colourings live in `FIELDS` in
+  `main.js` — mode integer, name, symbol, unit, ramp and default range — and
+  the legend, the Controls select and the `G` key all read it. The ramp
+  colours themselves are `Shaders.RAMPS`, interpolated into the display
+  shader, so the key on screen and the water cannot drift apart. Adding a
+  field is a row, not three edits. Each field's colour range is explicit
+  (`u_lo`/`u_hi`) and **held**, never tracked — see the engineering notes.
 - **Zero dependencies, classic scripts** — no modules, no bundlers, no fetch,
   and no YAML front matter in `index.html` or `js/*` (the Pages build copies
-  them verbatim only because there is none). Any published page carrying
+  them verbatim only because there is none). Those three are one rule wearing
+  three hats: **the app boots with no server**. A browser refuses both `fetch`
+  of a file beside it and an ES module under `file://`, and double-clicking
+  `index.html` is a real way this gets used. The rule binds the APP; the docs
+  reader (`docs/view.html`) does fetch the markdown it renders, because
+  nothing about running a simulation depends on it and it degrades to a
+  message and two working links when it cannot. Any published page carrying
   `math` code fences must end with a `<script>` tag loading `docs/math.js` —
   stripped on github.com, live on the Pages build, where it rewrites the
   fences for MathJax (README.md and docs/numerics.md show the pattern).
 
 ## Testing
 
-Four gates, all zero-dependency and all non-zero on failure:
+Five gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 |---|---|---|
-| `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders) | instant |
+| `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
-| `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it | 8 boots |
+| `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
+| `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing
 anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
@@ -107,7 +124,8 @@ anything that touches `js/`. `smoke.js --only=api,rig` is the fast subset
 
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
-`index.html`, the TOOLBAR spec, `DOCK`, `START` or the boot wiring. Every
+`index.html`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
+`START` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
 expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
@@ -142,6 +160,18 @@ methodology live in each folder's uncommitted `_archive/`. Coordinates in a
 recipe are exact — rounding them makes a new geometry; re-measure before
 shipping. `spinup` values are measured settle times, not guesses.
 
+An entry may also carry a **`ui` profile** — which strip families and
+instruments it wants in front of a student, how focused the Controls panel
+opens, which fields the legend offers, and which on-canvas readouts it
+withholds. What it does not spell out is derived from what it already
+declares: `instruments` narrows MEASURE, an entry naming no build tool loses
+BUILD, and the panel opens on the sections its own controls live in. So a
+card whose task tells a student to draw something **must** say
+`ui: { build: true }` or name a build tool in `instruments` —
+`check_pack.py` fails the pack otherwise, because the alternative is a tool
+that is silently not there. Hidden tools keep their digit: worksheets say
+"press 5", so the key explains itself rather than arming something else.
+
 ## Gotchas worth knowing on day one
 
 - A dev browser may serve stale JS from `http.server`; force with
@@ -156,7 +186,7 @@ shipping. `spinup` values are measured settle times, not guesses.
   ruler, scale bar and ∇ markers follow the same rect, so nothing on screen
   stops being true; details in
   [docs/engineering-notes.md](docs/engineering-notes.md).
-- The Force box, the Froude view, and surface-wave damping all have
+- The Control volume, the Froude view, and surface-wave damping all have
   non-obvious failure modes — read their sections in
   [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"
   anything they show.

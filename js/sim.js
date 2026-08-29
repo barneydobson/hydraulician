@@ -283,6 +283,10 @@ const SIM = (() => {
     if (a.fboB) gl.deleteFramebuffer(a.fboB);
     if (a.fld) a.fld.dispose();
     if (a.col) a.col.dispose();
+    // The two CPU snapshots are plain arrays, so they go with the dropped
+    // S.avg object either way — nulled here so this reads as the complete
+    // teardown it is, and so a stale bed cannot outlive its window.
+    a.f0buf = null; a.bedbuf = null;
   }
 
   /** Lazily allocated: a session that never opens Average pays nothing.
@@ -314,8 +318,10 @@ const SIM = (() => {
     // separate sample (FS_COL's output, not the raw field), so it gets a
     // separate window. Do not fold it into `tf` — see the module note above.
     const col = GLH.createDoubleBuffer(gl, S.nx, 1, F, RGBA, FL, null);
-    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0, col, tc: 0 };
+    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0,
+              col, tc: 0, bedbuf: null };
     snapshotF0();
+    snapshotBed();
   }
   function avgStop() { if (S.avg) { disposeAvg(S.avg); S.avg = null; } }
   function avgReset() { if (S.avg) { avgStop(); avgStart(); } }
@@ -331,6 +337,24 @@ const SIM = (() => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
     gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
     S.avg.f0buf = buf;
+  }
+
+  /** The bed as it stands when the window opens — one forced column readback,
+   *  here rather than on every avgColumns() call.
+   *
+   *  Valid because the bed cannot move while a window is open: every path that
+   *  moves a wall goes through `rasterise`, and `rasterise` calls `avgReset`,
+   *  which closes this window and opens a new one. A live re-read could only
+   *  ever return what is already in here. Do NOT "fix" this back into a
+   *  `columns()` call inside avgColumns: `columns()` drives the shared
+   *  `colTick` throttle in front of a synchronous readPixels that costs two
+   *  thirds of a frame at 1200 columns (see its own comment), and the overlay
+   *  calls avgColumns once per frame — a second call would halve the throttle
+   *  period on exactly that path. */
+  function snapshotBed() {
+    const c = columns(true), bed = new Float32Array(S.nx);
+    for (let i = 0; i < S.nx; i++) bed[i] = c[i * 4];
+    S.avg.bedbuf = bed;
   }
 
   /** The discrete transport balance of docs/averaging.md §5, over interior
@@ -487,16 +511,17 @@ const SIM = (() => {
 
   /** The mean columns, in SIM.columns' own layout so OVERLAY.analyse takes
    *  them unchanged: (bed, d, q, surface). The bed is static within a window
-   *  (any geometry edit resets via avgReset), so it is copied from the live
-   *  buffer rather than averaged. */
+   *  (any geometry edit resets via avgReset), so it comes from the snapshot
+   *  taken when the window opened rather than from an averaged channel — and
+   *  this function makes no call into columns(); see snapshotBed. */
   function avgColumns() {
     const buf = new Float32Array(S.nx * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.col.read.fbo);
     gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, buf);
-    const live = columns();
+    const bed = S.avg.bedbuf;
     const C = new Float32Array(S.nx * 4), sigma = new Float32Array(S.nx);
     for (let i = 0; i < S.nx; i++) {
-      C[i * 4]     = live[i * 4];              // bed
+      C[i * 4]     = bed[i];                   // bed, from the window snapshot
       C[i * 4 + 1] = buf[i * 4];               // d̄
       C[i * 4 + 2] = buf[i * 4 + 1];           // q̄
       C[i * 4 + 3] = buf[i * 4 + 2];           // η̄

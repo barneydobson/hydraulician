@@ -893,9 +893,11 @@ SUITES.avg = async (B) => {
   // call's own EMA step is then `x += 0.10*(x-x) = 0` — the filter reaches
   // its fixed point in ONE call whenever the input never changes. A second
   // call with the identical input can never move, whether or not the EMA is
-  // even running. (Measured while writing this test: re-enabling the EMA on
-  // the averaged path still passed the brief's literal same-input-twice
-  // check — see task-8-report.md.)
+  // even running — measured directly: re-enabling the EMA on the averaged
+  // path still left a same-input-twice check reading identical output on
+  // both calls, so that shape of test cannot tell a bypass from a filter
+  // that already converged (docs/averaging.md §4.3 documents the bypass
+  // this suite is pinning).
   //
   // So instead: seed the shared _hA/_qA state with a column buffer D that
   // is CLEARLY different from the averaged buffer C (a just-reset, still
@@ -909,6 +911,14 @@ SUITES.avg = async (B) => {
   //        C), must give two DIFFERENT outputs — proof the live EMA is
   //        actually carrying state between calls, which is what "the
   //        bypass is real" requires the live path to keep doing.
+  //   H2c: the fourth filter — the global d_n estimate `_ynK` — gets the
+  //        same treatment. Seed it via a live call on D (D's median
+  //        candidate measured at 0.0653 m against C's 0.1544 m — a factor
+  //        of 2.4, comfortably outside anything a single 6% EMA step could
+  //        produce), then call the averaged path on C twice. Both calls
+  //        must land on the SAME k an unseeded, freshly-reset averaged call
+  //        on C also lands on — proof the seed was ignored outright, not
+  //        just diluted below the 1e-9 tolerance by one blend step.
   const h = await B.evaluate(`(() => {
     __low(); APP.tick(600);
     APP.SIM.avgStart(); APP.frames(240);
@@ -939,12 +949,33 @@ SUITES.avg = async (B) => {
     let moved = false;
     for (let i = 0; i < nx; i++) if (Math.abs(isolated[i] - withHistory[i]) > 1e-9) { moved = true; break; }
 
-    return { same, atC, moved, n: nx };
+    // H2c — the _ynK global normal-depth estimate must ignore the seed too.
+    OVERLAY.resetEstimates(APP.sim);
+    OVERLAY.analyse(APP.sim, D);                  // live call seeds _ynK from D
+    const kSeed = S._ynK;
+    OVERLAY.analyse(APP.sim, C, { averaged: true });
+    const k1 = S._ynK;
+    OVERLAY.analyse(APP.sim, C, { averaged: true });
+    const k2 = S._ynK;
+    OVERLAY.resetEstimates(APP.sim);
+    OVERLAY.analyse(APP.sim, C, { averaged: true }); // clean reference, no seed
+    const kClean = S._ynK;
+    const ynAtClean = Math.abs(k1 - kClean) < 1e-9 && Math.abs(k2 - kClean) < 1e-9;
+    // The seed must actually differ from kClean by more than an EMA step
+    // could close, or a false pass here would mean the test has no power.
+    const seedDistinct = isFinite(kSeed) && isFinite(kClean) &&
+      Math.abs(kSeed - kClean) > 0.20 * kClean;
+
+    return { same, atC, moved, ynAtClean, kSeed, k1, k2, kClean, seedDistinct, n: nx };
   })()`);
   ok("H2 averaged analyse ignores stale filter state — both calls read C verbatim",
      h.same && h.atC, JSON.stringify(h));
   ok("H2 the live path carries state between calls, so the bypass is real",
      h.moved, JSON.stringify(h));
+  ok("H2c the seed differs enough from kClean for the check below to have power",
+     h.seedDistinct, JSON.stringify(h));
+  ok("H2c the averaged _ynK estimate ignores stale filter state too",
+     h.ynAtClean, JSON.stringify(h));
 };
 
 

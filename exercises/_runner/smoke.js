@@ -555,9 +555,16 @@ SUITES.avg = async (B) => {
   ok("F1 transport residual is at the sqrt(T) drift bound",
      r.max < b1 && r.max2 < b2,
      `max ${r.max} / bound ${b1}   max2 ${r.max2} / bound2 ${b2}`);
-  // Growth must be sub-linear in T. Over a 3× window √T predicts 1.73×.
-  ok("F1 residual grows no faster than sqrt(T)", r.max2 < r.max * 4 + 1e-9,
-     `max ${r.max} -> ${r.max2} over T ${r.T} -> ${r.T2}`);
+  // Growth must be SUB-LINEAR in T. Over the 3× window below √T predicts
+  // 1.73×; the old factor of 4 was larger than 3, so pure linear growth — the
+  // thing this is here to forbid — passed it. The window is pinned to a fixed
+  // substep count, so the ratio is reproducible: 1.995 on this ANGLE/D3D11
+  // path, identical to four decimal places across five runs, about 1.15x the
+  // √T prediction. 2.6 is 1.30x that measurement and
+  // 1.50x the prediction, with linear growth (3.0) still outside it.
+  ok("F1 residual grows no faster than sqrt(T)", r.max2 < r.max * 2.6 + 1e-9,
+     `max ${r.max} -> ${r.max2} (ratio ${(r.max2 / r.max).toFixed(3)})` +
+     ` over T ${r.T} -> ${r.T2}`);
 
   // What this does and does NOT prove: prog.vof is built from FS_VOF and
   // prog.vofA from withAccum(FS_VOF) — the SAME source, both already using the
@@ -594,19 +601,43 @@ SUITES.avg = async (B) => {
   // writes f and the accumulator into mismatched textures. It only shows up
   // once the ping-pong has flipped, so read back after an ODD substep count.
   const p = await B.evaluate(`(() => {
+    const gl = document.querySelector("canvas").getContext("webgl2");
     APP.SIM.avgStart();
     APP.tick(1201);                               // odd: the two buffers end flipped
     const res = APP.SIM.transportResidual(), T = APP.SIM.avgT();
     const act = APP.SIM.avgActive();
+    // Every GL object the accumulator owns, by handle, taken BEFORE the stop:
+    // three ping-pongs (transport, Favre field, columns) and the two MRT
+    // framebuffers. avgActive() alone is just !!S.avg, so a disposeAvg that
+    // deleted nothing would pass it while stranding ~44 MB of RGBA32F at
+    // Ultra — exactly the leak release() was written for.
+    const A = APP.sim.avg;
+    const tex = [A.T.a.tex, A.T.b.tex, A.fld.a.tex, A.fld.b.tex,
+                 A.col.a.tex, A.col.b.tex];
+    const fbo = [A.T.a.fbo, A.T.b.fbo, A.fld.a.fbo, A.fld.b.fbo,
+                 A.col.a.fbo, A.col.b.fbo, A.fboA, A.fboB];
+    const live = () => tex.filter((t) => gl.isTexture(t)).length
+                     + fbo.filter((f) => gl.isFramebuffer(f)).length;
+    const nObj = tex.length + fbo.length, liveBefore = live();
     APP.SIM.avgStop();
+    const liveAfter = live();
+    // and the accumulator is genuinely gone, not merely flagged off.
+    let reachable = true;
+    try { APP.SIM.avgColumns(); } catch (e) { reachable = false; }
     return { T, max: res.max, n: res.n, Fmax: res.Fmax, dt: APP.SIM.dt(),
-             dx: APP.sim.dx, act, actAfter: APP.SIM.avgActive() };
+             dx: APP.sim.dx, act, actAfter: APP.SIM.avgActive(),
+             nObj, liveBefore, liveAfter, reachable, err: gl.getError() };
   })()`);
   ok("avg ping-pongs stay in phase across an odd substep count",
      p.T > 0 && p.n > 100 && p.max < avgBound(p.Fmax, p.T, p.dt, p.dx),
      JSON.stringify(p));
   ok("avgStop releases the accumulator", p.act === true && p.actAfter === false,
      JSON.stringify(p));
+  ok("avgStop deletes every GL object the accumulator owns",
+     p.liveBefore === p.nObj && p.liveAfter === 0 && p.err === 0,
+     JSON.stringify(p));
+  ok("avgColumns is unreachable once the window is closed",
+     p.reachable === false, JSON.stringify(p));
 
   // R must restart the window — and it also respecifies the f textures the MRT
   // framebuffers attach, so this is the invalid-framebuffer case too.
@@ -673,6 +704,72 @@ SUITES.avg = async (B) => {
      e.segs1 === e.segs0 + 1 && e.n > 100 &&
      e.max < avgBound(e.Fmax, 300 * e.dt, e.dt, e.dx),
      JSON.stringify(e));
+
+  // A VALVE TOGGLE is a geometry edit in everything but name (§9): it leaves
+  // the rasterised mask alone, but every shader's SO() and the residual's own
+  // solidLo read p.valveClosed, so flipping it moves every valve texel between
+  // solid and open. Cells that were solid had their accumulator frozen by
+  // ACC_KEEP while T ran on, so reopening them would leave ⟨F⟩ weighted by a
+  // window they were absent for — the residual around the valve rises with no
+  // physical cause, on h23 where the valve IS the exercise. SIM.setValve is
+  // the single writer; the toolbar, the V key and the rig-apply path all go
+  // through it.
+  const v = await B.evaluate(`(() => {
+    APP.SIM.avgStart();
+    APP.tick(300);
+    const before = APP.SIM.avgT(), v0 = APP.sim.p.valveClosed;
+    APP.SIM.setValve(v0 <= 0.5);                  // flip it
+    const after = APP.SIM.avgT(), on = APP.SIM.avgActive(), v1 = APP.sim.p.valveClosed;
+    APP.tick(300);
+    const mid = APP.SIM.avgT();
+    APP.SIM.setValve(v1 > 0.5);                   // write the SAME value again
+    const noop = APP.SIM.avgT();
+    APP.SIM.setValve(v0 > 0.5);                   // put the scene back
+    APP.SIM.avgStop();
+    return { before, after, on, v0, v1, mid, noop };
+  })()`);
+  ok("avg a valve toggle resets the window",
+     v.before > 0 && v.after === 0 && v.on === true && v.v1 !== v.v0,
+     JSON.stringify(v));
+  // ...but only when it actually moves. The rig-apply path writes the flag on
+  // every load whether or not it changed, and pressing V twice must not cost
+  // two windows.
+  ok("avg an unchanged valve write does not reset the window",
+     v.mid > 0 && v.noop === v.mid, JSON.stringify(v));
+
+  // The CELERITY slider rewrites f in place (rescaleFill holds P = c²(f−1)
+  // fixed), and f(0) was snapshotted before it. The endpoint term
+  // (f(T)−f(0))/T would swallow the whole injected step — order 7% of f in
+  // every pressurised cell, ~7e-2 s⁻¹ at T = 1 s against an F1 bound near
+  // 1e-3 — with nothing in ⟨F⟩ or ⟨S⟩ to answer it. Driven through the panel
+  // control, which is how a user reaches it.
+  const cw = await B.evaluate(`(() => {
+    APP.SIM.avgStart();
+    APP.tick(300);
+    const before = APP.SIM.avgT(), c0 = APP.sim.p.c;
+    const ctl = CONTROLS.find((x) => x.id === "cel");
+    ctl.set(Math.round(c0 * 0.5));
+    const after = APP.SIM.avgT(), on = APP.SIM.avgActive(), c1 = APP.sim.p.c;
+    // Run the NEW window at the NEW celerity and close the balance in it. Do
+    // NOT restore c first: setting it back is the exact inverse of the
+    // rescale, so f(T) would return to a value consistent with the stale
+    // f(0) and the storage term would hide the injection it is here to catch.
+    APP.tick(300);
+    const res = APP.SIM.transportResidual();
+    const dt = APP.SIM.dt();                      // at the NEW c, as the bound needs
+    ctl.set(c0);                                  // and put the scene back
+    APP.SIM.avgStop();
+    return { before, after, on, c0, c1, max: res.max, n: res.n, Fmax: res.Fmax,
+             dt, dx: APP.sim.dx };
+  })()`);
+  ok("avg a celerity change resets the window",
+     cw.before > 0 && cw.after === 0 && cw.on === true && cw.c1 !== cw.c0,
+     JSON.stringify(cw));
+  // The consequence, measured rather than assumed: with a stale f(0) the
+  // endpoint term carries the whole injected step and the balance opens up.
+  ok("avg the transport balance closes across a celerity change",
+     cw.n > 100 && cw.max < avgBound(cw.Fmax, 300 * cw.dt, cw.dt, cw.dx),
+     JSON.stringify({ ...cw, bound: avgBound(cw.Fmax, 300 * cw.dt, cw.dt, cw.dx) }));
 
   // The Favre display field (Task 6): a per-FRAME accumulator, distinct from
   // the transport accumulator exercised above — APP.frames() drives tickFrame
@@ -763,6 +860,104 @@ SUITES.avg = async (B) => {
      JSON.stringify(cl));
   ok("avgField's ubar sits on the CENTRED velocity, not the bare west face",
      cl.dCentred < cl.dFace, JSON.stringify(cl));
+
+  // FAVRE, not Reynolds. The collocation probe above skips every cell with
+  // fbar <= 0.9, and its CPU reference is a plain time-weighted mean of u_c —
+  // which is the REYNOLDS mean. Where fbar > 0.9 the Favre and Reynolds means
+  // coincide to within the noise, so a shader storing vec4(uc, wc, f, U.b)
+  // instead of vec4(f*uc, f*wc, f, U.b) passes it, and so does an avgField()
+  // that forgets to divide by fbar. docs/averaging.md §8 A3/A4 exist for
+  // exactly this ("alternating f = 1,0 with u = 10,0 gives 10, not 5").
+  //
+  // So: run the same idea on PARTIALLY FILLED cells, 0.3 < fbar < 0.7, where
+  // <f u_c>/fbar and <u_c> genuinely differ, and compute BOTH references on
+  // the CPU from the SAME per-frame readbacks the shader samples (patch() for
+  // U, the F texture for f, weighted by each frame's own simulated advance —
+  // §4.4's rule). Then ask which one ubar landed on. A comparison, so it
+  // survives the flow's unsteadiness; taken over a POPULATION of the most
+  // separated cells rather than one, so a single noisy cell cannot decide it.
+  const fr = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    const gl = document.querySelector("canvas").getContext("webgl2");
+    const S = APP.sim, nx = S.nx, ny = S.ny, n = nx * ny;
+    const F = new Float32Array(n * 4);
+    const sFu = new Float64Array(n), sF = new Float64Array(n), sU = new Float64Array(n);
+    let T = 0, frames = 0;
+    APP.SIM.avgStart();
+    for (let s = 0; s < 60; s++) {
+      const t0 = S.t;
+      APP.frames(1);                       // tickFrame samples U/F AFTER the
+      const dt = S.t - t0;                 // substeps, so this reads the same
+      if (!(dt > 0)) continue;             // state avgStepField just consumed
+      const P = APP.SIM.patch(0, S.W);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+      gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, F);
+      for (let j = 0; j < ny; j++) {
+        for (let i = 1; i < nx - 2; i++) {
+          const k = j * nx + i, b = ((j * P.w) + i - P.i0) * 4;
+          const uc = 0.5 * (P.buf[b] + P.buf[b + 4]);   // centred, as FS_ACC does
+          const f = F[k * 4];
+          sFu[k] += dt * f * uc; sF[k] += dt * f; sU[k] += dt * uc;
+        }
+      }
+      T += dt; frames++;
+    }
+    const A = APP.SIM.avgField();
+    const cand = [];
+    for (let j = 2; j < ny - 2; j++) {
+      for (let i = 2; i < nx - 3; i++) {
+        const k = j * nx + i, fb = A.fbar[k];
+        if (!(fb > 0.3 && fb < 0.7)) continue;          // partially filled
+        if (!(sF[k] > 1e-9)) continue;
+        const favre = sFu[k] / sF[k], reyn = sU[k] / T;
+        if (!Number.isFinite(favre) || !Number.isFinite(reyn)) continue;
+        cand.push({ i, j, fb, favre, reyn, sep: Math.abs(favre - reyn),
+                    ubar: A.ubar[k] });
+      }
+    }
+    APP.SIM.avgStop();
+    cand.sort((a, b) => b.sep - a.sep);
+    const top = cand.slice(0, 25);
+    let dF = 0, dR = 0, nearFavre = 0;
+    for (const c of top) {
+      const a = Math.abs(c.ubar - c.favre), b = Math.abs(c.ubar - c.reyn);
+      dF += a; dR += b; if (a < b) nearFavre++;
+    }
+    const m = top.length || 1;
+    return { frames, T, nCand: cand.length, nTop: top.length, nearFavre,
+             dFavre: dF / m, dReyn: dR / m,
+             sepMax: top.length ? top[0].sep : 0,
+             sepMin: top.length ? top[top.length - 1].sep : 0,
+             best: top[0] || null };
+  })()`);
+  console.log(`
+    Favre vs Reynolds: ${fr.nCand} cells with 0.3<fbar<0.7 over T=${fr.T.toFixed(4)}s` +
+    ` (${fr.frames} frames); top ${fr.nTop} by separation ${fr.sepMin.toFixed(4)}-${fr.sepMax.toFixed(4)} m/s;` +
+    ` mean |ubar-Favre|=${fr.dFavre.toExponential(3)} vs |ubar-Reynolds|=${fr.dReyn.toExponential(3)};` +
+    ` nearer Favre in ${fr.nearFavre}/${fr.nTop}` +
+    (fr.best ? ` | best cell (${fr.best.i},${fr.best.j}) fbar=${fr.best.fb.toFixed(3)}` +
+      ` Favre=${fr.best.favre.toFixed(4)} Reynolds=${fr.best.reyn.toFixed(4)} ubar=${fr.best.ubar.toFixed(4)}` : ""));
+  // The probe is worthless unless the two references actually separate — a
+  // green assertion on cells where they coincide proves nothing, which is the
+  // failure this test was written to end.
+  ok("Favre/Reynolds probe found partially filled cells that separate the two",
+     fr.nTop >= 10 && fr.sepMin > 0.02, JSON.stringify({ ...fr, best: undefined }));
+  // "Nearer Favre than Reynolds" is NOT enough on its own, and the negative
+  // control is what showed it: storing uc instead of f*uc leaves avgField
+  // dividing by fbar anyway, so ubar becomes <u_c>/fbar — at fbar = 0.3 that
+  // is 4.2x the Reynolds mean, further from Reynolds than from Favre, and a
+  // nearness test passes it. The gate is therefore AGREEMENT with the Favre
+  // reference relative to the Favre/Reynolds separation. Measured on this
+  // scene: 1.3e-7 against 6.9e-1, a ratio of 2e-7. The negative control (the
+  // uc store) measured 3.98e-2 against 1.15e0, a ratio of 3.46e-2 — and it
+  // was still "nearer Favre" in 25 cells out of 25, which is precisely why
+  // the nearness clause cannot carry this on its own. The gate at 1e-3 sits
+  // between them with 5000x of clean headroom and 35x of separation from the
+  // bug. The other half of the trap, an avgField that forgets to divide by
+  // fbar, lands nearer Reynolds outright and the nearness clause catches it.
+  ok("avgField's ubar is the FAVRE mean <f u_c>/fbar, not the Reynolds mean <u_c>",
+     fr.dFavre < 1e-3 * fr.dReyn && fr.nearFavre >= 0.9 * fr.nTop,
+     JSON.stringify({ ...fr, best: undefined }));
 
   // The column-reading accumulator (Task 7): averages FS_COL's OWN OUTPUT
   // (bed, d, q, top), not the raw field — connectivity stays decided on the

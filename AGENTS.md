@@ -28,11 +28,11 @@ shallow water); this one resolves the depth.
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
-| `docs/averaging.md` | time averaging: the discrete mass balance the mean must satisfy, and how the free surface is reconstructed from it (phase C design; not yet built) |
+| `docs/averaging.md` | time averaging: the discrete mass balance the mean must satisfy, and how the free surface is reconstructed from it — the binding spec for the engine now on the branch |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
 | `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
-| `test/` | `ui-smoke.mjs` layout gate and `cdp.mjs`, its portable headless-Chrome client |
+| `test/` | `ui-smoke.mjs` layout gate, `recon-test.mjs` (RECON's unit tests, no browser) and `cdp.mjs`, its portable headless-Chrome client |
 | `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
 
 ## The model, in one paragraph
@@ -94,13 +94,15 @@ to look fine for a minute and explode in an exercise.
 
 ## Testing
 
-Four gates, all zero-dependency and all non-zero on failure:
+Six gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 |---|---|---|
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
+| `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 41 assertions, no browser | instant |
+| `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, the reset conditions, the Favre display field, the mean columns and the overlay — 35 assertions | ~4 min |
 | `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it | 8 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing

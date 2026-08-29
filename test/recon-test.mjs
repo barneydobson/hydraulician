@@ -206,9 +206,50 @@ for (const [gap, sep] of [[1, false], [2, false], [3, true], [4, true]]) {
   ok("C3 eta05 = eta0 - 0.98769a", near(eta05, eta0 - 0.98769 * a, 5e-4), `got ${eta05}`);
   // C4: the inversion. fbar = 0.05 is the HIGH edge.
   ok("C4 the fbar=0.05 crossing is the HIGH edge", eta95 > eta05);
-  // C5: the band agrees with sigma. 2.7936 for a sinusoid, 3.2897 Gaussian.
-  ok("C5 band/sigma is the sinusoid's 2.7936, not the Gaussian's 3.2897",
-     near((eta95 - eta05) / (a / Math.SQRT2), 2.7936, 0.02));
+}
+// C2 + C5: ONE synthetic surface, TWO independent routes to its width.
+//
+// eta(t) = eta0 + a sin(wt), sampled over four whole periods. The BAND route
+// builds the exceedance profile fbar(z) = Pr(eta > z) by running
+// RECON.accumStep on an indicator, then reads its 0.05 / 0.95 level sets. The
+// WELFORD route runs RECON.welford / RECON.sigma over the SAME samples. The
+// two share the surface and nothing else, which is what makes their ratio a
+// cross-check rather than an identity.
+//
+// The earlier C5 divided the band by the ANALYTIC a/sqrt(2), three lines below
+// two assertions that had already pinned eta95 and eta05 to the same analytic
+// constants. It was implied by them and could not fail on its own; breaking
+// the Welford update left it green. It now goes red with it (measured below).
+{
+  const eta0 = 1.0, a = 0.05, dx = 0.0025, ny = 600, N = 4000, PER = 4;
+  // dt is deliberately NOT 1: with unit samples an unweighted Welford
+  // (M2 += (phi-m0)(phi-m1), no dt) is numerically identical to the
+  // weighted one, so the assertion below could not see the difference.
+  // At dt = 0.01 it is 100x wrong in M2 and 10x wrong in sigma.
+  const dt = 0.01;
+  const g = new Float64Array(ny);
+  let mean = 0, M2 = 0, T = 0;
+  for (let n = 0; n < N; n++) {
+    const eta = eta0 + a * Math.sin(2 * Math.PI * PER * n / N);
+    for (let j = 0; j < ny; j++) {
+      g[j] = RECON.accumStep(g[j], eta > (j + 0.5) * dx ? 1 : 0, T, dt);
+    }
+    const m1 = RECON.accumStep(mean, eta, T, dt);
+    M2 = RECON.welford(M2, mean, m1, eta, dt);
+    mean = m1; T += dt;
+  }
+  const sig = RECON.sigma(M2, T);
+  const b = RECON.bodies(g, new Uint8Array(ny), ny)[0];
+  const L = RECON.bandLevels(g, b.j0, ny - 1, dx);
+  // C2: the Welford route alone. Exact for a whole number of periods.
+  ok("C2 Welford sigma over the sampled surface is a/sqrt(2)",
+     near(sig, a / Math.SQRT2, a * 1e-6), `got ${sig}`);
+  // C5: band against Welford. 2.7936 for a sinusoid, 3.2897 for a Gaussian —
+  // the two routes land at 2.7995 here, 0.006 from the sinusoid and 0.49 from
+  // the Gaussian, so the tolerance separates them by 80x.
+  ok("C5 the band and Welford routes agree at the sinusoid's 2.7936, not 3.2897",
+     near((L.eta95 - L.eta05) / sig, 2.7936, 0.02),
+     `got ${(L.eta95 - L.eta05) / sig} with sigma ${sig}`);
 }
 // C6: a skewed surface. eta_hi for 30% of the window, eta_lo otherwise. The
 // mean and the median differ, and only the mean conserves volume. Every
@@ -263,6 +304,28 @@ ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12),
   const L = RECON.bandLevels(g, 0, g.length - 1, 0.01);
   ok("C9 crossing takes the first threshold crossing, not the outer envelope",
      L.eta95 < 0.06, `eta95 ${L.eta95}`);
+}
+
+// E4: the g = 0 scene. Its EOS is two-sided, so P_diag can be negative and
+// geomFill's clamp(g,0,1) would absorb it silently -- a plausible fill where
+// the answer is "not defined". docs/averaging.md §7.1 excludes the scene by
+// construction; the refusal is how that exclusion is enforced at the only
+// entry point, and it must be a THROW rather than a quiet zero.
+{
+  const nx = 3, ny = 3, dx = 0.01, c = 25;
+  const fbar = new Float64Array(nx * ny).fill(0.8);
+  const pbar = new Float64Array(nx * ny).fill(-100);   // two-sided: p < 0
+  const mask = new Uint8Array(nx * ny);
+  let threw = false, why = "";
+  try { RECON.reconstruct({ fbar, pbar, mask, nx, ny, dx, c, g: 0 }); }
+  catch (e) { threw = true; why = e.message; }
+  ok("E4 reconstruct refuses g = 0", threw, "it returned a result instead");
+  ok("E4 the refusal says why", /two-sided|free surface/.test(why), why);
+  // and it must NOT refuse the scenes it is for.
+  let ran = true;
+  try { RECON.reconstruct({ fbar, pbar, mask, nx, ny, dx, c, g: 9.81 }); }
+  catch (e) { ran = false; why = e.message; }
+  ok("E4 reconstruct still runs under gravity", ran, why);
 }
 
 console.log(`${passed} passed, ${failures.length} failed`);

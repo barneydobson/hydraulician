@@ -23,10 +23,13 @@ const CONFIG = {
 const state = {
   scene: null, budget: CONFIG.defaultBudget,
   tool: "wall", brush: 0.055,
-  mode: 0, particles: false, dye: true, channel: true, labels: true, jumps: true,
+  mode: 0, range: {}, particles: false, dye: true, channel: true, labels: true, jumps: true,
+  ui: null,                   // the resolved UI profile; UIMODE.full() when absent
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
-  cv: null, cvDrag: null,          // the force control volume: box + EMA force
+  cv: null, cvDrag: null,          // the control volume: box + EMA budget
+  flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
+  cvShow: "Q",                     // which per-edge quantity the box labels
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   // Average is a measurement mode, not a blur filter (docs/averaging.md
@@ -168,6 +171,7 @@ function loadScene(id, keepDrawing) {
   state.scene = sc;
   sim = SIM.build(sc, CONFIG.budgets[state.budget], keepDrawing);
   state.mode = sc.mode;
+  state.range = {};              // each scene sets its own colour scales
   state.channel = !!sc.chan;
   state.labels = sc.labels === undefined ? true : !!sc.labels;
   // A scene whose whole subject is the particle motion should not open with
@@ -176,6 +180,7 @@ function loadScene(id, keepDrawing) {
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.measure = null; state.measDrag = null;
   state.cv = null; state.cvDrag = null;
+  state.flux.length = 0; state.fluxDrag = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -192,6 +197,10 @@ function loadScene(id, keepDrawing) {
   }
   computeView();
   syncPanel();
+  // The scene chose the field and cleared the ranges, so the card has to be
+  // repainted here — every path into a scene comes through this function, and
+  // syncing at the callers instead is how one of them gets missed.
+  LEGEND.sync();
   showToast(sc.name, sc.blurb);
   document.getElementById("sceneName").textContent = sc.name;
   document.getElementById("sceneKey").textContent = sc.key;
@@ -226,6 +235,7 @@ function switchScene(id) {
   state.particles = false;            // scenes that want them set `sc.particles`
   state.gaugeField = "h";
   state.tracerN = 9;
+  UIMODE.reset();                     // a new scene is a whole interface again
   GINSP.closeAll();
   if (state.paused) togglePause();    // via the toggle, so the glyph follows
   loadScene(id, false);
@@ -624,6 +634,10 @@ const EX = (() => {
       if (!setControl(k, p[k])) miss.push(k);
     });
     Object.keys(v).forEach((k) => { if (!setControl(k, v[k])) miss.push(k); });
+    // …and how much of the interface this exercise wants in front of a
+    // student. Applied here rather than in `pick` so it lands with everything
+    // else the entry declares, including on a re-pick.
+    UIMODE.apply(UIMODE.fromExercise(ex));
     syncPanel();
     return miss;
   }
@@ -1356,12 +1370,14 @@ const EX = (() => {
     if (!cur) return;
     cur = null; settleTo = 0; settleWhat = "";
     card.hide();
+    UIMODE.reset();          // the exercise's focus goes with the exercise
     refresh();
     syncPanel();
   }
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
            pick, reset, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
+           studentControls,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,
            get ready() { return ready; },
@@ -1380,6 +1396,78 @@ function syncURLEx(id) {
     u.searchParams.set("ex", id);
     history.replaceState(null, "", u.pathname + u.search);
   } catch (_) { /* file:// refuses — harmless */ }
+}
+
+// ==========================================================================
+//  The fields the water can be painted with.
+// ==========================================================================
+/** The seven colourings, as data.
+ *
+ *  A field used to be described in three disconnected places — a `u_mode`
+ *  integer in the GLSL, an `opts` pair in the panel spec, and prose in an
+ *  `info` string — so giving one a unit was three edits and a chance to
+ *  disagree with itself. `mode` is the shader's own integer and stays the
+ *  value a rig link already carries; the ORDER here is the order the picker
+ *  lists them, which is the order a session wants them: what the water is
+ *  doing, then the two heads, then the numbers derived from them.
+ *
+ *  `def()` is the range the ramp is painted over, in the field's own units.
+ *  `mid`, where a field has one, is the value that must land on the pale band
+ *  of a diverging ramp however lopsided the two ends are — Fr = 1 and ω = 0
+ *  are physics, not the midpoint of whatever range happens to be set. */
+const FIELDS = [
+  { mode: 0, id: "water", name: "Water", sym: "", unit: "m",
+    ramp: "water", def: () => [0, hmaxScene()],
+    blurb: "Depth below the local free surface as hue, with speed added on top as brightness. Two variables at once — read the legend's two rows, not the colour alone." },
+  { mode: 2, id: "speed", name: "Speed", sym: "|u|", unit: "m/s",
+    ramp: "turbo", def: () => [0, sceneNow().vmax || 4],
+    blurb: "The magnitude of the velocity, √(u² + w²) — the direction is not in it. Particles and dye are what show where the water is going." },
+  // The three heads, in the order they nest: H contains h contains p/ρg. Read
+  // down the list and each one is the previous with a term taken off.
+  { mode: 7, id: "ehead", name: "Energy head", sym: "H", unit: "m",
+    ramp: "turbo", def: () => [0, sim ? sim.H : 1],
+    blurb: "H = z + p/ρg + |u|²/2g — the whole head a cell carries. It can only fall downstream, so a drop along a reach IS the loss — friction, a jump's roller, a diffuser's separation. Point values, so α is 1 by construction; the depth-averaged α belongs to a profile, not a cell." },
+  { mode: 6, id: "head", name: "Piezometric head", sym: "h", unit: "m",
+    ramp: "turbo", def: () => [0, sim ? sim.H : 1],
+    blurb: "h = z + p/ρg — the potential whose gradient drives the flow. Its bands stand vertical wherever the flow is hydrostatic and bend exactly where vertical accelerations matter — crests, brinks, a chute toe, a gate contraction, a jump roller." },
+  { mode: 1, id: "phead", name: "Pressure head", sym: "p/ρg", unit: "m",
+    ramp: "turbo", def: () => [0, sceneNow().headMax || 3],
+    blurb: "The pressure alone. In still water it is simply the depth below the surface, so it climbs down every column and is not comparable between cells at different heights." },
+  { mode: 4, id: "vort", name: "Vorticity", sym: "ω", unit: "1/s",
+    ramp: "divg", mid: 0, def: () => [-40, 40],
+    blurb: "∂w/∂x − ∂u/∂z: the local spin. Shear layers, the roller of a jump and the separation off a step each show as sheets of one sign." },
+  { mode: 3, id: "froude", name: "Froude number", sym: "Fr", unit: "",
+    ramp: "divg", mid: 1, def: () => [0, 2],
+    blurb: "Fr = u/√(gd), from the streamwise velocity and the column depth. Pale is critical; blue is subcritical and red supercritical." },
+  // Last, and kept: MO-2's task and its README both say "Field → Momentum
+  // flux" in so many words, so removing it would break a shipped brief.
+  { mode: 5, id: "mom", name: "Momentum flux", sym: "ρu|u|", unit: "kg/m/s²",
+    ramp: "divg", mid: 0, def: () => [-momScene(), momScene()],
+    blurb: "Momentum per unit volume, signed by the streamwise direction, so a returning roller or an undertow reads opposite to the flow that drives it." },
+];
+
+/** The live scene, or an empty stand-in. The legend is built before the first
+ *  scene is loaded — it is what the start screen sits on top of — so every
+ *  default here has to survive `state.scene` being null. */
+function sceneNow() { return state.scene || {}; }
+/** The scene's own maximum for the Water view's depth hue. */
+function hmaxScene() { const s = sceneNow(); return s.hmax || (s.g ? 2.0 : 1); }
+/** The momentum-flux scale, as the display pass has always computed it. */
+function momScene() { return 0.5 * Math.pow(sceneNow().vmax || 4, 2); }
+
+/** The registry entry for a shader mode integer. */
+function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }
+
+/** The live colour range for a field, in its own units. Seeded from the
+ *  registry default the first time it is asked for, then owned by whatever
+ *  Fit or the legend's typed boxes last set. It does NOT track the flow:
+ *  colour that drifts while you watch cannot be compared between two frames,
+ *  let alone between two students' screenshots, which is the whole reason for
+ *  printing a scale at all. */
+function rangeFor(id) {
+  const f = FIELDS.find((q) => q.id === id) || FIELDS[0];
+  if (!state.range[id]) state.range[id] = f.def();
+  return state.range[id];
 }
 
 // ------------------------------------------------------------------- panel
@@ -1599,11 +1687,13 @@ const CONTROLS = [
     fmt: (v) => (v < 1.05 ? "true scale (1 : 1)" : "× " + v.toFixed(1) + " vertical") +
                 (state.vexAuto ? "  ·  fitted to the window" : ""),
     info: "Stretches the view vertically. A 12 m × 1.5 m flume is a thin strip at true scale, so a 0.1 m wave is a few pixels — every long-section in hydraulics is drawn exaggerated for the same reason. You can also drag the empty band above or below the domain." },
+  // Built from FIELDS, so the menu cannot fall behind the registry, and the
+  // note under it is the field's own one-line explanation.
   { id: "mode", type: "select", label: "Field",
-    opts: [["0", "Water"], ["1", "Pressure head"], ["6", "Piezometric head"],
-           ["2", "Speed"], ["3", "Froude number"],
-           ["4", "Vorticity"], ["5", "Momentum flux"]],
-    get: () => String(state.mode), set: (v) => state.mode = +v },
+    opts: FIELDS.map((f) => [String(f.mode), f.name]),
+    get: () => String(state.mode),
+    set: (v) => { state.mode = +v; LEGEND.sync(); },
+    fmt: () => fieldFor(state.mode).blurb },
   { id: "ruler", type: "check", label: "Ruler",
     get: () => state.ruler, set: (v) => state.ruler = v,
     info: "Metre ticks along the bottom and left edges of the view, with faint grid lines at the major ticks. They follow the zoom, so drawn geometry can be placed at a stated station — \"the plate goes at x = 8.0 m\" — without counting scale bars. M toggles it." },
@@ -1621,6 +1711,44 @@ const CONTROLS = [
     fmt: () => state.measure ? OVERLAY.measureText(state.measure)
                              : "then left-drag between two points on the water",
     info: "A tape measure: left-drag between two points for the straight-line length, the horizontal and vertical legs, and the slope written as 1 : n. Shift snaps to horizontal / vertical / 45°; a click without a drag clears it. The 8 key picks the tool from the keyboard, and the numbers stay printed here." },
+  { id: "cvShow", type: "buttons", label: "Control volume reads",
+    // The box reports a whole control-volume budget now, which is four edges
+    // times three quantities. One quantity at a time on the edges, chosen
+    // here or with B — the panel has to be able to reach it, because the
+    // sandbox must reproduce any scene by hand.
+    sync: (el) => {
+      el.textContent = "";
+      [["Q", "Q", "volume flow rate through each face, m²/s"],
+       ["M", "M→", "momentum flux plus pressure force on each face, N/m"],
+       ["E", "Ė", "energy flow rate through each face, W/m"]].forEach(([id, txt, why]) => {
+        const b = document.createElement("button");
+        b.textContent = txt; b.title = why;
+        b.className = state.cvShow === id ? "on" : "";
+        b.onclick = () => { b.blur(); state.cvShow = id; syncPanel(); };
+        el.appendChild(b);
+      });
+    },
+    fmt: () => !state.cv ? "left-drag a box on the water with the Control volume tool (9)"
+      : !state.cv.flux ? "settling…"
+      : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s  ·  " +
+        "Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m",
+    info: "The box is a control volume, and every face of it carries a budget: the volume crossing it, the momentum it carries plus the pressure on it, and the energy going with them. Air contributes nothing — every term is weighted by the fill fraction, so an empty cell adds zero and a half-full one adds half. Read outward-positive: what leaves is positive wherever it leaves from, so Σ Q is continuity and Σ Ė is the loss." },
+  { id: "fluxList", type: "buttons", label: "Flux sections",
+    sync: (el) => {
+      el.textContent = "";
+      const x = document.createElement("button");
+      x.textContent = "✕ Clear all";
+      x.title = "Remove every section — or click one with the Flux line tool to remove just that one";
+      x.disabled = !state.flux.length;
+      x.onclick = () => { x.blur(); state.flux.length = 0; syncPanel(); };
+      el.appendChild(x);
+    },
+    fmt: () => !state.flux.length
+        ? "pick the Flux line tool and left-drag a section across the flow"
+      : state.flux.length === 1
+        ? "1 section · draw a SECOND one for the balance between them"
+        : state.flux.length + " sections · the last two are compared",
+    info: "A section reads what crosses it: the volume Q, the momentum flux M, the pressure force F and the energy ρgQH, all four at once and all normal to the line. M and F are kept apart because telling them apart is what a control-volume question asks. <b>Two sections are the point</b> — between them you get continuity, the energy lost, and the force on whatever lies in between, which is the momentum theorem without drawing a box. Drawn bottom-to-top puts the positive side downstream." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
@@ -1664,6 +1792,19 @@ const CONTROLS = [
       c.disabled = !state.gauges.length;
       c.onclick = () => { c.blur(); GINSP.download(state.gauges, "gauges"); };
       el.appendChild(c);
+      // The gesture is to click a gauge with the Gauge tool, which nobody
+      // knows until they are told. This is where they are told.
+      const x = document.createElement("button");
+      x.textContent = "✕ Clear all";
+      x.title = "Remove every gauge — or click one with the Gauge tool to remove just that one";
+      x.disabled = !state.gauges.length;
+      x.onclick = () => {
+        x.blur();
+        GINSP.closeAll();
+        state.gauges.length = 0;
+        syncPanel();
+      };
+      el.appendChild(x);
     },
     fmt: () => state.gauges.length
       ? state.gauges.length + " gauge" + (state.gauges.length > 1 ? "s" : "") +
@@ -1686,8 +1827,25 @@ const CONTROLS = [
 
 function buildPanel() {
   const p = document.getElementById("panel");
+  // The way out of a focused panel, at its head where a reader meets it first.
+  const head = document.createElement("div");
+  head.className = "panelfocus";
+  const sw = document.createElement("button");
+  sw.type = "button"; sw.id = "panelAll";
+  sw.onclick = () => { sw.blur(); UIMODE.lift(); };
+  head.appendChild(sw);
+  p.appendChild(head);
+  // Every row remembers the section it is under, so a level can hide sections
+  // without the panel being rebuilt — and without the rows themselves knowing
+  // anything about exercises.
+  let section = "";
   CONTROLS.forEach((c) => {
-    if (c.h) { const el = document.createElement("h3"); el.textContent = c.h; p.appendChild(el); return; }
+    if (c.h) {
+      section = c.h;
+      const el = document.createElement("h3");
+      el.textContent = c.h; el.dataset.sec = section;
+      p.appendChild(el); return;
+    }
     // A custom row is a DIV, not a LABEL: a <label> forwards stray clicks to
     // its first labelable child, which would fire the file picker.
     const row = document.createElement(c.type === "custom" ? "div" : "label");
@@ -1735,8 +1893,10 @@ function buildPanel() {
     row.appendChild(input);
     if (infoEl && c.type !== "custom") row.appendChild(infoEl);
     if (c.type === "custom") c.build(input);
+    row.dataset.sec = section;
     p.appendChild(row);
     const note = document.createElement("div"); note.className = "notes"; note.id = "n_" + c.id;
+    note.dataset.sec = section;
     p.appendChild(note);
   });
 }
@@ -1767,6 +1927,47 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
+  applyPanelFocus();
+}
+
+/** The Controls sections a focused panel keeps: the ones carrying the
+ *  student's own controls, the ones the exercise itself sets through
+ *  `rigParams` / `viewParams`, and View — which holds the field, the legend
+ *  and the overlays, and is wanted in every exercise there is.
+ *
+ *  Derived from what the entry declares rather than from its prose: a brief
+ *  that asks for a control nothing declares would send a student looking, and
+ *  the fix for that is to declare the control, which is worth knowing anyway. */
+function focusedSections() {
+  const ex = EX.current;
+  const secs = ["View"];
+  if (!ex) return secs;
+  const ids = Object.keys(ex.rigParams || {})
+    .concat(Object.keys(ex.viewParams || {}))
+    .concat(EX.studentControls ? EX.studentControls(ex) : []);
+  let section = "";
+  CONTROLS.forEach((c) => {
+    if (c.h) { section = c.h; return; }
+    if (ids.indexOf(c.id) >= 0 && secs.indexOf(section) < 0) secs.push(section);
+  });
+  return secs;
+}
+
+/** Hide the sections a focused profile does not want. A first-year hunting
+ *  one slider through eleven sections is being asked the wrong question — and
+ *  everything is one click away, always. */
+function applyPanelFocus() {
+  const u = state.ui || UIMODE.full();
+  const level = u.lifted ? "full" : u.panel;
+  const keep = level === "full" ? null : focusedSections();
+  document.querySelectorAll("#panel [data-sec]").forEach((el) => {
+    el.classList.toggle("off", !!keep && keep.indexOf(el.dataset.sec) < 0);
+  });
+  const sw = document.getElementById("panelAll");
+  if (sw) {
+    sw.textContent = keep ? "⋯ Show every control" : "";
+    sw.parentElement.classList.toggle("on", !!keep);
+  }
 }
 
 // ------------------------------------------------------------------ toasts
@@ -1839,15 +2040,20 @@ const TOOLS = [
   ["erase", "Erase", "Left-drag to remove"],
   ["valve", "Valve", "Draw a gate you can slam with V"],
   ["spout", "Spout", "Click or drag to move the falling inflow"],
-  ["gauge", "Gauge", "Click to log head / depth"],
-  ["rake", "Rake", "Click for a velocity–depth profile"],
+  ["gauge", "Gauge", "Click to log head / depth — click one again to remove it"],
+  ["rake", "Rake", "Click for a velocity–depth profile — click it again to remove it"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
-  ["cv", "Force box", "Left-drag a control volume — reads the force on what it encloses. Click to clear"],
+  ["cv", "Control volume", "Left-drag a control volume — the budget on every edge, and the force on what it encloses. Click to clear"],
   // Tenth, and deliberately last: the digits 1–9 already mean the nine above
   // them, in worksheets as well as in muscle memory. Pour has no digit; on a
   // desktop its shortcut is the right-drag that works in any tool.
   ["pour", "Pour", "Drag to pour water — or right-drag with any tool"],
+  // ELEVENTH, and appended for the same reason: anything inserted above this
+  // line renumbers a digit, and a worksheet that says "press 5" would start
+  // arming the wrong tool. New tools go on the end, whatever group they
+  // belong to on the strip.
+  ["flux", "Flux line", "Left-drag a section — reads what crosses it. Draw TWO for the balance between them (Shift snaps; click a line to remove it)"],
 ];
 
 /** The tools the number keys can reach. */
@@ -1882,6 +2088,9 @@ const ICONS = {
   tracer:  '<ellipse cx="10" cy="10" rx="6.5" ry="4.5" transform="rotate(-18 10 10)"/>' +
            '<circle cx="15.4" cy="7.6" r="1.7" fill="currentColor" stroke="none"/>',
   measure: '<rect x="3" y="7.5" width="14" height="5.5" rx="1"/><path d="M6.5 7.5v2.2M10 7.5v2.2M13.5 7.5v2.2"/>',
+  // A section with the flow crossing it — the thing the tool measures.
+  flux:    '<path d="M6.5 3.5v13"/><path d="M10.5 10h6"/><path d="M14.5 7.5 17 10l-2.5 2.5"/>' +
+           '<path d="M2.5 10h2.2"/>',
   cv:      '<rect x="4" y="5" width="12" height="10" rx="1" stroke-dasharray="3 2.4"/>' +
            '<path d="M10 8v4M8.4 10.4 10 12l1.6-1.6"/>',
   pause:   '<rect x="5.2" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>' +
@@ -1896,6 +2105,20 @@ const ICONS = {
            '<circle cx="13" cy="10" r="1.9" fill="#070b0f"/><circle cx="6.5" cy="14" r="1.9" fill="#070b0f"/>',
   keys:    '<rect x="2.5" y="6" width="15" height="8" rx="1.5"/><path d="M5.5 9h.01M8 9h.01M10.5 9h.01M13 9h.01M14.5 9h.01M6.5 11.6h7"/>',
   about:   '<path d="M10 3.5 17 7l-7 3.5L3 7Z"/><path d="M3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5" opacity=".55"/>',
+  // ---- VIEW: what the water is painted with, and what is drawn over it.
+  // A colour bar with its ticks; the dashes ARE the numbers under a legend.
+  all:     '<circle cx="4.5" cy="10" r="1.45" fill="currentColor" stroke="none"/>' +
+           '<circle cx="10" cy="10" r="1.45" fill="currentColor" stroke="none"/>' +
+           '<circle cx="15.5" cy="10" r="1.45" fill="currentColor" stroke="none"/>',
+  legend:  '<rect x="3" y="5.5" width="14" height="4.5" rx="1"/>' +
+           '<path d="M3 13h3M8.5 13h3M14 13h3"/>',
+  particles: '<circle cx="5" cy="7" r="1.3"/><circle cx="11" cy="5.5" r="1.3"/>' +
+             '<circle cx="15" cy="9.5" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/>' +
+             '<circle cx="13" cy="15" r="1.3"/>',
+  dye:     '<path d="M10 3.5c3 3.6 4.5 5.9 4.5 8a4.5 4.5 0 0 1-9 0c0-2.1 1.5-4.4 4.5-8Z"/>',
+  // The two grade lines over a wavy surface: what the overlay actually draws.
+  channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
+           '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
 };
 
 /** An `<svg>` for one icon id. */
@@ -1937,6 +2160,300 @@ const TIP = (() => {
   return { show, hide, hoverable };
 })();
 
+/** The colour key — and the field picker, because they are the same question.
+ *
+ *  The seven colourings existed long before anything on screen said which one
+ *  was up, over what range, or in what units; a screenshot pasted into a
+ *  worksheet therefore carried no statement of what it showed. Worse, the
+ *  default Water view is a TWO-variable encoding — hue from submergence,
+ *  brightness added from speed — so "dark blue" was ambiguous between deep and
+ *  fast and nothing said so.
+ *
+ *  The card is built from FIELDS, so a field cannot be added without its
+ *  legend arriving with it, and its bar is painted from `Shaders.RAMPS` — the
+ *  same five stops the water is painted with. */
+const LEGEND = (() => {
+  let open = true, menuOpen = false;
+  const el = () => document.getElementById("legend");
+  const menu = () => document.getElementById("legmenu");
+
+  /** A CSS gradient from the ramp the shader itself uses. */
+  function css(stops) {
+    return "linear-gradient(to right," + stops.map((c, k) =>
+      "rgb(" + c.map((v) => Math.round(v * 255)).join(",") + ") " +
+      (100 * k / (stops.length - 1)).toFixed(0) + "%").join(",") + ")";
+  }
+  const RAMP_CSS = {
+    turbo: () => css(Shaders.RAMPS.turbo),
+    divg:  () => css(Shaders.RAMPS.divg),
+    // The Water view's own hue ramp, shallow → deep, as FS_DISP mixes it.
+    water: () => css([[0.24, 0.56, 0.78], [0.05, 0.20, 0.42]]),
+  };
+
+  function build() {
+    document.getElementById("legPick").onclick = (e) => { e.stopPropagation(); toggleMenu(); };
+    document.getElementById("legX").onclick = () => close();
+    document.getElementById("legFit").onclick = (e) => { e.target.blur(); fit(); };
+    document.getElementById("legDef").onclick = (e) => {
+      e.target.blur();
+      const f = fieldFor(state.mode);
+      state.range[f.id] = f.def();
+      sync();
+    };
+    ["legLo", "legHi"].forEach((id, k) => {
+      const box = document.getElementById(id);
+      box.addEventListener("blur", () => commit(k, box.textContent));
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); box.blur(); }
+        if (e.key === "Escape") { e.preventDefault(); sync(); box.blur(); }
+        e.stopPropagation();      // the app's one-key shortcuts are not for a text box
+      });
+    });
+    el().classList.toggle("open", open);
+    sync();
+  }
+
+  /** A typed end of the range. A pair that is not strictly increasing divides
+   *  by zero in the shader's mapping, so it is refused rather than clamped —
+   *  the box simply goes back to what it was showing. */
+  function commit(k, text) {
+    const f = fieldFor(state.mode), r = rangeFor(f.id).slice();
+    const v = parseFloat(String(text).replace(/[^\d.eE+-]/g, ""));
+    if (isFinite(v)) { r[k] = v; if (r[1] > r[0]) state.range[f.id] = r; }
+    sync();
+  }
+
+  /** Rescale to the frame this was clicked on, and then hold. */
+  function fit() {
+    const f = fieldFor(state.mode);
+    const s = SIM.fieldStats(state.mode);
+    if (!s) {
+      showToast("Nothing to fit",
+                "No wet cells on screen yet — pour some water in first.");
+      return;
+    }
+    if (f.mid !== undefined) {
+      // A diverging ramp keeps its centre: Fr = 1 and ω = 0 are physics, not
+      // the midpoint of whatever the reading happened to be.
+      const m = Math.max(f.mid - s.lo, s.hi - f.mid, 1e-6);
+      state.range[f.id] = [f.mid - m, f.mid + m];
+    } else {
+      state.range[f.id] = [Math.min(0, s.lo), Math.max(s.hi, s.lo + 1e-3)];
+    }
+    sync();
+  }
+
+  /** Repaint from live state. Cheap enough to call from the panel, the G key
+   *  and every open or close. */
+  function sync() {
+    if (!el()) return;
+    const f = fieldFor(state.mode), r = rangeFor(f.id);
+    document.getElementById("legName").textContent = f.name;
+    document.getElementById("legSym").textContent = f.sym;
+    document.getElementById("legUnit").textContent = f.unit;
+    document.getElementById("legLo").textContent = fmtNum(r[0]);
+    document.getElementById("legHi").textContent = fmtNum(r[1]);
+    const bars = document.getElementById("legBars");
+    bars.textContent = "";
+    if (f.id === "water") {
+      // TWO variables, and the card has to say so: a reader told only "blue"
+      // cannot tell deep water from fast water. The right-hand word is which
+      // CHANNEL of the colour carries it, which is the part nothing said.
+      bars.appendChild(row(RAMP_CSS.water(), "depth below surface", "hue"));
+      bars.appendChild(row("linear-gradient(to right, rgba(255,255,255,0.05), rgba(255,255,255,0.55))",
+                           "speed, 0 – " + fmtNum(vmaxFor()) + " m/s", "brightness"));
+    } else {
+      // The numbers are on the foot row, where they can be typed into; the
+      // caption carries the symbol so the bar is not an anonymous smear.
+      bars.appendChild(row(RAMP_CSS[f.ramp](), f.sym || f.name,
+                           f.mid !== undefined ? "pale = " + f.sym + " " + f.mid : ""));
+    }
+    const b = document.getElementById("legendBtn");
+    if (b) b.classList.toggle("on", open);
+    if (menuOpen) renderMenu();
+  }
+
+  function row(gradient, left, right) {
+    const d = document.createElement("div"); d.className = "legrow";
+    const bar = document.createElement("div"); bar.className = "legbar";
+    bar.style.background = gradient;
+    const cap = document.createElement("div"); cap.className = "legcap";
+    const a = document.createElement("span"); a.textContent = left;
+    const c = document.createElement("span"); c.textContent = right;
+    cap.appendChild(a); cap.appendChild(c);
+    d.appendChild(bar); d.appendChild(cap);
+    return d;
+  }
+
+  /** Three figures that read, without exponent soup on a 0.0004 range. */
+  function fmtNum(v) {
+    if (!isFinite(v)) return "—";
+    const a = Math.abs(v);
+    return a >= 100 ? v.toFixed(0)
+         : a >= 1 ? v.toFixed(2)
+         : a >= 0.01 ? v.toFixed(3)
+         : v === 0 ? "0" : v.toExponential(1);
+  }
+
+  function renderMenu() {
+    const m = menu();
+    m.textContent = "";
+    UIMODE.fields().forEach((f) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "legopt" + (f.mode === state.mode ? " on" : "");
+      b.dataset.mode = String(f.mode);
+      const t = document.createElement("b"); t.textContent = f.name;
+      const s = document.createElement("i"); s.textContent = f.sym;
+      const w = document.createElement("span"); w.textContent = f.blurb;
+      b.appendChild(t); b.appendChild(s); b.appendChild(w);
+      b.onclick = () => { state.mode = f.mode; closeMenu(); sync(); syncPanel(); };
+      m.appendChild(b);
+    });
+    const a = document.getElementById("legPick").getBoundingClientRect();
+    m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, a.left)) + "px";
+    m.style.top = Math.max(8, Math.min(innerHeight - m.offsetHeight - 8, a.bottom + 6)) + "px";
+  }
+  function toggleMenu() { if (menuOpen) closeMenu(); else openMenu(); }
+  function openMenu() {
+    menuOpen = true; menu().classList.add("open");
+    document.getElementById("legPick").classList.add("open");
+    renderMenu();
+  }
+  function closeMenu() {
+    menuOpen = false;
+    if (menu()) menu().classList.remove("open");
+    const p = document.getElementById("legPick");
+    if (p) p.classList.remove("open");
+  }
+  function onDown(e) {
+    if (!menuOpen) return;
+    if (menu().contains(e.target)) return;
+    if (document.getElementById("legPick").contains(e.target)) return;
+    closeMenu();
+  }
+
+  function setOpen(v) {
+    open = v;
+    if (el()) el().classList.toggle("open", open);
+    closeMenu();
+    sync();
+    syncToolbar();
+  }
+  return { build, sync, fit, onDown,
+           isOpen: () => open,
+           open: () => setOpen(true),
+           close: () => setOpen(false),
+           toggle: () => setOpen(!open) };
+})();
+
+/** What of the interface an exercise wants in front of a student.
+ *
+ *  The strip's families are what makes this expressible at all: "no build
+ *  tools, these two instruments" is one line because there is now a name for
+ *  each of those things. Most of the data was already in the pack — an entry's
+ *  `instruments` list has always been a statement of the tools that exercise
+ *  needs, and `studentControls` has always known which panel controls belong
+ *  to the student — so a profile is largely a matter of reading what the pack
+ *  already says.
+ *
+ *  A profile is NEVER a cage. `⋯ Show everything` puts the lot back in one
+ *  click, and the standing acceptance test — the sandbox must be able to
+ *  reproduce any scene by hand — is why it has to. */
+const UIMODE = (() => {
+  const BUILD_TOOLS = ["wall", "erase", "valve", "spout", "pour"];
+
+  function full() {
+    return { build: true, measure: true, view: true, fields: true,
+             legend: true, panel: "full",
+             readouts: { gauges: true, cursor: true, status: true },
+             lifted: false };
+  }
+
+  /** The profile an exercise gets when it does not spell one out, plus
+   *  whatever it does spell out on top. An exercise that lists no instruments
+   *  keeps every instrument: one that does not say cannot be second-guessed. */
+  function fromExercise(ex) {
+    const p = full();
+    if (!ex) return p;
+    const tools = (ex.instruments || []).map((i) => i.tool).filter(Boolean);
+    if (tools.length) {
+      const measure = tools.filter((t) => BUILD_TOOLS.indexOf(t) < 0);
+      const build = tools.filter((t) => BUILD_TOOLS.indexOf(t) >= 0);
+      p.measure = measure.length ? measure : false;
+      p.build = build.length ? build : false;
+    } else {
+      p.build = false;             // an exercise arrives with its rig already built
+    }
+    p.panel = "focused";
+    return Object.assign(p, ex.ui || {});
+  }
+
+  /** Is this item allowed? A family's entry is `true` (everything), `false`
+   *  (nothing) or the ids that survive. Tools are matched on the tool id, and
+   *  anything else on its button id, so a profile can name `legendBtn` as
+   *  readily as `gauge`. */
+  function allows(family, it) {
+    const u = state.ui || full();
+    if (u.lifted) return true;
+    const list = u[family];
+    if (list === undefined || list === true) return true;
+    if (list === false) return false;
+    return list.indexOf(it.tool) >= 0 || list.indexOf(it.id) >= 0;
+  }
+
+  /** Whether anything at all is hidden — what puts ⋯ on the strip. */
+  function narrowed() {
+    const u = state.ui;
+    if (!u || u.lifted) return false;
+    return ["build", "measure", "view"].some((f) => u[f] !== true) ||
+           u.fields !== true || u.panel !== "full" || u.legend !== true ||
+           Object.keys(u.readouts || {}).some((k) => u.readouts[k] === false);
+  }
+
+  function apply(profile) {
+    state.ui = Object.assign(full(), profile || {});
+    if (state.ui.legend === false) LEGEND.close(); else LEGEND.open();
+    // A profile that hides the live field would leave the legend naming
+    // something its own picker cannot reach, so the field moves to the first
+    // one the profile does offer.
+    if (Array.isArray(state.ui.fields) && state.ui.fields.length &&
+        state.ui.fields.indexOf(fieldFor(state.mode).id) < 0) {
+      const f = FIELDS.find((q) => q.id === state.ui.fields[0]);
+      if (f) state.mode = f.mode;
+    }
+    buildToolbar();
+    LEGEND.sync();
+    syncPanel();
+  }
+  function lift() {
+    if (!state.ui) state.ui = full();
+    state.ui.lifted = true;
+    buildToolbar(); LEGEND.sync(); syncPanel();
+  }
+  function reset() { apply(full()); }
+
+  /** The fields the picker offers — the whole registry unless narrowed. */
+  function fields() {
+    const u = state.ui;
+    if (!u || u.lifted || !Array.isArray(u.fields)) return FIELDS;
+    return FIELDS.filter((f) => u.fields.indexOf(f.id) >= 0);
+  }
+
+  /** Is this on-canvas readout wanted? Gauge cards, the hovering cursor
+   *  readout and the status line have no toggle of their own; the profile
+   *  labels, jump boxes and channel overlay stay with `viewParams`, which
+   *  already sets them — two ways to say the same thing is how they come to
+   *  disagree. */
+  function shows(what) {
+    const u = state.ui;
+    if (!u || u.lifted || !u.readouts) return true;
+    return u.readouts[what] !== false;
+  }
+
+  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows };
+})();
+
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
  *  the keyboard and the panel's own – all need it. */
 function setPanel(open) {
@@ -1970,12 +2487,23 @@ function newSandbox() {
   switchScene("sandbox");     // announces itself — `loadScene` toasts the blurb
 }
 
-/** The strip, as data. Five groups, in the order a session uses them: what to
- *  load, what to draw with, what to measure with, what the clock is doing, and
- *  what to look at. `id` is set on the button where another module already
- *  looks one up by name (PICKER and EX light their own opener). */
+/** The strip, as data. Five captioned families, in the order a session uses
+ *  them: what to LOAD, what to BUILD the rig with, what to MEASURE it with,
+ *  how to VIEW the water, and what the clock is doing.
+ *
+ *  The caption is the point of the regrouping. Build and Measure used to be
+ *  adjacent groups separated by a hairline, and nothing on screen said that
+ *  Wall changes the rig and Gauge does not — which is the whole difference
+ *  between setting an experiment up and taking a reading from it. VIEW is a
+ *  third family rather than part of Measure: it changes how the water is
+ *  DRAWN and nothing about what is being measured, which is also why the
+ *  averaging toggle and streamlines will belong there rather than among the
+ *  instruments.
+ *
+ *  `id` is set on the button where another module already looks one up by
+ *  name (PICKER and EX light their own opener). */
 const TOOLBAR = [
-  [
+  { cap: "SESSION", family: "session", items: [
     { id: "homeBtn", icon: "home", label: "Start", key: "H",
       hint: "The exercise pack, the sandbox and the scenes",
       act: () => START.open() },
@@ -1988,17 +2516,42 @@ const TOOLBAR = [
     { id: "newBtn", icon: "fresh", label: "New sandbox", key: "N",
       hint: "A blank flume — clears what is drawn and starts over",
       act: () => newSandbox() },
-  ],
-  // Draw: the four drawing tools, Pour beside them, and Undo — which was the
-  // Z key and nothing else, so on a touch screen a mis-drawn stroke could not
-  // be taken back at all.
-  TOOLS.slice(0, 4).map(toolItem).concat(
-    [toolItem(TOOLS[TOOLS.length - 1])],
-    [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
-       hint: "Take back the last thing you drew",
-       act: () => SIM.undoSeg() }]),
-  TOOLS.slice(4, TOOLS.length - 1).map(toolItem),
-  [
+  ] },
+  // BUILD: the four drawing tools, Pour beside them, Undo — which was the Z
+  // key and nothing else, so on a touch screen a mis-drawn stroke could not be
+  // taken back at all — and Clear, which used to sit with the clock although
+  // it edits the rig rather than running it.
+  { cap: "BUILD", family: "build", items:
+    toolItems("wall", "erase", "valve", "spout", "pour").concat(
+      [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
+         hint: "Take back the last thing you drew",
+         act: () => SIM.undoSeg() },
+       { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
+         hint: "Remove every segment you have drawn — the scene stays",
+         act: () => SIM.clearSegs() }]) },
+  { cap: "MEASURE", family: "measure",
+    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux") },
+  // VIEW: how the water is DRAWN. The three toggles were reachable only from
+  // the P / D / N keys or from a scroll of the Controls panel, which on a
+  // touch screen meant not at all.
+  { cap: "VIEW", family: "view", items: [
+    { id: "legendBtn", icon: "legend", label: "Field & legend", key: "L",
+      hint: "Which variable the colour shows, its range and its units",
+      on: () => LEGEND.isOpen(), act: () => LEGEND.toggle() },
+    { id: "partBtn", icon: "particles", label: "Particles", key: "P",
+      hint: "Massless tracers — the clearest way to see orbits and jets",
+      on: () => state.particles,
+      act: () => { state.particles = !state.particles; syncPanel(); } },
+    { id: "dyeBtn", icon: "dye", label: "Dye", key: "D",
+      hint: "Dye and the dye timelines injected at the inlet",
+      on: () => state.dye,
+      act: () => { state.dye = !state.dye; syncPanel(); } },
+    { id: "chanBtn", icon: "channel", label: "Open-channel overlay", key: "N",
+      hint: "Critical depth, normal depth and the energy grade line",
+      on: () => state.channel,
+      act: () => { state.channel = !state.channel; syncPanel(); } },
+  ] },
+  { cap: "RUN", family: "run", items: [
     { id: "playBtn", icon: () => (state.paused ? "play" : "pause"), key: "space",
       label: () => (state.paused ? "Run" : "Pause"),
       hint: "Stop the clock — gauge histories freeze with it",
@@ -2012,11 +2565,10 @@ const TOOLBAR = [
     { id: "valveBtn", icon: "valve", label: "Valves", key: "V",
       hint: "Open or slam every valve you have drawn",
       on: () => !!sim && sim.p.valveClosed < 0.5, act: () => toggleValve() },
-    { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
-      hint: "Remove every segment you have drawn — the scene stays",
-      act: () => SIM.clearSegs() },
-  ],
-  [
+  ] },
+  // Chrome, not a family: captioning it would put it in the same taxonomy as
+  // the four above, which is exactly what it is not.
+  { cap: "", family: "meta", items: [
     { id: "panelBtn", icon: "sliders", label: "Controls",
       hint: "Every slider: flow, boundaries, hydraulics, view, rig",
       act: () => togglePanel() },
@@ -2026,33 +2578,67 @@ const TOOLBAR = [
     { id: "aboutBtn", icon: "about", label: "About the solver",
       hint: "What is actually being computed — the numerics derivation",
       act: () => window.open(aboutHref(), "_blank", "noopener") },
-  ],
+  ] },
 ];
 
 /** A drawing / instrument tool as a strip item. Its shortcut is its position
  *  in TOOLS, which is exactly what the number keys do. */
+/** Strip items for the named tools, in the order given. The strip's ORDER is
+ *  not the TOOLS order: TOOLS is the digit order, which is fixed by every
+ *  worksheet ever printed, so a new tool is appended there and placed here. */
+function toolItems(...ids) {
+  return ids.map((id) => toolItem(TOOLS.find((t) => t[0] === id)));
+}
+
 function toolItem([id, label, tip]) {
   const n = TOOLS.findIndex((t) => t[0] === id) + 1;
-  return { icon: id === "valve" ? "gate" : id, label, hint: tip,
+  // `tool` is the item's own name for the thing it arms, and it is what a UI
+  // profile names — an exercise says `measure: ["gauge"]`, not "Gauge".
+  return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
            key: n <= TOOL_KEYS ? String(n) : "",
            on: () => state.tool === id,
            act: () => { state.tool = id; syncToolbar(); syncPanel(); } };
 }
 
 /** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
- *  README.md, so jekyll-readme-index does not make it a folder index);
- *  everywhere else — file://, a plain static host — the .md itself is right. */
+ *  README.md, so jekyll-readme-index does not make it a folder index) and does
+ *  NOT publish the .md source, so the reader below has nothing to fetch there
+ *  — the themed page is the right answer.
+ *
+ *  Everywhere else the browser used to be handed raw markdown, which is not a
+ *  document so much as its source code. `docs/view.html` renders it in the
+ *  app's own clothes instead. */
 function aboutHref() {
-  return "docs/numerics" + (/\.github\.io$/i.test(location.hostname) ? ".html" : ".md");
+  return /\.github\.io$/i.test(location.hostname)
+    ? "docs/numerics.html"
+    : "docs/view.html?doc=numerics.md";
 }
 
 function buildToolbar() {
   const host = document.getElementById("groups");
   host.textContent = "";
-  TOOLBAR.forEach((group, gi) => {
-    if (gi) { const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s); }
-    const g = document.createElement("div"); g.className = "tgrp";
-    group.forEach((it) => {
+  TOOLBAR.forEach((group) => {
+    // A profile can empty a family altogether. An empty captioned column would
+    // read as a family with nothing in it, so the group goes with its last
+    // button — and the rule keys off what has actually been appended, or a
+    // hidden first group leaves a leading hairline.
+    const items = group.items.filter((it) => UIMODE.allows(group.family, it));
+    if (!items.length) return;
+    if (host.children.length) {
+      const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
+    }
+    // A group is a captioned COLUMN: the caption names the family, the row
+    // holds the glyphs. The caption is aria-hidden — every button already
+    // carries its own label, and a screen reader does not need the heading
+    // read out once per button.
+    const g = document.createElement("div");
+    g.className = "tgrp fam-" + group.family;
+    const cap = document.createElement("div");
+    cap.className = "tcap"; cap.textContent = group.cap;
+    cap.setAttribute("aria-hidden", "true");
+    g.appendChild(cap);
+    const row = document.createElement("div"); row.className = "trow";
+    items.forEach((it) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "tbtn";
       if (it.id) b.id = it.id;
@@ -2072,19 +2658,51 @@ function buildToolbar() {
       b.onfocus = () => { if (TIP.hoverable()) tip(); };
       b.onblur = () => TIP.hide();
       it.el = b;
-      g.appendChild(b);
+      row.appendChild(b);
     });
+    g.appendChild(row);
     host.appendChild(g);
   });
+  if (UIMODE.narrowed()) host.appendChild(showAllGroup());
   syncToolbar();
   fitBar();
 }
 
+/** The way back out of a profile. It exists whenever anything is hidden, and
+ *  it is the reason a profile is allowed to hide anything at all: the sandbox
+ *  must be able to reproduce any scene by hand, and a narrowing that could not
+ *  be lifted would break that outright. */
+function showAllGroup() {
+  const g = document.createElement("div"); g.className = "tgrp fam-meta";
+  const cap = document.createElement("div");
+  cap.className = "tcap"; cap.textContent = ""; cap.setAttribute("aria-hidden", "true");
+  const row = document.createElement("div"); row.className = "trow";
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "tbtn"; b.id = "showAllBtn";
+  b.setAttribute("aria-label", "Show everything");
+  b.appendChild(iconEl("all"));
+  b.onclick = () => {
+    b.blur(); TIP.hide(); UIMODE.lift();
+    showToast("Every control is back",
+              "This exercise had narrowed the interface. Pick it again to get its focus back.");
+  };
+  b.onpointerenter = (e) => {
+    if (e.pointerType !== "touch") {
+      TIP.show(b, "Show everything",
+               "This exercise hides some controls — this brings them all back", "");
+    }
+  };
+  b.onpointerleave = () => TIP.hide();
+  row.appendChild(b); g.appendChild(cap); g.appendChild(row);
+  return g;
+}
+
 /** Fit the strip to the width it actually has. A media query cannot do this:
  *  the side panel takes its width out of the bar as well, so a 1440 px window
- *  with the panel open has the room of an 1100 px one. Two steps — smaller
- *  icons and no wordmark, then smaller still and no status line — and if even
- *  that is not enough the groups scroll rather than losing a control. */
+ *  with the panel open has the room of an 1100 px one. Three steps — the
+ *  family captions and the wordmark go, then the status line, then the icons
+ *  shrink again and the group rules go with them — and if even that is not
+ *  enough the groups scroll rather than losing a control. */
 function fitBar() {
   const bar = document.getElementById("bar"), g = document.getElementById("groups");
   if (!bar || !g) return;
@@ -2093,9 +2711,10 @@ function fitBar() {
   // would otherwise shrink itself for nothing. Two pixels of slack is already
   // too much — it leaves the last button clipped along its edge.
   const over = () => g.scrollWidth > g.clientWidth + 1;
-  bar.classList.remove("tight", "tighter");
+  bar.classList.remove("tight", "tighter", "tightest");
   if (over()) bar.classList.add("tight");
   if (over()) bar.classList.add("tighter");
+  if (over()) bar.classList.add("tightest");
   // Still too many for the room: the groups scroll, and the last one visible
   // is faded so that it looks like it continues rather than like it ends.
   bar.classList.toggle("scrolls", over());
@@ -2105,7 +2724,7 @@ function fitBar() {
  *  changes a tool, the clock or a valve; the icon only touches the DOM when it
  *  actually differs, because the play/pause glyph swaps on every space bar. */
 function syncToolbar() {
-  TOOLBAR.forEach((group) => group.forEach((it) => {
+  TOOLBAR.forEach((group) => group.items.forEach((it) => {
     const b = it.el;
     if (!b || !b.isConnected) return;
     if (it.on) b.classList.toggle("on", !!it.on());
@@ -2141,7 +2760,9 @@ const KEYS = (() => {
     ["V", "valves"],
     ["space", "pause"],
     ["R", "reset the water"],
-    ["G", "cycle the field"],
+    ["G", "cycle the field (the legend names it)"],
+    ["L", "the legend — which field, over what range, in what units"],
+    ["B", "what the Control volume reads on each edge: Q / momentum / energy"],
     ["P", "particles"],
     ["D", "dye"],
     ["N", "open-channel overlay"],
@@ -2434,7 +3055,8 @@ function onDown(e) {
   const [x, z] = pointerPos(e);
   state.cursor = [x, z];
   if (pointers.size === 2) {         // second finger: abandon tools, pinch
-    state.drag = null; state.spoutDrag = false; state.measDrag = null; state.cvDrag = null;
+    state.drag = null; state.spoutDrag = false; state.measDrag = null;
+    state.cvDrag = null; state.fluxDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
     const ps = [...pointers.values()];
     state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
@@ -2474,18 +3096,8 @@ function onDown(e) {
     syncPanel();
     return;
   }
-  if (state.tool === "gauge") {
-    if (state.gauges.length >= 4) state.gauges.shift();
-    state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
-                        colour: CONFIG.gaugeColours[state.gauges.length % 4] });
-    syncPanel();                      // the inspector row lists the live gauges
-    return;
-  }
-  if (state.tool === "rake") {
-    if (state.rakes.length >= 2) state.rakes.shift();
-    state.rakes.push({ x, buf: null });
-    return;
-  }
+  if (state.tool === "gauge") { placeGauge(x, z); return; }
+  if (state.tool === "rake") { placeRake(x); return; }
   if (state.tool === "tracer") {
     // Click anywhere in the water to hang a fresh column of tracers there;
     // click on dry ground to clear them.
@@ -2497,6 +3109,13 @@ function onDown(e) {
     // A tape, not a wall: the drag never reaches SIM.addSeg. A bare click
     // (see onUp) clears the tape instead of leaving a zero-length one.
     state.measDrag = { x0: x, z0: z, x1: x, z1: z };
+    return;
+  }
+  if (state.tool === "flux") {
+    // Same bargain as every other instrument: a click on one takes it away, a
+    // drag places a new one.
+    if (removeFluxAt(x, z)) return;
+    state.fluxDrag = { x0: x, z0: z, x1: x, z1: z };
     return;
   }
   if (state.tool === "cv") {
@@ -2558,6 +3177,12 @@ function onMove(e) {
     else { d.x1 = x; d.z1 = z; }
     return;
   }
+  if (state.fluxDrag) {
+    const d = state.fluxDrag;
+    if (e.shiftKey) { const s = snap(d.x0, d.z0, x, z); d.x1 = s[0]; d.z1 = s[1]; }
+    else { d.x1 = x; d.z1 = z; }
+    return;
+  }
   if (state.cvDrag) {
     state.cvDrag.x1 = x; state.cvDrag.z1 = z;
     return;
@@ -2581,6 +3206,13 @@ function onUp(e) {
     state.measure = Math.hypot(d.x1 - d.x0, d.z1 - d.z0) < sim.dx ? null : d;
     state.measDrag = null;
     syncPanel();                      // the panel's Measure row prints the numbers
+    return;
+  }
+  if (state.fluxDrag) {
+    const d = state.fluxDrag;
+    state.fluxDrag = null;
+    if (Math.hypot(d.x1 - d.x0, d.z1 - d.z0) >= 2 * sim.dx) placeFlux(d.x0, d.z0, d.x1, d.z1);
+    syncPanel();
     return;
   }
   if (state.cvDrag) {
@@ -2658,10 +3290,22 @@ function tickFrame(realDt) {
   const col = SIM.columns();
   // Averaging samples the frame the solver just advanced, weighted by the
   // simulated time it advanced — not by the frame, which is not a unit of
-  // anything physical. See docs/averaging.md §4.4.
+  // anything physical. Both must follow `columns()` above: the column
+  // accumulator reads the texture that call refreshes. See docs/averaging.md §4.4.
   SIM.avgStepField(simAdvanced);
   SIM.avgStepColumns(simAdvanced);
-  if (state.particles) SIM.advanceParticles(Math.min(realDt, 0.033) * Math.min(state.speed, 1.5));
+  // SIMULATED seconds, not wall-clock ones. Advancing by `realDt` made the
+  // particles a lie about the flow: the solver advances by whatever it fitted
+  // into the frame budget, which on m2 is about 0.3 × real time, so they
+  // travelled roughly three times faster than the water they were drawn in.
+  // The same fault the other way up: the clock stopped and they carried on.
+  // `advanceTracers` below has always taken `simAdvanced`, which is what the
+  // orbit tracers close their loops correctly and the particles did not.
+  //
+  // Capped because this is one explicit Euler step: during spin-up the solver
+  // runs flat out and a frame can advance half a second, which would teleport
+  // a particle through a wall rather than round it.
+  if (state.particles) SIM.advanceParticles(Math.min(simAdvanced, 0.05));
 
   const simMs = performance.now() - t0;
   // AIMD governor: creep up while there is headroom, back off hard when not
@@ -2678,6 +3322,7 @@ function tickFrame(realDt) {
   sampleGauges(analysis);
   sampleRakes();
   sampleCV();
+  sampleFlux();
   sampleInlet(analysis);
   advanceTracers(simAdvanced);
   // Scenes whose subject is the orbital motion seed their own tracer rake as
@@ -2685,8 +3330,12 @@ function tickFrame(realDt) {
   if (!state.tracers && state.scene.tracerX && sim.t > 0.5) seedTracers(state.scene.tracerX);
 
   const cur = state.inside ? state.cursor : [-99, -99];
+  const rg = rangeFor(fieldFor(state.mode).id);
   SIM.render(view, {
-    mode: state.mode, vmax: vmaxFor(), hmax: hmaxFor(analysis),
+    mode: state.mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1],
+    // The same simulated step the particles were advanced by, so the trail
+    // fades over a fixed span of FLOW rather than of wall clock.
+    pdt: Math.min(simAdvanced, 0.05),
     dye: state.dye, particles: state.particles,
     cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1 : state.brush * 0.55],
     guide: state.drag ? [state.drag.x0, state.drag.z0, state.drag.x1, state.drag.z1] : [0, 0, 0, 0],
@@ -2706,11 +3355,10 @@ function tickFrame(realDt) {
   cycleTips(realDt);
 }
 
-function vmaxFor() { return state.scene.vmax || 4; }
-function hmaxFor() {
-  return state.mode === 1 ? (state.scene.headMax || 3)
-                         : (state.scene.hmax || (state.scene.g ? 2.0 : 1));
-}
+/** The speed scale — the particle colouring and the Water view's brightness
+ *  term, both of which are speed whatever field is up. The FIELD's own range
+ *  is `rangeFor`, and the two are deliberately separate. */
+function vmaxFor() { return sceneNow().vmax || 4; }
 
 /** One sample per gauge per rendered frame — but ONLY when the clock has moved.
  *
@@ -2768,11 +3416,48 @@ function sampleRakes() {
 /** Place (or move) the force control volume. Corners are normalised and the
  *  running force estimate starts afresh — a moved box is a new measurement,
  *  and blending it with the old one would print a number no box ever read. */
+/** Take away the section under the pointer, if there is one. Named rather
+ *  than inlined because a click and a drag are different gestures on this
+ *  tool: removal happens on the way DOWN, placement on the way up. */
+function removeFluxAt(x, z) {
+  const hit = state.flux.findIndex((L) => nearSegment(L, x, z) < GRAB_PX);
+  if (hit < 0) return false;
+  state.flux.splice(hit, 1);
+  syncPanel();
+  return true;
+}
+
+/** Put a section down. Four is the ceiling for the same reason gauges stop at
+ *  four: past that nobody can tell them apart, and the questions these answer
+ *  need two. The oldest gives way, so the pair you are looking at is the pair
+ *  you drew last. */
+function placeFlux(x0, z0, x1, z1) {
+  if (state.flux.length >= 4) state.flux.shift();
+  state.flux.push({ x0, z0, x1, z1, ema: null, t0: sim.t });
+  syncPanel();
+}
+
+/** Every section, smoothed the same way the control volume is. A raw section
+ *  integral on a wobbling free surface is not a reading — it carries every
+ *  wave that crosses it — which is the whole reason the box grew an EMA. */
+function sampleFlux() {
+  if (!state.flux.length || state.paused) return;
+  state.flux.forEach((L) => {
+    if (sim.t < L.t0) { L.ema = null; L.t0 = sim.t; }
+    const r = SIM.lineFlux(L.x0, L.z0, L.x1, L.z1);
+    const a = 1 - Math.exp(-Math.min(Math.max(sim.t - L.t0, 0), 0.25) / 1.0);
+    L.t0 = sim.t;
+    if (!L.ema) { L.ema = r; return; }
+    FLUX_KEYS.forEach((k) => { L.ema[k] += (r[k] - L.ema[k]) * a; });
+    L.ema.nx = r.nx; L.ema.nz = r.nz; L.ema.len = r.len;
+  });
+}
+
 function placeCV(x0, z0, x1, z1) {
   state.cv = {
     x0: Math.min(x0, x1), z0: Math.min(z0, z1),
     x1: Math.max(x0, x1), z1: Math.max(z0, z1),
-    ema: null, hist: [], t0: sim.t,
+    ema: null, flux: null, hist: [], t0: sim.t,
   };
 }
 
@@ -2787,14 +3472,39 @@ function sampleCV() {
   if (sim.t < cv.t0) { cv.ema = null; cv.hist.length = 0; cv.t0 = sim.t; }
   if (!(sim.t > cv.t0) && cv.ema) return;
   const r = SIM.boxForce(cv.x0, cv.z0, cv.x1, cv.z1);
+  // The whole budget, from the same faces. One extra pair of readPixels per
+  // frame, which is the same cost the force alone already pays — and every
+  // number in it is smoothed by the SAME EMA, because a raw face integral on
+  // a wobbling free surface is a reading nobody can take.
+  const b = SIM.boxFlux(cv.x0, cv.z0, cv.x1, cv.z1);
   const a = 1 - Math.exp(-Math.min(sim.t - cv.t0, 0.25) / 1.0);
   cv.t0 = sim.t;
   cv.ema = cv.ema ? { fx: cv.ema.fx + (r.fx - cv.ema.fx) * a,
                       fz: cv.ema.fz + (r.fz - cv.ema.fz) * a }
                   : { fx: r.fx, fz: r.fz };
+  cv.flux = emaFlux(cv.flux, b, a);
   cv.hist.push({ t: sim.t, fx: r.fx });
   while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
   cv.last = r;
+}
+
+/** Smooth every scalar of a control-volume budget, edge by edge. Written as a
+ *  walk over the keys rather than by hand so that adding a quantity to
+ *  `boxFlux` cannot leave it unsmoothed and jittering while its neighbours
+ *  sit still. */
+const FLUX_KEYS = ["Q", "mdot", "Mx", "Mz", "Fpx", "Fpz", "E", "wet"];
+const CV_EDGES = ["left", "right", "bed", "top"];
+function emaFlux(prev, now, a) {
+  if (!prev) return JSON.parse(JSON.stringify({ edges: now.edges, total: now.total, inQ: now.inQ }));
+  const out = { edges: {}, total: {}, inQ: prev.inQ + (now.inQ - prev.inQ) * a };
+  CV_EDGES.forEach((e) => {
+    out.edges[e] = {};
+    FLUX_KEYS.forEach((k) => {
+      out.edges[e][k] = prev.edges[e][k] + (now.edges[e][k] - prev.edges[e][k]) * a;
+    });
+  });
+  FLUX_KEYS.forEach((k) => { out.total[k] = prev.total[k] + (now.total[k] - prev.total[k]) * a; });
+  return out;
 }
 
 /** What the reservoir is actually DELIVERING.
@@ -2922,23 +3632,85 @@ function drawOverlay(A) {
                                 z0: Math.min(state.cvDrag.z0, state.cvDrag.z1),
                                 x1: Math.max(state.cvDrag.x0, state.cvDrag.x1),
                                 z1: Math.max(state.cvDrag.z0, state.cvDrag.z1) });
-  } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv);
+  } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv, state.cvShow);
+  if (state.flux.length || state.fluxDrag) {
+    OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
+  }
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
   const fld = state.gaugeField;
-  const cards = OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-    fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
-    fld === "speed" ? "m/s" : "m");
+  // The MARKS always stay — a gauge you cannot see is a gauge you place twice.
+  // What a profile can withhold is the card that reads it out, for an exercise
+  // that wants a prediction before a number.
+  const cards = UIMODE.shows("gauges")
+    ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
+        fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
+        fld === "speed" ? "m/s" : "m")
+    : [];
   GINSP.tick(cards);
-  if (state.inside && !state.drag) {
+  if (state.inside && !state.drag && UIMODE.shows("cursor")) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
     if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1]); }
     OVERLAY.drawCursorReadout(ctx, view, A, sim, state.cursor[0], state.cursor[1], state.hover);
   }
 }
+
+/** Screen distance, in CSS pixels, between a domain point and a place on the
+ *  view. Hit-testing an instrument has to happen in PIXELS: the vertical
+ *  exaggeration is up to 8×, so a radius in metres is a tall thin ellipse on
+ *  screen and a gauge you are plainly pointing at is a miss. */
+function pxApart(x0, z0, x1, z1) {
+  const dx = (x1 - x0) * view.w / sim.W;
+  const dz = (z1 - z0) * view.h / sim.H;
+  return Math.hypot(dx, dz);
+}
+const GRAB_PX = 16;      // a finger is 44 px; this is for a pointed-at marker
+
+/** Screen distance from a point to a drawn section, in pixels. */
+function nearSegment(L, x, z) {
+  const ax = (L.x1 - L.x0) * view.w / sim.W, az = (L.z1 - L.z0) * view.h / sim.H;
+  const px = (x - L.x0) * view.w / sim.W, pz = (z - L.z0) * view.h / sim.H;
+  const len2 = ax * ax + az * az;
+  const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, (px * ax + pz * az) / len2));
+  return Math.hypot(px - ax * t, pz - az * t);
+}
+
+/** Place a gauge — or take away the one you just pointed at.
+ *
+ *  Gauges and rakes were the only instruments with no way back: every click
+ *  pushed another one, and the only way to lose one was to place four more.
+ *  The tape, the Control volume and the orbit tracers all already clear on a click,
+ *  so this is the convention the rest of the toolbox was using. */
+function placeGauge(x, z) {
+  const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < GRAB_PX);
+  if (hit >= 0) {
+    const gone = state.gauges.splice(hit, 1)[0];
+    GINSP.closeFor(gone);
+    syncPanel();
+    return;
+  }
+  if (state.gauges.length >= 4) state.gauges.shift();
+  state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
+                      colour: CONFIG.gaugeColours[state.gauges.length % 4] });
+  syncPanel();                      // the inspector row lists the live gauges
+}
+
+/** Place a rake — or take away the one at that station. A rake is a whole
+ *  column, so only the station is compared. */
+function placeRake(x) {
+  const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < GRAB_PX);
+  if (hit >= 0) { state.rakes.splice(hit, 1); syncPanel(); return; }
+  if (state.rakes.length >= 2) state.rakes.shift();
+  state.rakes.push({ x, buf: null });
+  syncPanel();
+}
+
+/** The order the Control volume's per-edge quantity cycles in: what crosses the
+ *  face, then what force it carries, then what energy goes with it. */
+const CV_NEXT = { Q: "M", M: "E", E: "Q" };
 
 /** How recently a panel control with a placement was touched → 0..1 pulse. */
 function flashOf(key) {
@@ -3053,11 +3825,7 @@ function drawSpout(ctx) {
 }
 
 function updateStatus() {
-  // The chip shares the strip with the icons and is allowed to shrink them,
-  // so the fit has to be rechecked whenever what it says changes — a boot-time
-  // measurement is taken while it still reads "Sandbox" with no clock, and a
-  // long scene name would then push a whole group out of sight.
-  fitBar();
+  document.getElementById("status").style.display = UIMODE.shows("status") ? "" : "none";
   document.getElementById("status").textContent =
     sim.nx + "×" + sim.ny + " · Δx " + (sim.dx * 1000).toFixed(0) + " mm · " +
     "t " + sim.t.toFixed(1) + " s · ×" + state.rt.toFixed(2) + " RT · " +
@@ -3069,6 +3837,13 @@ function updateStatus() {
   // The delivered numbers move on their own, so their notes are refreshed on
   // this cadence rather than only when a slider is touched.
   if (state.deliv) { refreshNote("inQ"); refreshNote("inLevel"); }
+  // AFTER the text, never before. The chip shares the strip with the icons and
+  // is allowed to shrink them, so the fit has to be rechecked whenever what it
+  // says changes — and measuring first measures the PREVIOUS string. The clock
+  // crossing t = 10 s widens the chip by a digit, which squeezed the groups two
+  // pixels past their content and clipped the last button until something else
+  // happened to re-measure: the strip was chronically one update behind.
+  fitBar();
 }
 
 function refreshNote(id) {
@@ -3122,12 +3897,16 @@ function dragWindow(el, handle, onPlace) {
  *  canvas because the things it needs (drag, wheel-zoom over a small target,
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
+  // The gauge's own traces — what a gauge RECORDS over time, which is a
+  // different register from the FIELDS the water is painted with, and named
+  // apart from it for that reason.
+  //
   // Symbols follow free-surface convention: h is the piezometric head, d the
   // depth and η the water level, leaving H free for the energy head (the full
   // rationale, texts included, is in docs/notation.md). Since rig format v2
   // the KEYS are the symbols; older wire formats are rejected, not migrated —
   // prototype, no back-compat.
-  const FIELDS = [
+  const SERIES = [
     ["h",     "h", "m",   "piezometric head, h = z + p/ρg"],
     ["d",     "d", "m",   "water depth of the column"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],
@@ -3194,7 +3973,7 @@ const GINSP = (() => {
     // ---- value rows (built once; only the numbers are rewritten per frame)
     const vals = el.querySelector(".ginsp-vals");
     o.vb = {};
-    FIELDS.forEach(([f, sym, unit, note]) => {
+    SERIES.forEach(([f, sym, unit, note]) => {
       const d = document.createElement("div"); d.dataset.f = f;
       d.innerHTML = "<span>" + sym + "</span><b>—</b><i>" + note + "</i>";
       vals.appendChild(d);
@@ -3203,9 +3982,9 @@ const GINSP = (() => {
 
     // ---- field tabs
     const tabs = el.querySelector(".ginsp-tabs");
-    FIELDS.forEach(([f, sym]) => {
+    SERIES.forEach(([f, sym]) => {
       const b = document.createElement("button");
-      b.textContent = sym; b.dataset.f = f; b.title = FIELDS.find((q) => q[0] === f)[3];
+      b.textContent = sym; b.dataset.f = f; b.title = SERIES.find((q) => q[0] === f)[3];
       b.onclick = () => { o.field = f; b.blur(); draw(o); };
       tabs.appendChild(b);
     });
@@ -3263,6 +4042,11 @@ const GINSP = (() => {
     o.el.remove();
   }
   function closeAll() { while (open.length) hide(open[0]); }
+  /** Close the window belonging to a gauge that has just been removed —
+   *  otherwise it hangs about plotting a series nothing is feeding. */
+  function closeFor(g) {
+    for (let k = open.length - 1; k >= 0; k--) if (open[k].g === g) hide(open[k]);
+  }
 
   // ---- time-axis helpers
   function span(o) { return Math.max(o.t1 - o.t0, 1e-6); }
@@ -3291,7 +4075,7 @@ const GINSP = (() => {
     el.querySelector(".ginsp-pos").textContent =
       "x " + g.x.toFixed(2) + " · z " + g.z.toFixed(2) + " m";
     const last = L.length ? L[L.length - 1] : null;
-    FIELDS.forEach(([f]) => {
+    SERIES.forEach(([f]) => {
       const V = o.vb[f];
       V.b.textContent = (last ? last[f].toFixed(3) : "—") + " " + V.unit;
       V.row.classList.toggle("on", f === o.field);
@@ -3380,7 +4164,7 @@ const GINSP = (() => {
       c.setLineDash([]);
       c.fillStyle = g.colour;
       c.beginPath(); c.arc(X, Y, 2.5, 0, 6.2832); c.fill();
-      const F = FIELDS.find((q) => q[0] === o.field);
+      const F = SERIES.find((q) => q[0] === o.field);
       const txt = "t " + L[i].t.toFixed(3) + " s   " + F[1] + " " +
                   L[i][o.field].toFixed(4) + " " + F[2];
       c.font = "700 10.5px ui-monospace, monospace";
@@ -3470,7 +4254,7 @@ const GINSP = (() => {
     return { name, text };
   }
 
-  return { show, hide, closeAll, tick, csv, download, open, draw };
+  return { show, hide, closeAll, closeFor, tick, csv, download, open, draw };
 })();
 
 // ------------------------------------------------------- rig save / share
@@ -3637,7 +4421,7 @@ const RIG = (() => {
              (state.gauges.length === 1 ? "" : "s") : "") +
            (state.rakes.length ? " · " + state.rakes.length + " rake" +
              (state.rakes.length === 1 ? "" : "s") : "") +
-           (state.cv ? " · force box" : "") +
+           (state.cv ? " · control volume" : "") +
            " · scene " + id + (swapped ? " (unknown scene “" + o.scene + "”)" : "");
     return note;
   }
@@ -3865,6 +4649,8 @@ function boot() {
   // The strip first: PICKER, EX and KEYS all light their own opener by id, so
   // the buttons have to exist before anything asks for one.
   buildToolbar();
+  // …then the legend, which lights the strip's own Field button.
+  LEGEND.build();
   // `syncTools` is the name the rest of the file (and the number keys) already
   // uses for "repaint whatever shows the current tool".
   window.syncTools = syncToolbar;
@@ -3888,6 +4674,7 @@ function boot() {
   addEventListener("resize", () => { if (EX.isOpen()) EX.place(); });
 
   window.addEventListener("pointerdown", KEYS.onDown, true);
+  window.addEventListener("pointerdown", LEGEND.onDown, true);
   addEventListener("resize", () => { if (KEYS.isOpen()) KEYS.place(); });
 
   // The side panel's two handles. Wired here rather than when a brief is first
@@ -3991,13 +4778,36 @@ function boot() {
     else if (k === "c") SIM.clearSegs();
     else if (k === "r") { SIM.resetWater(); clearGaugeHistory(); }
     else if (k === "p") { state.particles = !state.particles; syncPanel(); }
-    else if (k === "g") { state.mode = (state.mode + 1) % 7; syncPanel(); }
+    else if (k === "g") {
+      // Over the fields this profile OFFERS, so the key and the card's menu
+      // cannot disagree about what there is to cycle through.
+      const F = UIMODE.fields();
+      const i = F.findIndex((f) => f.mode === state.mode);
+      state.mode = F[(i + 1) % F.length].mode;
+      LEGEND.sync(); syncPanel();
+    }
+    else if (k === "l") LEGEND.toggle();
+    else if (k === "b") { state.cvShow = CV_NEXT[state.cvShow] || "Q"; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
     // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
     // so a tenth tool would have made "9" fail ("9" > "10" lexically).
-    else if (+k >= 1 && +k <= TOOL_KEYS) { state.tool = TOOLS[+k - 1][0]; window.syncTools(); }
+    //
+    // A hidden tool keeps its digit. Worksheets say "press 5", and renumbering
+    // the tools under a profile would make the pack lie — so the key says why
+    // the tool is not there rather than silently arming a different one.
+    else if (+k >= 1 && +k <= TOOL_KEYS) {
+      const t = TOOLS[+k - 1];
+      const fam = TOOLS.slice(0, 4).concat([TOOLS[TOOLS.length - 1]]).indexOf(t) >= 0
+                    ? "build" : "measure";
+      if (UIMODE.allows(fam, { tool: t[0], id: t[0] })) {
+        state.tool = t[0]; window.syncTools();
+      } else {
+        showToast(t[1] + " is off for this exercise",
+                  "The ⋯ button at the end of the strip brings every control back.");
+      }
+    }
     else if (k === "[") state.brush = Math.max(0.015, state.brush / 1.3);
     else if (k === "]") state.brush = Math.min(0.5, state.brush * 1.3);
     else if (k === "0") resetZoom();
@@ -4037,8 +4847,11 @@ window.APP = {
   // The chrome, for headless work: test/ui-smoke.mjs drives the strip, the
   // side panel and the start screen through here rather than by synthesising
   // clicks at pixel positions.
-  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar },
+  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor,
+        RAMPS: Shaders.RAMPS },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
+  LEGEND,                                  // the colour key and field picker
+  UIMODE,                                  // the exercise UI profile
   GINSP,                                   // gauge inspector windows
   RIG,                                     // rig save / share (see the Rig panel)
   inspect: (k) => GINSP.show(k || 0),
@@ -4047,9 +4860,13 @@ window.APP = {
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
   frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
   probe: (x, z) => SIM.probe(x, z),
+  particlePos: (n) => SIM.particlePos(n),  // x, z pairs — headless only
+  placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
-  placeCV,                                 // the Force box tool, headless
-  // The averaging mode's public surface — Task 6's Favre display field.
+  boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
+  placeCV,                                 // the control volume, headless
+  placeFlux, removeFluxAt,                 // a flux section, headless
+  // The averaging mode's public surface.
   avg: { start: SIM.avgStart, stop: SIM.avgStop, field: SIM.avgField, T: SIM.avgT },
   /** Total water volume per unit width (m²) — the mass-balance check. */
   volume: () => {

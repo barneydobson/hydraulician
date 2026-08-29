@@ -259,13 +259,17 @@ async function browser() {
     return r.result.value;
   }
 
-  async function goto(url) {
+  /** `ready` is the expression that says the page has arrived. It defaults to
+   *  the app booting, because almost every page here IS the app — the docs
+   *  reader is the exception, and it has no APP to wait for. */
+  async function goto(url, ready) {
     await send("Page.navigate", { url });
+    const cond = ready || "!!(window.APP && window.APP.sim)";
     for (let i = 0; i < 160; i++) {                 // software GL boots slowly
       await new Promise((r) => setTimeout(r, 250));
       try {
-        if (await evaluate("!!(window.APP && window.APP.sim)")) {
-          await evaluate(HELPERS + "true");
+        if (await evaluate(cond)) {
+          if (!ready) await evaluate(HELPERS + "true");
           return;
         }
       } catch (_) { /* mid-navigation */ }
@@ -287,7 +291,7 @@ async function browser() {
         });
       })()`);
     } catch (_) { /* the page may be wedged */ }
-    throw new Error("window.APP never appeared at " + url + " — " + why +
+    throw new Error("the page never became ready at " + url + " — " + why +
       (pageErrors.length
         ? "\n      page threw: " + pageErrors.slice(0, 3).join(" | ")
         : "\n      page threw nothing"));
@@ -520,6 +524,82 @@ SUITES.physics = async (B) => {
   ok("PHYSICS m1 runs subcritical (mild backwater)", flow.dMid > flow.dcMid,
     `d ${flow.dMid.toFixed(3)} vs d_c ${flow.dcMid.toFixed(3)}`);
   ok("PHYSICS the energy line falls downstream", flow.HFalls);
+
+  // The control-volume budget, on the same settled reach. These are the three
+  // conservation laws the Control volume is FOR, so they are asserted where a scene
+  // is actually steady — an instantaneous integral on a wobbling free surface
+  // closes to only a few per cent, and one taken mid-spin-up does not close at
+  // all, because the reach is still filling.
+  const cv = await B.evaluate(`(() => {
+    const W = APP.sim.W, H = APP.sim.H;
+    const box = [0.35 * W, 0, 0.62 * W, H];
+    let sE = 0, n = 0;
+    for (let k = 0; k < 60; k++) { APP.frames(2); sE += APP.boxFlux.apply(null, box).total.E; n++; }
+    const f = APP.boxFlux.apply(null, box);
+    const g = APP.boxForce.apply(null, box);
+    return { E: sE / n, fx: f.fx, gx: g.fx,
+             // Both integrals walk the same faces: boxForce's mdot is the mass
+             // flux, boxFlux's Q the volume flux, and with nothing pressurised
+             // (f <= 1 everywhere on a free-surface reach) they are the same
+             // number over rho.
+             // Compared on the INFLOW face, not on the net: the net is a small
+             // residual of two large opposite numbers, so the sign of its
+             // difference says nothing. On one face every cell flows the same
+             // way and the inequality is exact.
+             Qin: f.edges.left.Q, mdotIn: f.edges.left.mdot / 1000,
+             bed: Math.abs(f.edges.bed.Q), left: f.edges.left.Q, right: f.edges.right.Q };
+  })()`);
+  // NOT an absolute closure test. How nearly m1's discharge balances over a
+  // window is a property of the SCENE — the neighbouring "discharge holds one
+  // value along the reach" check is what measures that, and it is marginal on
+  // this scene for the same reason. What must hold here is that the two face
+  // integrals agree with each other, which is a property of the CODE.
+  // They are NOT the same number, and the difference is the physics: Q is the
+  // geometric volume flux (min(f, 1)) and mdot the mass flux (f), and in this
+  // model f > 1 everywhere below the surface — that IS the pressure, via
+  // p/rho = c^2 (f - 1). So the water carries more mass than volume, by the
+  // compression p/(rho c^2), which is a fraction of a per cent at the usual
+  // celerity. Same sign, same size, ordered the one way round physics allows.
+  ok("PHYSICS volume flux and mass flux differ only by the compression",
+    cv.Qin * cv.mdotIn > 0 && Math.abs(cv.Qin) <= Math.abs(cv.mdotIn) * 1.0001 &&
+    Math.abs(cv.Qin - cv.mdotIn) < 0.05 * Math.abs(cv.mdotIn),
+    `Q ${cv.Qin.toFixed(5)} m²/s vs mdot/rho ${cv.mdotIn.toFixed(5)}` +
+    ` (${(100 * (cv.mdotIn - cv.Qin) / cv.mdotIn).toFixed(2)}% compressed)`);
+  ok("PHYSICS water crosses the box in at one end and out at the other",
+    cv.left < 0 && cv.right > 0,
+    `left ${cv.left.toFixed(4)}, right ${cv.right.toFixed(4)} m²/s`);
+  ok("PHYSICS the box's solid bed passes nothing", cv.bed < 1e-9, String(cv.bed));
+  // A reach with friction in it cannot gain energy. Outward-positive, so a
+  // loss is negative.
+  ok("PHYSICS the reach loses energy through the box", cv.E < 0,
+    cv.E.toFixed(1) + " W/m");
+  // The same face integral by two routes; if they drift, one has been edited
+  // and the other has not.
+  // A SECTION at the box's own left face is the same integral over the same
+  // line, reached a different way — one walks grid faces, the other samples an
+  // arbitrary line. If they disagree by more than the discretisation, one of
+  // them is wrong.
+  const sec = await B.evaluate(`(() => {
+    const W = APP.sim.W, H = APP.sim.H;
+    const x = 0.35 * W;
+    const line = APP.SIM.lineFlux(x, 0, x, H);
+    const box = APP.SIM.boxFlux(x, 0, 0.62 * W, H);
+    return { lineQ: Math.abs(line.Q), faceQ: Math.abs(box.edges.left.Q),
+             lineE: Math.abs(line.E), faceE: Math.abs(box.edges.left.E),
+             n: line.n, len: line.len };
+  })()`);
+  ok("PHYSICS a section samples the water at all", sec.n > 10 && sec.lineQ > 0,
+    sec.n + " samples over " + sec.len.toFixed(2) + " m");
+  ok("PHYSICS a section agrees with the control-volume face it lies on",
+    Math.abs(sec.lineQ - sec.faceQ) < 0.06 * Math.max(sec.faceQ, 1e-9),
+    `line ${sec.lineQ.toFixed(4)} vs face ${sec.faceQ.toFixed(4)} m²/s`);
+  ok("PHYSICS and carries the same energy across it",
+    Math.abs(sec.lineE - sec.faceE) < 0.10 * Math.max(sec.faceE, 1e-9),
+    `line ${sec.lineE.toFixed(1)} vs face ${sec.faceE.toFixed(1)} W/m`);
+
+  ok("PHYSICS boxFlux and boxForce report the same force",
+    Math.abs(cv.fx - cv.gx) < 1e-6 * Math.max(1, Math.abs(cv.gx)),
+    cv.fx + " vs " + cv.gx);
 };
 
 SUITES.scenes = async (B) => {
@@ -546,6 +626,42 @@ SUITES.scenes = async (B) => {
       r.t > 0 && r.finite && r.dOk && Number.isFinite(r.vol),
       JSON.stringify(r));
   }
+};
+
+SUITES.docs = async (B) => {
+  // The About button opens docs/view.html off the Pages build, and a page that
+  // renders markdown either renders it or hands the reader its source code.
+  await B.goto(`http://localhost:${PORT}/docs/view.html?doc=numerics.md`,
+    "!!document.querySelector('#doc h1, #doc .note')");
+  const d = await B.evaluate(`(() => new Promise((done) => {
+    const check = () => {
+      if (document.querySelector("#doc h1") || document.querySelector("#doc .note")) {
+        done({
+          h1: (document.querySelector("#doc h1") || {}).textContent || null,
+          h2: document.querySelectorAll("#doc h2").length,
+          tables: document.querySelectorAll("#doc table").length,
+          math: document.querySelectorAll("#doc .mathblock").length,
+          note: !!document.querySelector("#doc .note"),
+          // A link to a sibling document comes back through the reader, or the
+          // second hop dumps raw markdown after the first one rendered.
+          hops: [...document.querySelectorAll("#doc a")]
+                  .filter((a) => /view[.]html[?]doc=/.test(a.getAttribute("href") || "")).length,
+          raw: [...document.querySelectorAll("#doc a")]
+                  .filter((a) => /^[a-z0-9-]+[.]md$/i.test(a.getAttribute("href") || "")).length,
+          title: document.title,
+        });
+      } else setTimeout(check, 100);
+    };
+    check();
+  }))()`);
+  ok("DOCS the reader renders numerics.md rather than showing its source",
+    !d.note && d.h1 === "Numerics", d.note ? "fell back to the note" : "h1 = " + d.h1);
+  ok("DOCS its sections, tables and equations all come through",
+    d.h2 > 5 && d.tables > 0 && d.math > 10,
+    `${d.h2} sections, ${d.tables} tables, ${d.math} equations`);
+  ok("DOCS a link to a sibling document stays inside the reader",
+    d.hops > 0 && d.raw === 0, `${d.hops} through the reader, ${d.raw} raw`);
+  ok("DOCS the page takes the document's own title", /Numerics/.test(d.title), d.title);
 };
 
 SUITES.pack = async (B) => {

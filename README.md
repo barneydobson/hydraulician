@@ -227,7 +227,7 @@ Water enters at the top left by default; everything else is drawn.
 | **left-drag** | draw a straight edge (hold **shift** to snap to 0°/45°/90°) |
 | **right-drag** | pour a larger flow |
 | **wheel** / **middle-drag** | zoom about the cursor · pan (**0** resets, **+** / **−** step) |
-| **1**–**9** | wall · erase · valve · spout · gauge · rake · tracers · measure · force box |
+| **1**–**9** | wall · erase · valve · spout · gauge · rake · tracers · measure · control volume |
 | **[** **]** | brush size |
 | **Z** / **C** | undo edge / clear drawing |
 | **V** | open / slam every valve |

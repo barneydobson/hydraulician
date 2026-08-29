@@ -9,3 +9,5 @@ exercises/*/_archive/
 .claude/worktrees/
 
 .DS_Store
+
+tmp/

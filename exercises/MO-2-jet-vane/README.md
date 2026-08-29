@@ -5,7 +5,7 @@ stagnation point and watch it read `v²/2g`; then switch to the momentum-flux
 display and redraw the plate as a 45° ramp, a 90° corner and a deep-V, and
 watch the coloured flux field turn from "forward" to "sideways" to "backward"
 as the shape changes. `F = ρqv(1 − cos θ)` goes on the board from `q`, `v` and
-the turning angle the sim has just shown you; a control-volume **Force box**
+the turning angle the sim has just shown you; a control-volume **Control volume**
 then reads the force the rig actually delivers, so the board number has
 something to be checked against.
 
@@ -29,7 +29,7 @@ not exactly 1: the jet keeps accelerating under gravity over its last stretch
 of flight, and the solver's compressible equation of state adds a term at
 v/c ≈ 0.2. That gap is the lesson, not an error to hide.
 
-The **Force box** (tool `9`) evaluates the momentum theorem on the box you
+The **Control volume** (tool `9`) evaluates the momentum theorem on the box you
 drag — the flux and pressure integral over its four faces, time-averaged, with
 the flutter printed after the ±. `F→` is the number to read; gravity never
 enters the horizontal budget. Two rules make the reading mean anything: the box
@@ -43,12 +43,12 @@ which is a source (footprint x 0.61–0.79) and not a force.
    plate face (1.32, 2.46).
 2. Press `R` and let it reach steady state — about **5 s**; the card counts it
    down. Re-settle after every redraw below: 3–5 s for the gauges, 8 s before
-   the Force box's `±` means anything.
+   the Control volume's `±` means anything.
 3. Read both gauge cards' **h**, which already includes elevation: the
    stagnation pressure head is `h_stag − y_stag`, and the free-jet gauge's own
    `h_ref − y_ref` should read ≈ 0, confirming it really is in free water.
    Hover that station for **u, v** and use the full speed √(u² + v²).
-4. Pick the **Force box** (`9`) and drag one from **(0.85, 1.55)** to
+4. Pick the **Control volume** (`9`) and drag one from **(0.85, 1.55)** to
    **(2.05, 3.20)**. That box encloses every shape in the table below and its
    upstream face clears the spout. Drag a second box around the same shape if
    you want the control-volume point made: the reading holds within a few
@@ -74,7 +74,7 @@ Faces drawn through that pressurised cavity read its pressure as force and
 report a much larger number that changes with the box — a number with nothing
 behind it.
 
-![deep-V at apex (1.90, 2.40): flooded wedge, force box reading ≈5.2 kN/m](shots/08-deepV-forcebox.png)
+![deep-V at apex (1.90, 2.40): flooded wedge, control volume reading ≈5.2 kN/m](shots/08-deepV-forcebox.png)
 
 ## For the instructor
 

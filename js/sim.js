@@ -12,6 +12,18 @@ const SIM = (() => {
 
   const CFL = 0.45;          // acoustic Courant number for the staggered update
   const UREF = 6.0;          // headroom for advective velocity in the dt estimate
+  // How long a particle's trail lives, in SIMULATED seconds. About a second of
+  // flow: long enough to read a path, short enough that a jet does not fill
+  // the screen with a solid wash.
+  // Long enough that a streak reads as a PATH — thin and drawn out, tapering
+  // behind the head — rather than as a dot with a smudge after it.
+  const TRAIL_TAU = 1.5;
+  // How many of the 128 × 128 particles are actually DRAWN. All of them are
+  // advected — the update is one fullscreen pass either way — but drawing all
+  // 16384 with a trail each fills a flume with white and shows nothing at all.
+  // A few thousand distinct paths is what reads as flow visualisation; the
+  // count follows the width so a big window gets more of them, not fatter ones.
+  const TRAIL_N = (pxW) => Math.round(Math.max(500, Math.min(2200, pxW * 1.1)));
 
   let gl, quad, rect, points, prog = {};
   let S = null;              // the live grid
@@ -47,6 +59,8 @@ const SIM = (() => {
     prog.acol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_ACOL);
     prog.draw = GLH.createProgram(gl, Shaders.VS_RECT, Shaders.FS_DISP);
     prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
+    prog.fill = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_FILL);
+    prog.tex  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TEX);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     return gl;
@@ -173,6 +187,10 @@ const SIM = (() => {
     if (g.colTex) gl.deleteTexture(g.colTex);
     g.U = null; g.F = null; g.P = null;
     g.solid = null; g.colTex = null; g.colFbo = null;
+    // The trail belongs to the CANVAS, not to the grid, so it survives a
+    // rebuild — but what is drawn in it does not: those pixels are the old
+    // geometry's particles. Marking it undrawn clears it on the next frame.
+    trail.drawn = false;
   }
 
   function build(scene, budget, keepSegs) {
@@ -760,27 +778,106 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_time"), S.t);
     gl.uniform1i(prog.draw.u("u_mode"), opts.mode);
     gl.uniform1f(prog.draw.u("u_vmax"), opts.vmax);
-    gl.uniform1f(prog.draw.u("u_hmax"), opts.hmax);
+    gl.uniform1f(prog.draw.u("u_lo"), opts.lo);
+    gl.uniform1f(prog.draw.u("u_hi"), opts.hi);
     gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : 0);
     gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
     gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);
     gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
     rect.draw();
 
-    if (opts.particles) {
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      gl.useProgram(prog.pdraw);
-      GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex]]);
-      gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
-      gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
-      gl.uniform4f(prog.pdraw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
-      gl.uniform1f(prog.pdraw.u("u_dx"), S.dx);
-      gl.uniform1f(prog.pdraw.u("u_psize"), Math.max(1.5, view.pxW / 420));
-      gl.uniform1f(prog.pdraw.u("u_vmax"), opts.vmax);
-      points.draw(S.pn * S.pn);
-      gl.disable(gl.BLEND);
+    if (opts.particles) drawParticles(view, opts, cw, ch);
+    else trail.drawn = false;
+  }
+
+  // ------------------------------------------------------- particle trails
+  /** A screen-sized buffer the particles accumulate into, faded a little every
+   *  frame. The tail cannot be drawn as a per-frame streak: at 1 m/s a
+   *  particle moves about two pixels between frames, so what makes a visible
+   *  trail is HISTORY, and one faded buffer is far cheaper than a ring of past
+   *  positions per particle.
+   *
+   *  Screen space, not domain space: the domain is up to 8× exaggerated
+   *  vertically, so a domain-aligned buffer would be smeared to nothing in z.
+   *  The price is that the trails belong to one view — pan, zoom or resize and
+   *  they are cleared, which reads as the trace starting again from where the
+   *  water is now. */
+  const trail = { tex: null, fbo: null, w: 0, h: 0, ndc: null, drawn: false };
+
+  function trailFor(cw, ch, view) {
+    if (trail.w !== cw || trail.h !== ch) {
+      if (trail.fbo) gl.deleteFramebuffer(trail.fbo);
+      if (trail.tex) gl.deleteTexture(trail.tex);
+      trail.tex = GLH.createTexture(gl, cw, ch, gl.RGBA8, gl.RGBA,
+                                    gl.UNSIGNED_BYTE, null, gl.LINEAR);
+      trail.fbo = GLH.createFBO(gl, trail.tex);
+      trail.w = cw; trail.h = ch; trail.ndc = null;
     }
+    // A view change invalidates every pixel in there, and so does a frame in
+    // which the particles were not drawn at all — otherwise switching them
+    // back on resumes a trace from wherever the water used to be.
+    const n = view.ndc, o = trail.ndc;
+    const moved = !o || !trail.drawn ||
+      n[0] !== o[0] || n[1] !== o[1] || n[2] !== o[2] || n[3] !== o[3];
+    trail.ndc = [n[0], n[1], n[2], n[3]];
+    return moved;
+  }
+
+  function drawParticles(view, opts, cw, ch) {
+    const clear = trailFor(cw, ch, view);
+    GLH.bindTarget(gl, trail.fbo, cw, ch);
+    if (clear) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+
+    gl.enable(gl.BLEND);
+    if (!clear) {
+      // Fade what is already there: dst *= k, in one draw and with no second
+      // buffer to ping-pong through. `k` is set from SIMULATED time, so the
+      // tail is a fixed span of FLOW — about a second of it — however fast or
+      // slow the frame rate happens to be.
+      const k = Math.exp(-Math.max(opts.pdt, 0) / TRAIL_TAU);
+      gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
+      gl.useProgram(prog.fill);
+      gl.uniform4f(prog.fill.u("u_col"), k, k, k, k);
+      quad.draw();
+    }
+
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.useProgram(prog.pdraw);
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
+    gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
+    gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
+    gl.uniform4f(prog.pdraw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
+    gl.uniform1f(prog.pdraw.u("u_dx"), S.dx);
+    // Big enough to see. The old 1.5-3 px dot disappeared over a pale field
+    // and read as sensor noise over a dark one.
+    // Fine. The streak's LENGTH is the reading; its width is only noise.
+    const n = Math.min(S.pn * S.pn, TRAIL_N(view.pxW));
+    const tail = Math.max(2.0, view.pxW / 620);
+    gl.uniform1f(prog.pdraw.u("u_psize"), tail);
+    gl.uniform1f(prog.pdraw.u("u_amp"), 0.30);
+    points.draw(n);
+
+    // The tail, composited under everything that follows.
+    GLH.bindTarget(gl, null, cw, ch);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // it is premultiplied
+    gl.useProgram(prog.tex);
+    GLH.bindTex(gl, prog.tex, [["u_T", trail.tex]]);
+    quad.draw();
+
+    // …then the heads, once, straight to the screen at full strength. Drawn
+    // outside the trail buffer on purpose: inside it they would fade with
+    // everything else and there would be no particle, only a smear.
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.useProgram(prog.pdraw);
+    // Re-bind: the composite above pointed texture unit 0 at the trail, and
+    // `u_P` still names unit 0 — without this the heads read the trail as
+    // their own positions and land nowhere.
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
+    gl.uniform1f(prog.pdraw.u("u_psize"), tail + 1.6);
+    gl.uniform1f(prog.pdraw.u("u_amp"), 1.0);
+    points.draw(n);
+    gl.disable(gl.BLEND);
+    trail.drawn = true;
   }
 
   // -------------------------------------------------------------- readback
@@ -834,6 +931,73 @@ const SIM = (() => {
     const g = Math.abs(S.p.g) || 9.81;
     return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, speed: Math.hypot(u, w),
              solid: S.mask[j * S.nx + i] };
+  }
+
+  /** The 1st and 99th percentile of a display field over WET cells, for the
+   *  legend's Fit button. One readPixels of each state texture — the same
+   *  bargain `rescaleFill` and `boxForce` already make, and it happens on a
+   *  click, never per frame.
+   *
+   *  Percentiles rather than min/max because one cell at a jet's lip, or one
+   *  cell of a bad column, otherwise sets the scale for the whole picture and
+   *  everything else renders as a single flat colour. Wet cells only, because
+   *  a dry cell is not water: its stored pressure is zero and averaging it in
+   *  drags every scale towards the floor.
+   *
+   *  `mode` is the display mode, so the arithmetic here has to agree with the
+   *  branch of FS_DISP that paints it. The two are checked against each other
+   *  by eye and by the legend: a Fit that leaves the picture saturated or flat
+   *  means they have drifted apart. */
+  function fieldStats(mode) {
+    const n = S.nx * S.ny;
+    const U = new Float32Array(n * 4), F = new Float32Array(n * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, F);
+    const g = Math.abs(S.p.g) || 9.81, tilt = S.scene.tiltS0 || 0;
+    const col = columns();                  // per-column depth, for the Froude number
+    const v = [];
+    const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && S.mask[j * S.nx + i] < 192;
+    for (let j = 0; j < S.ny; j++) {
+      for (let i = 0; i < S.nx; i++) {
+        if (!wet(i, j)) continue;
+        const k = (j * S.nx + i) * 4;
+        const u = U[k], w = U[k + 1], P = U[k + 2];
+        const x = (i + 0.5) * S.dx, z = (j + 0.5) * S.dx;
+        let q = null;
+        if (mode === 0 || mode === 1) q = P / g;
+        else if (mode === 6) q = z - tilt * x + P / g;
+        else if (mode === 7) q = z - tilt * x + P / g + (u * u + w * w) / (2 * g);
+        else if (mode === 2) q = Math.hypot(u, w);
+        else if (mode === 3) q = Math.abs(u) / Math.sqrt(Math.max(g * col[i * 4 + 1], 1e-4));
+        else if (mode === 5) q = F[k] * u * Math.hypot(u, w);
+        else if (mode === 4 && i > 0 && j > 0 && i < S.nx - 1 && j < S.ny - 1) {
+          // Vorticity is a stencil, not a cell: ∂w/∂x − ∂u/∂z, as FS_DISP does it.
+          const dwdx = U[(j * S.nx + i + 1) * 4 + 1] - U[(j * S.nx + i - 1) * 4 + 1];
+          const dudz = U[((j + 1) * S.nx + i) * 4] - U[((j - 1) * S.nx + i) * 4];
+          q = (dwdx - dudz) / (2 * S.dx);
+        }
+        if (q !== null && isFinite(q)) v.push(q);
+      }
+    }
+    if (!v.length) return null;
+    v.sort((a, b) => a - b);
+    const at = (p) => v[Math.min(v.length - 1, Math.max(0, Math.round(p * (v.length - 1))))];
+    return { lo: at(0.01), hi: at(0.99), n: v.length };
+  }
+
+  /** The first `n` particle positions, as x, z pairs in metres. For headless
+   *  work only — the particles are a GPU-side buffer with no CPU copy, so
+   *  there is otherwise no way to ask where they are. */
+  function particlePos(n) {
+    const w = Math.max(1, Math.min(S.pn, n || 16));
+    const buf = new Float32Array(w * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.P.read.fbo);
+    gl.readPixels(0, 0, w, 1, gl.RGBA, gl.FLOAT, buf);
+    const out = [];
+    for (let k = 0; k < w; k++) out.push(buf[k * 4], buf[k * 4 + 1]);
+    return out;
   }
 
   /** A whole column of velocity — the vertical rake. Returns u(z) at cell centres. */
@@ -891,6 +1055,206 @@ const SIM = (() => {
    *  box that includes the spout's footprint fails it loudly, because the
    *  spout is a source — mass and momentum appear inside the box and the
    *  budget is not a force any more. */
+  /** The full control-volume budget, edge by edge, in ONE readback.
+   *
+   *  `boxForce` answers "what force does this box feel"; this answers the
+   *  three questions a control-volume analysis actually asks — does mass
+   *  balance, where does the momentum go, and how much energy is lost — with
+   *  the answer split across the four faces, because which face a flux
+   *  crosses is half of what a student is being asked to see.
+   *
+   *  Everything is OUTWARD-positive and per metre of width. Air contributes
+   *  nothing, and not by a threshold: every term carries the fill fraction, so
+   *  an empty cell adds zero and a half-full one adds half. `Q` uses
+   *  min(f, 1) — the geometric water volume — because f > 1 is water that has
+   *  been compressed, not extra volume of it; the mass-carrying terms use f
+   *  itself, which IS the density in this model.
+   *
+   *  `M` (the momentum the fluid carries through the face) and `Fp` (the
+   *  pressure the surroundings apply to it) are kept apart rather than summed.
+   *  Distinguishing them is the whole content of a control-volume question,
+   *  and their sum is `boxForce`'s answer — which the layout gate checks, so
+   *  the two can never quietly disagree.
+   *
+   *  Energy is per unit time: ρ f uₙ (gz + P + ½|u|²) — the Bernoulli sum, so
+   *  the total over the four faces is the rate of energy LOSS through the box.
+   *  A tilted-gravity scene carries its slope in gravity rather than in the
+   *  bed, so the elevation term is z − S₀x there, exactly as the head views
+   *  and the overlay compute it. */
+  /** What crosses one SECTION: the same integrand as a control-volume face,
+   *  over a line you drew rather than over a box.
+   *
+   *  Two sections answer most of what a control volume answers — continuity
+   *  between them, the momentum they carry, the energy lost between one and
+   *  the next — without asking a student to reason about four faces at once,
+   *  and a section is what a textbook draws anyway.
+   *
+   *  The normal is the drawing direction turned a quarter-turn clockwise, so a
+   *  line drawn UP has its positive side downstream: draw across the flow the
+   *  way you would draw a section on paper and the sign comes out the way you
+   *  expect. Nothing is shown as a bare sign regardless — the overlay says
+   *  which way the water actually goes.
+   *
+   *  Exact on the grid only for a section along a cell face; anything at an
+   *  angle interpolates the staggered velocities, which is the same thing the
+   *  rake and the orbit tracers already do. Air contributes nothing: every
+   *  term carries the fill fraction, and `Q` uses min(f, 1) because f > 1 is
+   *  water that has been compressed rather than more of it. */
+  function lineFlux(x0, z0, x1, z1) {
+    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
+    const closed = S.p.valveClosed > 0.5;
+    const dx = x1 - x0, dz = z1 - z0;
+    const len = Math.hypot(dx, dz);
+    const out = { Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0,
+                  wet: 0, len, nx: 0, nz: 0, n: 0 };
+    if (!(len > 1e-6)) return out;
+    const tx = dx / len, tz = dz / len;
+    const nx = tz, nz = -tx;                    // a quarter-turn clockwise
+    out.nx = nx; out.nz = nz;
+
+    // One sample per cell along the section, and never fewer than a handful:
+    // a section shorter than a cell is still a section.
+    const ns = Math.max(8, Math.min(4096, Math.ceil(len / S.dx) * 2));
+    const ds = len / ns;
+
+    // The whole bounding rect in one readback, with a cell of margin for the
+    // staggered interpolation.
+    const iL = Math.max(0, Math.floor(Math.min(x0, x1) / S.dx) - 2);
+    const iR = Math.min(S.nx - 1, Math.ceil(Math.max(x0, x1) / S.dx) + 2);
+    const jB = Math.max(0, Math.floor(Math.min(z0, z1) / S.dx) - 2);
+    const jT = Math.min(S.ny - 1, Math.ceil(Math.max(z0, z1) / S.dx) + 2);
+    const w = iR - iL + 1, h = jT - jB + 1;
+    const need = w * h * 4;
+    if (!S.lnU || S.lnU.length < need) { S.lnU = new Float32Array(need); S.lnF = new Float32Array(need); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnU);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(iL, jB, w, h, gl.RGBA, gl.FLOAT, S.lnF);
+    const U = S.lnU, F = S.lnF;
+    const at = (buf, i, j, c) =>
+      buf[((Math.min(Math.max(j, jB), jT) - jB) * w +
+           (Math.min(Math.max(i, iL), iR) - iL)) * 4 + c];
+    /** Bilinear over cell CENTRES, which is where f and P live. */
+    const centre = (buf, x, z, c) => {
+      const gx = x / S.dx - 0.5, gz = z / S.dx - 0.5;
+      const i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j;
+      return (at(buf, i, j, c) * (1 - fx) + at(buf, i + 1, j, c) * fx) * (1 - fz)
+           + (at(buf, i, j + 1, c) * (1 - fx) + at(buf, i + 1, j + 1, c) * fx) * fz;
+    };
+
+    for (let k = 0; k < ns; k++) {
+      const s = (k + 0.5) * ds;
+      const x = x0 + tx * s, z = z0 + tz * s;
+      const ci = Math.min(S.nx - 1, Math.max(0, Math.floor(x / S.dx)));
+      const cj = Math.min(S.ny - 1, Math.max(0, Math.floor(z / S.dx)));
+      const m = S.mask[cj * S.nx + ci];
+      if (m > 192 || (closed && m > 64)) continue;      // a section through rock
+      // u lives on x-faces and w on z-faces, so each is offset half a cell.
+      const gx = x / S.dx, gz = z / S.dx;
+      const ui = Math.floor(gx), uj = Math.floor(gz - 0.5);
+      const ax = gx - ui, az = gz - 0.5 - uj;
+      const u = (at(U, ui, uj, 0) * (1 - ax) + at(U, ui + 1, uj, 0) * ax) * (1 - az)
+              + (at(U, ui, uj + 1, 0) * (1 - ax) + at(U, ui + 1, uj + 1, 0) * ax) * az;
+      const wi = Math.floor(gx - 0.5), wj = Math.floor(gz);
+      const bx = gx - 0.5 - wi, bz = gz - wj;
+      const wv = (at(U, wi, wj, 1) * (1 - bx) + at(U, wi + 1, wj, 1) * bx) * (1 - bz)
+               + (at(U, wi, wj + 1, 1) * (1 - bx) + at(U, wi + 1, wj + 1, 1) * bx) * bz;
+      const f = centre(F, x, z, 0);
+      const P = centre(U, x, z, 2);
+      const un = u * nx + wv * nz;
+      out.Q += Math.min(f, 1) * un * ds;
+      out.mdot += RHO * f * un * ds;
+      out.Mx += RHO * f * u * un * ds;
+      out.Mz += RHO * f * wv * un * ds;
+      out.Fpx += RHO * f * P * nx * ds;
+      out.Fpz += RHO * f * P * nz * ds;
+      out.E += RHO * f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv)) * ds;
+      out.wet += Math.min(f, 1) * ds;
+      out.n++;
+    }
+    return out;
+  }
+
+  function boxFlux(x0, z0, x1, z1) {
+    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
+    const closed = S.p.valveClosed > 0.5;
+    let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
+    let jB = Math.round(Math.min(z0, z1) / S.dx), jT = Math.round(Math.max(z0, z1) / S.dx);
+    iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
+    jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
+    const w = iR - iL + 2, h = jT - jB + 2;
+    const need = w * h * 4;
+    if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvU);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(iL - 1, jB - 1, w, h, gl.RGBA, gl.FLOAT, S.cvF);
+    const U = S.cvU, F = S.cvF;
+    const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
+    const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
+    const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
+    const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
+
+    // x-faces: u lives ON the face, so the normal velocity needs no averaging.
+    for (const [i, n, key] of [[iL, -1, "left"], [iR, 1, "right"]]) {
+      const e = out[key];
+      for (let j = jB; j < jT; j++) {
+        if (sol(i - 1, j) || sol(i, j)) continue;
+        const a = k(i - 1, j), b = k(i, j);
+        const u = U[b];
+        const f = 0.5 * (F[a] + F[b]);
+        const P = 0.5 * (U[a + 2] + U[b + 2]);
+        const wv = 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
+        const un = u * n, z = (j + 0.5) * S.dx, x = i * S.dx;
+        e.Q += Math.min(f, 1) * un;
+        e.mdot += f * un;
+        e.Mx += f * u * un;   e.Mz += f * wv * un;
+        e.Fpx += f * P * n;
+        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
+        e.wet += Math.min(f, 1);
+      }
+    }
+    // z-faces: w lives ON the face.
+    for (const [j, n, key] of [[jB, -1, "bed"], [jT, 1, "top"]]) {
+      const e = out[key];
+      for (let i = iL; i < iR; i++) {
+        if (sol(i, j - 1) || sol(i, j)) continue;
+        const a = k(i, j - 1), b = k(i, j);
+        const wv = U[b + 1];
+        const f = 0.5 * (F[a] + F[b]);
+        const P = 0.5 * (U[a + 2] + U[b + 2]);
+        const u = 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
+        const un = wv * n, z = j * S.dx, x = (i + 0.5) * S.dx;
+        e.Q += Math.min(f, 1) * un;
+        e.mdot += f * un;
+        e.Mx += f * u * un;   e.Mz += f * wv * un;
+        e.Fpz += f * P * n;
+        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
+        e.wet += Math.min(f, 1);
+      }
+    }
+
+    // …to physical units, and the totals.
+    const tot = edge();
+    let inQ = 0;
+    for (const key of ["left", "right", "bed", "top"]) {
+      const e = out[key];
+      e.Q *= S.dx;               e.wet *= S.dx;
+      e.mdot *= RHO * S.dx;
+      e.Mx *= RHO * S.dx;        e.Mz *= RHO * S.dx;
+      e.Fpx *= RHO * S.dx;       e.Fpz *= RHO * S.dx;
+      e.E *= RHO * S.dx;
+      for (const q of ["Q", "mdot", "Mx", "Mz", "Fpx", "Fpz", "E", "wet"]) tot[q] += e[q];
+      if (e.Q < 0) inQ -= e.Q;   // what came IN, for a relative closure error
+    }
+    // The force on what is inside is minus the flux of momentum out plus the
+    // pressure on the faces — the same sum `boxForce` reports, less the weight
+    // term, which is not a face quantity and is added by the caller if wanted.
+    return { edges: out, total: tot, inQ,
+             fx: -(tot.Mx + tot.Fpx), fz: -(tot.Mz + tot.Fpz),
+             iL, iR, jB, jT };
+  }
+
   function boxForce(x0, z0, x1, z1) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
     const closed = S.p.valveClosed > 0.5;
@@ -950,7 +1314,9 @@ const SIM = (() => {
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
-           boxForce, dt, get, inletVel, bands, rescaleFill, setValve,
+           fieldStats, particlePos,
+           boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
+           setValve,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

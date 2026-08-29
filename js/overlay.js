@@ -771,7 +771,7 @@ const OVERLAY = (() => {
    *  is the standard deviation of the instantaneous integral over the last
    *  few seconds — the flutter is real (splash crossing the faces), not
    *  measurement noise, and hiding it would overstate the instrument. */
-  function drawCV(ctx, V, cv) {
+  function drawCV(ctx, V, cv, show) {
     const x0 = V.X(cv.x0), x1 = V.X(cv.x1);
     const y0 = V.Y(cv.z1), y1 = V.Y(cv.z0);          // screen y flips
     const col = "#ffd166";
@@ -791,22 +791,266 @@ const OVERLAY = (() => {
       }
       const fx = cv.ema.fx, fz = cv.ema.fz;
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      const L = Math.min(Math.abs(fx) * 0.018, (x1 - x0) * 0.44);
-      if (L > 6) {                                   // the force arrow, x only
-        const s = Math.sign(fx), ax = cx - s * L / 2, bx = cx + s * L / 2;
+      // The arrow is the FORCE, both components. It used to be drawn from fx
+      // alone, so a box on a weir crest or an apron — where the vertical
+      // component is the whole point — showed an arrow that flatly ignored it.
+      //
+      // The two components are scaled by the same number of newtons per pixel,
+      // or the arrow would report an angle the force does not have. That one
+      // scale is set by whichever component is larger, so the arrow always
+      // fills a sensible fraction of the box whichever way it points. The
+      // SCREEN is stretched vertically, though (vex), and the arrow is a force
+      // rather than something in the water, so it is drawn in true proportion
+      // and reads as an angle you can measure with the tape.
+      const fMag = Math.hypot(fx, fz);
+      const room = Math.min(x1 - x0, Math.abs(y1 - y0)) * 0.42;
+      const L = Math.min(fMag * 0.018, room);
+      if (L > 6) {
+        const ux = fx / fMag, uz = fz / fMag;          // unit force, z up
+        const hx = ux * L / 2, hy = -uz * L / 2;       // screen y is down
+        const ax = cx - hx, ay = cy - hy, bx = cx + hx, by = cy + hy;
         ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(ax, cy); ctx.lineTo(bx, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        // The head, built on the arrow's own axis rather than on x.
+        const px = -hy / (L / 2), py = hx / (L / 2);   // unit perpendicular
         ctx.beginPath();
-        ctx.moveTo(bx + s * 9, cy); ctx.lineTo(bx, cy - 5); ctx.lineTo(bx, cy + 5);
+        ctx.moveTo(bx + hx / (L / 2) * 9, by + hy / (L / 2) * 9);
+        ctx.lineTo(bx + px * 5, by + py * 5);
+        ctx.lineTo(bx - px * 5, by - py * 5);
         ctx.closePath(); ctx.fill();
       }
       const fN = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
-      chip(ctx, x0, y0 - 12, "F→ " + fN(fx) + " ±" + fN(sd) +
-        " N/m · F↑ " + fN(fz), col);
+      drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN);
     } else {
-      chip(ctx, x0, y0 - 12, "force box · settling…", col);
+      chip(ctx, x0, y0 - 12, "control volume · settling…", col);
     }
     ctx.restore();
+  }
+
+  /** The per-edge budget, written ON the edges it crosses, and the three
+   *  totals under the box.
+   *
+   *  Numbers at the edges rather than in a table because WHICH face a flux
+   *  crosses is half of what a control-volume question is asking a student to
+   *  see; a table of four rows makes them map it back onto the picture
+   *  themselves. Outward-positive throughout, so a sign is a direction: what
+   *  leaves is positive wherever it leaves from. */
+  /** What a face can be labelled with.
+   *
+   *  `through` quantities (volume, energy) cross the face, so the honest way
+   *  to show one is an ARROW and a magnitude: a first-year reading "in" and
+   *  "out" off the picture never has to be told what an outward normal is,
+   *  and the sign convention stops being a thing they can get wrong. The
+   *  momentum column is not a through quantity — its sign is which way the
+   *  face pushes — so it keeps a left/right arrow instead.
+   *
+   *  The energy column is deliberately not given a letter: `E` is specific
+   *  energy in the register and stays that way (the E–d diagram is a named
+   *  teaching object), and `ρgQH` says exactly what the quantity is. */
+  const CV_Q = {
+    Q: { label: "Q", unit: "m²/s", through: true, dp: 3,
+         at: (e) => e.Q, fmt: (v) => v.toFixed(3) },
+    M: { label: "momentum + pressure", unit: "N/m", through: false, dp: 1,
+         at: (e) => e.Mx + e.Fpx, fmt: (v) => fmtBig(v, "N/m") },
+    E: { label: "ρgQH", unit: "W/m", through: true, dp: 0,
+         at: (e) => e.E, fmt: (v) => fmtBig(v, "W/m") },
+  };
+  /** Watts per metre run to thousands once a reach is doing any work at all. */
+  function fmtBig(v, unit) {
+    const a = Math.abs(v);
+    if (a >= 1000) return (v / 1000).toFixed(a >= 10000 ? 0 : 2) + " k" + unit;
+    return (a >= 100 ? v.toFixed(0) : v.toFixed(1)) + " " + unit;
+  }
+
+  /** Which way a through-quantity actually crosses this face, as the reader
+   *  sees it: the arrow points the way the water goes, so "into the box" and
+   *  "out of the box" are read off the picture rather than off a sign. */
+  const CV_ARROW = {
+    left:  (v) => (v < 0 ? "▶" : "◀"),   // outward-positive: v < 0 is INTO the box
+    right: (v) => (v < 0 ? "◀" : "▶"),
+    bed:   (v) => (v < 0 ? "▲" : "▼"),
+    top:   (v) => (v < 0 ? "▼" : "▲"),
+  };
+
+  function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
+    const F = cv.flux;
+    const q = CV_Q[show] || CV_Q.Q;
+    ctx.font = "10px ui-monospace, monospace";
+    if (F) {
+      const e = F.edges;
+      const mid = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+      const put = (key, x, y, ha, va) => {
+        const v = q.at(e[key]);
+        const txt = q.through
+          ? CV_ARROW[key](v) + " " + q.fmt(Math.abs(v))
+          : (v < 0 ? "◀ " : "▶ ") + q.fmt(Math.abs(v));
+        // In is cool, out is warm — the same distinction the arrow makes,
+        // said twice, because this is the thing that gets misread.
+        const into = q.through ? v < 0 : false;
+        ctx.fillStyle = into ? "rgba(127,212,255,0.95)" : "rgba(255,209,102,0.95)";
+        ctx.textAlign = ha; ctx.textBaseline = va;
+        ctx.fillText(txt, x, y);
+      };
+      put("left",  x0 - 6, mid.y, "right", "middle");
+      put("right", x1 + 6, mid.y, "left", "middle");
+      put("top",   mid.x, y0 - 4, "center", "bottom");
+      put("bed",   mid.x, y1 + 4, "center", "top");
+    }
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    chip(ctx, x0, y0 - 12,
+         "Control volume · " + q.label + " across each face  ·  B cycles", col);
+    if (!F) return;
+
+    // The three conservation laws, said as arithmetic a first-year can check:
+    // what went in, what came out, and what the difference means. "Σ over the
+    // outward normal" is the same statement and teaches nobody anything.
+    const gross = (pick) => {
+      let inn = 0, out = 0;
+      ["left", "right", "bed", "top"].forEach((k) => {
+        const v = pick(F.edges[k]);
+        if (v < 0) inn -= v; else out += v;
+      });
+      return { inn, out };
+    };
+    const Q = gross((e) => e.Q), E = gross((e) => e.E);
+    const lines = [
+      "water    in " + Q.inn.toFixed(3) + "   out " + Q.out.toFixed(3) +
+        "   net " + (Q.out - Q.inn).toFixed(3) + " m²/s" +
+        (Q.inn > 1e-9 ? "  (" + (100 * Math.abs(Q.out - Q.inn) / Q.inn).toFixed(1) + "%, should be 0)" : ""),
+      "force    on what is inside:  →  " + fN(fx) + " ±" + fN(sd) + " N/m    ↑ " + fN(fz) + " N/m",
+      "energy   in " + fmtBig(E.inn, "W/m") + "   out " + fmtBig(E.out, "W/m") +
+        "   lost " + fmtBig(E.inn - E.out, "W/m"),
+    ];
+    const tall = (y1 - y0) > 3 * 15 + 24;
+    const top = tall ? y0 + 18 : y0 - 12 - lines.length * 15;
+    lines.forEach((t, k) => chip(ctx, x1 - 6, top + k * 15, t, col, "right"));
+  }
+
+  /** The flux sections: what crosses each line, and what happened between
+   *  two of them.
+   *
+   *  A section is the instrument a textbook actually draws, and two of them
+   *  answer most of what a control volume answers — continuity between them,
+   *  the momentum they carry, the energy lost from one to the next — without
+   *  asking a first-year to reason about four faces at once.
+   *
+   *  Direction is shown, never a sign: an arrow across the line points the way
+   *  the water is going through it, and the number beside it is a magnitude.
+   *  Which side of the line counts as positive is the tool's business, not the
+   *  reader's. */
+  function drawFlux(ctx, V, lines, show, drag) {
+    const col = "#8ce1b0";
+    ctx.save();
+    if (drag) {
+      ctx.strokeStyle = "rgba(140,225,176,0.75)"; ctx.lineWidth = 1.6;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(V.X(drag.x0), V.Y(drag.z0));
+      ctx.lineTo(V.X(drag.x1), V.Y(drag.z1));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    lines.forEach((L, k) => {
+      const ax = V.X(L.x0), ay = V.Y(L.z0), bx = V.X(L.x1), by = V.Y(L.z1);
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      // End ticks, so a section reads as a measured extent rather than as a
+      // stray line somebody drew.
+      const ux = bx - ax, uy = by - ay, ln = Math.hypot(ux, uy) || 1;
+      const px = -uy / ln, py = ux / ln;
+      ctx.beginPath();
+      ctx.moveTo(ax - px * 5, ay - py * 5); ctx.lineTo(ax + px * 5, ay + py * 5);
+      ctx.moveTo(bx - px * 5, by - py * 5); ctx.lineTo(bx + px * 5, by + py * 5);
+      ctx.stroke();
+
+      const e = L.ema;
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      if (!e) { chip(ctx, mx + 8, my, "section " + (k + 1) + " · settling…", col); return; }
+
+      // The arrow shows which way the water crosses, so no reading anywhere on
+      // this tool is a bare sign.
+      const dir = e.Q >= 0 ? 1 : -1;
+      const hx = px * 14 * dir, hy = py * 14 * dir;
+      const lx = ux / ln, ly = uy / ln;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(mx - hx, my - hy); ctx.lineTo(mx + hx, my + hy); ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(mx + hx * 1.6, my + hy * 1.6);
+      ctx.lineTo(mx + hx + lx * 5, my + hy + ly * 5);
+      ctx.lineTo(mx + hx - lx * 5, my + hy - ly * 5);
+      ctx.closePath(); ctx.fill();
+
+      // All four, together. A section is a whole reading, not one number at a
+      // time: continuity, the momentum it carries, the pressure the water
+      // either side puts on it, and the energy going through — and momentum
+      // and pressure are separate columns because telling them apart IS the
+      // control-volume question.
+      const rows = [
+        (k + 1) + "   Q      " + e.Q.toFixed(3) + " m²/s",
+        "    M      " + vec(e.Mx, e.Mz, "N/m"),
+        "    F      " + vec(e.Fpx, e.Fpz, "N/m"),
+        "    ρgQH   " + fmtBig(e.E, "W/m"),
+      ];
+      const side = dir > 0 ? 1 : -1;
+      const cx = mx + hx * 1.9 * 1 + side * 8, cy = my - 22;
+      rows.forEach((t, i) => chip(ctx, cx, cy + i * 15, t, col,
+                                  side > 0 ? "left" : "right"));
+      // One section is a reading; two are an ANSWER. Said here, next to the
+      // one section that exists, because that is the moment it is useful —
+      // and it goes away by itself the moment it has been acted on.
+      if (lines.length === 1) {
+        chip(ctx, cx, cy + rows.length * 15 + 3,
+             "draw a second section for the balance between them",
+             "rgba(140,225,176,0.62)", side > 0 ? "left" : "right");
+      }
+    });
+
+    // …and the momentum theorem between the last two, which is the whole
+    // reason two sections are usually enough.
+    if (lines.length >= 2) {
+      const A = lines[lines.length - 2], B = lines[lines.length - 1];
+      if (A.ema && B.ema) {
+        const a = A.ema, b = B.ema;
+        const inQ = Math.max(Math.abs(a.Q), 1e-9);
+        // Both sections carry their OWN normal. Treating them as the two ends
+        // of a control volume flips the upstream one, which is where each of
+        // these differences comes from.
+        const dQ = Math.abs(b.Q) - Math.abs(a.Q);
+        const fx = (a.Mx - b.Mx) + (a.Fpx - b.Fpx);
+        const fz = (a.Mz - b.Mz) + (a.Fpz - b.Fpz);
+        const dE = Math.abs(a.E) - Math.abs(b.E);
+        const rows = [
+          "sections " + (lines.length - 1) + " → " + lines.length,
+          "water     " + Math.abs(a.Q).toFixed(3) + " → " + Math.abs(b.Q).toFixed(3) +
+            " m²/s   (" + (100 * dQ / inQ).toFixed(1) + "%, should be 0)",
+          "momentum  " + fmtBig(a.Mx, "N/m") + " → " + fmtBig(b.Mx, "N/m"),
+          "pressure  " + fmtBig(a.Fpx, "N/m") + " → " + fmtBig(b.Fpx, "N/m"),
+          "force on what is between them:  " + vec(fx, fz, "N/m"),
+          "energy    lost " + fmtBig(dE, "W/m"),
+        ];
+        const x = Math.min(V.X(A.x0), V.X(A.x1), V.X(B.x0), V.X(B.x1));
+        const y = Math.max(V.Y(A.z0), V.Y(A.z1), V.Y(B.z0), V.Y(B.z1));
+        rows.forEach((t, i) => chip(ctx, x + 6, y - 12 - (rows.length - 1 - i) * 15, t, col));
+      }
+    }
+    ctx.restore();
+  }
+
+  /** A vector as two signed components with their directions spelled out, so
+   *  nothing on this tool is read off a bare sign. */
+  function vec(vx, vz, unit) {
+    // ONE scale for the pair, and the unit written once at the end. Scaling
+    // each component on its own produced "1.51 k  0.0 N/m", where the k had
+    // come adrift from the unit it belonged to.
+    const big = Math.max(Math.abs(vx), Math.abs(vz)) >= 1000;
+    const d = (v) => {
+      const a = Math.abs(v) / (big ? 1000 : 1);
+      return big || a < 100 ? a.toFixed(a >= 10 ? 1 : 2) : a.toFixed(0);
+    };
+    return (vx >= 0 ? "→ " : "← ") + d(vx) +
+           "   " + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
+           " " + (big ? "k" : "") + unit;
   }
 
   /** Edge rulers in metres: ticks along the bottom (x stations) and left
@@ -875,5 +1119,5 @@ const OVERLAY = (() => {
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
-           drawMeasure, drawCV, measureText, chip, fmt };
+           drawMeasure, drawCV, drawFlux, measureText, chip, fmt };
 })();

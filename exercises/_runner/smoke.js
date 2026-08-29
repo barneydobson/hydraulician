@@ -696,7 +696,75 @@ SUITES.avg = async (B) => {
   ok("avgField is finite everywhere", g2.finite);
   ok("avgField finds the water", g2.wet > 0.05 * g2.n, `wet ${g2.wet}/${g2.n}`);
   ok("mean fill is a fill (slot storage excepted)", g2.fmax < 1.5, `fmax ${g2.fmax}`);
+
+  // The collocation trap the shader was built around (Task 6 brief): u lives
+  // on the west face, so a shader that weighted f by the face value alone —
+  // instead of centring first — would put a directional bias into every
+  // mean. avgField()'s wet/finite/fmax checks above do not exercise this at
+  // all (they only touch the f/P channels), so this is a dedicated check
+  // that ubar sits on the CENTRED velocity, not the west face.
+  //
+  // Comparison, not an absolute, so it survives the flow's own unsteadiness.
+  // A single instantaneous patch turned out to be the wrong reference: the
+  // strongest instantaneous |faceE - face| in a settled channel is a
+  // transient eddy (a momentary sign flip), not a steady spatial gradient —
+  // measured once at a cell where face=0.416, faceE=-0.886, and the window
+  // mean sat nowhere near either. So the reference here is an INDEPENDENT
+  // time-weighted mean, hand-rolled in JS from the same `patch()` readback
+  // FS_ACC itself reads from — not a second call into avgField() — sampled
+  // over the SAME window the accumulator is open for, weighted by each
+  // frame's actual simulated-time advance (`S.t` before/after), which is
+  // the same weighting rule docs/averaging.md §4.4 gives the GPU accumulator.
+  // Agreement between two independently-computed means, one CPU one GPU,
+  // discriminates the collocation bug without being a single noisy sample.
+  const cl = await B.evaluate(`(() => {
+    __low(); APP.tick(600);                // settle before the window opens
+    const S = APP.sim, nx = S.nx, ny = S.ny;
+    APP.SIM.avgStart();
+    const nSamp = 40;
+    let sum = null, w = 0, i0 = 0, totalT = 0;
+    for (let s = 0; s < nSamp; s++) {
+      const t0 = S.t;
+      APP.frames(1);
+      const dtAdv = S.t - t0;
+      const P = APP.SIM.patch(0, S.W);
+      if (!sum) { sum = new Float64Array(P.buf.length); w = P.w; i0 = P.i0; }
+      if (dtAdv > 0) {
+        for (let k = 0; k < P.buf.length; k++) sum[k] += P.buf[k] * dtAdv;
+        totalT += dtAdv;
+      }
+    }
+    const A = APP.SIM.avgField();
+    const uAt = (i, j) => sum[((j * w) + (i - i0)) * 4] / totalT;
+    let best = null, bestGap = -1;
+    for (let j = 2; j < ny - 2; j++) {
+      for (let i = 2; i < nx - 2; i++) {
+        const k = j * nx + i;
+        if (A.fbar[k] <= 0.9) continue;               // reliably wet in the mean
+        const face = uAt(i, j), faceE = uAt(i + 1, j);
+        const gap = Math.abs(faceE - face);           // 2x |centred - face|
+        if (gap > bestGap) { bestGap = gap; best = { i, j, k, face, faceE }; }
+      }
+    }
+    APP.SIM.avgStop();
+    if (!best) return { found: false, totalT };
+    const centred = 0.5 * (best.face + best.faceE);
+    const ubar = A.ubar[best.k];
+    return { found: true, i: best.i, j: best.j, face: best.face, faceE: best.faceE,
+             centred, ubar, dCentred: Math.abs(ubar - centred), dFace: Math.abs(ubar - best.face),
+             totalT };
+  })()`);
+  console.log(`\n    collocation: cell (${cl.i},${cl.j}) over T=${cl.totalT.toFixed(4)}s` +
+    ` face=${cl.face.toFixed(4)} faceE=${cl.faceE.toFixed(4)} centred=${cl.centred.toFixed(4)}` +
+    ` ubar=${cl.ubar.toFixed(4)} |ubar-centred|=${cl.dCentred.toExponential(3)}` +
+    ` |ubar-face|=${cl.dFace.toExponential(3)}`);
+  ok("collocation probe found a wet cell with a meaningful gradient",
+     cl.found && Math.abs(cl.centred - cl.face) > 1e-4,
+     JSON.stringify(cl));
+  ok("avgField's ubar sits on the CENTRED velocity, not the bare west face",
+     cl.dCentred < cl.dFace, JSON.stringify(cl));
 };
+
 
 // -------------------------------------------------------------------- main
 (async () => {

@@ -14,6 +14,12 @@ plane to the two GPU passes it actually integrates.
 [Limits](#7-what-is-not-represented) ·
 [References](#references)
 
+Companion documents:
+[notation](notation.md) ·
+[engineering notes](engineering-notes.md) ·
+[averaging](averaging.md) ·
+[boundary conditions](boundary-conditions.md)
+
 ---
 
 ## Notation
@@ -318,7 +324,7 @@ The governing small parameter is the ratio of the **long-wave celerity**
 stands an order of magnitude above the dynamic compression:
 
 | source | scale | value |
-|---|---|---|
+| --- | --- | --- |
 | hydrostatic | `(c₀/c)² = gd/c²` | 7% |
 | dynamic | `M² = (U/c)²`, `U ≈ 2 m/s` | 0.6% |
 
@@ -371,7 +377,7 @@ everywhere, which is maximally wrong — and integrating with the same discrete
 update. Over 200 s:
 
 | | start | end |
-|---|---|---|
+| --- | --- | --- |
 | `\|∂P/∂z + g\|/g` | 1 | 2.3×10⁻⁶ |
 | residual `max\|v\|` | 0 | 1.8×10⁻⁵ m/s |
 

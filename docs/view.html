@@ -48,6 +48,21 @@
   }
   .back:hover { background: rgba(77,195,255,0.20); border-color: rgba(77,195,255,0.45); }
 
+  /* Every document, one click away — the reader is the docs hub, and this row
+     is what makes "About the solver" open ALL of the documentation rather
+     than one page of it. */
+  nav.docs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+  nav.docs a {
+    display: inline-block; padding: 4px 10px; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
+    color: #c9d6e4; text-decoration: none; font-size: 12px; white-space: nowrap;
+  }
+  nav.docs a:hover { background: rgba(77,195,255,0.20); border-color: rgba(77,195,255,0.45); }
+  nav.docs a.here {
+    background: rgba(77,195,255,0.16); border-color: rgba(77,195,255,0.55);
+    color: #dff2ff; pointer-events: none;
+  }
+
   /* The document itself sits on the same glass card the app's boxes use. */
   main {
     background: rgba(12, 17, 26, 0.60);
@@ -122,6 +137,7 @@
     <span class="grow"></span>
     <a class="back" href="../index.html">← back to the app</a>
   </header>
+  <nav class="docs" id="docnav"></nav>
   <main id="doc"><p style="opacity:.6">Loading…</p></main>
   <footer id="foot"></footer>
 </div>
@@ -135,6 +151,22 @@ var DOC = (function () {
   var q = new URLSearchParams(location.search).get("doc") || "numerics.md";
   return /^[a-z0-9-]+\.md$/i.test(q) ? q : "numerics.md";
 })();
+
+/* The docs register — every markdown file in this folder, in reading order.
+   Hardcoded because a page with no server cannot list a directory; a new
+   document is a row here (and a link in numerics.md's header nav, which is
+   what the Pages build uses instead of this page). */
+var DOCS = [
+  ["numerics.md", "Numerics"],
+  ["notation.md", "Notation"],
+  ["engineering-notes.md", "Engineering notes"],
+  ["averaging.md", "Averaging"],
+  ["boundary-conditions.md", "Boundary conditions"],
+];
+document.getElementById("docnav").innerHTML = DOCS.map(function (d) {
+  return '<a href="view.html?doc=' + d[0] + '"' +
+         (d[0] === DOC ? ' class="here"' : "") + ">" + d[1] + "</a>";
+}).join("");
 
 var esc = function (s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

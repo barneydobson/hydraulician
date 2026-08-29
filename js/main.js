@@ -2660,7 +2660,7 @@ const TOOLBAR = [
       hint: "The shortcut sheet",
       act: (b) => KEYS.toggle(b) },
     { id: "aboutBtn", icon: "about", label: "About the solver",
-      hint: "What is actually being computed — the numerics derivation",
+      hint: "What is actually being computed — the numerics, and the rest of the documentation",
       act: () => window.open(aboutHref(), "_blank", "noopener") },
   ] },
 ];

@@ -14,7 +14,7 @@ shallow water); this one resolves the depth.
 ## Where things live
 
 | Path | What it is |
-|---|---|
+| --- | --- |
 | `index.html` | markup + all CSS, classic script tags; the control panel is generated from a spec in `main.js` |
 | `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
 | `js/reconstruct.js` | `RECON` — the averaging numerics with no WebGL in them: running mean, Welford, geometric fill, connected bodies, column compaction, band level sets |
@@ -28,7 +28,8 @@ shallow water); this one resolves the depth.
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
-| `docs/averaging.md` | time averaging: the discrete mass balance the mean must satisfy, and how the free surface is reconstructed from it — the binding spec for the engine |
+| `docs/averaging.md` | time averaging, user-facing: what Average shows, the Favre mean, the discrete balance it satisfies, surface reconstruction, reset conditions — section numbers are load-bearing (code and tests cite them) |
+| `docs/boundary-conditions.md` | every boundary in one place: the solid mask, wall mechanisms, the tri-state outer ring, level controls with their sponges and clamps, edge ownership |
 | `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
@@ -113,7 +114,7 @@ to look fine for a minute and explode in an exercise.
 Eight gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
-|---|---|---|
+| --- | --- | --- |
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |

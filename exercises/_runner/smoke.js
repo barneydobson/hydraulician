@@ -879,6 +879,72 @@ SUITES.avg = async (B) => {
   ok("sigma_eta has something to measure", cs.n > 10, JSON.stringify(cs));
   ok("sigma_eta matches an independent float64 weighted Welford",
      cs.worst < 1e-3, JSON.stringify(cs));
+
+  // The channel overlay (Task 8): OVERLAY.analyse() already filters three
+  // ways — a spatial prefilter, a temporal EMA (_hA/_qA) and an EMA on the
+  // global normal-depth estimate (_ynK). Handing it mean columns and letting
+  // those run would average an already-averaged field a second time, which
+  // shows up as a jump broadened by the filter rather than by the flow.
+  //
+  // Feeding the SAME column buffer to the SAME call twice, with a reset
+  // right before both calls, does NOT distinguish "bypassed" from "filtered
+  // but converged": resetEstimates() nulls _hA, so the first call
+  // initialises _hA to a bit-exact copy of the smoothed input, and that same
+  // call's own EMA step is then `x += 0.10*(x-x) = 0` — the filter reaches
+  // its fixed point in ONE call whenever the input never changes. A second
+  // call with the identical input can never move, whether or not the EMA is
+  // even running. (Measured while writing this test: re-enabling the EMA on
+  // the averaged path still passed the brief's literal same-input-twice
+  // check — see task-8-report.md.)
+  //
+  // So instead: seed the shared _hA/_qA state with a column buffer D that
+  // is CLEARLY different from the averaged buffer C (a just-reset, still
+  // near-empty channel vs. the settled averaged profile), then check —
+  //   H2a: the averaged path on C ignores that seed entirely. Both calls
+  //        must read C verbatim; if the EMA still ran, call 1 would sit
+  //        10% of the way from the seed toward C and call 2 would sit
+  //        further still — two different numbers, neither equal to C.
+  //   H2b: the LIVE path does NOT ignore history. The same current input D,
+  //        reached via two different histories (no history vs. seeded with
+  //        C), must give two DIFFERENT outputs — proof the live EMA is
+  //        actually carrying state between calls, which is what "the
+  //        bypass is real" requires the live path to keep doing.
+  const h = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    APP.SIM.avgStart(); APP.frames(240);
+    const { C } = APP.SIM.avgColumns();
+    APP.SIM.avgStop();
+    const S = APP.sim, nx = S.nx;
+
+    APP.SIM.resetWater(); APP.tick(30);          // near-empty, nothing like C
+    const D = APP.SIM.columns(true);
+
+    // H2a — averaged path must ignore stale filter state.
+    OVERLAY.resetEstimates(APP.sim);
+    OVERLAY.analyse(APP.sim, D);                  // live call seeds _hA/_qA from D
+    const A1 = OVERLAY.analyse(APP.sim, C, { averaged: true });
+    const A2 = OVERLAY.analyse(APP.sim, C, { averaged: true });
+    let same = true, atC = true;
+    for (let i = 0; i < nx; i++) {
+      if (Math.abs(A1.d[i] - A2.d[i]) > 1e-9) same = false;
+      if (Math.abs(A1.d[i] - C[i * 4 + 1]) > 1e-9) atC = false;
+    }
+
+    // H2b — live path must carry state: same D, different prior history.
+    OVERLAY.resetEstimates(APP.sim);
+    const isolated = OVERLAY.analyse(APP.sim, D).d.slice();
+    OVERLAY.resetEstimates(APP.sim);
+    OVERLAY.analyse(APP.sim, C);                  // seed history with C
+    const withHistory = OVERLAY.analyse(APP.sim, D).d;
+    let moved = false;
+    for (let i = 0; i < nx; i++) if (Math.abs(isolated[i] - withHistory[i]) > 1e-9) { moved = true; break; }
+
+    return { same, atC, moved, n: nx };
+  })()`);
+  ok("H2 averaged analyse ignores stale filter state — both calls read C verbatim",
+     h.same && h.atC, JSON.stringify(h));
+  ok("H2 the live path carries state between calls, so the bypass is real",
+     h.moved, JSON.stringify(h));
 };
 
 

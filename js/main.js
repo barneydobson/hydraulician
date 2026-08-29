@@ -29,6 +29,12 @@ const state = {
   cv: null, cvDrag: null,          // the force control volume: box + EMA force
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
+  // Average is a measurement mode, not a blur filter (docs/averaging.md
+  // §4.3): while it is up, the field, the channel overlay and every number
+  // derived from it must describe the SAME averaging window. The toggle that
+  // flips this lives in a later task; until then it stays false and the
+  // averaged overlay path below is correct but dormant.
+  avg: false,
   gauges: [], rakes: [], gaugeField: "h", tracers: null, tracerN: 9,
   gaugeT: -1,                 // sim time of the last gauge sample — see sampleGauges
   gaugeSeq: 0,                // ever-increasing gauge id, for inspector identity
@@ -2662,7 +2668,13 @@ function tickFrame(realDt) {
   if (simMs > CONFIG.frameBudgetMs * 1.6) state.nsubMax = Math.max(2, state.nsubMax * 0.82);
   else if (simMs < CONFIG.frameBudgetMs * 0.75) state.nsubMax = Math.min(4000, state.nsubMax * 1.05 + 1);
 
-  const analysis = OVERLAY.analyse(sim, col);
+  // Average mode must describe ONE window: the field, the overlay and every
+  // number derived from it. Mixing a mean field with live markers would put
+  // two flow states in one screenshot.
+  const avgCols = state.avg && SIM.avgActive() ? SIM.avgColumns() : null;
+  const analysis = avgCols
+    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true })
+    : OVERLAY.analyse(sim, col);
   sampleGauges(analysis);
   sampleRakes();
   sampleCV();

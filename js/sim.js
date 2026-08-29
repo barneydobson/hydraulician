@@ -261,6 +261,12 @@ const SIM = (() => {
     S.P = GLH.createDoubleBuffer(gl, pn, pn, F, RGBA, FL, pd);
 
     S.colBuf = new Float32Array(nx * 4);
+    // Whether the LAST columns() call actually pulled its buffer back, or
+    // handed out the one from up to two frames ago. avgColumns() rides this:
+    // its readback is the same nx x 1 pipeline sync, so refreshing on the same
+    // frames costs nothing extra and refreshing on the others would double the
+    // stall this throttle exists to avoid.
+    S.colFresh = false;
     S.pxBuf = new Float32Array(4);
     S.avg = null;                   // transport accumulator, allocated on demand
 
@@ -326,7 +332,7 @@ const SIM = (() => {
     // The two CPU snapshots are plain arrays, so they go with the dropped
     // S.avg object either way — nulled here so this reads as the complete
     // teardown it is, and so a stale bed cannot outlive its window.
-    a.f0buf = null; a.bedbuf = null;
+    a.f0buf = null; a.bedbuf = null; a.buf = null; a.out = null;
   }
 
   /** Lazily allocated: a session that never opens Average pays nothing.
@@ -359,7 +365,7 @@ const SIM = (() => {
     // separate window. Do not fold it into `tf` — see the module note above.
     const col = GLH.createDoubleBuffer(gl, S.nx, 1, F, RGBA, FL, null);
     S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0,
-              col, tc: 0, bedbuf: null };
+              col, tc: 0, bedbuf: null, buf: null, out: null };
     snapshotF0();
     snapshotBed();
   }
@@ -553,21 +559,63 @@ const SIM = (() => {
    *  them unchanged: (bed, d, q, surface). The bed is static within a window
    *  (any geometry edit resets via avgReset), so it comes from the snapshot
    *  taken when the window opened rather than from an averaged channel — and
-   *  this function makes no call into columns(); see snapshotBed. */
-  function avgColumns() {
-    const buf = new Float32Array(S.nx * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.col.read.fbo);
-    gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, buf);
-    const bed = S.avg.bedbuf;
-    const C = new Float32Array(S.nx * 4), sigma = new Float32Array(S.nx);
-    for (let i = 0; i < S.nx; i++) {
-      C[i * 4]     = bed[i];                   // bed, from the window snapshot
-      C[i * 4 + 1] = buf[i * 4];               // d̄
-      C[i * 4 + 2] = buf[i * 4 + 1];           // q̄
-      C[i * 4 + 3] = buf[i * 4 + 2];           // η̄
-      sigma[i] = RECON.sigma(buf[i * 4 + 3], S.avg.tc);
+   *  this function makes no call into columns(); see snapshotBed.
+   *
+   *  `force` bypasses the throttle below. The frame path never passes it; a
+   *  caller that wants THIS frame's numbers and is not inside the loop does. */
+  function avgColumns(force) {
+    const A = S.avg;
+    // The readback is the SAME nx x 1 full pipeline sync that columns() pays
+    // for its own buffer, and the Live/Average toggle is what makes it run
+    // every frame. So it refreshes exactly when columns() did, which costs one
+    // stall per frame instead of two AND makes the two buffers describe the
+    // same frame. Marginal cost over a bare columns(), interleaved A/B on
+    // h23, ANGLE/D3D11, two runs:
+    //
+    //     Medium,  667 columns:  +0.29 / +0.35 ms   against  +0.97 / +1.42 ms
+    //     Ultra,  1811 columns:  +0.36 / +0.40 ms   against  +1.36 / +1.60 ms
+    //
+    // i.e. riding the throttle takes about a quarter of the unthrottled cost,
+    // and saves a full millisecond of a 15 ms frame budget at Ultra. The
+    // staleness it buys is the same <= 2 frames the LIVE overlay has always
+    // had from the same throttle, so both paths lag alike.
+    //
+    // The first call in a window always reads: A.out belongs to the S.avg
+    // object, so a new window can never be served a closed one's numbers.
+    if (force || !A.out || S.colFresh) {
+      if (!A.buf) { A.buf = new Float32Array(S.nx * 4);
+                    A.out = { C: new Float32Array(S.nx * 4),
+                              sigma: new Float32Array(S.nx) }; }
+      const buf = A.buf, C = A.out.C, sigma = A.out.sigma, bed = A.bedbuf;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, A.col.read.fbo);
+      gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, buf);
+      for (let i = 0; i < S.nx; i++) {
+        C[i * 4]     = bed[i];                   // bed, from the window snapshot
+        C[i * 4 + 1] = buf[i * 4];               // d̄
+        C[i * 4 + 2] = buf[i * 4 + 1];           // q̄
+        C[i * 4 + 3] = buf[i * 4 + 2];           // η̄
+        sigma[i] = RECON.sigma(buf[i * 4 + 3], A.tc);
+      }
     }
-    return { C, sigma };
+    return A.out;
+  }
+
+  /** The mean state in ONE cell, for the legend's cursor readout: f-bar and
+   *  the Favre velocity where the pointer is. A 1x1 readPixels, the same
+   *  bargain `probe` already makes twice a frame. Null when no window is
+   *  open, because there is nothing to read. */
+  function avgProbe(x, z) {
+    if (!S.avg) return null;
+    const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
+    const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
+    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    const f = S.pxBuf[2], d = Math.max(f, 1e-6);
+    const g = Math.abs(S.p.g) || 9.81;
+    // U.b is KINEMATIC pressure p/rho, so the head is that over g -- it must
+    // not be divided by density a second time (docs/averaging.md §4.1).
+    return { i, j, fbar: f, ubar: S.pxBuf[0] / d, wbar: S.pxBuf[1] / d,
+             pbar: S.pxBuf[3], phead: S.pxBuf[3] / g };
   }
 
   // ------------------------------------------------------------------ step
@@ -731,7 +779,8 @@ const SIM = (() => {
     gl.uniform1f(prog.col.u("u_valve"), S.p.valveClosed);
     GLH.bindTarget(gl, S.colFbo, S.nx, 1);
     quad.draw();
-    if (force || colTick-- <= 0) {
+    S.colFresh = force || colTick-- <= 0;
+    if (S.colFresh) {
       colTick = readEvery - 1;
       gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, S.colBuf);
     }
@@ -765,8 +814,18 @@ const SIM = (() => {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(prog.draw);
+    // Average paints the same seven branches from the mean state, so the two
+    // accumulator textures go in beside the live ones and `u_avg` picks. With
+    // no window open they are BOUND TO THE LIVE TEXTURES rather than left
+    // dangling: an unbound sampler2D reads unit 0, which is whatever the last
+    // pass left there. Costing one extra bindTexture on a session that never
+    // opens Average, and nothing else.
+    const A = S.avg, useAvg = !!(opts.avg && A);
     GLH.bindTex(gl, prog.draw, [["u_F", S.F.read.tex], ["u_U", S.U.read.tex],
-      ["u_S", S.solid], ["u_C", S.colTex]]);
+      ["u_S", S.solid], ["u_C", S.colTex],
+      ["u_AF", useAvg ? A.fld.read.tex : S.F.read.tex],
+      ["u_AC", useAvg ? A.col.read.tex : S.colTex]]);
+    gl.uniform1f(prog.draw.u("u_avg"), useAvg ? 1 : 0);
     gl.uniform4f(prog.draw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
     gl.uniform2f(prog.draw.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.draw.u("u_canvas"), view.w, view.h);   // drawn rect, so zoom keeps px/m honest
@@ -948,15 +1007,34 @@ const SIM = (() => {
    *  branch of FS_DISP that paints it. The two are checked against each other
    *  by eye and by the legend: a Fit that leaves the picture saturated or flat
    *  means they have drifted apart. */
-  function fieldStats(mode) {
+  function fieldStats(mode, avg) {
     const n = S.nx * S.ny;
     const U = new Float32Array(n * 4), F = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, F);
+    // Average mode fits to the MEAN, because that is what is on screen. The
+    // live field's 99th percentile is drawn from excursions the mean does not
+    // contain, so fitting to it under a mean picture sets a scale nothing
+    // reaches and every colour reads low.
+    const A = avg && S.avg;
+    if (A) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, A.fld.read.fbo);
+      gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
+      // Unpacked into the LIVE layout the loop below already speaks:
+      // (u, w, P) in U and f in F.r, with u the Favre mean <f u_c>/f-bar.
+      for (let k = 0; k < n; k++) {
+        const fb = U[k * 4 + 2], d = Math.max(fb, 1e-6);
+        F[k * 4] = fb;
+        U[k * 4] /= d; U[k * 4 + 1] /= d; U[k * 4 + 2] = U[k * 4 + 3];
+      }
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
+      gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, U);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+      gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, F);
+    }
     const g = Math.abs(S.p.g) || 9.81, tilt = S.scene.tiltS0 || 0;
-    const col = columns();                  // per-column depth, for the Froude number
+    // The Froude number needs a depth, and under Average it is the mean
+    // column's <d> - the same number FS_DISP divides by (docs/averaging.md §6).
+    const col = A ? avgColumns(true).C : columns();
     const v = [];
     const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && S.mask[j * S.nx + i] < 192;
     for (let j = 0; j < S.ny; j++) {
@@ -1318,6 +1396,6 @@ const SIM = (() => {
            boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
            setValve,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
-           avgStepField, avgField, avgStepColumns, avgColumns,
+           avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };
 })();

@@ -120,7 +120,7 @@ Eight gates, all zero-dependency and all non-zero on failure:
 | `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
 | `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
 | `node test/mutation-test.mjs` | that `recon-test.mjs` can actually FAIL: fifteen known bugs patched into `RECON` one at a time, each required to kill the assertion it targets | ~9 s |
-| `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, the reset conditions, the Favre display field, the mean columns and the overlay — 35 assertions | ~4 min |
+| `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, every reset condition, the Favre display field, the mean columns, the overlay, the display pass painting the mean and the legend's Fit — 46 assertions | ~4 min |
 | `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing
@@ -132,7 +132,7 @@ stops testing, which is a failure the others cannot see. `smoke.js --only=api,ri
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
 `index.html`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
-`START` or the boot wiring. Every
+`START`, `setAverage` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
 expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
@@ -209,3 +209,13 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   non-obvious failure modes — read their sections in
   [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"
   anything they show.
+- **Average** (VIEW → A) is a measurement mode, not a blur. While it is up the
+  colour, the free-surface line, the channel overlay and every number derived
+  from it come from ONE window, and the window restarts on each of
+  [docs/averaging.md](docs/averaging.md) §9's conditions — including the
+  boundary-open switches in Controls, which look like view settings and are a
+  change of control volume. The velocity stored is the FAVRE mean, so `H`,
+  `Fr`, `|u|` and `ρu|u|` are fields **of the mean flow**; each field's `mean`
+  string in `FIELDS` is what the legend prints to say so. `setAverage` is the
+  single writer: the flag alone is not the mode, because the accumulators
+  (~22 MB apiece at Ultra) have to be opened and released with it.

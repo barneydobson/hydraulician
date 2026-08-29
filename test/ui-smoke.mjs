@@ -452,6 +452,77 @@ async function main() {
       check("the strip toggle moves the state", parity.before !== parity.after);
       eq("and the panel checkbox agrees", parity.box, parity.after);
 
+      // Average is a VIEW control: it changes how the water is DRAWN and
+      // nothing about what is measured. It is also the one strip button whose
+      // state costs memory, so "lit" and "a window is open" have to be the
+      // same fact — a toggle that set the flag without opening the
+      // accumulators would paint live data under an Average legend.
+      const avg = await tab.evaluate(`
+        const btns = [...document.querySelectorAll("#groups .tbtn")].map((b) => ({
+          label: b.getAttribute("aria-label"),
+          aria: !!b.getAttribute("aria-label"),
+          icon: !!(b.querySelector("svg") && b.querySelector("svg").innerHTML.trim()),
+        }));
+        const a = btns.find((b) => /average/i.test(b.label || ""));
+        // A missing button must REPORT, not throw: a thrown evaluate takes the
+        // whole gate down with a stack trace instead of a named failure, and
+        // the point of a layout gate is to say which agreement broke.
+        const btn = document.getElementById("avgBtn");
+        if (!btn) return { labels: btns.map((b) => b.label).join(","), a,
+                           on: {}, off: {} };
+        const box = () => document.getElementById("c_avg");
+        APP.state.mode = 7; APP.LEGEND.sync();      // energy head: a NONLINEAR field
+        APP.frames(20);
+        btn.click();
+        APP.frames(20);
+        const card = document.getElementById("legend");
+        const r = card.getBoundingClientRect();
+        const txt = (id) => { const e = document.getElementById(id);
+                              return e ? e.textContent : null; };
+        const on = { flag: APP.state.avg, open: APP.SIM.avgActive(),
+                     lit: btn.classList.contains("on"),
+                     box: !!(box() && box().checked),
+                     block: card.classList.contains("avg"),
+                     T: txt("legAvgT"), what: txt("legAvgWhat"),
+                     bottom: r.bottom, inner: window.innerHeight };
+        dispatchEvent(new KeyboardEvent("keydown", { key: "a" }));
+        const off = { flag: APP.state.avg, open: APP.SIM.avgActive(),
+                      box: !!(box() && box().checked),
+                      block: card.classList.contains("avg") };
+        APP.state.mode = 0; APP.LEGEND.sync();
+        return { labels: btns.map((b) => b.label).join(","), a, on, off };
+      `);
+      check("the strip carries an Average toggle", !!avg.a, avg.labels);
+      check("it is labelled and has an icon", !!avg.a && avg.a.aria && avg.a.icon,
+            JSON.stringify(avg.a));
+      check("turning it on opens an averaging window",
+            avg.on.flag && avg.on.open, JSON.stringify(avg.on));
+      check("the strip lights and the panel agrees",
+            avg.on.lit && avg.on.box, JSON.stringify(avg.on));
+      // The card is where T, f-bar and the aeration gap are reported, and
+      // where the reader is told that H, Fr and the momentum flux are fields
+      // OF the mean flow rather than means of the field (docs/averaging.md §6).
+      check("the legend grows its Average block", avg.on.block, JSON.stringify(avg.on));
+      // A NON-ZERO window, not merely a well-formed one: "T = 0.00 s" is what
+      // the markup ships, so a card that is never ticked would read correctly
+      // and say nothing.
+      check("and prints the elapsed window",
+            /^T = \d+\.\d\d s$/.test(avg.on.T || "") &&
+            parseFloat(String(avg.on.T).slice(4)) > 0.001, String(avg.on.T));
+      check("and says the nonlinear field is of the MEAN FLOW",
+            /mean flow/i.test(avg.on.what || ""), String(avg.on.what));
+      // A card that grew past the bottom of the window would take its numbers
+      // with it.
+      check("the card still fits the viewport",
+            avg.on.bottom > 0 && avg.on.bottom <= avg.on.inner,
+            avg.on.bottom + " vs " + avg.on.inner);
+      // A releases it, and the window goes with the mode - the accumulators
+      // are ~22 MB a piece at Ultra and a flag left set would hold them.
+      check("A releases it again",
+            avg.off.flag === false && avg.off.open === false &&
+            !avg.off.box && !avg.off.block,
+            JSON.stringify(avg.off));
+
       // Captions are decoration before they are information: they are the
       // first thing to go when the strip runs out of room, never a control.
       const tight = await tab.evaluate(`

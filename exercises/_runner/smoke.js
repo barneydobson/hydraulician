@@ -96,6 +96,68 @@ const GPU_MUTANTS = [
     kills: "F1 transport residual",
     measured: "c 22 -> 11 gives a residual of 4.13e-1 against a 1.28e-3 bound, 323x over" },
 
+  { id: "disp-tent-live", file: "/js/shaders.js",
+    why: "the display pass's 3x3 tent average reads the LIVE fill under a mean field",
+    find: "      fs += w * fAt(ivec2(g) + ivec2(dx, dy)).r;",
+    replace: "      fs += w * texelFetch(u_F, CLg(ivec2(g) + ivec2(dx, dy)), 0).r;",
+    kills: "avg the water is painted where the MEAN fill is",
+    measured: "the luminance centroid stops moving between the two renders: "
+            + "409.7 -> 408.6 rows, a gap of 1.1 against a clean 115.0, on a "
+            + "705 px canvas. The 1.1 that survives is blF's own share, which "
+            + "was already avg-aware -- so the tent drives 99% of the signal" },
+
+  { id: "disp-vort-live", file: "/js/shaders.js",
+    why: "the vorticity stencil reads the LIVE velocity under a mean field",
+    find: "    float dwdx = uAt(gi + ivec2(1,0)).g - uAt(gi - ivec2(1,0)).g;\n"
+        + "    float dudz = uAt(gi + ivec2(0,1)).r - uAt(gi - ivec2(0,1)).r;",
+    replace: "    float dwdx = texelFetch(u_U, gi + ivec2(1,0), 0).g - texelFetch(u_U, gi - ivec2(1,0), 0).g;\n"
+           + "    float dudz = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;",
+    kills: "avg the vorticity view paints the spin OF the mean flow",
+    measured: "R-B is 72.68 in BOTH renders -- bit-identical, not merely near "
+            + "-- against a clean 72.68 -> -59.73" },
+
+  { id: "disp-froude-live-depth", file: "/js/shaders.js",
+    why: "the Froude view divides by the LIVE column depth instead of the mean <d>",
+    find: "  float dep = u_avg > 0.5",
+    replace: "  float dep = false",
+    kills: "avg the Froude view divides by the MEAN depth",
+    measured: "R-B is 72.68 in both renders against a clean 72.68 -> -72.97: "
+            + "the mean render stays supercritical on the live 20 mm depth" },
+
+  { id: "fieldstats-fits-live", file: "/js/sim.js",
+    why: "the legend's Fit reads the live field while the mean is on screen",
+    find: "    const A = avg && S.avg;",
+    replace: "    const A = false;",
+    kills: "avg Fit reads the MEAN field, not the instant behind it",
+    measured: "Fit lands on the LIVE percentile: the relative gap to the CPU "
+            + "mean reference goes from 0.00e0 to 1.69e-1, the whole separation "
+            + "between the two distributions, and the wet-cell count with it "
+            + "(11893 -> 11414)" },
+
+  { id: "spinup-no-reset", file: "/js/main.js",
+    why: "the averaging window runs straight through the end of spin-up",
+    find: "    if (wasWarming && !warming) SIM.avgReset();",
+    replace: "    if (false && wasWarming && !warming) SIM.avgReset();",
+    kills: "avg the end of spin-up restarts the window",
+    measured: "T climbs monotonically to 1.198 s across the crossing, 0 drops, "
+            + "against a clean drop from 0.402 s at sim t = 0.407 s" },
+
+  { id: "spinup-reset-every-frame", file: "/js/main.js",
+    why: "the spin-up reset fires on the STATE rather than on the edge",
+    find: "    if (wasWarming && !warming) SIM.avgReset();",
+    replace: "    if (!warming) SIM.avgReset();",
+    kills: "avg and does it once, not on every frame after",
+    measured: "T is zeroed on every frame once spin-up ends, so no window ever "
+            + "starts: 9 drops against 1, and endT 5.3e-4 s against a clean "
+            + "0.79 s -- one frame's worth, not a window" },
+
+  { id: "mode-switch-no-reset", file: "/js/main.js",
+    why: "a Live/Average switch leaves the overlay's temporal estimates standing",
+    find: "  OVERLAY.resetEstimates(sim);\n  LEGEND.sync(); syncPanel(); syncToolbar();",
+    replace: "  LEGEND.sync(); syncPanel(); syncToolbar();",
+    kills: "avg both Live/Average transitions drop the overlay's temporal estimates",
+    measured: "_hA survives both directions, so each mode inherits the other's EMA" },
+
   { id: "setvalve-no-reset", file: "/js/sim.js",
     why: "a valve toggle changes the solid set with no reset, so frozen cells resume mid-window",
     find: "    S.p.valveClosed = v;\n    if (S.avg) avgReset();",
@@ -177,7 +239,12 @@ function serve() {
     fs.readFile(f, (err, data) => {
       if (err) { res.writeHead(404); res.end("not found"); return; }
       if (MUTANT && p === MUTANT.file) {
-        const before = data.toString("utf8");
+        // Normalised to LF before matching, and served that way. A catalogue
+        // entry spanning two lines is written with "\n" and git hands a
+        // Windows checkout CRLF, so on Windows EVERY multi-line pattern
+        // reported itself STALE and no negative control could be run at all.
+        // The browser does not care which it gets.
+        const before = data.toString("utf8").replace(/\r\n/g, "\n");
         // A pattern that no longer matches would serve untouched source and
         // let the suite pass, reporting success while testing nothing — the
         // exact failure this mechanism exists to catch. Never a silent skip.
@@ -1377,6 +1444,245 @@ SUITES.avg = async (B) => {
      h.seedDistinct, JSON.stringify(h));
   ok("H2c the averaged _ynK estimate ignores stale filter state too",
      h.ynAtClean, JSON.stringify(h));
+
+  // ================================================== the display path (Task 9)
+  //
+  // Everything above proves the accumulators hold the right numbers. These
+  // prove the PICTURE is painted from them — and specifically that it is
+  // painted from them EVERYWHERE, which is the part a "does the canvas
+  // change?" check cannot reach. FS_DISP reads the state in four places (the
+  // two bilinear samplers, a 3x3 tent average, a vorticity stencil) and two
+  // of those used to texelFetch the live textures directly. A half-applied
+  // Average is worse than none: the tent drives the opacity AND the
+  // free-surface line, so the surface would have wobbled over a still mean.
+  //
+  // Method: hand the accumulator and the live field DELIBERATELY OPPOSITE
+  // states and ask which one the pixels came from. A render is not stepped
+  // between the two grabs, so nothing but u_avg differs.
+  const paint = await B.evaluate(`(() => {
+    __low();
+    const cv = document.querySelector("canvas"), gl = cv.getContext("webgl2");
+    const S = APP.sim, nx = S.nx, ny = S.ny, mid = Math.floor(ny / 2);
+    APP.SIM.avgStart(); APP.frames(4);           // allocate, then overwrite
+
+    const put = (tex, buf) => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);        // texSubImage2D: these are FBO
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0,   // attachments, so respecifying
+                       nx, ny, gl.RGBA, gl.FLOAT, buf);   // storage would kill them
+    };
+    const grab = (avg, mode, lo, hi) => {
+      APP.SIM.render(APP.view, { mode, vmax: 4, lo, hi, pdt: 0, dye: false,
+        particles: false, cursor: [-99, -99, 0], guide: [0,0,0,0],
+        guideOn: false, avg });
+      const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+      const b = new Uint8Array(w * h * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, b);
+      return { b, w, h };
+    };
+    // Luminance centroid, in canvas rows. readPixels is y-up, so a LOW
+    // centroid means the bright band sits at the bottom of the view.
+    const centroid = (g) => {
+      let num = 0, den = 0;
+      for (let y = 0; y < g.h; y++) {
+        let row = 0;
+        for (let x = 0; x < g.w; x++) {
+          const k = (y * g.w + x) * 4;
+          row += g.b[k] + g.b[k+1] + g.b[k+2];
+        }
+        num += row * y; den += row;
+      }
+      return den ? num / den : -1;
+    };
+    // Mean (red - blue) over the canvas: which END of the diverging ramp the
+    // water was painted from. Sign is the whole assertion.
+    const warmth = (g) => {
+      let sum = 0;
+      for (let k = 0; k < g.b.length; k += 4) sum += g.b[k] - g.b[k+2];
+      return sum / (g.b.length / 4);
+    };
+
+    // ---- 1. the FILL. Live water in the TOP half, mean water in the BOTTOM.
+    const F = new Float32Array(nx*ny*4), A = new Float32Array(nx*ny*4);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = (j*nx+i)*4;
+      F[k]   = j >= mid ? 1 : 0;                 // live f
+      A[k+2] = j <  mid ? 1 : 0;                 // f-bar
+      A[k+3] = 1.0;                              // P-bar, so the hue is not 0/0
+    }
+    put(S.F.read.tex, F); put(S.avg.fld.read.tex, A);
+    const cLive = centroid(grab(false, 0, 0, 2));
+    const cMean = centroid(grab(true,  0, 0, 2));
+
+    // ---- 2. the VELOCITY, through the vorticity stencil. Both fields wet
+    // everywhere, so only the stencil can move the colour. Live du/dz < 0
+    // (omega > 0, warm); mean du/dz > 0 (omega < 0, cool).
+    const V = 100 * S.H;
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = (j*nx+i)*4, z = (j + 0.5) / ny;
+      F[k] = 1; A[k+2] = 1; A[k+3] = 1.0;
+      A[k]   = +V * z;                            // <f u_c> with f-bar = 1
+      A[k+1] = 0;
+    }
+    const U = new Float32Array(nx*ny*4);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = (j*nx+i)*4, z = (j + 0.5) / ny;
+      U[k] = -V * z; U[k+1] = 0; U[k+2] = 1.0;
+    }
+    put(S.F.read.tex, F); put(S.avg.fld.read.tex, A); put(S.U.read.tex, U);
+    const wLive = warmth(grab(false, 4, -40, 40));
+    const wMean = warmth(grab(true,  4, -40, 40));
+
+    // ---- 3. the DEPTH, through the Froude view. Identical velocity in both,
+    // so only the column source can move the colour: the live reduction says
+    // 20 mm (supercritical at 2 m/s, warm), the mean column says 2 m (deeply
+    // subcritical, cool).
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const k = (j*nx+i)*4;
+      A[k] = 2.0; A[k+1] = 0; A[k+2] = 1; A[k+3] = 1.0;
+      U[k] = 2.0; U[k+1] = 0; U[k+2] = 1.0;
+    }
+    put(S.F.read.tex, F); put(S.avg.fld.read.tex, A); put(S.U.read.tex, U);
+    const cl = new Float32Array(nx*4), ca = new Float32Array(nx*4);
+    for (let i = 0; i < nx; i++) {
+      cl[i*4+1] = 0.02;                           // live layout: (bed, d, q, top)
+      ca[i*4]   = 2.00;                           // mean layout: (<d>, <q>, <eta>, M2)
+    }
+    gl.bindTexture(gl.TEXTURE_2D, S.colTex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, nx, 1, gl.RGBA, gl.FLOAT, cl);
+    gl.bindTexture(gl.TEXTURE_2D, S.avg.col.read.tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, nx, 1, gl.RGBA, gl.FLOAT, ca);
+    const fLive = warmth(grab(false, 3, 0, 2));
+    const fMean = warmth(grab(true,  3, 0, 2));
+
+    APP.SIM.avgStop(); APP.SIM.resetWater();      // the synthetic state goes
+    return { ny, h: gl.drawingBufferHeight, cLive, cMean, wLive, wMean,
+             fLive, fMean, err: gl.getError() };
+  })()`);
+  console.log("\n    display: fill centroid live " + paint.cLive.toFixed(1) +
+    " -> mean " + paint.cMean.toFixed(1) + " rows of " + paint.h +
+    " | vorticity R-B live " + paint.wLive.toFixed(2) + " -> mean " + paint.wMean.toFixed(2) +
+    " | Froude R-B live " + paint.fLive.toFixed(2) + " -> mean " + paint.fMean.toFixed(2));
+  // The opacity, the water body AND the free-surface line all come off the
+  // 3x3 tent average, which used to texelFetch u_F directly. If it still did,
+  // both renders would paint the live band and the centroid would not move.
+  ok("avg the water is painted where the MEAN fill is",
+     paint.cLive - paint.cMean > 0.10 * paint.h,
+     JSON.stringify(paint));
+  // Mode 4 is a four-tap stencil on u_U, the second direct read. Sign, not
+  // magnitude: the two prescribed shears are exact opposites.
+  ok("avg the vorticity view paints the spin OF the mean flow",
+     paint.wLive > 5 && paint.wMean < -5, JSON.stringify(paint));
+  // Section 6: Fr~ = |u^| / sqrt(g <d>). Same velocity in both renders, so
+  // only the column source can flip it.
+  ok("avg the Froude view divides by the MEAN depth",
+     paint.fLive > 5 && paint.fMean < -5, JSON.stringify(paint));
+  ok("the display readbacks left no GL error", paint.err === 0, JSON.stringify(paint));
+
+  // §9's last reset condition. Spin-up is an initialisation interval, not the
+  // flow being reported: a window opened across a filling pipe carries the
+  // fill in every mean it prints. `spinup` is a plain scene field, so it is
+  // set short here rather than sitting through the scene's own.
+  const sp = await B.evaluate(`(() => {
+    __low();
+    APP.SIM.resetWater();
+    APP.state.scene.spinup = 0.4;                 // short, but a real crossing
+    APP.avg.set(true);
+    let prev = 0, drops = 0, dropAtSim = -1, dropFrom = 0, peak = 0;
+    for (let k = 0; k < 400 && APP.sim.t < 1.2; k++) {
+      APP.frames(1);
+      const T = APP.SIM.avgT();
+      if (T < prev - 1e-12) { drops++; dropAtSim = APP.sim.t; dropFrom = prev; }
+      if (prev > peak) peak = prev;
+      prev = T;
+    }
+    const endT = APP.SIM.avgT(), still = APP.SIM.avgActive();
+    APP.avg.set(false);
+    return { drops, dropAtSim, dropFrom, peak, endT, still,
+             spin: APP.state.scene.spinup, simT: APP.sim.t };
+  })()`);
+  console.log("    spin-up: T reached " + sp.dropFrom.toFixed(3) + " s, dropped at sim t = " +
+    sp.dropAtSim.toFixed(3) + " s (spin-up " + sp.spin + " s), " + sp.drops +
+    " drop(s), window since = " + sp.endT.toFixed(3) + " s");
+  // Power first, and on `peak` rather than on the drop: a check that only
+  // holds when the reset fired would fail WITH the assertion it is meant to
+  // give power to, and prove nothing about either.
+  ok("the spin-up window had something to lose", sp.peak > 0.02, JSON.stringify(sp));
+  ok("avg the end of spin-up restarts the window",
+     sp.drops === 1 && sp.dropAtSim >= sp.spin, JSON.stringify(sp));
+  // ...and exactly once. Resetting on the STATE rather than the EDGE would
+  // zero T every frame after, leaving no window at all.
+  ok("and does it once, not on every frame after",
+     sp.endT > 0.05 && sp.still, JSON.stringify(sp));
+
+  // H5. Average bypasses the live depth/discharge prefilters and the global
+  // d_n EMA, so state crossing the mode boundary would be one window read
+  // through the other's filter. Both directions, because only one of them is
+  // obvious.
+  const sw = await B.evaluate(`(() => {
+    __low(); APP.tick(300);
+    const S = APP.sim;
+    OVERLAY.analyse(S, APP.SIM.columns(true));    // seed the live EMAs
+    const seed1 = S._hA !== null && S._qA !== null;
+    APP.avg.set(true);                            // Live -> Average
+    const clearedOn = S._hA === null && S._qA === null && !isFinite(S._ynK);
+    OVERLAY.analyse(S, APP.SIM.columns(true));    // seed them again, under Average
+    const seed2 = S._hA !== null;
+    APP.avg.set(false);                           // Average -> Live
+    const clearedOff = S._hA === null && S._qA === null && !isFinite(S._ynK);
+    return { seed1, clearedOn, seed2, clearedOff, on: APP.state.avg };
+  })()`);
+  ok("H5 the transition probe actually had estimates to clear",
+     sw.seed1 && sw.seed2, JSON.stringify(sw));
+  ok("avg both Live/Average transitions drop the overlay's temporal estimates",
+     sw.clearedOn && sw.clearedOff, JSON.stringify(sw));
+
+  // The legend's Fit has to fit what is PAINTED. The live 99th percentile is
+  // drawn from excursions the mean does not contain, so fitting to it under a
+  // mean picture sets a scale nothing on screen reaches and every colour reads
+  // low.
+  //
+  // "The mean range is narrower" is TRUE but is not the assertion: it is
+  // physics, and it varies — measured over two runs the pressure head came in
+  // at 0.82x and then 0.95x of the live percentile, so any threshold drawn
+  // across it is a threshold across the weather. So this compares the number
+  // Fit returns against an INDEPENDENT CPU percentile computed from
+  // avgField() with the same wet test and the same order statistic. Same
+  // arithmetic on the same data: agreement is exact, and reading the live
+  // field instead misses by the whole gap between the two distributions.
+  const ft = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    APP.avg.set(true); APP.frames(300);
+    const S = APP.sim, nx = S.nx, ny = S.ny;
+    const A = APP.SIM.avgField();
+    const v = [];
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const k = j * nx + i;
+        if (!(A.fbar[k] >= 0.5) || S.mask[k] >= 192) continue;   // fieldStats' own wet test
+        v.push(Math.hypot(A.ubar[k], A.wbar[k]));                // mode 2 = |u|
+      }
+    }
+    v.sort((a, b) => a - b);
+    const at = (p) => v[Math.min(v.length - 1, Math.max(0, Math.round(p * (v.length - 1))))];
+    const ref = { lo: at(0.01), hi: at(0.99), n: v.length };
+    const got = APP.SIM.fieldStats(2, true);
+    const live = APP.SIM.fieldStats(2, false);
+    APP.avg.set(false);
+    return { refHi: ref.hi, refN: ref.n, gotHi: got.hi, gotN: got.n,
+             liveHi: live.hi, liveN: live.n,
+             relRef: Math.abs(got.hi - ref.hi) / Math.max(ref.hi, 1e-9),
+             relLive: Math.abs(live.hi - ref.hi) / Math.max(ref.hi, 1e-9) };
+  })()`);
+  console.log("    Fit: mean hi " + ft.gotHi.toFixed(4) + " against a CPU mean percentile of " +
+    ft.refHi.toFixed(4) + " (rel " + ft.relRef.toExponential(2) + ") and a live " +
+    ft.liveHi.toFixed(4) + " (rel " + ft.relLive.toExponential(2) + ")");
+  // Power: the two distributions must actually separate, or landing on either
+  // would look the same.
+  ok("the Fit probe's two references separate",
+     ft.refN > 100 && ft.relLive > 0.02, JSON.stringify(ft));
+  ok("avg Fit reads the MEAN field, not the instant behind it",
+     ft.relRef < 1e-5 && ft.gotN === ft.refN, JSON.stringify(ft));
 };
 
 

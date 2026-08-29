@@ -1,14 +1,21 @@
 # Time averaging: discrete conservation and free-surface reconstruction
 
-**Status: the engine is implemented.** The three accumulators (§4), the
-reconstruction numerics (§7, `js/reconstruct.js`) and the channel overlay's
-mean-column path (§4.3) are on the branch and under test — `node
-test/recon-test.mjs` and `node exercises/_runner/smoke.js --only=avg`. The
-display path and the Live / Average toggle described below are **deferred**:
-they collide with open PR #47, so `state.avg` exists and is always `false` and
-`SIM.avgStart()` is reachable only from headless tests. This document remains
-the binding specification for all of it: averaged quantities, discrete
-balances, reconstruction and acceptance tests.
+**Status: implemented, and reachable.** The three accumulators (§4), the
+reconstruction numerics (§7, `js/reconstruct.js`), the channel overlay's
+mean-column path (§4.3) and the display path (§6) are all on the branch and
+under test — `node test/recon-test.mjs`, `node test/mutation-test.mjs`,
+`node exercises/_runner/smoke.js --only=avg` and `node test/ui-smoke.mjs`.
+The mode is the VIEW family's **Average** button, the `A` key, the Controls
+panel's *Average the flow* row and `APP.avg.toggle()`, all of which go through
+`setAverage` in `main.js`. This document remains the binding specification:
+averaged quantities, discrete balances, reconstruction and acceptance tests.
+
+Two things §9 asks the legend for are **not** on it, and deliberately: the
+residuals of §5 and the 1D/2D depth discrepancy of §7.2. `transportResidual()`
+is two full-field readbacks and measures ~1.2 s, so it cannot be a per-frame
+readout; it is reachable as `APP.avg.residual()` and is what the `--only=avg`
+gate reads. The card carries `T`, `f̄`, `d̄`, `δ_a` and `σ_η` — the excursion
+band's own estimate — instead.
 
 The VIEW family provides a **Live / Average** toggle. In Average mode the solver
 continues to advance while diagnostic accumulators collect the flow. Live mode

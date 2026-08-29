@@ -749,25 +749,61 @@ uniform float u_dyeOn;
 uniform vec4  u_cursor;       // x, z (m), radius (m), tool tint
 uniform vec4  u_guide;        // preview line x0,z0,x1,z1 (m); w<0 = off
 uniform float u_guideOn;
+// ------------------------------------------------------- the averaging mode
+// docs/averaging.md §6. Average does not add seven more colourings: it
+// redirects the INPUTS of the seven that already exist, so a field stays
+// described once. u_AF is the Favre display accumulator (<f u_c>, <f w_c>,
+// f-bar, P-bar) and u_AC the column accumulator (<d>, <q>, <eta>, M2). Both
+// are bound to the LIVE textures whenever no window is open, so the samplers
+// stay valid and u_avg alone decides what is painted.
+uniform sampler2D u_AF, u_AC;
+uniform float u_avg;          // 1 = paint the mean state
+
+ivec2 CLg(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
+
+/** THE two readers of the state, and the only ones. Every sampler read in
+ *  this pass goes through them, because a half-applied Average is worse than
+ *  no Average at all: the 3x3 tent average below drives the water's opacity
+ *  AND the free-surface line, so reading it live would leave the surface
+ *  wobbling over a still mean, and the vorticity stencil would draw the
+ *  instantaneous spin under a mean-flow legend. Two ways to read the field is
+ *  one way too many. */
+vec4 fAt(ivec2 c){
+  c = CLg(c);
+  vec4 F = texelFetch(u_F, c, 0);
+  // Only the FILL has a mean. The two dye channels are a live tracer with no
+  // accumulator behind them - §4.1 stores four channels and dye is not among
+  // them - so they go on saying what the dye is doing now.
+  if (u_avg > 0.5) F.r = texelFetch(u_AF, c, 0).b;
+  return F;
+}
+/** (u, w, P). Under u_avg the velocity is the FAVRE mean <f u_c>/f-bar: the
+ *  density-weighted average is the one that leaves the equations looking like
+ *  themselves in the heavy-fluid limit. P is Reynolds-averaged, because it
+ *  enters the mean momentum equation as -grad(p-bar) and cannot be recovered
+ *  from f-bar with a nonlinear EOS (§4.1). */
+vec4 uAt(ivec2 c){
+  c = CLg(c);
+  if (u_avg > 0.5) {
+    vec4 A = texelFetch(u_AF, c, 0);
+    float fb = max(A.b, 1e-6);
+    return vec4(A.r / fb, A.g / fb, A.a, 0.0);
+  }
+  return texelFetch(u_U, c, 0);
+}
 
 vec4 blF(vec2 g){
   g -= 0.5;
   ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
-  ivec2 lo = ivec2(0), hi = ivec2(u_res) - ivec2(1);
-  vec4 a = texelFetch(u_F, clamp(i,             lo, hi), 0);
-  vec4 b = texelFetch(u_F, clamp(i+ivec2(1,0),  lo, hi), 0);
-  vec4 c = texelFetch(u_F, clamp(i+ivec2(0,1),  lo, hi), 0);
-  vec4 d = texelFetch(u_F, clamp(i+ivec2(1,1),  lo, hi), 0);
+  vec4 a = fAt(i),              b = fAt(i + ivec2(1,0));
+  vec4 c = fAt(i + ivec2(0,1)), d = fAt(i + ivec2(1,1));
   return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
 }
 vec4 blU(vec2 g){
   g -= 0.5;
   ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
-  ivec2 lo = ivec2(0), hi = ivec2(u_res) - ivec2(1);
-  vec4 a = texelFetch(u_U, clamp(i,             lo, hi), 0);
-  vec4 b = texelFetch(u_U, clamp(i+ivec2(1,0),  lo, hi), 0);
-  vec4 c = texelFetch(u_U, clamp(i+ivec2(0,1),  lo, hi), 0);
-  vec4 d = texelFetch(u_U, clamp(i+ivec2(1,1),  lo, hi), 0);
+  vec4 a = uAt(i),              b = uAt(i + ivec2(1,0));
+  vec4 c = uAt(i + ivec2(0,1)), d = uAt(i + ivec2(1,1));
   return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
 }
 float solAt(vec2 g){
@@ -829,19 +865,27 @@ void main(){
   for (int dy = -1; dy <= 1; dy++)
     for (int dx = -1; dx <= 1; dx++) {
       float w = (dx == 0 ? 2.0 : 1.0) * (dy == 0 ? 2.0 : 1.0);
-      fs += w * texelFetch(u_F, clamp(ivec2(g) + ivec2(dx, dy), ivec2(0), ivec2(u_res) - ivec2(1)), 0).r;
+      fs += w * fAt(ivec2(g) + ivec2(dx, dy)).r;
     }
   fs /= 16.0;
 
   // Linear interpolation between columns — the reduction is per-column, and
   // sampling it nearest paints hard vertical colour steps wherever the depth
   // jumps a cell (glaring in the Froude view).
+  //
+  // Under a mean field this is the COLUMN ACCUMULATOR's own <d>, which is what
+  // §6 asks the Froude view for: Fr~ = |u^| / sqrt(g <d>). Its layout is
+  // (<d>, <q>, <eta>, M2) against FS_COL's (bed, d, q, top), so the channel is
+  // chosen here rather than by pointing one sampler at two layouts. Depth is
+  // the only thing this pass wants from the reduction, so depth is all that is
+  // reconciled - the bed and top channels were unpacked here and never read.
   float gx = clamp(g.x - 0.5, 0.0, u_res.x - 1.001);
-  int ci = int(gx);
-  vec4 col4 = mix(texelFetch(u_C, ivec2(ci, 0), 0),
-                  texelFetch(u_C, ivec2(min(ci + 1, int(u_res.x) - 1), 0), 0),
-                  gx - float(ci));
-  float bed = col4.x, dep = col4.y, surf = col4.w;
+  int ci = int(gx), cj = min(ci + 1, int(u_res.x) - 1);
+  float dep = u_avg > 0.5
+    ? mix(texelFetch(u_AC, ivec2(ci, 0), 0).x,
+          texelFetch(u_AC, ivec2(cj, 0), 0).x, gx - float(ci))
+    : mix(texelFetch(u_C,  ivec2(ci, 0), 0).y,
+          texelFetch(u_C,  ivec2(cj, 0), 0).y, gx - float(ci));
 
   // ---- background: a faint metric grid so scale is readable
   vec3 bg = vec3(0.043, 0.055, 0.075);
@@ -882,8 +926,8 @@ void main(){
     water = divg(nrmMid(fr, 1.0));
   } else if (u_mode == 4) {
     ivec2 gi = ivec2(clamp(g, vec2(1.0), u_res - vec2(2.0)));
-    float dwdx = texelFetch(u_U, gi + ivec2(1,0), 0).g - texelFetch(u_U, gi - ivec2(1,0), 0).g;
-    float dudz = texelFetch(u_U, gi + ivec2(0,1), 0).r - texelFetch(u_U, gi - ivec2(0,1), 0).r;
+    float dwdx = uAt(gi + ivec2(1,0)).g - uAt(gi - ivec2(1,0)).g;
+    float dudz = uAt(gi + ivec2(0,1)).r - uAt(gi - ivec2(0,1)).r;
     float vort = (dwdx - dudz) / (2.0 * u_dx);
     water = divg(nrmMid(vort, 0.0));
   } else if (u_mode == 6) {

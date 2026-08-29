@@ -163,7 +163,7 @@ budgets.
 The three accumulators have distinct definitions and uses.
 
 | Product | Accumulated | Cadence | Answers |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Favre display** (§4.1) | `f`, `f u_c`, `f w_c`, `p/ρ_w` | per frame | mean-flow display fields |
 | **Exact transport** (§4.2) | `F^E`, `F^N`, source rate | per substep | discrete mass balance |
 | **Column and overlay** (§4.3) | `d`, `q`, `η`, `M₂` of `η` | per frame | reported measurements and channel overlay |
@@ -375,7 +375,7 @@ range in substep count — log-log slope **0.472** for `‖𝓡‖∞` and **0.4
 the mean, so this is the whole field drifting, not a few outlier cells:
 
 | substeps `n` | `T` (s) | `‖𝓡‖∞` | mean residual | `C` |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 200 | 0.0525 | 2.067×10⁻⁴ | 7.25×10⁻⁶ | 0.439 |
 | 800 | 0.2101 | 4.633×10⁻⁴ | 1.30×10⁻⁵ | 0.538 |
 | 3 200 | 0.8403 | 7.830×10⁻⁴ | 2.47×10⁻⁵ | 0.472 |
@@ -598,7 +598,7 @@ robustness.
 ### Group A — accumulator arithmetic
 
 | # | Case | Expected | Catches |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | A1 | Constant field, N frames | `f̄ = f`, `û = u`, `P̄_diag = P_diag` exactly | wiring, normalisation by `T` |
 | A2 | Alternating `Δt = 1, 3` with `φ = 0, 4` | mean `= 3`, not `2` | frame-count averaging |
 | A3 | Alternating `f = 1, 0` with `u = 10, 0` | `û = 10`, not `5` | Reynolds-averaged velocity |
@@ -609,7 +609,7 @@ robustness.
 ### Group B — compaction and compressibility
 
 | # | Case | Expected | Catches |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | B1 | Hydrostatic column, `η = 1.0`, `c = 25`, consistent `P_EOS` | `d = 1.0` to float precision; raw `Σf̄Δx = 1.00785` | missing `−P̄_EOS/c²`, error 7.9 mm |
 | B2 | Same at `c = 8` | `d = 1.0`; raw `= 1.0766` | missing correction at low celerity |
 | B3 | Pressurised column under a soffit | `f̄ − P̄_EOS/c² = 1` in **every** cell | the identity on its `f > 1` branch |
@@ -620,7 +620,7 @@ robustness.
 `η(t) = η₀ + a sin ωt` over a whole number of periods, sharp interface.
 
 | # | Case | Expected | Catches |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | C1 | Mean depth | `⟨d⟩ = η₀ − z_b` exactly | bias in the window |
 | C2 | Variance via Welford | `σ_η = a/√2 = 0.70711a` | the `M₂` channel |
 | C3 | Band level sets | `η₉₅ = η₀ + 0.98769a`, `η₀₅ = η₀ − 0.98769a` | the arcsine law |
@@ -634,7 +634,7 @@ C6 verifies that the line uses the mean rather than the median.
 ### Group D — falling jets and connectivity
 
 | # | Case | Expected | Catches |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | D1 | Pool + 4-cell air gap + steady nappe (`f = 0.6`) | two bodies; pool depth exact; nappe **excluded** | folding the nappe into the depth |
 | D2 | Gap of 1, 2, 3, 4 dry cells | **bridged, bridged, separated, separated** | the `dry > 2` rule, in both directions |
 | D3 | **Intermittent contact**: nappe bridges for 30% of the window | `⟨d⟩` and `d̄²ᴰ` both computed from the specified fill arrays — including nappe and bridge mass — and asserted to differ by that computed amount | §7.2's manufactured connectivity |
@@ -647,7 +647,7 @@ the nappe and bridge contributions selected by §7.2's fixed rule.
 ### Group E — geometry
 
 | # | Case | Expected |
-|---|---|---|
+| --- | --- | --- |
 | E1 | Perched pool above a lower pool, separated by solid | two bodies, each compacted separately |
 | E2 | Tilted-bed (`S₀`) scene | the reduction is bed-relative and unaffected |
 | E3 | Bed raised above `z = 0` | body found from the lowest **wet** cell, not the lowest non-solid |
@@ -676,7 +676,7 @@ across machines. Advancing it by rendered frames instead makes `T`, and hence
 the residual, a function of how fast the box is.
 
 | # | Case | Expected |
-|---|---|---|
+| --- | --- | --- |
 | F1 | Local transport residual in source-free interior cells | `‖𝓡‖∞` below the §5 window-scaled bound; measured margin ≈ 5–6× at `n = 1200` and `n = 3600`, and scale-invariant in `T` |
 | F2 | `Q̄_F = ΔxΣ_j⟨F^E⟩` along a steady source-free reach with closed vertical boundaries | one value across every section within the F1 bound |
 | F3 | Source-free draining domain with `f(T) ≠ f(0)` | storage-change rate plus signed outward boundary flux is zero |
@@ -688,14 +688,14 @@ the residual, a function of how fast the box is.
 ### Group G — numerical robustness
 
 | # | Case | Expected |
-|---|---|---|
+| --- | --- | --- |
 | G1 | 5 mm wobble on a 1 m datum, `10⁶` increments | Welford `M₂` gives `σ_η` to 3 digits; raw `⟨η²⟩−⟨η⟩²` demonstrably loses it |
 | G2 | Window of `10⁴` s at 60 fps | running mean unbiased; raw sums show drift |
 
 ### Group H — overlay consistency
 
 | # | Case | Expected |
-|---|---|---|
+| --- | --- | --- |
 | H1 | Average active with a fixed `C̄` and a deliberately different live column buffer | `d`, `d_c`, `d_n`, `V`, `Fr`, EGL and profile class use only `C̄` |
 | H2 | Two sample histories with the same final `C̄` but different ordering | Average-mode overlay values are identical; no `sm()`, `_hA`, `_qA` or `_ynK` prefilter remains |
 | H3 | Mean profile containing a hydraulic jump | jump-box position, `d₁`, `d₂` and conjugate-depth result come from `C̄` |
@@ -711,6 +711,15 @@ All three accumulators are zeroed, `T ← 0`, and `f(0)` re-copied, on:
 - switching Average on;
 - `R` / `resetWater`;
 - any geometry edit — `addSeg`, `undoSeg`, `clearSegs`;
+- **anything that opens or closes an edge.** This is the same reset by the same
+  route — `rasterise` is the choke point for both — but it is reached from a
+  different part of the interface, so it is listed separately rather than read
+  into the bullet above. Two paths lead here: the per-edge menus in the
+  Boundaries section, which set the edge outright, and the upstream-reservoir
+  and downstream-tailwater controls in the Flow section, each of which opens
+  its own edge when switched on and closes it again when switched off. An
+  opened or closed edge is a different control volume, so the window that was
+  accumulating across the old one has ended;
 - a **valve toggle**. The flag does not touch the rasterised mask, but every
   shader's `SO()` and the residual's own `solidLo` read it, so flipping it
   reclassifies every valve texel between solid and open. That is a change of
@@ -746,12 +755,13 @@ the equivalent depth part: a reading that appeared and vanished as the pointer
 moved would read as a glitch, and `δ_a = 0` is itself the statement that the two
 agree in that column.
 
-It must also say what ends a window. Every condition above is one a reader can
-reason about from the thing they just did, except one: the four boundary-open
-checkboxes in the Controls panel read as settings rather than as edits, and
-they go through `rasterise`, so ticking one mid-window sends `T` back to zero
-with nothing on screen to connect the two. The card names them among the reset
-conditions for that reason.
+It must also say what ends a window. Every condition in the list above is one a
+reader can connect to the thing they just did, with one exception: anything
+that opens or closes an edge. Those controls read as settings rather than as
+edits — nothing about picking *Outfall* from a menu, or switching a tailwater
+on, looks like moving a wall — and yet each of them goes through `rasterise`
+and sends `T` back to zero. The card names that whole class for that reason,
+rather than naming the individual controls, which would date.
 
 **Two things this section previously asked the legend for are deliberately not
 on it.** The residuals of §5 and the 1D/2D depth discrepancy of §7.2 both go
@@ -771,7 +781,7 @@ emergent rather than prescribed.
 ## 10 · Cost
 
 | | Per frame | Per substep | Memory |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Favre display | 1 fullscreen pass | — | `RGBA32F` ping-pong, 22 MB at Ultra |
 | Exact transport | — | 1 texture read + write inside `FS_VOF` | `RGBA32F` ping-pong, 22 MB at Ultra |
 | Column and overlay | 1 pass on `nx × 1` | — | negligible |

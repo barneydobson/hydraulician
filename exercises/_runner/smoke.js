@@ -164,6 +164,68 @@ const GPU_MUTANTS = [
     replace: "    S.p.valveClosed = v;",
     kills: "avg a valve toggle resets the window",
     measured: "T runs straight through the toggle instead of returning to zero" },
+
+  // -------- RECON-vs-GLSL differential mutants (closing the mirror gap) --------
+  { id: "col-wet-threshold", file: "/js/shaders.js",
+    why: "FS_COL's dry test is loosened, so interface cells RECON still counts as wet " +
+         "(f in [0.25, 0.55)) get walked past as dry",
+    find: "if (f < 0.25) { dry++; if (dry > 2) break; continue; }",
+    replace: "if (f < 0.55) { dry++; if (dry > 2) break; continue; }",
+    kills: "RECON vs FS_COL bed/depth",
+    measured: "depth OK drops from 459/459 to 324/459; worst depth gap 1.66e-1 m against a " +
+            "1e-5 m gate, four orders of magnitude over -- bed stays exact (7.2e-8 m) because " +
+            "only the WET walk moved, not the bed search" },
+
+  { id: "acol-weight-denominator", file: "/js/shaders.js",
+    why: "FS_ACOL's running-mean weight drops dt from its own denominator (h/T instead of h/(T+h))",
+    find: "vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)\n  float k = u_dt / max(u_T + u_dt, 1e-9);",
+    replace: "vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)\n  float k = u_dt / max(u_T, 1e-9);",
+    kills: "FS_ACOL's running mean matches RECON.accumStep",
+    measured: "the recursion blows up (T never appears in its own denominator's history): " +
+            "dD 1.17e4, dE 2.38e4 against a 5e-6 gate, and it collaterally breaks avgColumns() " +
+            "everywhere downstream -- dbar/d ratio -1759 instead of ~1, sigma_eta reads 0" },
+
+  { id: "acol-channel-swap", file: "/js/shaders.js",
+    why: "FS_ACOL writes qbar and etabar into each other's channels",
+    find: "o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
+    replace: "o = vec4(dN, eN, qN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
+    kills: "the aeration-gap agreement check",
+    measured: "worst |delta_a| 3.30e-1 m (20 cells) against an 8-cell gate, because the surface " +
+            "channel now holds the discharge; it also collaterally kills the accumulator-weight " +
+            "synthetic check (dE 1.00, dSigma 0.96 against 5e-6 gates) since that test reads the " +
+            "same eta channel" },
+
+  { id: "rig-no-flux", file: "/js/rig.js",
+    why: "RIG.snapshot() drops the flux array — the actual gap this review closed",
+    find: "      flux: state.flux.map((L) => [r4(L.x0), r4(L.z0), r4(L.x1), r4(L.z1)]),\n",
+    replace: "",
+    kills: "rig flux sections round-trip",
+    measured: "before [[11.2,...],[13.6,...]] -> after [] (snapLen 0): both sections vanish outright, " +
+            "not merely drift" },
+
+  { id: "rig-no-cvshow", file: "/js/rig.js",
+    why: "RIG.snapshot() drops ui.cvShow — the other half of the gap this review closed",
+    find: "            cvShow: state.cvShow,\n",
+    replace: "",
+    kills: "rig cvShow round-trips",
+    measured: "before M -> after Q: the scramble value survives the round trip untouched" },
+
+  { id: "rig-no-gauges-restore", file: "/js/rig.js",
+    why: "RIG.apply() stops restoring gauges from the snapshot",
+    find: "    (o.gauges || []).slice(0, 4).forEach((g) => {",
+    replace: "    ([]).slice(0, 4).forEach((g) => {",
+    kills: "rig gauges round-trip",
+    measured: "before [[4.8,...],[9.6,...]] -> after []: both gauges vanish outright" },
+
+  { id: "rig-new-unmapped-placer", file: "/js/main.js",
+    why: "a FIFTH place* API appears on APP with nobody having taught the rig " +
+         "coverage test where it lives — the exact shape of gap the reflection check exists for",
+    find: "  placeCV,                                 // the control volume, headless",
+    replace: "  placeCV, placeFoo: () => {},             // the control volume, headless",
+    kills: "rig's coverage test is not silently missing a placement API",
+    measured: "placers: placeGauge,placeRake,placeCV,placeFoo,placeFlux -- unmapped: placeFoo. " +
+            "The reflection genuinely notices a place* function nobody taught this test about, " +
+            "and fails instead of silently skipping it." },
 ];
 
 const MUTATE = (process.argv.find((a) => a.startsWith("--mutate=")) || "")
@@ -519,6 +581,112 @@ SUITES.rig = async (B) => {
   ok("RIG gauge CSV header uses z and the h/d columns",
     /_z0\.40_h_m/.test(csv) && /_d_m/.test(csv) &&
     !/_head_m/.test(csv) && !/_depth_m/.test(csv), csv);
+
+  // -------------------------------------------------------- instrument coverage
+  //
+  // Everything above asserts NOTATION (z/vz, h/d) and the VERSION gate, plus
+  // one round-tripped scalar. None of it asserts COVERAGE — that every
+  // DURABLE placed instrument actually survives a save/load. That gap is how
+  // flux sections went unstored for a long time: RIG.snapshot()/apply() (in
+  // js/rig.js) has just been fixed to carry a `flux` array and `ui.cvShow`,
+  // and nothing here checked either one.
+  //
+  // Two things below. First, a reflection-based inventory: enumerate the
+  // `place*` functions APP actually exposes, rather than hand-listing them,
+  // so a FIFTH instrument type (a future placeX) is picked up by this
+  // enumeration and — because it will not be in the KNOWN map below — makes
+  // the coverage assertion fail LOUDLY, the same "silently not there" gate
+  // check_pack.py already enforces for exercise UI profiles (AGENTS.md).
+  // This is honestly only half-general: it discovers that a new placer
+  // EXISTS, but a person still has to teach this test its arguments and
+  // where it lands in `state` before it can be checked for real — it cannot
+  // guess either. What it prevents is the silent version of that gap: an
+  // unmapped placer fails the build instead of nobody noticing.
+  //
+  // Second, a real round trip: place a control volume, TWO flux sections and
+  // TWO gauges (plus a rake, since placeRake is part of the same reflected
+  // list) with distinct, known coordinates; snapshot; scramble the live
+  // state; apply the snapshot back; and diff the LIVE STATE — not the
+  // snapshot JSON — before against after. Diffing the live state is what
+  // makes this catch total omission: a key RIG.snapshot() never writes at
+  // all would still round-trip an internally-consistent (empty) JSON, but it
+  // would not reproduce the live state that was actually placed.
+  const cov = await B.evaluate(`(() => {
+    APP.loadScene("m2", false);
+    const W = APP.sim.W, H = APP.sim.H;
+    const placers = Object.keys(APP).filter((k) => /^place[A-Z]/.test(k) && typeof APP[k] === "function");
+    // Known instrument -> [the args this test places it with, how to read
+    // its result back out of the LIVE state]. Extend this the day a new
+    // place* lands, or the "fully catalogued" assertion below fails on purpose.
+    const KNOWN = {
+      placeGauge: { read: () => APP.state.gauges.map((g) => [g.x, g.z]) },
+      placeRake:  { read: () => APP.state.rakes.map((k) => k.x) },
+      placeCV:    { read: () => APP.state.cv
+                      ? [APP.state.cv.x0, APP.state.cv.z0, APP.state.cv.x1, APP.state.cv.z1] : null },
+      placeFlux:  { read: () => APP.state.flux.map((L) => [L.x0, L.z0, L.x1, L.z1]) },
+    };
+    const unmapped = placers.filter((p) => !KNOWN[p]);
+
+    APP.state.gauges.length = 0; APP.state.rakes.length = 0;
+    APP.state.cv = null; APP.state.flux.length = 0;
+    APP.placeGauge(0.30 * W, 0.20 * H); APP.placeGauge(0.60 * W, 0.35 * H);
+    APP.placeRake(0.45 * W);
+    APP.placeCV(0.15 * W, 0.05 * H, 0.45 * W, 0.55 * H);
+    APP.placeFlux(0.70 * W, 0.05 * H, 0.70 * W, 0.55 * H);
+    APP.placeFlux(0.85 * W, 0.05 * H, 0.85 * W, 0.55 * H);
+    APP.state.cvShow = "M";
+
+    const before = {};
+    for (const p of placers) if (KNOWN[p]) before[p] = KNOWN[p].read();
+    before.cvShow = APP.state.cvShow;
+
+    const snap = APP.RIG.snapshot();
+    // Scramble every live location the round trip is supposed to restore.
+    APP.state.gauges.length = 0; APP.state.rakes.length = 0;
+    APP.state.cv = null; APP.state.flux.length = 0; APP.state.cvShow = "Q";
+    APP.RIG.apply(snap);
+
+    const after = {};
+    for (const p of placers) if (KNOWN[p]) after[p] = KNOWN[p].read();
+    after.cvShow = APP.state.cvShow;
+
+    const maxDiff = (a, b) => {
+      if (a === null || b === null) return a === b ? 0 : Infinity;
+      if (Array.isArray(a) && Array.isArray(b)) {
+        if (a.length !== b.length) return Infinity;
+        let m = 0;
+        for (let i = 0; i < a.length; i++) m = Math.max(m, maxDiff(a[i], b[i]));
+        return m;
+      }
+      return Math.abs(a - b);
+    };
+    const diffs = {};
+    for (const p of placers) if (KNOWN[p]) diffs[p] = maxDiff(before[p], after[p]);
+
+    return { placers, unmapped, before, after, diffs,
+             snapFluxLen: (snap.flux || []).length,
+             snapCvShow: snap.ui && snap.ui.cvShow };
+  })()`);
+  ok("rig's coverage test is not silently missing a placement API",
+     cov.unmapped.length === 0,
+     "placers: " + cov.placers.join(",") + "  unmapped: " + cov.unmapped.join(","));
+  ok("rig round-trips the control volume position",
+     (cov.diffs.placeCV || 0) < 1e-4, JSON.stringify({ before: cov.before.placeCV, after: cov.after.placeCV }));
+  ok("rig round-trips both flux sections, positions included",
+     cov.before.placeFlux.length === 2 && cov.after.placeFlux.length === 2 &&
+     (cov.diffs.placeFlux || 0) < 1e-4 && cov.snapFluxLen === 2,
+     JSON.stringify({ before: cov.before.placeFlux, after: cov.after.placeFlux, snapLen: cov.snapFluxLen }));
+  ok("rig round-trips both gauges, positions included",
+     cov.before.placeGauge.length === 2 && cov.after.placeGauge.length === 2 &&
+     (cov.diffs.placeGauge || 0) < 1e-4,
+     JSON.stringify({ before: cov.before.placeGauge, after: cov.after.placeGauge }));
+  ok("rig round-trips the rake station",
+     cov.before.placeRake.length === 1 && cov.after.placeRake.length === 1 &&
+     (cov.diffs.placeRake || 0) < 1e-4,
+     JSON.stringify({ before: cov.before.placeRake, after: cov.after.placeRake }));
+  ok("rig round-trips which quantity the control volume/sections read (cvShow)",
+     cov.before.cvShow === "M" && cov.after.cvShow === "M" && cov.snapCvShow === "M",
+     JSON.stringify({ before: cov.before.cvShow, after: cov.after.cvShow, snap: cov.snapCvShow }));
 };
 
 SUITES.physics = async (B) => {
@@ -578,6 +746,26 @@ SUITES.physics = async (B) => {
              HFalls: A.H[wet[0]] > A.H[wet[wet.length - 1]] };
   })()`);
   ok("PHYSICS m1 has a wet reach to measure", flow.n > 50, flow.n + " columns");
+  // ASSERT THE SETTLE, before asserting anything measured on it.
+  //
+  // `__settle` gives up on wall clock and reports what it reached — deliberately,
+  // because a test that says "settled to 12 s of 30" is debuggable and one that
+  // hangs is not. But nothing used to CHECK the number it returned, so a machine
+  // too slow to reach t = 30 did not fail here: it fell through to the discharge
+  // assertion below and failed THAT, on a backwater curve still visibly filling.
+  // The reading was blamed for the settle, which sent at least one reader
+  // looking for a conservation bug that was not there.
+  //
+  // If this is the assertion that fails, the physics below is untested, not
+  // wrong. The usual cause is the rasteriser: smoke.js runs Chrome with
+  // `--disable-gpu` (SwiftShader), while test/cdp.mjs passes
+  // `--use-angle=d3d11` and reaches t = 30 on this same scene in about 7 s of
+  // wall clock. Measured on a Windows laptop, m1 at Low, 828 x 64: ANGLE gets
+  // to t = 30 in 6.5 s; SwiftShader reaches roughly t = 9.5 in the full 150 s
+  // budget, about 50x slower. Raise the budget, or give this harness the GPU.
+  ok("PHYSICS m1 settled to the time its readings are taken at", flow.t >= 29.5,
+    `reached t = ${flow.t.toFixed(1)} s of 30 — the wall-clock budget in ` +
+    `__settle ran out first, so every reading below is of an unsettled reach`);
   ok("PHYSICS discharge holds one value along the reach",
     flow.med > 0 && (flow.qHi - flow.qLo) / flow.med < 0.8,
     `q ${flow.qLo.toFixed(3)}–${flow.qHi.toFixed(3)}, median ${flow.med.toFixed(3)} m²/s` +
@@ -1379,6 +1567,208 @@ SUITES.avg = async (B) => {
   ok("sigma_eta has something to measure", cs.n > 10, JSON.stringify(cs));
   ok("sigma_eta matches an independent float64 weighted Welford",
      cs.worst < 1e-3, JSON.stringify(cs));
+
+  // ============================================== RECON vs GLSL: closing the mirror gap
+  //
+  // js/reconstruct.js's own header says "the GLSL accumulators implement the
+  // SAME formulae, and test/recon-test.mjs is what pins them down" — but
+  // nothing before this compared RECON's output to the GPU's. Production
+  // code calls only RECON.sigma (above, in avgColumns) and RECON.aerationGap
+  // (the legend's cursor readout); the other nine functions and the WET /
+  // DRY_BREAK / SURF constants were exercised only by the CPU-only test
+  // suite. The three blocks below run RECON on the SAME data the GPU pass
+  // consumed and compare outputs directly, so a drifted threshold or a
+  // mis-weighted recursion in the shader shows up here even though every
+  // gate above it stays green.
+
+  // ---- (a) column compaction: RECON.bodies / RECON.bodyDepth vs FS_COL ----
+  //
+  // Compared against the INSTANTANEOUS columns (SIM.columns()), not the
+  // averaged ones. avgColumns() accumulates FS_COL's OWN OUTPUT (js/sim.js's
+  // avgStepColumns comment; docs/averaging.md §4.3/§7.2) precisely because
+  // connectivity on a time-averaged fill is ill-posed — a nappe touching a
+  // pool for part of a window leaves mean fill joining bodies that were
+  // never joined at any instant. So running RECON's connectivity walk on a
+  // raw MEAN fill and comparing to avgColumns() would check two different
+  // questions and could fail for reasons that have nothing to do with
+  // RECON/FS_COL agreement. The honest comparison is RECON's walk against
+  // FS_COL's per-frame reduction on the SAME instantaneous F/mask snapshot.
+  //
+  // FS_COL does not call anything like RECON.geomFill: it walks raw
+  // min(f,1), with no pressure compaction (that correction — §7.1 — only
+  // means something for the time-averaged fill). So the CPU mirror here
+  // feeds RECON.bodies / RECON.bodyDepth gcol = min(f,1) directly, with the
+  // same WET=0.25 / DRY_BREAK=3 thresholds RECON exports specifically so
+  // nothing else has to restate them.
+  const rc = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    const S = APP.sim, nx = S.nx, ny = S.ny, dx = S.dx;
+    const gl = document.querySelector("canvas").getContext("webgl2");
+    const live = Float32Array.from(APP.SIM.columns(true));   // (bed, d, q, top); colBuf is reused, so copy it
+    const F = new Float32Array(nx * ny * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, F);
+    // FS_COL's SO(), in the CPU idiom this file already uses elsewhere for
+    // the same test (js/sim.js's own boxForce/lineFlux helpers): a fully
+    // solid mask texel, or a valve texel while the valve is shut.
+    const closed = S.p.valveClosed > 0.5;
+    const gcol = new Float64Array(ny), solid = new Uint8Array(ny);
+    let nWet = 0, bedOK = 0, depthOK = 0, worstBed = 0, worstDepth = 0, atI = -1;
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        const m = S.mask[j * nx + i];
+        solid[j] = (m > 192 || (closed && m > 64)) ? 1 : 0;
+        gcol[j] = solid[j] ? 0 : Math.min(F[(j * nx + i) * 4], 1.0);
+      }
+      const bodies = RECON.bodies(gcol, solid, ny);
+      const gpuBed = live[i * 4], gpuD = live[i * 4 + 1];
+      if (!bodies.length) { if (gpuD === 0) depthOK++; continue; }         // both agree: dry
+      nWet++;
+      const b0 = bodies[0];                    // FS_COL only ever walks the FIRST body from the bed
+      const cpuBed = b0.j0 * dx, cpuD = RECON.bodyDepth(gcol, b0.j0, b0.j1, dx);
+      const dBed = Math.abs(cpuBed - gpuBed), dDepth = Math.abs(cpuD - gpuD);
+      if (dBed > worstBed) worstBed = dBed;
+      if (dDepth > worstDepth) { worstDepth = dDepth; atI = i; }
+      // Tolerances: the bed is one integer cell index times dx, read back
+      // through a float32 texture on both sides, so the only source of
+      // disagreement is a single ULP of dx — measured 7.2e-8 m on h23/Low
+      // (dx there is a few cm). Depth is a float32 SUM of up to ny wet
+      // terms (ny ~ 100 here) each O(dx), so its rounding floor is ~ny
+      // times dx's ULP — measured 7.1e-7 m, against a ~3e-7 m back-of-
+      // envelope (ny * dx * 2^-23). Both gates sit at ~10x the measured
+      // worst case: a real threshold/DRY_BREAK drift (the col-wet-threshold
+      // mutant) misses by orders of magnitude, not a factor of a few.
+      if (dBed < 1e-6) bedOK++;
+      if (dDepth < 1e-5) depthOK++;
+    }
+    return { nx, ny, nWet, bedOK, depthOK, worstBed, worstDepth, atI };
+  })()`);
+  console.log(`\n    RECON vs FS_COL: ${rc.nWet}/${rc.nx} wet columns, bed OK ${rc.bedOK}, ` +
+    `depth OK ${rc.depthOK}, worst bed gap ${rc.worstBed.toExponential(3)} m, ` +
+    `worst depth gap ${rc.worstDepth.toExponential(3)} m (column ${rc.atI}, ny=${rc.ny})`);
+  ok("RECON.bodies finds a wet column wherever FS_COL does", rc.nWet > 100, JSON.stringify(rc));
+  ok("RECON's bed matches FS_COL's bed exactly (same integer cell)",
+     rc.bedOK === rc.nx, JSON.stringify(rc));
+  ok("RECON.bodyDepth matches FS_COL's own depth reduction",
+     rc.depthOK === rc.nx, JSON.stringify(rc));
+
+  // ---- (b)/(c) the accumulator weight and Welford moment, RECON vs GPU ----
+  //
+  // §4.4's running-mean weight h/(T+h) and the Welford second moment are
+  // exercised in production only through avgColumns()'s call to RECON.sigma
+  // — nothing drives RECON.accumStep or RECON.welford themselves against the
+  // GPU. The natural substep/frame loop cannot pin this down honestly:
+  // APP.frames() — the column accumulator's own cadence — advances by a
+  // machine-dependent dt each frame, so a sequence driven that way is not
+  // reproducible and could not be replayed sample-for-sample on the CPU.
+  //
+  // Instead this drives SIM.avgStepColumns(dt) DIRECTLY, off the frame loop
+  // entirely: a synthetic column buffer is written straight into S.colTex
+  // with texSubImage2D (the same technique the display-path test above
+  // uses), paired with an EXPLICIT, hand-chosen dt sequence that is
+  // deliberately NOT constant — so this is not the degenerate case where
+  // h/(T+h) collapses to the plain arithmetic-mean weight 1/n and would
+  // pass a broken denominator by accident. Every phi and every dt is a
+  // number this test chose, so the CPU replay via RECON.accumStep /
+  // RECON.welford / RECON.sigma is comparing against a fully known target.
+  const aw = await B.evaluate(`(() => {
+    const S = APP.sim, nx = S.nx, gl = document.querySelector("canvas").getContext("webgl2");
+    APP.SIM.avgStart();                      // also (re)builds S.colTex, via snapshotBed's columns(true)
+    const N = 80;
+    const buf = new Float32Array(nx * 4);
+    let T = 0, meanD = 0, meanE = 0, M2 = 0;
+    for (let k = 0; k < N; k++) {
+      const dtK  = 0.0015 * (1 + 0.6 * Math.sin(1.7 * k + 0.3));   // 0.6-2.4 ms, chosen, not simulated
+      const phiD = 1.0 + 0.4 * Math.sin(0.9 * k);
+      const phiE = 2.0 + 0.05 * Math.sin(1.3 * k + 1.1);
+      for (let i = 0; i < nx; i++) { buf[i*4] = 0; buf[i*4+1] = phiD; buf[i*4+2] = 0; buf[i*4+3] = phiE; }
+      gl.bindTexture(gl.TEXTURE_2D, S.colTex);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, nx, 1, gl.RGBA, gl.FLOAT, buf);
+      APP.SIM.avgStepColumns(dtK);
+      const meanEnew = RECON.accumStep(meanE, phiE, T, dtK);
+      M2 = RECON.welford(M2, meanE, meanEnew, phiE, dtK);
+      meanD = RECON.accumStep(meanD, phiD, T, dtK);
+      meanE = meanEnew;
+      T += dtK;
+    }
+    const { C, sigma } = APP.SIM.avgColumns(true);
+    const sigmaRef = RECON.sigma(M2, T);
+    const mid = nx >> 1;                     // any column: the synthetic signal is uniform in i
+    const gotD = C[mid*4+1], gotE = C[mid*4+3], gotSigma = sigma[mid];
+    const err = gl.getError();
+    APP.SIM.avgStop();
+    return { T, meanD, meanE, sigmaRef, gotD, gotE, gotSigma, err,
+             dD: Math.abs(gotD - meanD), dE: Math.abs(gotE - meanE),
+             dSigma: Math.abs(gotSigma - sigmaRef) };
+  })()`);
+  console.log(`    accumulator weight: T=${aw.T.toFixed(4)}s dD=${aw.dD.toExponential(3)} ` +
+    `dE=${aw.dE.toExponential(3)} dSigma=${aw.dSigma.toExponential(3)} ` +
+    `(cpu mean ${aw.meanD.toFixed(6)}/${aw.meanE.toFixed(6)}, sigma ${aw.sigmaRef.toExponential(4)})`);
+  ok("the synthetic drive left no GL error", aw.err === 0, JSON.stringify(aw));
+  // Measured on this run: dD 4.46e-7, dE 1.98e-7 over 80 steps of float32
+  // GPU recursion vs a float64 CPU replay of the identical formula — the gap
+  // is pure float32-vs-float64 rounding, not model error, so it should stay
+  // near a few ULPs of the O(1-2) magnitude values involved (~2.4e-7 each).
+  // Gated at 5e-6, about 10x-25x the measured value: the acol-weight-
+  // denominator mutant (dropping dt from the weight's denominator) misses by
+  // several ORDERS of magnitude, not a small multiple, because it injects a
+  // genuinely different recursion rather than a rounding difference.
+  ok("FS_ACOL's running mean matches RECON.accumStep for a fully known, non-constant dt sequence",
+     aw.dD < 5e-6 && aw.dE < 5e-6, JSON.stringify(aw));
+  // Measured dSigma 1.91e-8 against a sigma of ~3.5e-2 -- six orders of
+  // magnitude of headroom before the 5e-6 gate, because M2 is a SUM (not a
+  // recursion with cancellation) so float32/float64 rounding barely
+  // accumulates over 80 terms. The welford-naive mutant (which drops the
+  // dt weight from the M2 update entirely) is the documented kill for this
+  // shape of bug and misses by 3+ orders of magnitude (see its own entry).
+  ok("FS_ACOL's Welford moment matches RECON.welford/RECON.sigma on the same sequence",
+     aw.dSigma < 5e-6, JSON.stringify(aw));
+
+  // ---- (d) the aeration-gap identity, across the whole column array -------
+  //
+  // RECON.aerationGap(etaBar, bed, dBar) = etaBar - (bed + dBar) IS the
+  // identity docs/averaging.md §7.3 states (η̄ − z_b = d̄ + δ_a) by
+  // construction, so calling it back on the numbers it was given proves
+  // nothing about the numbers themselves — that would be circular. What is
+  // worth pinning is that avgColumns()'s three channels — an independently
+  // accumulated depth and an independently accumulated surface level — agree
+  // with EACH OTHER: in an ordinary (non-aerated, singly-connected) column
+  // the surface line has to sit within a cell or two of bed + mean depth.
+  // Production only ever evaluates this at the cursor cell (js/main.js's
+  // legend readout); this checks it over the whole array.
+  const ag = await B.evaluate(`(() => {
+    __low(); APP.tick(600);
+    APP.SIM.avgStart(); APP.frames(240);
+    const { C } = APP.SIM.avgColumns();
+    const live = APP.SIM.columns(true);
+    const S = APP.sim, nx = S.nx, dx = S.dx;
+    let nWet = 0, worst = 0, atI = -1;
+    const gaps = [];
+    for (let i = 2; i < nx - 2; i++) {
+      if (!(live[i*4+1] > 5 * dx)) continue;         // a clear single body, well clear of the bed
+      const bed = C[i*4], dBar = C[i*4+1], etaBar = C[i*4+3];
+      const da = RECON.aerationGap(etaBar, bed, dBar);
+      gaps.push(da);
+      nWet++;
+      if (Math.abs(da) > worst) { worst = Math.abs(da); atI = i; }
+    }
+    APP.SIM.avgStop();
+    return { nWet, worst, atI, dx, finite: gaps.every(Number.isFinite) };
+  })()`);
+  console.log(`    aeration gap: ${ag.nWet} columns, worst |delta_a| = ${ag.worst.toExponential(3)} m ` +
+    `(${(ag.worst/ag.dx).toFixed(2)} cells) at i=${ag.atI}`);
+  ok("aeration gap is finite everywhere it is evaluated", ag.finite && ag.nWet > 50, JSON.stringify(ag));
+  // Measured on h23/Low across several runs: worst |delta_a| 1.4-2.4 cell
+  // widths (2.3e-2 - 3.9e-2 m), always near the downstream sponge/outfall
+  // reach where the surface is least settled and the run-to-run water state
+  // varies most (this block runs late in a long shared session, after many
+  // earlier blocks have nudged the flow). Gated at 8 cells, ~3x the worst
+  // measured value: a channel swap between the q-bar and eta-bar channels
+  // (the acol-channel-swap mutant) puts the DISCHARGE where the surface
+  // elevation belongs, which is METRES away from bed + depth on this scene
+  // -- two more orders of magnitude than the gate, not a small multiple.
+  ok("the surface line and the mean depth agree to a few cells in a simple settled reach",
+     ag.worst < 8 * ag.dx, JSON.stringify(ag));
 
   // The channel overlay (Task 8): OVERLAY.analyse() already filters three
   // ways — a spatial prefilter, a temporal EMA (_hA/_qA) and an EMA on the

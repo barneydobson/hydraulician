@@ -84,6 +84,39 @@
  *   settle   sim-seconds to wait, from the demo's verification record. The
  *            picker runs the solver flat out for this long, exactly as a
  *            scene's own `spinup` does, so it is not a wall-clock wait.
+ *   rigWhy   why a `rigParams` value is what it is, keyed by the same control
+ *            id — "at the stock 0.16 the tanks equalise in 2–6 s and there is
+ *            nothing to time". Maintenance prose, like `instruments[].why`:
+ *            NOT printed on the card. It exists so the next person to touch a
+ *            load-bearing constant knows what it is holding up.
+ *   secondScene  an optional coda the card offers as a suggestion — {scene,
+ *            when}. Nothing is applied; the student switches by hand from the
+ *            Scenes menu, and `when` is the sentence that says why.
+ *   ui       the UI PROFILE: what of the interface this exercise wants in
+ *            front of a student (UIMODE in js/main.js). Families are `build`,
+ *            `measure` and `view` — each `true`, `false`, or the list of tool
+ *            ids that survive — plus `fields` (which colourings the legend
+ *            offers), `panel` ("full" / "focused" / "shut") and `readouts`
+ *            ({gauges, cursor, status}).
+ *
+ *            MOSTLY IT IS DERIVED, so most entries carry no `ui` at all.
+ *            `instruments` narrows MEASURE to the tools it names; an entry
+ *            naming no build tool loses BUILD, on the reasoning that an
+ *            exercise arrives with its rig already built; and the panel opens
+ *            focused on the sections its own controls live in. What you write
+ *            here is merged ON TOP of that derivation.
+ *
+ *            SO: a card whose `task` or `setup` tells a student to draw, cut,
+ *            erase or move something MUST say `ui: { build: true }` or name a
+ *            build tool in `instruments`. Otherwise the derivation takes the
+ *            tools away and the student is told "Erase is off for this
+ *            exercise" by a card that just told them to erase. check_pack.py
+ *            fails the pack over it, because the alternative is a tool that is
+ *            silently not there.
+ *
+ *            A profile is never a cage — the `⋯` on the strip restores
+ *            everything in one click, which is what keeps the standing
+ *            acceptance test (the sandbox reproduces any scene by hand) true.
  *
  * HOW SHORT `start` AND `task` ARE IS THE POINT. This pack is read in a lecture
  * theatre by somebody whose lecturer is already saying what to do, or at home
@@ -451,6 +484,11 @@ const EXERCISES = [
       { tool: "gauge", where: "x = 3.0 m, z = 0.60 m", why: "the flange, 1.0 m downstream of the pump" },
       { tool: "gauge", where: "x = 0.9 m, z = 1.0 m", why: "the sump's open water — H is gauge 1 minus gauge 2" },
     ],
+    // Step 3 MOVES the spout, and the panel cannot: spoutOn/R/Vx/Vy are all
+    // there, but the spout's POSITION is set only by dragging with the Spout
+    // tool. The two gauges above would otherwise derive a measure-only profile
+    // and take the one tool the sequence depends on off the strip.
+    ui: { build: true },
     start: "a sump, a drawn rising main and a delivery tank, spout off",
     task: "Prime the rising main as below, then set your own spout velocity and read Q by hovering the low-run bore and H as gauge 1 minus gauge 2.",
     settle: 10,
@@ -676,6 +714,10 @@ const EXERCISES = [
       { tool: "gauge", where: "x ≈ 0.9 m, z ≈ 0.30 m", why: "tank 1 — the fall you time" },
       { tool: "gauge", where: "x ≈ 4.6 m, z ≈ 0.30 m", why: "tank 2 — the level it is finding" },
     ],
+    // Step 1 moves tank 2's far wall and step 2 slams the valve, so Wall,
+    // Erase and Valve all have to stay. The instruments above are gauges
+    // only, and without this the derived profile would hide BUILD entirely.
+    ui: { build: true },
     start: "twin tanks joined by a valved pipe, both empty",
     task: "Follow the steps to fill and isolate, then press V and time tank 1 falling from 2.00 m to your own h*.",
     settle: 5,
@@ -776,6 +818,10 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "x ≈ 4.25 m, z ≈ 1.62 m", why: "the chamber at crest level — first spill is this gauge ≥ crest + 1 cell" },
     ],
+    // The task says "cut your own throttle" and the setup spends two steps on
+    // the erase brush, so BUILD stays. The single gauge above would otherwise
+    // derive a measure-only profile and the Erase tool would not be there.
+    ui: { build: true },
     start: "a sewer feeding a CSO chamber with a spill crest",
     task: "Cut your own throttle, pre-charge at dry-weather flow, then ramp the storm inflow until the chamber first spills over the crest, and read q off the hover over the sewer.",
     settle: 20,

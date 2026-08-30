@@ -10,4 +10,8 @@ exercises/*/_archive/
 
 .DS_Store
 
+# Python bytecode from the exercise collectors and the CDP runner — build
+# artefacts in a project that has no build step.
+__pycache__/
+
 tmp/

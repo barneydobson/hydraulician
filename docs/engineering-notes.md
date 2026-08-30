@@ -187,6 +187,48 @@ the depth sat perfectly steady. Symptoms to watch for: `q` rising monotonically
 downstream in a steady state; total volume constant while inflow ≠ outflow.
 `APP.volume()` plus a face-flux integral is how it was found.
 
+## The column flux is conserved only IN THE MEAN
+
+Integrate continuity over a column and the bed/surface fluxes drop out:
+
+```
+    d/dt ( integral f dz )  +  d/dx ( integral f u dz )  =  0
+```
+
+so `q = ∫ f u dz` is uniform along `x` **only where the column storage is
+steady**. It never is instantaneously — the free surface wobbles, and that
+wobble is a real `∂d/∂t`, not noise to be tolerated away. Two consequences
+that have both cost time:
+
+- **It is a MASS flux, not a discharge.** `f` doubles as the density, so the
+  conserved integral is `∫ f u dz`. `FS_COL` computes that — but it used to
+  feed it a fill clamped to 1, discarding the mass in over-full cells, which
+  is exactly the compressible part. Depth wants the clamped fill; the flux
+  wants the real one. They are different questions and now use different
+  variables.
+- **Averaging is not optional.** Measured on m1 at Low, settled, spread of the
+  column flux over the middle 60% as a fraction of its median:
+
+| window | one frame | 1 s | 2 s | 5 s | 10 s | 20 s |
+| --- | --- | --- | --- | --- | --- | --- |
+| spread | 0.1115 | 0.0585 | 0.0406 | 0.0308 | 0.0132 | **0.0022** |
+
+  Monotone in `T`, converging on zero. The 0.2% left at 20 s is the scheme's
+  real error, and it reproduces (0.0020 / 0.0019 / 0.0019 on three runs). A
+  reading taken on one frame is not a worse measurement of the same thing — it
+  is a measurement of a different thing, and no tolerance makes it right.
+
+This is what issue #46 actually was. A 2.6x spread looked like a conservation
+bug; it was an unsettled scene read on a single frame. `smoke.js --only=physics`
+now settles, opens a 20 s averaging window, and gates the spread at 0.01 —
+where the old gate was 0.8.
+
+One trap when you measure this yourself: use `analyse().qRaw`, not
+`analyse().q`. `analyse` carries its own 10% EMA over the column reduction to
+steady the drawn profile against roll waves, so a single call on the mean
+columns is still 90% full of the live frames before it — enough to report
+0.03 where the mean columns give 0.002.
+
 ## Enclosed voids: holes inside the water are REAL, not a drawing artefact
 
 Run `jet` or `h23` for twenty seconds and there are cells of pure air sitting

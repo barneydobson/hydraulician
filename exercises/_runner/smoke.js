@@ -774,21 +774,42 @@ SUITES.physics = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=m1`);
   const flow = await B.evaluate(`(() => {
     __low();
-    const t = __settle(30, 150000);
-    const A = __warm(20);
-    const nx = A.d.length, lo = Math.floor(nx * 0.2), hi = Math.floor(nx * 0.8);
-    const wet = [];
-    for (let i = lo; i < hi; i++) if (A.ok[i] && A.d[i] > 3 * APP.sim.dx) wet.push(i);
-    const q = wet.map((i) => A.q[i]).filter(Number.isFinite).sort((a, b) => a - b);
-    const med = q[q.length >> 1];
-    const third = Math.floor(wet.length / 3);
-    const medOf = (arr) => { const s = arr.slice().sort((a, b) => a - b); return s[s.length >> 1]; };
-    const qUp = medOf(wet.slice(0, third).map((i) => A.q[i]));
-    const qDn = medOf(wet.slice(-third).map((i) => A.q[i]));
-    const mid = wet[Math.floor(wet.length / 2)];
-    return { t, n: wet.length, qLo: q[0], qHi: q[q.length - 1], med, qUp, qDn,
-             dMid: A.d[mid], dcMid: A.dc[mid],
-             HFalls: A.H[wet[0]] > A.H[wet[wet.length - 1]] };
+    // Settle to 40 s, not 30. m1's volume is still climbing at 30 (8.75 m2
+    // against 8.86) and only levels off around t = 45.
+    const t = __settle(40, 150000);
+    // qRaw / dRaw, NOT q / d. analyse() carries its own 10% EMA over the
+    // column reduction (S._qA in js/overlay.js) to steady the on-screen
+    // profile against roll waves. Called ONCE on the mean columns, that EMA is
+    // still 90% full of the LIVE frames that came before it, so A.q would be a
+    // blend of the average with the instant -- and would report a spread of
+    // 0.03 where the mean columns themselves give 0.002. A.qRaw is the column
+    // reduction's own output, which is what the window averaged.
+    const stats = (A) => {
+      const nx = A.dRaw.length, lo = Math.floor(nx * 0.2), hi = Math.floor(nx * 0.8);
+      const wet = [];
+      for (let i = lo; i < hi; i++) if (A.ok[i] && A.dRaw[i] > 3 * APP.sim.dx) wet.push(i);
+      const q = wet.map((i) => A.qRaw[i]).filter(Number.isFinite).sort((a, b) => a - b);
+      const med = q[q.length >> 1];
+      const third = Math.floor(wet.length / 3);
+      const medOf = (a) => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+      const mid = wet[Math.floor(wet.length / 2)];
+      return { n: wet.length, qLo: q[0], qHi: q[q.length - 1], med,
+               qUp: medOf(wet.slice(0, third).map((i) => A.qRaw[i])),
+               qDn: medOf(wet.slice(-third).map((i) => A.qRaw[i])),
+               dMid: A.dRaw[mid], dcMid: A.dc[mid],
+               HFalls: A.H[wet[0]] > A.H[wet[wet.length - 1]] };
+    };
+    // One frame, for the contrast printed in the detail line.
+    const inst = stats(OVERLAY.analyse(APP.sim, APP.SIM.columns(true)));
+    // Then a real time average. SIM.avgColumns returns the mean columns in
+    // SIM.columns' own layout, so analyse() takes them unchanged.
+    APP.SIM.avgStart();
+    const t1 = Date.now(), tgt = APP.sim.t + 20;
+    while (APP.sim.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const T = APP.SIM.avgT();
+    const avg = stats(OVERLAY.analyse(APP.sim, APP.SIM.avgColumns(true).C));
+    APP.SIM.avgStop();
+    return Object.assign({ t, T, instSpread: (inst.qHi - inst.qLo) / inst.med }, avg);
   })()`);
   ok("PHYSICS m1 has a wet reach to measure", flow.n > 50, flow.n + " columns");
   // ASSERT THE SETTLE, before asserting anything measured on it.
@@ -808,36 +829,58 @@ SUITES.physics = async (B) => {
   // wall clock. Measured on a Windows laptop, m1 at Low, 828 x 64: ANGLE gets
   // to t = 30 in 6.5 s; SwiftShader reaches roughly t = 9.5 in the full 150 s
   // budget, about 50x slower. Raise the budget, or give this harness the GPU.
-  ok("PHYSICS m1 settled to the time its readings are taken at", flow.t >= 29.5,
-    `reached t = ${flow.t.toFixed(1)} s of 30 — the wall-clock budget in ` +
+  ok("PHYSICS m1 settled to the time its readings are taken at", flow.t >= 39.5,
+    `reached t = ${flow.t.toFixed(1)} s of 40 — the wall-clock budget in ` +
     `__settle ran out first, so every reading below is of an unsettled reach`);
-  // MASS flux, not discharge, and the name matters. This model is weakly
-  // compressible and the VOF fill f doubles as the density, so the quantity
-  // that is constant along a steady reach is the mass flux integral f*u dz,
-  // NOT the volumetric discharge. FS_COL computes exactly that. It used to
-  // feed the flux a fill clamped to 1, which discarded the mass in over-full
-  // (pressurised) cells -- i.e. discarded precisely the compressible part --
-  // and biased the reported flux low by 0.7% even on m1, where f only reaches
-  // 1.015. It now uses the raw fill for the flux and the clamped one for the
-  // depth, which are different questions.
+  ok("PHYSICS the averaging window actually opened", flow.T >= 19.5,
+    `window T = ${flow.T.toFixed(2)} s of 20`);
+  // MASS FLUX, IN THE MEAN. Both halves of that matter and the test used to
+  // get both wrong.
   //
-  // 0.30, not the 0.8 this carried for a long time. 0.8 let the discharge
-  // range over four fifths of its own median before failing, which is most of
-  // the way to "any two numbers", and it was never a measurement — it was a
-  // margin picked while the scene was not settling (see the settle assertion
-  // above, and issue #46, where this gate reporting a 2.6x spread was read as
-  // a conservation bug). MEASURED on a genuinely settled m1 at Low
-  // (828 x 64, driven to sim t = 30): q ranges 0.2324-0.2560 about a median of
-  // 0.2467, a spread of 0.094 -- and an independent f-weighted integral over
-  // the same columns, computed from a raw field readback rather than from the
-  // reduction, gives 0.094 to three figures. So 0.094 is the scheme's real
-  // number, not an artefact of how the column reduction forms the flux.
-  // 0.30 is about three times the measured spread — enough headroom for
-  // resolution and scene changes, tight enough that a doubling fails.
-  ok("PHYSICS the column MASS flux holds one value along the reach",
-    flow.med > 0 && (flow.qHi - flow.qLo) / flow.med < 0.30,
-    `q ${flow.qLo.toFixed(3)}–${flow.qHi.toFixed(3)}, median ${flow.med.toFixed(3)} m²/s` +
-    ` (settled to ${flow.t.toFixed(1)} s)`);
+  // MASS, not discharge: this model is weakly compressible and the VOF fill f
+  // doubles as the density, so the quantity continuity makes uniform is the
+  // mass flux integral f*u dz, not the volumetric discharge. FS_COL computes
+  // that integral, but it used to feed it a fill CLAMPED to 1, discarding the
+  // mass in over-full (pressurised) cells -- precisely the compressible part.
+  // It now uses the raw fill for the flux and the clamped one for the depth,
+  // which are different questions. The clamp biased the flux 0.7% low even on
+  // m1, where f only reaches 1.015.
+  //
+  // IN THE MEAN, not on one frame. Integrating continuity over a column,
+  //
+  //     d/dt (integral f dz)  +  d/dx (integral f*u dz)  =  0
+  //
+  // so q is uniform along x only where the column storage is steady. It never
+  // is instantaneously: the free surface wobbles, and that wobble is a real
+  // dd/dt, not noise to be tolerated. Only <q> over a window long enough for
+  // <dd/dt> to vanish is uniform, and this reach is exactly what the averaging
+  // engine (docs/averaging.md) is for. The old test averaged NOTHING -- it
+  // called __warm(20), which runs analyse() twenty times over the SAME frame
+  // without advancing the solver, warming an EMA on twenty copies of one
+  // instant. So it measured the instantaneous spread and then needed a
+  // tolerance loose enough to swallow it.
+  //
+  // MEASURED on m1 at Low, settled to t = 40, spread of the column flux over
+  // the middle 60% as a fraction of its median:
+  //     one frame  0.1115
+  //     T =  1 s   0.0585      T =  5 s   0.0308
+  //     T =  2 s   0.0406      T = 10 s   0.0132      T = 20 s   0.0022
+  // Monotone in T, converging on zero: that IS the continuity statement, and
+  // the residual at T = 20 s is the scheme's real error. Reproducible --
+  // 0.0020, 0.0019, 0.0019 on three consecutive runs, with the domain volume
+  // moving 8.8561 -> 8.861 across the window, i.e. genuinely steady.
+  //
+  // The gate is 0.01, five times the measured value. It replaces a 0.8 that
+  // let the flux range over four fifths of its own median -- most of the way
+  // to "any two numbers", and the reason issue #46 read as a conservation bug
+  // when it was really an unsettled scene measured on a single frame. This is
+  // now a real statement of mass conservation: 0.8 -> 0.01 is a factor of 80.
+  ok("PHYSICS the column MASS flux holds one value along the reach, in the mean",
+    flow.med > 0 && (flow.qHi - flow.qLo) / flow.med < 0.01,
+    `<q> ${flow.qLo.toFixed(4)}–${flow.qHi.toFixed(4)}, median ` +
+    `${flow.med.toFixed(4)} m²/s over T = ${flow.T.toFixed(1)} s ` +
+    `(spread ${((flow.qHi - flow.qLo) / flow.med).toFixed(4)}; the same reach ` +
+    `on one frame spreads ${flow.instSpread.toFixed(4)})`);
   // The signature of the conservation bug this project has already been bitten
   // by: a clamped VOF invents water, so q climbs monotonically downstream
   // while the depth sits perfectly steady. Guard the direction, not the noise.

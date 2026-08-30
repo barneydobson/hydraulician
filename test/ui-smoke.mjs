@@ -533,6 +533,75 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------- the legend's place, and the mode switch
+    console.log("\nthe legend sits top right, moves when dragged, carries the mode");
+    {
+      // ?ex= so the brief dock is OPEN: the default position is expressed as
+      // right: calc(var(--dock) + 12px), and a dock of zero width would prove
+      // nothing about whether it clears one.
+      const tab = await browser.open(INDEX + "?ex=HJ-1",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const p = await tab.evaluate(`
+        const leg = document.getElementById("legend");
+        APP.LEGEND.open();
+        const L = leg.getBoundingClientRect();
+        const dock = document.getElementById("dock").getBoundingClientRect();
+        const panel = document.getElementById("panel");
+        const pr = panel.getBoundingClientRect();
+        const overPanel = panel.classList.contains("open") &&
+          L.left < pr.right - 0.5 && L.top < pr.bottom && L.bottom > pr.top;
+
+        // A drag must NOT start on a control. Fit is a button; pulling on it
+        // has to leave the card exactly where it was.
+        const fit = document.getElementById("legFit");
+        const pd = (el, t, x, y, id) => el.dispatchEvent(
+          new PointerEvent(t, { clientX: x, clientY: y, bubbles: true, pointerId: id }));
+        pd(fit, "pointerdown", 0, 0, 9);
+        pd(fit, "pointermove", 300, 300, 9);
+        const heldStill = leg.getBoundingClientRect().left === L.left;
+        pd(fit, "pointerup", 300, 300, 9);
+
+        // ...but a drag on the card body must move it, and take the position over.
+        const bars = document.getElementById("legBars");
+        pd(bars, "pointerdown", L.left + 40, L.top + 60, 1);
+        pd(bars, "pointermove", 460, 300, 1);
+        pd(bars, "pointerup", 460, 300, 1);
+        const after = leg.getBoundingClientRect();
+
+        // The mode switch, and whether it agrees with the single writer.
+        const liveB = document.getElementById("legLive"), avgB = document.getElementById("legAvgOn");
+        avgB.click();
+        const onState = APP.state.avg;
+        const onPressed = avgB.getAttribute("aria-pressed") === "true" &&
+                          liveB.getAttribute("aria-pressed") === "false";
+        const avgChars = document.getElementById("legAvg").innerText.replace(/\ss+/g, " ").trim().length;
+        APP.avg.set(false);                     // the path the A key takes
+        const offPressed = liveB.getAttribute("aria-pressed") === "true" &&
+                           avgB.getAttribute("aria-pressed") === "false";
+        return { dockGap: Math.round(dock.left - L.right), overDock: L.right > dock.left + 0.5,
+                 overPanel, heldStill, from: Math.round(L.left), movedTo: Math.round(after.left),
+                 placed: leg.classList.contains("placed"), flag: APP.state.legendPlaced,
+                 inView: after.left >= 0 && after.right <= innerWidth,
+                 onState, onPressed, offPressed, avgChars };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("it sits immediately left of the dock", p.dockGap === 12, "gap " + p.dockGap + "px");
+      check("and never under it", !p.overDock);
+      check("nor under the Controls panel", !p.overPanel);
+      check("a drag on a control does not move the card", p.heldStill);
+      check("a drag on the card body does", p.movedTo !== p.from, p.from + " -> " + p.movedTo);
+      check("and that takes the position over", p.placed && p.flag);
+      check("a dragged card stays on screen", p.inView);
+      check("the legend's Average button turns averaging on", p.onState);
+      check("the buttons show which mode is running", p.onPressed);
+      check("and follow setAverage when something else writes it", p.offPressed);
+      // The block used to carry two static paragraphs that never changed and
+      // are still in the panel's own info and docs/averaging.md section 9. If
+      // it grows back past a few hundred characters, the prose has crept in.
+      check("the Average block stays short", p.avgChars < 320, p.avgChars + " chars");
+      await tab.close();
+    }
+
     // ------------------------------------------------------------ the legend
     console.log("\nthe legend says what the colour means, and changes it");
     {

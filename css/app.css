@@ -226,11 +226,50 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    up, over what range, in what units — so a screenshot pasted into a
    worksheet carried no statement of what it showed. Top left, because the
    gauge cards stack bottom-right and the ruler owns the edges. */
+/* Top right, immediately left of the Controls panel. `--dock` is the width
+   the docked panel takes out of the viewport, so this is the same expression
+   #bar uses and the legend tracks the panel opening and closing for free --
+   including the phone case, where the panel becomes a bottom sheet and --dock
+   goes to 0, leaving this at the right edge with no special case.
+
+   Once the reader DRAGS it, js/main.js sets `left`/`top` inline and adds
+   .placed, which drops the `right` anchor: from then on the position is
+   theirs and stops following the panel. Same bargain as the vertical
+   exaggeration -- fitted until somebody sets it by hand. */
 #legend {
-  position: fixed; z-index: 12; left: 12px; top: 84px; width: 236px;
+  position: fixed; z-index: 12; right: calc(var(--dock) + 12px); top: 84px;
+  width: 236px;
   display: none; padding: 9px 11px 8px; gap: 5px; flex-direction: column;
   font: 11.5px system-ui, sans-serif;
 }
+#legend.placed { right: auto; }
+/* The whole card drags; dragWindow's own guard excludes every button, the
+   editable range numbers and anything else you can click. */
+#legend { cursor: grab; }
+#legend button, #legend [contenteditable] { cursor: auto; }
+#legPick, #legend #legMode button, #legend #legActs button { cursor: pointer; }
+
+/* Live | Average. A segmented pair rather than one toggle button: the two
+   states are equally real and a student should be able to see which one they
+   are in without having to know what a pressed button looks like. */
+#legMode {
+  display: flex; gap: 2px; padding: 2px; margin: 1px 0 2px;
+  background: rgba(255,255,255,0.05); border-radius: 8px;
+}
+#legMode button {
+  appearance: none; flex: 1 1 0; cursor: pointer;
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: #9fb0c4; font: 600 11px system-ui, sans-serif;
+  padding: 3px 0; letter-spacing: .02em;
+}
+#legMode button:hover { background: rgba(255,255,255,0.07); color: #dfe8f2; }
+#legMode button[aria-pressed="true"] {
+  background: rgba(77,195,255,0.20); border-color: rgba(77,195,255,0.55);
+  color: #cdeaff;
+}
+/* Averaging is a measurement MODE, not a view setting, so when it is on the
+   whole card says so rather than leaving one small pressed button to carry it. */
+#legend.avg { border-color: rgba(77,195,255,0.42); }
 #legend.open { display: flex; }
 #legPick {
   appearance: none; background: transparent; border: 1px solid transparent;

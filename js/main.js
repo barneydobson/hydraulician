@@ -25,6 +25,11 @@ const state = {
   tool: "wall", brush: 0.055,
   mode: 0, range: {}, particles: false, dye: true, channel: true, labels: true, jumps: true,
   ui: null,                   // the resolved UI profile; UIMODE.full() when absent
+  // The legend sits top right, immediately left of the Controls panel, until
+  // somebody drags it; then the position is theirs for the session and stops
+  // following the panel. Not stored anywhere on purpose: a `?ex=` link has to
+  // look the same for every student who opens it.
+  legendPlaced: false,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
@@ -1088,6 +1093,29 @@ const LEGEND = (() => {
   function build() {
     document.getElementById("legPick").onclick = (e) => { e.stopPropagation(); toggleMenu(); };
     document.getElementById("legX").onclick = () => close();
+    // Live / Average. Both go through setAverage, which is the single writer:
+    // it has to open and release the accumulators, so the flag alone is not
+    // the mode. Clicking the state you are already in does nothing rather
+    // than restarting the window, which would silently throw the reading away.
+    document.getElementById("legLive").onclick = (e) => {
+      e.target.blur(); if (state.avg) setAverage(false);
+    };
+    document.getElementById("legAvgOn").onclick = (e) => {
+      e.target.blur(); if (!state.avg) setAverage(true);
+    };
+    // The whole card is the handle, not its header: the header IS a button
+    // (the field picker) and dragWindow correctly refuses to start a drag on
+    // one, so using it as the handle meant nothing ever moved. Everything
+    // interactive on the card -- the picker, Fit, scene, the mode buttons, the
+    // editable range numbers -- is excluded by dragWindow's own guard.
+    dragWindow(el(), el(), () => {
+      // First drag takes the position over: .placed drops the `right` anchor
+      // in the stylesheet so the inline left/top wins, and the card stops
+      // following the Controls panel. Same bargain as the vertical
+      // exaggeration -- fitted until somebody sets it by hand, then theirs.
+      state.legendPlaced = true;
+      el().classList.add("placed");
+    });
     document.getElementById("legFit").onclick = (e) => { e.target.blur(); fit(); };
     document.getElementById("legDef").onclick = (e) => {
       e.target.blur();
@@ -1144,6 +1172,14 @@ const LEGEND = (() => {
    *  and every open or close. */
   function sync() {
     if (!el()) return;
+    const live = document.getElementById("legLive");
+    const avgb = document.getElementById("legAvgOn");
+    if (live && avgb) {
+      // aria-pressed is what the stylesheet paints from, so the button that is
+      // lit and the mode that is running are the same fact.
+      live.setAttribute("aria-pressed", String(!state.avg));
+      avgb.setAttribute("aria-pressed", String(!!state.avg));
+    }
     const f = fieldFor(state.mode), r = rangeFor(f.id);
     document.getElementById("legName").textContent = f.name;
     document.getElementById("legSym").textContent = f.sym;
@@ -2886,7 +2922,11 @@ function cycleTips(dt) {
 function dragWindow(el, handle, onPlace) {
   let d = null;
   handle.addEventListener("pointerdown", (e) => {
-    if (e.target.closest && e.target.closest("button, input, a")) return;
+    // Anything you can click, type in or drag a caret through is NOT a drag
+    // handle. [contenteditable] joined this list when the legend became
+    // draggable: its colour-range numbers are editable SPANS, so `input` did
+    // not cover them and a drag would start on top of the text caret.
+    if (e.target.closest && e.target.closest("button, input, a, [contenteditable], select, textarea")) return;
     e.preventDefault();
     try { handle.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
     d = { dx: e.clientX - el.offsetLeft, dy: e.clientY - el.offsetTop };

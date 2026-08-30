@@ -1746,10 +1746,37 @@ SUITES.avg = async (B) => {
   const cs = await B.evaluate(`(() => {
     __low(); APP.tick(600);
     const S = APP.sim, nx = S.nx;
+    // STOP FIRST. avgStart() opens with an early return when S.avg is
+    // already set -- a no-op when a window is open, and earlier blocks open
+    // them. Inheriting one leaves the GPU dividing its moment by a window
+    // that started before this loop did, while the float64 reference below
+    // divides by the T it accumulated itself. The two sigmas then differ by
+    // sqrt(tc/T) -- measured at up to 14%, mid-domain, on columns with plenty
+    // of signal. That is far larger than the 1.6e-2 signature of the naive
+    // moment this assertion exists to catch, so it was not just noise: it
+    // destroyed the discrimination the test is for.
+    APP.SIM.avgStop();
     APP.SIM.avgStart();
     const mean = new Float64Array(nx), M2 = new Float64Array(nx);
     let T = 0;
-    for (let s = 0; s < 80; s++) {
+    // Run to a WINDOW LENGTH, not a frame count. A fixed 80 frames makes T
+    // whatever the machine happened to manage: measured here it came out
+    // anywhere from 4.8 s to 17 s depending on load, and that is the one
+    // variable this assertion cannot tolerate. sigma is sqrt(max(0, M2/T)),
+    // and on a short window M2 is a sum of tiny products against an eta datum
+    // of ~1.14 m; in float32 it can cancel slightly NEGATIVE, which max(0, .)
+    // clamps to exactly zero. The GPU then reported sigma = 0 where float64
+    // said 5e-3, the assertion failed with a relative gap of 1, and it looked
+    // like a formula bug rather than a window too short to have a variance.
+    //
+    // MEASURED at T ~ 15 s: worst relative gap 2.9e-6 to 6.4e-6 over all 455
+    // columns with signal, zero clamped, three runs out of three. At T ~ 5 s,
+    // columns near the inlet -- where the level is held and eta barely moves,
+    // so the variance is smallest -- clamp out. 12 s is the target, with a
+    // frame cap so a stalled machine fails the length check below rather than
+    // spinning. Same rule as the jump test: settle by SIMULATED time, so the
+    // count is independent of dt.
+    for (let s = 0; s < 4000 && T < 12; s++) {
       const t0 = S.t;
       APP.frames(1);
       const dt = S.t - t0;
@@ -1763,24 +1790,70 @@ SUITES.avg = async (B) => {
       }
       T += dt;
     }
-    const { sigma } = APP.SIM.avgColumns();
+    // FORCED. avgColumns only re-reads when force, or !A.out, or S.colFresh,
+    // and the frame loop above populates A.out on the FIRST frame of the
+    // window -- where T is ~0, M2 is ~0 and sigma is legitimately zero. An
+    // unforced call here handed back that opening snapshot whenever the
+    // throttle did not happen to land on the last frame, so this assertion
+    // compared 80 frames of CPU Welford against one frame of GPU and failed
+    // with gpu = 0 exactly. Flaky, not wrong -- which is worse, because it
+    // passed often enough to look like noise. js/sim.js states the rule: the
+    // frame path never forces, a caller that wants THIS frame's numbers and
+    // is not inside the loop always must.
+    const A = APP.SIM.avgColumns(true), sigma = A.sigma;
     const live = APP.SIM.columns(true);
     let n = 0, worst = -1, at = -1, ref0 = 0, got0 = 0, sMax = 0;
     for (let i = 2; i < nx - 2; i++) {
       if (!(live[i*4+1] > 0.02)) continue;          // wet columns only
       const ref = Math.sqrt(Math.max(0, M2[i] / T));
       if (ref > sMax) sMax = ref;
-      if (ref < 1e-4) continue;                     // no signal to compare to
+      // SIGNAL FLOOR, RELATIVE TO THE DATUM -- not an absolute 1e-4.
+      //
+      // sigma is sqrt(max(0, M2/T)), and M2 is a sum of products of
+      // (eta - mean): differences of order 1e-3 m taken between numbers of
+      // order 1.14 m. In float32 that difference keeps about four digits, its
+      // square about two, and the running sum can cancel slightly NEGATIVE --
+      // which max(0, .) then clamps to exactly zero. This is the same
+      // arithmetic js/reconstruct.js's header describes as leaving 'about two
+      // surviving digits of the variance', which is why Welford is used at
+      // all; Welford raises the floor, it does not abolish it.
+      //
+      // The columns that hit the floor are the ones nearest the inlet, where
+      // the level is held and eta barely moves, so their variance is smallest.
+      // An absolute cutoff cannot express that, because what matters is sigma
+      // AGAINST ITS OWN DATUM. MEASURED over three runs at T = 12 s, binned
+      // by sigma/eta:
+      //     1e-2 .. 1e-1   609 columns   worst relative gap 6.7e-6
+      //     1e-1 .. 1e0    756 columns   worst relative gap 9.9e-7
+      // i.e. everything at or above 1% of its datum agrees to parts in 1e5,
+      // which is 150x inside the 1e-3 gate below. Beneath that the float32
+      // moment has no digits left and the comparison measures the storage
+      // format, not the formula this assertion exists to discriminate.
+      const eta = A.C[i * 4 + 3];
+      if (!(eta > 0) || ref / eta < 1e-2) continue;
       n++;
       const rel = Math.abs(sigma[i] - ref) / ref;
       if (rel > worst) { worst = rel; at = i; ref0 = ref; got0 = sigma[i]; }
     }
+    // Read the window BEFORE closing it -- avgStop() nulls S.avg.
+    // sigma divides by the COLUMN accumulator's own clock (tc), which is a
+    // different counter from the field accumulator's (t, what avgT() reports
+    // and what only advances while the display is averaging).
+    const tc = S.avg ? S.avg.tc : 0;
     APP.SIM.avgStop();
-    return { n, worst, at, ref: ref0, got: got0, sMax, T, nx };
+    return { n, worst, at, ref: ref0, got: got0, sMax, T, nx, tc };
   })()`);
   console.log(`    sigma_eta: ${cs.n} columns with signal (max sigma ${cs.sMax.toExponential(3)})` +
     ` over T=${cs.T.toFixed(4)}s; worst rel gap ${cs.worst.toExponential(3)} at i=${cs.at}` +
     ` (gpu ${cs.got.toExponential(4)} vs cpu ${cs.ref.toExponential(4)})`);
+  ok("sigma_eta had a long enough window to have a variance", cs.T >= 11.5,
+     "T = " + cs.T.toFixed(2) + " s of 12 - below this the float32 moment "
+     + "clamps to zero near the inlet and the comparison is meaningless");
+  // The two windows must BE the same window, or the sigmas are of
+  // different things and any agreement is luck.
+  ok("sigma_eta compares one window against itself",
+     Math.abs(cs.tc - cs.T) < 0.02 * cs.T,
+     "gpu window " + cs.tc.toFixed(3) + " s vs cpu " + cs.T.toFixed(3) + " s");
   ok("sigma_eta has something to measure", cs.n > 10, JSON.stringify(cs));
   ok("sigma_eta matches an independent float64 weighted Welford",
      cs.worst < 1e-3, JSON.stringify(cs));

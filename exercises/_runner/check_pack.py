@@ -150,6 +150,7 @@ def main():
     verbose = "-v" in sys.argv
     ex = cards()
     fail, checked = [], 0
+    unverified = []   # cards whose digit ladder this could not locate
     if not ex:
         print("could not parse any exercise from js/exercises.js")
         return 1
@@ -218,6 +219,14 @@ def main():
                     fail.append("%-5s digit ladder differs\n        rule:   %s\n        README: %s"
                                 % (i, want, vals))
 
+            else:
+                # The card states a base/step rule but no ladder in the one form
+                # this recognises, so the rule went UNVERIFIED. Silence here reads
+                # as "checked and fine", which is the opposite of what happened.
+                # Reported, not failed: how a README lays out a table is its own
+                # business, but a maintainer should know the rule was not checked.
+                unverified.append(i)
+
     # 6. the UI profile. An exercise may narrow the interface a student meets
     #    (see UIMODE in js/main.js); what it must not do is narrow away a tool
     #    its own task asks for, or name something that does not exist.
@@ -263,8 +272,12 @@ def main():
         tools = [t.get("tool") for t in (e.get("instruments") or []) if t.get("tool")]
         declares_build = bool(set(tools) & BUILD_TOOLS) or \
                          bool(ui and (ui.get("build") is True or isinstance(ui.get("build"), list)))
-        if DRAWS.search(draws_text(e)) and not declares_build:
+        # Count the check when it RUNS, not when it fails -- every other
+        # counter in this file works that way, and a counter that only ticks
+        # on failure makes the printed total an undercount of real coverage.
+        if DRAWS.search(draws_text(e)):
             checked += 1
+        if DRAWS.search(draws_text(e)) and not declares_build:
             fail.append("%-5s task asks the student to draw, but its profile hides "
                         "BUILD -- add `ui: { build: true }` or an instruments entry" % i)
 
@@ -276,6 +289,9 @@ def main():
         if os.path.isdir(p) and not d.startswith("_") and d not in seen_folders:
             fail.append("%-5s exercises/%s/ has no card in js/exercises.js" % ("", d))
 
+    if unverified:
+        print("note: no digit ladder found in the recognised table form, so "
+              "the base/step rule is UNVERIFIED for: " + ", ".join(unverified))
     print("%d exercises, %d assertions" % (len(ex), checked))
     if verbose:
         for e in ex:

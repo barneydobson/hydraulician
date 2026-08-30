@@ -93,7 +93,12 @@ const GPU_MUTANTS = [
     why: "the celerity slider rewrites f under the window with no reset",
     find: "    // at the old one.\n    if (S.avg) avgReset();",
     replace: "    // at the old one.",
-    kills: "F1 transport residual",
+    // Names the assertion this actually breaks. It used to say "F1 transport
+    // residual", which is a literal PREFIX of a different assertion that runs
+    // before celerity is ever touched and is untouched by this mutant — so a
+    // reader grepping the failures for the kills text found nothing and could
+    // conclude the guard was dead.
+    kills: "avg a celerity change resets the window",
     measured: "c 22 -> 11 gives a residual of 4.13e-1 against a 1.28e-3 bound, 323x over" },
 
   { id: "disp-tent-live", file: "/js/shaders.js",
@@ -189,7 +194,10 @@ const GPU_MUTANTS = [
     why: "FS_ACOL writes qbar and etabar into each other's channels",
     find: "o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
     replace: "o = vec4(dN, eN, qN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
-    kills: "the aeration-gap agreement check",
+    // The assertion that actually fails names neither "aeration" nor "gap";
+    // the one that does contain those words is a finiteness check, which a
+    // wrong-but-finite number survives.
+    kills: "the surface line and the mean depth agree to a few cells",
     measured: "worst |delta_a| 3.30e-1 m (20 cells) against an 8-cell gate, because the surface " +
             "channel now holds the discharge; it also collaterally kills the accumulator-weight " +
             "synthetic check (dE 1.00, dSigma 0.96 against 5e-6 gates) since that test reads the " +
@@ -251,6 +259,43 @@ const CHROMES = [
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
                ".png": "image/png", ".json": "application/json", ".md": "text/plain" };
+
+/**
+ * ANGLE backend for headless Chrome's GPU-backed rasteriser, chosen by
+ * platform: `d3d11` and `metal` are real GPU backends but exist only on
+ * Windows and macOS respectively. Software (SwiftShader, `--disable-gpu`)
+ * renders a full-window WebGL canvas so slowly that a spin-up scene times
+ * the run out — measured on scene m1 at Low, 828x64: ANGLE reaches sim
+ * t=30s in 6.5s of wall clock; SwiftShader reaches only t~9.5s in a 150s
+ * budget, roughly 50x slower. That gap is what made `--only=physics` fail
+ * here: the reach never settled, and the unsettled reading got misreported
+ * as a discharge inconsistency below.
+ *
+ * Linux gets `gl`, not `vulkan`: ANGLE's Vulkan backend needs a working
+ * Vulkan ICD on the host, which a generic Linux box (and most CI runners)
+ * does not reliably have, whereas the GL backend talks to Mesa — present on
+ * essentially every Linux desktop and server install, real GPU or not — and
+ * is the path most headless-Chrome-on-Linux deployments already exercise.
+ * `gl` is the safer default; a maintainer who has confirmed Vulkan drivers
+ * can opt in with `$ANGLE=vulkan`.
+ *
+ * `$ANGLE` overrides the platform pick, the same way `$CHROME_PATH` above
+ * overrides the browser binary. `$SOFTWARE=1` asks for the old
+ * `--disable-gpu` behaviour, for a machine with no working GPU backend.
+ *
+ * Duplicated (not shared) from test/cdp.mjs's angleArgs(): that file is an
+ * ES module and this one is CommonJS, and with no package.json in this
+ * zero-dependency project neither can `import`/`require` a file written for
+ * the other's module system without an extension trick or an async interop
+ * shim — more moving parts than these ~10 lines are worth. Keep the two
+ * copies in sync by hand if the policy ever changes.
+ */
+function angleArgs() {
+  if (process.env.SOFTWARE) return ["--disable-gpu"];
+  const byPlatform = { win32: "d3d11", darwin: "metal", linux: "gl" };
+  const backend = process.env.ANGLE || byPlatform[process.platform] || "gl";
+  return ["--use-angle=" + backend];
+}
 
 let passed = 0;
 const failures = [];
@@ -331,7 +376,7 @@ async function browser() {
   const exe = CHROMES.find((p) => { try { return fs.existsSync(p); } catch (_) { return false; } });
   if (!exe) throw new Error("no Chrome found — set CHROME_PATH");
   const proc = spawn(exe, [
-    "--headless=new", "--disable-gpu", "--window-size=1280,800",
+    "--headless=new", ...angleArgs(), "--window-size=1280,800",
     "--no-first-run", "--no-default-browser-check",
     "--remote-debugging-port=" + CDP_PORT,
     "--user-data-dir=" + path.join(require("os").tmpdir(), "hydro-smoke-" + process.pid),
@@ -766,8 +811,31 @@ SUITES.physics = async (B) => {
   ok("PHYSICS m1 settled to the time its readings are taken at", flow.t >= 29.5,
     `reached t = ${flow.t.toFixed(1)} s of 30 — the wall-clock budget in ` +
     `__settle ran out first, so every reading below is of an unsettled reach`);
-  ok("PHYSICS discharge holds one value along the reach",
-    flow.med > 0 && (flow.qHi - flow.qLo) / flow.med < 0.8,
+  // MASS flux, not discharge, and the name matters. This model is weakly
+  // compressible and the VOF fill f doubles as the density, so the quantity
+  // that is constant along a steady reach is the mass flux integral f*u dz,
+  // NOT the volumetric discharge. FS_COL computes exactly that. It used to
+  // feed the flux a fill clamped to 1, which discarded the mass in over-full
+  // (pressurised) cells -- i.e. discarded precisely the compressible part --
+  // and biased the reported flux low by 0.7% even on m1, where f only reaches
+  // 1.015. It now uses the raw fill for the flux and the clamped one for the
+  // depth, which are different questions.
+  //
+  // 0.30, not the 0.8 this carried for a long time. 0.8 let the discharge
+  // range over four fifths of its own median before failing, which is most of
+  // the way to "any two numbers", and it was never a measurement — it was a
+  // margin picked while the scene was not settling (see the settle assertion
+  // above, and issue #46, where this gate reporting a 2.6x spread was read as
+  // a conservation bug). MEASURED on a genuinely settled m1 at Low
+  // (828 x 64, driven to sim t = 30): q ranges 0.2324-0.2560 about a median of
+  // 0.2467, a spread of 0.094 -- and an independent f-weighted integral over
+  // the same columns, computed from a raw field readback rather than from the
+  // reduction, gives 0.094 to three figures. So 0.094 is the scheme's real
+  // number, not an artefact of how the column reduction forms the flux.
+  // 0.30 is about three times the measured spread — enough headroom for
+  // resolution and scene changes, tight enough that a doubling fails.
+  ok("PHYSICS the column MASS flux holds one value along the reach",
+    flow.med > 0 && (flow.qHi - flow.qLo) / flow.med < 0.30,
     `q ${flow.qLo.toFixed(3)}–${flow.qHi.toFixed(3)}, median ${flow.med.toFixed(3)} m²/s` +
     ` (settled to ${flow.t.toFixed(1)} s)`);
   // The signature of the conservation bug this project has already been bitten
@@ -825,9 +893,48 @@ SUITES.physics = async (B) => {
     `left ${cv.left.toFixed(4)}, right ${cv.right.toFixed(4)} m²/s`);
   ok("PHYSICS the box's solid bed passes nothing", cv.bed < 1e-9, String(cv.bed));
   // A reach with friction in it cannot gain energy. Outward-positive, so a
-  // loss is negative.
-  ok("PHYSICS the reach loses energy through the box", cv.E < 0,
-    cv.E.toFixed(1) + " W/m");
+  // loss is negative — but WHERE that is asserted decides whether it is a
+  // test or a coin toss, and this used to be a coin toss.
+  //
+  // It ran on the m1 box, on a single instant, at sim t = 30. Three things
+  // were wrong at once. m1 is a backwater POOL: it dissipates almost nothing,
+  // so the quantity being signed is near zero. m1 is not settled at t = 30 —
+  // its volume is still climbing (8.75 m² against 8.86 settled) and does not
+  // level off until about t = 45. And a single instant carries the whole
+  // surface wobble. MEASURED, m1 box, 40 samples over 8 s of sim time after a
+  // genuine t = 60 settle (net Q then 1.4e-4 m²/s, i.e. actually steady):
+  //     E = -6.5 W/m with a standard deviation of 37 W/m, range -91 to +73,
+  //     NEGATIVE IN 50% OF SAMPLES.
+  // The fluctuation is 5.7x the mean and the sign is a fair coin. It passed
+  // for years only because the settle failure upstream kept the scene in a
+  // draining transient, where E is strongly negative for the wrong reason.
+  //
+  // m3 — a jump onto a mild apron — is where this physics is actually large.
+  // Same measurement, same box fractions, 40 samples: E = -910 W/m, sd 399,
+  // and the LEAST negative sample is still -97 W/m, so 40 of 40 are negative.
+  // (h23 dissipates more but surges: mean -2005, sd 2056, 7% of samples
+  // positive. A jump that moves on its apron is the wrong place to sign an
+  // instantaneous budget.) The gate is the mean over a window, not one frame,
+  // and it asks for a real loss rather than a sign.
+  const dis = await B.evaluate(`(() => {
+    APP.loadScene("m3", false); __low();
+    const t0 = Date.now();
+    while (APP.sim.t < 30 && Date.now() - t0 < 90000) APP.tick(200);
+    const W = APP.sim.W, H = APP.sim.H, Es = [];
+    for (let k = 0; k < 24; k++) {
+      const t1 = Date.now(), tgt = APP.sim.t + 0.2;
+      while (APP.sim.t < tgt && Date.now() - t1 < 5000) APP.tick(20);
+      Es.push(APP.SIM.boxFlux(0.20 * W, 0, 0.80 * W, H).total.E);
+    }
+    const mean = Es.reduce((a, b) => a + b, 0) / Es.length;
+    return { mean, worst: Math.max.apply(null, Es), n: Es.length, t: APP.sim.t };
+  })()`);
+  ok("PHYSICS m3 settled before its energy budget is read", dis.t >= 29.5,
+    "reached t = " + dis.t.toFixed(1) + " s of 30");
+  ok("PHYSICS the reach loses energy through the box",
+    dis.mean < -200 && dis.worst < 0,
+    `mean ${dis.mean.toFixed(0)} W/m over ${dis.n} samples, ` +
+    `least-negative sample ${dis.worst.toFixed(0)} W/m`);
   // The same face integral by two routes; if they drift, one has been edited
   // and the other has not.
   // A SECTION at the box's own left face is the same integral over the same
@@ -851,6 +958,67 @@ SUITES.physics = async (B) => {
   ok("PHYSICS and carries the same energy across it",
     Math.abs(sec.lineE - sec.faceE) < 0.10 * Math.max(sec.faceE, 1e-9),
     `line ${sec.lineE.toFixed(1)} vs face ${sec.faceE.toFixed(1)} W/m`);
+
+  // ---- ENCLOSED VOIDS (issue: "air gaps inside the fluid")
+  //
+  // A cell with f < 0.5 that is NOT reachable from the atmosphere is a hole
+  // inside the water. It is not a display artefact: this reads the fill field
+  // straight off the GPU and flood-fills air inward from the domain edges, so
+  // what it counts is enclosed void, never the open air above a free surface
+  // or the gap between a plunging jet and its pool (a per-column test counts
+  // both of those and is why the first version of this check was wrong).
+  //
+  // These are REAL and this model makes them: the EOS is one-sided with
+  // gravity on, p = c^2 max(f-1, 0), so an under-full cell has ZERO pressure
+  // and nothing pulls a rarefied cell of a vortex core back shut. press() in
+  // js/shaders.js says so itself, in the comment explaining why the plan view
+  // (g = 0) turns the two-sided branch on: "without that, every strong vortex
+  // core slowly cavitates into a hole." In the vertical plane that branch is
+  // off, because there f < 1 IS the free surface.
+  //
+  // So this is a BOUND, not a zero. MEASURED at Low, driven to sim t = 20,
+  // as a fraction of the water volume in the domain:
+  //     dambreak 0.00%   wave 0.00%   m3 0.18%   m1 0.52%
+  //     h23      1.11%   jet  2.03%
+  // The gate is 4%, about twice the worst scene. It exists so the number
+  // cannot grow silently: a change to the advection, the flux cap or the EOS
+  // that starts shredding the interior will trip it here rather than in a
+  // lecture. Tightening it is welcome; a rise means something got worse.
+  const voidf = await B.evaluate(`(() => {
+    APP.loadScene("h23", false); __low();
+    const t0 = Date.now();
+    while (APP.sim.t < 20 && Date.now() - t0 < 90000) APP.tick(200);
+    const S = APP.sim, nx = S.nx, ny = S.ny, dx = S.dx;
+    const gl = document.getElementById("view").getContext("webgl2");
+    const F = new Float32Array(nx * ny * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+    gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, F);
+    const sol = (i, j) => { const m = S.mask[j * nx + i];
+      return m >= 192 ? 1 : (m >= 64 ? (S.p.valveClosed > 0.5 ? 1 : 0) : 0); };
+    const f_ = (i, j) => F[(j * nx + i) * 4];
+    const seen = new Uint8Array(nx * ny), st = [];
+    const push = (i, j) => { if (i < 0 || j < 0 || i >= nx || j >= ny) return;
+      const k = j * nx + i;
+      if (seen[k] || sol(i, j) || f_(i, j) >= 0.5) return; seen[k] = 1; st.push(k); };
+    for (let i = 0; i < nx; i++) { push(i, ny - 1); push(i, ny - 2); }
+    for (let j = 0; j < ny; j++) { push(0, j); push(1, j); push(nx - 1, j); push(nx - 2, j); }
+    while (st.length) { const k = st.pop(), j = (k / nx) | 0, i = k - j * nx;
+      push(i + 1, j); push(i - 1, j); push(i, j + 1); push(i, j - 1); }
+    let vol = 0, water = 0, cells = 0, worst = 1;
+    for (let i = 0; i < nx; i++) for (let j = 1; j < ny - 1; j++) {
+      if (sol(i, j)) continue;
+      const f = f_(i, j); water += Math.min(f, 2) * dx * dx;
+      if (f >= 0.5 || seen[j * nx + i]) continue;
+      cells++; vol += (1 - f) * dx * dx; if (f < worst) worst = f;
+    }
+    return { cells, vol, water, frac: vol / Math.max(water, 1e-9), worst, t: APP.sim.t };
+  })()`);
+  ok("PHYSICS h23 settled far enough to judge its interior", voidf.t >= 19.5,
+    "reached t = " + voidf.t.toFixed(1) + " s of 20");
+  ok("PHYSICS enclosed voids stay a small fraction of the water",
+    voidf.frac < 0.04,
+    `${voidf.cells} enclosed cells, ${(100 * voidf.frac).toFixed(2)}% of ` +
+    `${voidf.water.toFixed(2)} m² of water, emptiest f = ${voidf.worst.toFixed(3)}`);
 
   ok("PHYSICS boxFlux and boxForce report the same force",
     Math.abs(cv.fx - cv.gx) < 1e-6 * Math.max(1, Math.abs(cv.gx)),
@@ -877,8 +1045,14 @@ SUITES.scenes = async (B) => {
       ok("SCENE " + id + " boots and steps", false, e.message);
       continue;
     }
+    // `> 0`, not `Number.isFinite`. APP.volume() sums the CACHED column
+    // reduction (AGENTS.md's own sharp edge: it returns 0 until
+    // SIM.columns(true) forces a readback), and 0 is perfectly finite — so a
+    // finiteness check here would keep passing across all forty scenes if an
+    // ordering change ever left the cache stale. The analyse() call above
+    // forces the readback; this is the assertion that notices when it stops.
     ok("SCENE " + id + " boots and steps",
-      r.t > 0 && r.finite && r.dOk && Number.isFinite(r.vol),
+      r.t > 0 && r.finite && r.dOk && r.vol > 0,
       JSON.stringify(r));
   }
 };

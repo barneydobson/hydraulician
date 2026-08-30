@@ -187,6 +187,49 @@ the depth sat perfectly steady. Symptoms to watch for: `q` rising monotonically
 downstream in a steady state; total volume constant while inflow ≠ outflow.
 `APP.volume()` plus a face-flux integral is how it was found.
 
+## Enclosed voids: holes inside the water are REAL, not a drawing artefact
+
+Run `jet` or `h23` for twenty seconds and there are cells of pure air sitting
+deep inside the body of the water. This is not the display thresholding a
+nearly-full cell: read the fill field straight off the GPU, flood-fill air
+inward from the domain edges, and what is left over is enclosed void.
+Measured at Low, sim t = 20, as a fraction of the water in the domain:
+
+| scene | enclosed cells | worst `f` | deepest below surface | % of water |
+| --- | --- | --- | --- | --- |
+| dambreak | 0 | — | — | 0.00 |
+| wave | 0 | — | — | 0.00 |
+| m3 | 18 | 0.007 | 6 cells | 0.18 |
+| m1 | 129 | 0.000 | 14 cells | 0.52 |
+| h23 | 149 | 0.000 | 25 cells | 1.11 |
+| jet | 224 | 0.000 | 45 cells | 2.03 |
+
+**Why they persist.** With gravity on, the EOS is one-sided:
+`p = c² max(f − 1, 0)`. An under-full cell therefore has *zero* pressure, so
+nothing pulls a rarefied cell shut — a void can only be filled by advection
+wandering back into it. `press()` in `js/shaders.js` says this itself, in the
+comment explaining why the plan view (`g = 0`) switches the two-sided branch
+on: *"without that, every strong vortex core slowly cavitates into a hole."*
+In the vertical plane that branch is off, because there `f < 1` **is** the free
+surface. Representing the free surface and closing interior voids are the same
+knob, which is why this is not a one-line fix.
+
+**A fix was tried and it failed — do not retry it blind.** The obvious move is
+to gate the two-sided branch on whether the cell is submerged, read off the one
+cell above it: at a free surface that cell is air (no suction, nothing changes),
+inside the fluid it is water (suction closes the void). It works on the calm
+scenes — m1 129 → 0, h23 149 → 0, m3 18 → 0 — and then destroys `hammer`:
+total water in the domain went from 320 m² to **1615 m²**, five times the mass
+invented in twenty seconds, with 39% of the domain void. Pressurised flow is
+exactly where suction runs away. Anything along these lines has to be measured
+against `hammer` and against `docs/hydrostatic-attractor.js` before it is
+believed.
+
+So the voids stand, and `smoke.js --only=physics` **bounds** them instead:
+enclosed void must stay under 4% of the water volume (about twice the worst
+scene). It is a bound, not a zero — its job is to stop the number growing
+silently when someone edits the advection, the flux cap or the EOS.
+
 ## Coordinate and geometry contracts
 
 - Domain = a fixed physical rectangle (`scene.W × scene.H`). The grid is sized

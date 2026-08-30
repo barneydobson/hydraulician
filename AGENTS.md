@@ -142,15 +142,29 @@ anything that touches `js/`. Run `mutation-test.mjs` after touching
 stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
 
+`.github/workflows/checks.yml` runs the first, second, fifth and sixth of
+these gates on every push and pull request — the ones that are instant and
+need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
+all, not even as a manual `workflow_dispatch` job: both need a real
+GPU-backed Chrome (see `angleArgs()` in `test/cdp.mjs` and
+`exercises/_runner/smoke.js`, which pick the ANGLE backend by platform —
+`d3d11`/`metal`/`gl` — because the software rasteriser is too slow to settle
+a scene inside `smoke.js`'s physics budget), and standard GitHub-hosted
+runners have no GPU passthrough, so ubuntu-latest's `gl` backend would very
+likely fall back to the same class of software rasteriser and fail the same
+way. Run both locally, where a real GPU is available.
+
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
 `index.html`, `css/app.css`, `js/pickers.js`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
 `START`, `setAverage` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
-expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
-`--use-angle=d3d11` itself, because the software rasteriser renders a
-full-window WebGL canvas so slowly that a spin-up scene times the run out.
+expectation. Its `test/cdp.mjs` launcher passes a GPU-backed `--use-angle`
+itself (`d3d11`/`metal`/`gl` by platform, `$ANGLE` to override, `$SOFTWARE=1`
+for the old `--disable-gpu` behaviour), because the software rasteriser
+renders a full-window WebGL canvas so slowly that a spin-up scene times the
+run out.
 
 **Why there is a mutation gate.** Eleven assertions written during the averaging
 work passed while asserting nothing — a constant fed where a varying value was

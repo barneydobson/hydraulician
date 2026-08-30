@@ -39,15 +39,48 @@ export function findChrome() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * ANGLE backend for headless Chrome's GPU-backed rasteriser, chosen by
+ * platform: `d3d11` and `metal` are real GPU backends but exist only on
+ * Windows and macOS respectively. Software (SwiftShader, `--disable-gpu`)
+ * renders a full-window WebGL canvas so slowly that a spin-up scene times
+ * the run out — measured on scene m1 at Low, 828x64: ANGLE reaches sim
+ * t=30s in 6.5s of wall clock; SwiftShader reaches only t~9.5s in a 150s
+ * budget, roughly 50x slower.
+ *
+ * Linux gets `gl`, not `vulkan`: ANGLE's Vulkan backend needs a working
+ * Vulkan ICD on the host, which a generic Linux box (and most CI runners)
+ * does not reliably have, whereas the GL backend talks to Mesa — present on
+ * essentially every Linux desktop and server install, real GPU or not — and
+ * is the path most headless-Chrome-on-Linux deployments already exercise.
+ * `gl` is the safer default; a maintainer who has confirmed Vulkan drivers
+ * can opt in with `$ANGLE=vulkan`.
+ *
+ * `$ANGLE` overrides the platform pick, the same way `$CHROME` above
+ * overrides the browser binary. `$SOFTWARE=1` asks for the old
+ * `--disable-gpu` behaviour, for a machine with no working GPU backend.
+ *
+ * Duplicated (not shared) in exercises/_runner/smoke.js's browser(): this
+ * file is an ES module and smoke.js is CommonJS, and with no package.json
+ * in this zero-dependency project neither can `import`/`require` a file
+ * written for the other's module system without an extension trick or an
+ * async interop shim — more moving parts than these ~10 lines are worth.
+ * Keep the two copies in sync by hand if the policy ever changes.
+ */
+export function angleArgs() {
+  if (process.env.SOFTWARE) return ["--disable-gpu"];
+  const byPlatform = { win32: "d3d11", darwin: "metal", linux: "gl" };
+  const backend = process.env.ANGLE || byPlatform[process.platform] || "gl";
+  return ["--use-angle=" + backend];
+}
+
 /** Launch headless Chrome and connect to its browser endpoint. */
 export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
   const bin = findChrome();
   if (!bin) throw new Error("no Chrome found — set $CHROME to a Chrome or Edge binary");
   const profile = mkdtempSync(join(tmpdir(), "hydra-ui-"));
-  // ANGLE over the real GPU: the software rasteriser renders a full-window
-  // WebGL canvas so slowly that a spin-up scene times the run out.
   const args = [
-    "--headless=new", "--use-angle=d3d11", "--disable-extensions",
+    "--headless=new", ...angleArgs(), "--disable-extensions",
     "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
     "--user-data-dir=" + profile,
     "--window-size=" + width + "," + height,

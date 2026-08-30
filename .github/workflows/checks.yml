@@ -1,0 +1,88 @@
+name: Checks
+
+# The four zero-dependency, browser-free gates from AGENTS.md's Testing
+# table, run on every push and pull request: two Python checkers that assert
+# the exercise pack and the notation agree with themselves, and two Node
+# suites for js/reconstruct.js (recon-test.mjs, and mutation-test.mjs which
+# proves recon-test.mjs can actually fail). All four are instant-to-~10s, so
+# they gate every push rather than running on a schedule.
+#
+# The browser gates (smoke.js, ui-smoke.mjs) are NOT here, and there is no
+# `workflow_dispatch` job for them either — deliberately, not an oversight.
+# Both drive a real headless Chrome through an ANGLE GPU backend
+# (test/cdp.mjs and exercises/_runner/smoke.js's browser() now pick
+# d3d11/metal/gl by platform, see their angleArgs() comments), because the
+# software rasteriser renders a full-window WebGL canvas about 50x too
+# slowly for smoke.js's physics checks to settle before their wall-clock
+# budget runs out (measured locally: SwiftShader reaches sim t~9.5 of a
+# t=30 target in the 150s `__settle` allows; the GPU backend reaches t=30 in
+# ~6.5s). Standard GitHub-hosted runners, ubuntu-latest included, have no
+# GPU passthrough, so `--use-angle=gl` on one of them almost certainly falls
+# back to the same class of software rasteriser (Mesa's llvmpipe) that
+# already fails this budget under SwiftShader — untested here (this repo
+# cannot run GitHub Actions to check), but a job built on that assumption
+# would be red from day one and train everyone to ignore it. Run both
+# locally instead, where a real GPU is available:
+#   node exercises/_runner/smoke.js
+#   node test/ui-smoke.mjs
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  instant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # Default (shallow, fetch-depth 1) is enough: check_notation.py's
+        # only git call is `git ls-files`, which reads the checked-out INDEX,
+        # not commit history -- verified locally (`git log -1` still works,
+        # and ls-files does not consult history at all) rather than assumed.
+        # fetch-depth 0 would buy this workflow nothing and cost a full clone.
+
+      # ubuntu-latest ships a working python3 already, and neither checker
+      # imports anything beyond the standard library (both docstrings say
+      # "zero dependencies") -- a setup-python step would pin an interpreter
+      # for no package to install against, so this relies on the runner's
+      # system python3 instead. Node IS pinned, because check_pack.py hands
+      # js/exercises.js to `node` to parse it as real JS (see its docstring),
+      # and the two .mjs suites run under it directly; AGENTS.md documents
+      # Node 22+ as this repo's floor.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: python3 --version / node --version
+        run: |
+          python3 --version
+          node --version
+
+      # check_notation.py falls back to a filesystem walk when `git ls-files`
+      # fails (e.g. repo exported as a tarball) -- correct on a laptop, but in
+      # CI that fallback silently scanning the wrong file set must never be
+      # what actually ran under a green tick. This step cannot see inside the
+      # checker's own subprocess call, but it proves git ls-files works in
+      # this exact checkout, in this exact job, immediately before the
+      # checker runs -- so if its internal call still fell back, something
+      # broke git itself between these two steps.
+      - name: Verify git ls-files works (check_notation.py depends on it)
+        run: |
+          count=$(git ls-files | wc -l)
+          echo "git ls-files tracked $count files"
+          if [ "$count" -lt 1 ]; then
+            echo "::error::git ls-files returned nothing -- check_notation.py would silently fall back to a filesystem walk and scan the wrong file set"
+            exit 1
+          fi
+
+      - name: check_pack.py — the exercise pack agrees with itself
+        run: python3 exercises/_runner/check_pack.py
+
+      - name: check_notation.py — one notation everywhere
+        run: python3 exercises/_runner/check_notation.py
+
+      - name: recon-test.mjs — RECON's closed-form answers
+        run: node test/recon-test.mjs
+
+      - name: mutation-test.mjs — proves recon-test.mjs can fail
+        run: node test/mutation-test.mjs

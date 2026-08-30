@@ -628,32 +628,21 @@ const EXERCISE_RIGS = {
   }
 };
 
-/* Per-student parameters that change GEOMETRY, so no slider can express them:
-   the picker can load the base rig above, but the student still draws this
-   one thing. `how` is lifted from the exercise's own worksheet. */
-const EXERCISE_RIG_NOTES = {
-  "UN-1": {
-    control: "nozzle gap g = 0.14 x (1 + (d mod 6)) metres — the verified SIX-rung ladder, 0.14-0.84 m (the flow area is quantised to ONE cell at Medium)",
-    how: "Erase the scene's plate with the brush widened four `]` presses, then with the Wall tool and Shift held draw two vertical pieces at the same station: lower half from the pipe floor (z = 2.0) up to z = 3.5 - gap/2, upper half from z = 3.5 + gap/2 up to the pipe roof (z = 5.0).",
-  },
-  "LL-2": {
-    control: "partner A's hidden fault: its station x (4.6-7.0 m) and its height (2-3 blocked cells of the 18-cell bore)",
-    how: "Wall tool with the brush narrowed two or three `[` presses to about one grid cell, Shift held, one short vertical stroke starting exactly on the pipe invert (z = 2.00 m) and ending between z = 2.04 and z = 2.07 m, at any x from 4.6 to 7.0 m.",
-  },
-  "FB-1": {
-    control: "hump height dz above the bed — raised in steps until the flow chokes",
-    how: "Wall tool with the brush shrunk to about 0.04 m, Shift held, a horizontal stroke about 1 m long centred on x = 4.5 m starting from inside the bed slab (about z = 0.48) up to a low first height, e.g. z = 0.55 m.",
-  },
-  "QS-2": {
-    control: "tank 2 width A2 = 0.50 + 0.25·d metres (the payload ships A2 = 2.00, d = 6)",
-    how: "Wall tool, one vertical stroke (brush 0.10) at x = 3.60 + A2, floor to z ~ 3.2 — tank 2's far wall is the personalised dimension.",
-  },
-  "UN-3": {
-    control: "reservoir level = 10.0 + 0.4·d metres (the payload ships 12.0, d = 5)",
-    how: "Set the Reservoir level slider, then press R. Nothing is drawn — the standpipe ships built and is the same for everyone.",
-  },
-  "B10": {
-    control: "crest soffit elevation z_c — lifted step by step until the pipe separates (the payload ships the FLAT pipe, no crest)",
-    how: "Console only: B10.crest(z) redraws the whole staircase hump so its soffit sits at z, jumped first to about 0.09 m below your HGL prediction and then raised in 3-cell (0.065 m) steps, switching to 1-cell (0.0217 m) steps once the crown pressure head falls below 0.06 m.",
-  },
-};
+/* There is deliberately NO second object here.
+   A `EXERCISE_RIG_NOTES` used to sit at this point, keyed by exercise id,
+   carrying the erase-and-redraw procedure for the six exercises whose
+   personalised parameter is DRAWN rather than set on a slider. The card
+   rendered it as a blue "you draw this" block; that block was removed when
+   the cards were trimmed (exercises/_code-changes/CARDFIX-report.md), on the
+   standing finding that the card which says everything is the card nobody
+   reads. The reader was deleted and the data was not, so it sat here for a
+   long time being loaded into every page and read by nothing.
+
+   Its content lives in the READMEs now, which is where a procedure belongs:
+   `exercises/<folder>/README.md` carries the brush width, the key presses
+   and the coordinates for each of the six. The card says WHAT is personalised
+   (`digitNote` in js/exercises.js) and links to the README for HOW.
+
+   If a drawing procedure ever needs to reach the student in the app again,
+   it belongs on the card through js/exercises.js like every other field —
+   not in a side table here that nothing is obliged to read. */

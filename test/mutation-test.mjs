@@ -23,7 +23,21 @@ import { join } from "node:path";
 
 const SRC = fileURLToPath(new URL("../js/reconstruct.js", import.meta.url));
 const SUITE = fileURLToPath(new URL("./recon-test.mjs", import.meta.url));
-const source = readFileSync(SRC, "utf8");
+/** Read with the line endings NORMALISED to LF.
+ *
+ *  `.gitattributes` sets `* text=auto`, so the repo stores LF and a Windows
+ *  checkout gets CRLF. The catalogue below is written with `\n`, so on Windows
+ *  the one multi-line pattern (`band-inverted`) stopped matching and the mutant
+ *  went STALE — the excursion-band orientation, test C4, was no longer being
+ *  proven killable, on exactly the platform this repo is developed on. The
+ *  gate did fail loudly, which is the design working; it just blamed a
+ *  refactor that had not happened.
+ *
+ *  Normalising here rather than in each pattern keeps the catalogue readable
+ *  and platform-blind: a `find` is written the way the source reads, once. The
+ *  mutant is written back out as LF too, which the suite does not care about —
+ *  it only ever parses the file. */
+const source = readFileSync(SRC, "utf8").replace(/\r\n/g, "\n");
 
 /** `find` → `replace` on js/reconstruct.js. `kills` are substrings of the
  *  assertion names that MUST appear among the failures — naming them is what

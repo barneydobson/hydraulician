@@ -187,6 +187,91 @@ the depth sat perfectly steady. Symptoms to watch for: `q` rising monotonically
 downstream in a steady state; total volume constant while inflow ≠ outflow.
 `APP.volume()` plus a face-flux integral is how it was found.
 
+## The column flux is conserved only IN THE MEAN
+
+Integrate continuity over a column and the bed/surface fluxes drop out:
+
+```
+    d/dt ( integral f dz )  +  d/dx ( integral f u dz )  =  0
+```
+
+so `q = ∫ f u dz` is uniform along `x` **only where the column storage is
+steady**. It never is instantaneously — the free surface wobbles, and that
+wobble is a real `∂d/∂t`, not noise to be tolerated away. Two consequences
+that have both cost time:
+
+- **It is a MASS flux, not a discharge.** `f` doubles as the density, so the
+  conserved integral is `∫ f u dz`. `FS_COL` computes that — but it used to
+  feed it a fill clamped to 1, discarding the mass in over-full cells, which
+  is exactly the compressible part. Depth wants the clamped fill; the flux
+  wants the real one. They are different questions and now use different
+  variables.
+- **Averaging is not optional.** Measured on m1 at Low, settled, spread of the
+  column flux over the middle 60% as a fraction of its median:
+
+| window | one frame | 1 s | 2 s | 5 s | 10 s | 20 s |
+| --- | --- | --- | --- | --- | --- | --- |
+| spread | 0.1115 | 0.0585 | 0.0406 | 0.0308 | 0.0132 | **0.0022** |
+
+  Monotone in `T`, converging on zero. The 0.2% left at 20 s is the scheme's
+  real error, and it reproduces (0.0020 / 0.0019 / 0.0019 on three runs). A
+  reading taken on one frame is not a worse measurement of the same thing — it
+  is a measurement of a different thing, and no tolerance makes it right.
+
+This is what issue #46 actually was. A 2.6x spread looked like a conservation
+bug; it was an unsettled scene read on a single frame. `smoke.js --only=physics`
+now settles, opens a 20 s averaging window, and gates the spread at 0.01 —
+where the old gate was 0.8.
+
+One trap when you measure this yourself: use `analyse().qRaw`, not
+`analyse().q`. `analyse` carries its own 10% EMA over the column reduction to
+steady the drawn profile against roll waves, so a single call on the mean
+columns is still 90% full of the live frames before it — enough to report
+0.03 where the mean columns give 0.002.
+
+## Enclosed voids: holes inside the water are REAL, not a drawing artefact
+
+Run `jet` or `h23` for twenty seconds and there are cells of pure air sitting
+deep inside the body of the water. This is not the display thresholding a
+nearly-full cell: read the fill field straight off the GPU, flood-fill air
+inward from the domain edges, and what is left over is enclosed void.
+Measured at Low, sim t = 20, as a fraction of the water in the domain:
+
+| scene | enclosed cells | worst `f` | deepest below surface | % of water |
+| --- | --- | --- | --- | --- |
+| dambreak | 0 | — | — | 0.00 |
+| wave | 0 | — | — | 0.00 |
+| m3 | 18 | 0.007 | 6 cells | 0.18 |
+| m1 | 129 | 0.000 | 14 cells | 0.52 |
+| h23 | 149 | 0.000 | 25 cells | 1.11 |
+| jet | 224 | 0.000 | 45 cells | 2.03 |
+
+**Why they persist.** With gravity on, the EOS is one-sided:
+`p = c² max(f − 1, 0)`. An under-full cell therefore has *zero* pressure, so
+nothing pulls a rarefied cell shut — a void can only be filled by advection
+wandering back into it. `press()` in `js/shaders.js` says this itself, in the
+comment explaining why the plan view (`g = 0`) switches the two-sided branch
+on: *"without that, every strong vortex core slowly cavitates into a hole."*
+In the vertical plane that branch is off, because there `f < 1` **is** the free
+surface. Representing the free surface and closing interior voids are the same
+knob, which is why this is not a one-line fix.
+
+**A fix was tried and it failed — do not retry it blind.** The obvious move is
+to gate the two-sided branch on whether the cell is submerged, read off the one
+cell above it: at a free surface that cell is air (no suction, nothing changes),
+inside the fluid it is water (suction closes the void). It works on the calm
+scenes — m1 129 → 0, h23 149 → 0, m3 18 → 0 — and then destroys `hammer`:
+total water in the domain went from 320 m² to **1615 m²**, five times the mass
+invented in twenty seconds, with 39% of the domain void. Pressurised flow is
+exactly where suction runs away. Anything along these lines has to be measured
+against `hammer` and against `docs/hydrostatic-attractor.js` before it is
+believed.
+
+So the voids stand, and `smoke.js --only=physics` **bounds** them instead:
+enclosed void must stay under 4% of the water volume (about twice the worst
+scene). It is a bound, not a zero — its job is to stop the number growing
+silently when someone edits the advection, the flux cap or the EOS.
+
 ## Coordinate and geometry contracts
 
 - Domain = a fixed physical rectangle (`scene.W × scene.H`). The grid is sized

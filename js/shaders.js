@@ -583,13 +583,20 @@ void main(){
   int dry = 0;
   for (int j = jb; j < NY - 1; j++) {
     if (SO(ivec2(i,j)) > 0.5) break;          // soffit / obstruction
-    float f  = min(texelFetch(u_F, ivec2(i,j), 0).r, 1.0);
+    // TWO uses of the fill, and they want different things. DEPTH is
+    // geometric: a cell cannot be more than full of water, so it takes the
+    // clamped fill. The COLUMN FLUX is a MASS flux -- f IS the density in
+    // this model, so the mass in an over-full (pressurised) cell is real and
+    // clamping it discards exactly the compressible part. Feeding one clamped
+    // f to both under-reported the flux wherever the water was pressurised.
+    float fr = texelFetch(u_F, ivec2(i,j), 0).r;   // raw: > 1 where pressurised
+    float f  = min(fr, 1.0);                       // geometric fill
     if (f < 0.25) { dry++; if (dry > 2) break; continue; }
     dry = 0;
     float uc = 0.5 * (texelFetch(u_U, ivec2(i,  j), 0).r
                     + texelFetch(u_U, ivec2(i+1,j), 0).r);
     d += f * u_dx;
-    q += f * uc * u_dx;
+    q += fr * uc * u_dx;
     if (f > 0.5) top = (float(j) + 1.0) * u_dx;
   }
   o = vec4(float(jb) * u_dx, d, q, top);

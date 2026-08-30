@@ -15,14 +15,18 @@ shallow water); this one resolves the depth.
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | markup + all CSS, classic script tags; the control panel is generated from a spec in `main.js` |
+| `index.html` | markup and the classic script tags, and little else — under 200 lines; the control panel is generated from a spec in `main.js` |
+| `css/app.css` | every rule the app uses. A `<link rel=stylesheet>` to a relative path works under `file://` (unlike `fetch` and ES modules), so this costs the no-server guarantee nothing |
 | `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
 | `js/reconstruct.js` | `RECON` — the averaging numerics with no WebGL in them: running mean, Welford, geometric fill, connected bodies, column compaction, band level sets |
 | `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
 | `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
-| `js/main.js` | boot, panel spec, pointer tools, view transform, `window.APP`, rig save/load (`RIG`) |
+| `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
+| `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards, digit rules, the settings a pick applies) |
+| `js/gauge-inspector.js` | `GINSP` — a draggable window per gauge: identity, live values, the full history chart, CSV export |
+| `js/rig.js` | `RIG` — rig save / load / share, the wire format and its version gate |
 | `js/exercises.js` | the exercise register the picker reads (machine-readable source of the pack) |
 | `js/exercises-rigs.js` | drawn rigs + applied settings per exercise, as rig-format JSON |
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
@@ -97,11 +101,19 @@ to look fine for a minute and explode in an exercise.
   field is a row, not three edits. Each field's colour range is explicit
   (`u_lo`/`u_hi`) and **held**, never tracked — see the engineering notes.
 - **Zero dependencies, classic scripts** — no modules, no bundlers, no fetch,
-  and no YAML front matter in `index.html` or `js/*` (the Pages build copies
-  them verbatim only because there is none). Those three are one rule wearing
-  three hats: **the app boots with no server**. A browser refuses both `fetch`
-  of a file beside it and an ES module under `file://`, and double-clicking
-  `index.html` is a real way this gets used. The rule binds the APP; the docs
+  and no YAML front matter in `index.html`, `js/*` or `css/*` (the Pages build
+  copies them verbatim only because there is none). Those three are one rule
+  wearing three hats: **the app boots with no server**. A browser refuses both
+  `fetch` of a file beside it and an ES module under `file://`, and
+  double-clicking `index.html` is a real way this gets used.
+
+  What the rule does NOT forbid is more than one file. `<script src>` and
+  `<link rel=stylesheet>` to relative paths both work under `file://` — that is
+  why the app already loads a dozen classic scripts and one stylesheet, and why
+  splitting a long file is never blocked by this rule. Only `fetch`, ES modules
+  and a build step are. If you find yourself keeping something in one enormous
+  file "because zero dependencies", check which of the three you are actually
+  protecting; usually it is none of them. The rule binds the APP; the docs
   reader (`docs/view.html`) does fetch the markdown it renders, because
   nothing about running a simulation depends on it and it degrades to a
   message and two working links when it cannot. Any published page carrying
@@ -130,15 +142,29 @@ anything that touches `js/`. Run `mutation-test.mjs` after touching
 stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
 
+`.github/workflows/checks.yml` runs the first, second, fifth and sixth of
+these gates on every push and pull request — the ones that are instant and
+need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
+all, not even as a manual `workflow_dispatch` job: both need a real
+GPU-backed Chrome (see `angleArgs()` in `test/cdp.mjs` and
+`exercises/_runner/smoke.js`, which pick the ANGLE backend by platform —
+`d3d11`/`metal`/`gl` — because the software rasteriser is too slow to settle
+a scene inside `smoke.js`'s physics budget), and standard GitHub-hosted
+runners have no GPU passthrough, so ubuntu-latest's `gl` backend would very
+likely fall back to the same class of software rasteriser and fail the same
+way. Run both locally, where a real GPU is available.
+
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
-`index.html`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
+`index.html`, `css/app.css`, `js/pickers.js`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
 `START`, `setAverage` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
-expectation. Its `test/cdp.mjs` launcher passes the GPU-backed
-`--use-angle=d3d11` itself, because the software rasteriser renders a
-full-window WebGL canvas so slowly that a spin-up scene times the run out.
+expectation. Its `test/cdp.mjs` launcher passes a GPU-backed `--use-angle`
+itself (`d3d11`/`metal`/`gl` by platform, `$ANGLE` to override, `$SOFTWARE=1`
+for the old `--disable-gpu` behaviour), because the software rasteriser
+renders a full-window WebGL canvas so slowly that a spin-up scene times the
+run out.
 
 **Why there is a mutation gate.** Eleven assertions written during the averaging
 work passed while asserting nothing — a constant fed where a varying value was
@@ -151,6 +177,13 @@ cannot reach, `smoke.js --mutate=<id>` patches one known bug into a served file
 in flight — never touching the working tree — so the same control can be run by
 hand: `node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds`.
 Each catalogue entry carries what was measured when the control was performed.
+
+Both checkers read the register the way it should be read: `check_pack.py`
+hands `js/exercises.js` to `node` and gets `EXERCISES` back as JSON, so a
+nested `ui` profile parses instead of being truncated at the first `}`; and
+`check_notation.py` walks `git ls-files`, so an untracked scratch file cannot
+fail a commit gate. Neither is a new dependency — Node is already required by
+the browser gates.
 
 The two checkers are complements: `check_notation.py` greps for *names*,
 `smoke.js` proves the names are *connected* — a field renamed at the write

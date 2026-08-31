@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """collect_plot.py -- NC-1 "Slope-area method: estimate the mystery discharge"
-(NC-1b rescue: ?scene=m3, replacing the m1 rig -- see _archive/README-full.md,
+(NC-1b: ?scene=sa1, a long uniform tilted reach. It replaced m3, which had
+replaced the m1 rig -- see _archive/README-full.md,
 "Appendix A -- Why not m1")
 
-Pools a class CSV of two-gauge + cursor slope-area readings taken on the m3
+Pools a class CSV of two-gauge + cursor slope-area readings taken on the sa1
 scene (chute -> hydraulic jump -> M2 apron) and plots the class's estimated
 discharge Q-hat against where their 7 m gauge window sat along the apron,
 against the true (concealed) q. Matplotlib only (Agg backend), no
@@ -36,9 +37,10 @@ import matplotlib.pyplot as plt
 
 G = 9.81
 READABLE_MM = 10.0   # the go/no-go floor used to clear m3 (_archive/README-full.md Sec. 5.1)
+                     # sa1 clears it by an order of magnitude: F runs 111-130 mm
 M1_BEST_F_MM = 3.24  # m1's best fall EVER measured, any window length, anywhere in its domain
                       # (_archive/README-full.md Sec. A.5.1's length sweep) -- the most
-                      # generous possible comparison point for "how much bigger is F on m3"
+                      # generous possible comparison point for "how much bigger is F on sa1"
 
 # Windows measured-and-rejected during calibration (_archive/README-full.md's safe bounds),
 # NOT part of the class/pooled statistics -- drawn only as a faded reference
@@ -112,7 +114,7 @@ def main():
         r["K"], r["Qhat1"], r["Fe_mm"], r["Qhat2"] = K, Q1, Fe_mm, Q2
         (valid if Q2 is not None else invalid).append(r)
 
-    print("NC-1b pooled class: %d windows (7 m, digit -> window position along m3's apron)"
+    print("NC-1b pooled class: %d windows (7 m, digit -> window position along the sa1 reach)"
           % len(rows))
     print("true q (concealed until reveal) = %.3f m^2/s" % trueQ)
     print("fall F over the window: range %.1f to %.1f mm (go/no-go floor was ~%.0f mm; m1's"
@@ -190,7 +192,7 @@ def main():
                     xytext=(0, 8), fontsize=7.5, ha="center", color="#555")
 
     ax.set_ylabel("estimated discharge Q̂ (m$^2$/s)")
-    ax.set_title("NC-1b -- slope-area Q̂ vs 7 m gauge-window position on m3's apron"
+    ax.set_title("NC-1b -- slope-area Q̂ vs 7 m gauge-window position on the sa1 reach"
                  " (q concealed, n=%.3f–%.3f)"
                  % (min(r["n_mid"] for r in rows), max(r["n_mid"] for r in rows)))
     ax.set_ylim(0.0, trueQ * 1.35)
@@ -209,7 +211,7 @@ def main():
     axf.axhline(READABLE_MM, color="#1c8c4e", lw=1, ls=":", alpha=0.7)
     axf.axhline(0, color="#888", lw=0.8)
     axf.bar(fx, fy, width=0.15, color=colors, alpha=0.85, zorder=3)
-    axf.text(fx[0], READABLE_MM + 4, "~10 mm go/no-go floor (m1 never reached it; every m3"
+    axf.text(fx[0], READABLE_MM + 4, "~10 mm go/no-go floor (m1 never reached it; every sa1"
              " window clears it by 8-16x)", fontsize=7, color="#1c6b3d")
     axf.set_xlabel("window midpoint x (m)  [window = [x₀, x₀+7] m,"
                    " digit d → x₀ = 5.0 + 0.5·(d mod 8)]")

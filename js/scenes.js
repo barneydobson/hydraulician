@@ -30,10 +30,12 @@
  *
  * `spinup` is the MEASURED time for the depth profile to stop moving (the
  * last moment a 10 s running mean is still >3% of mean depth from its final
- * shape), taken from headless 120 s runs. It is not guessable:
+ * shape), taken from headless runs (120 s for most scenes; sa1 needed a
+ * 260 s run to see past its own residual wobble — see its own comment). It
+ * is not guessable:
  *
  *     venturi  7    hammer  7    h23 15    m3 17    s2 17    m1 25
- *     jet     54    m2     85    c13 91
+ *     jet     54    m2     85    c13 91    sa1    120
  *
  * m1 and m2 are the same slope, roughness and discharge and differ by 3×,
  * because a drawdown has to propagate the length of the reach several times
@@ -357,6 +359,42 @@ const SCENES = (() => {
              "The jump box compares the measured d₂ against ½d₁(√(1+8Fr₁²) − 1).",
              "Past the jump the depth sits between d_n and d_c: that reach is M<b>2</b>.",
              "Raise the tailwater and the jump marches upstream onto the chute."] }),
+
+    // Same mild channel as m1/m2 (S0 = 0.0147, cf = 0.125, q = 0.25 — proven
+    // physics, not re-derived), but built for a reach with NO slope break and
+    // NO close control: the inlet is pinned at the measured normal depth (as
+    // m2's is) so the profile starts flat and STAYS flat for a long way
+    // before the brink pulls it down — see m2's inletDepth note for why that
+    // trick works. The brink sits far past NC-1's own gauge window (x up to
+    // 15.5) so the window itself only feels the start of the drawdown.
+    // tilt: true for the same reason as m2 — the rasterised staircase would
+    // otherwise be excited at this depth — but tilt has a consequence a
+    // gauge-reading exercise has to respect: with the bed drawn flat, the
+    // raw column/probe z does NOT carry the S₀·x the geometry represents —
+    // main.js's gauge readout and OVERLAY's S₀/S_f already add tiltS0·x
+    // back in, and any OTHER headless reader of `surf`/`z` on a tilted scene
+    // must do the same or its "head fall" is off by S₀·L (here 103 mm over
+    // NC-1's 7 m window — the entire signal).
+    //   MEASURED headless (Medium budget, digit ladder x₀ = 5.0…8.5, a 25–30 s
+    // Average-mode window after settling): delivered q = 0.266 m²/s (not the
+    // nominal 0.25), delivered n = 0.078–0.080, d/d_n = 0.97–0.99 at x₀ and
+    // 0.90–0.96 at x₀+7 (the window's downstream end drifts further from
+    // uniform as x₀ approaches the brink — the far end of the ladder is the
+    // least uniform, same qualitative lesson as m2). The tilt-corrected head
+    // fall F over L = 7 m runs 111–130 mm across the ladder, and the
+    // slope-area estimate (Q̂₂, both iterations) came out within 2% of the
+    // delivered q at every one of the 8 stations.
+    Object.assign(channel({
+      W: 20, H: 0.95, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
+      inletDepth: 0.36, xEnd: 19, tilt: true,
+      hmax: 0.45, vmax: 2.0, spinup: 120, dyeLine: 1.2,
+    }), {
+      id: "sa1", name: "Long mild reach", key: "Uniform, no break",
+      blurb: "The same mild channel as M1/M2, run long and flat with the control pushed far downstream — a reach with no weir, no jump, and (nearly) no drawdown to measure against.",
+      tips: ["Colour is Froude number: blue subcritical, red supercritical.",
+             "The surface sits close to d_n almost everywhere — this is what uniform flow looks like.",
+             "Only right at the far brink does the surface draw down through critical depth.",
+             "Compare with M2: same channel, but here the drawdown is pushed out of sight."] }),
 
     // ------------------------------------------------ STEEP  (C_f < 2.8 S₀)
     // S₀ = 1 in 4 at q = 1.2 m²/s. Against the MEASURED resistance that is

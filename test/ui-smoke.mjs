@@ -533,6 +533,55 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------- what the hover card prints
+    console.log("\nthe hover card prints the rows an exercise asked for");
+    {
+      const tab = await browser.open(INDEX + "?scene=m3");
+      const p = await tab.evaluate(`
+        APP.tick(400); APP.frames(2);
+        const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+        const probe = APP.probe(APP.sim.W * 0.5, 0.5);
+        // Spy on the 2d context rather than reading pixels: what this asserts
+        // is WHICH rows were drawn, and the text is the only honest record of
+        // that. A screenshot diff would pass on a card that drew the right
+        // number of wrong rows.
+        const cap = (show) => {
+          const seen = [];
+          const c = document.createElement("canvas").getContext("2d");
+          const real = c.fillText.bind(c);
+          c.fillText = (t, x, y) => { seen.push(String(t)); return real(t, x, y); };
+          OVERLAY.drawCursorReadout(c, APP.view, A, APP.sim,
+                                    APP.sim.W * 0.5, 0.5, probe, show);
+          return seen;
+        };
+        const def = cap(null);
+        const narrow = cap(["pos", "d", "Sf"]);
+        const withF = cap(["pos", "f"]);
+        const idsCovered = OVERLAY.ROW_IDS.every((id) => typeof id === "string" && id.length);
+        return {
+          nIds: OVERLAY.ROW_IDS.length,
+          defaultOmitsF: OVERLAY.DEFAULT_ROWS.indexOf("f") < 0,
+          defaultDrawsNoF: !def.some((t) => /fill f/.test(t)),
+          defaultDrawsDepth: def.some((t) => /depth d/.test(t)),
+          narrowDropsQ: !narrow.some((t) => t === "q"),
+          narrowKeepsSf: narrow.some((t) => /S_f/.test(t)),
+          fReturnsWhenNamed: withF.some((t) => /fill f/.test(t)),
+          idsCovered,
+        };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("the row register is populated", p.nIds >= 14 && p.idsCovered, p.nIds + " ids");
+      // f is the VOF fill fraction: a solver internal, 1.000 everywhere a
+      // free-surface card can be read. It is off by default and nameable back.
+      check("fill f is not in the default set", p.defaultOmitsF);
+      check("and the default card does not draw it", p.defaultDrawsNoF);
+      check("while the ordinary rows still draw", p.defaultDrawsDepth);
+      check("a profile's row list drops what it omits", p.narrowDropsQ);
+      check("and keeps what it names", p.narrowKeepsSf);
+      check("naming f puts it back", p.fReturnsWhenNamed);
+      await tab.close();
+    }
+
     // ------------------------------- the legend's place, and the mode switch
     console.log("\nthe legend sits top right, moves when dragged, carries the mode");
     {

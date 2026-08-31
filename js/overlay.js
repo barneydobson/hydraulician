@@ -466,7 +466,33 @@ const OVERLAY = (() => {
   }
 
   /** Profile label + hydraulics numbers at the cursor column. */
-  function drawCursorReadout(ctx, V, A, sim, mx, mz, probe) {
+  /** THE HOVER CARD'S ROWS, as a register -- the one place they are named.
+   *
+   *  An exercise profile names these ids to choose what its student reads
+   *  (js/main.js, UIMODE.rows), and check_pack.py validates a profile's list
+   *  against ROW_IDS so a typo fails the pack instead of quietly hiding a row.
+   *  Adding a row means adding an id here and tagging the push below; the two
+   *  are checked against each other by the layout gate.
+   *
+   *  `f` IS DELIBERATELY NOT IN THE DEFAULT. It is the VOF fill fraction, a
+   *  solver internal rather than a hydraulics quantity: in free-surface flow it
+   *  is 1.000 everywhere the card can be read, which teaches nothing, and the
+   *  one thing it did say -- that a cell is pressurised -- is already printed
+   *  on the head row and is the reason the level row disappears there. A pipe
+   *  exercise that genuinely wants it back names it.
+   */
+  const ROW_IDS = ["pos", "d", "eta", "q", "V", "Fr", "dc", "dn", "S0", "Sf",
+                   "uw", "phead", "h", "f"];
+  const DEFAULT_ROWS = ROW_IDS.filter((r) => r !== "f");
+
+  /** `show` is the set of row ids the caller wants, or null for the default.
+   *  Every row below carries a stable id as its third element, so an exercise
+   *  can name exactly the quantities its student should be reading and no
+   *  others -- a slope-area exercise wants d, S_f and n, and a card offering
+   *  fourteen numbers is a card nobody reads carefully. The ids are the
+   *  contract: they are validated against ROW_IDS by check_pack.py, so a typo
+   *  in a profile fails the pack rather than silently hiding a row. */
+  function drawCursorReadout(ctx, V, A, sim, mx, mz, probe, show) {
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(mx / sim.dx)));
     const d = A.d[i], dc = A.dc[i], dn = A.dn[i], S0 = A.S0[i];
     // Numbers wherever there is water standing on something; the CLASS only
@@ -484,34 +510,39 @@ const OVERLAY = (() => {
     const press = !!probe && probe.f > 1.002 && capped;
     const cls = wet && A.ok[i] && !press ? classify(d, dn, dc, S0) : "";
     const rows = [];
-    rows.push(["x, z", fmt(mx, 2) + ", " + fmt(mz, 2) + " m"]);
+    rows.push(["x, z", fmt(mx, 2) + ", " + fmt(mz, 2) + " m", "pos"]);
     if (wet) {
-      rows.push(["depth d", fmt(d, 3) + " m"]);
-      if (!press) rows.push(["level η", fmt(A.bed[i] + d, 3) + " m above datum"]);
-      rows.push(["q", fmt(A.q[i], 3) + " m²/s"]);
-      rows.push(["V", fmt(A.V[i], 2) + " m/s"]);
+      rows.push(["depth d", fmt(d, 3) + " m", "d"]);
+      if (!press) rows.push(["level η", fmt(A.bed[i] + d, 3) + " m above datum", "eta"]);
+      rows.push(["q", fmt(A.q[i], 3) + " m²/s", "q"]);
+      rows.push(["V", fmt(A.V[i], 2) + " m/s", "V"]);
     }
     if (wet && !press) {
-      rows.push(["Fr", fmt(A.Fr[i], 2) + (A.Fr[i] > 1 ? "  supercritical" : "  subcritical")]);
-      rows.push(["d_c", fmt(dc, 3) + " m"]);
-      if (isFinite(dn)) rows.push(["d_n", fmt(dn, 3) + " m  (measured)"]);
-      rows.push(["S₀", (S0 >= 0 ? "1 : " + fmt(1 / Math.max(S0, 1e-9), 0) : "adverse")]);
+      rows.push(["Fr", fmt(A.Fr[i], 2) + (A.Fr[i] > 1 ? "  supercritical" : "  subcritical"), "Fr"]);
+      rows.push(["d_c", fmt(dc, 3) + " m", "dc"]);
+      if (isFinite(dn)) rows.push(["d_n", fmt(dn, 3) + " m  (measured)", "dn"]);
+      rows.push(["S₀", (S0 >= 0 ? "1 : " + fmt(1 / Math.max(S0, 1e-9), 0) : "adverse"), "S0"]);
       // n is only computed where the classification is trustworthy, so a
       // guard-band station prints the slope alone rather than "n = NaN".
       if (A.Sf[i] > 0) rows.push(["S_f", "1 : " + fmt(1 / A.Sf[i], 0) +
-        (isFinite(A.n[i]) ? "   n = " + fmt(A.n[i], 3) : "")]);
+        (isFinite(A.n[i]) ? "   n = " + fmt(A.n[i], 3) : ""), "Sf"]);
     }
     if (probe) {
-      rows.push(["u, w", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s"]);
-      rows.push(["pressure head p/ρg", fmt(probe.phead, 3) + " m"]);
+      rows.push(["u, w", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s", "uw"]);
+      rows.push(["pressure head p/ρg", fmt(probe.phead, 3) + " m", "phead"]);
       // h = z + p/ρg. Shown in BOTH regimes: in hydrostatic open-channel flow
       // it equals the level η above, but inside a pressurised conduit there is
       // no surface and the η row is suppressed, which is exactly where the
       // piezometric head is the only meaningful head to read.
       rows.push(["head h = z + p/ρg",
-        fmt(mz - (sim.scene.tiltS0 || 0) * mx + probe.phead, 3) + " m"]);
-      rows.push(["fill f", fmt(probe.f, 3) + (probe.f > 1.002 ? "  pressurised" : "")]);
+        fmt(mz - (sim.scene.tiltS0 || 0) * mx + probe.phead, 3) + " m", "h"]);
+      rows.push(["fill f", fmt(probe.f, 3) + (probe.f > 1.002 ? "  pressurised" : ""), "f"]);
     }
+    // Filter to what was asked for. A row with no id is never hidden -- if a
+    // future row forgets its tag it keeps showing, which is the safe way round.
+    const keep = show || DEFAULT_ROWS;
+    const shown = rows.filter((r) => !r[2] || keep.indexOf(r[2]) >= 0);
+    rows.length = 0; Array.prototype.push.apply(rows, shown);
     if (!rows.length) return;
 
     const B = V.vis || V;
@@ -1118,6 +1149,7 @@ const OVERLAY = (() => {
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
+           ROW_IDS, DEFAULT_ROWS,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
            drawMeasure, drawCV, drawFlux, measureText, chip, fmt };
 })();

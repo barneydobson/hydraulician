@@ -1425,13 +1425,28 @@ const UIMODE = (() => {
    *  labels, jump boxes and channel overlay stay with `viewParams`, which
    *  already sets them — two ways to say the same thing is how they come to
    *  disagree. */
+  /** Which rows the hover card should print: the ids an exercise named, or
+   *  null for OVERLAY's own default set. A profile writes them under readouts,
+   *  beside the three whole-panel switches, because they answer the same
+   *  question at a finer grain -- what of the numbers a student meets:
+   *
+   *      ui: { readouts: { rows: ["pos", "d", "q", "Sf"] } }
+   *
+   *  An unknown id is not silently dropped here; check_pack.py fails the pack
+   *  over it, which is the only place that can catch a typo before a lecture. */
+  function rows() {
+    const u = state.ui;
+    if (!u || u.lifted || !u.readouts || !Array.isArray(u.readouts.rows)) return null;
+    return u.readouts.rows;
+  }
+
   function shows(what) {
     const u = state.ui;
     if (!u || u.lifted || !u.readouts) return true;
     return u.readouts[what] !== false;
   }
 
-  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows };
+  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows, rows };
 })();
 
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
@@ -2699,7 +2714,8 @@ function drawOverlay(A) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
     if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1], measuringAvg()); }
-    OVERLAY.drawCursorReadout(ctx, view, A, sim, state.cursor[0], state.cursor[1], state.hover);
+    OVERLAY.drawCursorReadout(ctx, view, A, sim, state.cursor[0], state.cursor[1],
+                              state.hover, UIMODE.rows());
   }
 }
 

@@ -30,6 +30,10 @@ const state = {
   // following the panel. Not stored anywhere on purpose: a `?ex=` link has to
   // look the same for every student who opens it.
   legendPlaced: false,
+  // The two grade lines, on their own switch beside the channel overlay. Off
+  // by default: they cost a full-field readback, and most scenes are
+  // free-surface, where the HGL lies on the water line and adds nothing.
+  grade: false, gradeBuf: null, gradeTick: 0,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
@@ -647,6 +651,9 @@ const CONTROLS = [
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
+  { id: "grade", type: "check", label: "Grade lines (EGL / HGL)",
+    get: () => state.grade, set: (v) => state.grade = v,
+    info: "The energy grade line H and the hydraulic grade line h = z + p/ρg, drawn for every wet column whether it has a free surface or not. The gap between them is the velocity head V²/2g, to scale. In a free-surface reach the HGL sits on the water surface; in a pressurised conduit there is no surface and the HGL is the only meaningful head — it can run above the crown, which is what B10 is about. Costs one full-field readback, throttled to every third frame." },
   { id: "labels", type: "check", label: "Profile labels",
     get: () => state.labels, set: (v) => state.labels = v,
     info: "Names each reach by its gradually-varied-flow class. The letter is the bed (Mild, Steep, Critical, Horizontal, Adverse); the number is the zone — 1 above both d_n and d_c, 2 between them, 3 below both." },
@@ -1545,6 +1552,10 @@ const TOOLBAR = [
       hint: "Critical depth, normal depth and the energy grade line",
       on: () => state.channel,
       act: () => { state.channel = !state.channel; syncPanel(); } },
+    { id: "gradeBtn", icon: "channel", label: "Grade lines", key: "",
+      hint: "Energy and hydraulic grade lines — the gap between them is the velocity head",
+      on: () => state.grade,
+      act: () => { state.grade = !state.grade; syncPanel(); } },
     // VIEW and not MEASURE, deliberately, although it is the one toggle here
     // that changes what the numbers say: it changes how the water is DRAWN,
     // and everything else follows the picture — the overlay, the instruments
@@ -2710,6 +2721,15 @@ function drawOverlay(A) {
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);
+  if (state.grade) {
+    // Throttled for the same reason the hover probe is: this is a full-field
+    // readPixels, and a line a reader looks at does not need one every frame.
+    if (--state.gradeTick <= 0) {
+      state.gradeTick = 3;
+      state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, measuringAvg());
+    }
+    OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
+  }
   if (state.inside && !state.drag && UIMODE.shows("cursor")) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.

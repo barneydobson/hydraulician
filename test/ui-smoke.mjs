@@ -533,6 +533,80 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------------- the grade lines
+    console.log("\nthe grade lines follow the head, in both regimes");
+    {
+      const tab = await browser.open(INDEX + "?scene=m1");
+      const p = await tab.evaluate(`
+        const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
+        APP.tick(1200); APP.frames(3);
+        const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+        const h = APP.SIM.hydraulicGrade(null, false);
+        const dx = APP.sim.dx;
+        // In a hydrostatic free-surface column the piezometric head IS the
+        // water surface. That is the check with teeth: it caught a half-cell
+        // elevation bias (the median sat at exactly dx/2) that looked entirely
+        // plausible on screen.
+        const dev = [];
+        for (let i = 2; i < APP.sim.nx - 2; i++) {
+          if (!isFinite(h[i])) continue;
+          dev.push(Math.abs(h[i] - (A.bed[i] + A.dRaw[i])));
+        }
+        dev.sort((a, b) => a - b);
+        const median = dev[dev.length >> 1];
+        // and the draw path must actually run and label both lines
+        let labels = [];
+        const cx = document.createElement("canvas").getContext("2d");
+        const real = cx.fillText.bind(cx);
+        cx.fillText = (t, x, y) => { labels.push(String(t)); return real(t, x, y); };
+        OVERLAY.drawGradeLines(cx, APP.view, A, APP.sim, h);
+        const before = APP.state.grade;
+        document.getElementById("gradeBtn").click();
+        return { n: dev.length, median, dx, ratio: median / dx, labels,
+                 toggled: APP.state.grade !== before,
+                 panelHasIt: !!CONTROLS.find((x) => x.id === "grade") };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("the grade line covers the reach", p.n > 200, p.n + " columns");
+      check("and lies on the water surface where the column is hydrostatic",
+            p.ratio < 0.25,
+            "median |HGL - surface| " + p.median.toFixed(5) + " m = " +
+            p.ratio.toFixed(3) + " dx");
+      check("both lines are labelled", p.labels.length === 2, JSON.stringify(p.labels));
+      check("the strip button toggles it", p.toggled);
+      // The panel must be able to reproduce anything the strip does — the
+      // standing acceptance test for control changes.
+      check("and the panel can set it too", p.panelHasIt);
+      await tab.close();
+    }
+
+    // A pressurised run is the case the HGL exists for: there is no free
+    // surface, the column reduction reports the soffit, and the head runs
+    // above the crown.
+    {
+      const tab = await browser.open(INDEX + "?scene=hammer");
+      const p = await tab.evaluate(`
+        const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
+        APP.tick(1200); APP.frames(3);
+        const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+        const h = APP.SIM.hydraulicGrade(null, false);
+        let n = 0, above = 0, worst = 0;
+        for (let i = 2; i < APP.sim.nx - 2; i++) {
+          if (!isFinite(h[i])) continue;
+          n++;
+          const d = h[i] - (A.bed[i] + A.dRaw[i]);
+          if (d > 0.02) above++;
+          if (d > worst) worst = d;
+        }
+        return { n, above, worst };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("in a pressurised conduit the HGL leaves the conduit",
+            p.above > 0.8 * p.n && p.worst > 1,
+            p.above + " of " + p.n + " columns, up to " + p.worst.toFixed(1) + " m above");
+      await tab.close();
+    }
+
     // ------------------------------------------- what the hover card prints
     console.log("\nthe hover card prints the rows an exercise asked for");
     {

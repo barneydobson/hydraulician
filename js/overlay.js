@@ -28,7 +28,7 @@ const OVERLAY = (() => {
   const EMA = 0.06;                       // temporal smoothing of the estimate
 
   const C = {
-    dc: "#ffb648", dn: "#5fd08a", egl: "#cfe3f5", surf: "#7fd4ff",
+    dc: "#ffb648", dn: "#5fd08a", egl: "#cfe3f5", hgl: "#ff9de2", surf: "#7fd4ff",
     dim: "rgba(223,232,242,0.55)", grid: "rgba(223,232,242,0.13)",
   };
 
@@ -492,6 +492,54 @@ const OVERLAY = (() => {
    *  fourteen numbers is a card nobody reads carefully. The ids are the
    *  contract: they are validated against ROW_IDS by check_pack.py, so a typo
    *  in a profile fails the pack rather than silently hiding a row. */
+  /** THE TWO GRADE LINES, on their own switch.
+   *
+   *  The channel overlay already draws the energy line, but only across
+   *  columns it considers open-channel: a pressurised run fails its `ok` test
+   *  and the line simply stops, which is exactly where a pipe exercise needs
+   *  it most. And the HYDRAULIC grade line was not drawn at all.
+   *
+   *  Both are drawn here for every column that has water in it, pressurised or
+   *  not, and the pair is the point: they are separated by the velocity head
+   *  V^2/2g, so the gap between them IS the kinetic energy, drawn to scale. In
+   *  a steady free-surface reach the HGL lies on the water surface; in a pipe
+   *  it leaves the crown and the picture stops being a cartoon.
+   *
+   *  `hgl` is SIM.hydraulicGrade()'s array (piezometric head per column, NaN
+   *  where dry). The energy line is that plus the velocity head, so the two
+   *  are consistent by construction rather than by two separate estimates that
+   *  can disagree about where the water is. */
+  function drawGradeLines(ctx, V, A, sim, hgl) {
+    if (!hgl) return;
+    const nx = sim.nx, step = Math.max(1, Math.round(nx / 900));
+    const g = Math.abs(sim.p.g) || 9.81;
+    const ph = [], pe = [];
+    for (let i = 0; i < nx; i += step) {
+      const x = V.X((i + 0.5) * sim.dx), h = hgl[i];
+      if (isFinite(h)) {
+        const v = A.V[i] || 0;
+        ph.push([x, V.Y(h)]);
+        pe.push([x, V.Y(h + v * v / (2 * g))]);
+      } else { ph.push(null); pe.push(null); }
+    }
+    line(ctx, pe, C.egl, 1.4, [6, 3]);
+    line(ctx, ph, C.hgl, 1.4, [2, 3]);
+
+    const B = V.vis || V;
+    let ly = B.y + 16;
+    [["energy grade line  H", C.egl, [6, 3]],
+     ["hydraulic grade line  h", C.hgl, [2, 3]]].forEach(([t, c, d], k) => {
+      ctx.save();
+      ctx.strokeStyle = c; ctx.lineWidth = 1.6; ctx.setLineDash(d);
+      ctx.beginPath(); ctx.moveTo(B.x + 12, ly + k * 15); ctx.lineTo(B.x + 40, ly + k * 15);
+      ctx.stroke(); ctx.restore();
+      ctx.fillStyle = C.dim;
+      ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
+      ctx.textBaseline = "middle";
+      ctx.fillText(t, B.x + 46, ly + k * 15 + 1);
+    });
+  }
+
   function drawCursorReadout(ctx, V, A, sim, mx, mz, probe, show) {
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(mx / sim.dx)));
     const d = A.d[i], dc = A.dc[i], dn = A.dn[i], S0 = A.S0[i];
@@ -1149,6 +1197,7 @@ const OVERLAY = (() => {
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
+           drawGradeLines,
            ROW_IDS, DEFAULT_ROWS,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
            drawMeasure, drawCV, drawFlux, measureText, chip, fmt };

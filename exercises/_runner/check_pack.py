@@ -146,6 +146,21 @@ DRAWS = re.compile(
     r"cut|cuts|move|widen|narrow|shrink)\b", re.I)
 
 
+def row_ids():
+    """The hover-card row ids, read out of js/overlay.js's ROW_IDS register.
+
+    Parsed rather than duplicated. This check exists to catch a profile naming
+    a row that does not exist, and it could not do that honestly against a copy
+    of the list that nobody updates."""
+    src = open(os.path.join(ROOT, "js", "overlay.js"), encoding="utf-8").read()
+    m = re.search(r"const ROW_IDS = \[(.*?)\];", src, re.S)
+    if not m:
+        print("check_pack.py cannot find ROW_IDS in js/overlay.js -- the hover-card "
+              "row register moved or was renamed, and this check will not run blind.")
+        sys.exit(1)
+    return set(re.findall(r'"([^"]+)"', m.group(1)))
+
+
 def main():
     verbose = "-v" in sys.argv
     ex = cards()
@@ -234,7 +249,10 @@ def main():
                 "measure", "cv", "pour"}
     FIELD_IDS = {"water", "speed", "ehead", "head", "phead", "vort", "froude", "mom"}
     PANEL = {"full", "focused", "shut"}
-    READOUT_IDS = {"gauges", "cursor", "status"}
+    # gauges/cursor/status switch a whole panel; `rows` narrows the hover
+    # card to named lines and is validated against ROW_IDS below.
+    READOUT_IDS = {"gauges", "cursor", "status", "rows"}
+    ROW_IDS = row_ids()
     BUILD_TOOLS = {"wall", "erase", "valve", "spout", "pour"}
     for e in ex:
         i, ui = e.get("id"), e.get("ui")
@@ -263,6 +281,24 @@ def main():
                 if bad:
                     fail.append("%-5s ui.readouts names readouts that do not exist: %s"
                                 % (i, ", ".join(bad)))
+                # `rows` picks which lines the hover card prints. The ids come
+                # out of js/overlay.js's own ROW_IDS register rather than a
+                # copy kept here, because a second hand-maintained list is a
+                # list that drifts -- and what it would hide is a row that
+                # simply never appears in front of a student.
+                rws = readouts.get("rows")
+                if rws is not None:
+                    checked += 1
+                    if not isinstance(rws, list) or not rws:
+                        fail.append("%-5s ui.readouts.rows must be a non-empty "
+                                    "list of row ids" % i)
+                    else:
+                        bad = [r for r in rws if r not in ROW_IDS]
+                        if bad:
+                            fail.append("%-5s ui.readouts.rows names rows that do not "
+                                        "exist: %s (known: %s)"
+                                        % (i, ", ".join(map(str, bad)),
+                                           ", ".join(sorted(ROW_IDS))))
 
         # The derived profile hides BUILD unless the card declares a build
         # tool or says so outright. A task that tells a student to draw, cut,

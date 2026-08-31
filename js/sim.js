@@ -1037,6 +1037,64 @@ const SIM = (() => {
     return false;
   }
 
+  /** THE HYDRAULIC GRADE LINE: piezometric head h = z + p/rho g, per column.
+   *
+   *  Read at the cell just above the bed, which is the one place the answer is
+   *  right in BOTH regimes. In free-surface flow the column is hydrostatic, so
+   *  z + p/rho g at the bed equals the water surface -- the HGL and the surface
+   *  line coincide, which is the textbook statement and a useful thing for a
+   *  student to SEE rather than be told. Inside a pressurised conduit there is
+   *  no surface at all, the column reduction reports the soffit, and the
+   *  piezometric head is then the only meaningful head there is: it can and
+   *  does run above the pipe crown, which is the whole subject of B10.
+   *
+   *  Taking it at the bed rather than at the free surface is deliberate. At the
+   *  surface p -> 0 by construction (the EOS is one-sided), so a surface sample
+   *  would return the surface elevation in every regime and the line would
+   *  carry no information a pipe run needs.
+   *
+   *  ONE readPixels of the whole velocity/pressure texture -- the same bargain
+   *  fieldStats and boxForce already make. Never call it on the frame path
+   *  without a throttle.
+   *
+   *  Returns a Float32Array of nx heads; a dry column reads NaN so the overlay
+   *  can break the line rather than drawing it through a gap. */
+  function hydraulicGrade(out, avg) {
+    const nx = S.nx, ny = S.ny, dx = S.dx;
+    const h = out && out.length >= nx ? out : new Float32Array(nx);
+    const g = Math.abs(S.p.g) || 9.81;
+    const buf = S.gradeBuf && S.gradeBuf.length >= nx * ny * 4
+      ? S.gradeBuf : (S.gradeBuf = new Float32Array(nx * ny * 4));
+    const on = !!(avg && S.avg);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, on ? S.avg.fld.read.fbo : S.U.read.fbo);
+    gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, buf);
+    // The averaged field stores (f*u, f*w, f, P); the live one (u, w, P, dye).
+    // The pressure sits in a different channel in each, and reading the wrong
+    // one gives a plausible-looking line made of velocity.
+    const pc = on ? 3 : 2;
+    const F = S.fBuf && S.fBuf.length >= nx * ny * 4
+      ? S.fBuf : (S.fBuf = new Float32Array(nx * ny * 4));
+    if (!on) { gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+               gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, F); }
+    for (let i = 0; i < nx; i++) {
+      h[i] = NaN;
+      for (let j = 1; j < ny - 1; j++) {
+        const k = j * nx + i;
+        if (S.mask[k] >= 192) continue;                      // solid
+        const f = on ? buf[k * 4 + 2] : F[k * 4];
+        if (f < 0.25) continue;                              // not water yet
+        // j * dx, NOT the cell centre. MEASURED: with (j + 0.5) * dx the
+        // whole line sat a uniform 0.00964 m above the free surface on m1
+        // at Low, where dx/2 is 0.00966 -- a clean half-cell bias, not
+        // weir physics. The stored pressure references the cell's lower
+        // face, so that is the elevation it belongs to.
+        h[i] = j * dx + buf[k * 4 + pc] / g;                 // z + p/rho g
+        break;                                               // lowest wet cell
+      }
+    }
+    return h;
+  }
+
   function probe(x, z, avg) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
@@ -1484,6 +1542,7 @@ const SIM = (() => {
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
+           hydraulicGrade,
            setValve,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,

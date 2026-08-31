@@ -208,7 +208,7 @@ const EXERCISES = [
     title: "Slope-area method: estimate the mystery discharge",
     topic: "Natural channels",
     folder: "NC-1-slope-area",
-    scene: "m3",
+    scene: "sa1",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { channel: true, gaugeField: "h" },
@@ -219,7 +219,7 @@ const EXERCISES = [
     ],
     start: "a natural-looking reach with the discharge hidden — keep the panel shut",
     task: "Gauge x₀ and x₀ + 7, read the head fall F between them and h and n at the midpoint, then Q̂ = K√(F/L) with K = h^(5/3)/n.",
-    settle: 32,
+    settle: 120,
   },
   {
     id: "NC-2",

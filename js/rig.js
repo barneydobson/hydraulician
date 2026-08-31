@@ -112,6 +112,10 @@ const RIG = (() => {
             cvShow: state.cvShow,
             channel: b01(state.channel), labels: b01(state.labels),
             jumps: b01(state.jumps), particles: b01(state.particles),
+            // A view flag like the three above it: what a shared rig was
+            // being LOOKED at with, which is part of the rig for a demo
+            // whose whole subject is where the HGL runs.
+            grade: b01(state.grade),
             dye: b01(state.dye) },
     };
     if (state.tracers) o.tracers = [r4(state.tracers.x), state.tracerN | 0,
@@ -198,7 +202,7 @@ const RIG = (() => {
     if (U.field) state.gaugeField = U.field;
     if (U.cvShow && CV_NEXT[U.cvShow]) state.cvShow = U.cvShow;
     if (U.speed !== undefined) state.speed = +U.speed;
-    ["channel", "labels", "jumps", "particles", "dye"].forEach((k) => {
+    ["channel", "labels", "jumps", "particles", "dye", "grade"].forEach((k) => {
       if (U[k] !== undefined) state[k] = !!(+U[k]);
     });
 

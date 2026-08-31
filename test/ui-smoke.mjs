@@ -533,6 +533,198 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------------- the grade lines
+    console.log("\nthe grade lines follow the head, in both regimes");
+    {
+      const tab = await browser.open(INDEX + "?scene=m1");
+      const p = await tab.evaluate(`
+        const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
+        APP.tick(1200); APP.frames(3);
+        const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+        const h = APP.SIM.hydraulicGrade(null, false);
+        const dx = APP.sim.dx;
+        // In a hydrostatic free-surface column the piezometric head IS the
+        // water surface. That is the check with teeth: it caught a half-cell
+        // elevation bias (the median sat at exactly dx/2) that looked entirely
+        // plausible on screen.
+        const dev = [];
+        for (let i = 2; i < APP.sim.nx - 2; i++) {
+          if (!isFinite(h[i])) continue;
+          dev.push(Math.abs(h[i] - (A.bed[i] + A.dRaw[i])));
+        }
+        dev.sort((a, b) => a - b);
+        const median = dev[dev.length >> 1];
+        // and the draw path must actually run and label both lines
+        let labels = [];
+        const cx = document.createElement("canvas").getContext("2d");
+        const real = cx.fillText.bind(cx);
+        cx.fillText = (t, x, y) => { labels.push(String(t)); return real(t, x, y); };
+        OVERLAY.drawGradeLines(cx, APP.view, A, APP.sim, h);
+        const before = APP.state.grade;
+        document.getElementById("gradeBtn").click();
+        return { n: dev.length, median, dx, ratio: median / dx, labels,
+                 toggled: APP.state.grade !== before,
+                 panelHasIt: !!CONTROLS.find((x) => x.id === "grade") };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("the grade line covers the reach", p.n > 200, p.n + " columns");
+      check("and lies on the water surface where the column is hydrostatic",
+            p.ratio < 0.25,
+            "median |HGL - surface| " + p.median.toFixed(5) + " m = " +
+            p.ratio.toFixed(3) + " dx");
+      check("both lines are labelled", p.labels.length === 2, JSON.stringify(p.labels));
+      check("the strip button toggles it", p.toggled);
+      // The panel must be able to reproduce anything the strip does — the
+      // standing acceptance test for control changes.
+      check("and the panel can set it too", p.panelHasIt);
+      await tab.close();
+    }
+
+    // A pressurised run is the case the HGL exists for: there is no free
+    // surface, the column reduction reports the soffit, and the head runs
+    // above the crown.
+    {
+      const tab = await browser.open(INDEX + "?scene=hammer");
+      const p = await tab.evaluate(`
+        const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
+        APP.tick(1200); APP.frames(3);
+        const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+        const h = APP.SIM.hydraulicGrade(null, false);
+        let n = 0, above = 0, worst = 0;
+        for (let i = 2; i < APP.sim.nx - 2; i++) {
+          if (!isFinite(h[i])) continue;
+          n++;
+          const d = h[i] - (A.bed[i] + A.dRaw[i]);
+          if (d > 0.02) above++;
+          if (d > worst) worst = d;
+        }
+        return { n, above, worst };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("in a pressurised conduit the HGL leaves the conduit",
+            p.above > 0.8 * p.n && p.worst > 1,
+            p.above + " of " + p.n + " columns, up to " + p.worst.toFixed(1) + " m above");
+      await tab.close();
+    }
+
+    // ------------------------------------------- what the hover card prints
+    console.log("\nthe hover card prints the rows an exercise asked for");
+    {
+      const tab = await browser.open(INDEX + "?scene=m3");
+      const p = await tab.evaluate(`
+        APP.tick(400); APP.frames(2);
+        const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
+        const probe = APP.probe(APP.sim.W * 0.5, 0.5);
+        // Spy on the 2d context rather than reading pixels: what this asserts
+        // is WHICH rows were drawn, and the text is the only honest record of
+        // that. A screenshot diff would pass on a card that drew the right
+        // number of wrong rows.
+        const cap = (show) => {
+          const seen = [];
+          const c = document.createElement("canvas").getContext("2d");
+          const real = c.fillText.bind(c);
+          c.fillText = (t, x, y) => { seen.push(String(t)); return real(t, x, y); };
+          OVERLAY.drawCursorReadout(c, APP.view, A, APP.sim,
+                                    APP.sim.W * 0.5, 0.5, probe, show);
+          return seen;
+        };
+        const def = cap(null);
+        const narrow = cap(["pos", "d", "Sf"]);
+        const withF = cap(["pos", "f"]);
+        const idsCovered = OVERLAY.ROW_IDS.every((id) => typeof id === "string" && id.length);
+        return {
+          nIds: OVERLAY.ROW_IDS.length,
+          defaultOmitsF: OVERLAY.DEFAULT_ROWS.indexOf("f") < 0,
+          defaultDrawsNoF: !def.some((t) => /fill f/.test(t)),
+          defaultDrawsDepth: def.some((t) => /depth d/.test(t)),
+          narrowDropsQ: !narrow.some((t) => t === "q"),
+          narrowKeepsSf: narrow.some((t) => /S_f/.test(t)),
+          fReturnsWhenNamed: withF.some((t) => /fill f/.test(t)),
+          idsCovered,
+        };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("the row register is populated", p.nIds >= 14 && p.idsCovered, p.nIds + " ids");
+      // f is the VOF fill fraction: a solver internal, 1.000 everywhere a
+      // free-surface card can be read. It is off by default and nameable back.
+      check("fill f is not in the default set", p.defaultOmitsF);
+      check("and the default card does not draw it", p.defaultDrawsNoF);
+      check("while the ordinary rows still draw", p.defaultDrawsDepth);
+      check("a profile's row list drops what it omits", p.narrowDropsQ);
+      check("and keeps what it names", p.narrowKeepsSf);
+      check("naming f puts it back", p.fReturnsWhenNamed);
+      await tab.close();
+    }
+
+    // ------------------------------- the legend's place, and the mode switch
+    console.log("\nthe legend sits top right, moves when dragged, carries the mode");
+    {
+      // ?ex= so the brief dock is OPEN: the default position is expressed as
+      // right: calc(var(--dock) + 12px), and a dock of zero width would prove
+      // nothing about whether it clears one.
+      const tab = await browser.open(INDEX + "?ex=HJ-1",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const p = await tab.evaluate(`
+        const leg = document.getElementById("legend");
+        APP.LEGEND.open();
+        const L = leg.getBoundingClientRect();
+        const dock = document.getElementById("dock").getBoundingClientRect();
+        const panel = document.getElementById("panel");
+        const pr = panel.getBoundingClientRect();
+        const overPanel = panel.classList.contains("open") &&
+          L.left < pr.right - 0.5 && L.top < pr.bottom && L.bottom > pr.top;
+
+        // A drag must NOT start on a control. Fit is a button; pulling on it
+        // has to leave the card exactly where it was.
+        const fit = document.getElementById("legFit");
+        const pd = (el, t, x, y, id) => el.dispatchEvent(
+          new PointerEvent(t, { clientX: x, clientY: y, bubbles: true, pointerId: id }));
+        pd(fit, "pointerdown", 0, 0, 9);
+        pd(fit, "pointermove", 300, 300, 9);
+        const heldStill = leg.getBoundingClientRect().left === L.left;
+        pd(fit, "pointerup", 300, 300, 9);
+
+        // ...but a drag on the card body must move it, and take the position over.
+        const bars = document.getElementById("legBars");
+        pd(bars, "pointerdown", L.left + 40, L.top + 60, 1);
+        pd(bars, "pointermove", 460, 300, 1);
+        pd(bars, "pointerup", 460, 300, 1);
+        const after = leg.getBoundingClientRect();
+
+        // The mode switch, and whether it agrees with the single writer.
+        const liveB = document.getElementById("legLive"), avgB = document.getElementById("legAvgOn");
+        avgB.click();
+        const onState = APP.state.avg;
+        const onPressed = avgB.getAttribute("aria-pressed") === "true" &&
+                          liveB.getAttribute("aria-pressed") === "false";
+        const avgChars = document.getElementById("legAvg").innerText.replace(/\ss+/g, " ").trim().length;
+        APP.avg.set(false);                     // the path the A key takes
+        const offPressed = liveB.getAttribute("aria-pressed") === "true" &&
+                           avgB.getAttribute("aria-pressed") === "false";
+        return { dockGap: Math.round(dock.left - L.right), overDock: L.right > dock.left + 0.5,
+                 overPanel, heldStill, from: Math.round(L.left), movedTo: Math.round(after.left),
+                 placed: leg.classList.contains("placed"), flag: APP.state.legendPlaced,
+                 inView: after.left >= 0 && after.right <= innerWidth,
+                 onState, onPressed, offPressed, avgChars };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("it sits immediately left of the dock", p.dockGap === 12, "gap " + p.dockGap + "px");
+      check("and never under it", !p.overDock);
+      check("nor under the Controls panel", !p.overPanel);
+      check("a drag on a control does not move the card", p.heldStill);
+      check("a drag on the card body does", p.movedTo !== p.from, p.from + " -> " + p.movedTo);
+      check("and that takes the position over", p.placed && p.flag);
+      check("a dragged card stays on screen", p.inView);
+      check("the legend's Average button turns averaging on", p.onState);
+      check("the buttons show which mode is running", p.onPressed);
+      check("and follow setAverage when something else writes it", p.offPressed);
+      // The block used to carry two static paragraphs that never changed and
+      // are still in the panel's own info and docs/averaging.md section 9. If
+      // it grows back past a few hundred characters, the prose has crept in.
+      check("the Average block stays short", p.avgChars < 320, p.avgChars + " chars");
+      await tab.close();
+    }
+
     // ------------------------------------------------------------ the legend
     console.log("\nthe legend says what the colour means, and changes it");
     {

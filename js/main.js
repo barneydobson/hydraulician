@@ -25,6 +25,15 @@ const state = {
   tool: "wall", brush: 0.055,
   mode: 0, range: {}, particles: false, dye: true, channel: true, labels: true, jumps: true,
   ui: null,                   // the resolved UI profile; UIMODE.full() when absent
+  // The legend sits top right, immediately left of the Controls panel, until
+  // somebody drags it; then the position is theirs for the session and stops
+  // following the panel. Not stored anywhere on purpose: a `?ex=` link has to
+  // look the same for every student who opens it.
+  legendPlaced: false,
+  // The two grade lines, on their own switch beside the channel overlay. Off
+  // by default: they cost a full-field readback, and most scenes are
+  // free-surface, where the HGL lies on the water line and adds nothing.
+  grade: false, gradeBuf: null, gradeTick: 0,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
@@ -642,6 +651,9 @@ const CONTROLS = [
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
+  { id: "grade", type: "check", label: "Grade lines (EGL / HGL)",
+    get: () => state.grade, set: (v) => state.grade = v,
+    info: "The energy grade line H and the hydraulic grade line h = z + p/ρg, drawn for every wet column whether it has a free surface or not. The gap between them is the velocity head V²/2g, to scale. In a free-surface reach the HGL sits on the water surface; in a pressurised conduit there is no surface and the HGL is the only meaningful head — it can run above the crown, which is what B10 is about. Costs one full-field readback, throttled to every third frame." },
   { id: "labels", type: "check", label: "Profile labels",
     get: () => state.labels, set: (v) => state.labels = v,
     info: "Names each reach by its gradually-varied-flow class. The letter is the bed (Mild, Steep, Critical, Horizontal, Adverse); the number is the zone — 1 above both d_n and d_c, 2 between them, 3 below both." },
@@ -1088,6 +1100,29 @@ const LEGEND = (() => {
   function build() {
     document.getElementById("legPick").onclick = (e) => { e.stopPropagation(); toggleMenu(); };
     document.getElementById("legX").onclick = () => close();
+    // Live / Average. Both go through setAverage, which is the single writer:
+    // it has to open and release the accumulators, so the flag alone is not
+    // the mode. Clicking the state you are already in does nothing rather
+    // than restarting the window, which would silently throw the reading away.
+    document.getElementById("legLive").onclick = (e) => {
+      e.target.blur(); if (state.avg) setAverage(false);
+    };
+    document.getElementById("legAvgOn").onclick = (e) => {
+      e.target.blur(); if (!state.avg) setAverage(true);
+    };
+    // The whole card is the handle, not its header: the header IS a button
+    // (the field picker) and dragWindow correctly refuses to start a drag on
+    // one, so using it as the handle meant nothing ever moved. Everything
+    // interactive on the card -- the picker, Fit, scene, the mode buttons, the
+    // editable range numbers -- is excluded by dragWindow's own guard.
+    dragWindow(el(), el(), () => {
+      // First drag takes the position over: .placed drops the `right` anchor
+      // in the stylesheet so the inline left/top wins, and the card stops
+      // following the Controls panel. Same bargain as the vertical
+      // exaggeration -- fitted until somebody sets it by hand, then theirs.
+      state.legendPlaced = true;
+      el().classList.add("placed");
+    });
     document.getElementById("legFit").onclick = (e) => { e.target.blur(); fit(); };
     document.getElementById("legDef").onclick = (e) => {
       e.target.blur();
@@ -1144,6 +1179,14 @@ const LEGEND = (() => {
    *  and every open or close. */
   function sync() {
     if (!el()) return;
+    const live = document.getElementById("legLive");
+    const avgb = document.getElementById("legAvgOn");
+    if (live && avgb) {
+      // aria-pressed is what the stylesheet paints from, so the button that is
+      // lit and the mode that is running are the same fact.
+      live.setAttribute("aria-pressed", String(!state.avg));
+      avgb.setAttribute("aria-pressed", String(!!state.avg));
+    }
     const f = fieldFor(state.mode), r = rangeFor(f.id);
     document.getElementById("legName").textContent = f.name;
     document.getElementById("legSym").textContent = f.sym;
@@ -1389,13 +1432,28 @@ const UIMODE = (() => {
    *  labels, jump boxes and channel overlay stay with `viewParams`, which
    *  already sets them — two ways to say the same thing is how they come to
    *  disagree. */
+  /** Which rows the hover card should print: the ids an exercise named, or
+   *  null for OVERLAY's own default set. A profile writes them under readouts,
+   *  beside the three whole-panel switches, because they answer the same
+   *  question at a finer grain -- what of the numbers a student meets:
+   *
+   *      ui: { readouts: { rows: ["pos", "d", "q", "Sf"] } }
+   *
+   *  An unknown id is not silently dropped here; check_pack.py fails the pack
+   *  over it, which is the only place that can catch a typo before a lecture. */
+  function rows() {
+    const u = state.ui;
+    if (!u || u.lifted || !u.readouts || !Array.isArray(u.readouts.rows)) return null;
+    return u.readouts.rows;
+  }
+
   function shows(what) {
     const u = state.ui;
     if (!u || u.lifted || !u.readouts) return true;
     return u.readouts[what] !== false;
   }
 
-  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows };
+  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows, rows };
 })();
 
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
@@ -1494,6 +1552,10 @@ const TOOLBAR = [
       hint: "Critical depth, normal depth and the energy grade line",
       on: () => state.channel,
       act: () => { state.channel = !state.channel; syncPanel(); } },
+    { id: "gradeBtn", icon: "channel", label: "Grade lines", key: "",
+      hint: "Energy and hydraulic grade lines — the gap between them is the velocity head",
+      on: () => state.grade,
+      act: () => { state.grade = !state.grade; syncPanel(); } },
     // VIEW and not MEASURE, deliberately, although it is the one toggle here
     // that changes what the numbers say: it changes how the water is DRAWN,
     // and everything else follows the picture — the overlay, the instruments
@@ -2659,11 +2721,21 @@ function drawOverlay(A) {
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);
+  if (state.grade) {
+    // Throttled for the same reason the hover probe is: this is a full-field
+    // readPixels, and a line a reader looks at does not need one every frame.
+    if (--state.gradeTick <= 0) {
+      state.gradeTick = 3;
+      state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, measuringAvg());
+    }
+    OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
+  }
   if (state.inside && !state.drag && UIMODE.shows("cursor")) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
     if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1], measuringAvg()); }
-    OVERLAY.drawCursorReadout(ctx, view, A, sim, state.cursor[0], state.cursor[1], state.hover);
+    OVERLAY.drawCursorReadout(ctx, view, A, sim, state.cursor[0], state.cursor[1],
+                              state.hover, UIMODE.rows());
   }
 }
 
@@ -2886,7 +2958,11 @@ function cycleTips(dt) {
 function dragWindow(el, handle, onPlace) {
   let d = null;
   handle.addEventListener("pointerdown", (e) => {
-    if (e.target.closest && e.target.closest("button, input, a")) return;
+    // Anything you can click, type in or drag a caret through is NOT a drag
+    // handle. [contenteditable] joined this list when the legend became
+    // draggable: its colour-range numbers are editable SPANS, so `input` did
+    // not cover them and a drag would start on top of the text caret.
+    if (e.target.closest && e.target.closest("button, input, a, [contenteditable], select, textarea")) return;
     e.preventDefault();
     try { handle.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
     d = { dx: e.clientX - el.offsetLeft, dy: e.clientY - el.offsetTop };

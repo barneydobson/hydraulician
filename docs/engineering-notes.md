@@ -187,6 +187,28 @@ the depth sat perfectly steady. Symptoms to watch for: `q` rising monotonically
 downstream in a steady state; total volume constant while inflow ≠ outflow.
 `APP.volume()` plus a face-flux integral is how it was found.
 
+## On a TILTED scene, raw `z` does not contain the slope
+
+A scene with `tilt: true` (`m2`, `sa1`) draws its bed FLAT and tilts gravity
+instead, via the `u_gx` uniform — the point being that a grid-aligned bed has
+no rasterisation staircase to excite waves. The consequence is easy to forget
+and expensive to rediscover:
+
+> the elevation the solver reports does **not** include the `S₀·x` the bed no
+> longer draws.
+
+The app already puts it back where a reader meets it — the gauge readout and
+`analyse`'s `S₀`/`S_f` both add `tiltS0 · x` — so nothing on screen is wrong.
+But a headless script reading `analyse().surf` or `probe().z` directly gets
+the untilted number, and is out by exactly `S₀·L` over a window of length `L`.
+
+That is not a small error where it matters most. Working NC-1's 7 m window on
+`sa1` (`S₀ = 0.0147`), the head fall came out as 6–27 mm instead of 111–130 mm
+— off by 103 mm, which is `S₀ · 7 m` to the millimetre. It looks exactly like
+a broken scene: the fall is far too small to read, which is the one thing that
+exercise depends on. The fix is to add `sim.scene.tiltS0 * x` back to any
+elevation you take from a tilted scene by hand.
+
 ## The column flux is conserved only IN THE MEAN
 
 Integrate continuity over a column and the bed/surface fluxes drop out:

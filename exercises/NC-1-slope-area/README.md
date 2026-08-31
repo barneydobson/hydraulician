@@ -5,9 +5,10 @@ levelling staff. Two surface levels a known distance apart give the energy
 slope; a wetted cross-section and a roughness estimate give the conveyance;
 multiply and you have a discharge nobody measured directly — the same
 technique that puts a number on a flood nobody could stand next to. The class
-does it here on a chute–jump–apron reach with the discharge concealed, one
-7 m window each, and the argument afterwards is about *where* along a reach
-the method works, not whether it works at all.
+does it here on a long, uniform mild reach with the discharge concealed and
+the only control — a brink — pushed well out of sight downstream, one 7 m
+window each, and the argument afterwards is about *where* along a reach the
+method works, not whether it works at all.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **NC-1**, or use the direct link
@@ -29,9 +30,9 @@ same speed:
 
 `Q̂₂` is the number you submit. Everything is per metre of width, **L = 7 m**,
 and `n` is the *delivered* Manning's n the app prints beside `S_f` — about
-0.07 on this reach, not the 0.03 a textbook table would offer. Depth falls
-downstream here (it is an M2 drawdown), so `h_v1 > h_v0` and the correction
-always subtracts a little; on a backwater it would add.
+0.08 on this reach, not the 0.03 a textbook table would offer. Depth falls
+downstream here (it is a very gentle M2 drawdown), so `h_v1 > h_v0` and the
+correction always subtracts a little; on a backwater it would add.
 
 ## Your gauge window
 
@@ -50,8 +51,10 @@ explain the assignment in class.
 1. Place two gauges — Gauge (`5`) — at **x₀** and **x₀ + 7**, anywhere inside
    the water; the scale bar and Measure (`8`) find the stations. Keep the
    Controls panel shut: it holds the answer.
-2. Press `R` and let it reach steady state — about **32 s**; the card counts
-   it down.
+2. Press `R` and let it reach steady state — about **120 s**; the card counts
+   it down. (This reach is long, so the wait is longer than most scenes in
+   the app — the settling itself is part of what makes a long uniform reach
+   different from a short one.)
 3. Watch both gauge cards for 20–30 s. Each prints **`h`**, the surface
    elevation; **F** is the fall between the middles of the two traces, in mm
    — tens to well over a hundred, and clearly positive.
@@ -79,16 +82,23 @@ over a bar chart of the raw fall F.
 
 ### Discussion points
 
-- **Walk the bank.** Put a second gauge pair at x₀ ≈ 4.0–4.5 m, in the jump's
-  wake, and take the same reading live: identical arithmetic, 22–63% low.
-  Where you set your staff *is* the measurement.
+- **Walk the bank.** Switch scenes (Scenes menu) to **m3** — the chute-onto-
+  a-mild-apron demo this exercise used to run on — and put a second gauge
+  pair at x₀ ≈ 4.0–4.5 m, right in the jump's wake: identical arithmetic,
+  22–63% low. Where you set your staff *is* the measurement. On this
+  exercise's own reach the same trick is far gentler — there is no jump to
+  stand in the wake of, only a brink far downstream, so gauging close to it
+  (x₀ ≈ 11–11.5 m, well past the ladder's own range) still comes back within
+  a few percent, just biased high as the reach stops being close to uniform.
 - **The same method on `m1`.** Open m1 (Scenes menu) and gauge two points 8 m
   apart on that backwater pool: the fall is about a millimetre, under the
   solver's own read noise, and half the windows come back with the
   downstream gauge sitting *higher* than the upstream one. Slope-area was
   never the broken part — the reach was.
 
-The full verification record — why m1 was abandoned for m3, the measured fall
-at every candidate window, the delivered-n spread, settle evidence and safe
-bounds — is kept locally, out of version control, at
+The full verification record — why m1 was abandoned for m3 and m3 in turn for
+`sa1` (a long uniform mild reach, tilt-built so it has no rasterisation
+staircase and no slope break), the measured fall at every candidate window,
+the delivered-n spread, settle evidence and safe bounds — is kept locally,
+out of version control, at
 `exercises/NC-1-slope-area/_archive/README-full.md`.

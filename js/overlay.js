@@ -1121,17 +1121,20 @@ const OVERLAY = (() => {
    *
    *  Two different things are being drawn, and they are drawn two different
    *  ways on purpose. The DISTRIBUTION — the arrow at every station — is a
-   *  geometric feature glued to the wall, so its head is placed by offsetting
-   *  the domain point `q - n*L(q)` and mapping THAT through V.X/V.Y: it
-   *  stretches with the vertical exaggeration exactly the way the wall it is
-   *  pressing on does. The RESULTANT is a force vector, not a shape in the
-   *  water — like drawCV's arrow, it is built in true screen proportion (no
-   *  vex), because an angle on it is one a straightedge on the screen should
-   *  be able to measure.
-   *
-   *  `L(q)` points along -n: outward normals face into the water (see
-   *  SIM.faceForce), so the arrow runs FROM the face INTO the solid it is
-   *  pressing on — the same "pressing" picture the strip icon draws. */
+   *  geometric feature glued to the wall. Pressure has no tangential
+   *  component, so the diagram MUST be perpendicular to the face as rendered,
+   *  whatever the exaggeration — but the view transform is anisotropic under
+   *  vex (`V.w/sim.W != V.h/sim.H`), so offsetting a sample by its DOMAIN
+   *  normal and mapping the result through V.X/V.Y is only perpendicular on
+   *  screen when the face is axis-aligned or vex = 1. Instead each arrow's
+   *  direction is built from the SCREEN-SPACE tangent between neighbouring
+   *  mapped samples (a quarter-turn gives the screen perpendicular); the
+   *  domain normal is used only to pick which of the two screen
+   *  perpendiculars points into the solid — the "pressing" picture the strip
+   *  icon draws. The RESULTANT is a force vector, not a shape in the water —
+   *  like drawCV's arrow, it is built in true screen proportion (no vex),
+   *  because an angle on it is one a straightedge on the screen should be
+   *  able to measure. */
   function drawForce(ctx, V, sim, force) {
     const D = force.data, samples = D.samples;
     const col = "#ff8fa3";
@@ -1148,35 +1151,47 @@ const OVERLAY = (() => {
     ctx.stroke();
 
     const g = Math.abs(sim.p.g) || 9.81;
-    let maxHead = 0, maxI = 0;
-    const heads = samples.map((s, i) => {
+    let maxHead = 0;
+    const heads = samples.map((s) => {
       const h = Math.max(0, Math.min(s.f, 1) * s.p) / g;
-      if (h > maxHead) { maxHead = h; maxI = i; }
+      if (h > maxHead) maxHead = h;
       return h;
     });
     if (maxHead > 1e-6) {
       // ONE scale for the whole face — the shape of the diagram is the
       // reading, and a per-station scale would draw a lie. The largest head
-      // maps to `maxPx`, capped at a third of the view so a huge head on a
-      // small window cannot run the diagram off the canvas.
+      // maps to `maxPx` SCREEN pixels, capped at a third of the view so a
+      // huge head on a small window cannot run the diagram off the canvas.
+      // This is now the ONLY scale in play — screen px per metre of head —
+      // because the arrow direction and length are both built in screen
+      // space (see the function comment).
       const maxPx = Math.min(56, V.h / 3);
-      const mAt = samples[maxI];
-      const pxPerDomM = (dx, dz) => Math.hypot(dx * V.w / sim.W, dz * V.h / sim.H);
-      const dirPx = Math.max(pxPerDomM(mAt.nx, mAt.nz), 1e-9);
       const pxPerHead = maxPx / maxHead;             // screen px per metre of head
-      const mPerHead = pxPerHead / dirPx;             // domain metres per metre of head
 
+      const P = samples.map((s) => [V.X(s.x), V.Y(s.z)]);
+      // Screen px -> domain metres, per axis (the inverse of V.X/V.Y's
+      // scaling), just to test which screen perpendicular points into the
+      // solid — never used to size or place anything.
+      const invSx = sim.W / V.w, invSy = sim.H / V.h;
+      const n = samples.length;
       const tips = samples.map((s, i) => {
-        const L = heads[i] * mPerHead;
-        return [V.X(s.x - s.nx * L), V.Y(s.z - s.nz * L)];
+        const p0 = P[Math.max(0, i - 1)], p1 = P[Math.min(n - 1, i + 1)];
+        let tx = p1[0] - p0[0], ty = p1[1] - p0[1];
+        const tl = Math.hypot(tx, ty) || 1;
+        tx /= tl; ty /= tl;
+        let qx = -ty, qy = tx;                       // a screen perpendicular
+        // Which one points into the solid? Convert it to a domain step
+        // (screen y is down, so dz flips) and dot with -n (into the solid,
+        // per SIM.faceForce's own convention).
+        const ddx = qx * invSx, ddz = -qy * invSy;
+        if (ddx * -s.nx + ddz * -s.nz < 0) { qx = -qx; qy = -qy; }
+        const Lpx = heads[i] * pxPerHead;
+        return [P[i][0] + qx * Lpx, P[i][1] + qy * Lpx];
       });
 
       // The filled prism: out along the face, back along the tips.
       ctx.beginPath();
-      samples.forEach((s, i) => {
-        const px = V.X(s.x), py = V.Y(s.z);
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-      });
+      P.forEach((p, i) => { if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]); });
       for (let i = tips.length - 1; i >= 0; i--) ctx.lineTo(tips[i][0], tips[i][1]);
       ctx.closePath();
       ctx.fillStyle = "rgba(255,143,163,0.20)";
@@ -1185,10 +1200,10 @@ const OVERLAY = (() => {
       // A subset of arrows, not a hedgehog: a long face samples every couple
       // of centimetres, and an arrowhead at every one of them would be paint,
       // not a reading. The fill above already carries every sample.
-      const step = Math.max(1, Math.ceil(samples.length / 24));
+      const step = Math.max(1, Math.ceil(n / 24));
       ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.4;
-      for (let i = 0; i < samples.length; i += step) {
-        const ax = V.X(samples[i].x), ay = V.Y(samples[i].z);
+      for (let i = 0; i < n; i += step) {
+        const ax = P[i][0], ay = P[i][1];
         const [bx, by] = tips[i];
         const Lpx = Math.hypot(bx - ax, by - ay);
         if (Lpx < 3) continue;
@@ -1204,7 +1219,7 @@ const OVERLAY = (() => {
         ctx.closePath(); ctx.fill();
       }
 
-      chip(ctx, V.X(samples[0].x) + 6, V.Y(samples[0].z) - 12,
+      chip(ctx, P[0][0] + 6, P[0][1] - 12,
            "scale: 1 m head = " + pxPerHead.toFixed(0) + " px", col);
 
       // The resultant, through the centre of pressure — heavier, and NOT

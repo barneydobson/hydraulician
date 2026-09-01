@@ -2194,11 +2194,12 @@ function onDown(e) {
     return;
   }
   if (state.tool === "force") {
-    // GRAB_PX is a screen tolerance; GEOM.faceAt wants domain metres, so it is
-    // converted the same way removeFluxAt's nearSegment does — through the
-    // view's horizontal px-per-metre, the same conversion placeRake uses for
-    // its own single-axis pick.
-    const hit = GEOM.faceAt(sim.solids || [], x, z, GRAB_PX * sim.W / view.w);
+    // GEOM.faceAt's tolerance is domain-space and isotropic, so a single
+    // horizontal-axis conversion of GRAB_PX (the old approach here) makes
+    // the grab radius wrong under vex for sloped or horizontal faces — the
+    // same anisotropy nearSegment's per-axis scaling exists to handle. Pick
+    // in screen space instead, GRAB_PX applied directly as a screen radius.
+    const hit = faceAtPx(sim.solids || [], x, z, GRAB_PX);
     if (!hit) { state.force = null; return; }
     if (state.force && state.force.solidId === hit.solid.id) {
       // Same solid again: cycle to its next named face.
@@ -2616,14 +2617,17 @@ function sampleCV() {
 }
 
 /** The pressure diagram on the selected face — same idiom as sampleCV, but
- *  the EMA runs per SAMPLE rather than on the two scalars: it is `p` at each
- *  station that gets the τ = 1 s filter, and Fx/Fz/F/cop/wetLen are then
- *  re-integrated (GEOM.faceForceFromSamples) from the smoothed row. Because
- *  that integral is linear in p and the geometry weights (nx, nz, f, ds) are
- *  unchanged between frames, the result is exactly the number a direct EMA
- *  of Fx/Fz would have given — so the resultant arrow is always consistent
- *  with the diagram it is drawn from, by construction rather than by two
- *  separate filters that could drift apart.
+ *  the EMA runs per SAMPLE rather than on the two scalars: it is `p` AND `f`
+ *  at each station that get the τ = 1 s filter, same `a`, same restart
+ *  conditions for both. `f` has to be smoothed alongside `p` — not left
+ *  raw — because `GEOM.faceForceFromSamples` gates every term AND `wetLen`
+ *  on `min(f,1)` and `f·p`; an EMA'd `p` sitting on a raw, wobbling `f`
+ *  would still make the integral jump at the waterline, which is the exact
+ *  transition this filter exists to smooth. Fx/Fz/F/cop/wetLen are then
+ *  re-integrated (GEOM.faceForceFromSamples) from the smoothed row, so the
+ *  resultant arrow is always consistent with the diagram it is drawn from
+ *  by construction — one filter, not `p` and `f` each smoothed and then a
+ *  third, separate filter on Fx/Fz that could drift from either.
  *
  *  A geometry change changes the sample count (a resolution rebuild
  *  resamples every face at the new dx; a parameterised solid can change
@@ -2649,7 +2653,8 @@ function sampleForce() {
   f.t0 = sim.t;
   const prev = f.data.samples;
   const samples = r.samples.map((s, i) =>
-    Object.assign({}, s, { p: prev[i].p + (s.p - prev[i].p) * a }));
+    Object.assign({}, s, { p: prev[i].p + (s.p - prev[i].p) * a,
+                            f: prev[i].f + (s.f - prev[i].f) * a }));
   const ds = samples.length > 1 ? samples[1].s - samples[0].s : sim.dx;
   const g = Math.abs(sim.p.g) || 9.81;
   f.data = Object.assign(GEOM.faceForceFromSamples(samples, ds, 1000, g),
@@ -2855,6 +2860,30 @@ function nearSegment(L, x, z) {
   const len2 = ax * ax + az * az;
   const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, (px * ax + pz * az) / len2));
   return Math.hypot(px - ax * t, pz - az * t);
+}
+
+/** The nearest named face across `solids`, within `tolPx` SCREEN pixels —
+ *  the Force tool's own pick, walking the same per-edge run GEOM.faceAt
+ *  does but testing distance in screen space via `nearSegment`'s per-axis
+ *  convention (dx and dz each scaled by their own view-w-over-sim-W /
+ *  view-h-over-sim-H factor before the hypot) rather than GEOM.faceAt's
+ *  single domain-space tolerance. GEOM.faceAt's distance is isotropic in
+ *  domain space, so one domain-space radius cannot represent a round screen
+ *  radius once vex makes the two axes' px-per-metre differ — a sloped or
+ *  horizontal face would grab too wide or too narrow depending on its angle
+ *  to the stretch. */
+function faceAtPx(solids, x, z, tolPx) {
+  let best = null;
+  for (const solid of solids) {
+    for (const face of solid.faces) {
+      for (const e of GEOM.faceEdges(solid, face.id)) {
+        const v0 = solid.verts[e], v1 = solid.verts[(e + 1) % solid.verts.length];
+        const dist = nearSegment({ x0: v0[0], z0: v0[1], x1: v1[0], z1: v1[1] }, x, z);
+        if (dist <= tolPx && (!best || dist < best.dist)) best = { solid, faceId: face.id, dist };
+      }
+    }
+  }
+  return best;
 }
 
 /** Place a gauge — or take away the one you just pointed at.

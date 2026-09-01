@@ -134,6 +134,52 @@ const MUTANTS = [
     find: "if (!(Math.abs(g) > 0)) {",
     replace: "if (false) {",
     kills: ["E4 reconstruct refuses"] },
+
+  // --- the specific-energy inlet and the energy line's velocity head
+  { id: "inlet-pins-the-surface",
+    why: "the OLD boundary, restored: the level becomes the surface and the velocity head is added on top. This is the bug the whole change exists to remove, and it looks entirely reasonable in a diff",
+    find: "    if (!(q > 0)) { out.d = E; return out; }",
+    replace: "    out.d = E; return out;",
+    kills: ["H1", "H3"] },
+
+  { id: "inlet-wrong-root",
+    why: "the branch argument ignored, so every caller is handed the subcritical root — a chute that silently enters on the wrong side of critical. Written first as a deleted `if`, which only made the module fail to parse: a mutant has to change BEHAVIOUR, and the gate said so",
+    find: '    if (branch === "super") { lo = q / Math.sqrt(2 * g * E); hi = dc; }',
+    replace: '    if (false) { lo = q / Math.sqrt(2 * g * E); hi = dc; }',
+    kills: ["H2 supercritical root also solves it", "H2 the roots straddle"] },
+
+  { id: "inlet-choke-ignored",
+    why: "a reservoir that cannot pass the demanded q reports a depth anyway. s2 ships q = 1.2 against a head that can pass 0.651, so this is the case that actually occurs",
+    find: "    if (E < Emin - slack) { out.d = dc; out.choked = true; return out; }",
+    replace: "    if (E < Emin - slack) { out.d = dc; return out; }",
+    kills: ["H5 an over-drawn reservoir reports choked"] },
+
+  { id: "inlet-emin-off-by-a-half",
+    why: "E_min written as d_c rather than 1.5 d_c — the reservoir is then reported able to pass half again what it can",
+    find: "    const Emin = 1.5 * dc;",
+    replace: "    const Emin = dc;",
+    // NOT H6: at E = 1.5 d_c the bracket's lower end IS the root, so bisection
+    // still lands on d_c however E_min is written. H7 is the assertion that
+    // actually depends on the 1.5, and it was written because this survived.
+    kills: ["H5 and reports the E_min it needed", "H7"] },
+
+  { id: "energy-head-drops-w",
+    why: "the vertical velocity left out of the kinetic energy — invisible in a parallel reach and most of the head at a brink, which is exactly where the line was sagging",
+    find: "      ke += fr * uk * (uk * uk + wk * wk) / 2 * dx;",
+    replace: "      ke += fr * uk * (uk * uk) / 2 * dx;",
+    kills: ["K3 w is in the kinetic energy"] },
+
+  { id: "energy-head-assumes-alpha-one",
+    why: "the OLD energy line, restored: the velocity head built from the mean velocity, so alpha is 1 by construction. It agrees with the new one on every uniform profile, which is why K2 has to exist",
+    find: "    const hv = Math.abs(q) > 1e-30 ? ke / (g * q) : 0;",
+    replace: "    const hv = V * V / (2 * g);",
+    kills: ["K2 two-layer profile", "K3"] },
+
+  { id: "energy-head-clamps-the-flux",
+    why: "the mass flux takes the CLAMPED fill, discarding the compressible part in a pressurised cell — the same split FS_COL's comment warns about",
+    find: "      q  += fr * uk * dx;",
+    replace: "      q  += (fr < 1 ? fr : 1) * uk * dx;",
+    kills: ["K6 the mass flux counts the pressurised part"] },
 ];
 
 // ------------------------------------------------------------------ harness

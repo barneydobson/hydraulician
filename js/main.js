@@ -33,7 +33,7 @@ const state = {
   // The two grade lines, on their own switch beside the channel overlay. Off
   // by default: they cost a full-field readback, and most scenes are
   // free-surface, where the HGL lies on the water line and adds nothing.
-  grade: false, gradeBuf: null, gradeTick: 0,
+  grade: false, gradeBuf: null, gradeTick: 0, gradeAvg: false,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
@@ -426,17 +426,23 @@ const CONTROLS = [
         sim.p.autoL = 0; sim.p.open[0] = 0; SIM.rasterise();
       }
     },
-    info: "Holds a water level on the LEFT edge and feeds the set discharge through it. Ticking it opens the left edge automatically (and closes it again when unticked, unless you set that edge yourself); the ∇ marker shows the level." },
+    info: "Holds a reservoir on the LEFT edge and feeds the set discharge through it. The level is the reservoir's ENERGY line, so the water surface at the inlet sits a velocity head below it and draws down further as q rises. Ticking it opens the left edge automatically (and closes it again when unticked, unless you set that edge yourself); the ∇ marker shows the level." },
   { id: "inLevel", place: "res", label: "Reservoir level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.inflow.level, set: (v) => sim.p.inflow.level = v,
     fmt: (v) => {
-      const b = SIM.bands(), D = state.deliv;
+      const b = SIM.bands(), D = state.deliv, st = SIM.inletStage();
       const d = Math.min(v, b.inB[1]) - b.inB[0];
-      return v.toFixed(2) + " m above datum" +
-        (d > 0 ? "  ·  " + d.toFixed(2) + " m deep at the inlet" : "  ·  below the inlet bed!") +
+      if (!(d > 0)) return v.toFixed(2) + " m above datum  ·  below the inlet bed!";
+      // The level is the ENERGY line; the surface sits a velocity head under
+      // it, and how far under is the number worth printing.
+      const surf = st.stage - b.inB[0];
+      const drawdown = d - surf;
+      return v.toFixed(2) + " m above datum  ·  " + surf.toFixed(2) + " m deep at the inlet" +
+        (drawdown > 0.005 ? "  (drawn down " + (drawdown * 1000).toFixed(0) + " mm)" : "") +
+        (st.choked ? "  ·  OVER-DRAWN: cannot pass this q" : "") +
         (D ? "  ·  delivering " + D.level.toFixed(2) + " m" : "");
     },
-    info: "Water level held on the left boundary, measured from the domain floor (the datum), NOT from the bed. Set it to the level the arriving flow actually wants — a level below a downstream control's backwater will choke the backwater at the inlet. The DELIVERED level is measured just clear of the relaxation sponge and sits below the slider by however much head the sponge is giving up." },
+    info: "The reservoir's ENERGY grade line, measured from the domain floor (the datum), NOT from the bed. The water in a reservoir is at rest, so its surface IS the total head, and what arrives in the channel is the depth that solves E = d + q²/2gd² — which falls as q rises. The velocity head between the two is printed as the drawdown. Raising q far enough exhausts the reservoir: past q_max = √(g(2E/3)³) there is no depth that satisfies the equation at all, and the inlet is held at critical depth and says so. The DELIVERED level is measured just clear of the relaxation sponge and sits below that by however much head the sponge is giving up." },
   { id: "inQ", place: "res", label: "Inflow q", min: 0, max: 2.0, step: 0.005,
     get: () => sim.p.inflow.q, set: (v) => sim.p.inflow.q = v,
     fmt: (v) => {
@@ -448,10 +454,13 @@ const CONTROLS = [
         return "head-driven  ·  q → " + (D ? D.q.toFixed(3) : "—") + " m²/s delivered" +
                (D ? "   d_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
       }
+      const st = SIM.inletStage();
       return v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
-             "   d_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m";
+             "   d_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m" +
+             (st.choked ? "  ·  MORE THAN THE RESERVOIR CAN PASS (q_max = "
+                          + st.qmax.toFixed(3) + " m²/s) — held at critical" : "");
     },
-    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth d_c = (q²/g)^⅓ follows directly from it. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
+    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth the reservoir DELIVERS at that discharge. Critical depth d_c = (q²/g)^⅓ follows directly from it. A reservoir has a ceiling: q_max = √(g(2E/3)³) on the head E it stands above the inlet bed, and asking for more than that is asking for energy the reservoir does not have — the note says so and the inlet holds critical depth, which is what a real crest does. Raise the reservoir level to pass more. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
   { id: "inFree", place: "res", type: "check", label: "Head-driven inflow",
     get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
@@ -2359,9 +2368,13 @@ function tickFrame(realDt) {
   // number derived from it. Mixing a mean field with live markers would put
   // two flow states in one screenshot.
   const avgCols = state.avg && SIM.avgActive() ? SIM.avgColumns() : null;
+  refreshGrade();
+  // hv is the MEAN flow's velocity head or nothing (SIM.hydraulicGrade), so
+  // it only ever reaches analyse alongside the mean columns it belongs to.
+  const hv = avgCols && state.gradeBuf ? state.gradeBuf.hv : null;
   const analysis = avgCols
-    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true })
-    : OVERLAY.analyse(sim, col);
+    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true, hv })
+    : OVERLAY.analyse(sim, col, { hv });
   // T and the cursor readouts, which move every frame. Behind the same flag,
   // so a session with Average off pays one boolean for all of it.
   if (avgCols) LEGEND.avgTick(avgCols);
@@ -2578,6 +2591,41 @@ function emaFlux(prev, now, a) {
   return out;
 }
 
+/** The piezometric head per column, and with it the TRUE velocity head that
+ *  the energy line is drawn at (`hv` on the returned array — RECON.columnEnergy
+ *  through SIM.hydraulicGrade).
+ *
+ *  One buffer, one throttle, two consumers: the grade lines draw `h` and
+ *  `h + hv` directly, and OVERLAY.analyse takes `hv` for its own energy line
+ *  and for everything measured off that line's slope. They MUST be the same
+ *  numbers — two estimates of the same head that disagree is how you get an
+ *  overlay arguing with itself.
+ *
+ *  Throttled because this is a full-field readPixels: MEASURED on m2 at Medium
+ *  (1265 x 75) it costs 6.6 ms against a 12.6 ms frame, so it can never go on
+ *  the frame path undivided. Every 3rd frame while the grade lines are up (the
+ *  rate that switch already shipped with, ~2.2 ms/frame amortised); every 10th
+ *  otherwise, because alpha is a smooth, slowly-varying field and a third of a
+ *  second of lag in it is invisible in a steady reach — where it is NOT steady
+ *  the velocity head is being smoothed over 1.5 m of reach anyway.
+ *
+ *  The window flag is part of the key, not just the throttle: a buffer built
+ *  from the live field is the wrong flow state to hand an Average-mode
+ *  overlay, so switching modes refreshes at once rather than showing one of
+ *  each for three frames. */
+function refreshGrade() {
+  const avg = measuringAvg();
+  // Nobody is asking: the grade lines are off and there is no mean for the
+  // energy line's alpha to come from. Costs nothing and, more to the point,
+  // a stale buffer never reaches analyse — `hv` goes with the window it was
+  // measured in or it does not go at all.
+  if (!state.grade && !avg) { state.gradeBuf = null; state.gradeTick = 0; return; }
+  if (avg !== state.gradeAvg) { state.gradeAvg = avg; state.gradeTick = 0; }
+  if (--state.gradeTick > 0 && state.gradeBuf) return;
+  state.gradeTick = state.grade ? 3 : 10;
+  state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, avg);
+}
+
 /** What the reservoir is actually DELIVERING.
  *
  *  Neither reservoir number on the panel is a measurement: `inflow.q` is a
@@ -2721,15 +2769,7 @@ function drawOverlay(A) {
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);
-  if (state.grade) {
-    // Throttled for the same reason the hover probe is: this is a full-field
-    // readPixels, and a line a reader looks at does not need one every frame.
-    if (--state.gradeTick <= 0) {
-      state.gradeTick = 3;
-      state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, measuringAvg());
-    }
-    OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
-  }
+  if (state.grade) OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
   if (state.inside && !state.drag && UIMODE.shows("cursor")) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
@@ -2825,8 +2865,17 @@ function drawMarkers(ctx) {
     ctx.restore();
   };
   if (p.inflow.on > 0.5) {
+    // The marker rides the reservoir level, which is its ENERGY line — so
+    // under prescribed q it stands a velocity head ABOVE the water arriving
+    // at the inlet, and that gap is the point rather than a mismatch. It is
+    // named on the chip so nobody reads the marker as a promised surface.
+    const st = SIM.inletStage();
+    const drawn = p.inflow.level - st.stage;
     level("L", p.inflow.level,
-      "reservoir " + p.inflow.level.toFixed(2) + " m" + (p.inflow.free > 0.5 ? " · head-driven" : ""),
+      "reservoir " + p.inflow.level.toFixed(2) + " m"
+        + (p.inflow.free > 0.5 ? " · head-driven"
+           : st.choked ? " · energy line · over-drawn"
+           : drawn > 0.005 ? " · energy line" : ""),
       "#7fd4ff", "res");
   }
   if (p.tailwater.on > 0.5) {

@@ -681,16 +681,65 @@ const SIM = (() => {
     return { inB: S.inBand, twB: S.twBand };
   }
 
+  /** The free surface the upstream reservoir actually delivers.
+   *
+   *  The reservoir level is an ENERGY grade line — the water in it is at rest,
+   *  so its surface IS the total head — and the depth that arrives in the
+   *  channel is the one that solves E = d + q²/(2gd²) with E = level − bed.
+   *  It FALLS as q rises, and above q_max the reservoir simply cannot pass the
+   *  discharge asked of it.
+   *
+   *  Pinning the surface AT the level instead, which is what this boundary
+   *  used to do, adds the velocity head on top of the reservoir rather than
+   *  taking it out: measured on s2, the inlet energy line stood 0.26 m above
+   *  its 2.07 m reservoir at the shipped q = 1.2 and 0.66 m above it at
+   *  q = 1.8, while the surface itself moved 32 mm across that whole range.
+   *
+   *  Three cases keep the old meaning, and each for a reason:
+   *
+   *  - HEAD-DRIVEN (`free`) prescribes no discharge at all, so there is no
+   *    energy equation to solve. The level is a still-water head, the flow
+   *    finds its own q, and the drawdown happens inside the domain where the
+   *    scene has built a reservoir compartment for it. Measured on estab, H
+   *    holds at 3.80–3.83 m against a 3.80 m level the whole length of the
+   *    pipe — this half was already right.
+   *  - A SUBMERGED run (band top below the level) is pressurised. There is no
+   *    free surface to draw down and the level is a piezometric head.
+   *  - A scene that pins `inflow.v` has said what it wants directly; q is not
+   *    the control.
+   *
+   *  Cached on the same key as `bands()`, because `simUniforms` runs twice a
+   *  substep and the root solve, while cheap, has no business running there. */
+  function inletStage() {
+    const inf = S.p.inflow, b = bands().inB;
+    const key = inf.level + ":" + inf.q + ":" + inf.free + ":" + inf.v + ":" + b[0] + ":" + b[1];
+    if (S.stageKey === key) return S.stage;
+    S.stageKey = key;
+    const out = { stage: inf.level, choked: false, qmax: Infinity, dc: 0, Emin: 0 };
+    const solved = !(inf.free > 0.5) && inf.v === undefined && b[1] >= inf.level - 1e-4;
+    if (solved) {
+      const g = Math.abs(S.p.g) || 9.81;
+      const r = RECON.inletDepth(inf.level - b[0], inf.q || 0, g,
+                                 inf.branch === "super" ? "super" : "sub");
+      out.stage = b[0] + r.d;
+      out.choked = r.choked; out.qmax = r.qmax; out.dc = r.dc; out.Emin = r.Emin;
+    }
+    return (S.stage = out);
+  }
+
   /** Inlet velocity implied by the prescribed unit discharge and the depth
-   *  actually available between the inlet run's bed and the reservoir level.
+   *  the reservoir DELIVERS (`inletStage`), not the depth up to its level.
    *  The 1.5 Δx offset repays the discharge lost to the shader's 3-cell
-   *  surface taper on the prescribed plug. */
+   *  surface taper on the prescribed plug — mass before energy: the taper eats
+   *  area, and a reach fed the wrong discharge is wrong everywhere, where a
+   *  velocity head short by a taper's worth is wrong at the inlet. */
   function inletVel() {
     const inf = S.p.inflow;
     const b = bands().inB;
     if (inf.v !== undefined) return inf.v;          // scenes may pin velocity
-    const feather = b[1] < inf.level ? 0 : 1.5 * S.dx;   // none for a submerged duct
-    return (inf.q || 0) / Math.max(Math.min(inf.level, b[1]) - b[0] - feather, S.dx);
+    const surf = inletStage().stage;
+    const feather = b[1] < surf ? 0 : 1.5 * S.dx;   // none for a submerged duct
+    return (inf.q || 0) / Math.max(Math.min(surf, b[1]) - b[0] - feather, S.dx);
   }
 
   /** Uniforms shared by the two simulation passes. */
@@ -705,9 +754,12 @@ const SIM = (() => {
     gl.uniform1f(pr.u("u_c2"), p.c * p.c);
     gl.uniform1f(pr.u("u_valve"), p.valveClosed);
     const { inB, twB } = bands();
-    gl.uniform4f(pr.u("u_in"), p.inflow.level, inletVel(), p.inflow.on, p.inflow.free || 0);
+    // u_in.x is the SURFACE the boundary pins, which is the delivered stage —
+    // NOT the reservoir level, which is its energy line. See `inletStage`.
+    const inSurf = inletStage().stage;
+    gl.uniform4f(pr.u("u_in"), inSurf, inletVel(), p.inflow.on, p.inflow.free || 0);
     gl.uniform2f(pr.u("u_tw"), p.tailwater.level, p.tailwater.on);
-    gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(p.inflow.level, inB[1]));
+    gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(inSurf, inB[1]));
     gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
     // Sponge widths are physical (metres) so resolution changes keep the
     // same reservoir; default is ~10 cells.
@@ -1058,7 +1110,30 @@ const SIM = (() => {
    *  without a throttle.
    *
    *  Returns a Float32Array of nx heads; a dry column reads NaN so the overlay
-   *  can break the line rather than drawing it through a gap. */
+   *  can break the line rather than drawing it through a gap.
+   *
+   *  It also fills `out.hv` with each column's TRUE velocity head — the
+   *  kinetic energy the flow carries per unit weight of it, RECON.columnEnergy
+   *  — so the energy line can be drawn at h + hv rather than at h + V²/2g.
+   *  The two integrals ride this readback because it is already here and
+   *  already walking every column: the whole correction costs a handful of
+   *  flops per cell and not one extra pipeline sync. `hv` is NaN wherever `h`
+   *  is, so the two lines break together.
+   *
+   *  ONLY UNDER AVERAGING, and this is a physical restriction rather than a
+   *  performance one. The kinetic-energy correction alpha is defined on a MEAN
+   *  velocity profile; the instantaneous one has no alpha in that sense,
+   *  because the third moment of a fluctuating field is dominated by the
+   *  fluctuation. MEASURED on m2 at seven stations: off the Favre mean alpha
+   *  runs 1.58 -> 1.22 downstream, smooth and monotone, and the line it draws
+   *  falls monotonically; off the LIVE field the same stations give 2.35,
+   *  1.93, 1.58, 2.41, 1.43, 1.75, 1.43 — scatter of a whole unit with no
+   *  trend, and a reach loss of 0.1405 m against the mean flow's 0.0775 m.
+   *  A time-average of that instantaneous head does not rescue it either: it
+   *  converges on alpha ~ 1.9 roughly uniformly, which understates the reach
+   *  loss by about half. So live mode reports NaN and its callers fall back to
+   *  the mean-velocity head, which is what they always drew. Average (VIEW ->
+   *  A) is this project's measurement mode, and alpha is a measurement. */
   function hydraulicGrade(out, avg) {
     const nx = S.nx, ny = S.ny, dx = S.dx;
     const h = out && out.length >= nx ? out : new Float32Array(nx);
@@ -1076,8 +1151,13 @@ const SIM = (() => {
       ? S.fBuf : (S.fBuf = new Float32Array(nx * ny * 4));
     if (!on) { gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
                gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, F); }
+    // Reused column scratch for the energy moments — one allocation, not nx.
+    const cf = S.ceF && S.ceF.length >= ny ? S.ceF : (S.ceF = new Float64Array(ny));
+    const cu = S.ceU && S.ceU.length >= ny ? S.ceU : (S.ceU = new Float64Array(ny));
+    const cw = S.ceW && S.ceW.length >= ny ? S.ceW : (S.ceW = new Float64Array(ny));
+    const hv = out && out.hv && out.hv.length >= nx ? out.hv : new Float32Array(nx);
     for (let i = 0; i < nx; i++) {
-      h[i] = NaN;
+      h[i] = NaN; hv[i] = NaN;
       for (let j = 1; j < ny - 1; j++) {
         const k = j * nx + i;
         if (S.mask[k] >= 192) continue;                      // solid
@@ -1091,7 +1171,37 @@ const SIM = (() => {
         h[i] = j * dx + buf[k * 4 + pc] / g;                 // z + p/rho g
         break;                                               // lowest wet cell
       }
+      // Dry column, or no mean to take the third moment of: leave hv NaN and
+      // let the caller fall back (see the note above).
+      if (!on || h[i] !== h[i]) continue;
+      // COLLOCATION is the trap, and the same one FS_ACC's comment names: on
+      // the LIVE field u lives on the west face and w on the south face, so
+      // both are averaged to the centre here exactly as FS_COL does it. The
+      // MEAN field was collocated before it was accumulated (FS_ACC) and
+      // stores MOMENTUM, so there the velocity is the Favre mean f*u/f --
+      // divided out here and multiplied back inside columnEnergy so the
+      // integrand is written once, in one place, for both fields.
+      cf.fill(0, 0, ny); cu.fill(0, 0, ny); cw.fill(0, 0, ny);
+      for (let j = 1; j < ny - 1; j++) {
+        const k = j * nx + i;
+        if (S.mask[k] >= 192) continue;
+        const f = on ? buf[k * 4 + 2] : F[k * 4];
+        if (f < 0.25) continue;
+        cf[j] = f;
+        if (on) {
+          const fi = Math.max(f, 1e-6);
+          cu[j] = buf[k * 4] / fi;
+          cw[j] = buf[k * 4 + 1] / fi;
+        } else {
+          const kE = j * nx + Math.min(i + 1, nx - 1);
+          const kN = Math.min(j + 1, ny - 1) * nx + i;
+          cu[j] = 0.5 * (buf[k * 4] + buf[kE * 4]);
+          cw[j] = 0.5 * (buf[k * 4 + 1] + buf[kN * 4 + 1]);
+        }
+      }
+      hv[i] = RECON.columnEnergy(cf, cu, cw, dx, g).hv;
     }
+    h.hv = hv;
     return h;
   }
 
@@ -1541,7 +1651,7 @@ const SIM = (() => {
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
-           boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
+           boxForce, boxFlux, lineFlux, dt, get, inletVel, inletStage, bands, rescaleFill,
            hydraulicGrade,
            setValve,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,

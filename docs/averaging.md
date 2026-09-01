@@ -263,6 +263,25 @@ from it by the same display-pass branch that draws it live:
 One accumulator serves all seven fields, so changing the displayed field does
 not restart the averaging window.
 
+**The channel overlay's energy line is one of these.** Drawn over a depth
+rather than at a point, it needs the kinetic energy of the whole column, so its
+velocity head is
+
+```math
+h_v \;=\; \frac{\displaystyle\int \bar{f}\,\hat{u}\,\tfrac{1}{2}(\hat{u}^2+\hat{w}^2)\,dz}
+                {\displaystyle g \int \bar{f}\,\hat{u}\,dz}
+      \;=\; \alpha\,\frac{V^2}{2g},
+```
+
+which is the kinetic-energy correction coefficient `α` falling out of the mean
+profile rather than being assumed to be 1. It exists **only** in this mode: `α`
+is defined on a mean profile, and the third moment of an instantaneous field is
+dominated by the fluctuation, not the shear — measured, live `α` on m2 scatters
+1.43–2.41 across stations where the Favre mean runs a smooth 1.58 → 1.22. Live,
+the overlay draws `V²/2g` as it always did. The numbers are in
+[engineering-notes.md](engineering-notes.md#measured-not-assumed); the
+integrals are `RECON.columnEnergy`, called from `SIM.hydraulicGrade`.
+
 ### What may and may not be claimed
 
 `h` is linear in pressure and elevation, so `h̃ = h̄`: the piezometric head of

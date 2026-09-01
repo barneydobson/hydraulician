@@ -106,9 +106,13 @@ const SIM = (() => {
    *  shallow-angle long edge close enough to a neighbour to leave a
    *  cell-centre gap between them — neither can happen once nothing on the
    *  solid is that short, so the fill test alone is exact and the stroke has
-   *  nothing left to protect. What it does instead, for a solid already
-   *  chunky enough, is overshoot: it paints solid up to its own radius
-   *  (~0.85*dx) OUTSIDE the true edge, on the water side too.
+   *  nothing left to protect. This holds for a CONVEX solid only — what
+   *  GEOM.poly/slab/rect produce today; a non-convex shape (e.g. a bent
+   *  strip with two long parallel edges pulled close together) could still
+   *  pinch with every edge long, and would need its own check. What the
+   *  stroke does instead, for a convex solid already chunky enough, is
+   *  overshoot: it paints solid up to its own radius (~0.85*dx) OUTSIDE the
+   *  true edge, on the water side too.
    *
    *  MEASURED on s3's gate blade (5 cm wide, faces stroked before this fix):
    *  at Low (dx = 0.0193 m, the blade ~2.6 cells across) the stroke's rim

@@ -595,6 +595,15 @@ SUITES.api = async (B) => {
   // catching what actually breaks stampPoly: a fill that never runs leaves
   // the polygon's whole 0.4 x 3 m interior unstamped, which is most of
   // `solid`, not a rim around it.
+  //
+  // 2026-09-01 addendum (stampPoly's stroke-skip, js/sim.js): those
+  // percentages describe the PRE-stroke-skip stroke. Now that stampPoly
+  // skips the edge stroke whenever every edge of the solid clears 2*dx, this
+  // wall's edges (5 m and 0.4 m — the short end already 2 cells at every
+  // budget the sandbox offers) clear the floor at Medium too, so the stroke
+  // never runs and there is no rim left to measure: diff/solid measured 0 of
+  // 3356 (0.00%) at Medium. The 20% gate still passes, now for a different
+  // reason — an exact fill match, not a rim comfortably under budget.
   await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
   const poly = await B.evaluate(`(() => {
     const S = APP.sim, orig = S.scene;

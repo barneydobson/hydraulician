@@ -94,14 +94,51 @@ const SIM = (() => {
     }
   }
 
-  /** Rebuild the solid mask from scratch: scene walls, then user edits, then
-   *  the closed edges of the domain. Order matters — the border always wins,
-   *  so no amount of erasing can spring a leak. */
+  /** Fill a solid polygon: even-odd at every cell centre in its bounding box
+   *  (GEOM.contains), then every edge re-stamped through stampSeg at th = 0
+   *  (its own max(th, dx*1.7)*0.5 radius floor is the anti-leak stroke). Two
+   *  parts, two jobs — the fill decides which cells the solid OWNS, the
+   *  zero-width edge stroke seals the sub-cell pinches a scan test alone can
+   *  leave open on a near-tangent or shallow-angle edge. */
+  function stampPoly(mask, solid, value) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const v of solid.verts) {
+      if (v[0] < x0) x0 = v[0];
+      if (v[0] > x1) x1 = v[0];
+      if (v[1] < z0) z0 = v[1];
+      if (v[1] > z1) z1 = v[1];
+    }
+    const i0 = Math.max(0, Math.floor(x0 / S.dx));
+    const i1 = Math.min(S.nx - 1, Math.ceil(x1 / S.dx));
+    const j0 = Math.max(0, Math.floor(z0 / S.dx));
+    const j1 = Math.min(S.ny - 1, Math.ceil(z1 / S.dx));
+    for (let j = j0; j <= j1; j++) {
+      const pz = (j + 0.5) * S.dx;
+      for (let i = i0; i <= i1; i++) {
+        const px = (i + 0.5) * S.dx;
+        if (GEOM.contains(solid, px, pz)) mask[j * S.nx + i] = value;
+      }
+    }
+    const n = solid.verts.length;
+    for (let e = 0; e < n; e++) {
+      const a = solid.verts[e], b = solid.verts[(e + 1) % n];
+      stampSeg(mask, [a[0], a[1], b[0], b[1], 0], value);
+    }
+  }
+
+  /** Rebuild the solid mask from scratch: scene solids/walls, then user
+   *  edits, then the closed edges of the domain. Order matters — the border
+   *  always wins, so no amount of erasing can spring a leak. */
   function rasterise() {
     const m = S.mask;
     m.fill(0);
     const sc = S.scene;
-    (sc.walls(sc.W, sc.H) || []).forEach((s) => stampSeg(m, s, 255));
+    const par = S.params || {};
+    S.solids = sc.solids ? sc.solids(sc.W, sc.H, S.p, par) : [];
+    if (S.solids.length) S.solids.forEach((so) => stampPoly(m, so, 255));
+    // The shim: a scene still on walls() rasterises exactly as it always
+    // has — same stampSeg, same capsule, same measured geometry.
+    (sc.walls ? sc.walls(sc.W, sc.H) || [] : []).forEach((s) => stampSeg(m, s, 255));
     (sc.valves ? sc.valves(sc.W, sc.H) : []).forEach((s) => stampSeg(m, s, 128));
     S.segs.forEach((s) => stampSeg(m, s, s[5]));
     const [oL, oR, oB, oT] = S.p ? S.p.open : sc.open;
@@ -137,6 +174,20 @@ const SIM = (() => {
   }
   function undoSeg() { if (S.segs.length) { S.segs.pop(); rasterise(); } }
   function clearSegs() { S.segs.length = 0; rasterise(); }
+
+  /** The single writer for a scene's live parameter values (dam crest level,
+   *  weir height — whatever the scene's `params` declares). Clamps to the
+   *  declared [min, max], writes S.params, and rebuilds the mask: a param a
+   *  scene's `solids()` reads is geometry, so it takes the same rasterise()
+   *  choke point (and the same averaging reset) as a drawn edge. */
+  function setParam(key, v) {
+    const decl = (S.scene.params || []).find((d) => d.key === key);
+    const clamped = decl ? Math.min(decl.max, Math.max(decl.min, v)) : v;
+    S.params[key] = clamped;
+    rasterise();
+    return clamped;
+  }
+  const params = () => ({ decl: S.scene.params || [], values: S.params });
 
   /** The single writer for the valve flag — every caller routes through here.
    *
@@ -232,13 +283,21 @@ const SIM = (() => {
       for (const k of ["inflow", "tailwater", "wave", "source"]) p[k] = Object.assign({}, prev[k]);
       p.pour = null;
     }
+    // A resolution rebuild keeps live param values the same way it keeps
+    // p above — losing a slider position because you asked for more cells
+    // would be maddening. A scene change (or a scene with no params) seeds
+    // fresh from the declaration's defaults, {} when it declares none.
+    const prevParams = keepSegs && S && S.scene === scene ? S.params : null;
+    const params = prevParams || (scene.params
+      ? Object.fromEntries(scene.params.map((d) => [d.key, d.value]))
+      : {});
     const old = S;                  // everything CPU-side has been read off it
     S = {
       scene, nx, ny, dx, segs,
       W: nx * dx, H: ny * dx,
       mask: new Uint8Array(nx * ny),
       t: 0, frames: 0,
-      p,
+      p, params,
     };
     release(old);                   // free BEFORE allocating: lower peak VRAM
 
@@ -1543,7 +1602,7 @@ const SIM = (() => {
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
            hydraulicGrade,
-           setValve,
+           setValve, setParam, params,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

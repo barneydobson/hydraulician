@@ -576,6 +576,51 @@ SUITES.api = async (B) => {
       `d2 ${j.d2.toFixed(3)} vs Belanger ${j.d2p.toFixed(3)} at t ${j.t.toFixed(1)} s`);
     ok("PHYSICS the jump dissipates energy", j.dE > 0, "dE = " + j.dE);
   }
+
+  // GEOM/polygon rasterisation (Task 2 of the polygon-geometry work): a
+  // scene's solids() must fill the mask the same way walls() always has.
+  // Stamp the SAME 0.4 m wall two ways on the live grid — once as a segment
+  // through the existing stampSeg capsule, once as a GEOM.slab polygon
+  // through the new stampPoly fill+edge-stroke — and diff the two masks.
+  //
+  // The two are NOT pixel-identical, and should not be expected to be: the
+  // edge stroke stampPoly re-stamps with is stampSeg's own dx*1.7 anti-leak
+  // floor (th = 0 forces it), which is a fixed multiple of dx, run around the
+  // WHOLE polygon perimeter — while this wall's 0.4 m thickness is fixed in
+  // metres. At the sandbox's default (Medium) budget, dx ~ 0.0217 m, so the
+  // stroke's rim is a real, measured ~8.5% of the wall's footprint (312 of
+  // 3668 solid-or-poly cells) — geometry, not noise: the same comparison at
+  // Low (dx ~ 0.0316 m) gives ~10.5%, at Ultra (dx ~ 0.0080 m) ~2.2%, falling
+  // as dx does. A 20% gate is comfortably clear of that floor while still
+  // catching what actually breaks stampPoly: a fill that never runs leaves
+  // the polygon's whole 0.4 x 3 m interior unstamped, which is most of
+  // `solid`, not a rim around it.
+  await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
+  const poly = await B.evaluate(`(() => {
+    const S = APP.sim, orig = S.scene;
+    S.scene = Object.assign({}, orig, {
+      walls: () => [[2, 2, 5, 2, 0.4]], solids: undefined, valves: undefined,
+    });
+    APP.SIM.rasterise();
+    const segMask = S.mask.slice();
+    S.scene = Object.assign({}, orig, {
+      walls: undefined, solids: () => [GEOM.slab(2, 2, 5, 2, 0.4)], valves: undefined,
+    });
+    APP.SIM.rasterise();
+    const polyMask = S.mask.slice();
+    S.scene = orig;                    // leave the live grid as it was found
+    APP.SIM.rasterise();
+    let diff = 0, solid = 0;
+    for (let i = 0; i < segMask.length; i++) {
+      const a = segMask[i] >= 192, b = polyMask[i] >= 192;
+      if (a || b) solid++;
+      if (a !== b) diff++;
+    }
+    return { diff, solid };
+  })()`);
+  ok("SIM a solids() polygon stamps the same wall walls() would",
+    poly.solid > 20 && poly.diff / poly.solid < 0.20,
+    `${poly.diff} of ${poly.solid} solid-or-poly cells disagree`);
 };
 
 SUITES.rig = async (B) => {

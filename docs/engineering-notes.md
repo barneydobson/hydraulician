@@ -598,3 +598,40 @@ picture saturated or flat is the symptom of the two having drifted apart.
   s1's roller — never fall below tolerance at all; for those the mean profile
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
+
+## Polygon geometry
+
+`js/geom.js` (`GEOM`) is the RECON pattern applied to shapes: pure numerics,
+no WebGL, no DOM, pinned against closed-form answers in
+`test/geom-test.mjs`. A later polygon rasteriser (`js/sim.js`) and a
+pressure-force instrument are built on it, so its conventions are worth
+having settled before anything calls into it.
+
+- **CCW winding fixes what "outward" means, and nothing checks it for you.**
+  A solid's verts run counter-clockwise; `edgeNormal` takes an edge's
+  tangent and turns it a quarter-turn clockwise to get the outward normal.
+  Wind a polygon the other way and every normal silently points into the
+  water instead of out of it — no exception, no NaN, just a pressure force
+  pushing the wrong way. `test/geom-test.mjs`'s G2 pins the convention down
+  directly: every edge normal of a rectangle must point away from its own
+  centre.
+- **Faces are runs of consecutive edges, not index lists**, because that is
+  the only shape a stretch of polygon boundary can take, and it lets a run
+  that wraps past the last vertex (`e0 > e1`) be written as two numbers
+  instead of an array. `faceEdges` resolves the wrap; `faceSamples` walks
+  it to produce the points a pressure-force integral consumes, each carrying
+  its outward normal and an arc-length coordinate `s`.
+- **Curves are polyline-sampled, not kept as true arcs**, at a spacing fine
+  enough that the chord's sagitta sits far below the finest cell the app
+  runs at (Δx ~ 2.6 mm at Ultra) — `arcPts` bounds each segment's own arc
+  length to 0.02 m by default, `humpPts` the same in x. Once sampled,
+  everything downstream (a rasteriser, `contains`, `faceSamples`) only ever
+  has to reason about straight edges, which is what keeps the geometry
+  layer small.
+- `test/geom-test.mjs` holds the closed forms that would otherwise have to
+  be trusted by eye: a slab's exact butt-end corners, the winding/normal
+  convention, point-in-polygon on an axis box and a slanted slab, an arc's
+  endpoints and length, a hump's symmetry and zero end slope, and the
+  textbook hydrostatic force and centre of pressure (`rho*g*H^2/2` and
+  `H/3`) on a vertical face — the same closed form a lab manual would use
+  to check a submerged gate by hand.

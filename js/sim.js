@@ -1480,7 +1480,9 @@ const SIM = (() => {
    *  (u, w, P) / f shape (see its comment) — pressure sits at U[...+2] and
    *  fill at F[...] either way, cell-centred in both, so the `cen` flag it
    *  returns plays no part here: it only distinguishes the staggered u/w
-   *  positions lineFlux reads, and this instrument never touches those. */
+   *  positions lineFlux reads, and this instrument never touches those.
+   *  Result: {samples (each carrying s, the arc-length coordinate along the
+   *  face), Fx, Fz, F, cop, wetLen, len, solidId, faceId}. */
   function faceForce(solidId, faceId, avg) {
     const so = (S.solids || []).find((s) => s.id === solidId);
     if (!so) return null;
@@ -1496,8 +1498,8 @@ const SIM = (() => {
       iL = Math.min(iL, i); iR = Math.max(iR, i);
       jB = Math.min(jB, j); jT = Math.max(jT, j);
     }
-    iL = Math.max(0, iL - 1); iR = Math.min(S.nx - 1, iR + 1);
-    jB = Math.max(0, jB - 1); jT = Math.min(S.ny - 1, jT + 1);
+    iL = Math.max(0, Math.min(S.nx - 1, iL - 1)); iR = Math.max(iL, Math.min(S.nx - 1, iR + 1));
+    jB = Math.max(0, Math.min(S.ny - 1, jB - 1)); jT = Math.max(jB, Math.min(S.ny - 1, jT + 1));
     const w = iR - iL + 1, h = jT - jB + 1;
     const need = w * h * 4;
     if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }

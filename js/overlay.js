@@ -1116,6 +1116,126 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** The pressure diagram on the face `force` (== `state.force`) has selected
+   *  — `force.data` is a `SIM.faceForce` result, EMA'd by `sampleForce`.
+   *
+   *  Two different things are being drawn, and they are drawn two different
+   *  ways on purpose. The DISTRIBUTION — the arrow at every station — is a
+   *  geometric feature glued to the wall, so its head is placed by offsetting
+   *  the domain point `q - n*L(q)` and mapping THAT through V.X/V.Y: it
+   *  stretches with the vertical exaggeration exactly the way the wall it is
+   *  pressing on does. The RESULTANT is a force vector, not a shape in the
+   *  water — like drawCV's arrow, it is built in true screen proportion (no
+   *  vex), because an angle on it is one a straightedge on the screen should
+   *  be able to measure.
+   *
+   *  `L(q)` points along -n: outward normals face into the water (see
+   *  SIM.faceForce), so the arrow runs FROM the face INTO the solid it is
+   *  pressing on — the same "pressing" picture the strip icon draws. */
+  function drawForce(ctx, V, sim, force) {
+    const D = force.data, samples = D.samples;
+    const col = "#ff8fa3";
+    ctx.save();
+
+    // The face itself, always — the selection has to read even where there
+    // is no water on it yet (or any longer).
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath();
+    samples.forEach((s, i) => {
+      const px = V.X(s.x), py = V.Y(s.z);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+
+    const g = Math.abs(sim.p.g) || 9.81;
+    let maxHead = 0, maxI = 0;
+    const heads = samples.map((s, i) => {
+      const h = Math.max(0, Math.min(s.f, 1) * s.p) / g;
+      if (h > maxHead) { maxHead = h; maxI = i; }
+      return h;
+    });
+    if (maxHead > 1e-6) {
+      // ONE scale for the whole face — the shape of the diagram is the
+      // reading, and a per-station scale would draw a lie. The largest head
+      // maps to `maxPx`, capped at a third of the view so a huge head on a
+      // small window cannot run the diagram off the canvas.
+      const maxPx = Math.min(56, V.h / 3);
+      const mAt = samples[maxI];
+      const pxPerDomM = (dx, dz) => Math.hypot(dx * V.w / sim.W, dz * V.h / sim.H);
+      const dirPx = Math.max(pxPerDomM(mAt.nx, mAt.nz), 1e-9);
+      const pxPerHead = maxPx / maxHead;             // screen px per metre of head
+      const mPerHead = pxPerHead / dirPx;             // domain metres per metre of head
+
+      const tips = samples.map((s, i) => {
+        const L = heads[i] * mPerHead;
+        return [V.X(s.x - s.nx * L), V.Y(s.z - s.nz * L)];
+      });
+
+      // The filled prism: out along the face, back along the tips.
+      ctx.beginPath();
+      samples.forEach((s, i) => {
+        const px = V.X(s.x), py = V.Y(s.z);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      for (let i = tips.length - 1; i >= 0; i--) ctx.lineTo(tips[i][0], tips[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255,143,163,0.20)";
+      ctx.fill();
+
+      // A subset of arrows, not a hedgehog: a long face samples every couple
+      // of centimetres, and an arrowhead at every one of them would be paint,
+      // not a reading. The fill above already carries every sample.
+      const step = Math.max(1, Math.ceil(samples.length / 24));
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.4;
+      for (let i = 0; i < samples.length; i += step) {
+        const ax = V.X(samples[i].x), ay = V.Y(samples[i].z);
+        const [bx, by] = tips[i];
+        const Lpx = Math.hypot(bx - ax, by - ay);
+        if (Lpx < 3) continue;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+        // The head, built on the arrow's OWN axis — same idiom as drawCV's.
+        const ux = (bx - ax) / Lpx, uy = (by - ay) / Lpx;
+        const px = -uy, py = ux;
+        const hs = Math.min(4.5, Lpx * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx - ux * hs + px * hs * 0.5, by - uy * hs + py * hs * 0.5);
+        ctx.lineTo(bx - ux * hs - px * hs * 0.5, by - uy * hs - py * hs * 0.5);
+        ctx.closePath(); ctx.fill();
+      }
+
+      chip(ctx, V.X(samples[0].x) + 6, V.Y(samples[0].z) - 12,
+           "scale: 1 m head = " + pxPerHead.toFixed(0) + " px", col);
+
+      // The resultant, through the centre of pressure — heavier, and NOT
+      // stretched by vex (see the function comment).
+      if (D.cop && D.F > 1e-6) {
+        const cx = V.X(D.cop.x), cy = V.Y(D.cop.z);
+        const B = V.vis || V;
+        const room = Math.min(B.w, B.h) * 0.22;
+        const L = Math.min(D.F * 0.018, room);
+        if (L > 6) {
+          const ux = D.Fx / D.F, uz = D.Fz / D.F;    // unit force, z up
+          const hx = ux * L, hy = -uz * L;           // screen y is down
+          const bx = cx + hx, by = cy + hy;
+          ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke();
+          const px = -hy / L, py = hx / L;           // unit perpendicular
+          ctx.beginPath();
+          ctx.moveTo(bx + hx / L * 9, by + hy / L * 9);
+          ctx.lineTo(bx + px * 5, by + py * 5);
+          ctx.lineTo(bx - px * 5, by - py * 5);
+          ctx.closePath(); ctx.fill();
+        }
+        const fKN = (v) => Math.abs(v) >= 1000
+          ? (v / 1000).toFixed(1) + " kN/m" : v.toFixed(0) + " N/m";
+        chip(ctx, cx + 8, cy - 18, "F = " + fKN(D.F), col);
+        chip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m"), col);
+      }
+    }
+    ctx.restore();
+  }
+
   /** A vector as two signed components with their directions spelled out, so
    *  nothing on this tool is read off a bare sign. */
   function vec(vx, vz, unit) {
@@ -1200,5 +1320,5 @@ const OVERLAY = (() => {
            drawGradeLines,
            ROW_IDS, DEFAULT_ROWS,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
-           drawMeasure, drawCV, drawFlux, measureText, chip, fmt };
+           drawMeasure, drawCV, drawFlux, drawForce, measureText, chip, fmt };
 })();

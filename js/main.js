@@ -39,6 +39,7 @@ const state = {
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
   flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
   cvShow: "Q",                     // which per-edge quantity the box labels
+  force: null,                     // the pressure-force face: {solidId, faceId, data, t0}
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   // Average is a measurement mode, not a blur filter (docs/averaging.md
@@ -191,6 +192,7 @@ function loadScene(id, keepDrawing) {
   state.measure = null; state.measDrag = null;
   state.cv = null; state.cvDrag = null;
   state.flux.length = 0; state.fluxDrag = null;
+  state.force = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -984,6 +986,10 @@ const TOOLS = [
   // arming the wrong tool. New tools go on the end, whatever group they
   // belong to on the strip.
   ["flux", "Flux line", "Left-drag a section — reads what crosses it. Draw TWO for the balance between them (Shift snaps; click a line to remove it)"],
+  // TWELFTH, appended for the same reason as Flux: it needs a scene solid to
+  // click on (Task 2 of the polygon-geometry work), which nothing draws yet,
+  // so it has no digit of its own either.
+  ["force", "Pressure force", "Click a wall or gate face for its pressure diagram — click the same solid again to cycle faces, click open water to clear"],
 ];
 
 /** The tools the number keys can reach. */
@@ -1054,6 +1060,10 @@ const ICONS = {
   // The two grade lines over a wavy surface: what the overlay actually draws.
   channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
            '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
+  // A vertical face with three arrows of growing length pressing on it — the
+  // textbook pressure diagram drawForce paints on the canvas.
+  force:   '<path d="M13.5 3v14"/><path d="M4 6.5h5M6 10h3M8 13.5h1"/>' +
+           '<path d="M9 6.5 7.5 5.4M9 6.5 7.5 7.6M9 10l-1.2-1M9 10l-1.2 1M9 13.5l-.9-.8M9 13.5l-.9.8"/>',
 };
 
 /** An `<svg>` for one icon id. */
@@ -1560,7 +1570,7 @@ const TOOLBAR = [
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
   { cap: "MEASURE", family: "measure",
-    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux") },
+    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux", "force") },
   // VIEW: how the water is DRAWN. The three toggles were reachable only from
   // the P / D / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
@@ -2183,6 +2193,23 @@ function onDown(e) {
     state.cvDrag = { x0: x, z0: z, x1: x, z1: z };
     return;
   }
+  if (state.tool === "force") {
+    // GRAB_PX is a screen tolerance; GEOM.faceAt wants domain metres, so it is
+    // converted the same way removeFluxAt's nearSegment does — through the
+    // view's horizontal px-per-metre, the same conversion placeRake uses for
+    // its own single-axis pick.
+    const hit = GEOM.faceAt(sim.solids || [], x, z, GRAB_PX * sim.W / view.w);
+    if (!hit) { state.force = null; return; }
+    if (state.force && state.force.solidId === hit.solid.id) {
+      // Same solid again: cycle to its next named face.
+      const ids = hit.solid.faces.map((fc) => fc.id);
+      const k = (ids.indexOf(state.force.faceId) + 1) % ids.length;
+      state.force = { solidId: hit.solid.id, faceId: ids[k], data: null, t0: sim.t };
+    } else {
+      state.force = { solidId: hit.solid.id, faceId: hit.faceId, data: null, t0: sim.t };
+    }
+    return;
+  }
   state.drag = { x0: x, z0: z, x1: x, z1: z };
 }
 
@@ -2397,6 +2424,7 @@ function tickFrame(realDt) {
   sampleRakes();
   sampleCV();
   sampleFlux();
+  sampleForce();
   sampleInlet(analysis);
   advanceTracers(simAdvanced);
   // Scenes whose subject is the orbital motion seed their own tracer rake as
@@ -2587,6 +2615,47 @@ function sampleCV() {
   cv.last = r;
 }
 
+/** The pressure diagram on the selected face — same idiom as sampleCV, but
+ *  the EMA runs per SAMPLE rather than on the two scalars: it is `p` at each
+ *  station that gets the τ = 1 s filter, and Fx/Fz/F/cop/wetLen are then
+ *  re-integrated (GEOM.faceForceFromSamples) from the smoothed row. Because
+ *  that integral is linear in p and the geometry weights (nx, nz, f, ds) are
+ *  unchanged between frames, the result is exactly the number a direct EMA
+ *  of Fx/Fz would have given — so the resultant arrow is always consistent
+ *  with the diagram it is drawn from, by construction rather than by two
+ *  separate filters that could drift apart.
+ *
+ *  A geometry change changes the sample count (a resolution rebuild
+ *  resamples every face at the new dx; a parameterised solid can change
+ *  shape under a scene control) — that is the restart signal, the same way
+ *  the clock going backwards is. */
+function sampleForce() {
+  const f = state.force;
+  if (!f || state.paused) return;
+  if (sim.t < f.t0) { f.data = null; f.t0 = sim.t; }
+  if (!(sim.t > f.t0) && f.data) return;
+  const av = measuringAvg();
+  const r = SIM.faceForce(f.solidId, f.faceId, av);
+  if (!r) { f.data = null; f.t0 = sim.t; return; }
+  if (av || !f.data || f.data.samples.length !== r.samples.length) {
+    // The window mean IS the instrument's aggregate (no second filter), a
+    // fresh face has nothing to blend against, and a sample-count change is
+    // a different station layout — averaging across it would be nonsense.
+    f.data = r;
+    f.t0 = sim.t;
+    return;
+  }
+  const a = 1 - Math.exp(-Math.min(sim.t - f.t0, 0.25) / 1.0);
+  f.t0 = sim.t;
+  const prev = f.data.samples;
+  const samples = r.samples.map((s, i) =>
+    Object.assign({}, s, { p: prev[i].p + (s.p - prev[i].p) * a }));
+  const ds = samples.length > 1 ? samples[1].s - samples[0].s : sim.dx;
+  const g = Math.abs(sim.p.g) || 9.81;
+  f.data = Object.assign(GEOM.faceForceFromSamples(samples, ds, 1000, g),
+                          { samples, solidId: r.solidId, faceId: r.faceId, len: r.len });
+}
+
 /** Smooth every scalar of a control-volume budget, edge by edge. Written as a
  *  walk over the keys rather than by hand so that adding a quantity to
  *  `boxFlux` cannot leave it unsmoothed and jittering while its neighbours
@@ -2735,6 +2804,7 @@ function drawOverlay(A) {
   if (state.flux.length || state.fluxDrag) {
     OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
   }
+  if (state.force && state.force.data) OVERLAY.drawForce(ctx, view, sim, state.force);
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -3230,6 +3300,7 @@ function setAverage(on) {
   // live EMA, and Live must not resume from a window mean.
   if (state.cv) { state.cv.ema = null; state.cv.flux = null; state.cv.hist.length = 0; state.cv.t0 = sim.t; }
   state.flux.forEach((L) => { L.ema = null; L.t0 = sim.t; });
+  if (state.force) { state.force.data = null; state.force.t0 = sim.t; }
   OVERLAY.resetEstimates(sim);
   LEGEND.sync(); syncPanel(); syncToolbar();
 }

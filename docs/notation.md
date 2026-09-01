@@ -60,6 +60,9 @@ solver merely extends `h` into the non-hydrostatic cells it resolves.
   unambiguous.
 - `q`, `Fr`, `S₀`, `S_f`, `n`, `f`, `c` — unit discharge, Froude number, bed
   and friction slopes, Manning n, fill fraction, slot celerity.
+- `F` — pressure force per metre width on a named face, N/m, with components
+  `Fx`, `Fz`; centre of pressure — the point on the face through which the
+  resultant acts.
 
 `y` survives only where it is genuinely something else: `y⁺` wall units, and
 chart reference lines like `y = 2x`.

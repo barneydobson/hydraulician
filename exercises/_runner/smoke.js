@@ -621,6 +621,24 @@ SUITES.api = async (B) => {
   ok("SIM a solids() polygon stamps the same wall walls() would",
     poly.solid > 20 && poly.diff / poly.solid < 0.20,
     `${poly.diff} of ${poly.solid} solid-or-poly cells disagree`);
+
+  // faceForce (Task 4 of the polygon-geometry work): wiring only here. No
+  // scene declares solids yet, so sandbox — restored above — has none, and
+  // every (solidId, faceId) must come back null the same way an unknown
+  // solid id does on any scene. The real closed-form check (a face force
+  // against its hydrostatic integral) lands in Task 6, once s3's pool gate
+  // exists to check it against.
+  const ff = await B.evaluate(`(() => ({
+    unknownSolid: APP.faceForce("nosuch", "x"),
+    noSolids: (APP.sim.solids || []).length === 0,
+    onEmptyScene: APP.faceForce("anything", "top"),
+  }))()`);
+  ok("SIM faceForce returns null for an unknown solid id",
+    ff.unknownSolid === null, String(ff.unknownSolid));
+  ok("SIM faceForce on a scene with no solids has none to find",
+    ff.noSolids === true, "solids: " + ff.noSolids);
+  ok("SIM faceForce returns null on a scene with no solids",
+    ff.onEmptyScene === null, String(ff.onEmptyScene));
 };
 
 SUITES.rig = async (B) => {

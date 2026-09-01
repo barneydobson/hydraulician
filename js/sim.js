@@ -189,6 +189,7 @@ const SIM = (() => {
   function setParam(key, v) {
     const decl = (S.scene.params || []).find((d) => d.key === key);
     if (!decl) return undefined;
+    if (!Number.isFinite(v)) return undefined;   // a hand-edited rig can carry NaN
     const clamped = Math.min(decl.max, Math.max(decl.min, v));
     S.params[key] = clamped;
     rasterise();
@@ -1467,6 +1468,54 @@ const SIM = (() => {
     return out;
   }
 
+  /** The pressure force on ONE named face of a scene solid, per metre width.
+   *  Same bargain as lineFlux: a readback on a click, never on the frame
+   *  path. Samples sit 0.75*dx off the face along the outward normal — in
+   *  the water, clear of the solid cell the face bounds — and every term
+   *  carries the fill fraction, so air contributes nothing and a
+   *  half-wetted face reports half its diagram. Under an averaging window
+   *  the sample is the window mean: one window, every instrument.
+   *
+   *  readState folds both the live and the averaged layout down to the same
+   *  (u, w, P) / f shape (see its comment) — pressure sits at U[...+2] and
+   *  fill at F[...] either way, cell-centred in both, so the `cen` flag it
+   *  returns plays no part here: it only distinguishes the staggered u/w
+   *  positions lineFlux reads, and this instrument never touches those. */
+  function faceForce(solidId, faceId, avg) {
+    const so = (S.solids || []).find((s) => s.id === solidId);
+    if (!so) return null;
+    const pts = GEOM.faceSamples(so, faceId, S.dx);
+    if (!pts || !pts.length) return null;
+    // Bounding box of the offset sample points, one readback, with a cell
+    // of margin the way lineFlux and boxForce both keep.
+    const off = 0.75 * S.dx;
+    let iL = Infinity, iR = -Infinity, jB = Infinity, jT = -Infinity;
+    for (const q of pts) {
+      const sx = q.x + q.nx * off, sz = q.z + q.nz * off;
+      const i = Math.floor(sx / S.dx), j = Math.floor(sz / S.dx);
+      iL = Math.min(iL, i); iR = Math.max(iR, i);
+      jB = Math.min(jB, j); jT = Math.max(jT, j);
+    }
+    iL = Math.max(0, iL - 1); iR = Math.min(S.nx - 1, iR + 1);
+    jB = Math.max(0, jB - 1); jT = Math.min(S.ny - 1, jT + 1);
+    const w = iR - iL + 1, h = jT - jB + 1;
+    const need = w * h * 4;
+    if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
+    readState(iL, jB, w, h, S.cvU, S.cvF, avg);
+    for (const q of pts) {
+      const sx = q.x + q.nx * off, sz = q.z + q.nz * off;
+      const i = Math.min(iR, Math.max(iL, Math.floor(sx / S.dx)));
+      const j = Math.min(jT, Math.max(jB, Math.floor(sz / S.dx)));
+      const k = ((j - jB) * w + (i - iL)) * 4;
+      q.p = S.cvU[k + 2]; q.f = S.cvF[k];
+      if (S.mask[j * S.nx + i] > 192) { q.p = 0; q.f = 0; }   // sample landed solid
+    }
+    const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
+    const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);
+    return Object.assign(r, { samples: pts, solidId, faceId,
+                              len: pts[pts.length - 1].s + ds / 2 });
+  }
+
   function boxFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
@@ -1607,7 +1656,7 @@ const SIM = (() => {
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
-           boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
+           boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, bands, rescaleFill,
            hydraulicGrade,
            setValve, setParam, params,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,

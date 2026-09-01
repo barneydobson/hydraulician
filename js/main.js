@@ -3275,6 +3275,7 @@ window.APP = {
   placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
+  faceForce: (sid, fid, avg) => SIM.faceForce(sid, fid, avg),   // the pressure diagram on one named face
   placeCV,                                 // the control volume, headless
   placeFlux, removeFluxAt,                 // a flux section, headless
   // The averaging mode's public surface.

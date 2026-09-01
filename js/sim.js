@@ -179,10 +179,17 @@ const SIM = (() => {
    *  weir height — whatever the scene's `params` declares). Clamps to the
    *  declared [min, max], writes S.params, and rebuilds the mask: a param a
    *  scene's `solids()` reads is geometry, so it takes the same rasterise()
-   *  choke point (and the same averaging reset) as a drawn edge. */
+   *  choke point (and the same averaging reset) as a drawn edge.
+   *
+   *  An undeclared key is a no-op — write nothing, rasterise nothing, return
+   *  undefined. This entry point is fed straight off the rig wire (RIG.apply
+   *  calls it once per key in a loaded `params` object), so a stale link
+   *  naming a key the current scene never declared must not go on to write an
+   *  unbounded value into S.params. */
   function setParam(key, v) {
     const decl = (S.scene.params || []).find((d) => d.key === key);
-    const clamped = decl ? Math.min(decl.max, Math.max(decl.min, v)) : v;
+    if (!decl) return undefined;
+    const clamped = Math.min(decl.max, Math.max(decl.min, v));
     S.params[key] = clamped;
     rasterise();
     return clamped;

@@ -118,6 +118,13 @@ const RIG = (() => {
             grade: b01(state.grade),
             dye: b01(state.dye) },
     };
+    // additive, optional — a scene with no `params` declaration writes none,
+    // and an old rig read back into one just keeps that scene's defaults.
+    const pd = SIM.params();
+    if (pd.decl && pd.decl.length) {
+      o.params = {};
+      pd.decl.forEach((d) => o.params[d.key] = r4(pd.values[d.key]));
+    }
     if (state.tracers) o.tracers = [r4(state.tracers.x), state.tracerN | 0,
                                     r4(state.tracers.trail)];
     if (state.cv) o.cv = [r4(state.cv.x0), r4(state.cv.z0), r4(state.cv.x1), r4(state.cv.z1)];
@@ -175,6 +182,11 @@ const RIG = (() => {
       if (o.dye.line !== undefined) p.dyeLine = +o.dye.line;
       if (o.dye.decay !== undefined) p.dyeDecay = +o.dye.decay;
     }
+    // additive, optional — SIM.setParam itself is the single writer (clamps
+    // to the scene's own declared range and ignores a key the current scene
+    // never declared), and rasterises on every call, which is redundant with
+    // the SIM.rasterise() a few lines down but harmless at apply time.
+    if (o.params) Object.keys(o.params).forEach((k) => SIM.setParam(k, +o.params[k]));
     p.pour = null;
     SIM.rasterise();                         // one stamp for the whole rig
 

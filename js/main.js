@@ -489,6 +489,21 @@ const CONTROLS = [
     get: () => sim.p.source.vz, set: (v) => sim.p.source.vz = v,
     fmt: (v) => v.toFixed(2) + " m/s" },
 
+  { h: "Geometry" },
+  ...[0, 1, 2, 3].map((k) => ({
+    id: "geom" + k, label: "—",
+    min: 0, max: 1, step: 0.01,
+    // The row binds to the k-th declared param of whatever scene is up.
+    par: () => (SIM.params().decl || [])[k],
+    get: function () { const d = this.par(); return d ? SIM.params().values[d.key] : 0; },
+    set: function (v) { const d = this.par(); if (d) SIM.setParam(d.key, v); },
+    fmt: function (v) {
+      const d = this.par();
+      return d ? v.toFixed(3) + (d.unit ? " " + d.unit : "") : "";
+    },
+    info: "A dimension of the scene's own geometry. Moving it redraws the solid and re-rasterises the grid — and resets any averaging window, because the walls the mean was accumulated through are no longer the walls on screen.",
+  })),
+
   { h: "Boundaries" },
   ...[["openL", 0, "Left edge", "carries the reservoir control when it is on"],
       ["openR", 1, "Right edge", "carries the tailwater control when it is on"],
@@ -817,6 +832,19 @@ function syncPanel() {
       c.sync(input);
       if (note) note.textContent = c.fmt ? c.fmt() : "";
       return;
+    }
+    // A dynamic row (Geometry's geom0…geom3) binds to whatever param its
+    // scene declares at that index — none for most scenes. Hide the row and
+    // its note when there is nothing to bind to, and when there is, adopt
+    // that param's own range and label before reading its value below.
+    if (c.par) {
+      const d = c.par();
+      input.parentElement.classList.toggle("gone", !d);
+      if (note) note.classList.toggle("gone", !d);
+      if (d) {
+        c.min = d.min; c.max = d.max; c.step = d.step;
+        input.parentElement.querySelector(".lbl").textContent = d.label;
+      }
     }
     const v = c.get();
     if (c.type === "check") input.checked = !!v;

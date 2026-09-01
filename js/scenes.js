@@ -86,6 +86,27 @@ const SCENES = (() => {
   // puts the depth in zone 1, 2 or 3.
   const TH = 1.4;                          // bed thickness — reaches below z=0
 
+  /** A scene states the DEPTH its arriving profile wants (`inletDepth`, always
+   *  a measured number — m1's is the weir backwater, m2's the measured d_n).
+   *  The reservoir level that delivers it is that depth plus its velocity
+   *  head, because the level is an ENERGY line: the boundary solves
+   *  E = d + q²/2gd² for what it hands over (SIM.inletStage).
+   *
+   *  Doing the conversion HERE is what lets every `inletDepth` in this file go
+   *  on meaning exactly what its comment says it means. Set the level to the
+   *  bare depth instead and every scene is pinned a velocity head too shallow
+   *  — 11 mm on m1, 26 mm on m2, 271 mm on the steep pair — which is the
+   *  failure the engineering notes already describe: an inlet pinned under
+   *  what the flow wants chokes the profile and sheds ripples for ever. It
+   *  cost two physics gates when it was tried: m1's mean column flux spread
+   *  0.0109 against a 0.01 limit (0.0022 settled), and m3 turned in a positive
+   *  energy sample.
+   *
+   *  Head-driven inflow prescribes no discharge, so there is no velocity head
+   *  to add: its level is a still-water head and stays one. */
+  const inletLevel = (bed, depth, q, free) =>
+    bed + depth + (free || !(q > 0) ? 0 : (q * q) / (2 * 9.81 * depth * depth));
+
   function channel(o) {
     const W = o.W, H = o.H, xEnd = o.xEnd === undefined ? W : o.xEnd;
     // tilt: draw the bed FLAT (grid-aligned, so there is no rasterisation
@@ -103,7 +124,11 @@ const SCENES = (() => {
     const off = (TH / 2) * Math.sqrt(1 + S0g * S0g);
     const offB = (TH / 2) * Math.sqrt(1 + S0b * S0b);
     const outBed = bedTop(xEnd);
-    const inLevel = o.bed0 + o.inletDepth;
+    const inLevel = inletLevel(o.bed0, o.inletDepth, o.q, o.free);
+    // The SURFACE that depth stands at. inLevel is an energy line and is a
+    // velocity head above it, so it must never be handed to `still()` — filling
+    // a gate pool to the energy line starts the scene with water it has to shed.
+    const inSurf = o.bed0 + o.inletDepth;
     const twLevel = o.tail === undefined ? 0 : outBed + o.tail;
 
     // A butt-ended sloping slab is cut PERPENDICULAR to its axis, so its top
@@ -137,7 +162,7 @@ const SCENES = (() => {
     const water = (x, z, P) => {
       if (x >= xEnd || z <= bedTop(x)) return 0;
       let lev;
-      if (o.gate && x < o.gate.x) lev = inLevel;                 // pool behind the gate
+      if (o.gate && x < o.gate.x) lev = inSurf;                  // pool behind the gate
       else if (o.weir && x < o.weir.x) lev = Math.max(crest, bedTop(x) + d0);
       else lev = Math.max(bedTop(x) + d0, twLevel);
       return still(lev, z, P);
@@ -181,7 +206,8 @@ const SCENES = (() => {
     // recession (overlapping the approach slab, which is harmless).
     const ext = (TH / 2) * sr / Math.sqrt(1 + sr * sr) * 1.3;
     const twLevel = apron(W) + o.tail;
-    const inLevel = o.hi + o.inletDepth;
+    const inLevel = inletLevel(o.hi, o.inletDepth, o.q, 0);
+    const inSurf = o.hi + o.inletDepth;      // the surface, not the energy line
     return Object.assign({
       chan: 1, group: "Open channel — surface profiles",
       id: o.id, name: o.name, key: o.key, blurb: o.blurb, tips: o.tips,
@@ -199,7 +225,7 @@ const SCENES = (() => {
       water: (x, z, P) => {
         const bed = x < o.xa ? o.hi : (x < o.xb ? o.hi - sr * (x - o.xa) : apron(x));
         if (z <= bed) return 0;
-        const lev = x < o.xa ? inLevel : Math.max(bed + 0.10, twLevel);
+        const lev = x < o.xa ? inSurf : Math.max(bed + 0.10, twLevel);
         return still(lev, z, P);
       },
     }, o.extra || {});

@@ -25,8 +25,16 @@ Two capabilities the segment representation cannot deliver:
   pressure, kN per m width, Fx/Fz components).
 - First demos: **sluice gate opening** (convert `s3`) and **hump height**
   (new scene, curved crest). Tainter gate is a follow-up, not this branch.
-- Rig wire format **bumps to v3** (geometry params are new keys; the
-  standing rule is bump-and-break, no migration).
+- Rig wire format **stays at v2** with an additive optional `params` key.
+  The v3 bump approved at first was wrong on the codebase's own evidence,
+  found during planning: `js/rig.js` documents (and its `flux`/`ui.cvShow`
+  precedent establishes) that a purely additive optional key does NOT bump
+  `V` — only a rename/redefinition does — and `check_notation.py`
+  cross-checks `V` against the 26 v2 payloads in `js/exercises-rigs.js`,
+  which are Linux-bound CDP captures. A bump would fail CI and cost the
+  teaching pack for zero benefit. A rig without `params` loads scene
+  defaults; an old build ignores the key. Both directions degrade to the
+  truth, which is exactly the documented test.
 
 ## 1. Geometry model — `js/geom.js` (`GEOM`)
 
@@ -107,11 +115,14 @@ does today (the mask wins; VOF flux caps handle the rest) — no new
 mechanism, but the smoke test pins it (lowering the gate into flow must not
 create volume).
 
-### Wire format v3
+### Wire format: v2 + additive `params`
 
-`RIG.V` → 3. A rig stores `params: {key: value}` when the scene has any.
-`migrate` accepts exactly v3, rejects the rest — the standing rule. The
-smoke rig round-trip gains params.
+`RIG.V` stays 2. `snapshot()` writes `params: {key: value}` only when the
+scene declares params; `apply()` reads it if present and otherwise leaves
+scene defaults. Additive-optional, per the documented rule in `js/rig.js`
+(the `flux` / `ui.cvShow` precedent): a missing key and an unknown key both
+degrade to the truth, so no bump — and no re-capture of the 26 v2 exercise
+payloads `check_notation.py` guards. The smoke rig round-trip gains params.
 
 ## 4. The pressure-force instrument
 
@@ -188,13 +199,13 @@ control volume). Sampled at the instrument throttle, not per frame.
 - **`smoke.js`** additions: `APP.faceForce` on a still tank wall within a
   few % of ½ρgH²; `setParam` rebuilds the mask and resets averaging;
   gate-into-flow conserves volume (no invented water); converted `s3` and
-  new `hump` pass the existing per-scene physics gates; rig v3 round-trip
-  carries params.
+  new `hump` pass the existing per-scene physics gates; the v2 rig
+  round-trip carries params.
 - **`ui-smoke.mjs`** additions: the Force tool appears in the MEASURE strip
   family; the Geometry panel section renders exactly when the scene has
   params; an exercise `ui` profile can expose/withhold the tool.
 - Docs: polygon contract, face identity, thin-polygon stroke guard and the
-  v3 bump recorded in `docs/engineering-notes.md`; force symbols in
+  params-stays-v2 reasoning recorded in `docs/engineering-notes.md`; force symbols in
   `docs/notation.md`; `check_notation.py` taught any new reserved names.
 
 ## Out of scope (follow-ups, not this branch)

@@ -99,7 +99,28 @@ const SIM = (() => {
    *  (its own max(th, dx*1.7)*0.5 radius floor is the anti-leak stroke). Two
    *  parts, two jobs — the fill decides which cells the solid OWNS, the
    *  zero-width edge stroke seals the sub-cell pinches a scan test alone can
-   *  leave open on a near-tangent or shallow-angle edge. */
+   *  leave open on a near-tangent or shallow-angle edge.
+   *
+   *  The stroke is skipped when EVERY edge of the solid is at least 2 cells
+   *  long. A pinch needs a short edge (a capsule's own butt end IS one) or a
+   *  shallow-angle long edge close enough to a neighbour to leave a
+   *  cell-centre gap between them — neither can happen once nothing on the
+   *  solid is that short, so the fill test alone is exact and the stroke has
+   *  nothing left to protect. What it does instead, for a solid already
+   *  chunky enough, is overshoot: it paints solid up to its own radius
+   *  (~0.85*dx) OUTSIDE the true edge, on the water side too.
+   *
+   *  MEASURED on s3's gate blade (5 cm wide, faces stroked before this fix):
+   *  at Low (dx = 0.0193 m, the blade ~2.6 cells across) the stroke's rim
+   *  (0.85*dx = 0.0164 m) reached past faceForce's own 0.75*dx sampling
+   *  offset, so every sample on the upstream face read solid — Fx measured
+   *  0 N/m regardless of how deep the pool behind the gate stood. Skipping
+   *  the stroke here (the blade clears the 2-cell floor) restored a real
+   *  pressure diagram: Fx = 9.61 kN/m against a ~8.94 kN/m hydrostatic
+   *  estimate (exercises/_runner/smoke.js's closed-form case has the derivation
+   *  and the run-to-run spread). The threshold reads the LIVE S.dx, so a
+   *  coarser future budget that thins the same solid below 2 cells gets the
+   *  stroke back automatically. */
   function stampPoly(mask, solid, value) {
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const v of solid.verts) {
@@ -120,9 +141,16 @@ const SIM = (() => {
       }
     }
     const n = solid.verts.length;
+    let minEdge = Infinity;
     for (let e = 0; e < n; e++) {
       const a = solid.verts[e], b = solid.verts[(e + 1) % n];
-      stampSeg(mask, [a[0], a[1], b[0], b[1], 0], value);
+      minEdge = Math.min(minEdge, Math.hypot(b[0] - a[0], b[1] - a[1]));
+    }
+    if (minEdge < 2 * S.dx) {
+      for (let e = 0; e < n; e++) {
+        const a = solid.verts[e], b = solid.verts[(e + 1) % n];
+        stampSeg(mask, [a[0], a[1], b[0], b[1], 0], value);
+      }
     }
   }
 

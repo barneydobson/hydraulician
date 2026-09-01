@@ -118,7 +118,6 @@ const SCENES = (() => {
         ? [[x0, o.bed0 - off - S0g * x0, xEnd + e, outBed - off - S0g * e, TH]]
         : [[x0, o.bed0 - off - S0g * x0, xB, bedTop(xB) - off, TH],
            [xB, bedTop(xB) - offB, xEnd + e, outBed - offB - S0b * e, TH]];
-      if (o.gate) w.push([o.gate.x, bedTop(o.gate.x) + o.gate.a, o.gate.x, H, 0.05]);
       if (o.weir) {
         const b = bedTop(o.weir.x);
         w.push([o.weir.x, b - 0.25, o.weir.x, b + o.weir.h, o.weir.w || 0.7]);
@@ -143,6 +142,29 @@ const SCENES = (() => {
       return still(lev, z, P);
     };
 
+    // The gate is a parametric solid, not a fixed wall segment: `gate_a`
+    // (the opening) is a declared param, so the Geometry panel gets a slider
+    // and a rig can carry a chosen opening. The bed slabs stay in walls()
+    // (the shim) — this is the parametric proof for one piece of geometry,
+    // not a wholesale migration.
+    const params = o.gate
+      ? [{ key: "gate_a", label: "Gate opening", min: 0.05,
+           max: Math.min(o.inletDepth, H - bedTop(o.gate.x)),
+           step: 0.005, value: o.gate.a, unit: "m" }]
+      : undefined;
+    const solids = o.gate ? (W_, H_, P_, par) => {
+      const a = (par && par.gate_a !== undefined) ? par.gate_a : o.gate.a;
+      const b = bedTop(o.gate.x);
+      // The gate blade: 0.05 m thick, lip at bed + a, top out of the domain.
+      // Faces: upstream (the pressure-diagram face), downstream, lip.
+      const x = o.gate.x, t = 0.025;
+      return [GEOM.poly(
+        [[x - t, b + a], [x + t, b + a], [x + t, H_ + 0.5], [x - t, H_ + 0.5]],
+        [{ id: "us", label: "Upstream face", e0: 3, e1: 3 },
+         { id: "ds", label: "Downstream face", e0: 1, e1: 1 },
+         { id: "lip", label: "Lip", e0: 0, e1: 0 }], "gate")];
+    } : undefined;
+
     return Object.assign({
       chan: 1, group: "Open channel — surface profiles",
       W, H, c: 22, cf: o.cf, cs: o.cs === undefined ? 0.16 : o.cs,
@@ -153,7 +175,7 @@ const SCENES = (() => {
       tiltS0: o.tilt ? S0 : 0,
       inflow: { level: inLevel, q: o.free ? 0 : o.q, on: 1, free: o.free ? 1 : 0 },
       tailwater: o.tail === undefined ? { level: 0, on: 0 } : { level: twLevel, on: 1 },
-      walls, water,
+      walls, water, params, solids,
       yc: ycE, yn: S0 > 1e-5 ? ynE : Infinity, bedTop,   // handy from APP.sim.scene
     }, o.extra || {});
   }

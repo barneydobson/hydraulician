@@ -622,12 +622,11 @@ SUITES.api = async (B) => {
     poly.solid > 20 && poly.diff / poly.solid < 0.20,
     `${poly.diff} of ${poly.solid} solid-or-poly cells disagree`);
 
-  // faceForce (Task 4 of the polygon-geometry work): wiring only here. No
-  // scene declares solids yet, so sandbox — restored above — has none, and
-  // every (solidId, faceId) must come back null the same way an unknown
-  // solid id does on any scene. The real closed-form check (a face force
-  // against its hydrostatic integral) lands in Task 6, once s3's pool gate
-  // exists to check it against.
+  // faceForce (Task 4 of the polygon-geometry work): wiring only here.
+  // sandbox — restored above — declares no solids, so every (solidId,
+  // faceId) must come back null the same way an unknown solid id does on
+  // any scene. The real closed-form check (a face force against its
+  // hydrostatic integral) follows below, now that s3's gate is a solid.
   const ff = await B.evaluate(`(() => ({
     unknownSolid: APP.faceForce("nosuch", "x"),
     noSolids: (APP.sim.solids || []).length === 0,
@@ -639,6 +638,84 @@ SUITES.api = async (B) => {
     ff.noSolids === true, "solids: " + ff.noSolids);
   ok("SIM faceForce returns null on a scene with no solids",
     ff.onEmptyScene === null, String(ff.onEmptyScene));
+
+  // The closed form (Task 6): s3's gate blade is a GEOM.poly solid with an
+  // "us" (upstream) face, so faceForce("gate", "us") should recover the
+  // hydrostatic pressure diagram behind it. Settle to the scene's own
+  // measured spin-up (26 s) before reading it.
+  await B.goto(`http://localhost:${PORT}/?scene=s3`);
+  const g = await B.evaluate(`(() => {
+    __low();
+    const t = __settle(26, 120000);
+    const b = APP.sim.scene.bedTop(1.2);
+    const a = APP.SIM.params().values.gate_a;
+    const level = APP.sim.p.inflow.level;
+    const ff = APP.faceForce("gate", "us");
+    return { t, b, a, level,
+      Fx: ff && ff.Fx, Fz: ff && ff.Fz, cop: ff && ff.cop,
+      wetLen: ff && ff.wetLen, samples: ff ? ff.samples.length : 0 };
+  })()`);
+  ok("PHYSICS s3 gate settled before its face is read", g.t >= 25.5,
+    "reached t = " + (g.t || 0).toFixed(1) + " s of 26");
+  // z_s: the pool behind the gate is backed up by the LEVEL Dirichlet inflow
+  // (p.inflow.level, 2.80 m) — a near-static reservoir standing at that
+  // level, not at a constant DEPTH above the gate's own bed. The gate sits
+  // 0.30 m below the inlet's bed (S0 = 0.25 over 1.2 m), so the depth THERE
+  // is ~1.70 m, not the channel's inletDepth (1.40 m, the depth at the
+  // INLET). lip: the opening the water passes under. Expected upstream
+  // force is the hydrostatic integral over the wetted stretch [lip, z_s];
+  // the flow accelerating under the gate depresses pressure near the lip,
+  // and the pool itself carries a small approach/piling correction above
+  // the nominal level, so this is a bracket, not an equality.
+  const lip = g.b + g.a, zs = g.level;
+  const expect = 0.5 * 1000 * 9.81 * (zs - lip) * (zs - lip);
+  // MEASURED (ANGLE/D3D11, Low budget, dx = 0.0193 m): Fx = 9.61 kN/m
+  // against expect = 8.94 kN/m — 7.5% high, and stable (9.5-10.1 kN/m,
+  // wetLen 1.42-1.46 m) across a t = 5-70 s settle sweep, so this is the
+  // pool's own steady piling above the nominal level, not a transient. A
+  // regression in the RISK this task was written against (the polygon
+  // lip's effective opening drifting by the ~0.85*dx edge-stroke floor)
+  // would move Fx by several percent on top of that -- either the wetted
+  // extent or the near-lip depression would visibly shift -- so 15% still
+  // has margin to catch it while not being so loose it catches nothing.
+  ok("PHYSICS s3 gate upstream face brackets the hydrostatic force",
+    g.Fx !== undefined && g.Fx > 0 && near(g.Fx, expect, 0.15 * expect),
+    `Fx = ${(g.Fx / 1000).toFixed(3)} kN/m vs ½ρg(zs−lip)² = ${(expect / 1000).toFixed(3)} kN/m` +
+    ` (lip ${lip.toFixed(3)} m, zs ${zs.toFixed(3)} m, wetLen ${g.wetLen && g.wetLen.toFixed(3)} m,` +
+    ` ${g.samples} samples, t ${g.t.toFixed(1)} s)`);
+  const mid = lip + (zs - lip) / 2;
+  ok("PHYSICS s3 gate cop sits between the lip and mid-depth",
+    !!g.cop && g.cop.z >= lip - 1e-6 && g.cop.z <= mid + 1e-6,
+    `cop.z = ${g.cop && g.cop.z.toFixed(3)} m, lip ${lip.toFixed(3)} m, mid ${mid.toFixed(3)} m`);
+
+  // The slider proof (Task 6): gate_a is a live param, so SIM.setParam must
+  // clamp, rasterise a new mask and — because docs/averaging.md §9 treats a
+  // geometry edit as a reset condition — restart any open averaging window,
+  // exactly like a drawn wall or a valve flip already do.
+  const slide = await B.evaluate(`(() => {
+    const before = APP.sim.mask.slice();
+    APP.SIM.avgStart();
+    APP.tick(50);
+    const T0 = APP.SIM.avgT();
+    const v = APP.SIM.setParam("gate_a", 0.50);
+    APP.SIM.columns(true);
+    const vol = APP.volume();
+    let maskDiff = 0;
+    const after = APP.sim.mask;
+    for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) maskDiff++;
+    const T1 = APP.SIM.avgT(), active1 = APP.SIM.avgActive();
+    APP.SIM.avgStop();
+    return { v, vol, maskDiff, T0, T1, active1 };
+  })()`);
+  ok("SIM setParam(gate_a) clamps within range and applies the value",
+    slide.v === 0.50, "applied = " + slide.v);
+  ok("SIM setParam(gate_a) leaves volume() finite once columns(true) forces the readback",
+    Number.isFinite(slide.vol), "volume = " + slide.vol);
+  ok("SIM setParam(gate_a) rebuilds the mask — the blade actually moved",
+    slide.maskDiff > 0, slide.maskDiff + " mask cells changed");
+  ok("SIM setParam(gate_a) resets the averaging window it invalidated",
+    slide.active1 === true && slide.T1 < slide.T0,
+    `T ${slide.T0.toFixed(3)} s -> ${slide.T1.toFixed(3)} s, still active ${slide.active1}`);
 };
 
 SUITES.rig = async (B) => {

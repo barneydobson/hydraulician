@@ -218,7 +218,11 @@ const SIM = (() => {
 
   /** Rebuild the solid mask from scratch: scene solids/walls, then user
    *  edits, then the closed edges of the domain. Order matters — the border
-   *  always wins, so no amount of erasing can spring a leak. */
+   *  always wins, so no amount of erasing can spring a leak. Once the mask
+   *  is exactly what it always was, `S.solids` is extended with
+   *  registration-only GEOM.slab wrappers for every wall, valve and drawn
+   *  seg — the pickable surfaces `faceAtPx` and `faceForce` need — without
+   *  the mask itself ever being touched again. */
   function rasterise() {
     const m = S.mask;
     m.fill(0);
@@ -227,9 +231,15 @@ const SIM = (() => {
     S.solids = sc.solids ? sc.solids(sc.W, sc.H, S.p, par) : [];
     if (S.solids.length) S.solids.forEach((so) => stampPoly(m, so, 255));
     // The shim: a scene still on walls() rasterises exactly as it always
-    // has — same stampSeg, same capsule, same measured geometry.
-    (sc.walls ? sc.walls(sc.W, sc.H) || [] : []).forEach((s) => stampSeg(m, s, 255));
-    (sc.valves ? sc.valves(sc.W, sc.H) : []).forEach((s) => stampSeg(m, s, 128));
+    // has — same stampSeg, same capsule, same measured geometry. Kept in
+    // wallSegs/valveSegs (rather than called and stamped inline) only so the
+    // registration block below can wrap the SAME arrays instead of
+    // re-invoking sc.walls()/sc.valves() a second time — every stampSeg call
+    // and its order are exactly what they were before this existed.
+    const wallSegs = sc.walls ? sc.walls(sc.W, sc.H) || [] : [];
+    const valveSegs = sc.valves ? sc.valves(sc.W, sc.H) : [];
+    wallSegs.forEach((s) => stampSeg(m, s, 255));
+    valveSegs.forEach((s) => stampSeg(m, s, 128));
     S.segs.forEach((s) => stampSeg(m, s, s[5]));
     const [oL, oR, oB, oT] = S.p ? S.p.open : sc.open;
     for (let j = 0; j < S.ny; j++) {
@@ -240,6 +250,42 @@ const SIM = (() => {
       if (!oB) m[i] = 255;
       if (!oT) m[(S.ny - 1) * S.nx + i] = 255;
     }
+
+    // Registration-only pick solids: from here down `m` is never touched
+    // again — every byte the mask carries is exactly what the block above
+    // (unchanged, in the order it always ran) put there. What follows only
+    // WRAPS a segment already stamped — or, for an eraser stroke, a segment
+    // deliberately NOT stamped — in a GEOM.slab, so the Force tool and
+    // faceForce have a named, pickable surface to click and integrate over.
+    // A wrapper can never move a cell the mask did not already move, because
+    // it is built from the SAME seg the mask was stamped from, strictly
+    // after the stamping. Faces name all FOUR edges — side0/side1, the two
+    // long sides GEOM.slab already knows, AND end0/end1, the two butt ends
+    // it does not name by default — because a drawn gate's lip (a butt end)
+    // has to be pickable exactly as its long faces are. Scene solids() are
+    // left alone here: they carry their own faces and were already made
+    // pickable by the `S.solids.forEach(stampPoly)` line above.
+    const WRAP_FACES = [
+      { id: "side0", label: "Face A", e0: 0, e1: 0 },
+      { id: "side1", label: "Face B", e0: 2, e1: 2 },
+      { id: "end0", label: "End A", e0: 3, e1: 3 },
+      { id: "end1", label: "End B", e0: 1, e1: 1 },
+    ];
+    const register = (id, seg, extra) => {
+      const [x0, z0, x1, z1, th] = seg;
+      const w = GEOM.slab(x0, z0, x1, z1, th, { id, faces: WRAP_FACES });
+      if (extra) Object.assign(w, extra);
+      S.solids.push(w);
+    };
+    wallSegs.forEach((s, i) => register("wall" + i, s));
+    valveSegs.forEach((s, i) => register("valve" + i, s, { valve: true }));
+    let drawnI = 0, drawnValveI = 0;
+    S.segs.forEach((s) => {
+      if (s[5] === 255) register("drawn" + (drawnI++), s);
+      else if (s[5] === 128) register("drawnvalve" + (drawnValveI++), s, { valve: true });
+      // kind 0 (eraser) registers nothing — there is no surface to click.
+    });
+
     gl.bindTexture(gl.TEXTURE_2D, S.solid);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
@@ -1573,6 +1619,22 @@ const SIM = (() => {
    *  fill at F[...] either way, cell-centred in both, so the `cen` flag it
    *  returns plays no part here: it only distinguishes the staggered u/w
    *  positions lineFlux reads, and this instrument never touches those.
+   *
+   *  Two things zero a sample, and they are different questions. First, the
+   *  offset sample point itself can land ON rock — the valve-aware test
+   *  `boxForce`'s own `sol()` uses (`m > 192`, or `m > 64` while the valve
+   *  is shut, since a shut valve's texel reads as a lighter solid than a
+   *  wall). Second, and new: `rasterise()`'s wrappers are REGISTRATION-only
+   *  — they say where a surface WOULD be, drawn from the same seg the mask
+   *  was stamped from, but the mask is what says where a surface actually
+   *  IS. An erase stroke can punch a hole through a wall's own wrapper, and
+   *  an OPEN valve has no surface at all though its wrapper still exists for
+   *  the Force tool to click. So every sample is also checked half a cell
+   *  INTO the solid, along `-n`: if that texel is not solid under the same
+   *  valve-aware test, there is no surface here regardless of what the
+   *  wrapper claims, and the sample reads exactly as it would off the end of
+   *  a wall that was never drawn. A closed valve keeps its real diagram (the
+   *  water-hammer teaching number); an open one reads zero on both faces.
    *  Result: {samples (each carrying s, the arc-length coordinate along the
    *  face), Fx, Fz, F, cop, wetLen, len, solidId, faceId}. */
   function faceForce(solidId, faceId, avg) {
@@ -1580,6 +1642,11 @@ const SIM = (() => {
     if (!so) return null;
     const pts = GEOM.faceSamples(so, faceId, S.dx);
     if (!pts || !pts.length) return null;
+    const closed = S.p.valveClosed > 0.5;
+    const sol = (i, j) => {
+      const m = S.mask[j * S.nx + i];
+      return m > 192 || (closed && m > 64);
+    };
     // Bounding box of the offset sample points, one readback, with a cell
     // of margin the way lineFlux and boxForce both keep.
     const off = 0.75 * S.dx;
@@ -1602,7 +1669,14 @@ const SIM = (() => {
       const j = Math.min(jT, Math.max(jB, Math.floor(sz / S.dx)));
       const k = ((j - jB) * w + (i - iL)) * 4;
       q.p = S.cvU[k + 2]; q.f = S.cvF[k];
-      if (S.mask[j * S.nx + i] > 192) { q.p = 0; q.f = 0; }   // sample landed solid
+      if (sol(i, j)) { q.p = 0; q.f = 0; continue; }   // sample landed solid
+      // Surface-existence check: step 0.5*dx the OTHER way, into where the
+      // wrapper says the solid is. If that texel is not solid, the wrapper
+      // is describing a surface the mask does not have (an erased hole) or
+      // no longer has (an open valve) — zero the sample.
+      const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * 0.5 * S.dx) / S.dx)));
+      const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * 0.5 * S.dx) / S.dx)));
+      if (!sol(ix, jx)) { q.p = 0; q.f = 0; }
     }
     const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
     const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);

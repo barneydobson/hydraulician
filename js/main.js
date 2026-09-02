@@ -40,6 +40,11 @@ const state = {
   flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
   cvShow: "Q",                     // which per-edge quantity the box labels
   force: null,                     // the pressure-force face: {solidId, faceId, data, t0}
+  // The face the Force tool is hovering over, BEFORE a click selects it: pure
+  // CPU pick (faceAtPx), never a faceForce readback — {solidId, faceId} or
+  // null. Cleared on a tool change, a scene load, and the pointer leaving the
+  // domain, so it never outlives the pick it was computed from.
+  forceHover: null,
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   // Average is a measurement mode, not a blur filter (docs/averaging.md
@@ -193,6 +198,7 @@ function loadScene(id, keepDrawing) {
   state.cv = null; state.cvDrag = null;
   state.flux.length = 0; state.fluxDrag = null;
   state.force = null;
+  state.forceHover = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -1674,7 +1680,7 @@ function toolItem([id, label, tip]) {
   return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
            key: n <= TOOL_KEYS ? String(n) : "",
            on: () => state.tool === id,
-           act: () => { state.tool = id; syncToolbar(); syncPanel(); } };
+           act: () => { state.tool = id; state.forceHover = null; syncToolbar(); syncPanel(); } };
 }
 
 /** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
@@ -2245,6 +2251,18 @@ function onMove(e) {
   const [x, z] = pointerPos(e);
   state.cursor = [x, z];
   state.inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
+  // The Force tool's own hover pick: pure CPU (faceAtPx, screen-space),
+  // recomputed on every move so the surface under the cursor lights up
+  // BEFORE a click selects it — no SIM.faceForce call, so no GPU readback.
+  // Never live mid-drag or mid-pinch: both of those `return` above this
+  // point, and the Force tool itself never sets state.drag (onDown handles
+  // its click and returns), so there is no drag state to guard against here.
+  if (state.tool === "force") {
+    const hit = state.inside ? faceAtPx(sim.solids || [], x, z, GRAB_PX) : null;
+    state.forceHover = hit ? { solidId: hit.solid.id, faceId: hit.faceId } : null;
+  } else if (state.forceHover) {
+    state.forceHover = null;
+  }
   if (state.panDrag) {
     const px = pointerPx(e), d = state.panDrag;
     state.panC = [
@@ -2818,6 +2836,15 @@ function drawOverlay(A) {
     OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
   }
   if (state.force && state.force.data) OVERLAY.drawForce(ctx, view, sim, state.force);
+  // The hover pick, faint — drawn UNDER the selected face's full-strength
+  // stroke conceptually, but skipped entirely when it IS the selected face:
+  // drawForce above already owns that stroke, and a second one under it
+  // would only ever be redundant paint, never a visible style.
+  if (state.forceHover && !(state.force &&
+      state.forceHover.solidId === state.force.solidId &&
+      state.forceHover.faceId === state.force.faceId)) {
+    OVERLAY.drawForceHover(ctx, view, sim, state.forceHover);
+  }
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -3233,7 +3260,7 @@ function boot() {
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("pointercancel", onUp);
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-  canvas.addEventListener("pointerleave", () => state.inside = false);
+  canvas.addEventListener("pointerleave", () => { state.inside = false; state.forceHover = null; });
   canvas.addEventListener("pointerenter", () => state.inside = true);
   canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
   canvas.addEventListener("wheel", (e) => {
@@ -3292,7 +3319,7 @@ function boot() {
       const t = TOOLS[+k - 1];
       const fam = familyOf(t[0]);
       if (UIMODE.allows(fam, { tool: t[0], id: t[0] })) {
-        state.tool = t[0]; window.syncTools();
+        state.tool = t[0]; state.forceHover = null; window.syncTools();
       } else {
         showToast(t[1] + " is off for this exercise",
                   "The ⋯ button at the end of the strip brings every control back.");

@@ -719,3 +719,33 @@ having settled before anything calls into it.
   differently again — in true screen proportion, no vex — because it is a
   force vector, not a shape glued to the water, and an angle on it is one a
   straightedge on the screen should be able to measure.
+- **Every wetted surface is clickable, and the wrappers that make it so are
+  REGISTRATION-only — they never touch the mask.** `rasterise()` stamps the
+  mask exactly as it always did, and only once that is done does it extend
+  `S.solids` with a `GEOM.slab` wrapper for every scene `walls()`/`valves()`
+  seg and every user-drawn wall/valve stroke, built from the SAME seg the
+  mask was stamped from. A wrapper therefore cannot move a cell the mask
+  did not already move — the acceptance test is that the mask stays
+  byte-identical to before this existed, which is exactly what the ordering
+  (wrap after stamp, never instead of or interleaved with it) guarantees.
+  Each wrapper names all four edges — `side0`/`side1` (the long faces
+  `GEOM.slab` already knew) and `end0`/`end1` (the butt ends it did not),
+  because a drawn gate's lip is a butt end and has to be pickable exactly
+  like its long faces are. Scene `solids()` entries are untouched: they
+  carry their own faces and were already pickable.
+- **A wrapper says where a surface WOULD be; the mask says where it IS, and
+  `faceForce` trusts the mask.** A wrapper is built once per `rasterise()`
+  from a seg, whether or not an eraser stroke later punches a hole through
+  the middle of it or a valve later opens — the wrapper has no way to know.
+  So every sample `faceForce` takes is checked twice: once at its usual
+  0.75·dx offset OUT into the water (the valve-aware test `boxForce`'s own
+  `sol()` uses, `m > 192` or, while the valve is shut, `m > 64`), and once
+  0.5·dx the OTHER way, IN along `−n` — a second, independent point inside
+  where the wrapper claims the solid is. If that texel is not solid under
+  the same test, there is no surface there regardless of what the wrapper
+  says, and the sample zeroes exactly as it would off the end of a wall that
+  was never drawn. The consequence students actually see: an OPEN valve's
+  faces both read zero force (there is no surface to press on), a CLOSED
+  valve reads the real diagram — the water-hammer teaching number — and an
+  erased hole in a wall contributes nothing to the integral either side of
+  it.

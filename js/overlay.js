@@ -1251,6 +1251,31 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** The Force tool's hover pick — every wetted surface is a clickable
+   *  pressure surface, and this is what says so BEFORE the click. Pure CPU:
+   *  `hover` is `{solidId, faceId}` from main.js's screen-space `faceAtPx`,
+   *  never a `SIM.faceForce` result, so there is no GPU readback here and no
+   *  pressure diagram to draw — only the face's own polyline, in the same
+   *  colour as the selected-face stroke (`drawForce`) but thinner and
+   *  fainter, so a hover never reads as strong as an actual selection. The
+   *  caller skips this entirely when the hover face IS the selected face —
+   *  `drawForce`'s full-strength stroke already owns that case. */
+  function drawForceHover(ctx, V, sim, hover) {
+    const solid = (sim.solids || []).find((s) => s.id === hover.solidId);
+    if (!solid) return;
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,143,163,0.55)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const e of GEOM.faceEdges(solid, hover.faceId)) {
+      const v0 = solid.verts[e], v1 = solid.verts[(e + 1) % solid.verts.length];
+      ctx.moveTo(V.X(v0[0]), V.Y(v0[1]));
+      ctx.lineTo(V.X(v1[0]), V.Y(v1[1]));
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   /** A vector as two signed components with their directions spelled out, so
    *  nothing on this tool is read off a bare sign. */
   function vec(vx, vz, unit) {
@@ -1335,5 +1360,5 @@ const OVERLAY = (() => {
            drawGradeLines,
            ROW_IDS, DEFAULT_ROWS,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
-           drawMeasure, drawCV, drawFlux, drawForce, measureText, chip, fmt };
+           drawMeasure, drawCV, drawFlux, drawForce, drawForceHover, measureText, chip, fmt };
 })();

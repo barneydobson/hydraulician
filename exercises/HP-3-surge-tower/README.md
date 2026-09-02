@@ -13,7 +13,9 @@ and pick **HP-3**, or use the direct link
 [`?ex=HP-3`](https://barneydobson.github.io/hydraulician/?ex=HP-3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 The hand calculation to do before the session is
-[`tutorial-sheet.docx`](tutorial-sheet.docx) in this folder.
+[`tutorial-sheet.docx`](tutorial-sheet.docx) in this folder, set on this
+scheme's own dimensions; `tutorial-sheet.py` regenerates it, answers
+included, from the same constants.
 
 ## Theory
 

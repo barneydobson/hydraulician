@@ -303,6 +303,10 @@ const EX = (() => {
    *  "set it on the Inflow q slider" rather than setting it. */
   function ctlLabel(id) {
     const c = CONTROLS.find((x) => x.id === id);
+    // A Geometry row (geom0…geom5) carries a placeholder label and takes the
+    // name of whatever param the loaded scene bound to it — the card has to
+    // say "Surge shaft width slider", not "— slider".
+    if (c && c.par) { const d = c.par(); if (d) return d.label; }
     return c ? c.label : id;
   }
   /** A control value as the panel would name it: an option's own text for a
@@ -330,9 +334,10 @@ const EX = (() => {
   function ctlWhere(id) {
     const c = CONTROLS.find((x) => x.id === id);
     if (!c) return "";
-    if (c.type === "check") return c.label + " tickbox";
-    if (c.type === "select") return c.label + " menu";
-    return c.label + (c.min !== undefined ? " slider" : "");
+    const label = ctlLabel(id);
+    if (c.type === "check") return label + " tickbox";
+    if (c.type === "select") return label + " menu";
+    return label + (c.min !== undefined ? " slider" : "");
   }
   /** "q = 0.51 m²/s (Inflow q slider) · tailwater 0.538 m" — the rules
    *  evaluated at a digit. No longer printed on the card (the card prints the
@@ -974,7 +979,7 @@ const EX = (() => {
       // The brief is a form, not the canvas: its keystrokes are its own, or
       // typing 0.45 would pick the Erase tool and reset the view on the way.
       el.onkeydown = (e) => e.stopPropagation();
-      el.setAttribute("aria-label", c.label);
+      el.setAttribute("aria-label", ctlLabel(id));
       wrap.appendChild(el);
       if (c.type !== "check" && c.type !== "select") {
         const u = document.createElement("span");

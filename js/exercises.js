@@ -559,6 +559,31 @@ const EXERCISES = [
     settle: 5,
   },
 
+  {
+    id: "HP-3",
+    title: "Design the surge tower: the class measures the upsurge",
+    topic: "Hydropower",
+    folder: "HP-3-surge-tower",
+    scene: "hydro",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "1", gaugeField: "h" },
+    // The shaft width is the FIFTH declared param of the hydro scene, and the
+    // Geometry panel binds its rows by index — so geom4 IS d_shaft. Reorder
+    // the scene's params and this rule silently moves onto another slider;
+    // check_pack.py cross-checks the index against js/scenes.js for that reason.
+    digit: { label: "surge shaft width D_s", control: "geom4", base: 2.5, step: 0.5, unit: "m",
+             rule: "D_s = 2.5 + 0.5·d" },
+    instruments: [
+      { tool: "gauge", where: "in the reservoir strip by the wall, x ≈ 6.6 m, z ≈ 20 m", why: "the reservoir level — every drawdown and upsurge is measured from it; the strip is the free surface the headrace actually sees" },
+      { tool: "gauge", where: "in the surge shaft, x ≈ 50 m, z ≈ 18 m — expand its card (⤢) for the trace", why: "the shaft level: z₀ on h before the slam, the crest on d after it (the h channel under an accelerating column reads low by a·D/g — see the README)" },
+    ],
+    start: "a reservoir, a 42 m headrace, a surge shaft at the knee and a penstock down to a nozzle, running steadily",
+    task: "Set your shaft width, wait out the settle, gauge the reservoir and the shaft and hover the headrace for u₀; then switch Gauges plot to d, press V, and read the first crest and the period off the shaft trace.",
+    note: "The green bar at x = 63.5 m is the valve — V is the instantaneous shutdown. The nozzle beyond it sets the steady discharge; its gap is a Geometry slider, which is what the maximum-power coda moves.",
+    settle: 60,
+  },
+
   // ------------------------------------------------------- unsteady flow
   {
     id: "UN-1",

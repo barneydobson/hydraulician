@@ -498,7 +498,9 @@ const CONTROLS = [
     fmt: (v) => v.toFixed(2) + " m/s" },
 
   { h: "Geometry" },
-  ...[0, 1, 2, 3].map((k) => ({
+  // Six rows: the hydro scene declares six params (knee x/z, three bores,
+  // the nozzle gap). A scene declaring fewer hides the rest (syncPanel).
+  ...[0, 1, 2, 3, 4, 5].map((k) => ({
     id: "geom" + k, label: "—",
     min: 0, max: 1, step: 0.01,
     // The row binds to the k-th declared param of whatever scene is up.
@@ -841,7 +843,7 @@ function syncPanel() {
       if (note) note.textContent = c.fmt ? c.fmt() : "";
       return;
     }
-    // A dynamic row (Geometry's geom0…geom3) binds to whatever param its
+    // A dynamic row (Geometry's geom0…geom5) binds to whatever param its
     // scene declares at that index — none for most scenes. Hide the row and
     // its note when there is nothing to bind to, and when there is, adopt
     // that param's own range and label before reading its value below.
@@ -866,8 +868,8 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
-  // The "Geometry" heading fronts geom0…geom3, which hide themselves row by
-  // row above as the scene declares fewer than four params, down to none —
+  // The "Geometry" heading fronts geom0…geom5, which hide themselves row by
+  // row above as the scene declares fewer than six params, down to none —
   // but a heading is not a row, so nothing in the loop hides IT. A scene
   // with no declared params (most of them) would otherwise leave the
   // heading standing over an empty section.

@@ -52,6 +52,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | DA-3 | Scale effects, live | DA-3-scale-effects/ | DA-1/DA-2 rigs × resolutions | optional (λ, q, resolution, C_d) |
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |
 | HP-2 | Cups vs plates | HP-2-pelton/ | shared jet rig | — (lecturer demo) |
+| HP-3 | Surge tower design: the upsurge | HP-3-surge-tower/ | hydro (parametric scheme) | (D_s, u₀, z₀, rise, T) |
 | NC-1 | Slope-area mystery discharge | NC-1-slope-area/ | **m3** (m1 impossible — kept as contrast) | (x₀, F, Q̂) |
 | NC-2 | Is α really 1? | NC-2-alpha/ | s2 stations + gate wake | (station, α) |
 | NC-3 | Bed shear and riprap | NC-3-bed-shear/ | s2 sweep + m2 anchor | (τ₀, D_min) |

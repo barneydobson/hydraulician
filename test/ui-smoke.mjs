@@ -1012,6 +1012,44 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------- the Geometry section
+    console.log("\nthe Geometry panel binds to whatever the scene actually declares");
+    {
+      // hump declares one param (hump_h); the panel's four geom rows are a
+      // fixed pool that binds to a scene's params by INDEX (main.js's
+      // syncPanel), so exactly one of the four should be showing, and it
+      // should carry the scene's own label rather than a placeholder.
+      const tab = await browser.open(INDEX + "?scene=hump");
+      const r = await tab.evaluate(`
+        const rows = [0, 1, 2, 3].map((k) => {
+          const input = document.getElementById("c_geom" + k);
+          return !input.parentElement.classList.contains("gone");
+        });
+        return { rows, visible: rows.filter(Boolean).length,
+                 label: document.querySelector("#c_geom0").parentElement
+                          .querySelector(".lbl").textContent };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("exactly one geometry row shows", r.visible, 1, JSON.stringify(r.rows));
+      eq("it is named after the scene's own param", r.label, "Hump height");
+      await tab.close();
+    }
+    {
+      // m1 has no declared params at all — a wall-segment scene, not a
+      // polygon one — so every one of the four rows should stay hidden.
+      const tab = await browser.open(INDEX + "?scene=m1");
+      const r = await tab.evaluate(`
+        const rows = [0, 1, 2, 3].map((k) => {
+          const input = document.getElementById("c_geom" + k);
+          return !input.parentElement.classList.contains("gone");
+        });
+        return { visible: rows.filter(Boolean).length };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("a scene with no params hides every geometry row", r.visible, 0);
+      await tab.close();
+    }
+
     // ------------------------------------------------- placing and removing
     console.log("\nan instrument you can place is an instrument you can remove");
     {

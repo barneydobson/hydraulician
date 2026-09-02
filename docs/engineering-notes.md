@@ -635,3 +635,64 @@ having settled before anything calls into it.
   textbook hydrostatic force and centre of pressure (`rho*g*H^2/2` and
   `H/3`) on a vertical face — the same closed form a lab manual would use
   to check a submerged gate by hand.
+- **The anti-leak edge stroke is skipped when every edge of a solid is at
+  least 2 cells long, and only for a CONVEX solid** — `stampPoly`'s comment
+  in `js/sim.js` has the full reasoning; the short version is that a pinch a
+  scan-fill test alone can miss needs either a short edge (a capsule's own
+  butt end is one) or a shallow-angle long edge sitting close enough to a
+  neighbour to leave a cell-centre gap, and neither can happen once nothing
+  on the solid is that short — so the fill test alone is exact and the
+  stroke has nothing left to protect. Convexity is load-bearing: a
+  non-convex shape (e.g. a bent strip with two long parallel edges pulled
+  close together) could still pinch with every edge long, and would need its
+  own check — `GEOM.poly`/`slab`/`rect` produce convex output today, which
+  is what makes the guard sound for everything the branch built. Skipping
+  the stroke matters because the stroke itself has a cost: it overshoots by
+  painting solid up to ~0.85·dx OUTSIDE the true edge, on the water side
+  too, and MEASURED on s3's gate blade (5 cm wide, faces stroked before this
+  fix) that overshoot at Low (dx = 0.0193 m) reached past `faceForce`'s own
+  0.75·dx sampling offset, so every upstream-face sample read solid and Fx
+  measured 0 N/m regardless of pool depth. Skipping the stroke on a solid
+  that clears the 2-cell floor restored a real pressure diagram: **Fx =
+  9.61 kN/m against a ~8.94 kN/m hydrostatic estimate**
+  (`exercises/_runner/smoke.js`'s closed-form case has the derivation and
+  the run-to-run spread — the two are not expected to match exactly because
+  the diagram integrates the actual flow field, not still water). The
+  threshold reads the LIVE `S.dx`, so a coarser future budget that thins the
+  same solid below 2 cells gets the stroke back automatically.
+- **The shim (a scene still declaring `walls()` instead of `solids()`)
+  rasterises byte-for-byte identically to the old path** — same `stampSeg`,
+  same capsule, same measured geometry — which is the promise that lets 20
+  pre-existing scenes go untouched by this branch. `smoke.js` measures the
+  diff directly on the sandbox's drawn segments: at Medium the segments
+  clear the same 2-cell floor as s3's gate, so the stroke never runs on
+  either the reference or the polygon path and there is no rim left to
+  produce a difference — diff/solid measured **0 of 3356 cells, 0.00%**.
+  The 20% gate this check runs under still passes, but for a different
+  reason than before the stroke-skip landed: an exact fill match, not a rim
+  comfortably inside budget.
+- **`params` is additive to the rig wire format and does not bump `V`** — the
+  same reasoning `js/rig.js`'s own comment on `V` gives for `flux` and
+  `ui.cvShow` at v2 applies again: the version bump exists to catch a
+  RENAMED or REDEFINED key silently misloading, and neither hazard applies
+  to a purely additive optional key. An old rig with no `params` reads as a
+  scene's own defaults (nothing to apply); a rig carrying `params` read back
+  by code that predates this branch simply ignores a key it does not know.
+  Both directions degrade to the truth, so `V` stays 2 — bumping would
+  reject all the v2 captures in `js/exercises-rigs.js` for zero benefit, the
+  same trade the comment already made once.
+- **The pressure-diagram arrow is built in screen space, not domain space,
+  and that is not optional.** Pressure has no tangential component, so the
+  per-station arrows in the Force tool's diagram (drawn in `overlay.js`'s
+  `drawForce`) MUST render perpendicular to the face — but the view
+  transform is anisotropic under vertical exaggeration (`V.w/sim.W !=
+  V.h/sim.H`), so offsetting a sample along its DOMAIN normal and only then
+  mapping it through `V.X`/`V.Y` is perpendicular on screen only when the
+  face happens to be axis-aligned or vex = 1. `drawForce` instead builds
+  each arrow's direction from the SCREEN-SPACE tangent between neighbouring
+  already-mapped samples (a quarter-turn gives the screen perpendicular),
+  and uses the domain normal only to choose which of the two screen
+  perpendiculars points into the solid. The resultant arrow is drawn
+  differently again — in true screen proportion, no vex — because it is a
+  force vector, not a shape glued to the water, and an angle on it is one a
+  straightedge on the screen should be able to measure.

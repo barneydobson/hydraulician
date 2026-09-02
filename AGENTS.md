@@ -21,6 +21,7 @@ shallow water); this one resolves the depth.
 | `js/reconstruct.js` | `RECON` — the averaging numerics with no WebGL in them: running mean, Welford, geometric fill, connected bodies, column compaction, band level sets |
 | `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
 | `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
+| `js/geom.js` | `GEOM` — polygon solids with named faces: builders, samplers, point-in-polygon, face force integration; no WebGL |
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
 | `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
@@ -123,12 +124,13 @@ to look fine for a minute and explode in an exercise.
 
 ## Testing
 
-Eight gates, all zero-dependency and all non-zero on failure:
+Nine gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 | --- | --- | --- |
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
+| `node test/geom-test.mjs` | `GEOM`'s closed forms — winding, slab corners, arc lengths, ½ρgH² — no browser; runs in checks.yml with the other instant gates | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
 | `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
 | `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
@@ -142,9 +144,9 @@ anything that touches `js/`. Run `mutation-test.mjs` after touching
 stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
 
-`.github/workflows/checks.yml` runs the first, second, fifth and sixth of
-these gates on every push and pull request — the ones that are instant and
-need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
+`.github/workflows/checks.yml` runs the first, second, third, sixth and
+seventh of these gates on every push and pull request — the ones that are
+instant and need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
 all, not even as a manual `workflow_dispatch` job: both need a real
 GPU-backed Chrome (see `angleArgs()` in `test/cdp.mjs` and
 `exercises/_runner/smoke.js`, which pick the ANGLE backend by platform —

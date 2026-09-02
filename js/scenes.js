@@ -423,31 +423,44 @@ const SCENES = (() => {
     // z = 0.35, flat both sides of the crest (a mild reach, same bed level
     // m1/m2 use, but no slope — the point here is the crest, not the reach).
     //   d_c = (q²/g)^⅓ = 0.1854 m at q = 0.25. inletDepth 0.34 m is a
-    // subcritical approach depth comfortably above d_c; the inflow LEVEL adds
-    // its own velocity head so the boundary hands the reach the head it
-    // actually needs, the same arithmetic channel()'s inLevel would use if it
-    // carried one: level = bed0 + d + q²/(2 g d²)
-    //                     = 0.35 + 0.34 + 0.25²/(2·9.81·0.34²) = 0.7176 m.
+    // subcritical approach depth comfortably above d_c. NO velocity head
+    // goes into the inflow level: on THIS branch (polygon-geometry, off
+    // main) there is no energy-line inlet solve — sim.js's inletVel() finds
+    // the boundary VELOCITY from level and q (v = q / depth-at-boundary), it
+    // does not back-solve level from an energy target — and channel()'s own
+    // inLevel is bed0 + inletDepth, same convention, no velocity head. So
+    // `inflow.level` here IS the pinned boundary surface, plain:
+    //   level = bed0 + d = 0.35 + 0.34 = 0.69 m.
+    // (Adding q²/2gd² on top was tried and measured wrong: with the hump
+    // removed the approach settled at 0.7172 m — the boundary pins the
+    // surface directly, so the extra term just bought 27 mm of unwanted
+    // depth. The reservoir-energy-line branch, unmerged as of this writing,
+    // adds a real energy-line inlet solve; once that lands this scene should
+    // revisit whether to hand it a level or an energy line.)
     // Tailwater stands at bed0 + 0.30 = 0.65 m — a tail depth of 0.30 m
     // against d_c = 0.1854 m is 1.3 d_c ≈ 0.241 m clear, the AGENTS.md floor
     // for a subcritical downstream control.
     //   cf = 0.02, not m1/m2's 0.125: MEASURED headless that m1/m2's
     // roughness is tuned against their S₀ = 0.0147 slope, which carries most
     // of the friction loss on its own; on this hump's FLAT approach the same
-    // 0.125 has nothing to balance it, and the reach backs up to a level
-    // (0.80 m, not 0.72 m) that leaves no headroom for the choke this scene
-    // exists to show, and drives it past H at hump_h's top of range. At 0.02
-    // the flat approach settles right back on the 0.7176 m the arithmetic
-    // above targets (measured 0.7172 m with the hump removed) — this is the
-    // standard "flow over a bump" textbook problem, effectively frictionless.
+    // 0.125 has nothing to balance it, and the reach backs up regardless of
+    // the pinned level, eating the headroom this scene needs for the choke
+    // and driving it past H at hump_h's top of range. At 0.02 the flat
+    // approach (hump removed) settles right back on the pinned level — this
+    // is the standard "flow over a bump" textbook problem, effectively
+    // frictionless.
     { id: "hump", name: "Hump in a mild channel", key: "Specific energy",
       group: "Open channel — surface profiles", chan: 1,
       // H = 1.3, not 1.05: MEASURED at hump_h = 0.45 the choked approach
-      // backs up to ~1.035 m — 1.05 m left only 15 mm of freeboard (water
-      // visibly lapping the top wall). 1.3 m clears it by a quarter metre.
+      // backs up to ~1.03-1.10 m (it oscillates — see the spin-up comment
+      // below) — 1.05 m left as little as 15 mm of freeboard (water visibly
+      // lapping the top wall). 1.3 m clears the worst of it by ~0.2 m. Not
+      // sensitive to the inflow-level fix below: re-measured after that fix
+      // at 1.094 m, same ballpark.
       W: 16, H: 1.3, c: 22, cf: 0.02, cs: 0.16, mode: 3,
-      // hmax/vmax cover the choked case too: approach depth reaches 0.685 m
-      // and the crest sheet accelerates to Fr ≈ 1.9 (~2.2 m/s at that depth).
+      // hmax/vmax cover the choked case too: approach depth reaches ~0.74 m
+      // and the crest sheet accelerates to Fr up to ~1.5 (~1.7 m/s at that
+      // depth) — re-measured after the inflow-level fix below.
       hmax: 0.9, vmax: 3.0,
       // MEASURED headless (APP.tick, hump_h = 0.15, approach-pool probe at
       // x = 3 via OVERLAY.analyse — see task-7-report.md for the method):
@@ -463,7 +476,7 @@ const SCENES = (() => {
       // station to read.
       spinup: 10, dyeLine: 0.9,
       open: [1, 1, 0, 0],
-      inflow: { level: 0.7176, q: 0.25, on: 1, free: 0 },
+      inflow: { level: 0.69, q: 0.25, on: 1, free: 0 },
       tailwater: { level: 0.65, on: 1 },     // mild control downstream
       params: [{ key: "hump_h", label: "Hump height", min: 0, max: 0.45,
                  step: 0.005, value: 0.15, unit: "m" }],

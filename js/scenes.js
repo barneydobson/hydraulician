@@ -118,7 +118,6 @@ const SCENES = (() => {
         ? [[x0, o.bed0 - off - S0g * x0, xEnd + e, outBed - off - S0g * e, TH]]
         : [[x0, o.bed0 - off - S0g * x0, xB, bedTop(xB) - off, TH],
            [xB, bedTop(xB) - offB, xEnd + e, outBed - offB - S0b * e, TH]];
-      if (o.gate) w.push([o.gate.x, bedTop(o.gate.x) + o.gate.a, o.gate.x, H, 0.05]);
       if (o.weir) {
         const b = bedTop(o.weir.x);
         w.push([o.weir.x, b - 0.25, o.weir.x, b + o.weir.h, o.weir.w || 0.7]);
@@ -143,6 +142,29 @@ const SCENES = (() => {
       return still(lev, z, P);
     };
 
+    // The gate is a parametric solid, not a fixed wall segment: `gate_a`
+    // (the opening) is a declared param, so the Geometry panel gets a slider
+    // and a rig can carry a chosen opening. The bed slabs stay in walls()
+    // (the shim) — this is the parametric proof for one piece of geometry,
+    // not a wholesale migration.
+    const params = o.gate
+      ? [{ key: "gate_a", label: "Gate opening", min: 0.05,
+           max: Math.min(o.inletDepth, H - bedTop(o.gate.x)),
+           step: 0.005, value: o.gate.a, unit: "m" }]
+      : undefined;
+    const solids = o.gate ? (W_, H_, P_, par) => {
+      const a = (par && par.gate_a !== undefined) ? par.gate_a : o.gate.a;
+      const b = bedTop(o.gate.x);
+      // The gate blade: 0.05 m thick, lip at bed + a, top out of the domain.
+      // Faces: upstream (the pressure-diagram face), downstream, lip.
+      const x = o.gate.x, t = 0.025;
+      return [GEOM.poly(
+        [[x - t, b + a], [x + t, b + a], [x + t, H_ + 0.5], [x - t, H_ + 0.5]],
+        [{ id: "us", label: "Upstream face", e0: 3, e1: 3 },
+         { id: "ds", label: "Downstream face", e0: 1, e1: 1 },
+         { id: "lip", label: "Lip", e0: 0, e1: 0 }], "gate")];
+    } : undefined;
+
     return Object.assign({
       chan: 1, group: "Open channel — surface profiles",
       W, H, c: 22, cf: o.cf, cs: o.cs === undefined ? 0.16 : o.cs,
@@ -153,7 +175,7 @@ const SCENES = (() => {
       tiltS0: o.tilt ? S0 : 0,
       inflow: { level: inLevel, q: o.free ? 0 : o.q, on: 1, free: o.free ? 1 : 0 },
       tailwater: o.tail === undefined ? { level: 0, on: 0 } : { level: twLevel, on: 1 },
-      walls, water,
+      walls, water, params, solids,
       yc: ycE, yn: S0 > 1e-5 ? ynE : Infinity, bedTop,   // handy from APP.sim.scene
     }, o.extra || {});
   }
@@ -395,6 +417,102 @@ const SCENES = (() => {
              "The surface sits close to d_n almost everywhere — this is what uniform flow looks like.",
              "Only right at the far brink does the surface draw down through critical depth.",
              "Compare with M2: same channel, but here the drawdown is pushed out of sight."] }),
+
+    // A dedicated entry, not through channel(): the hump IS the subject, and
+    // channel() has no hump concept to bolt one onto. Approach bed at
+    // z = 0.35, flat both sides of the crest (a mild reach, same bed level
+    // m1/m2 use, but no slope — the point here is the crest, not the reach).
+    //   d_c = (q²/g)^⅓ = 0.1854 m at q = 0.25. inletDepth 0.34 m is a
+    // subcritical approach depth comfortably above d_c. NO velocity head
+    // goes into the inflow level: on THIS branch (polygon-geometry, off
+    // main) there is no energy-line inlet solve — sim.js's inletVel() finds
+    // the boundary VELOCITY from level and q (v = q / depth-at-boundary), it
+    // does not back-solve level from an energy target — and channel()'s own
+    // inLevel is bed0 + inletDepth, same convention, no velocity head. So
+    // `inflow.level` here IS the pinned boundary surface, plain:
+    //   level = bed0 + d = 0.35 + 0.34 = 0.69 m.
+    // (Adding q²/2gd² on top was tried and measured wrong: with the hump
+    // removed the approach settled at 0.7172 m — the boundary pins the
+    // surface directly, so the extra term just bought 27 mm of unwanted
+    // depth. The reservoir-energy-line branch, unmerged as of this writing,
+    // adds a real energy-line inlet solve; once that lands this scene should
+    // revisit whether to hand it a level or an energy line.)
+    // Tailwater stands at bed0 + 0.30 = 0.65 m — a tail depth of 0.30 m
+    // against d_c = 0.1854 m is 1.3 d_c ≈ 0.241 m clear, the AGENTS.md floor
+    // for a subcritical downstream control.
+    //   cf = 0.02, not m1/m2's 0.125: MEASURED headless that m1/m2's
+    // roughness is tuned against their S₀ = 0.0147 slope, which carries most
+    // of the friction loss on its own; on this hump's FLAT approach the same
+    // 0.125 has nothing to balance it, and the reach backs up regardless of
+    // the pinned level, eating the headroom this scene needs for the choke
+    // and driving it past H at hump_h's top of range. At 0.02 the flat
+    // approach (hump removed) settles right back on the pinned level — this
+    // is the standard "flow over a bump" textbook problem, effectively
+    // frictionless.
+    { id: "hump", name: "Hump in a mild channel", key: "Specific energy",
+      group: "Open channel — surface profiles", chan: 1,
+      // H = 1.3, not 1.05: MEASURED at hump_h = 0.45 the choked approach
+      // backs up to ~1.03-1.10 m (it oscillates — see the spin-up comment
+      // below) — 1.05 m left as little as 15 mm of freeboard (water visibly
+      // lapping the top wall). 1.3 m clears the worst of it by ~0.2 m. Not
+      // sensitive to the inflow-level fix below: re-measured after that fix
+      // at 1.094 m, same ballpark.
+      W: 16, H: 1.3, c: 22, cf: 0.02, cs: 0.16, mode: 3,
+      // hmax/vmax cover the choked case too: approach depth reaches ~0.74 m
+      // and the crest sheet accelerates to Fr up to ~1.5 (~1.7 m/s at that
+      // depth) — re-measured after the inflow-level fix below.
+      hmax: 0.9, vmax: 3.0,
+      // MEASURED headless (APP.tick, hump_h = 0.15, approach-pool probe at
+      // x = 3 via OVERLAY.analyse — see task-7-report.md for the method):
+      // sampled every 5 s of sim time to 120 s. The big move — the initial
+      // still-water fill relaxing onto the arriving backwater — is over by
+      // t = 10 s; what is left from there to 120 s is a persistent +-2-3%
+      // surface wobble that never damps further, i.e. genuine unsteadiness
+      // rather than a settling trend (the same distinction the channel()
+      // comment above draws for venturi/hammer/h23's own short spin-ups) —
+      // a probe ON the crest itself (near-critical by design) shows the same
+      // wobble at 5-10x the relative amplitude and never reads "settled" by
+      // this test, which is why the approach pool, not the crest, is the
+      // station to read.
+      spinup: 10, dyeLine: 0.9,
+      open: [1, 1, 0, 0],
+      inflow: { level: 0.69, q: 0.25, on: 1, free: 0 },
+      tailwater: { level: 0.65, on: 1 },     // mild control downstream
+      params: [{ key: "hump_h", label: "Hump height", min: 0, max: 0.45,
+                 step: 0.005, value: 0.15, unit: "m" }],
+      solids: (W, H, P, par) => {
+        const h = par && par.hump_h !== undefined ? par.hump_h : 0.15;
+        const zb = 0.35, x0 = 6.0, x1 = 10.0;
+        // 0.005 m floor: a zero-height hump still has to close into a valid
+        // polygon (two coincident crest runs would leave a zero-length face).
+        const crest = GEOM.humpPts(x0, x1, Math.max(h, 0.005), zb, 160);
+        // Close the solid down into the bed — below z = 0, where ground is
+        // solid all the way down per AGENTS.md's geometry contract — left to
+        // right along the crest, then straight down each end.
+        //   bottom-left -> up -> over the crest LEFT TO RIGHT -> down ->
+        // bottom-right -> close back to bottom-left is CLOCKWISE in this
+        // z-up frame (shoelace area came out negative — checked by hand for
+        // both this 163-vertex polygon and a 5-vertex toy version), so
+        // reverse it to CCW. Reversing swaps the two vertical end edges
+        // (index 0 <-> index n-2) but leaves the crest's own edge run sat at
+        // [1, crest.length-1] either way — checked directly with
+        // GEOM.edgeNormal after the reverse: every edge in that range comes
+        // back with nz > 0 (min 0.993 across the 160 crest edges, dipping
+        // only right at the two ends where the hump's slope is steepest),
+        // i.e. genuinely outward and up, never into the water.
+        const verts = [[x0, -0.5]].concat(crest).concat([[x1, -0.5]]).reverse();
+        const e1 = crest.length - 1;
+        return [GEOM.poly(verts, [{ id: "crest", label: "Hump crest",
+                                     e0: 1, e1 }], "hump")];
+      },
+      walls: () => [[-1.0, 0.35 - 0.7, 17, 0.35 - 0.7, 1.4]],   // the flat bed, shim
+      water: (x, z, P) => (z <= 0.35 ? 0 : SCENES.still(0.65, z, P)),
+      blurb: "A mild channel with a smooth hump you can raise. The surface dips over the crest while E is to spare — and when the crest eats the margin, the flow chokes: upstream depth rises and the crest runs critical.",
+      tips: ["Specific energy E = d + q²/2gd² is conserved along the bed until the crest takes more of it than the approach flow has to give.",
+             "At a small hump the surface just DIPS — same E, shallower d, so higher speed over the crest.",
+             "Raise the slider past h = E₁ − E_c and the crest can no longer pass the flow at the depth it arrived: the approach backs up instead.",
+             "Watch the Froude colours at the crest — a choked hump runs Fr ≈ 1 right over the top.",
+             "The Force tool on the crest face reads the pressure pushing back on the bed as the depth over it thins."] },
 
     // ------------------------------------------------ STEEP  (C_f < 2.8 S₀)
     // S₀ = 1 in 4 at q = 1.2 m²/s. Against the MEASURED resistance that is

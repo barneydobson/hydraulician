@@ -94,15 +94,152 @@ const SIM = (() => {
     }
   }
 
-  /** Rebuild the solid mask from scratch: scene walls, then user edits, then
-   *  the closed edges of the domain. Order matters — the border always wins,
-   *  so no amount of erasing can spring a leak. */
+  /** Fill a solid polygon: even-odd at every cell centre in its bounding box
+   *  (GEOM.contains), then every edge re-stamped through stampSeg at th = 0
+   *  (its own max(th, dx*1.7)*0.5 radius floor is the anti-leak stroke). Two
+   *  parts, two jobs — the fill decides which cells the solid OWNS, the
+   *  zero-width edge stroke seals the sub-cell pinches a scan test alone can
+   *  leave open on a near-tangent or shallow-angle edge.
+   *
+   *  The stroke is skipped when every MERGED run of near-collinear edges is
+   *  at least 2 cells long — not every raw polyline edge. A pinch needs a
+   *  genuinely short stretch of boundary (a capsule's own butt end IS one)
+   *  or a shallow-angle long stretch close enough to a neighbour to leave a
+   *  cell-centre gap between them; neither can happen once nothing on the
+   *  solid is that short, so the fill test alone is exact and the stroke has
+   *  nothing left to protect. Consecutive edges whose turn is under ~20°
+   *  (cos > cos20, computed below) are summed into one run before the 2*dx
+   *  test, because a smoothly curved face is polyline-sampled fine enough
+   *  that its individual chords can be shorter than a cell (GEOM.humpPts at
+   *  n=160 gives ~0.025 m edges) while the STRETCH of boundary they trace is
+   *  metres long and needs no seal at all. A real corner (a right angle, or
+   *  any turn past the threshold) still starts a new run, so a genuinely
+   *  short edge — a gate blade's 0.05 m end — is never merged into its long
+   *  neighbours and still triggers the stroke on its own.
+   *
+   *  This holds for any solid, convex or not, PROVIDED no two stretches of
+   *  its own boundary pass within a cell of each other while every merged
+   *  run along the way stays >= 2*dx — a folded strip whose two long
+   *  near-parallel sides are pulled that close together could still pinch
+   *  with every run long, and would need its own check. Nothing shipped
+   *  does that: GEOM.poly/slab/rect are convex, and the hump crest (a
+   *  single non-convex curve, sampled at n=160) has only two corners, at its
+   *  butt ends, each accounted for above. What the stroke does instead, for
+   *  a solid already chunky enough along its whole boundary, is overshoot:
+   *  it paints solid up to its own radius (~0.85*dx) OUTSIDE the true edge,
+   *  on the water side too.
+   *
+   *  MEASURED on s3's gate blade (5 cm wide, faces stroked before this fix):
+   *  at Low (dx = 0.0193 m, the blade ~2.6 cells across) the stroke's rim
+   *  (0.85*dx = 0.0164 m) reached past faceForce's own 0.75*dx sampling
+   *  offset, so every sample on the upstream face read solid — Fx measured
+   *  0 N/m regardless of how deep the pool behind the gate stood. Skipping
+   *  the stroke here (the blade clears the 2-cell floor) restored a real
+   *  pressure diagram: Fx = 9.61 kN/m against a ~8.94 kN/m hydrostatic
+   *  estimate (exercises/_runner/smoke.js's closed-form case has the derivation
+   *  and the run-to-run spread).
+   *
+   *  MEASURED on the hump crest (160 edges, ~0.025 m chords, before the
+   *  merge above existed): raw per-edge minEdge is one chord — under 2*dx at
+   *  both Low (dx = 0.0215 m) and Medium (dx = 0.0148 m, the default) — so
+   *  the stroke ran around the WHOLE hump and its 0.85*dx rim swallowed
+   *  faceForce's 0.75*dx sample offset on most of the crest: at Medium,
+   *  APP.faceForce("hump","crest") on the settled hump (hump_h = 0.15,
+   *  t = 30 s) came back with only 122 of 320 samples wet (38.1%) against a
+   *  crest that is fully submerged at this height. Merging near-collinear
+   *  edges makes the crest one ~4.0 m run (its two vertical butt ends stay
+   *  their own ~0.85 m runs, both still well clear of 2*dx), the stroke is
+   *  skipped again, and the same read comes back 320 of 320 wet (100%). The
+   *  threshold reads the LIVE S.dx, so a coarser future budget that thins a
+   *  merged run below 2 cells gets the stroke back automatically. */
+  function stampPoly(mask, solid, value) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const v of solid.verts) {
+      if (v[0] < x0) x0 = v[0];
+      if (v[0] > x1) x1 = v[0];
+      if (v[1] < z0) z0 = v[1];
+      if (v[1] > z1) z1 = v[1];
+    }
+    const i0 = Math.max(0, Math.floor(x0 / S.dx));
+    const i1 = Math.min(S.nx - 1, Math.ceil(x1 / S.dx));
+    const j0 = Math.max(0, Math.floor(z0 / S.dx));
+    const j1 = Math.min(S.ny - 1, Math.ceil(z1 / S.dx));
+    for (let j = j0; j <= j1; j++) {
+      const pz = (j + 0.5) * S.dx;
+      for (let i = i0; i <= i1; i++) {
+        const px = (i + 0.5) * S.dx;
+        if (GEOM.contains(solid, px, pz)) mask[j * S.nx + i] = value;
+      }
+    }
+    const n = solid.verts.length;
+    const len = new Array(n), tx = new Array(n), tz = new Array(n);
+    for (let e = 0; e < n; e++) {
+      const a = solid.verts[e], b = solid.verts[(e + 1) % n];
+      const ex = b[0] - a[0], ez = b[1] - a[1];
+      const L = Math.hypot(ex, ez);
+      len[e] = L;
+      tx[e] = L > 1e-12 ? ex / L : 0;
+      tz[e] = L > 1e-12 ? ez / L : 0;
+    }
+    // A break sits BETWEEN edge i and edge i+1 when the turn between their
+    // tangents exceeds ~20 degrees (cos of the angle between unit tangents
+    // drops below cos(20 deg)). Below that, the two are one smooth run.
+    const COS20 = Math.cos(20 * Math.PI / 180);
+    const breaks = new Array(n);
+    let anyBreak = false;
+    for (let e = 0; e < n; e++) {
+      const f = (e + 1) % n;
+      breaks[e] = tx[e] * tx[f] + tz[e] * tz[f] < COS20;
+      if (breaks[e]) anyBreak = true;
+    }
+    let minRun;
+    if (!anyBreak) {
+      // No corner anywhere — the whole perimeter is one smooth loop.
+      minRun = len.reduce((s, L) => s + L, 0);
+    } else {
+      // Start scanning right after a known break, so no run wraps past the
+      // point the loop stops at.
+      const start = breaks.indexOf(true);
+      minRun = Infinity;
+      let run = 0;
+      for (let step = 0; step < n; step++) {
+        const e = (start + 1 + step) % n;
+        run += len[e];
+        if (breaks[e]) { minRun = Math.min(minRun, run); run = 0; }
+      }
+    }
+    if (minRun < 2 * S.dx) {
+      for (let e = 0; e < n; e++) {
+        const a = solid.verts[e], b = solid.verts[(e + 1) % n];
+        stampSeg(mask, [a[0], a[1], b[0], b[1], 0], value);
+      }
+    }
+  }
+
+  /** Rebuild the solid mask from scratch: scene solids/walls, then user
+   *  edits, then the closed edges of the domain. Order matters — the border
+   *  always wins, so no amount of erasing can spring a leak. Once the mask
+   *  is exactly what it always was, `S.solids` is extended with
+   *  registration-only GEOM.slab wrappers for every wall, valve and drawn
+   *  seg — the pickable surfaces `faceAtPx` and `faceForce` need — without
+   *  the mask itself ever being touched again. */
   function rasterise() {
     const m = S.mask;
     m.fill(0);
     const sc = S.scene;
-    (sc.walls(sc.W, sc.H) || []).forEach((s) => stampSeg(m, s, 255));
-    (sc.valves ? sc.valves(sc.W, sc.H) : []).forEach((s) => stampSeg(m, s, 128));
+    const par = S.params || {};
+    S.solids = sc.solids ? sc.solids(sc.W, sc.H, S.p, par) : [];
+    if (S.solids.length) S.solids.forEach((so) => stampPoly(m, so, 255));
+    // The shim: a scene still on walls() rasterises exactly as it always
+    // has — same stampSeg, same capsule, same measured geometry. Kept in
+    // wallSegs/valveSegs (rather than called and stamped inline) only so the
+    // registration block below can wrap the SAME arrays instead of
+    // re-invoking sc.walls()/sc.valves() a second time — every stampSeg call
+    // and its order are exactly what they were before this existed.
+    const wallSegs = sc.walls ? sc.walls(sc.W, sc.H) || [] : [];
+    const valveSegs = sc.valves ? sc.valves(sc.W, sc.H) : [];
+    wallSegs.forEach((s) => stampSeg(m, s, 255));
+    valveSegs.forEach((s) => stampSeg(m, s, 128));
     S.segs.forEach((s) => stampSeg(m, s, s[5]));
     const [oL, oR, oB, oT] = S.p ? S.p.open : sc.open;
     for (let j = 0; j < S.ny; j++) {
@@ -113,6 +250,42 @@ const SIM = (() => {
       if (!oB) m[i] = 255;
       if (!oT) m[(S.ny - 1) * S.nx + i] = 255;
     }
+
+    // Registration-only pick solids: from here down `m` is never touched
+    // again — every byte the mask carries is exactly what the block above
+    // (unchanged, in the order it always ran) put there. What follows only
+    // WRAPS a segment already stamped — or, for an eraser stroke, a segment
+    // deliberately NOT stamped — in a GEOM.slab, so the Force tool and
+    // faceForce have a named, pickable surface to click and integrate over.
+    // A wrapper can never move a cell the mask did not already move, because
+    // it is built from the SAME seg the mask was stamped from, strictly
+    // after the stamping. Faces name all FOUR edges — side0/side1, the two
+    // long sides GEOM.slab already knows, AND end0/end1, the two butt ends
+    // it does not name by default — because a drawn gate's lip (a butt end)
+    // has to be pickable exactly as its long faces are. Scene solids() are
+    // left alone here: they carry their own faces and were already made
+    // pickable by the `S.solids.forEach(stampPoly)` line above.
+    const WRAP_FACES = [
+      { id: "side0", label: "Face A", e0: 0, e1: 0 },
+      { id: "side1", label: "Face B", e0: 2, e1: 2 },
+      { id: "end0", label: "End A", e0: 3, e1: 3 },
+      { id: "end1", label: "End B", e0: 1, e1: 1 },
+    ];
+    const register = (id, seg, extra) => {
+      const [x0, z0, x1, z1, th] = seg;
+      const w = GEOM.slab(x0, z0, x1, z1, th, { id, faces: WRAP_FACES });
+      if (extra) Object.assign(w, extra);
+      S.solids.push(w);
+    };
+    wallSegs.forEach((s, i) => register("wall" + i, s));
+    valveSegs.forEach((s, i) => register("valve" + i, s, { valve: true }));
+    let drawnI = 0, drawnValveI = 0;
+    S.segs.forEach((s) => {
+      if (s[5] === 255) register("drawn" + (drawnI++), s);
+      else if (s[5] === 128) register("drawnvalve" + (drawnValveI++), s, { valve: true });
+      // kind 0 (eraser) registers nothing — there is no surface to click.
+    });
+
     gl.bindTexture(gl.TEXTURE_2D, S.solid);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
@@ -137,6 +310,28 @@ const SIM = (() => {
   }
   function undoSeg() { if (S.segs.length) { S.segs.pop(); rasterise(); } }
   function clearSegs() { S.segs.length = 0; rasterise(); }
+
+  /** The single writer for a scene's live parameter values (dam crest level,
+   *  weir height — whatever the scene's `params` declares). Clamps to the
+   *  declared [min, max], writes S.params, and rebuilds the mask: a param a
+   *  scene's `solids()` reads is geometry, so it takes the same rasterise()
+   *  choke point (and the same averaging reset) as a drawn edge.
+   *
+   *  An undeclared key is a no-op — write nothing, rasterise nothing, return
+   *  undefined. This entry point is fed straight off the rig wire (RIG.apply
+   *  calls it once per key in a loaded `params` object), so a stale link
+   *  naming a key the current scene never declared must not go on to write an
+   *  unbounded value into S.params. */
+  function setParam(key, v) {
+    const decl = (S.scene.params || []).find((d) => d.key === key);
+    if (!decl) return undefined;
+    if (!Number.isFinite(v)) return undefined;   // a hand-edited rig can carry NaN
+    const clamped = Math.min(decl.max, Math.max(decl.min, v));
+    S.params[key] = clamped;
+    rasterise();
+    return clamped;
+  }
+  const params = () => ({ decl: S.scene.params || [], values: S.params });
 
   /** The single writer for the valve flag — every caller routes through here.
    *
@@ -232,13 +427,21 @@ const SIM = (() => {
       for (const k of ["inflow", "tailwater", "wave", "source"]) p[k] = Object.assign({}, prev[k]);
       p.pour = null;
     }
+    // A resolution rebuild keeps live param values the same way it keeps
+    // p above — losing a slider position because you asked for more cells
+    // would be maddening. A scene change (or a scene with no params) seeds
+    // fresh from the declaration's defaults, {} when it declares none.
+    const prevParams = keepSegs && S && S.scene === scene ? S.params : null;
+    const params = prevParams || (scene.params
+      ? Object.fromEntries(scene.params.map((d) => [d.key, d.value]))
+      : {});
     const old = S;                  // everything CPU-side has been read off it
     S = {
       scene, nx, ny, dx, segs,
       W: nx * dx, H: ny * dx,
       mask: new Uint8Array(nx * ny),
       t: 0, frames: 0,
-      p,
+      p, params,
     };
     release(old);                   // free BEFORE allocating: lower peak VRAM
 
@@ -1401,6 +1604,86 @@ const SIM = (() => {
     return out;
   }
 
+  /** The pressure force on ONE named face of a scene solid, per metre width.
+   *  Called once per RENDERED FRAME by main.js's sampleForce, gated on the
+   *  sim clock actually moving — the same idiom sampleCV's own comment
+   *  describes, not a readback confined to a click. Samples sit 0.75*dx off
+   *  the face along the outward normal — in the water, clear of the solid
+   *  cell the face bounds — and every term
+   *  carries the fill fraction, so air contributes nothing and a
+   *  half-wetted face reports half its diagram. Under an averaging window
+   *  the sample is the window mean: one window, every instrument.
+   *
+   *  readState folds both the live and the averaged layout down to the same
+   *  (u, w, P) / f shape (see its comment) — pressure sits at U[...+2] and
+   *  fill at F[...] either way, cell-centred in both, so the `cen` flag it
+   *  returns plays no part here: it only distinguishes the staggered u/w
+   *  positions lineFlux reads, and this instrument never touches those.
+   *
+   *  Two things zero a sample, and they are different questions. First, the
+   *  offset sample point itself can land ON rock — the valve-aware test
+   *  `boxForce`'s own `sol()` uses (`m > 192`, or `m > 64` while the valve
+   *  is shut, since a shut valve's texel reads as a lighter solid than a
+   *  wall). Second, and new: `rasterise()`'s wrappers are REGISTRATION-only
+   *  — they say where a surface WOULD be, drawn from the same seg the mask
+   *  was stamped from, but the mask is what says where a surface actually
+   *  IS. An erase stroke can punch a hole through a wall's own wrapper, and
+   *  an OPEN valve has no surface at all though its wrapper still exists for
+   *  the Force tool to click. So every sample is also checked half a cell
+   *  INTO the solid, along `-n`: if that texel is not solid under the same
+   *  valve-aware test, there is no surface here regardless of what the
+   *  wrapper claims, and the sample reads exactly as it would off the end of
+   *  a wall that was never drawn. A closed valve keeps its real diagram (the
+   *  water-hammer teaching number); an open one reads zero on both faces.
+   *  Result: {samples (each carrying s, the arc-length coordinate along the
+   *  face), Fx, Fz, F, cop, wetLen, len, solidId, faceId}. */
+  function faceForce(solidId, faceId, avg) {
+    const so = (S.solids || []).find((s) => s.id === solidId);
+    if (!so) return null;
+    const pts = GEOM.faceSamples(so, faceId, S.dx);
+    if (!pts || !pts.length) return null;
+    const closed = S.p.valveClosed > 0.5;
+    const sol = (i, j) => {
+      const m = S.mask[j * S.nx + i];
+      return m > 192 || (closed && m > 64);
+    };
+    // Bounding box of the offset sample points, one readback, with a cell
+    // of margin the way lineFlux and boxForce both keep.
+    const off = 0.75 * S.dx;
+    let iL = Infinity, iR = -Infinity, jB = Infinity, jT = -Infinity;
+    for (const q of pts) {
+      const sx = q.x + q.nx * off, sz = q.z + q.nz * off;
+      const i = Math.floor(sx / S.dx), j = Math.floor(sz / S.dx);
+      iL = Math.min(iL, i); iR = Math.max(iR, i);
+      jB = Math.min(jB, j); jT = Math.max(jT, j);
+    }
+    iL = Math.max(0, Math.min(S.nx - 1, iL - 1)); iR = Math.max(iL, Math.min(S.nx - 1, iR + 1));
+    jB = Math.max(0, Math.min(S.ny - 1, jB - 1)); jT = Math.max(jB, Math.min(S.ny - 1, jT + 1));
+    const w = iR - iL + 1, h = jT - jB + 1;
+    const need = w * h * 4;
+    if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
+    readState(iL, jB, w, h, S.cvU, S.cvF, avg);
+    for (const q of pts) {
+      const sx = q.x + q.nx * off, sz = q.z + q.nz * off;
+      const i = Math.min(iR, Math.max(iL, Math.floor(sx / S.dx)));
+      const j = Math.min(jT, Math.max(jB, Math.floor(sz / S.dx)));
+      const k = ((j - jB) * w + (i - iL)) * 4;
+      q.p = S.cvU[k + 2]; q.f = S.cvF[k];
+      if (sol(i, j)) { q.p = 0; q.f = 0; continue; }   // sample landed solid
+      // Surface-existence check: step 0.5*dx the OTHER way, into where the
+      // wrapper says the solid is. If that texel is not solid, the wrapper
+      // is describing a surface the mask does not have (an erased hole) or
+      // no longer has (an open valve) — zero the sample.
+      const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * 0.5 * S.dx) / S.dx)));
+      const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * 0.5 * S.dx) / S.dx)));
+      if (!sol(ix, jx)) { q.p = 0; q.f = 0; }
+    }
+    const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
+    const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);
+    return Object.assign(r, { samples: pts, solidId, faceId,
+                              len: pts[pts.length - 1].s + ds / 2 });
+  }
+
   function boxFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
@@ -1541,9 +1824,9 @@ const SIM = (() => {
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
-           boxForce, boxFlux, lineFlux, dt, get, inletVel, bands, rescaleFill,
+           boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, bands, rescaleFill,
            hydraulicGrade,
-           setValve,
+           setValve, setParam, params,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

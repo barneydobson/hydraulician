@@ -246,7 +246,7 @@ def main():
     #    (see UIMODE in js/main.js); what it must not do is narrow away a tool
     #    its own task asks for, or name something that does not exist.
     TOOL_IDS = {"wall", "erase", "valve", "spout", "gauge", "rake", "tracer",
-                "measure", "cv", "pour"}
+                "measure", "cv", "pour", "flux", "force"}
     FIELD_IDS = {"water", "speed", "ehead", "head", "phead", "vort", "froude", "mom"}
     PANEL = {"full", "focused", "shut"}
     # gauges/cursor/status switch a whole panel; `rows` narrows the hover

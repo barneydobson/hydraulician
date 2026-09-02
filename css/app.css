@@ -395,6 +395,12 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #panel .row .lbl { flex: 1 1 auto; white-space: nowrap; }
 #panel input[type=range] { width: 138px; flex: 0 0 auto; accent-color: #4dc3ff; }
 #panel .notes { font: 11px ui-monospace, SFMono-Regular, monospace; opacity: .5; margin: 0 0 6px; min-height: 12px; }
+/* A dynamic row (Geometry's geom0…geom3) with nothing to bind to — most
+   scenes declare no params, so these stay hidden rather than showing a dead
+   slider. The section's own h3 rides the same class: when every one of its
+   rows is gone (no declared params at all), the heading goes with them
+   rather than fronting an empty section. */
+#panel .row.gone, #panel .notes.gone, #panel h3.gone { display: none; }
 #panel .info { flex: 0 0 auto; opacity: .35; cursor: help; font-size: 12px; padding: 2px; user-select: none; }
 #panel .info:hover { opacity: .9; }
 #panel select, #panel input[type=checkbox] { accent-color: #4dc3ff; }

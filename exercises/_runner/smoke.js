@@ -576,6 +576,503 @@ SUITES.api = async (B) => {
       `d2 ${j.d2.toFixed(3)} vs Belanger ${j.d2p.toFixed(3)} at t ${j.t.toFixed(1)} s`);
     ok("PHYSICS the jump dissipates energy", j.dE > 0, "dE = " + j.dE);
   }
+
+  // GEOM/polygon rasterisation (Task 2 of the polygon-geometry work): a
+  // scene's solids() must fill the mask the same way walls() always has.
+  // Stamp the SAME 0.4 m wall two ways on the live grid — once as a segment
+  // through the existing stampSeg capsule, once as a GEOM.slab polygon
+  // through the new stampPoly fill+edge-stroke — and diff the two masks.
+  //
+  // The two are NOT pixel-identical, and should not be expected to be: the
+  // edge stroke stampPoly re-stamps with is stampSeg's own dx*1.7 anti-leak
+  // floor (th = 0 forces it), which is a fixed multiple of dx, run around the
+  // WHOLE polygon perimeter — while this wall's 0.4 m thickness is fixed in
+  // metres. At the sandbox's default (Medium) budget, dx ~ 0.0217 m, so the
+  // stroke's rim is a real, measured ~8.5% of the wall's footprint (312 of
+  // 3668 solid-or-poly cells) — geometry, not noise: the same comparison at
+  // Low (dx ~ 0.0316 m) gives ~10.5%, at Ultra (dx ~ 0.0080 m) ~2.2%, falling
+  // as dx does. A 20% gate is comfortably clear of that floor while still
+  // catching what actually breaks stampPoly: a fill that never runs leaves
+  // the polygon's whole 0.4 x 3 m interior unstamped, which is most of
+  // `solid`, not a rim around it.
+  //
+  // 2026-09-01 addendum (stampPoly's stroke-skip, js/sim.js): those
+  // percentages describe the PRE-stroke-skip stroke. Now that stampPoly
+  // skips the edge stroke whenever every edge of the solid clears 2*dx, this
+  // wall's edges (5 m and 0.4 m — the short end already 2 cells at every
+  // budget the sandbox offers) clear the floor at Medium too, so the stroke
+  // never runs and there is no rim left to measure: diff/solid measured 0 of
+  // 3356 (0.00%) at Medium. The 20% gate still passes, now for a different
+  // reason — an exact fill match, not a rim comfortably under budget.
+  await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
+  const poly = await B.evaluate(`(() => {
+    const S = APP.sim, orig = S.scene;
+    S.scene = Object.assign({}, orig, {
+      walls: () => [[2, 2, 5, 2, 0.4]], solids: undefined, valves: undefined,
+    });
+    APP.SIM.rasterise();
+    const segMask = S.mask.slice();
+    S.scene = Object.assign({}, orig, {
+      walls: undefined, solids: () => [GEOM.slab(2, 2, 5, 2, 0.4)], valves: undefined,
+    });
+    APP.SIM.rasterise();
+    const polyMask = S.mask.slice();
+    S.scene = orig;                    // leave the live grid as it was found
+    APP.SIM.rasterise();
+    let diff = 0, solid = 0;
+    for (let i = 0; i < segMask.length; i++) {
+      const a = segMask[i] >= 192, b = polyMask[i] >= 192;
+      if (a || b) solid++;
+      if (a !== b) diff++;
+    }
+    return { diff, solid };
+  })()`);
+  ok("SIM a solids() polygon stamps the same wall walls() would",
+    poly.solid > 20 && poly.diff / poly.solid < 0.20,
+    `${poly.diff} of ${poly.solid} solid-or-poly cells disagree`);
+
+  // faceForce (Task 4 of the polygon-geometry work): wiring only here.
+  // Every wetted surface is a registration wrapper now (js/sim.js's
+  // rasterise()), so sandbox — restored above — is no longer a scene with
+  // NO solids: its own two walls() segs (drawn by the scene, not the
+  // student) register as "wall0"/"wall1". What still must come back null is
+  // an unknown solid id, and an unknown face id on a real one. The real
+  // closed-form check (a face force against its hydrostatic integral)
+  // follows below, now that s3's gate and m1's bed are both solids.
+  const ff = await B.evaluate(`(() => ({
+    unknownSolid: APP.faceForce("nosuch", "x"),
+    hasWallWrappers: (APP.sim.solids || []).some((s) => s.id === "wall0"),
+    unknownFace: APP.faceForce("wall0", "nosuchface"),
+  }))()`);
+  ok("SIM faceForce returns null for an unknown solid id",
+    ff.unknownSolid === null, String(ff.unknownSolid));
+  ok("SIM a scene still on the walls() shim registers pickable wrappers too",
+    ff.hasWallWrappers === true, "hasWallWrappers: " + ff.hasWallWrappers);
+  ok("SIM faceForce returns null for an unknown face id on a real solid",
+    ff.unknownFace === null, String(ff.unknownFace));
+
+  // The closed form (Task 6): s3's gate blade is a GEOM.poly solid with an
+  // "us" (upstream) face, so faceForce("gate", "us") should recover the
+  // hydrostatic pressure diagram behind it. Settle to the scene's own
+  // measured spin-up (26 s) before reading it.
+  await B.goto(`http://localhost:${PORT}/?scene=s3`);
+  const g = await B.evaluate(`(() => {
+    __low();
+    const t = __settle(26, 120000);
+    const b = APP.sim.scene.bedTop(1.2);
+    const a = APP.SIM.params().values.gate_a;
+    const level = APP.sim.p.inflow.level;
+    const ff = APP.faceForce("gate", "us");
+    return { t, b, a, level,
+      Fx: ff && ff.Fx, Fz: ff && ff.Fz, cop: ff && ff.cop,
+      wetLen: ff && ff.wetLen, samples: ff ? ff.samples.length : 0 };
+  })()`);
+  ok("PHYSICS s3 gate settled before its face is read", g.t >= 25.5,
+    "reached t = " + (g.t || 0).toFixed(1) + " s of 26");
+  // z_s: the pool behind the gate is backed up by the LEVEL Dirichlet inflow
+  // (p.inflow.level, 2.80 m) — a near-static reservoir standing at that
+  // level, not at a constant DEPTH above the gate's own bed. The gate sits
+  // 0.30 m below the inlet's bed (S0 = 0.25 over 1.2 m), so the depth THERE
+  // is ~1.70 m, not the channel's inletDepth (1.40 m, the depth at the
+  // INLET). lip: the opening the water passes under. Expected upstream
+  // force is the hydrostatic integral over the wetted stretch [lip, z_s];
+  // the flow accelerating under the gate depresses pressure near the lip,
+  // and the pool itself carries a small approach/piling correction above
+  // the nominal level, so this is a bracket, not an equality.
+  const lip = g.b + g.a, zs = g.level;
+  const expect = 0.5 * 1000 * 9.81 * (zs - lip) * (zs - lip);
+  // MEASURED (ANGLE/D3D11, Low budget, dx = 0.0193 m): Fx = 9.61 kN/m
+  // against expect = 8.94 kN/m — 7.5% high, and stable (9.5-10.1 kN/m,
+  // wetLen 1.42-1.46 m) across a t = 5-70 s settle sweep, so this is the
+  // pool's own steady piling above the nominal level, not a transient. A
+  // regression in the RISK this task was written against (the polygon
+  // lip's effective opening drifting by the ~0.85*dx edge-stroke floor)
+  // would move Fx by several percent on top of that -- either the wetted
+  // extent or the near-lip depression would visibly shift -- so 15% still
+  // has margin to catch it while not being so loose it catches nothing.
+  ok("PHYSICS s3 gate upstream face brackets the hydrostatic force",
+    g.Fx !== undefined && g.Fx > 0 && near(g.Fx, expect, 0.15 * expect),
+    `Fx = ${(g.Fx / 1000).toFixed(3)} kN/m vs ½ρg(zs−lip)² = ${(expect / 1000).toFixed(3)} kN/m` +
+    ` (lip ${lip.toFixed(3)} m, zs ${zs.toFixed(3)} m, wetLen ${g.wetLen && g.wetLen.toFixed(3)} m,` +
+    ` ${g.samples} samples, t ${g.t.toFixed(1)} s)`);
+  const mid = lip + (zs - lip) / 2;
+  ok("PHYSICS s3 gate cop sits between the lip and mid-depth",
+    !!g.cop && g.cop.z >= lip - 1e-6 && g.cop.z <= mid + 1e-6,
+    `cop.z = ${g.cop && g.cop.z.toFixed(3)} m, lip ${lip.toFixed(3)} m, mid ${mid.toFixed(3)} m`);
+
+  // The slider proof (Task 6): gate_a is a live param, so SIM.setParam must
+  // clamp, rasterise a new mask and — because docs/averaging.md §9 treats a
+  // geometry edit as a reset condition — restart any open averaging window,
+  // exactly like a drawn wall or a valve flip already do.
+  //
+  // LOWER the gate here (0.35 -> 0.20 m), not raise it: that is the risky
+  // direction — cells that were open water become solid in one rasterise()
+  // call, no different from a gate physically dropping into moving water —
+  // and a finite-only check on volume() cannot tell a real conservation
+  // failure from a bug that quietly invents water in the newly-solid cells'
+  // place. volBefore/vol below bracket that directly.
+  const slide = await B.evaluate(`(() => {
+    const before = APP.sim.mask.slice();
+    APP.SIM.avgStart();
+    APP.tick(50);
+    const T0 = APP.SIM.avgT();
+    APP.SIM.columns(true);
+    const volBefore = APP.volume();
+    const v = APP.SIM.setParam("gate_a", 0.20);
+    APP.SIM.columns(true);
+    const vol = APP.volume();
+    let maskDiff = 0;
+    const after = APP.sim.mask;
+    for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) maskDiff++;
+    const T1 = APP.SIM.avgT(), active1 = APP.SIM.avgActive();
+    APP.SIM.avgStop();
+    return { v, vol, volBefore, maskDiff, T0, T1, active1 };
+  })()`);
+  ok("SIM setParam(gate_a) clamps within range and applies the value",
+    slide.v === 0.20, "applied = " + slide.v);
+  ok("SIM setParam(gate_a) leaves volume() finite once columns(true) forces the readback",
+    Number.isFinite(slide.vol), "volume = " + slide.vol);
+  ok("SIM setParam(gate_a) rebuilds the mask — the blade actually moved",
+    slide.maskDiff > 0, slide.maskDiff + " mask cells changed");
+  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m), three repeats landing on the
+  // same six digits: lowering gate_a from 0.35 to 0.20 m flips 16 mask cells
+  // from open water to solid, and volume falls from 3.19742 to 3.19190 m2 —
+  // a real drop, because the water that had stood in those 16 cells simply
+  // leaves the wet-cell accounting; nothing moves it elsewhere first. 0.01 m2
+  // (~0.3% of volBefore, ~2x the measured 0.00552 m2 drop) is margin against
+  // single-frame readback noise on a free surface that is never perfectly
+  // flat — not slack for an invented-water bug, which would show as an
+  // INCREASE past this floor, not a smaller decrease.
+  ok("SIM setParam(gate_a) lowering the gate into flow does not invent water",
+    slide.vol <= slide.volBefore + 0.01,
+    `${slide.volBefore.toFixed(5)} -> ${slide.vol.toFixed(5)} m2 (` +
+    `${(slide.vol - slide.volBefore) >= 0 ? "+" : ""}${(slide.vol - slide.volBefore).toFixed(5)})`);
+  ok("SIM setParam(gate_a) resets the averaging window it invalidated",
+    slide.active1 === true && slide.T1 < slide.T0,
+    `T ${slide.T0.toFixed(3)} s -> ${slide.T1.toFixed(3)} s, still active ${slide.active1}`);
+
+  // The thin-sliver stroke test (polygon-geometry Finding 1, the case the
+  // original task deferred): a genuinely short edge — one a merged run
+  // cannot absorb, because it turns 90 degrees at both ends against long
+  // neighbours — must still force stampPoly's anti-leak stroke. Built so a
+  // fill-only (point-in-polygon-at-cell-centres) test finds NOTHING: a
+  // 5*dx x 0.3*dx rectangle straddling a cell BOUNDARY in z, thin enough
+  // that no cell centre falls inside it. If the stroke's threshold ever
+  // regressed to reading this as clear of the 2*dx floor (e.g., a future
+  // edit that merges every edge regardless of turn angle), the sliver would
+  // rasterise to nothing — a real solid the fill test cannot see and the
+  // stroke was the only thing sealing.
+  const sliver = await B.evaluate(`(() => {
+    const S = APP.sim, orig = S.scene;
+    const dx = S.dx;
+    const jMid = 40;                       // an interior row, clear of the border
+    const zMid = jMid * dx;                // exactly on a cell boundary
+    const x0 = 2.0, x1 = x0 + 5 * dx;       // long sides clear 2*dx on their own
+    const halfH = 0.15 * dx;                // short sides: 0.3*dx, well under 2*dx
+    const solid = GEOM.rect(x0, zMid - halfH, x1, zMid + halfH, { id: "sliver" });
+    let fillOnly = 0;
+    for (let j = jMid - 2; j <= jMid + 2; j++) {
+      for (let i = Math.floor(x0 / dx) - 1; i <= Math.floor(x1 / dx) + 1; i++) {
+        if (GEOM.contains(solid, (i + 0.5) * dx, (j + 0.5) * dx)) fillOnly++;
+      }
+    }
+    S.scene = Object.assign({}, orig, { walls: undefined, solids: () => [solid], valves: undefined });
+    APP.SIM.rasterise();
+    let stamped = 0;
+    for (let j = jMid - 2; j <= jMid + 2; j++) {
+      for (let i = Math.floor(x0 / dx) - 1; i <= Math.floor(x1 / dx) + 1; i++) {
+        if (S.mask[j * S.nx + i] >= 192) stamped++;
+      }
+    }
+    S.scene = orig;                        // leave the live grid as it was found
+    APP.SIM.rasterise();
+    return { fillOnly, stamped, dx };
+  })()`);
+  ok("SIM a fill-only test would miss the thin sliver entirely",
+    sliver.fillOnly === 0, `fill-only found ${sliver.fillOnly} cells (dx=${sliver.dx})`);
+  ok("SIM stampPoly's stroke seals a genuinely short edge's pinch",
+    sliver.stamped > 0, `stroke stamped ${sliver.stamped} cells`);
+
+  // The hump crest (polygon-geometry Finding 1): a single curved face
+  // sampled at n=160 (~0.025 m chords, GEOM.humpPts) is exactly the case
+  // stampPoly's merged-run threshold exists for — a fine polyline sampling
+  // a smooth, chunky solid must not read as 160 separately-short edges.
+  // Settled at the scene's DEFAULT budget (Medium, dx = 0.0148 m): this is
+  // the resolution a student actually opens the scene at, and it is
+  // exactly the budget the pre-merge threshold failed on (so did Low).
+  //
+  // The crest never "settles" by a single-instant read — the scene's own
+  // comment (js/scenes.js) documents a persistent surface wobble that runs
+  // 5-10x LARGER on the crest than on the approach pool it recommends
+  // reading instead. MEASURED: two of three raw (non-averaged) faceForce
+  // reads at t = 30 s landed on a momentary near-drained crest — all 320
+  // samples reading dry — purely from the wobble's phase, nothing to do
+  // with stampPoly. Average mode is the house answer to exactly this kind
+  // of reading ("Under an averaging window the sample is the window mean:
+  // one window, every instrument," AGENTS.md), so this opens a window AFTER
+  // spin-up and reads faceForce(..., avg). avgStepField only runs from the
+  // real frame loop (main.js's tickFrame), so time is driven through
+  // APP.frames() here, not the raw APP.tick() the rest of this suite uses —
+  // APP.tick() would leave the display accumulator at zero forever and
+  // every avg reading below would silently read as zero (also MEASURED,
+  // chasing this down).
+  await B.goto(`http://localhost:${PORT}/?scene=hump`);
+  const hump = await B.evaluate(`(() => {
+    const t0 = Date.now();
+    while (APP.sim.t < 15 && Date.now() - t0 < 150000) APP.frames(20, 2.0);
+    APP.SIM.avgStart();
+    while (APP.SIM.avgT() < 15 && Date.now() - t0 < 250000) APP.frames(20, 2.0);
+    const ff = APP.faceForce("hump", "crest", true);
+    let wet = 0;
+    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
+    const dx = APP.sim.dx;
+    // The classical vertical-force-on-a-submerged-surface identity: under a
+    // hydrostatic pressure field, the force equals the weight of the water
+    // standing directly above the surface. rho*g times the window-mean
+    // depth integrated over the hump's own footprint (x in [6,10], the
+    // crest's x0/x1 in js/scenes.js) gives that weight; the real flow's
+    // departure from hydrostatic (it accelerates over the crest) is the gap
+    // between this estimate and the measured Fz.
+    const avgCols = APP.SIM.avgColumns(true);
+    const iLo = Math.round(6.0 / dx), iHi = Math.round(10.0 / dx);
+    let sumD = 0;
+    for (let i = iLo; i < iHi; i++) sumD += avgCols.C[i * 4 + 1] * dx;
+    const weight = 1000 * 9.81 * sumD;
+    const out = { t: APP.sim.t, avgT: APP.SIM.avgT(), budget: APP.state.budget,
+      Fx: ff.Fx, Fz: ff.Fz, wetLen: ff.wetLen, len: ff.len,
+      samples: ff.samples.length, wet, weight };
+    APP.SIM.avgStop();
+    return out;
+  })()`);
+  ok("SIM hump crest faceForce is exercised at the scene's DEFAULT budget",
+    hump.budget === "Medium", "budget: " + hump.budget);
+  ok("PHYSICS hump crest averaging window opened", hump.avgT >= 14.5,
+    "avgT = " + hump.avgT.toFixed(1) + " s of 15");
+  // MEASURED (ANGLE/D3D11, Medium, dx = 0.0148 m, hump_h = 0.15, default —
+  // the crest is fully submerged at this height): BEFORE the merged-run fix,
+  // a raw read at this same budget came back with only 122 of 320 samples
+  // wet (38.1%), Fz = -4473 N/m. AFTER, over a 15 s averaging window: 320 of
+  // 320 wet (100%), every one of three independent windows landing within
+  // 0.1% of Fz = -11922 N/m.
+  ok("PHYSICS hump crest is entirely wet at h=0.15 (fully submerged)",
+    hump.wet === hump.samples,
+    `${hump.wet} of ${hump.samples} samples wet, wetLen ${hump.wetLen.toFixed(3)} of ${hump.len.toFixed(3)} m`);
+  ok("PHYSICS hump crest carries a net downward pressure force",
+    hump.Fz < 0, "Fz = " + hump.Fz.toFixed(1) + " N/m");
+  // MEASURED (same three windows): Fz = -11914 to -11926 N/m against the
+  // weight-of-water-above estimate of -12138 to -12143 N/m — 1.7-1.8% low.
+  // 20% brackets that with ample margin while still catching the fix's own
+  // failure mode: the pre-fix raw Fz (-4473 N/m) sits 63% below this
+  // bracket's floor.
+  ok("PHYSICS hump crest Fz brackets the weight of water standing over it",
+    near(hump.Fz, -hump.weight, 0.20 * hump.weight),
+    `Fz = ${hump.Fz.toFixed(0)} N/m vs weight-of-water estimate ${(-hump.weight).toFixed(0)} N/m`);
+
+  // Every wetted surface is clickable (the registration-wrapper task): a
+  // scene still on the walls() shim gets a pickable face too now, not just
+  // the scenes that declare solids() (s3's gate, above). m1's bed is
+  // channel()'s own sloping slab, kept in walls() — so "wall0" is the
+  // registration wrapper `rasterise()` built from that SAME seg, and its
+  // "side1" face (the +m side — see GEOM.slab's own comment; a mild bed
+  // sloping down to the right has a tangent close to +x, so +m is close to
+  // +z, the TOP) is the bed the channel actually stands on.
+  //
+  // MEASURED: a raw (non-averaged) read here is exactly the hump crest's own
+  // failure mode (its own comment above) — the M1 backwater reach carries a
+  // slow, whole-reach pulsation that occasionally reads the ENTIRE bed dry
+  // at a single instant (0 of 808 samples wet, twice in three raw reads),
+  // not a partial wobble. Average mode is the same house answer, so this
+  // settles, then opens a window and reads faceForce(..., avg) the same way
+  // the hump crest test does.
+  await B.goto(`http://localhost:${PORT}/?scene=m1`);
+  const bed = await B.evaluate(`(() => {
+    __low();
+    const t0 = Date.now();
+    while (APP.sim.t < 30 && Date.now() - t0 < 150000) APP.frames(20, 2.0);
+    APP.SIM.avgStart();
+    while (APP.SIM.avgT() < 10 && Date.now() - t0 < 250000) APP.frames(20, 2.0);
+    const ff = APP.faceForce("wall0", "side1", true);
+    let wet = 0;
+    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
+    const dx = APP.sim.dx;
+    const avgCols = APP.SIM.avgColumns(true);
+    // wall0 runs x = -1.0 to 14.6 (js/scenes.js's channel(), x0/xEnd for
+    // m1): the "run in from outside the domain" metre before x = 0 has no
+    // column of its own, so its contribution is approximated with column 0's
+    // depth held constant over it — the inlet is real open-channel flow, not
+    // a drop, so that is close to what is actually there.
+    const iHi = Math.min(APP.sim.nx - 1, Math.round(14.6 / dx));
+    let sumD = avgCols.C[1] * 1.0;               // the x < 0 metre, held at column 0
+    for (let i = 0; i <= iHi; i++) sumD += avgCols.C[i * 4 + 1] * dx;
+    const weight = 1000 * 9.81 * sumD;
+    const out = { t: APP.sim.t, avgT: APP.SIM.avgT(), dx, Fz: ff.Fz, Fx: ff.Fx, wet,
+      samples: ff.samples.length, wetLen: ff.wetLen, len: ff.len, weight };
+    APP.SIM.avgStop();
+    return out;
+  })()`);
+  ok("PHYSICS m1 settled before its bed averaging window opened", bed.t >= 29.5,
+    "reached t = " + (bed.t || 0).toFixed(1) + " s of 30");
+  ok("PHYSICS m1 bed averaging window opened", bed.avgT >= 9.5,
+    "avgT = " + bed.avgT.toFixed(1) + " s of 10");
+  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m, over a 10 s window): 746 of
+  // 808 samples wet (92.3%). Not 100%, unlike the hump crest: the face runs
+  // x = -1.0 to 14.6, and the metre before x = 0 sits outside the domain
+  // avgColumns() can read at all — close to the ~7.7% that reads dry here.
+  // 85% leaves margin for that known sliver while still catching a real
+  // hole in the middle of the bed.
+  ok("PHYSICS m1 bed (a walls()-shim wrapper) returns wet samples",
+    bed.wet / bed.samples >= 0.85,
+    `${bed.wet} of ${bed.samples} samples wet, wetLen ${bed.wetLen.toFixed(3)} of ${bed.len.toFixed(3)} m`);
+  ok("PHYSICS m1 bed top face presses down on the bed (Fz < 0)",
+    bed.Fz < 0, "Fz = " + bed.Fz.toFixed(1) + " N/m");
+  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m, over a 10 s window, two
+  // independent runs): Fz = -85007 to -85285 N/m against a weight-of-water-
+  // above estimate of -90783 to -91331 N/m — 6.2-6.4% low, well inside the
+  // 25% this brackets with (looser than the hump's 20% because this
+  // estimate leans on a held-constant approximation for the metre of bed
+  // run in from outside the domain, not a full column integral).
+  ok("PHYSICS m1 bed Fz brackets the weight of water standing over it",
+    near(bed.Fz, -bed.weight, 0.25 * bed.weight),
+    `Fz = ${bed.Fz.toFixed(0)} N/m vs weight-of-water estimate ${(-bed.weight).toFixed(0)} N/m`);
+
+  // The surface-existence check (Task 2), on the two surfaces it exists for.
+  // hammer's valve is a registration wrapper ("valve0") built from the same
+  // seg SIM.setValve's own texel reclassifies, so its faces are the water-
+  // hammer scene's own teaching instrument: SHUT, the valve blade is a real
+  // solid surface with a static head behind it; OPEN, the SAME texel reads
+  // as open pipe (the valve-aware `sol()` boxForce already uses), so the
+  // wrapper's face has no surface at all and faceForce must read zero on it
+  // — not because there is no water (there is, right there, on the sample's
+  // own side), but because the existence probe half a cell further IN finds
+  // open water where the wrapper says there should be rock.
+  //
+  // "side1" is the −x (upstream, reservoir) face: the valve's centreline
+  // runs straight up (dz > 0, dx = 0), so GEOM.slab's `m` (the left-normal
+  // of the tangent) points in −x, and side1 is the DEFAULT +m long side —
+  // the one nearer the reservoir at x < 6, not the nozzle at x > 55.
+  await B.goto(`http://localhost:${PORT}/?scene=hammer`);
+  const valve = await B.evaluate(`(() => {
+    __low();
+    APP.SIM.setValve(1);                       // shut
+    const t = __settle(10, 90000);
+    const ff = APP.faceForce("valve0", "side1");
+    let wet = 0;
+    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
+    const level = APP.sim.p.inflow.level, z0 = 2.0, z1 = 5.0;
+    // The static head estimate: still(level, z, P), integrated over the
+    // valve's own bore height, is a triangle-minus-triangle,
+    // rho*g*((level-z0)^2 - (level-z1)^2)/2.
+    const expect = 1000 * 9.81 * ((level - z0) * (level - z0) - (level - z1) * (level - z1)) / 2;
+    APP.SIM.setValve(0);                       // open — same face, nothing else moved
+    const open = APP.faceForce("valve0", "side1");
+    let wetOpen = 0;
+    for (const s of open.samples) if (s.f * s.p > 0) wetOpen++;
+
+    // The other half of the same fix, on the OTHER kind of hole: hammer's
+    // own "wall2" (the reservoir wall at x = 6, js/scenes.js) separates the
+    // settled, pressurised reservoir (x < 6) from the dry attic above the
+    // pipe (x > 6, z > 5) it was never asked to fill. Its "side1" face (the
+    // reservoir side, same −m/+m convention as the valve above) reads real
+    // water the whole way up to the reservoir's own free surface. Erasing
+    // the middle third punches a hole straight through the WRAPPER without
+    // moving a drop of water on the sample side — the offset sample there
+    // sits in the same real reservoir it always did, so only the
+    // surface-existence probe (into where the wall used to be) can tell the
+    // difference.
+    const before = APP.faceForce("wall2", "side1");
+    const wz0 = 5.0, wz1 = 30.0, mid0 = wz0 + (wz1 - wz0) / 3, mid1 = wz0 + 2 * (wz1 - wz0) / 3;
+    let gapTotal = 0, gapWetBefore = 0, wetBefore = 0;
+    for (const s of before.samples) {
+      const inGap = s.z >= mid0 && s.z <= mid1;
+      if (inGap) gapTotal++;
+      if (s.f * s.p > 0) { wetBefore++; if (inGap) gapWetBefore++; }
+    }
+    APP.SIM.addSeg(6.0, mid0, 6.0, mid1, 1.0, 0);   // eraser, kind 0 — punch clean through 0.7 m
+    const after = APP.faceForce("wall2", "side1");
+    let gapWetAfter = 0, wetAfter = 0;
+    for (const s of after.samples) {
+      const inGap = s.z >= mid0 && s.z <= mid1;
+      if (s.f * s.p > 0) { wetAfter++; if (inGap) gapWetAfter++; }
+    }
+
+    APP.SIM.setValve(1);                       // put the scene back
+    return { t, level,
+      shutWet: wet, shutSamples: ff.samples.length, Fx: ff.Fx, expect,
+      openWet: wetOpen, openSamples: open.samples.length, openFx: open.Fx,
+      gapTotal, gapWetBefore, wetBefore, samplesBefore: before.samples.length,
+      gapWetAfter, wetAfter, samplesAfter: after.samples.length };
+  })()`);
+  ok("PHYSICS hammer settled before the shut valve's face is read", valve.t >= 9.5,
+    "reached t = " + (valve.t || 0).toFixed(1) + " s of 10");
+  ok("PHYSICS shut valve upstream face reads wet from lip to reservoir",
+    valve.shutWet > 0 && valve.shutWet === valve.shutSamples,
+    `${valve.shutWet} of ${valve.shutSamples} samples wet`);
+  ok("PHYSICS shut valve face pushes toward the nozzle (Fx > 0)",
+    valve.Fx > 0, "Fx = " + valve.Fx.toFixed(0) + " N/m");
+  // MEASURED (ANGLE/D3D11, Low, t = 10 s): Fx = 632.9 kN/m against a static
+  // head estimate of 632.7 kN/m — 0.03% high, essentially exact because the
+  // reservoir behind a SHUT valve is genuinely still water with nowhere to
+  // go. 20% has ample margin while a stroke-swallow-class bug (which read
+  // 0 N/m regardless of head, engineering-notes.md's s3 case) sits nowhere
+  // near this bracket's floor.
+  ok("PHYSICS shut valve Fx brackets the static head estimate",
+    near(valve.Fx, valve.expect, 0.20 * valve.expect),
+    `Fx = ${(valve.Fx / 1000).toFixed(1)} kN/m vs static estimate ${(valve.expect / 1000).toFixed(1)} kN/m`);
+  ok("PHYSICS an OPEN valve reads zero on the same face — the surface-existence check",
+    valve.openWet === 0 && Math.abs(valve.openFx) < 1,
+    `${valve.openWet} of ${valve.openSamples} samples wet, Fx = ${valve.openFx.toFixed(2)} N/m`);
+
+  ok("PHYSICS hammer wall2 side1 reads real pressure across the future erase gap",
+    valve.gapTotal > 0 && valve.gapWetBefore === valve.gapTotal,
+    `${valve.gapWetBefore} of ${valve.gapTotal} gap samples wet before erasing`);
+  // MEASURED (ANGLE/D3D11, Low, t = 10 s): 41 of 125 samples sit in the
+  // erased middle third, all 41 wet before erasing (real reservoir pressure,
+  // reservoir level 25 m against the wall's z = 5-30 m span) and all 41 dry
+  // after — nothing else on the face moved (125 samples both times, and the
+  // 41-sample drop accounts for the WHOLE 100 -> 59 change), which is the
+  // point: the water on the sample side never left, only the wrapper's own
+  // claim to a surface there did.
+  ok("PHYSICS erasing the middle third zeroes exactly that stretch — nothing else moved",
+    valve.gapWetAfter === 0 && valve.wetBefore - valve.wetAfter === valve.gapWetBefore &&
+    valve.samplesBefore === valve.samplesAfter,
+    `gap: ${valve.gapWetAfter} of ${valve.gapTotal} wet after; ` +
+    `whole face: ${valve.wetBefore} -> ${valve.wetAfter} of ${valve.samplesBefore} wet`);
+
+  // The renumbering hazard a drawn wrapper's id carries, and the fix for it
+  // (code review finding on this branch's own commits). "drawn0"/"drawn1"/…
+  // are assigned by POSITION in S.segs every time rasterise() runs — not a
+  // stable identity — so draw A, draw B ("drawn1"), undo B, draw C
+  // elsewhere, and C becomes "drawn1" in B's place. Proven at the SIM level
+  // first: the SAME id "drawn1" samples a materially different stretch of
+  // geometry before and after. That is exactly why main.js's rasterise/
+  // addSeg/undoSeg/clearSegs wrap (js/main.js, ~line 3161) drops
+  // state.force/state.forceHover on every edit — a selection held by a raw
+  // (solidId, faceId) pair cannot otherwise tell it is now pointing at a
+  // different wall — so the second half checks that UI-level drop directly.
+  await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
+  const renumber = await B.evaluate(`(() => {
+    APP.SIM.clearSegs();
+    APP.SIM.addSeg(0.5, 4.5, 1.0, 4.5, 0.1, 255);         // A -> "drawn0"
+    APP.SIM.addSeg(3.0, 0.5, 3.5, 0.5, 0.1, 255);         // B -> "drawn1"
+    const before = APP.faceForce("drawn1", "side1");
+    const cenBefore = before.samples.reduce((s, p) => s + p.x, 0) / before.samples.length;
+    // Select B's face the way onDown would.
+    APP.state.force = { solidId: "drawn1", faceId: "side1", data: null, t0: 0 };
+    APP.state.forceHover = { solidId: "drawn1", faceId: "side1" };
+    APP.SIM.undoSeg();                                     // drop B
+    const droppedForce = APP.state.force, droppedHover = APP.state.forceHover;
+    APP.SIM.addSeg(7.0, 4.5, 7.5, 4.5, 0.1, 255);          // C, elsewhere -> "drawn1"
+    const after = APP.faceForce("drawn1", "side1");
+    const cenAfter = after.samples.reduce((s, p) => s + p.x, 0) / after.samples.length;
+    APP.SIM.clearSegs();
+    return { cenBefore, cenAfter, droppedForce, droppedHover };
+  })()`);
+  ok("SIM a drawn wrapper's id renumbers on an edit — a raw solidId is not a stable identity",
+    Math.abs(renumber.cenAfter - renumber.cenBefore) > 1.0,
+    `"drawn1" centroid x: ${renumber.cenBefore.toFixed(2)} -> ${renumber.cenAfter.toFixed(2)} m`);
+  ok("UI a Force selection does not survive an edit that could have renumbered it",
+    renumber.droppedForce === null && renumber.droppedHover === null,
+    `force: ${JSON.stringify(renumber.droppedForce)}, hover: ${JSON.stringify(renumber.droppedHover)}`);
 };
 
 SUITES.rig = async (B) => {
@@ -616,6 +1113,30 @@ SUITES.rig = async (B) => {
   ok("RIG a superseded format is refused", r.v1 === "rejected", r.v1msg);
   ok("RIG a refused load leaves the live field alone",
     ["h", "d", "speed"].includes(r.fieldAfterV1), "field: " + r.fieldAfterV1);
+
+  // The `params` wire key (additive to v2, docs/engineering-notes.md) is
+  // untouched by everything above — the m2 scene it runs against declares no
+  // params at all, so `RIG.snapshot()` never even writes the key on that
+  // path. s3's gate_a is a live param: set it away from its default,
+  // snapshot, scramble the live value back off the snapshot, apply the
+  // snapshot, and read the RECONSTRUCTED S.params off the reload — not the
+  // snapshot JSON, so this catches total omission the way the instrument
+  // coverage test below does for placed instruments.
+  await B.goto(`http://localhost:${PORT}/?scene=s3`);
+  const pr = await B.evaluate(`(() => {
+    const applied = APP.SIM.setParam("gate_a", 0.90);   // s3's default is 0.35
+    const snap = APP.RIG.snapshot();
+    APP.SIM.setParam("gate_a", 0.35);                    // scramble away from it
+    APP.RIG.apply(snap);
+    return { applied, snapParam: snap.params && snap.params.gate_a,
+      reloaded: APP.SIM.params().values.gate_a };
+  })()`);
+  ok("RIG snapshot carries the params wire key",
+    typeof pr.snapParam === "number", "params.gate_a = " + pr.snapParam);
+  ok("RIG round-trips a scene param end to end (gate_a)",
+    near(pr.reloaded, pr.applied, 1e-6),
+    `set ${pr.applied} -> snapshot ${pr.snapParam} -> reloaded ${pr.reloaded}`);
+  await B.goto(`http://localhost:${PORT}/?scene=m2`);
 
   const csv = await B.evaluate(`(() => {
     APP.state.gauges.length = 0;

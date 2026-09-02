@@ -39,6 +39,12 @@ const state = {
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
   flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
   cvShow: "Q",                     // which per-edge quantity the box labels
+  force: null,                     // the pressure-force face: {solidId, faceId, data, t0}
+  // The face the Force tool is hovering over, BEFORE a click selects it: pure
+  // CPU pick (faceAtPx), never a faceForce readback — {solidId, faceId} or
+  // null. Cleared on a tool change, a scene load, and the pointer leaving the
+  // domain, so it never outlives the pick it was computed from.
+  forceHover: null,
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   // Average is a measurement mode, not a blur filter (docs/averaging.md
@@ -191,6 +197,8 @@ function loadScene(id, keepDrawing) {
   state.measure = null; state.measDrag = null;
   state.cv = null; state.cvDrag = null;
   state.flux.length = 0; state.fluxDrag = null;
+  state.force = null;
+  state.forceHover = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -488,6 +496,21 @@ const CONTROLS = [
   { id: "spoutVy", place: "spout", label: "Spout velocity ↑", min: -6, max: 3, step: 0.05,
     get: () => sim.p.source.vz, set: (v) => sim.p.source.vz = v,
     fmt: (v) => v.toFixed(2) + " m/s" },
+
+  { h: "Geometry" },
+  ...[0, 1, 2, 3].map((k) => ({
+    id: "geom" + k, label: "—",
+    min: 0, max: 1, step: 0.01,
+    // The row binds to the k-th declared param of whatever scene is up.
+    par: () => (SIM.params().decl || [])[k],
+    get: function () { const d = this.par(); return d ? SIM.params().values[d.key] : 0; },
+    set: function (v) { const d = this.par(); if (d) SIM.setParam(d.key, v); },
+    fmt: function (v) {
+      const d = this.par();
+      return d ? v.toFixed(3) + (d.unit ? " " + d.unit : "") : "";
+    },
+    info: "A dimension of the scene's own geometry. Moving it redraws the solid and re-rasterises the grid — and resets any averaging window, because the walls the mean was accumulated through are no longer the walls on screen.",
+  })),
 
   { h: "Boundaries" },
   ...[["openL", 0, "Left edge", "carries the reservoir control when it is on"],
@@ -818,6 +841,20 @@ function syncPanel() {
       if (note) note.textContent = c.fmt ? c.fmt() : "";
       return;
     }
+    // A dynamic row (Geometry's geom0…geom3) binds to whatever param its
+    // scene declares at that index — none for most scenes. Hide the row and
+    // its note when there is nothing to bind to, and when there is, adopt
+    // that param's own range and label before reading its value below.
+    if (c.par) {
+      const d = c.par();
+      input.parentElement.classList.toggle("gone", !d);
+      if (note) note.classList.toggle("gone", !d);
+      if (d) {
+        c.min = d.min; c.max = d.max; c.step = d.step;
+        input.step = d.step;           // the range input's own step, not just c's
+        input.parentElement.querySelector(".lbl").textContent = d.label;
+      }
+    }
     const v = c.get();
     if (c.type === "check") input.checked = !!v;
     else if (c.type === "select") input.value = v;
@@ -829,6 +866,13 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
+  // The "Geometry" heading fronts geom0…geom3, which hide themselves row by
+  // row above as the scene declares fewer than four params, down to none —
+  // but a heading is not a row, so nothing in the loop hides IT. A scene
+  // with no declared params (most of them) would otherwise leave the
+  // heading standing over an empty section.
+  const geomHeading = document.querySelector('#panel h3[data-sec="Geometry"]');
+  if (geomHeading) geomHeading.classList.toggle("gone", !(SIM.params().decl || []).length);
   applyPanelFocus();
 }
 
@@ -956,6 +1000,10 @@ const TOOLS = [
   // arming the wrong tool. New tools go on the end, whatever group they
   // belong to on the strip.
   ["flux", "Flux line", "Left-drag a section — reads what crosses it. Draw TWO for the balance between them (Shift snaps; click a line to remove it)"],
+  // TWELFTH, appended for the same reason as Flux: it needs a scene solid to
+  // click on (Task 2 of the polygon-geometry work), which nothing draws yet,
+  // so it has no digit of its own either.
+  ["force", "Pressure force", "Click a wall or gate face for its pressure diagram — click the same solid again to cycle faces, click open water to clear"],
 ];
 
 /** The tools the number keys can reach. */
@@ -1026,6 +1074,10 @@ const ICONS = {
   // The two grade lines over a wavy surface: what the overlay actually draws.
   channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
            '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
+  // A vertical face with three arrows of growing length pressing on it — the
+  // textbook pressure diagram drawForce paints on the canvas.
+  force:   '<path d="M13.5 3v14"/><path d="M4 6.5h5M6 10h3M8 13.5h1"/>' +
+           '<path d="M9 6.5 7.5 5.4M9 6.5 7.5 7.6M9 10l-1.2-1M9 10l-1.2 1M9 13.5l-.9-.8M9 13.5l-.9.8"/>',
 };
 
 /** An `<svg>` for one icon id. */
@@ -1532,7 +1584,7 @@ const TOOLBAR = [
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
   { cap: "MEASURE", family: "measure",
-    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux") },
+    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux", "force") },
   // VIEW: how the water is DRAWN. The three toggles were reachable only from
   // the P / D / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
@@ -1628,7 +1680,7 @@ function toolItem([id, label, tip]) {
   return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
            key: n <= TOOL_KEYS ? String(n) : "",
            on: () => state.tool === id,
-           act: () => { state.tool = id; syncToolbar(); syncPanel(); } };
+           act: () => { state.tool = id; state.forceHover = null; syncToolbar(); syncPanel(); } };
 }
 
 /** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
@@ -2155,6 +2207,24 @@ function onDown(e) {
     state.cvDrag = { x0: x, z0: z, x1: x, z1: z };
     return;
   }
+  if (state.tool === "force") {
+    // GEOM.faceAt's tolerance is domain-space and isotropic, so a single
+    // horizontal-axis conversion of GRAB_PX (the old approach here) makes
+    // the grab radius wrong under vex for sloped or horizontal faces — the
+    // same anisotropy nearSegment's per-axis scaling exists to handle. Pick
+    // in screen space instead, GRAB_PX applied directly as a screen radius.
+    const hit = faceAtPx(sim.solids || [], x, z, GRAB_PX);
+    if (!hit) { state.force = null; return; }
+    if (state.force && state.force.solidId === hit.solid.id) {
+      // Same solid again: cycle to its next named face.
+      const ids = hit.solid.faces.map((fc) => fc.id);
+      const k = (ids.indexOf(state.force.faceId) + 1) % ids.length;
+      state.force = { solidId: hit.solid.id, faceId: ids[k], data: null, t0: sim.t };
+    } else {
+      state.force = { solidId: hit.solid.id, faceId: hit.faceId, data: null, t0: sim.t };
+    }
+    return;
+  }
   state.drag = { x0: x, z0: z, x1: x, z1: z };
 }
 
@@ -2181,6 +2251,18 @@ function onMove(e) {
   const [x, z] = pointerPos(e);
   state.cursor = [x, z];
   state.inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
+  // The Force tool's own hover pick: pure CPU (faceAtPx, screen-space),
+  // recomputed on every move so the surface under the cursor lights up
+  // BEFORE a click selects it — no SIM.faceForce call, so no GPU readback.
+  // Never live mid-drag or mid-pinch: both of those `return` above this
+  // point, and the Force tool itself never sets state.drag (onDown handles
+  // its click and returns), so there is no drag state to guard against here.
+  if (state.tool === "force") {
+    const hit = state.inside ? faceAtPx(sim.solids || [], x, z, GRAB_PX) : null;
+    state.forceHover = hit ? { solidId: hit.solid.id, faceId: hit.faceId } : null;
+  } else if (state.forceHover) {
+    state.forceHover = null;
+  }
   if (state.panDrag) {
     const px = pointerPx(e), d = state.panDrag;
     state.panC = [
@@ -2369,6 +2451,7 @@ function tickFrame(realDt) {
   sampleRakes();
   sampleCV();
   sampleFlux();
+  sampleForce();
   sampleInlet(analysis);
   advanceTracers(simAdvanced);
   // Scenes whose subject is the orbital motion seed their own tracer rake as
@@ -2559,6 +2642,51 @@ function sampleCV() {
   cv.last = r;
 }
 
+/** The pressure diagram on the selected face — same idiom as sampleCV, but
+ *  the EMA runs per SAMPLE rather than on the two scalars: it is `p` AND `f`
+ *  at each station that get the τ = 1 s filter, same `a`, same restart
+ *  conditions for both. `f` has to be smoothed alongside `p` — not left
+ *  raw — because `GEOM.faceForceFromSamples` gates every term AND `wetLen`
+ *  on `min(f,1)` and `f·p`; an EMA'd `p` sitting on a raw, wobbling `f`
+ *  would still make the integral jump at the waterline, which is the exact
+ *  transition this filter exists to smooth. Fx/Fz/F/cop/wetLen are then
+ *  re-integrated (GEOM.faceForceFromSamples) from the smoothed row, so the
+ *  resultant arrow is always consistent with the diagram it is drawn from
+ *  by construction — one filter, not `p` and `f` each smoothed and then a
+ *  third, separate filter on Fx/Fz that could drift from either.
+ *
+ *  A geometry change changes the sample count (a resolution rebuild
+ *  resamples every face at the new dx; a parameterised solid can change
+ *  shape under a scene control) — that is the restart signal, the same way
+ *  the clock going backwards is. */
+function sampleForce() {
+  const f = state.force;
+  if (!f || state.paused) return;
+  if (sim.t < f.t0) { f.data = null; f.t0 = sim.t; }
+  if (!(sim.t > f.t0) && f.data) return;
+  const av = measuringAvg();
+  const r = SIM.faceForce(f.solidId, f.faceId, av);
+  if (!r) { f.data = null; f.t0 = sim.t; return; }
+  if (av || !f.data || f.data.samples.length !== r.samples.length) {
+    // The window mean IS the instrument's aggregate (no second filter), a
+    // fresh face has nothing to blend against, and a sample-count change is
+    // a different station layout — averaging across it would be nonsense.
+    f.data = r;
+    f.t0 = sim.t;
+    return;
+  }
+  const a = 1 - Math.exp(-Math.min(sim.t - f.t0, 0.25) / 1.0);
+  f.t0 = sim.t;
+  const prev = f.data.samples;
+  const samples = r.samples.map((s, i) =>
+    Object.assign({}, s, { p: prev[i].p + (s.p - prev[i].p) * a,
+                            f: prev[i].f + (s.f - prev[i].f) * a }));
+  const ds = samples.length > 1 ? samples[1].s - samples[0].s : sim.dx;
+  const g = Math.abs(sim.p.g) || 9.81;
+  f.data = Object.assign(GEOM.faceForceFromSamples(samples, ds, 1000, g),
+                          { samples, solidId: r.solidId, faceId: r.faceId, len: r.len });
+}
+
 /** Smooth every scalar of a control-volume budget, edge by edge. Written as a
  *  walk over the keys rather than by hand so that adding a quantity to
  *  `boxFlux` cannot leave it unsmoothed and jittering while its neighbours
@@ -2707,6 +2835,16 @@ function drawOverlay(A) {
   if (state.flux.length || state.fluxDrag) {
     OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
   }
+  if (state.force && state.force.data) OVERLAY.drawForce(ctx, view, sim, state.force);
+  // The hover pick, faint — drawn UNDER the selected face's full-strength
+  // stroke conceptually, but skipped entirely when it IS the selected face:
+  // drawForce above already owns that stroke, and a second one under it
+  // would only ever be redundant paint, never a visible style.
+  if (state.forceHover && !(state.force &&
+      state.forceHover.solidId === state.force.solidId &&
+      state.forceHover.faceId === state.force.faceId)) {
+    OVERLAY.drawForceHover(ctx, view, sim, state.forceHover);
+  }
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -2757,6 +2895,30 @@ function nearSegment(L, x, z) {
   const len2 = ax * ax + az * az;
   const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, (px * ax + pz * az) / len2));
   return Math.hypot(px - ax * t, pz - az * t);
+}
+
+/** The nearest named face across `solids`, within `tolPx` SCREEN pixels —
+ *  the Force tool's own pick, walking the same per-edge run GEOM.faceAt
+ *  does but testing distance in screen space via `nearSegment`'s per-axis
+ *  convention (dx and dz each scaled by their own view-w-over-sim-W /
+ *  view-h-over-sim-H factor before the hypot) rather than GEOM.faceAt's
+ *  single domain-space tolerance. GEOM.faceAt's distance is isotropic in
+ *  domain space, so one domain-space radius cannot represent a round screen
+ *  radius once vex makes the two axes' px-per-metre differ — a sloped or
+ *  horizontal face would grab too wide or too narrow depending on its angle
+ *  to the stretch. */
+function faceAtPx(solids, x, z, tolPx) {
+  let best = null;
+  for (const solid of solids) {
+    for (const face of solid.faces) {
+      for (const e of GEOM.faceEdges(solid, face.id)) {
+        const v0 = solid.verts[e], v1 = solid.verts[(e + 1) % solid.verts.length];
+        const dist = nearSegment({ x0: v0[0], z0: v0[1], x1: v1[0], z1: v1[1] }, x, z);
+        if (dist <= tolPx && (!best || dist < best.dist)) best = { solid, faceId: face.id, dist };
+      }
+    }
+  }
+  return best;
 }
 
 /** Place a gauge — or take away the one you just pointed at.
@@ -2996,9 +3158,25 @@ function boot() {
   // is what made a drowned gate on a 1-in-4 bed read "M1". Every path that
   // re-rasterises the walls goes through one of these; a resolution change or
   // a scene load builds a fresh grid and starts clean anyway.
+  //
+  // The Force selection has to drop here too: a drawn wrapper's id is its
+  // POSITION in S.segs at the moment rasterise() runs ("drawn0", "drawn1",
+  // …), not a stable identity, so an edit can renumber what a selection
+  // points at — draw A ("drawn0"), draw B ("drawn1"), select B's face, Undo,
+  // draw C, and without this C becomes "drawn1" and quietly inherits B's
+  // selection. A scene's own solids() carry fixed ids and never have this
+  // problem, but a drawn one always can — dropping the selection on every
+  // edit (the same choke point averaging already resets through) is the
+  // one answer that is right regardless of which id moved.
   ["rasterise", "addSeg", "undoSeg", "clearSegs"].forEach((k) => {
     const f = SIM[k];
-    SIM[k] = (...a) => { const r = f(...a); OVERLAY.resetEstimates(sim); return r; };
+    SIM[k] = (...a) => {
+      const r = f(...a);
+      OVERLAY.resetEstimates(sim);
+      state.force = null;
+      state.forceHover = null;
+      return r;
+    };
   });
 
   // The strip first: PICKER, EX and KEYS all light their own opener by id, so
@@ -3098,7 +3276,7 @@ function boot() {
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("pointercancel", onUp);
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-  canvas.addEventListener("pointerleave", () => state.inside = false);
+  canvas.addEventListener("pointerleave", () => { state.inside = false; state.forceHover = null; });
   canvas.addEventListener("pointerenter", () => state.inside = true);
   canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
   canvas.addEventListener("wheel", (e) => {
@@ -3157,7 +3335,7 @@ function boot() {
       const t = TOOLS[+k - 1];
       const fam = familyOf(t[0]);
       if (UIMODE.allows(fam, { tool: t[0], id: t[0] })) {
-        state.tool = t[0]; window.syncTools();
+        state.tool = t[0]; state.forceHover = null; window.syncTools();
       } else {
         showToast(t[1] + " is off for this exercise",
                   "The ⋯ button at the end of the strip brings every control back.");
@@ -3202,6 +3380,7 @@ function setAverage(on) {
   // live EMA, and Live must not resume from a window mean.
   if (state.cv) { state.cv.ema = null; state.cv.flux = null; state.cv.hist.length = 0; state.cv.t0 = sim.t; }
   state.flux.forEach((L) => { L.ema = null; L.t0 = sim.t; });
+  if (state.force) { state.force.data = null; state.force.t0 = sim.t; }
   OVERLAY.resetEstimates(sim);
   LEGEND.sync(); syncPanel(); syncToolbar();
 }
@@ -3247,6 +3426,7 @@ window.APP = {
   placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
+  faceForce: (sid, fid, avg) => SIM.faceForce(sid, fid, avg),   // the pressure diagram on one named face
   placeCV,                                 // the control volume, headless
   placeFlux, removeFluxAt,                 // a flux section, headless
   // The averaging mode's public surface.

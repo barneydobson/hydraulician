@@ -982,6 +982,81 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------- the pressure-force tool
+    console.log("\nthe Force tool is on the strip and arms without breaking the layout");
+    {
+      // No scene declares solids yet (that lands with the s3 conversion), so
+      // this is wiring-only: the tool exists, sits in MEASURE beside its
+      // fellow instruments, carries no digit (twelfth, appended, same as
+      // Flux), and arming it disturbs nothing the layout gate watches.
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const strip = APP.ui.TOOLBAR.flatMap((g) => g.items);
+        const inMeasure = APP.ui.TOOLBAR.find((g) => g.cap === "MEASURE").items
+                             .some((i) => i.tool === "force");
+        const item = strip.find((i) => i.tool === "force");
+        item.el.click();
+        return { hasForce: APP.TOOLS.map((t) => t[0]).includes("force"),
+                 inMeasure, key: item.key, armed: APP.state.tool };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("Force is a tool", r.hasForce);
+      check("it lives in MEASURE", r.inMeasure);
+      eq("and carries no digit — 1-9 are already taken", r.key, "");
+      eq("the strip arms it", r.armed, "force");
+      const p = await tab.evaluate(PROBE);
+      check("every strip button still has an icon", p.emptyIcons === 0, p.emptyIcons + " empty");
+      check("every strip button is still labelled", p.unlabelled === 0, p.unlabelled + " bare");
+      eq("the strip still renders the whole spec", p.buttons, p.specCount);
+      check("no control fell out of the strip", !p.groupsClipped);
+      await tab.close();
+    }
+
+    // ------------------------------------------------- the Geometry section
+    console.log("\nthe Geometry panel binds to whatever the scene actually declares");
+    {
+      // hump declares one param (hump_h); the panel's four geom rows are a
+      // fixed pool that binds to a scene's params by INDEX (main.js's
+      // syncPanel), so exactly one of the four should be showing, and it
+      // should carry the scene's own label rather than a placeholder.
+      const tab = await browser.open(INDEX + "?scene=hump");
+      const r = await tab.evaluate(`
+        const rows = [0, 1, 2, 3].map((k) => {
+          const input = document.getElementById("c_geom" + k);
+          return !input.parentElement.classList.contains("gone");
+        });
+        return { rows, visible: rows.filter(Boolean).length,
+                 label: document.querySelector("#c_geom0").parentElement
+                          .querySelector(".lbl").textContent,
+                 headingShown: !document.querySelector('#panel h3[data-sec="Geometry"]')
+                                  .classList.contains("gone") };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("exactly one geometry row shows", r.visible, 1, JSON.stringify(r.rows));
+      eq("it is named after the scene's own param", r.label, "Hump height");
+      check("the Geometry heading shows when a row does", r.headingShown);
+      await tab.close();
+    }
+    {
+      // m1 has no declared params at all — a wall-segment scene, not a
+      // polygon one — so every one of the four rows should stay hidden, and
+      // the section's own heading should not be left fronting an empty list.
+      const tab = await browser.open(INDEX + "?scene=m1");
+      const r = await tab.evaluate(`
+        const rows = [0, 1, 2, 3].map((k) => {
+          const input = document.getElementById("c_geom" + k);
+          return !input.parentElement.classList.contains("gone");
+        });
+        return { visible: rows.filter(Boolean).length,
+                 headingShown: !document.querySelector('#panel h3[data-sec="Geometry"]')
+                                  .classList.contains("gone") };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("a scene with no params hides every geometry row", r.visible, 0);
+      check("a scene with no params hides the Geometry heading too", !r.headingShown);
+      await tab.close();
+    }
+
     // ------------------------------------------------- placing and removing
     console.log("\nan instrument you can place is an instrument you can remove");
     {

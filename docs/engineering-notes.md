@@ -598,3 +598,154 @@ picture saturated or flat is the symptom of the two having drifted apart.
   s1's roller — never fall below tolerance at all; for those the mean profile
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
+
+## Polygon geometry
+
+`js/geom.js` (`GEOM`) is the RECON pattern applied to shapes: pure numerics,
+no WebGL, no DOM, pinned against closed-form answers in
+`test/geom-test.mjs`. A later polygon rasteriser (`js/sim.js`) and a
+pressure-force instrument are built on it, so its conventions are worth
+having settled before anything calls into it.
+
+- **CCW winding fixes what "outward" means, and nothing checks it for you.**
+  A solid's verts run counter-clockwise; `edgeNormal` takes an edge's
+  tangent and turns it a quarter-turn clockwise to get the outward normal.
+  Wind a polygon the other way and every normal silently points into the
+  water instead of out of it — no exception, no NaN, just a pressure force
+  pushing the wrong way. `test/geom-test.mjs`'s G2 pins the convention down
+  directly: every edge normal of a rectangle must point away from its own
+  centre.
+- **Faces are runs of consecutive edges, not index lists**, because that is
+  the only shape a stretch of polygon boundary can take, and it lets a run
+  that wraps past the last vertex (`e0 > e1`) be written as two numbers
+  instead of an array. `faceEdges` resolves the wrap; `faceSamples` walks
+  it to produce the points a pressure-force integral consumes, each carrying
+  its outward normal and an arc-length coordinate `s`.
+- **Curves are polyline-sampled, not kept as true arcs**, at a spacing fine
+  enough that the chord's sagitta sits far below the finest cell the app
+  runs at (Δx ~ 2.6 mm at Ultra) — `arcPts` bounds each segment's own arc
+  length to 0.02 m by default, `humpPts` the same in x. Once sampled,
+  everything downstream (a rasteriser, `contains`, `faceSamples`) only ever
+  has to reason about straight edges, which is what keeps the geometry
+  layer small.
+- `test/geom-test.mjs` holds the closed forms that would otherwise have to
+  be trusted by eye: a slab's exact butt-end corners, the winding/normal
+  convention, point-in-polygon on an axis box and a slanted slab, an arc's
+  endpoints and length, a hump's symmetry and zero end slope, and the
+  textbook hydrostatic force and centre of pressure (`rho*g*H^2/2` and
+  `H/3`) on a vertical face — the same closed form a lab manual would use
+  to check a submerged gate by hand.
+- **The anti-leak edge stroke is skipped when every MERGED run of
+  near-collinear edges is at least 2 cells long** — `stampPoly`'s comment in
+  `js/sim.js` has the full reasoning; the short version is that a pinch a
+  scan-fill test alone can miss needs either a genuinely short stretch of
+  boundary (a capsule's own butt end is one) or a shallow-angle long stretch
+  sitting close enough to a neighbour to leave a cell-centre gap, and
+  neither can happen once nothing on the solid is that short — so the fill
+  test alone is exact and the stroke has nothing left to protect.
+  `stampPoly` merges consecutive edges whose turn is under ~20° into one run
+  before measuring length, because a smoothly curved face is
+  polyline-sampled fine enough (the hump crest, `GEOM.humpPts` at n=160,
+  ~0.025 m chords) that its individual edges are far shorter than a cell
+  while the STRETCH of boundary they trace needs no seal at all; a real
+  corner still starts a new run, so a genuinely short edge (a gate blade's
+  0.05 m end) is never merged away and still triggers the stroke on its own.
+  The guard holds for any solid, convex or not, PROVIDED no two stretches of
+  its own boundary pass within a cell of each other while every merged run
+  along the way clears 2·dx — a folded strip whose two long near-parallel
+  sides are pulled that close together could still pinch with every run
+  long, and would need its own check. Nothing shipped does that:
+  `GEOM.poly`/`slab`/`rect` are convex, and the hump crest (one non-convex
+  curve with two corners, at its butt ends, each its own run) does not
+  fold back on itself. Skipping the stroke matters because the stroke
+  itself has a cost: it overshoots by painting solid up to ~0.85·dx OUTSIDE
+  the true edge, on the water side too, and MEASURED on s3's gate blade
+  (5 cm wide, faces stroked before this fix) that overshoot at Low
+  (dx = 0.0193 m) reached past `faceForce`'s own 0.75·dx sampling offset, so
+  every upstream-face sample read solid and Fx measured 0 N/m regardless of
+  pool depth. Skipping the stroke on a solid that clears the 2-cell floor
+  restored a real pressure diagram: **Fx = 9.61 kN/m against a ~8.94 kN/m
+  hydrostatic estimate** (`exercises/_runner/smoke.js`'s closed-form case
+  has the derivation and the run-to-run spread — the two are not expected to
+  match exactly because the diagram integrates the actual flow field, not
+  still water).
+
+  Before the merge existed, the per-edge version of this same threshold read
+  the hump's 160 crest chords as 160 separately-short edges and ran the
+  stroke around the WHOLE hump at both Low (dx = 0.0215 m) and Medium
+  (dx = 0.0148 m, the default) — its rim swallowed `faceForce`'s sampling
+  offset there too: at Medium, `APP.faceForce("hump","crest")` on the
+  settled hump (hump_h = 0.15, t = 30 s) read only 122 of 320 samples wet
+  (38.1%) against a crest that is fully submerged at this height, so the
+  flagship curved-face pressure demo was reading well under half its true
+  integral. Merging near-collinear edges makes the crest one ~4.0 m run
+  (its two vertical butt ends stay their own ~0.85 m runs), the stroke is
+  skipped again, and the same read comes back 320 of 320 wet (100%). The
+  threshold reads the LIVE `S.dx`, so a coarser future budget that thins a
+  merged run below 2 cells gets the stroke back automatically.
+- **The shim (a scene still declaring `walls()` instead of `solids()`)
+  rasterises byte-for-byte identically to the old path** — same `stampSeg`,
+  same capsule, same measured geometry — which is the promise that lets 20
+  pre-existing scenes go untouched by this branch. `smoke.js` measures the
+  diff directly on the sandbox's drawn segments: at Medium the segments
+  clear the same 2-cell floor as s3's gate, so the stroke never runs on
+  either the reference or the polygon path and there is no rim left to
+  produce a difference — diff/solid measured **0 of 3356 cells, 0.00%**.
+  The 20% gate this check runs under still passes, but for a different
+  reason than before the stroke-skip landed: an exact fill match, not a rim
+  comfortably inside budget.
+- **`params` is additive to the rig wire format and does not bump `V`** — the
+  same reasoning `js/rig.js`'s own comment on `V` gives for `flux` and
+  `ui.cvShow` at v2 applies again: the version bump exists to catch a
+  RENAMED or REDEFINED key silently misloading, and neither hazard applies
+  to a purely additive optional key. An old rig with no `params` reads as a
+  scene's own defaults (nothing to apply); a rig carrying `params` read back
+  by code that predates this branch simply ignores a key it does not know.
+  Both directions degrade to the truth, so `V` stays 2 — bumping would
+  reject all the v2 captures in `js/exercises-rigs.js` for zero benefit, the
+  same trade the comment already made once.
+- **The pressure-diagram arrow is built in screen space, not domain space,
+  and that is not optional.** Pressure has no tangential component, so the
+  per-station arrows in the Force tool's diagram (drawn in `overlay.js`'s
+  `drawForce`) MUST render perpendicular to the face — but the view
+  transform is anisotropic under vertical exaggeration (`V.w/sim.W !=
+  V.h/sim.H`), so offsetting a sample along its DOMAIN normal and only then
+  mapping it through `V.X`/`V.Y` is perpendicular on screen only when the
+  face happens to be axis-aligned or vex = 1. `drawForce` instead builds
+  each arrow's direction from the SCREEN-SPACE tangent between neighbouring
+  already-mapped samples (a quarter-turn gives the screen perpendicular),
+  and uses the domain normal only to choose which of the two screen
+  perpendiculars points into the solid. The resultant arrow is drawn
+  differently again — in true screen proportion, no vex — because it is a
+  force vector, not a shape glued to the water, and an angle on it is one a
+  straightedge on the screen should be able to measure.
+- **Every wetted surface is clickable, and the wrappers that make it so are
+  REGISTRATION-only — they never touch the mask.** `rasterise()` stamps the
+  mask exactly as it always did, and only once that is done does it extend
+  `S.solids` with a `GEOM.slab` wrapper for every scene `walls()`/`valves()`
+  seg and every user-drawn wall/valve stroke, built from the SAME seg the
+  mask was stamped from. A wrapper therefore cannot move a cell the mask
+  did not already move — the acceptance test is that the mask stays
+  byte-identical to before this existed, which is exactly what the ordering
+  (wrap after stamp, never instead of or interleaved with it) guarantees.
+  Each wrapper names all four edges — `side0`/`side1` (the long faces
+  `GEOM.slab` already knew) and `end0`/`end1` (the butt ends it did not),
+  because a drawn gate's lip is a butt end and has to be pickable exactly
+  like its long faces are. Scene `solids()` entries are untouched: they
+  carry their own faces and were already pickable.
+- **A wrapper says where a surface WOULD be; the mask says where it IS, and
+  `faceForce` trusts the mask.** A wrapper is built once per `rasterise()`
+  from a seg, whether or not an eraser stroke later punches a hole through
+  the middle of it or a valve later opens — the wrapper has no way to know.
+  So every sample `faceForce` takes is checked twice: once at its usual
+  0.75·dx offset OUT into the water (the valve-aware test `boxForce`'s own
+  `sol()` uses, `m > 192` or, while the valve is shut, `m > 64`), and once
+  0.5·dx the OTHER way, IN along `−n` — a second, independent point inside
+  where the wrapper claims the solid is. If that texel is not solid under
+  the same test, there is no surface there regardless of what the wrapper
+  says, and the sample zeroes exactly as it would off the end of a wall that
+  was never drawn. The consequence students actually see: an OPEN valve's
+  faces both read zero force (there is no surface to press on), a CLOSED
+  valve reads the real diagram — the water-hammer teaching number — and an
+  erased hole in a wall contributes nothing to the integral either side of
+  it.

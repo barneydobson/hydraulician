@@ -36,6 +36,12 @@ enters the horizontal budget. Two rules make the reading mean anything: the box
 must enclose the **whole** deflector, and it must **not** contain the spout,
 which is a source (footprint x 0.61–0.79) and not a force.
 
+The **Pressure force** tool (pick it on the strip — it has no digit key) reads
+the same `F→` a different way: click the deflector itself and it draws the
+pressure diagram the jet presses it with, resultant included, with no box to
+place or redraw between shapes. Measured on the flat plate: **4.44 kN/m**,
+against the box's own ~4.3.
+
 ## What to do
 
 1. Drop two gauges — Gauge (`5`) — one in the free jet, clear of both the
@@ -57,11 +63,13 @@ which is a source (footprint x 0.61–0.79) and not a force.
    the flat plate is already on the bench, so Erase (`2`) it and draw the next
    with Wall (`1`) each time. Warm colours are flow still heading the way the
    jet was fired, white is flow turned sideways, blue is flow turned back on
-   itself. Let each shape settle, then read `F→` off the box.
+   itself. Let each shape settle, then read `F→` off the box — or pick the
+   **Pressure force** tool and click the shape directly for the same number
+   off its own pressure diagram, no box to redraw between shapes.
 
 | shape | draw | θ | ρqv(1−cos θ) | F→ measured |
 |---|---|---|---|---|
-| flat plate | (1.35, 2.00)–(1.35, 3.00) | 90° | 3.5 kN/m | ≈4.3 |
+| flat plate | (1.35, 2.00)–(1.35, 3.00) | 90° | 3.5 kN/m | ≈4.3 (box), 4.44 (Pressure force) |
 | 45° ramp | (1.00, 2.90)–(1.80, 2.10) | 45° | 1.0 | ≈1.3 |
 | 90° corner | ceiling (1.00, 2.60)–(1.35, 2.60), wall (1.35, 2.60)–(1.35, 1.60) | 90° | 3.5 | ≈3.8 |
 | deep-V | two arms from apex (1.90, 2.40) out to (1.05, 2.65) and (1.05, 2.15) | 165° | 6.8 | ≈5 |

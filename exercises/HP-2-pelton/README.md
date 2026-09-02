@@ -32,6 +32,11 @@ and not the spout.
 Measured where the jet crosses the box's upstream face: **q ≈ 0.78 m²/s** at
 **v ≈ 4.4 m/s**, so ρqv ≈ 3.5 kN/m.
 
+The **Pressure force** tool (pick it on the strip — no digit key) reads F→ a
+second way, with no box at all: click the deflector and it draws the pressure
+diagram the jet presses it with, resultant included. Measured on the flat
+plate: **4.44 kN/m**, matching the box.
+
 | deflector | θ | 1 − cos θ | ρqv(1−cosθ) | F→ measured |
 |---|---|---|---|---|
 | flat plate | 90° | 1.00 | 3.5 kN/m | ≈4 |
@@ -46,7 +51,10 @@ Lecturer demonstration, ~10 min. The card counts each settle down.
    (2.05, 3.20)** around the flat plate: **F→ ≈ 4 kN/m**. Drag a different
    box around the same plate — the reading holds. Keep the upstream face
    right of x ≈ 0.8: a box that contains the spout contains a source, and
-   its reading is not a force.
+   its reading is not a force. Or skip the box: pick the **Pressure force**
+   tool and click the plate itself — it draws the same diagram straight off
+   the deflector (measured: 4.44 kN/m) and follows it from shape to shape
+   with nothing to redraw.
 2. Hover the jet just inside the upstream face: u ≈ 4.4 m/s, so ρqv ≈ 3.5
    kN/m. The plate reads about 20% more because deflected water rains back
    onto the jet and is driven in a second time — switch **Field → Momentum

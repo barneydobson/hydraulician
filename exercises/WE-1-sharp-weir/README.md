@@ -76,6 +76,11 @@ are just the crest plus the head the weir is about to produce.
    The load on the plate is *linear* in H where the discharge is a 3/2 power.
    Read `F→`; `F↑` is mostly the weight of the pool inside the box.
 
+   The **Pressure force** tool (pick it on the strip) reads the same thrust
+   with no box: click the plate itself and it draws that hydrostatic-diagram
+   picture directly — the diagram the formula above already is. Measured at
+   q = 0.35: **2.78 kN/m**, matching the box's ~2.9 and the 2.8 computed.
+
 ## For the instructor — pooling the class
 
 Collect one row per student (`student,digit,q,level,h_gauge,P,H`), export the

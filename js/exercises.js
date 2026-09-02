@@ -325,9 +325,10 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "x = 4.5 m, z ≈ 0.75 m", why: "the approach pool — H = h − 0.50" },
       { tool: "cv", where: "Control volume (9), optional: drag about (2.0, 0.3) → (6.7, 1.6) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
+      { tool: "force", where: "the plate itself — pick the Pressure force tool and click it", why: "the same thrust, read straight off the pressure diagram cut off at the crest — no box to place at all" },
     ],
     start: "an approach pool behind a sharp-crested weir",
-    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Control volume round the plate reads F→ a few percent above ρgP(h − P/2).",
+    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Control volume round the plate, or the Pressure force tool clicked on the plate itself, both read F→ a few percent above ρgP(h − P/2).",
     settle: 60,
   },
 
@@ -355,10 +356,11 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "x = 3.5 m, z ≈ 0.65 m", why: "the upstream pool — reads d₀" },
       { tool: "cv", where: "Control volume (9): drag (3.50, 0.30) → (5.63, 3.20) — gauge station to vena station, bottom face inside the bed", why: "measures the thrust F_R predicts, on the same control volume and without its two assumptions" },
+      { tool: "force", where: "the gate face itself — pick the Pressure force tool on the strip and click it", why: "the pressure diagram and F→ straight off the gate, a third reading beside F_R and the box" },
     ],
     ui: { build: true },
     start: "a pool behind a drawn sluice gate — its opening is yours to adjust",
-    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, and measure that thrust with the Control volume on the same control volume.",
+    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, measure that thrust with the Control volume, and click the gate itself with the Pressure force tool for the diagram it is drawn from.",
     settle: 70,
   },
   {
@@ -378,10 +380,11 @@ const EXERCISES = [
       { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20) — it encloses all four shapes and clears the spout", why: "F→ is the force each turn actually delivers, to set against ρqv(1−cosθ)" },
       { tool: "gauge", where: "in the free jet, ~0.25 m clear of the plate (README uses 0.95, 2.50)", why: "the approach head" },
       { tool: "gauge", where: "on the stagnation point, ~0.03 m off the plate face (README uses 1.32, 2.46)", why: "the stagnation head — the ratio is the answer" },
+      { tool: "force", where: "the deflector itself — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, with no box to redraw as the shape changes" },
     ],
     ui: { build: true },
     start: "a horizontal jet from a spout striking a flat plate",
-    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each. The deep-V under-delivers because it floods.",
+    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each, or off the Pressure force tool clicked straight on the shape. The deep-V under-delivers because it floods.",
     settle: 5,
   },
 
@@ -548,10 +551,11 @@ const EXERCISES = [
     instruments: [
       { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
       { tool: "gauge", where: "optionally in the free jet and on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
+      { tool: "force", where: "the deflector itself — pick the Pressure force tool and click it", why: "the same F→ read straight off the pressure diagram, with no box to place" },
     ],
     ui: { build: true },
     start: "the jet-on-a-plate rig, as a lecturer demonstration",
-    task: "Read F→ off the Control volume: about 4 kN/m on the flat plate; redraw as the 6-stroke cup (README table) and the same box reads about 7 — close to the factor of two. The textbook deep-V reads only about 5 because it floods.",
+    task: "Read F→ off the Control volume, or click the deflector itself with the Pressure force tool: about 4 kN/m on the flat plate; redraw as the 6-stroke cup (README table) and the same reading climbs to about 7 — close to the factor of two. The textbook deep-V reads only about 5 because it floods.",
     settle: 5,
   },
 

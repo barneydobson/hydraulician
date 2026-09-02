@@ -4,8 +4,9 @@ A reservoir feeds a level headrace; at the knee a surge shaft rises off the
 pipe, and a penstock drops to a nozzle at the power house. Slam the valve
 and the headrace column has nowhere to go but up the shaft. Each student
 runs a different shaft width and reads how high the water rises; pooled,
-the class traces the curve a surge tower is sized from — the calculation of
-the tutorial sheet's Grand'Maison problem, at a scale the solver can run.
+the class traces the curve a surge tower is sized from. The tutorial sheet
+sets the same calculation on this scheme, so every answer on it can be
+checked on screen.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **HP-3**, or use the direct link
@@ -37,7 +38,8 @@ shaft centre), **D_h = 3.05 m**, **u₀ ≈ 2.5 m/s**, reservoir level
 **≈ 24.9 m** (the slider says 25.0; the free surface by the wall stands
 0.1 m lower under draw), **z₀ ≈ 0.35 m**. Nearly all of z₀ is velocity
 head (u₀²/2g = 0.32 m): this headrace is 14 bores long, so friction is a
-tenth of the drawdown, where at Grand'Maison (L/D = 1000) it is all of it.
+tenth of the drawdown, where in a real headrace a thousand bores long it
+is all of it.
 
 ## Your shaft width
 
@@ -112,7 +114,7 @@ textbook period underneath.
 ### Running it in a 40-minute session
 
 - 0–5 min: the sheet's answers on the board — z₀ = k·u₀², the frictionless
-  upsurge, what friction did to it, the tower height.
+  upsurge, what friction did to it, whether the shaft clears the roof.
 - 5–10 min: everyone opens HP-3, types their digit, sets D_s, waits out
   the settle.
 - 10–25 min: steps 2–4; submit. The optional friction factor is for those

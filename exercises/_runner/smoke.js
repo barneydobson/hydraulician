@@ -1037,6 +1037,42 @@ SUITES.api = async (B) => {
     valve.samplesBefore === valve.samplesAfter,
     `gap: ${valve.gapWetAfter} of ${valve.gapTotal} wet after; ` +
     `whole face: ${valve.wetBefore} -> ${valve.wetAfter} of ${valve.samplesBefore} wet`);
+
+  // The renumbering hazard a drawn wrapper's id carries, and the fix for it
+  // (code review finding on this branch's own commits). "drawn0"/"drawn1"/…
+  // are assigned by POSITION in S.segs every time rasterise() runs — not a
+  // stable identity — so draw A, draw B ("drawn1"), undo B, draw C
+  // elsewhere, and C becomes "drawn1" in B's place. Proven at the SIM level
+  // first: the SAME id "drawn1" samples a materially different stretch of
+  // geometry before and after. That is exactly why main.js's rasterise/
+  // addSeg/undoSeg/clearSegs wrap (js/main.js, ~line 3161) drops
+  // state.force/state.forceHover on every edit — a selection held by a raw
+  // (solidId, faceId) pair cannot otherwise tell it is now pointing at a
+  // different wall — so the second half checks that UI-level drop directly.
+  await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
+  const renumber = await B.evaluate(`(() => {
+    APP.SIM.clearSegs();
+    APP.SIM.addSeg(0.5, 4.5, 1.0, 4.5, 0.1, 255);         // A -> "drawn0"
+    APP.SIM.addSeg(3.0, 0.5, 3.5, 0.5, 0.1, 255);         // B -> "drawn1"
+    const before = APP.faceForce("drawn1", "side1");
+    const cenBefore = before.samples.reduce((s, p) => s + p.x, 0) / before.samples.length;
+    // Select B's face the way onDown would.
+    APP.state.force = { solidId: "drawn1", faceId: "side1", data: null, t0: 0 };
+    APP.state.forceHover = { solidId: "drawn1", faceId: "side1" };
+    APP.SIM.undoSeg();                                     // drop B
+    const droppedForce = APP.state.force, droppedHover = APP.state.forceHover;
+    APP.SIM.addSeg(7.0, 4.5, 7.5, 4.5, 0.1, 255);          // C, elsewhere -> "drawn1"
+    const after = APP.faceForce("drawn1", "side1");
+    const cenAfter = after.samples.reduce((s, p) => s + p.x, 0) / after.samples.length;
+    APP.SIM.clearSegs();
+    return { cenBefore, cenAfter, droppedForce, droppedHover };
+  })()`);
+  ok("SIM a drawn wrapper's id renumbers on an edit — a raw solidId is not a stable identity",
+    Math.abs(renumber.cenAfter - renumber.cenBefore) > 1.0,
+    `"drawn1" centroid x: ${renumber.cenBefore.toFixed(2)} -> ${renumber.cenAfter.toFixed(2)} m`);
+  ok("UI a Force selection does not survive an edit that could have renumbered it",
+    renumber.droppedForce === null && renumber.droppedHover === null,
+    `force: ${JSON.stringify(renumber.droppedForce)}, hover: ${JSON.stringify(renumber.droppedHover)}`);
 };
 
 SUITES.rig = async (B) => {

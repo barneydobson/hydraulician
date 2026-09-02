@@ -3158,9 +3158,25 @@ function boot() {
   // is what made a drowned gate on a 1-in-4 bed read "M1". Every path that
   // re-rasterises the walls goes through one of these; a resolution change or
   // a scene load builds a fresh grid and starts clean anyway.
+  //
+  // The Force selection has to drop here too: a drawn wrapper's id is its
+  // POSITION in S.segs at the moment rasterise() runs ("drawn0", "drawn1",
+  // …), not a stable identity, so an edit can renumber what a selection
+  // points at — draw A ("drawn0"), draw B ("drawn1"), select B's face, Undo,
+  // draw C, and without this C becomes "drawn1" and quietly inherits B's
+  // selection. A scene's own solids() carry fixed ids and never have this
+  // problem, but a drawn one always can — dropping the selection on every
+  // edit (the same choke point averaging already resets through) is the
+  // one answer that is right regardless of which id moved.
   ["rasterise", "addSeg", "undoSeg", "clearSegs"].forEach((k) => {
     const f = SIM[k];
-    SIM[k] = (...a) => { const r = f(...a); OVERLAY.resetEstimates(sim); return r; };
+    SIM[k] = (...a) => {
+      const r = f(...a);
+      OVERLAY.resetEstimates(sim);
+      state.force = null;
+      state.forceHover = null;
+      return r;
+    };
   });
 
   // The strip first: PICKER, EX and KEYS all light their own opener by id, so

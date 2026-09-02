@@ -380,11 +380,11 @@ const EXERCISES = [
       { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20) — it encloses all four shapes and clears the spout", why: "F→ is the force each turn actually delivers, to set against ρqv(1−cosθ)" },
       { tool: "gauge", where: "in the free jet, ~0.25 m clear of the plate (README uses 0.95, 2.50)", why: "the approach head" },
       { tool: "gauge", where: "on the stagnation point, ~0.03 m off the plate face (README uses 1.32, 2.46)", why: "the stagnation head — the ratio is the answer" },
-      { tool: "force", where: "the deflector itself — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, with no box to redraw as the shape changes" },
+      { tool: "force", where: "the flat plate only — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, on the ONE drawn wall the plate is. The ramp's face is oblique enough that the same click reads a third under the box (measured), and the corner and deep-V are two and three strokes the tool cannot sum — so the Control volume is what the series is actually read on" },
     ],
     ui: { build: true },
     start: "a horizontal jet from a spout striking a flat plate",
-    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each, or off the Pressure force tool clicked straight on the shape. The deep-V under-delivers because it floods.",
+    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each. On the flat plate only, the Pressure force tool clicked on the plate reads the same number with no box. The deep-V under-delivers because it floods.",
     settle: 5,
   },
 
@@ -551,11 +551,11 @@ const EXERCISES = [
     instruments: [
       { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
       { tool: "gauge", where: "optionally in the free jet and on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
-      { tool: "force", where: "the deflector itself — pick the Pressure force tool and click it", why: "the same F→ read straight off the pressure diagram, with no box to place" },
+      { tool: "force", where: "the flat plate only — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, on the ONE drawn wall the plate is; the 6-stroke cup and the deep-V's three strokes are why the Control volume stays how the rest of the demo is read" },
     ],
     ui: { build: true },
     start: "the jet-on-a-plate rig, as a lecturer demonstration",
-    task: "Read F→ off the Control volume, or click the deflector itself with the Pressure force tool: about 4 kN/m on the flat plate; redraw as the 6-stroke cup (README table) and the same reading climbs to about 7 — close to the factor of two. The textbook deep-V reads only about 5 because it floods.",
+    task: "Read F→ off the Control volume — or, on the flat plate only, click the deflector with the Pressure force tool for the same number with no box: about 4 kN/m. Redraw as the 6-stroke cup (README table) and the box reads about 7 — close to the factor of two; the cup is six drawn walls, so only the box sums it. The textbook deep-V reads only about 5 because it floods.",
     settle: 5,
   },
 

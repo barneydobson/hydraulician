@@ -701,12 +701,21 @@ SUITES.api = async (B) => {
   // clamp, rasterise a new mask and — because docs/averaging.md §9 treats a
   // geometry edit as a reset condition — restart any open averaging window,
   // exactly like a drawn wall or a valve flip already do.
+  //
+  // LOWER the gate here (0.35 -> 0.20 m), not raise it: that is the risky
+  // direction — cells that were open water become solid in one rasterise()
+  // call, no different from a gate physically dropping into moving water —
+  // and a finite-only check on volume() cannot tell a real conservation
+  // failure from a bug that quietly invents water in the newly-solid cells'
+  // place. volBefore/vol below bracket that directly.
   const slide = await B.evaluate(`(() => {
     const before = APP.sim.mask.slice();
     APP.SIM.avgStart();
     APP.tick(50);
     const T0 = APP.SIM.avgT();
-    const v = APP.SIM.setParam("gate_a", 0.50);
+    APP.SIM.columns(true);
+    const volBefore = APP.volume();
+    const v = APP.SIM.setParam("gate_a", 0.20);
     APP.SIM.columns(true);
     const vol = APP.volume();
     let maskDiff = 0;
@@ -714,17 +723,147 @@ SUITES.api = async (B) => {
     for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) maskDiff++;
     const T1 = APP.SIM.avgT(), active1 = APP.SIM.avgActive();
     APP.SIM.avgStop();
-    return { v, vol, maskDiff, T0, T1, active1 };
+    return { v, vol, volBefore, maskDiff, T0, T1, active1 };
   })()`);
   ok("SIM setParam(gate_a) clamps within range and applies the value",
-    slide.v === 0.50, "applied = " + slide.v);
+    slide.v === 0.20, "applied = " + slide.v);
   ok("SIM setParam(gate_a) leaves volume() finite once columns(true) forces the readback",
     Number.isFinite(slide.vol), "volume = " + slide.vol);
   ok("SIM setParam(gate_a) rebuilds the mask — the blade actually moved",
     slide.maskDiff > 0, slide.maskDiff + " mask cells changed");
+  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m), three repeats landing on the
+  // same six digits: lowering gate_a from 0.35 to 0.20 m flips 16 mask cells
+  // from open water to solid, and volume falls from 3.19742 to 3.19190 m2 —
+  // a real drop, because the water that had stood in those 16 cells simply
+  // leaves the wet-cell accounting; nothing moves it elsewhere first. 0.01 m2
+  // (~0.3% of volBefore, ~2x the measured 0.00552 m2 drop) is margin against
+  // single-frame readback noise on a free surface that is never perfectly
+  // flat — not slack for an invented-water bug, which would show as an
+  // INCREASE past this floor, not a smaller decrease.
+  ok("SIM setParam(gate_a) lowering the gate into flow does not invent water",
+    slide.vol <= slide.volBefore + 0.01,
+    `${slide.volBefore.toFixed(5)} -> ${slide.vol.toFixed(5)} m2 (` +
+    `${(slide.vol - slide.volBefore) >= 0 ? "+" : ""}${(slide.vol - slide.volBefore).toFixed(5)})`);
   ok("SIM setParam(gate_a) resets the averaging window it invalidated",
     slide.active1 === true && slide.T1 < slide.T0,
     `T ${slide.T0.toFixed(3)} s -> ${slide.T1.toFixed(3)} s, still active ${slide.active1}`);
+
+  // The thin-sliver stroke test (polygon-geometry Finding 1, the case the
+  // original task deferred): a genuinely short edge — one a merged run
+  // cannot absorb, because it turns 90 degrees at both ends against long
+  // neighbours — must still force stampPoly's anti-leak stroke. Built so a
+  // fill-only (point-in-polygon-at-cell-centres) test finds NOTHING: a
+  // 5*dx x 0.3*dx rectangle straddling a cell BOUNDARY in z, thin enough
+  // that no cell centre falls inside it. If the stroke's threshold ever
+  // regressed to reading this as clear of the 2*dx floor (e.g., a future
+  // edit that merges every edge regardless of turn angle), the sliver would
+  // rasterise to nothing — a real solid the fill test cannot see and the
+  // stroke was the only thing sealing.
+  const sliver = await B.evaluate(`(() => {
+    const S = APP.sim, orig = S.scene;
+    const dx = S.dx;
+    const jMid = 40;                       // an interior row, clear of the border
+    const zMid = jMid * dx;                // exactly on a cell boundary
+    const x0 = 2.0, x1 = x0 + 5 * dx;       // long sides clear 2*dx on their own
+    const halfH = 0.15 * dx;                // short sides: 0.3*dx, well under 2*dx
+    const solid = GEOM.rect(x0, zMid - halfH, x1, zMid + halfH, { id: "sliver" });
+    let fillOnly = 0;
+    for (let j = jMid - 2; j <= jMid + 2; j++) {
+      for (let i = Math.floor(x0 / dx) - 1; i <= Math.floor(x1 / dx) + 1; i++) {
+        if (GEOM.contains(solid, (i + 0.5) * dx, (j + 0.5) * dx)) fillOnly++;
+      }
+    }
+    S.scene = Object.assign({}, orig, { walls: undefined, solids: () => [solid], valves: undefined });
+    APP.SIM.rasterise();
+    let stamped = 0;
+    for (let j = jMid - 2; j <= jMid + 2; j++) {
+      for (let i = Math.floor(x0 / dx) - 1; i <= Math.floor(x1 / dx) + 1; i++) {
+        if (S.mask[j * S.nx + i] >= 192) stamped++;
+      }
+    }
+    S.scene = orig;                        // leave the live grid as it was found
+    APP.SIM.rasterise();
+    return { fillOnly, stamped, dx };
+  })()`);
+  ok("SIM a fill-only test would miss the thin sliver entirely",
+    sliver.fillOnly === 0, `fill-only found ${sliver.fillOnly} cells (dx=${sliver.dx})`);
+  ok("SIM stampPoly's stroke seals a genuinely short edge's pinch",
+    sliver.stamped > 0, `stroke stamped ${sliver.stamped} cells`);
+
+  // The hump crest (polygon-geometry Finding 1): a single curved face
+  // sampled at n=160 (~0.025 m chords, GEOM.humpPts) is exactly the case
+  // stampPoly's merged-run threshold exists for — a fine polyline sampling
+  // a smooth, chunky solid must not read as 160 separately-short edges.
+  // Settled at the scene's DEFAULT budget (Medium, dx = 0.0148 m): this is
+  // the resolution a student actually opens the scene at, and it is
+  // exactly the budget the pre-merge threshold failed on (so did Low).
+  //
+  // The crest never "settles" by a single-instant read — the scene's own
+  // comment (js/scenes.js) documents a persistent surface wobble that runs
+  // 5-10x LARGER on the crest than on the approach pool it recommends
+  // reading instead. MEASURED: two of three raw (non-averaged) faceForce
+  // reads at t = 30 s landed on a momentary near-drained crest — all 320
+  // samples reading dry — purely from the wobble's phase, nothing to do
+  // with stampPoly. Average mode is the house answer to exactly this kind
+  // of reading ("Under an averaging window the sample is the window mean:
+  // one window, every instrument," AGENTS.md), so this opens a window AFTER
+  // spin-up and reads faceForce(..., avg). avgStepField only runs from the
+  // real frame loop (main.js's tickFrame), so time is driven through
+  // APP.frames() here, not the raw APP.tick() the rest of this suite uses —
+  // APP.tick() would leave the display accumulator at zero forever and
+  // every avg reading below would silently read as zero (also MEASURED,
+  // chasing this down).
+  await B.goto(`http://localhost:${PORT}/?scene=hump`);
+  const hump = await B.evaluate(`(() => {
+    const t0 = Date.now();
+    while (APP.sim.t < 15 && Date.now() - t0 < 150000) APP.frames(20, 2.0);
+    APP.SIM.avgStart();
+    while (APP.SIM.avgT() < 15 && Date.now() - t0 < 250000) APP.frames(20, 2.0);
+    const ff = APP.faceForce("hump", "crest", true);
+    let wet = 0;
+    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
+    const dx = APP.sim.dx;
+    // The classical vertical-force-on-a-submerged-surface identity: under a
+    // hydrostatic pressure field, the force equals the weight of the water
+    // standing directly above the surface. rho*g times the window-mean
+    // depth integrated over the hump's own footprint (x in [6,10], the
+    // crest's x0/x1 in js/scenes.js) gives that weight; the real flow's
+    // departure from hydrostatic (it accelerates over the crest) is the gap
+    // between this estimate and the measured Fz.
+    const avgCols = APP.SIM.avgColumns(true);
+    const iLo = Math.round(6.0 / dx), iHi = Math.round(10.0 / dx);
+    let sumD = 0;
+    for (let i = iLo; i < iHi; i++) sumD += avgCols.C[i * 4 + 1] * dx;
+    const weight = 1000 * 9.81 * sumD;
+    const out = { t: APP.sim.t, avgT: APP.SIM.avgT(), budget: APP.state.budget,
+      Fx: ff.Fx, Fz: ff.Fz, wetLen: ff.wetLen, len: ff.len,
+      samples: ff.samples.length, wet, weight };
+    APP.SIM.avgStop();
+    return out;
+  })()`);
+  ok("SIM hump crest faceForce is exercised at the scene's DEFAULT budget",
+    hump.budget === "Medium", "budget: " + hump.budget);
+  ok("PHYSICS hump crest averaging window opened", hump.avgT >= 14.5,
+    "avgT = " + hump.avgT.toFixed(1) + " s of 15");
+  // MEASURED (ANGLE/D3D11, Medium, dx = 0.0148 m, hump_h = 0.15, default —
+  // the crest is fully submerged at this height): BEFORE the merged-run fix,
+  // a raw read at this same budget came back with only 122 of 320 samples
+  // wet (38.1%), Fz = -4473 N/m. AFTER, over a 15 s averaging window: 320 of
+  // 320 wet (100%), every one of three independent windows landing within
+  // 0.1% of Fz = -11922 N/m.
+  ok("PHYSICS hump crest is entirely wet at h=0.15 (fully submerged)",
+    hump.wet === hump.samples,
+    `${hump.wet} of ${hump.samples} samples wet, wetLen ${hump.wetLen.toFixed(3)} of ${hump.len.toFixed(3)} m`);
+  ok("PHYSICS hump crest carries a net downward pressure force",
+    hump.Fz < 0, "Fz = " + hump.Fz.toFixed(1) + " N/m");
+  // MEASURED (same three windows): Fz = -11914 to -11926 N/m against the
+  // weight-of-water-above estimate of -12138 to -12143 N/m — 1.7-1.8% low.
+  // 20% brackets that with ample margin while still catching the fix's own
+  // failure mode: the pre-fix raw Fz (-4473 N/m) sits 63% below this
+  // bracket's floor.
+  ok("PHYSICS hump crest Fz brackets the weight of water standing over it",
+    near(hump.Fz, -hump.weight, 0.20 * hump.weight),
+    `Fz = ${hump.Fz.toFixed(0)} N/m vs weight-of-water estimate ${(-hump.weight).toFixed(0)} N/m`);
 };
 
 SUITES.rig = async (B) => {
@@ -765,6 +904,30 @@ SUITES.rig = async (B) => {
   ok("RIG a superseded format is refused", r.v1 === "rejected", r.v1msg);
   ok("RIG a refused load leaves the live field alone",
     ["h", "d", "speed"].includes(r.fieldAfterV1), "field: " + r.fieldAfterV1);
+
+  // The `params` wire key (additive to v2, docs/engineering-notes.md) is
+  // untouched by everything above — the m2 scene it runs against declares no
+  // params at all, so `RIG.snapshot()` never even writes the key on that
+  // path. s3's gate_a is a live param: set it away from its default,
+  // snapshot, scramble the live value back off the snapshot, apply the
+  // snapshot, and read the RECONSTRUCTED S.params off the reload — not the
+  // snapshot JSON, so this catches total omission the way the instrument
+  // coverage test below does for placed instruments.
+  await B.goto(`http://localhost:${PORT}/?scene=s3`);
+  const pr = await B.evaluate(`(() => {
+    const applied = APP.SIM.setParam("gate_a", 0.90);   // s3's default is 0.35
+    const snap = APP.RIG.snapshot();
+    APP.SIM.setParam("gate_a", 0.35);                    // scramble away from it
+    APP.RIG.apply(snap);
+    return { applied, snapParam: snap.params && snap.params.gate_a,
+      reloaded: APP.SIM.params().values.gate_a };
+  })()`);
+  ok("RIG snapshot carries the params wire key",
+    typeof pr.snapParam === "number", "params.gate_a = " + pr.snapParam);
+  ok("RIG round-trips a scene param end to end (gate_a)",
+    near(pr.reloaded, pr.applied, 1e-6),
+    `set ${pr.applied} -> snapshot ${pr.snapParam} -> reloaded ${pr.reloaded}`);
+  await B.goto(`http://localhost:${PORT}/?scene=m2`);
 
   const csv = await B.evaluate(`(() => {
     APP.state.gauges.length = 0;

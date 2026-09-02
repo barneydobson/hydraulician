@@ -635,31 +635,54 @@ having settled before anything calls into it.
   textbook hydrostatic force and centre of pressure (`rho*g*H^2/2` and
   `H/3`) on a vertical face — the same closed form a lab manual would use
   to check a submerged gate by hand.
-- **The anti-leak edge stroke is skipped when every edge of a solid is at
-  least 2 cells long, and only for a CONVEX solid** — `stampPoly`'s comment
-  in `js/sim.js` has the full reasoning; the short version is that a pinch a
-  scan-fill test alone can miss needs either a short edge (a capsule's own
-  butt end is one) or a shallow-angle long edge sitting close enough to a
-  neighbour to leave a cell-centre gap, and neither can happen once nothing
-  on the solid is that short — so the fill test alone is exact and the
-  stroke has nothing left to protect. Convexity is load-bearing: a
-  non-convex shape (e.g. a bent strip with two long parallel edges pulled
-  close together) could still pinch with every edge long, and would need its
-  own check — `GEOM.poly`/`slab`/`rect` produce convex output today, which
-  is what makes the guard sound for everything the branch built. Skipping
-  the stroke matters because the stroke itself has a cost: it overshoots by
-  painting solid up to ~0.85·dx OUTSIDE the true edge, on the water side
-  too, and MEASURED on s3's gate blade (5 cm wide, faces stroked before this
-  fix) that overshoot at Low (dx = 0.0193 m) reached past `faceForce`'s own
-  0.75·dx sampling offset, so every upstream-face sample read solid and Fx
-  measured 0 N/m regardless of pool depth. Skipping the stroke on a solid
-  that clears the 2-cell floor restored a real pressure diagram: **Fx =
-  9.61 kN/m against a ~8.94 kN/m hydrostatic estimate**
-  (`exercises/_runner/smoke.js`'s closed-form case has the derivation and
-  the run-to-run spread — the two are not expected to match exactly because
-  the diagram integrates the actual flow field, not still water). The
-  threshold reads the LIVE `S.dx`, so a coarser future budget that thins the
-  same solid below 2 cells gets the stroke back automatically.
+- **The anti-leak edge stroke is skipped when every MERGED run of
+  near-collinear edges is at least 2 cells long** — `stampPoly`'s comment in
+  `js/sim.js` has the full reasoning; the short version is that a pinch a
+  scan-fill test alone can miss needs either a genuinely short stretch of
+  boundary (a capsule's own butt end is one) or a shallow-angle long stretch
+  sitting close enough to a neighbour to leave a cell-centre gap, and
+  neither can happen once nothing on the solid is that short — so the fill
+  test alone is exact and the stroke has nothing left to protect.
+  `stampPoly` merges consecutive edges whose turn is under ~20° into one run
+  before measuring length, because a smoothly curved face is
+  polyline-sampled fine enough (the hump crest, `GEOM.humpPts` at n=160,
+  ~0.025 m chords) that its individual edges are far shorter than a cell
+  while the STRETCH of boundary they trace needs no seal at all; a real
+  corner still starts a new run, so a genuinely short edge (a gate blade's
+  0.05 m end) is never merged away and still triggers the stroke on its own.
+  The guard holds for any solid, convex or not, PROVIDED no two stretches of
+  its own boundary pass within a cell of each other while every merged run
+  along the way clears 2·dx — a folded strip whose two long near-parallel
+  sides are pulled that close together could still pinch with every run
+  long, and would need its own check. Nothing shipped does that:
+  `GEOM.poly`/`slab`/`rect` are convex, and the hump crest (one non-convex
+  curve with two corners, at its butt ends, each its own run) does not
+  fold back on itself. Skipping the stroke matters because the stroke
+  itself has a cost: it overshoots by painting solid up to ~0.85·dx OUTSIDE
+  the true edge, on the water side too, and MEASURED on s3's gate blade
+  (5 cm wide, faces stroked before this fix) that overshoot at Low
+  (dx = 0.0193 m) reached past `faceForce`'s own 0.75·dx sampling offset, so
+  every upstream-face sample read solid and Fx measured 0 N/m regardless of
+  pool depth. Skipping the stroke on a solid that clears the 2-cell floor
+  restored a real pressure diagram: **Fx = 9.61 kN/m against a ~8.94 kN/m
+  hydrostatic estimate** (`exercises/_runner/smoke.js`'s closed-form case
+  has the derivation and the run-to-run spread — the two are not expected to
+  match exactly because the diagram integrates the actual flow field, not
+  still water).
+
+  Before the merge existed, the per-edge version of this same threshold read
+  the hump's 160 crest chords as 160 separately-short edges and ran the
+  stroke around the WHOLE hump at both Low (dx = 0.0215 m) and Medium
+  (dx = 0.0148 m, the default) — its rim swallowed `faceForce`'s sampling
+  offset there too: at Medium, `APP.faceForce("hump","crest")` on the
+  settled hump (hump_h = 0.15, t = 30 s) read only 122 of 320 samples wet
+  (38.1%) against a crest that is fully submerged at this height, so the
+  flagship curved-face pressure demo was reading well under half its true
+  integral. Merging near-collinear edges makes the crest one ~4.0 m run
+  (its two vertical butt ends stay their own ~0.85 m runs), the stroke is
+  skipped again, and the same read comes back 320 of 320 wet (100%). The
+  threshold reads the LIVE `S.dx`, so a coarser future budget that thins a
+  merged run below 2 cells gets the stroke back automatically.
 - **The shim (a scene still declaring `walls()` instead of `solids()`)
   rasterises byte-for-byte identically to the old path** — same `stampSeg`,
   same capsule, same measured geometry — which is the promise that lets 20

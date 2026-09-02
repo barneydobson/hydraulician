@@ -845,6 +845,7 @@ function syncPanel() {
       if (note) note.classList.toggle("gone", !d);
       if (d) {
         c.min = d.min; c.max = d.max; c.step = d.step;
+        input.step = d.step;           // the range input's own step, not just c's
         input.parentElement.querySelector(".lbl").textContent = d.label;
       }
     }
@@ -859,6 +860,13 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
+  // The "Geometry" heading fronts geom0…geom3, which hide themselves row by
+  // row above as the scene declares fewer than four params, down to none —
+  // but a heading is not a row, so nothing in the loop hides IT. A scene
+  // with no declared params (most of them) would otherwise leave the
+  // heading standing over an empty section.
+  const geomHeading = document.querySelector('#panel h3[data-sec="Geometry"]');
+  if (geomHeading) geomHeading.classList.toggle("gone", !(SIM.params().decl || []).length);
   applyPanelFocus();
 }
 

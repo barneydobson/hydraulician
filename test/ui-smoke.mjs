@@ -1027,26 +1027,33 @@ async function main() {
         });
         return { rows, visible: rows.filter(Boolean).length,
                  label: document.querySelector("#c_geom0").parentElement
-                          .querySelector(".lbl").textContent };
+                          .querySelector(".lbl").textContent,
+                 headingShown: !document.querySelector('#panel h3[data-sec="Geometry"]')
+                                  .classList.contains("gone") };
       `);
       check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("exactly one geometry row shows", r.visible, 1, JSON.stringify(r.rows));
       eq("it is named after the scene's own param", r.label, "Hump height");
+      check("the Geometry heading shows when a row does", r.headingShown);
       await tab.close();
     }
     {
       // m1 has no declared params at all — a wall-segment scene, not a
-      // polygon one — so every one of the four rows should stay hidden.
+      // polygon one — so every one of the four rows should stay hidden, and
+      // the section's own heading should not be left fronting an empty list.
       const tab = await browser.open(INDEX + "?scene=m1");
       const r = await tab.evaluate(`
         const rows = [0, 1, 2, 3].map((k) => {
           const input = document.getElementById("c_geom" + k);
           return !input.parentElement.classList.contains("gone");
         });
-        return { visible: rows.filter(Boolean).length };
+        return { visible: rows.filter(Boolean).length,
+                 headingShown: !document.querySelector('#panel h3[data-sec="Geometry"]')
+                                  .classList.contains("gone") };
       `);
       check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("a scene with no params hides every geometry row", r.visible, 0);
+      check("a scene with no params hides the Geometry heading too", !r.headingShown);
       await tab.close();
     }
 

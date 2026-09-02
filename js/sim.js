@@ -101,18 +101,33 @@ const SIM = (() => {
    *  zero-width edge stroke seals the sub-cell pinches a scan test alone can
    *  leave open on a near-tangent or shallow-angle edge.
    *
-   *  The stroke is skipped when EVERY edge of the solid is at least 2 cells
-   *  long. A pinch needs a short edge (a capsule's own butt end IS one) or a
-   *  shallow-angle long edge close enough to a neighbour to leave a
-   *  cell-centre gap between them — neither can happen once nothing on the
+   *  The stroke is skipped when every MERGED run of near-collinear edges is
+   *  at least 2 cells long — not every raw polyline edge. A pinch needs a
+   *  genuinely short stretch of boundary (a capsule's own butt end IS one)
+   *  or a shallow-angle long stretch close enough to a neighbour to leave a
+   *  cell-centre gap between them; neither can happen once nothing on the
    *  solid is that short, so the fill test alone is exact and the stroke has
-   *  nothing left to protect. This holds for a CONVEX solid only — what
-   *  GEOM.poly/slab/rect produce today; a non-convex shape (e.g. a bent
-   *  strip with two long parallel edges pulled close together) could still
-   *  pinch with every edge long, and would need its own check. What the
-   *  stroke does instead, for a convex solid already chunky enough, is
-   *  overshoot: it paints solid up to its own radius (~0.85*dx) OUTSIDE the
-   *  true edge, on the water side too.
+   *  nothing left to protect. Consecutive edges whose turn is under ~20°
+   *  (cos > cos20, computed below) are summed into one run before the 2*dx
+   *  test, because a smoothly curved face is polyline-sampled fine enough
+   *  that its individual chords can be shorter than a cell (GEOM.humpPts at
+   *  n=160 gives ~0.025 m edges) while the STRETCH of boundary they trace is
+   *  metres long and needs no seal at all. A real corner (a right angle, or
+   *  any turn past the threshold) still starts a new run, so a genuinely
+   *  short edge — a gate blade's 0.05 m end — is never merged into its long
+   *  neighbours and still triggers the stroke on its own.
+   *
+   *  This holds for any solid, convex or not, PROVIDED no two stretches of
+   *  its own boundary pass within a cell of each other while every merged
+   *  run along the way stays >= 2*dx — a folded strip whose two long
+   *  near-parallel sides are pulled that close together could still pinch
+   *  with every run long, and would need its own check. Nothing shipped
+   *  does that: GEOM.poly/slab/rect are convex, and the hump crest (a
+   *  single non-convex curve, sampled at n=160) has only two corners, at its
+   *  butt ends, each accounted for above. What the stroke does instead, for
+   *  a solid already chunky enough along its whole boundary, is overshoot:
+   *  it paints solid up to its own radius (~0.85*dx) OUTSIDE the true edge,
+   *  on the water side too.
    *
    *  MEASURED on s3's gate blade (5 cm wide, faces stroked before this fix):
    *  at Low (dx = 0.0193 m, the blade ~2.6 cells across) the stroke's rim
@@ -122,9 +137,21 @@ const SIM = (() => {
    *  the stroke here (the blade clears the 2-cell floor) restored a real
    *  pressure diagram: Fx = 9.61 kN/m against a ~8.94 kN/m hydrostatic
    *  estimate (exercises/_runner/smoke.js's closed-form case has the derivation
-   *  and the run-to-run spread). The threshold reads the LIVE S.dx, so a
-   *  coarser future budget that thins the same solid below 2 cells gets the
-   *  stroke back automatically. */
+   *  and the run-to-run spread).
+   *
+   *  MEASURED on the hump crest (160 edges, ~0.025 m chords, before the
+   *  merge above existed): raw per-edge minEdge is one chord — under 2*dx at
+   *  both Low (dx = 0.0215 m) and Medium (dx = 0.0148 m, the default) — so
+   *  the stroke ran around the WHOLE hump and its 0.85*dx rim swallowed
+   *  faceForce's 0.75*dx sample offset on most of the crest: at Medium,
+   *  APP.faceForce("hump","crest") on the settled hump (hump_h = 0.15,
+   *  t = 30 s) came back with only 122 of 320 samples wet (38.1%) against a
+   *  crest that is fully submerged at this height. Merging near-collinear
+   *  edges makes the crest one ~4.0 m run (its two vertical butt ends stay
+   *  their own ~0.85 m runs, both still well clear of 2*dx), the stroke is
+   *  skipped again, and the same read comes back 320 of 320 wet (100%). The
+   *  threshold reads the LIVE S.dx, so a coarser future budget that thins a
+   *  merged run below 2 cells gets the stroke back automatically. */
   function stampPoly(mask, solid, value) {
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const v of solid.verts) {
@@ -145,12 +172,43 @@ const SIM = (() => {
       }
     }
     const n = solid.verts.length;
-    let minEdge = Infinity;
+    const len = new Array(n), tx = new Array(n), tz = new Array(n);
     for (let e = 0; e < n; e++) {
       const a = solid.verts[e], b = solid.verts[(e + 1) % n];
-      minEdge = Math.min(minEdge, Math.hypot(b[0] - a[0], b[1] - a[1]));
+      const ex = b[0] - a[0], ez = b[1] - a[1];
+      const L = Math.hypot(ex, ez);
+      len[e] = L;
+      tx[e] = L > 1e-12 ? ex / L : 0;
+      tz[e] = L > 1e-12 ? ez / L : 0;
     }
-    if (minEdge < 2 * S.dx) {
+    // A break sits BETWEEN edge i and edge i+1 when the turn between their
+    // tangents exceeds ~20 degrees (cos of the angle between unit tangents
+    // drops below cos(20 deg)). Below that, the two are one smooth run.
+    const COS20 = Math.cos(20 * Math.PI / 180);
+    const breaks = new Array(n);
+    let anyBreak = false;
+    for (let e = 0; e < n; e++) {
+      const f = (e + 1) % n;
+      breaks[e] = tx[e] * tx[f] + tz[e] * tz[f] < COS20;
+      if (breaks[e]) anyBreak = true;
+    }
+    let minRun;
+    if (!anyBreak) {
+      // No corner anywhere — the whole perimeter is one smooth loop.
+      minRun = len.reduce((s, L) => s + L, 0);
+    } else {
+      // Start scanning right after a known break, so no run wraps past the
+      // point the loop stops at.
+      const start = breaks.indexOf(true);
+      minRun = Infinity;
+      let run = 0;
+      for (let step = 0; step < n; step++) {
+        const e = (start + 1 + step) % n;
+        run += len[e];
+        if (breaks[e]) { minRun = Math.min(minRun, run); run = 0; }
+      }
+    }
+    if (minRun < 2 * S.dx) {
       for (let e = 0; e < n; e++) {
         const a = solid.verts[e], b = solid.verts[(e + 1) % n];
         stampSeg(mask, [a[0], a[1], b[0], b[1], 0], value);
@@ -1501,9 +1559,11 @@ const SIM = (() => {
   }
 
   /** The pressure force on ONE named face of a scene solid, per metre width.
-   *  Same bargain as lineFlux: a readback on a click, never on the frame
-   *  path. Samples sit 0.75*dx off the face along the outward normal — in
-   *  the water, clear of the solid cell the face bounds — and every term
+   *  Called once per RENDERED FRAME by main.js's sampleForce, gated on the
+   *  sim clock actually moving — the same idiom sampleCV's own comment
+   *  describes, not a readback confined to a click. Samples sit 0.75*dx off
+   *  the face along the outward normal — in the water, clear of the solid
+   *  cell the face bounds — and every term
    *  carries the fill fraction, so air contributes nothing and a
    *  half-wetted face reports half its diagram. Under an averaging window
    *  the sample is the window mean: one window, every instrument.

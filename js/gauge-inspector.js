@@ -203,10 +203,8 @@ const GINSP = (() => {
     const last = L.length ? L[L.length - 1] : null;
     SERIES.forEach(([f]) => {
       const V = o.vb[f];
-      // A sample logged before a SERIES entry existed (a half-refreshed
-      // browser mid-deploy, stale main.js next to a fresh gauge-inspector.js)
-      // has no such key — fall back rather than crash the frame loop, which
-      // an uncaught throw here would do every frame this window stays open.
+      // A sample logged before a SERIES entry existed (stale main.js next to
+      // a fresh this) has no such key; throwing here kills the frame loop.
       const v = last ? last[f] : undefined;
       V.b.textContent = (Number.isFinite(v) ? v.toFixed(3) : "—") + " " + V.unit;
       V.row.classList.toggle("on", f === o.field);

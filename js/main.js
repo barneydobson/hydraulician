@@ -2528,9 +2528,8 @@ function sampleGauges(A) {
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
     const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
-    // η = z_b + d, the free surface itself — unlike h it carries no
-    // non-hydrostatic bias under an accelerating column, at the cost of the
-    // column-reduction's own whole-cell quantisation (see docs/notation.md).
+    // η = z_b + d is the surface itself, so unlike h it carries no
+    // non-hydrostatic bias under an accelerating column.
     const s = { t: sim.t, h: z + pr.phead, d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);

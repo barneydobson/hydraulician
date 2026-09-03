@@ -149,9 +149,6 @@ textbook period underneath.
   slider (0.16–0.9 m), and the jet speed stays at √(2gH) all the way up it
   (measured 20.6–21 m/s against 20.7): this model's pipe losses are too
   small to bend the power curve over. HP-1 puts a throttle plate in its
-  penstock for exactly that reason; run the coda there. The slider stopped
-  at 1.2 m until that stop was swept from below and found to be inside a
-  collapse — past about 1.0 m the penstock runs at 9 m/s, the discharge
-  past the nozzle pressurises instead of jetting, and the headrace reverses
-  (engineering notes, "Hydropower scheme"). If a run ever goes chaotic with
-  a saturated block past the nozzle, that is what happened: press R.
+  penstock for exactly that reason; run the coda there. Past about 1.0 m the
+  penstock cavitates and the run collapses — a chaotic bore and a saturated
+  block past the nozzle, cured by R — which is why the slider stops at 0.9.

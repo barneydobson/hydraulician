@@ -680,8 +680,7 @@ Things that were tried and what they taught:
   Part C of the tutorial sheet asks the student to sweep this slider to its
   top, so the broken rung was on the worksheet's own path. 0.9 holds 7.0 m/s
   in the penstock and survives a slam (p/ρg = 0 in the discharge, no
-  cavitation, 7.7 m minimum at the valve). Guard rails get verified from the
-  safe side, not extrapolated from the far side of a failure.
+  cavitation, 7.7 m minimum at the valve).
 - **The jet stays at √(2gH)** over the whole gap range (20.6–21 m/s against
   20.7), so the maximum-power coda (h_f = H/3) cannot be reached on this rig
   any more than on hammer's — HP-1's throttle plate is the answer there too.

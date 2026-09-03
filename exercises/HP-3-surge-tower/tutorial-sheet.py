@@ -248,7 +248,7 @@ NUM(" At the design point q₀: the friction loss in headrace and penstock, the 
 ANS(4)
 NUM(" The discharge q* = √(H/(3·k_t)) that would put a third of the head into friction, the jet speed at that point, "
     "√(2g·2H/3), and the nozzle opening it would need, q*/u_jet. Compare with the penstock bore (2.4 m) and with the "
-    "top of the Nozzle gap slider (1.2 m, about 18 m²/s). Where does that leave the peak on this scheme?", "C3.")
+    "top of the Nozzle gap slider (0.9 m, about 12 m²/s measured). Where does that leave the peak on this scheme?", "C3.")
 ANS(4)
 
 Hd("Part D — In the session", 1)
@@ -274,7 +274,7 @@ TABLE([["", ""],
        ["B4", "Both scale with √L: × √(30/42.4) = %.2f." % math.sqrt(30 / L)],
        ["C1", "P = ρgq(H − k_tq²); dP/dq = ρg(H − 3k_tq²) = 0 ⇒ k_tq² = H/3 = h_f."],
        ["C2", "u_p = 7.6/2.4 = %.2f m/s; h_f = %.3f (headrace) + %.3f (penstock) = %.2f m; H = 21.9 m; u_jet = √(19.62 × %.2f) = %.1f m/s; P = ρ·g·q₀·(H − h_f) = %.2f MW per m = ½ρq₀u_jet²." % (up, hf, hfp, hft, H - hft, ujet, P0 / 1e6)],
-       ["C3", "k_t = %.5f s²/m⁵; q* = √(21.9/(3k_t)) = %.0f m²/s; u_jet = √(2g·2H/3) = %.1f m/s; opening = q*/u_jet = %.1f m — wider than the 2.4 m penstock, three times the slider's top (about 18 m²/s at 1.2 m). The peak cannot be reached: sweep the slider and the jet stays near √(2gH) = %.1f m/s while the power keeps rising with the gap. (P* would be %.1f MW per m.)" % (kt, qstar, ujet_star, opening, math.sqrt(2 * g * H), Pstar / 1e6)],
+       ["C3", "k_t = %.5f s²/m⁵; q* = √(21.9/(3k_t)) = %.0f m²/s; u_jet = √(2g·2H/3) = %.1f m/s; opening = q*/u_jet = %.1f m — wider than the 2.4 m penstock, nearly four times the slider's top (about 12 m²/s at 0.9 m). The peak cannot be reached: sweep the slider and the jet stays near √(2gH) = %.1f m/s while the power keeps rising with the gap. (P* would be %.1f MW per m.)" % (kt, qstar, ujet_star, opening, math.sqrt(2 * g * H), Pstar / 1e6)],
        ], [1.4, 14.6], header=False)
 P("B1, B2 — per digit (u₀ = %.2f m/s, z₀ = %.2f m, k = %.4f s²/m, L = 42.4 m, D_h = 3.05 m); the last two columns are what the app measured on the dry-run class:" % (u0, z0, k), bold=True, space_after=2)
 rows = [["d", "D_s (m)", "z_max no friction (m)", "Z (m)", "z_max with friction (m)", "T (s)", "app: crest (m)", "app: T (s)"]]

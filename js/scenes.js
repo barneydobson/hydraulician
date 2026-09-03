@@ -818,10 +818,21 @@ const SCENES = (() => {
           { key: "d_head", label: "Headrace bore D_h", min: 2.0, max: 4.0, step: 0.1, value: DEF.d_head, unit: "m" },
           { key: "d_pen", label: "Penstock bore D_p", min: 1.5, max: 3.0, step: 0.1, value: DEF.d_pen, unit: "m" },
           { key: "d_shaft", label: "Surge shaft width D_s", min: 1.5, max: 8.0, step: 0.1, value: DEF.d_shaft, unit: "m" },
-          // 1.2 m, not the bore: MEASURED, at a 1.44 m gap (9 cells) the seeded
-          // 22 m²/s start puts 9 m/s down the penstock, the slam-sized hammer
-          // that follows cavitates at the plate and the run collapses.
-          { key: "gap", label: "Nozzle gap", min: 0.16, max: 1.2, step: 0.02, value: DEF.gap, unit: "m" },
+          // 0.9 m, not the bore, and not the 1.2 this used to say: the old cap
+          // was set by measuring 1.44 m (9 cells) fail and stepping back a
+          // guess, never by finding the edge from below. Swept at Medium, no
+          // slam, 45 s of steady running, reading p/ρg and f at (67, 2) where
+          // the discharge should be atmosphere:
+          //   0.6/0.8/0.9  q₂₀ = +10.4/+12.0/+12.2, p_out = 0, f_out = 0
+          //   1.0          q₂₀ = +14.5, f_out = 0.08, u_pen = 9.4 — on the edge
+          //   1.1          p_out = 2.5 m, f_out = 1.01 — the outlet pressurises
+          //   1.2          q₂₀ = −17.6 (REVERSED), p_out = 36 m, f_out = 1.1
+          // i.e. the slider's own top stop was inside the broken region, and
+          // Part C of the tutorial sheet asks the student to sweep it there.
+          // 9 m/s down the penstock is the failure mechanism the 1.44 m note
+          // already named; 0.9 keeps it to 7.0 and survives a slam (p_out 0,
+          // no cavitation, min p/ρg 7.7 m at the valve).
+          { key: "gap", label: "Nozzle gap", min: 0.16, max: 0.9, step: 0.02, value: DEF.gap, unit: "m" },
         ],
         solids: (W_, H_, P_, par) => geomFor(par).solids,
         valves: (W_, H_, par) => { const g = geomFor(par); return [[XV, ZO - g.h, XV, ZO + g.h, 0.5]]; },

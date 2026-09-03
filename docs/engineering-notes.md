@@ -667,12 +667,24 @@ Things that were tried and what they taught:
   the ladder starts at 2.5. **Wide shafts reflect the water hammer in
   full**: at c = 70 the valve's downsurge reached 0.4 m of head at D_s = 8
   (the slider's top), so the scene runs c = 60 (1.8 m at 7, 0.8 at 8).
-- **The nozzle gap stops at 1.2 m.** At 1.44 m (9 cells) the seeded start
-  puts 9 m/s down the penstock, the hammer that follows cavitates at the
-  plate and the run collapses (q read −19 m²/s). And the jet stays at
-  √(2gH) over the whole range (20.6–21 m/s against 20.7), so the
-  maximum-power coda (h_f = H/3) cannot be reached on this rig any more
-  than on hammer's — HP-1's throttle plate is the answer there too.
+- **The nozzle gap stops at 0.9 m — and the cap has to be found from
+  BELOW.** It first read 1.2 m, set by measuring 1.44 m (9 cells) fail and
+  stepping back a guess. That guess was wrong: swept in 0.1 m steps at
+  Medium, with no slam at all, the steady run is clean to 0.9 (q₂₀ = +12.2,
+  and the discharge past the nozzle stays dry: p/ρg = 0, f = 0 at (67, 2)),
+  marginal at 1.0 (f = 0.08, 9.4 m/s down the penstock — the same 9 m/s the
+  1.44 m note already blamed), pressurising at 1.1 (p/ρg = 2.5 m, f = 1.01)
+  and fully collapsed at 1.2, the old stop itself: **q₂₀ = −17.6 m²/s,
+  reversed, with 36 m of head standing in what should be atmosphere.** The
+  tell on screen is a saturated block past the nozzle and a chaotic bore.
+  Part C of the tutorial sheet asks the student to sweep this slider to its
+  top, so the broken rung was on the worksheet's own path. 0.9 holds 7.0 m/s
+  in the penstock and survives a slam (p/ρg = 0 in the discharge, no
+  cavitation, 7.7 m minimum at the valve). Guard rails get verified from the
+  safe side, not extrapolated from the far side of a failure.
+- **The jet stays at √(2gH)** over the whole gap range (20.6–21 m/s against
+  20.7), so the maximum-power coda (h_f = H/3) cannot be reached on this rig
+  any more than on hammer's — HP-1's throttle plate is the answer there too.
 - **The period's excess** is mostly the shaft's own inertia
   (L + h_s·D_h/D_s closes half of it, h_s ≈ 9 m) and the slot's elastic
   storage (a 42 × 3 m headrace at c = 60 stores 0.34 m² per metre of head

@@ -698,7 +698,7 @@ const CONTROLS = [
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["h", "Piezometric head"], ["d", "Depth"], ["speed", "Speed"]],
+    opts: [["h", "Piezometric head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
@@ -2528,7 +2528,10 @@ function sampleGauges(A) {
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
     const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
-    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], speed: pr.speed };
+    // η = z_b + d, the free surface itself — unlike h it carries no
+    // non-hydrostatic bias under an accelerating column, at the cost of the
+    // column-reduction's own whole-cell quantisation (see docs/notation.md).
+    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2857,7 +2860,7 @@ function drawOverlay(A) {
   // that wants a prediction before a number.
   const cards = UIMODE.shows("gauges")
     ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-        fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
+        fld === "h" ? "h" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);

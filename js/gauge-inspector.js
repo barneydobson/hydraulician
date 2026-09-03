@@ -26,13 +26,15 @@ const GINSP = (() => {
   // apart from it for that reason.
   //
   // Symbols follow free-surface convention: h is the piezometric head, d the
-  // depth and η the water level, leaving H free for the energy head (the full
-  // rationale, texts included, is in docs/notation.md). Since rig format v2
-  // the KEYS are the symbols; older wire formats are rejected, not migrated —
-  // prototype, no back-compat.
+  // depth and η the water level (wire key "eta" — ASCII, the same pattern as
+  // "speed" for |u|), leaving H free for the energy head (the full rationale,
+  // texts included, is in docs/notation.md). Since rig format v2 the KEYS are
+  // the symbols; older wire formats are rejected, not migrated — prototype,
+  // no back-compat.
   const SERIES = [
     ["h",     "h", "m",   "piezometric head, h = z + p/ρg"],
     ["d",     "d", "m",   "water depth of the column"],
+    ["eta",   "η", "m",   "water level, η = z_b + d"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],
   ];
   const open = [];              // live inspector windows
@@ -336,23 +338,24 @@ const GINSP = (() => {
   }
 
   // ---------------------------------------------------------------- export
-  /** Wide CSV: one row per sample time, three columns per gauge. Gauges are
-   *  sampled in the same call, so their sample times are bit-identical and
-   *  the rows line up; a gauge dropped later simply has empty cells before
-   *  its first sample. Values are printed at full precision. */
+  /** Wide CSV: one row per sample time, one column per gauge per SERIES
+   *  entry. Gauges are sampled in the same call, so their sample times are
+   *  bit-identical and the rows line up; a gauge dropped later simply has
+   *  empty cells before its first sample. Values are printed at full
+   *  precision. */
   function csv(list) {
     const gs = (list && list.length ? list : state.gauges).filter((g) => g);
     const hdr = ["t_sim_s"];
     gs.forEach((g) => {
       const tag = "g" + (state.gauges.indexOf(g) + 1) +
                   "_x" + g.x.toFixed(2) + "_z" + g.z.toFixed(2);
-      hdr.push(tag + "_h_m", tag + "_d_m", tag + "_speed_mps");
+      SERIES.forEach(([f, , unit]) => hdr.push(tag + "_" + f + "_" + (unit === "m/s" ? "mps" : unit)));
     });
-    const cols = gs.length * 3, rows = new Map();
+    const cols = gs.length * SERIES.length, rows = new Map();
     gs.forEach((g, gi) => (g.log || []).forEach((s) => {
       let r = rows.get(s.t);
       if (!r) { r = new Array(cols).fill(""); rows.set(s.t, r); }
-      r[gi * 3] = String(s.h); r[gi * 3 + 1] = String(s.d); r[gi * 3 + 2] = String(s.speed);
+      SERIES.forEach(([f], fi) => r[gi * SERIES.length + fi] = String(s[f]));
     }));
     const ts = [...rows.keys()].sort((a, b) => a - b);
     const out = [hdr.join(",")];

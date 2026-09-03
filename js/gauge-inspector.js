@@ -203,7 +203,12 @@ const GINSP = (() => {
     const last = L.length ? L[L.length - 1] : null;
     SERIES.forEach(([f]) => {
       const V = o.vb[f];
-      V.b.textContent = (last ? last[f].toFixed(3) : "—") + " " + V.unit;
+      // A sample logged before a SERIES entry existed (a half-refreshed
+      // browser mid-deploy, stale main.js next to a fresh gauge-inspector.js)
+      // has no such key — fall back rather than crash the frame loop, which
+      // an uncaught throw here would do every frame this window stays open.
+      const v = last ? last[f] : undefined;
+      V.b.textContent = (Number.isFinite(v) ? v.toFixed(3) : "—") + " " + V.unit;
       V.row.classList.toggle("on", f === o.field);
     });
     [...el.querySelectorAll(".ginsp-tabs button")]
@@ -291,8 +296,9 @@ const GINSP = (() => {
       c.fillStyle = g.colour;
       c.beginPath(); c.arc(X, Y, 2.5, 0, 6.2832); c.fill();
       const F = SERIES.find((q) => q[0] === o.field);
+      const v = L[i][o.field];
       const txt = "t " + L[i].t.toFixed(3) + " s   " + F[1] + " " +
-                  L[i][o.field].toFixed(4) + " " + F[2];
+                  (Number.isFinite(v) ? v.toFixed(4) : "—") + " " + F[2];
       c.font = "700 10.5px ui-monospace, monospace";
       const tw = c.measureText(txt).width;
       const bx = Math.min(Math.max(X + 7, x0), x1 - tw - 10);

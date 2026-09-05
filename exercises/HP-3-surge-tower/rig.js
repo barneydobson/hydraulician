@@ -98,11 +98,18 @@
      *  water (the reservoir strip, the shaft before the slam, the headrace
      *  axis), biased by a·D/g under an accelerating column (the shaft mid-
      *  surge, see the README). `shaft` is the sub-cell free surface. */
+    // Each station is read where the brief actually puts its gauge: the
+    // reservoir at ZRES, the shaft at ZSH. Reading the shaft at ZRES instead
+    // — which this did — costs 0.08 m: over a 60 s mean the shaft column is
+    // not hydrostatic to better than that, so z + p/ρg there depends on the
+    // depth you sample, and the drawdown came out 0.31 against 0.38 at ZSH.
     levels: function () {
-      var s = APP.sim, g = this.GEOM, z = 20.0;
-      var hr = APP.probe(this.XRES, z).phead + z, hs = APP.probe(g.xk, z).phead + z;
+      var s = APP.sim, g = this.GEOM;
+      var hr = APP.probe(this.XRES, this.ZRES).phead + this.ZRES;
+      var hs = APP.probe(g.xk, this.ZSH).phead + this.ZSH;
       var h1 = APP.probe(this.XH1, g.zk).phead + g.zk, h2 = APP.probe(this.XH2, g.zk).phead + g.zk;
-      return { res: hr, shaftH: hs, shaft: this.surfaceAt(g.xk, 16.0), h1: h1, h2: h2, t: s.t };
+      return { res: hr, shaftH: hs, resEta: this.surfaceAt(this.XRES, 16.0),
+               shaft: this.surfaceAt(g.xk, 16.0), h1: h1, h2: h2, t: s.t };
     },
     /** Warm the analyse EMA exactly as the overlay does, then read the
      *  bore-mean velocity mid-headrace — the hover readout's V. */
@@ -120,18 +127,25 @@
      *  frame, against a 0.3 m drawdown and a 0.04 m friction drop. */
     steady: function (secs) {
       var s = APP.sim, i = Math.floor(this.XMID / s.dx), n = Math.round((secs || 10) * 10);
-      var acc = { u0: 0, q: 0, res: 0, shaft: 0, shaftH: 0, h1: 0, h2: 0, pv: 0 }, k;
+      var acc = { u0: 0, q: 0, res: 0, resEta: 0, shaft: 0, shaftH: 0, h1: 0, h2: 0, pv: 0 }, k;
       APP.state.paused = false; this.A();
       for (k = 0; k < n; k++) {
         APP.frames(1, 0.1);
         var A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true)), L = this.levels();
-        acc.u0 += A.V[i]; acc.q += A.q[i]; acc.res += L.res; acc.shaft += L.shaft; acc.shaftH += L.shaftH;
+        acc.u0 += A.V[i]; acc.q += A.q[i]; acc.res += L.res; acc.resEta += L.resEta;
+        acc.shaft += L.shaft; acc.shaftH += L.shaftH;
         acc.h1 += L.h1; acc.h2 += L.h2; acc.pv += APP.probe(this.XVALVE, 3.0).phead;
       }
       for (k in acc) acc[k] = acc[k] / n;
+      // y0 off the FREE SURFACES. Measured over ten runs the η drawdown is
+      // 0.380 ± 0.022 m against a predicted 0.382; the same runs read
+      // 0.452 ± 0.036 off p/ρg at ZSH, because a 60 s mean of the shaft
+      // column is not hydrostatic to better than ~0.08 m. y0H keeps the
+      // pressure-probe version for anything that wants it.
       return { t: +s.t.toFixed(1), u0: +acc.u0.toFixed(3), q: +acc.q.toFixed(3), d: +A.d[i].toFixed(3),
                res: +acc.res.toFixed(3), shaft: +acc.shaft.toFixed(3), shaftH: +acc.shaftH.toFixed(3),
-               y0: +(acc.res - acc.shaftH).toFixed(3),
+               y0: +(acc.resEta - acc.shaft).toFixed(3),
+               y0H: +(acc.res - acc.shaftH).toFixed(3),
                h1: +acc.h1.toFixed(3), h2: +acc.h2.toFixed(3), hf: +(acc.h1 - acc.h2).toFixed(3),
                pheadValve: +acc.pv.toFixed(2) };
     },

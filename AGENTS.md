@@ -233,6 +233,12 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   `fetch(url, {cache:"reload"})` then `location.reload()`.
 - Resolution changes Δx, not the physics: the domain is a fixed physical
   rectangle and the grid is sized to a cell budget.
+- A scene's `params` (the Geometry sliders — six rows, bound by index) reach
+  its `solids()`, `walls()`, `valves()` and `water()`, and an optional `flow()`
+  seeds the initial velocity field (`hydro` opens near its steady flow instead
+  of surging from rest). A digit rule on a `geomN` row is cross-checked against
+  the scene's declaration by `check_pack.py`; the lore is in the engineering
+  notes under "Hydropower scheme".
 - `state.rt` in the status bar is the speed truth — m2 at ~0.9× real time is
   the design point, not a bug.
 - The vertical exaggeration is fitted to the window (`autoVex` in main.js),

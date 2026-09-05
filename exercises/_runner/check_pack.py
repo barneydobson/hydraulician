@@ -19,6 +19,12 @@ facts that are derivable from the register and leaves the prose to people:
      BUILD is not hidden from a card whose task, start or setup tells the
      student to draw, cut, erase or otherwise build something
   7. no orphans in either direction
+  8. a digit rule (or studentParams entry) on a Geometry row -- `geomN` --
+     names a param its scene actually declares at index N. The panel binds
+     those rows BY INDEX, so a reordered `params` list moves a student's
+     slider without a word from the browser; js/scenes.js is parsed the same
+     way js/exercises.js is (with js/geom.js in front of it) and the label
+     the rule lands on is printed with -v
 
 HOW THIS PARSES js/exercises.js
 --------------------------------
@@ -74,6 +80,42 @@ const src = fs.readFileSync(process.argv[2], "utf8");
 const EXERCISES = new Function(src + "\nreturn EXERCISES;")();
 process.stdout.write(JSON.stringify(EXERCISES));
 """
+
+
+_SCENES_LOADER_JS = r"""
+"use strict";
+const fs = require("fs");
+const src = fs.readFileSync(process.argv[2], "utf8") + "\n" + fs.readFileSync(process.argv[3], "utf8");
+const SCENES = new Function(src + "\nreturn SCENES;")();
+const out = {};
+SCENES.list.forEach((s) => { out[s.id] = (s.params || []).map((p) => ({ key: p.key, label: p.label })); });
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+def scene_params():
+    """Scene id -> its declared params ([{key, label}, ...]), read out of
+    js/scenes.js the way `cards()` reads the register. js/geom.js goes in
+    front because scenes.js names GEOM (at call time only, but the constant
+    has to exist for the file to evaluate)."""
+    fd, loader_path = tempfile.mkstemp(suffix=".js")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(_SCENES_LOADER_JS)
+        proc = subprocess.run(["node", loader_path,
+                               os.path.join(ROOT, "js", "geom.js"),
+                               os.path.join(ROOT, "js", "scenes.js")],
+                              capture_output=True, timeout=30, encoding="utf-8")
+    finally:
+        os.unlink(loader_path)
+    if proc.returncode != 0:
+        print("node failed to evaluate js/scenes.js as JavaScript:\n" + proc.stderr)
+        sys.exit(1)
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        print("node did not print JSON for SCENES (%s)" % exc)
+        sys.exit(1)
 
 
 def cards():
@@ -316,6 +358,28 @@ def main():
         if DRAWS.search(draws_text(e)) and not declares_build:
             fail.append("%-5s task asks the student to draw, but its profile hides "
                         "BUILD -- add `ui: { build: true }` or an instruments entry" % i)
+
+    # 8. Geometry rows bind by index. A rule on geomN with a scene that
+    #    declares N params or fewer is a slider that is not there; one on a
+    #    scene that declares more may be the wrong one -- both silent in the
+    #    browser, both loud here.
+    geom_rules = [(e, r) for e in ex
+                  for r in ([e.get("digit")] if e.get("digit") else []) +
+                           (e.get("digit") or {}).get("also", []) +
+                           (e.get("studentParams") or [])
+                  if r and re.match(r"^geom\d$", str(r.get("control") or ""))]
+    if geom_rules:
+        params_by_scene = scene_params()
+        for e, r in geom_rules:
+            checked += 1
+            n = int(r["control"][4:])
+            decl = params_by_scene.get(e.get("scene"), [])
+            if n >= len(decl):
+                fail.append("%-5s %s is on Geometry row %d but scene %r declares only %d param%s"
+                            % (e.get("id"), r["control"], n, e.get("scene"), len(decl),
+                               "" if len(decl) == 1 else "s"))
+            elif verbose:
+                print("  %-5s %s -> %s (%s)" % (e.get("id"), r["control"], decl[n]["key"], decl[n]["label"]))
 
     # 7. orphans
     for i in sorted(index_ids - {e.get("id") for e in ex}):

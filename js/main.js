@@ -498,7 +498,9 @@ const CONTROLS = [
     fmt: (v) => v.toFixed(2) + " m/s" },
 
   { h: "Geometry" },
-  ...[0, 1, 2, 3].map((k) => ({
+  // Six rows: the hydro scene declares six params (knee x/z, three bores,
+  // the nozzle gap). A scene declaring fewer hides the rest (syncPanel).
+  ...[0, 1, 2, 3, 4, 5].map((k) => ({
     id: "geom" + k, label: "—",
     min: 0, max: 1, step: 0.01,
     // The row binds to the k-th declared param of whatever scene is up.
@@ -696,7 +698,7 @@ const CONTROLS = [
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["h", "Piezometric head"], ["d", "Depth"], ["speed", "Speed"]],
+    opts: [["h", "Piezometric head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
@@ -841,7 +843,7 @@ function syncPanel() {
       if (note) note.textContent = c.fmt ? c.fmt() : "";
       return;
     }
-    // A dynamic row (Geometry's geom0…geom3) binds to whatever param its
+    // A dynamic row (Geometry's geom0…geom5) binds to whatever param its
     // scene declares at that index — none for most scenes. Hide the row and
     // its note when there is nothing to bind to, and when there is, adopt
     // that param's own range and label before reading its value below.
@@ -866,8 +868,8 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
-  // The "Geometry" heading fronts geom0…geom3, which hide themselves row by
-  // row above as the scene declares fewer than four params, down to none —
+  // The "Geometry" heading fronts geom0…geom5, which hide themselves row by
+  // row above as the scene declares fewer than six params, down to none —
   // but a heading is not a row, so nothing in the loop hides IT. A scene
   // with no declared params (most of them) would otherwise leave the
   // heading standing over an empty section.
@@ -2526,7 +2528,9 @@ function sampleGauges(A) {
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
     const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
-    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], speed: pr.speed };
+    // η = z_b + d is the surface itself, so unlike h it carries no
+    // non-hydrostatic bias under an accelerating column.
+    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2855,7 +2859,7 @@ function drawOverlay(A) {
   // that wants a prediction before a number.
   const cards = UIMODE.shows("gauges")
     ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-        fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
+        fld === "h" ? "h" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);

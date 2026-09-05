@@ -599,6 +599,96 @@ picture saturated or flat is the symptom of the two having drifted apart.
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
 
+## Hydropower scheme (`hydro`): the surge shaft
+
+The first scene built entirely from `params` (six of them: the knee's x and
+z, the headrace, penstock and shaft bores, the nozzle gap) and the reason the
+Geometry panel grew from four rows to six. Every solid is derived from the
+params in one place (`geom` in js/scenes.js): the penstock is a slab along
+the axis knee → (60, 3) whose two wall lines are intersected with the
+headrace invert, the shaft's right wall and the level tailpipe, so moving a
+slider re-mitres the corners rather than leaving a notch. Three big solids
+(ground, headrace roof, penstock roof) and two nozzle plates; the shaft is the
+gap between the two roofs. Three small hooks were needed and all are
+additive — a scene taking the old arguments never sees them:
+
+- `walls(W, H, par)` and `valves(W, H, par)` get the live params, so the
+  valve seg can span exactly the penstock bore its solids() drew (a valve
+  seg reaching into the roof turns roof cells into valve texels, which are
+  OPEN while the valve is open — a notch in the rock).
+- `water(x, z, P, par)` gets them too, plus `P.level` (the live reservoir
+  slider, NaN when the control is off), so the fill follows both the
+  geometry and the slider. It fills no solid cell, on purpose: a column read
+  mid-headrace has to be the bore alone or V = q/d is not the bore-mean.
+- `flow(x, z, P, par)` — an initial velocity field, written by
+  `resetWater()` onto the staggered faces. From rest the establishment IS a
+  load-acceptance surge: the shaft swung ±4 m and was still ±1 m at 60 s
+  (measured), because quadratic friction damps a mass oscillation
+  algebraically. Seeded with the estimated steady plug
+  (q₀ = 0.76·gap·√(2g(level − 3)), the shaft started k·u₀² down, both
+  constants measured at the defaults) the residual is ±0.3 m for the first
+  20 s and ±0.1 m after. A slider the estimate does not follow just costs
+  settle time.
+
+Measured, at Medium (dx = 0.161 m; the ladder is HP-3's, D_s = 2.5–7.0 m):
+
+| quantity | value |
+| --- | --- |
+| headrace bore-mean u₀, mid-length | 2.50 ± 0.02 m/s, identical across the ladder |
+| reservoir free surface by the wall | 24.87–24.92 m against the 25.0 slider |
+| shaft drawdown z₀ | 0.31–0.43 m, of which u₀²/2g is 0.32 |
+| headrace HGL drop, x = 22 → 44 m, 30 s mean | 0.02–0.05 m → Darcy f ≈ 0.03 with D_H = 2D_h |
+| first crest above the reservoir | 5.16 → 3.22 m; 0.91–0.98 of u₀√(L·D_h/(g·D_s)); within ±5% of the rigid-column crest with the measured k |
+| period, first two crests | 14.9 → 23.7 s; 1.17–1.26 × 2π√(L·D_s/(g·D_h)) |
+| valve head after the slam | peak ≈ 42 m, minimum 1.8–9 m (no cavitation) |
+
+Things that were tried and what they taught:
+
+- **The friction knobs barely move a 19-cell bore's loss.** cf 0.004 → 0.3
+  and cs 0.05 → 0.3 changed the 22 m HGL drop between 0.02 and 0.05 m; what
+  they change is the bore-mean velocity (2.5 → 2.06 m/s at cf = 0.3),
+  because a strong wall function stalls the wall cells and the core runs
+  through a narrower pipe. The delivered f ≈ 0.03 is a realistic rough-pipe
+  number; it is simply that 14 bores of pipe lose a tenth of a velocity
+  head. The scene ships cf = 0.05 (twice the HGL drop of hammer's 0.004).
+- **Instantaneous heads in the bore wobble ±0.3 m** at the slot's organ
+  mode, against a 0.04 m friction drop: the friction-factor measurement
+  needs Average (a 30 s window reproduces the 30 s probe means to 0.01 m).
+  The entry vena contracta depresses the head to x ≈ 15 m and it recovers
+  by x ≈ 22; gauges in that stretch read a NEGATIVE friction slope.
+- **The column surface is quantised to whole cells** here (the top cell is
+  either over-full or empty under the slot EOS), so the d channel moves in
+  0.16 m steps; the h channel is continuous — and under the accelerating
+  column at the crest it reads a·D/g low, about a metre for a gauge 12 m
+  under the crest at D_s = 3 (a = (D_h/D_s)(g/L)·z_max ≈ 0.9 m/s²). Hence
+  the brief's protocol: h for the still levels, d for the crest.
+- **Narrow shafts throttle themselves**: at D_s = 2.0 the crest is 16%
+  under the curve, at 1.5 m 21% under (the entry loss into the shaft), so
+  the ladder starts at 2.5. **Wide shafts reflect the water hammer in
+  full**: at c = 70 the valve's downsurge reached 0.4 m of head at D_s = 8
+  (the slider's top), so the scene runs c = 60 (1.8 m at 7, 0.8 at 8).
+- **The nozzle gap stops at 0.9 m — and the cap has to be found from
+  BELOW.** It first read 1.2 m, set by measuring 1.44 m (9 cells) fail and
+  stepping back a guess. That guess was wrong: swept in 0.1 m steps at
+  Medium, with no slam at all, the steady run is clean to 0.9 (q₂₀ = +12.2,
+  and the discharge past the nozzle stays dry: p/ρg = 0, f = 0 at (67, 2)),
+  marginal at 1.0 (f = 0.08, 9.4 m/s down the penstock — the same 9 m/s the
+  1.44 m note already blamed), pressurising at 1.1 (p/ρg = 2.5 m, f = 1.01)
+  and fully collapsed at 1.2, the old stop itself: **q₂₀ = −17.6 m²/s,
+  reversed, with 36 m of head standing in what should be atmosphere.** The
+  tell on screen is a saturated block past the nozzle and a chaotic bore.
+  Part C of the tutorial sheet asks the student to sweep this slider to its
+  top, so the broken rung was on the worksheet's own path. 0.9 holds 7.0 m/s
+  in the penstock and survives a slam (p/ρg = 0 in the discharge, no
+  cavitation, 7.7 m minimum at the valve).
+- **The jet stays at √(2gH)** over the whole gap range (20.6–21 m/s against
+  20.7), so the maximum-power coda (h_f = H/3) cannot be reached on this rig
+  any more than on hammer's — HP-1's throttle plate is the answer there too.
+- **The period's excess** is mostly the shaft's own inertia
+  (L + h_s·D_h/D_s closes half of it, h_s ≈ 9 m) and the slot's elastic
+  storage (a 42 × 3 m headrace at c = 60 stores 0.34 m² per metre of head
+  — 14% of a 2.5 m shaft's area).
+
 ## Polygon geometry
 
 `js/geom.js` (`GEOM`) is the RECON pattern applied to shapes: pure numerics,

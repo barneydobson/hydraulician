@@ -684,6 +684,189 @@ const SCENES = (() => {
              "Push the celerity past ~90 m/s and the downsurge hits zero: column separation.",
              "Set wave damping to zero and the oscillation never dies."] },
 
+    // ------------------------------------------------- hydropower scheme
+    // Reservoir → level headrace → surge shaft at the knee → penstock down to
+    // a power house, where a nozzle sets the discharge and a valve stands in
+    // for the turbine's instantaneous shutdown (exercise HP-3). Slam the valve
+    // and the headrace column has nowhere to go but up the shaft: the rigid-
+    // column mass oscillation, with the shaft's steady drawdown y₀ = k·u₀²
+    // measuring the headrace friction directly, as a piezometer would.
+    //
+    // EVERY SOLID IS BUILT FROM THE PARAMS. The knee (x, z), the three bores
+    // and the nozzle gap are Geometry sliders and ride the rig, so the
+    // penstock's two walls are mitred against the headrace invert, the
+    // shaft's right wall and the level tailpipe (`geom` below), and the valve
+    // and the initial water follow the same geometry — which is why
+    // rasterise() and resetWater() hand `params` to valves() and water().
+    //
+    // Scale (measured — docs/engineering-notes.md, "Hydropower scheme"): a
+    // 42 m headrace of 3 m bore under 25 m of reservoir, a 0.48 m nozzle, a
+    // 35 m domain so that a 2 m shaft's upsurge still clears the roof. c = 70
+    // as hammer: the Joukowsky surge in the penstock, c·u_p/g, has to stay
+    // under the ~22 m of static head at the valve or the downsurge cavitates,
+    // and that caps the penstock velocity — the reason the default penstock
+    // bore is 2.4 m against a 3 m headrace rather than the figure's 3 : 7.7.
+    (() => {
+      const W = 70, H = 35;
+      const XR = 8.0, TW = 0.7;     // reservoir wall centreline and thickness
+      const XO = 60.0, ZO = 3.0;    // lower knee: the penstock meets the level tailpipe
+      const XV = 63.5, XN = 65.0;   // valve station, nozzle station
+      const LEVEL = 25.0;
+      const DEF = { knee_x: 50, knee_z: 14, d_head: 3.0, d_pen: 2.4, d_shaft: 3.0, gap: 0.48 };
+      const val = (par, k) => (par && par[k] !== undefined ? par[k] : DEF[k]);
+
+      /** Everything the geometry needs, from the params. The penstock is a
+       *  slab of bore Dp along the axis knee → (XO, ZO); its upper and lower
+       *  wall lines are intersected with the surfaces they run into:
+       *    A  lower wall meets the headrace invert     B  … the tailpipe invert
+       *    C  upper wall leaves the shaft's right wall  D  … meets the tailpipe soffit
+       *  Three big solids (ground, headrace roof, penstock roof) plus the two
+       *  nozzle plates; the shaft is the gap between the two roofs. All CCW. */
+      const geom = (par) => {
+        const xk = val(par, "knee_x"), zk = val(par, "knee_z");
+        const Dh = val(par, "d_head"), Dp = val(par, "d_pen"), Ds = val(par, "d_shaft");
+        const gap = val(par, "gap");
+        const zi = zk - Dh / 2, zs = zk + Dh / 2;              // headrace invert / soffit
+        const xs0 = xk - Ds / 2, xs1 = xk + Ds / 2;            // shaft walls
+        const len = Math.hypot(XO - xk, ZO - zk);
+        const tx = (XO - xk) / len, tz = (ZO - zk) / len;      // penstock axis, down-right
+        const nx = -tz, nz = tx;                               // its upper normal
+        const h = Dp / 2;
+        const up = (s) => [xk + s * tx + h * nx, zk + s * tz + h * nz];
+        const lo = (s) => [xk + s * tx - h * nx, zk + s * tz - h * nz];
+        const A = lo((zi - zk + h * nz) / tz);
+        const B = lo((ZO - h - zk + h * nz) / tz);
+        const C = up((xs1 - xk - h * nx) / tx);
+        const D = up((ZO + h - zk - h * nz) / tz);
+        const xw = XR - TW / 2;                                // the reservoir wall's wet face
+        const ground = GEOM.poly(
+          [[-1, -1], [W + 1, -1], [W + 1, ZO - h], B, A, [-1, zi]],
+          [{ id: "invert", label: "Headrace invert", e0: 4, e1: 4 },
+           { id: "pen_lo", label: "Penstock lower wall", e0: 3, e1: 3 },
+           { id: "tail_lo", label: "Tailpipe invert", e0: 2, e1: 2 }], "ground");
+        const roofL = GEOM.rect(xw, zs, xs0, H + 1, { id: "roof",
+          faces: [{ id: "soffit", label: "Headrace soffit", e0: 0, e1: 0 },
+                  { id: "shaft_l", label: "Shaft, left wall", e0: 1, e1: 1 },
+                  { id: "res", label: "Reservoir wall", e0: 3, e1: 3 }] });
+        const roofR = GEOM.poly(
+          [C, D, [W + 1, ZO + h], [W + 1, H + 1], [xs1, H + 1]],
+          [{ id: "pen_up", label: "Penstock upper wall", e0: 0, e1: 0 },
+           { id: "tail_up", label: "Tailpipe soffit", e0: 1, e1: 1 },
+           { id: "shaft_r", label: "Shaft, right wall", e0: 4, e1: 4 }], "penroof");
+        // The nozzle: two plates 0.5 m thick (3 cells at Medium) leaving `gap`
+        // centred on the tailpipe axis. Delivered in whole cells, like every
+        // drawn plate in the set (UN-1's ladder is quantised the same way).
+        const noz0 = GEOM.rect(XN - 0.25, ZO - h - 0.3, XN + 0.25, ZO - gap / 2, { id: "nozzle0" });
+        const noz1 = GEOM.rect(XN - 0.25, ZO + gap / 2, XN + 0.25, ZO + h + 0.3, { id: "nozzle1" });
+        return { xk, zk, Dh, Dp, Ds, gap, zi, zs, xs0, xs1, h, xw, A, B, C, D,
+                 tx, tz, nx, nz, sD: (ZO + h - zk - h * nz) / tz,
+                 walls: [ground, roofL, roofR], solids: [ground, roofL, roofR, noz0, noz1] };
+      };
+      // water() is called once per cell; the geometry is built once per
+      // params object rather than per cell.
+      let cache = { key: null, g: null };
+      const geomFor = (par) => {
+        const key = JSON.stringify(par || {});
+        if (cache.key !== key) cache = { key, g: geom(par) };
+        return cache.g;
+      };
+
+      // The steady flow, estimated: what the nozzle passes under the head it
+      // has, q₀ = C_q·gap·√(2g·(level − z_nozzle)), and the shaft's steady
+      // drawdown y₀ = K·u₀². Both constants are MEASURED at the defaults (see
+      // the engineering notes) and only have to be close: they seed the
+      // initial velocity field and the shaft's starting level so the scene
+      // opens near its steady state instead of at rest. Move a slider the
+      // estimate does not follow and the spin-up just takes longer.
+      const Q_C = 0.76, K_EST = 0.07;
+      const flowOf = (par, level) => {
+        const g = geomFor(par);
+        const q = Q_C * g.gap * Math.sqrt(2 * 9.81 * Math.max(level - ZO, 0.5));
+        const u0 = q / g.Dh;
+        return { q, u0, y0: K_EST * u0 * u0, up: q / g.Dp };
+      };
+
+      return {
+        id: "hydro", name: "Hydropower scheme · surge shaft", key: "Rigid-column surge",
+        group: "Pressure & transients",
+        blurb: "A reservoir, a level headrace, a surge shaft at the knee and a penstock down to a nozzle. Slam the valve and the headrace column runs up the shaft — a mass oscillation the shaft has to be tall enough to hold.",
+        // cf = 0.05, not hammer's 0.004: MEASURED, the headrace HGL falls 0.09 m
+        // over 28 m at 2.5 m/s (Darcy f ≈ 0.06) against 0.045 m at 0.004, and
+        // neither knob goes much further — a 19-cell bore's wall function only
+        // slows the wall cells (cf = 0.3 gives 0.03 m and a 2.06 m/s bore-mean).
+        // c = 60, not hammer's 70: the penstock runs ~3.1 m/s, and a wide
+        // shaft reflects the Joukowsky wave in full, so the downsurge at the
+        // valve reached 0.4 m of head at c = 70 (D_s = 8 m) — cavitation.
+        W, H, c: 60, cf: 0.05, cs: 0.05, bulk: 0.03, nu: 1e-4,
+        valveOpen: 1, spinup: 60,
+        mode: 1, headMax: 45, hmax: 25, vmax: 6,
+        open: [1, 1, 0, 0],
+        // The sponge holds the left 5 m of an 8 m compartment: the 2.7 m of free
+        // surface before the wall IS the reservoir a gauge reads — its level
+        // is what the headrace actually sees — and it is where the panel's
+        // delivered-level readout samples (sampleInlet takes the ten columns
+        // just clear of the sponge; with the sponge reaching the wall that read
+        // landed inside the headrace mouth and printed the soffit).
+        spongeIn: 5.0,
+        inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
+        // ORDER IS LOAD-BEARING: the Geometry panel binds its rows by index,
+        // and HP-3's digit rule names the shaft width as `geom4`. check_pack.py
+        // cross-checks that against this list.
+        params: [
+          { key: "knee_x", label: "Knee x", min: 30, max: 54, step: 0.5, value: DEF.knee_x, unit: "m" },
+          { key: "knee_z", label: "Knee z", min: 8, max: 20, step: 0.5, value: DEF.knee_z, unit: "m" },
+          { key: "d_head", label: "Headrace bore D_h", min: 2.0, max: 4.0, step: 0.1, value: DEF.d_head, unit: "m" },
+          { key: "d_pen", label: "Penstock bore D_p", min: 1.5, max: 3.0, step: 0.1, value: DEF.d_pen, unit: "m" },
+          { key: "d_shaft", label: "Surge shaft width D_s", min: 1.5, max: 8.0, step: 0.1, value: DEF.d_shaft, unit: "m" },
+          // 0.9, not the 1.2 this used to say: swept from below, 1.1 already
+          // pressurises the discharge and 1.2 — the old stop itself — reverses
+          // the headrace. The ladder is in the engineering notes.
+          { key: "gap", label: "Nozzle gap", min: 0.16, max: 0.9, step: 0.02, value: DEF.gap, unit: "m" },
+        ],
+        solids: (W_, H_, P_, par) => geomFor(par).solids,
+        valves: (W_, H_, par) => { const g = geomFor(par); return [[XV, ZO - g.h, XV, ZO + g.h, 0.5]]; },
+        // Still water at the reservoir level in the reservoir, the headrace,
+        // the shaft and the penstock, up to the nozzle plate — and in no
+        // solid cell, so a column read mid-headrace is the bore and nothing
+        // else (V = q/d has to be the bore-mean velocity).
+        water: (x, z, P, par) => {
+          const level = Number.isFinite(P.level) ? P.level : LEVEL;
+          if (z >= level || x > XN - 0.25) return 0;
+          const g = geomFor(par);
+          for (const so of g.walls) if (GEOM.contains(so, x, z)) return 0;
+          // The head the water is filled to: the reservoir level, falling to
+          // the shaft's estimated steady level along the headrace and held
+          // there through the shaft and the penstock.
+          const f = flowOf(par, level);
+          const head = x < g.xw ? level
+                     : x < g.xs0 ? level - f.y0 * (x - g.xw) / (g.xs0 - g.xw)
+                     : level - f.y0;
+          return still(head, z, P);
+        },
+        // The estimated steady velocity field (see flowOf): a plug along the
+        // headrace, under the shaft, down the penstock axis and along the
+        // tailpipe to the nozzle; a slow drift toward the mouth in the
+        // reservoir; nothing in the shaft, the jet or the void.
+        flow: (x, z, P, par) => {
+          const level = Number.isFinite(P.level) ? P.level : LEVEL;
+          const g = geomFor(par), f = flowOf(par, level);
+          if (z >= level - f.y0 || x > XN - 0.25) return null;
+          if (x < g.xw) return z > g.zi ? [f.q / (level - g.zi), 0] : null;
+          if (x < g.xs1 && z > g.zi && z < g.zs) return [f.u0, 0];
+          const s = (x - g.xk) * g.tx + (z - g.zk) * g.tz;
+          const nn = (x - g.xk) * g.nx + (z - g.zk) * g.nz;
+          if (s >= 0 && s <= g.sD && Math.abs(nn) <= g.h) return [f.up * g.tx, f.up * g.tz];
+          if (x >= g.B[0] - 0.5 && Math.abs(z - ZO) < g.h) return [f.up, 0];
+          return null;
+        },
+        geom: geomFor,                           // handy from APP.sim.scene, for rigs and tests
+        tips: ["Drop a <b>gauge</b> in the shaft and one in the reservoir, then press <b>V</b> to slam the valve.",
+               "The shaft stands below the reservoir by the headrace friction loss — a piezometer at the knee.",
+               "After the slam the shaft rises about u₀·√(L·D_h/(g·D_s)) less the friction — read the crest off the gauge trace.",
+               "Widen the shaft (Controls → Geometry) and the upsurge falls as 1/√D_s while the period grows as √D_s.",
+               "The penstock still takes the Joukowsky pulse: gauge it near the valve on the h channel."] };
+    })(),
+
     // Establishment: shaped so the rigid-column derivation is actually valid,
     // which the hammer scene cannot offer (there the rise is over inside one
     // wave transit and the trace is Allievi's staircase). The rise must span

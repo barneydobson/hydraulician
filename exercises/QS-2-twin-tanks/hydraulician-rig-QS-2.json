@@ -1,0 +1,74 @@
+{
+  "v": 2,
+  "scene": "two-tank",
+  "segs": [],
+  "open": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "valveClosed": 1,
+  "inflow": {
+    "on": 0,
+    "free": 0,
+    "level": 0,
+    "q": 0
+  },
+  "tailwater": {
+    "on": 0,
+    "level": 0
+  },
+  "source": {
+    "on": 0,
+    "x": 0.5,
+    "z": 4,
+    "r": 0.12,
+    "vx": 1.2,
+    "vz": -1.6
+  },
+  "wave": {
+    "on": 0,
+    "amp": 0,
+    "period": 1.5,
+    "x": 0.15
+  },
+  "hyd": {
+    "c": 35,
+    "cf": 0.25,
+    "cs": 0.4,
+    "bulk": 0.1,
+    "ca": 0.6,
+    "nu": 1e-05,
+    "slip": 0,
+    "g": 9.81
+  },
+  "dye": {
+    "line": 0,
+    "decay": 0.02
+  },
+  "gauges": [
+    [
+      5,
+      0.35
+    ],
+    [
+      27.5,
+      0.35
+    ]
+  ],
+  "rakes": [],
+  "flux": [],
+  "ui": {
+    "mode": 1,
+    "field": "h",
+    "speed": 1,
+    "cvShow": "Q",
+    "channel": 0,
+    "labels": 1,
+    "jumps": 1,
+    "particles": 0,
+    "grade": 1,
+    "dye": 1
+  }
+}

@@ -282,6 +282,31 @@ const SCENES = (() => {
 
   const list = [
 
+    { id: "two-tank", name: "Two tanks · parallel ducts", key: "QS-2 · per metre width", group: "Sandbox",
+      blurb: "Two rectangular tanks exchange water through identical 15 m × 0.10 m ducts. Left starts high; the shallow right-hand charge keeps both outlets submerged.",
+      W: 32, H: 4, c: 35, cf: 0.25, cs: 0.40, hmax: 3.2, vmax: 2,
+      // Clear tank widths 9 m and 6 m. All dimensions describe water faces,
+      // not wall centrelines. Thick blocks leave no hidden under-floor void.
+      walls: () => [
+        [0, 0.1, 32, 0.1, 0.2],
+        [0.45, 0, 0.45, 4, 0.1],
+        [30.55, 0, 30.55, 4, 0.1],
+        [9.5, 0.25, 24.5, 0.25, 0.5],
+        [9.5, 0.77, 24.5, 0.77, 0.34],
+        [9.5, 2.52, 24.5, 2.52, 2.96],
+      ],
+      water: (x, z, P) => {
+        if (x < 0.5 || x > 30.5 || z < 0.2) return 0;
+        if (x < 9.5) return still(3.0, z, P);
+        if (x > 24.5) return still(1.2, z, P);
+        return ((z > 0.5 && z < 0.60) || (z > 0.94 && z < 1.04))
+          ? still(3.0 - 1.8 * (x - 9.5) / 15, z, P) : 0;
+      },
+      tips: ["Tank widths are 9 m and 6 m; storage and discharge are per metre out of the screen.",
+             "Each duct is 15 m long with a 0.10 m clear gap. Both branches see the same level difference.",
+             "The left level starts at 3.00 m and the right at 1.20 m. R restores this initial condition.",
+             "Use the QS-2 brief for the measured resistance and the prediction. Circular-pipe friction factors do not transfer directly to this slice."] },
+
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",
       blurb: "Water falls in at the top left. Left-drag to draw edges and route it; right-drag for a big flow.",
       W: 9, H: 5, c: 22, cf: 0.02, hmax: 1.2, vmax: 5,

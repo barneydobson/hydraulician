@@ -30,7 +30,7 @@
  *                  captured at, the open/closed edges, which supplies and
  *                  controls exist, and the levels/constants a README documents
  *                  as load-bearing (FR-1's 2.50 m tailwater, DA-2's 0.04 m
- *                  draining apron, QS-2's C_s = 0.40). CONTROLS ids → values;
+ *                  draining apron). CONTROLS ids → values;
  *                  key ORDER matters, because ticking a level control opens its
  *                  own edge, so edges come first.
  *   viewParams     APPLIED. Display and readout only — Field, Gauges plot,
@@ -696,35 +696,21 @@ const EXERCISES = [
   },
   {
     id: "QS-2",
-    title: "Two reservoirs finding a level",
+    title: "Two tanks and two parallel ducts",
     topic: "Quasi-steady flow",
     folder: "QS-2-twin-tanks",
-    scene: "sandbox",
-    rig: "QS-2",
-    // C_s = 0.40 is load-bearing (at the stock 0.16 the tanks equalise in
-    // 2–6 s); the reservoir is on so the fill in step 2 has a source.
-    rigParams: { budget: "Medium", spoutOn: false, cs: 0.40,
-                 openL: "0", openR: "0", openB: "0", openT: "0",
-                 inflowOn: true, inQ: 0, inLevel: 2.00 },
-    rigWhy: { cs: "at the stock 0.16 the tanks equalise in 2–6 s and there is nothing to time.",
-              inLevel: "the fill source for step 2; step 3 unticks it again." },
-    viewParams: { gaugeField: "h", mode: "0" },
-    digitNote: "your tank 2 width is DRAWN: A₂ = 0.50 + 0.25·d m, so its far wall goes at x = 3.60 + A₂. Your target level h* = (3.96 + 1.25·A₂)/(1.978 + A₂)",
-    setup: ["Move tank 2's far wall to x = 3.60 + your own A₂ (erase the shipped one first).",
-            "With the valve OPEN, fill tank 1 to 2.00 m from the reservoir; shut it (V) as tank 2 reaches 0.50 m.",
-            "Untick Upstream reservoir AND set the Left edge back to Wall, or it leaks through the run.",
-            "Let it stand, read both cards while the water is still, then press V and time the fall."],
+    scene: "two-tank",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { gaugeField: "h", mode: "1", grade: true, speed: 1 },
     instruments: [
-      { tool: "gauge", where: "x ≈ 0.9 m, z ≈ 0.30 m", why: "tank 1 — the fall you time" },
-      { tool: "gauge", where: "x ≈ 4.6 m, z ≈ 0.30 m", why: "tank 2 — the level it is finding" },
+      { tool: "gauge", where: "(5, 0.35) and (27.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
+      { tool: "flux", where: "x = 17 m, across each duct", why: "the two parallel discharges add; both branches see the same head difference" },
     ],
-    // Step 1 moves tank 2's far wall and step 2 slams the valve, so Wall,
-    // Erase and Valve all have to stay. The instruments above are gauges
-    // only, and without this the derived profile would hide BUILD entirely.
     ui: { build: true },
-    start: "twin tanks joined by a valved pipe, both empty",
-    task: "Follow the steps to fill and isolate, then press V and time tank 1 falling from 2.00 m to your own h*.",
-    settle: 5,
+    start: "9 m and 6 m wide tanks; two equal 15 m × 0.10 m ducts; left level 3.00 m, right level 1.20 m",
+    task: "Read the QS-2 brief and predict the two level changes from the measured 2D resistance. Place two gauges, press R, and compare at 120 s on the simulation clock. Storage and discharge are per metre of width.",
+    settle: 0,
   },
 
   // ------------------------------------------------------------- metering

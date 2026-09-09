@@ -56,7 +56,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | NC-2 | Is α really 1? | NC-2-alpha/ | s2 stations + gate wake | (station, α) |
 | NC-3 | Bed shear and riprap | NC-3-bed-shear/ | s2 sweep + m2 anchor | (τ₀, D_min) |
 | QS-1 | Predict the drain | QS-1-drain-predict/ | jet | (t_pred, t_meas) |
-| QS-2 | Two reservoirs find a level | QS-2-twin-tanks/ | RIG-C | (A₂, t_½) |
+| QS-2 | Two tanks and two parallel ducts | QS-2-twin-tanks/ | two-tank scene | level changes at 120 s, per metre width |
 | UN-1 | The class discovers c | UN-1-celerity/ | hammer + nozzle rungs | (v₀, ΔH) |
 | UN-2 | Flow establishment | UN-2-establishment/ | estab | (level, u_max, t_75) |
 | UN-3 | Surge tank: fit k to the decay | UN-3-surge-tank/ | hammer + standpipe | (k) |
@@ -89,5 +89,5 @@ pause-and-read promptly (the chart buffer keeps moving).
 | B10 | Lift the crest until the pipe gives up | B10-crest-vs-hgl/ | RIG-A + raised crest | (level, z_sep, HGL at the crest) |
 
 Rigs: RIG-A (pressurised duct) card = FR-1/rig.js · RIG-B (flat channel) card
-= WE-1/rig.js · RIG-C (twin tanks) card = QS-2/rig.js. Each dependent demo's
-rig.js extends its family card.
+= WE-1/rig.js. The historical RIG-C tank family is implemented independently
+in each dependent demo's rig.js; QS-2 now uses the two-tank scene.

@@ -1061,4 +1061,32 @@ const EXERCISES = [
     task: "Keep your own DA-1 weir, q and level exactly as they are and change ONLY the Resolution, then re-read H at the same station and recompute C_d.",
     settle: 55,
   },
+
+  // ------------------------------------------------------- hydrostatics
+  // A lecturer demo on the `dyke` scene: no rig payload, because the scene's
+  // own polygons ARE the rig, and no digit, because the point is watched, not
+  // pooled. `settle: 0` is deliberate — the water boots at rest and there is
+  // nothing to wait out; the wait that matters is the ~20 s after V, which
+  // the README states and the card's task says to watch, not to time.
+  {
+    id: "HS-1",
+    title: "Three surfaces, one level: a dyke and its piezometer",
+    topic: "Hydrostatics",
+    folder: "HS-1-dyke-piezometer",
+    scene: "dyke",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", particles: true, gaugeField: "h" },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "gauge", where: "x ≈ 1.2 m, z ≈ 1.3 m — the left basin", why: "h in the left basin: 4.00 m at boot" },
+      { tool: "gauge", where: "x ≈ 4.4 m, z ≈ 1.3 m — inside the culvert, under the piezometer", why: "h in the culvert reads the LEFT level while the valve is shut — the number the piezometer column stands at, without the tube" },
+      { tool: "gauge", where: "x ≈ 5.6 m, z ≈ 1.3 m — the right basin", why: "h in the right basin: 3.10 m, then the common level after V" },
+      { tool: "force", where: "the sloped Upstream face of the dyke; click the same block again to cycle to its Culvert roof; the Downstream face is on the block past the piezometer", why: "½ρg·d² sideways on each face, plus the weight of the water on the slope downward on the upstream one, and the uplift on the roof; after V both faces read the same horizontal force" },
+    ],
+    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead", "head"], panel: "shut" },
+    start: "a dyke between two reservoirs at 4.00 and 3.10 m, joined by a shut culvert with a piezometer tapped into its roof",
+    task: "Read the three levels and the two face forces while the valve is shut, then press V: watch the culvert run and the small basin fill, and read them again once the water is still — one level, equal forces.",
+    settle: 0,
+  },
 ];

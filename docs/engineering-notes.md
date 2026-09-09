@@ -719,6 +719,28 @@ having settled before anything calls into it.
   differently again — in true screen proportion, no vex — because it is a
   force vector, not a shape glued to the water, and an angle on it is one a
   straightedge on the screen should be able to measure.
+- **The pressure diagram's scale is ONE per scene, set at the first pick
+  from the largest head on any wall, and HELD — never refitted.** It used to
+  be refitted every frame — the largest head on the face always drawn 56 px
+  long — which made the diagram the same size whatever the pressure did.
+  Measured on HS-1's piezometer wall: the column swung 2.75–3.52 m and the
+  wall force 16–34 kN/m during the slosh, and the triangle on screen never
+  changed, with the entire reading pushed into the "1 m head = N px" chip
+  that nobody watches. A per-face scale was tried next and was wrong too: it
+  resized the diagram every time you clicked from one face to the next, so
+  the upstream face and the downstream face of the same dyke could not be
+  compared by eye. `forceScale()` in main.js now reads every named face of
+  every solid once, at the first pick, and stores `{headMax}` on
+  `state.forceScale`; every selection shares it, so the same pixels per
+  metre draw every face and a bigger triangle is a bigger force anywhere in
+  the scene. Cleared on a scene load. `drawForce` only ratchets `headMax` up
+  if a later reading exceeds it, so the diagram stays on the canvas; it
+  never comes back down. The length itself is `56 px × forceSize`, a
+  Controls row (so a `viewParams` key) for the case the scale cannot fix: a
+  submerged face in a narrow passage — HS-1's culvert roof hangs its arrows
+  into a 0.6 m culvert — whose diagram would otherwise run into the opposite
+  wall's. The same rule the colour ranges follow: explicit and held, because
+  a scale that tracks the reading erases it.
 - **Every wetted surface is clickable, and the wrappers that make it so are
   REGISTRATION-only — they never touch the mask.** `rasterise()` stamps the
   mask exactly as it always did, and only once that is done does it extend

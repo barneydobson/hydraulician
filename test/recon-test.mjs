@@ -357,5 +357,178 @@ ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12),
   ok("E4 reconstruct still runs under gravity", ran, why);
 }
 
+// ---- Group H: the specific-energy inlet ---------------------------------
+// A reservoir level is an ENERGY grade line, so the depth it delivers solves
+// E = d + q^2/(2 g d^2). The old inlet pinned the SURFACE at the level and
+// added the velocity head on top, which manufactures head: measured on s2 at
+// the shipped q = 1.2, the inlet energy line stood 0.264 m above the 2.07 m
+// reservoir it was supposed to come from.
+
+// H1: the returned depth actually solves the specific-energy equation. This is
+// the whole contract — everything else is which root and what happens when
+// there is none.
+{
+  const g = 9.81, q = 0.5, E = 0.9;
+  const r = RECON.inletDepth(E, q, g, "sub");
+  const res = r.d + q * q / (2 * g * r.d * r.d) - E;
+  ok("H1 subcritical root solves E = d + q^2/2gd^2", near(res, 0, 1e-10),
+     `d ${r.d}, residual ${res}`);
+}
+
+// H2: both roots exist and they straddle critical depth. Picking the wrong one
+// silently turns a mild reach supercritical at the inlet.
+{
+  const g = 9.81, q = 0.5, E = 0.9;
+  const dc = Math.cbrt(q * q / g);
+  const sub = RECON.inletDepth(E, q, g, "sub");
+  const sup = RECON.inletDepth(E, q, g, "super");
+  const rSup = sup.d + q * q / (2 * g * sup.d * sup.d) - E;
+  ok("H2 supercritical root also solves it", near(rSup, 0, 1e-10), `residual ${rSup}`);
+  ok("H2 the roots straddle d_c", sub.d > dc && sup.d < dc,
+     `sub ${sub.d}, dc ${dc}, super ${sup.d}`);
+}
+
+// H3: the point of the whole change. At a FIXED reservoir level the delivered
+// depth must FALL as q rises. The old boundary held it constant: measured on
+// s2, the inlet surface moved 32 mm across a 3x change in discharge.
+{
+  const g = 9.81, E = 0.9;
+  const ds = [0.1, 0.3, 0.5, 0.7].map((q) => RECON.inletDepth(E, q, g, "sub").d);
+  let falling = true;
+  for (let i = 1; i < ds.length; i++) if (!(ds[i] < ds[i - 1])) falling = false;
+  ok("H3 the delivered depth falls as q rises", falling, ds.join(", "));
+}
+
+// H4: q = 0 is still water — the level IS the surface, and no root solve
+// should wander off it.
+{
+  const r = RECON.inletDepth(0.9, 0, 9.81, "sub");
+  ok("H4 q = 0 delivers the level itself", near(r.d, 0.9, 1e-12), `got ${r.d}`);
+  ok("H4 and is not choked", r.choked === false, `choked ${r.choked}`);
+}
+
+// H5: a reservoir cannot pass more than its head allows. E < E_min = 1.5 d_c
+// has NO root, and the honest answer is critical depth plus a flag — not a
+// NaN, and not a silently-invented deeper section. s2 ships q = 1.2 against
+// E = 0.526 m, where q_max is 0.651: the scene demands 1.8x what the
+// reservoir can pass.
+{
+  const g = 9.81, q = 1.2, E = 0.526;
+  const dc = Math.cbrt(q * q / g);
+  const r = RECON.inletDepth(E, q, g, "sub");
+  ok("H5 an over-drawn reservoir reports choked", r.choked === true, `choked ${r.choked}`);
+  ok("H5 and falls back to critical depth", near(r.d, dc, 1e-12), `d ${r.d}, dc ${dc}`);
+  ok("H5 and reports the E_min it needed", near(r.Emin, 1.5 * dc, 1e-12), `Emin ${r.Emin}`);
+  ok("H5 and the capacity it actually has", near(r.qmax, Math.sqrt(g * Math.pow(2 * E / 3, 3)), 1e-12),
+     `qmax ${r.qmax}`);
+}
+
+// H6: exactly at critical the two roots coincide, and the solve must not fall
+// off the end of its bracket there.
+{
+  const g = 9.81, q = 0.5, dc = Math.cbrt(q * q / g), E = 1.5 * dc;
+  const sub = RECON.inletDepth(E, q, g, "sub");
+  ok("H6 at E = 1.5 d_c the root IS d_c", near(sub.d, dc, 1e-6), `d ${sub.d}, dc ${dc}`);
+  ok("H6 and it is not reported choked", sub.choked === false, `choked ${sub.choked}`);
+}
+
+// H7: the choke test is E < 1.5 d_c, not E < d_c. Between those two a
+// reservoir is deep enough to hold the water but not to accelerate it, and
+// reporting a depth there is the failure that puts more through the inlet than
+// the head can drive.
+{
+  const g = 9.81, q = 0.5, dc = Math.cbrt(q * q / g);
+  const r = RECON.inletDepth(0.5 * (dc + 1.5 * dc), q, g, "sub");
+  ok("H7 E between d_c and 1.5 d_c is choked", r.choked === true,
+     `dc ${dc}, Emin ${r.Emin}, choked ${r.choked}`);
+}
+
+// ---- Group K: the energy line's velocity head ----------------------------
+// The overlay drew surf + V^2/2g with V = q/d, so alpha was 1 by construction
+// and w was not in it at all. Measured on m2 off the Favre mean, alpha runs
+// 1.44 at x = 3 down to 1.21 at x = 13.3 — and because it VARIES, the drawn
+// line sags where alpha falls. That sag is a free outfall's apparent energy
+// loss, and it is not real.
+
+// K1: a uniform profile has alpha = 1. If this ever fails the convention has
+// drifted, because it is the one case where the old and new lines must agree.
+{
+  const n = 8, dx = 0.05, g = 9.81, U = 2;
+  const f = new Float64Array(n).fill(1), u = new Float64Array(n).fill(U);
+  const w = new Float64Array(n);
+  const r = RECON.columnEnergy(f, u, w, dx, g);
+  ok("K1 uniform profile has alpha = 1", near(r.alpha, 1, 1e-12), `alpha ${r.alpha}`);
+  ok("K1 and the velocity head is U^2/2g", near(r.hv, U * U / (2 * g), 1e-12), `hv ${r.hv}`);
+}
+
+// K2: a two-layer profile, half at u = 1 and half at u = 3. V = 2, and the
+// cube mean is (1 + 27)/2 = 14, so alpha = 14/2^3 = 1.75 exactly. Mean
+// velocity alone cannot see this — it is the whole error being corrected.
+{
+  const n = 8, dx = 0.05, g = 9.81;
+  const f = new Float64Array(n).fill(1), u = new Float64Array(n), w = new Float64Array(n);
+  for (let i = 0; i < n; i++) u[i] = i < n / 2 ? 1 : 3;
+  const r = RECON.columnEnergy(f, u, w, dx, g);
+  ok("K2 two-layer profile has alpha = 1.75", near(r.alpha, 1.75, 1e-12), `alpha ${r.alpha}`);
+  ok("K2 V is still the mean, 2", near(r.V, 2, 1e-12), `V ${r.V}`);
+}
+
+// K3: the vertical velocity carries kinetic energy too. With w = u the speed
+// squared doubles, so the head doubles — and at a brink w is most of it.
+{
+  const n = 6, dx = 0.05, g = 9.81, U = 2;
+  const f = new Float64Array(n).fill(1), u = new Float64Array(n).fill(U);
+  const w = new Float64Array(n).fill(U);
+  const r = RECON.columnEnergy(f, u, w, dx, g);
+  ok("K3 w is in the kinetic energy", near(r.alpha, 2, 1e-12), `alpha ${r.alpha}`);
+}
+
+// K4: alpha >= 1 always (power means), so the correction can only ever RAISE
+// the energy line. A profile that reported alpha < 1 would be drawing energy
+// the flow does not have.
+{
+  const n = 10, dx = 0.05, g = 9.81;
+  const f = new Float64Array(n).fill(1), u = new Float64Array(n), w = new Float64Array(n);
+  for (let i = 0; i < n; i++) { u[i] = 0.4 + 1.6 * Math.sqrt((i + 0.5) / n); w[i] = 0.1 * i; }
+  const r = RECON.columnEnergy(f, u, w, dx, g);
+  ok("K4 alpha is never below 1", r.alpha >= 1, `alpha ${r.alpha}`);
+}
+
+// K5: no NaN from a zero mass flux. The grade lines are drawn for every wet
+// column and one NaN poisons a whole polyline. STILL WATER is the case that
+// bites — d is real, but the flux in the denominator of ke/(g*m) is zero — so
+// the depth is asserted too, which is what stops this passing on a function
+// that returns zero for everything.
+{
+  const n = 5, dx = 0.05, g = 9.81;
+  const f = new Float64Array(n).fill(1), z = new Float64Array(n);
+  const still = RECON.columnEnergy(f, z, z, dx, g);
+  ok("K5 still water has a real depth", near(still.d, n * dx, 1e-12), `d ${still.d}`);
+  ok("K5 and no velocity head, without dividing by zero",
+     still.hv === 0 && Number.isFinite(still.alpha), JSON.stringify(still));
+  const dry = RECON.columnEnergy(z, z, z, dx, g);
+  ok("K5 a dry column is zero throughout",
+     dry.d === 0 && dry.hv === 0 && Number.isFinite(dry.alpha), JSON.stringify(dry));
+}
+
+// K6: f is the DENSITY as well as the fill, so a pressurised cell carries mass
+// that a clamped fill throws away. The depth is geometric and takes min(f,1);
+// the two FLUXES take f raw — the same split FS_COL makes. The velocities have
+// to differ between the full and the over-full cells or clamping scales the
+// numerator and denominator of hv alike and cancels itself out.
+{
+  const dx = 0.05, g = 9.81;
+  const f = new Float64Array([1, 1, 1.5, 1.5]);
+  const u = new Float64Array([1, 1, 3, 3]);
+  const w = new Float64Array(4);
+  const r = RECON.columnEnergy(f, u, w, dx, g);
+  ok("K6 depth is geometric — the slot storage is not extra depth",
+     near(r.d, 4 * dx, 1e-12), `d ${r.d}`);
+  ok("K6 the mass flux counts the pressurised part",
+     near(r.q, (1 + 1 + 4.5 + 4.5) * dx, 1e-12), `q ${r.q}`);
+  ok("K6 and so does the kinetic energy flux",
+     near(r.hv, ((1 + 1 + 40.5 + 40.5) / 2 * dx) / (g * r.q), 1e-12), `hv ${r.hv}`);
+}
+
 console.log(`${passed} passed, ${failures.length} failed`);
 if (failures.length) { for (const f of failures) console.error("  FAIL " + f); process.exit(1); }

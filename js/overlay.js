@@ -80,7 +80,7 @@ const OVERLAY = (() => {
     // space and _hA/_qA/_ynK would smooth in time a second time, which shows
     // up as a jump broadened by the filter rather than by the flow.
     const AVG = !!(opts && opts.averaged);
-    const out = { bed: [], d: [], q: [], surf: [], dc: [], dn: [], S0: [], V: [], Fr: [] };
+    const out = { bed: [], d: [], q: [], surf: [], dc: [], dn: [], S0: [], V: [], Fr: [], hv: [] };
 
     const win = Math.max(5, Math.round(nx * 0.09));
     const bd = new Float32Array(nx), use = new Float32Array(nx);
@@ -184,8 +184,31 @@ const OVERLAY = (() => {
     // --- friction slope from the energy grade line. The window has to be a
     //     decent fraction of the reach: in a backwater curve dE/dx is small and
     //     differencing it over a short window is mostly noise.
+    //
+    //     UNDER AVERAGING the velocity head is the TRUE kinetic energy the
+    //     flow carries per unit weight of it (`opts.hv`, from
+    //     SIM.hydraulicGrade), not the mean-velocity head V^2/2g. The two
+    //     differ by the kinetic-energy correction coefficient alpha, and alpha
+    //     is neither 1 nor constant: MEASURED on m2 off the Favre mean it runs
+    //     1.58 at x = 2 down to 1.22 at x = 13.3. A CONSTANT alpha would only
+    //     lift the line; a VARYING one tilts it, and because it falls towards a
+    //     drawdown the old line sagged exactly there — the gap it was short by
+    //     grows from 11 mm through the uniform reach to 16 mm at the lip.
+    //
+    //     LIVE, there is no alpha to have: the third moment of an instantaneous
+    //     field is dominated by the fluctuation, not the profile (the same
+    //     seven stations scatter 1.43-2.41 with no trend), so hv arrives null
+    //     and this falls back to the mean-velocity head it always drew. The
+    //     reasoning, and the measurements that settled it, are on
+    //     SIM.hydraulicGrade. The same fallback covers a column the head walk
+    //     found dry.
+    const hv = opts && opts.hv;
     const Efull = new Float32Array(nx);
-    for (let i = 0; i < nx; i++) Efull[i] = out.surf[i] + out.V[i] * out.V[i] / (2 * g);
+    for (let i = 0; i < nx; i++) {
+      const k = hv && isFinite(hv[i]) ? hv[i] : out.V[i] * out.V[i] / (2 * g);
+      out.hv.push(k);
+      Efull[i] = out.surf[i] + k;
+    }
     const ew = Math.max(3, Math.round(Math.min(1.5, S.W * 0.10) / dx));
     const pe = new Float32Array(nx + 1);
     for (let i = 0; i < nx; i++) pe[i + 1] = pe[i] + Efull[i];
@@ -500,15 +523,23 @@ const OVERLAY = (() => {
    *  it most. And the HYDRAULIC grade line was not drawn at all.
    *
    *  Both are drawn here for every column that has water in it, pressurised or
-   *  not, and the pair is the point: they are separated by the velocity head
-   *  V^2/2g, so the gap between them IS the kinetic energy, drawn to scale. In
-   *  a steady free-surface reach the HGL lies on the water surface; in a pipe
-   *  it leaves the crown and the picture stops being a cartoon.
+   *  not, and the pair is the point: the gap between them IS the kinetic
+   *  energy, drawn to scale. In a steady free-surface reach the HGL lies on
+   *  the water surface; in a pipe it leaves the crown and the picture stops
+   *  being a cartoon.
    *
    *  `hgl` is SIM.hydraulicGrade()'s array (piezometric head per column, NaN
-   *  where dry). The energy line is that plus the velocity head, so the two
-   *  are consistent by construction rather than by two separate estimates that
-   *  can disagree about where the water is. */
+   *  where dry) and `hgl.hv` the true velocity head that rides with it. The
+   *  energy line is the sum, so the two are consistent by construction rather
+   *  than by two separate estimates that can disagree about where the water
+   *  is — and it is the SAME hv OVERLAY.analyse drew its own energy line at.
+   *
+   *  UNDER AVERAGING that gap is a real kinetic energy rather than V^2/2g: it
+   *  carries the profile's alpha and the vertical velocity, both of which
+   *  matter most exactly where this line is most worth looking at — a brink, a
+   *  chute toe, a contraction. Live it is the mean-velocity head, because an
+   *  instantaneous profile has no alpha worth the name; SIM.hydraulicGrade
+   *  carries the measurements behind that split. */
   function drawGradeLines(ctx, V, A, sim, hgl) {
     if (!hgl) return;
     const nx = sim.nx, step = Math.max(1, Math.round(nx / 900));
@@ -517,9 +548,10 @@ const OVERLAY = (() => {
     for (let i = 0; i < nx; i += step) {
       const x = V.X((i + 0.5) * sim.dx), h = hgl[i];
       if (isFinite(h)) {
-        const v = A.V[i] || 0;
+        const k = hgl.hv && isFinite(hgl.hv[i]) ? hgl.hv[i]
+                : (A.V[i] || 0) * (A.V[i] || 0) / (2 * g);
         ph.push([x, V.Y(h)]);
-        pe.push([x, V.Y(h + v * v / (2 * g))]);
+        pe.push([x, V.Y(h + k)]);
       } else { ph.push(null); pe.push(null); }
     }
     line(ctx, pe, C.egl, 1.4, [6, 3]);

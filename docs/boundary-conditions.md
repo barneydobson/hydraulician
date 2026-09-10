@@ -133,8 +133,11 @@ EOS written in the state variable:
 f \;=\; 1 + \frac{g\,(L - z)}{c^2} \quad (z < L), \qquad f = 0 \ \text{above},
 ```
 
-with `L` the control level. Levels are **elevations above the domain floor
-(the datum), not depths over the bed** — the panel prints both.
+with `L` the **surface the control is pinning**. For the tailwater that is its
+level directly. For the upstream reservoir it is the *delivered stage*, which
+is a velocity head below the level — see "The reservoir level is an energy
+grade line" below. Levels are **elevations above the domain floor (the datum),
+not depths over the bed** — the panel prints both.
 
 **The control band.** The Dirichlet is applied only over the contiguous open
 run of cells in the boundary column that contains the level (`columnBand` in
@@ -144,27 +147,70 @@ pressurises the pocket to the clamp with no feedback — the steep-scene
 explosion. If the level sits above every run (a plan-view duct fed at
 "level 99"), the topmost run below it is used.
 
+**The reservoir level is an energy grade line, not a surface.** The water in a
+reservoir is at rest, so its surface *is* the total head, and the depth that
+arrives in the channel is the one that satisfies
+
+```math
+L - z_b \;=\; E \;=\; d \;+\; \frac{q^2}{2 g d^2},
+```
+
+solved CPU-side by `RECON.inletDepth` through `SIM.inletStage`. The delivered
+depth therefore **falls as `q` rises**, which is the whole point: pinning the
+surface *at* the level instead — what this boundary used to do — adds the
+velocity head on top of the reservoir rather than taking it out of it.
+Measured on s2, the inlet energy line stood 0.26 m above its own 2.07 m
+reservoir at the shipped `q` = 1.2 and 0.66 m above it at `q` = 1.8, while the
+surface itself moved 32 mm across that entire range.
+
+The equation has two roots straddling `d_c` and the caller picks
+(`inflow.branch`, default the subcritical one), because the choice belongs to
+the reach and not to the boundary. Below `E_min = 1.5 d_c` it has **no** root:
+the reservoir cannot pass that discharge at that level, `q_max = √(g(2E/3)³)`
+is what it can, and the inlet holds `d_c` and says so on the panel rather than
+inventing a section. That is not a failure mode — it is what a crest does.
+
+`u_in.x` therefore carries the **delivered stage**, not the level; the level
+stays on the CPU and on the ∇ marker, which is labelled "energy line" so
+nobody reads it as a promised surface.
+
 **The inflow edge** has two modes, per the `free` flag:
 
 - *Prescribed-q* (`free` = 0): the interior column `i = 1` carries a velocity
   plug over the control band, at the velocity `inletVel()` derives from `q`
-  and the depth actually available between the inlet run's bed and the
-  reservoir level. The plug's top three cells taper to zero — a hard velocity
-  step at the waterline waterfalls into the slightly drawn-down interior
-  surface and sheds ripples forever — and `inletVel()` repays the lost
-  discharge with a `1.5 Δx` offset. A submerged duct (band top below the
-  nominal level) keeps the full plug; there is no free surface there to
-  protect. Scenes may pin the velocity directly (`inflow.v`).
+  and the depth the reservoir **delivers**. The plug's top three cells taper
+  to zero — a hard velocity step at the waterline waterfalls into the slightly
+  drawn-down interior surface and sheds ripples forever — and `inletVel()`
+  repays the lost discharge with a `1.5 Δx` offset (mass before energy: a
+  reach fed the wrong discharge is wrong everywhere). A submerged duct (band
+  top below the nominal level) keeps the full plug and the level goes back to
+  being a piezometric head; there is no free surface there to draw down.
+  Scenes may pin the velocity directly (`inflow.v`), which likewise bypasses
+  the solve.
 - *Head-driven* (`free` = 1): only the level is pinned and the head difference
   drives the discharge — how the water-hammer and venturi scenes feed
-  themselves. The `q` slider is inert; the panel prints the measured delivered
+  themselves. Nothing is prescribed, so there is no energy equation to solve
+  and the level stays a still-water head; the drawdown happens *inside* the
+  domain, in the reservoir compartment the scene builds for it. Measured on
+  estab, `H` holds at 3.80–3.83 m against a 3.80 m level the whole length of
+  the pipe. The `q` slider is inert; the panel prints the measured delivered
   discharge instead.
 
-The inlet pins the surface *at* its level, so a scene must set the level the
-arriving profile actually wants (m1's `inletDepth` is the measured weir
-backwater, not `d_n`): pinned lower, the boundary chokes the backwater and
-sheds ripples for ever. The adaptive alternatives were tried and reverted —
+A scene still states the **depth its arriving profile wants** (m1's
+`inletDepth` is the measured weir backwater, not `d_n`); `inletLevel()` in
+`js/scenes.js` converts that to the energy line the boundary needs, so every
+measured `inletDepth` goes on meaning what its comment says. Set the level to
+the bare depth instead and every scene is pinned a velocity head too shallow —
+11 mm on m1, 26 mm on m2, 271 mm on the steep pair — which is the old failure
+under a new name: an inlet pinned below what the flow wants chokes the profile
+and sheds ripples for ever. The adaptive alternatives were tried and reverted —
 see [Soft level boundaries](engineering-notes.md#guard-rails-each-bought-with-an-explosion).
+
+The energy line is a head, never a water surface: `inLevel` feeds the boundary
+and `inSurf` (the bare `bed + inletDepth`) initialises the water. Filling a
+gate pool or a drop's approach to the energy line starts the scene with water
+it has to shed — it cost h23 its hydraulic jump and pushed m1's mean column
+flux outside its conservation gate.
 
 **The tailwater edge** pins the level only. It must stand clear of critical
 depth — `≥ 1.3 d_c` is the floor to clear, rechecked whenever `q` changes,
@@ -259,7 +305,7 @@ Where each piece of the above enters the GPU passes; all are set in
 | `u_S` (texture) | the solid mask (0 / 128 / 255, as 0 / 0.5 / 1) | both passes via `SO()` |
 | `u_valve` | 1 = valves solid | `SO()` |
 | `u_openMode` | `[L, R, B, T]`, 0 wall / 1 open / 2 outfall | vof ghost ring |
-| `u_in` | inflow: level, `inletVel()`, on, free | vel plug, vof ghost + sponge |
+| `u_in` | inflow: **delivered stage** (not the level — see §4), `inletVel()`, on, free | vel plug, vof ghost + sponge |
 | `u_tw` | tailwater: level, on | vel clamp, vof ghost + sponge |
 | `u_inBand`, `u_twBand` | the control band z-range from `columnBand` | vel plug, vof ghost + sponge |
 | `u_spongeN` | sponge widths in columns (from metres per scene) | vof sponges |

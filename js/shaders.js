@@ -79,7 +79,11 @@ uniform float u_gx;           // downstream gravity component: a scene with a
                               // excite waves) and tilts gravity by S0 instead
 uniform float u_c, u_c2;      // slot celerity and its square
 uniform float u_valve;        // 1 = valves closed (solid), 0 = open
-uniform vec4  u_in;           // left reservoir: level (m), velocity (m/s), on, free
+uniform vec4  u_in;           // left reservoir: PINNED SURFACE (m), velocity (m/s), on, free
+                              //   .x is the stage the reservoir DELIVERS, not the
+                              //   reservoir level: the level is an energy line and
+                              //   the surface sits a velocity head below it. The
+                              //   solve is CPU-side in SIM.inletStage().
                               // free = 1 pins the level only and lets the head drive the flow
 uniform vec2  u_tw;           // right tailwater: level (m), on
 uniform vec2  u_inBand;       // z-range the inflow control applies to (bed of the
@@ -273,6 +277,10 @@ void main(){
   // one-cell Dirichlet can resonate with the pond slosh right up to it —
   // the drowned-jump scenes used to pump themselves apart at t ≈ 40 s.
   float gMag = abs(u_g);
+  // Torricelli off the PINNED SURFACE, which is at or below the reservoir
+  // level, so the bound only ever tightens with the change of u_in.x's
+  // meaning. It is a resonance guard with metres of headroom (s2 runs an
+  // inlet plug of 2.3 m/s under a cap of 6.4), not a physical statement.
   float capR = (u_tw.y > 0.5) ? sqrt(2.0 * gMag * max(u_tw.x, 0.05)) + 1.0 : capBase;
   float capL = (u_in.z > 0.5) ? sqrt(2.0 * gMag * max(u_in.x, 0.05)) + 1.0 : capBase;
   if (i == 0)          wn = tE.g;

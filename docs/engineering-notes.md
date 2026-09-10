@@ -130,13 +130,35 @@ settling at the end of a run.
   stops waterfalling ripples into the drawn-down interior surface; submerged
   ducts (level above the whole run) keep the full plug. Levels are
   ELEVATIONS above the domain floor (the datum), not depths over the bed —
-  the panel prints both. The inlet pins the surface AT its level, so a scene
-  must set the level the arriving profile actually wants (m1's inletDepth is
-  the MEASURED weir backwater at the inlet, not d_n): pinned lower, the
-  boundary chokes the backwater and shed ripples for ever. An adaptive
-  "ride the backwater" inlet was tried and reverted — it hunts (visibly on
-  M2) and can self-feed at steep crests; so was a pressure-feedback rating
-  on the plug — it neither hurt nor helped.
+  the panel prints both. A scene must still set the depth the arriving profile
+  actually wants (m1's inletDepth is the MEASURED weir backwater at the inlet,
+  not d_n): pinned lower, the boundary chokes the backwater and sheds ripples
+  for ever. An adaptive "ride the backwater" inlet was tried and reverted — it
+  hunts (visibly on M2) and can self-feed at steep crests; so was a
+  pressure-feedback rating on the plug — it neither hurt nor helped.
+- **The reservoir level is an ENERGY line, and the inlet solves for its own
+  depth.** The inlet used to pin the surface AT the level, which adds the
+  velocity head on top of the reservoir instead of taking it out: measured on
+  s2, the inlet energy line stood 0.26 m above its own 2.07 m reservoir at the
+  shipped q = 1.2 and 0.66 m above it at q = 1.8, while the surface moved 32 mm
+  across that whole 3x range. It now solves E = d + q²/2gd² (RECON.inletDepth
+  via SIM.inletStage), so the delivered depth FALLS as q rises, and refuses
+  above q_max = √(g(2E/3)³) — holding d_c and saying so, which is what a crest
+  does. Three things this cost, all of them measured:
+    * Scenes state a DEPTH; `inletLevel()` in js/scenes.js turns it into the
+      energy line. Skip that and every scene sits a velocity head too shallow
+      (11 mm on m1, 26 mm on m2, 271 mm on the steep pair) — m1's mean column
+      flux then spread 0.0109 against its 0.01 conservation gate, and m3
+      returned a POSITIVE energy sample.
+    * The energy line is a head, NEVER a water surface. `inSurf` (bed +
+      inletDepth) initialises the water; handing `inLevel` to `still()` filled
+      h23's approach 110 mm deep and it stopped forming a hydraulic jump at
+      all — deterministically, three runs each way.
+    * Head-driven inflow prescribes no discharge, so it has no velocity head to
+      subtract and keeps a still-water level; the drawdown happens inside the
+      compartment the scene builds. Measured on estab, H holds at 3.80–3.83 m
+      against a 3.80 m level the whole length of the pipe. Submerged runs and
+      scenes pinning `inflow.v` likewise bypass the solve.
 - **A tailwater must stand clear of critical depth.** Re-check it every time
   `q` changes, because `d_c = (q²/g)^⅓` moves with it. A subcritical level
   control set AT d_c is degenerate: the outlet chokes at critical, the reach
@@ -340,6 +362,29 @@ Normal depth and Manning's n are read off the solver rather than derived from
 ```
 d_n = d·(S_f/S₀)^⅓        n = d^⅔ √S_f / V
 ```
+
+**What "H" means in that formula.** The energy line is drawn at the surface plus
+the KINETIC ENERGY the flow actually carries per unit weight of it, not at the
+mean-velocity head `V²/2g` — the two differ by the correction coefficient `α`,
+and `α` is neither 1 nor constant. Measured on m2 off the Favre mean it runs
+1.58 at x = 2 down to 1.22 at x = 13.3. A constant `α` would only lift the
+line; a VARYING one tilts it, and because it falls towards a drawdown the old
+line sagged exactly there — the head it was short by grew from 11 mm through
+the uniform reach to 16 mm at the lip, which reads as an energy loss that is
+not happening. The integrals ride `SIM.hydraulicGrade`'s existing full-field
+readback (`RECON.columnEnergy`), so they cost flops and not a second sync, and
+the vertical velocity is in them: at a brink it is most of the kinetic energy.
+
+**Only under Average**, and that is physics rather than thrift. `α` is defined
+on a MEAN profile; the third moment of an instantaneous field is dominated by
+the fluctuation instead. The same seven m2 stations read 2.35, 1.93, 1.58,
+2.41, 1.43, 1.75, 1.43 live — a whole unit of scatter with no trend, and a
+reach loss of 0.1405 m against the mean flow's 0.0775 m. Time-averaging that
+instantaneous head does not rescue it: it converges on `α ≈ 1.9` roughly
+uniformly, which UNDERSTATES the reach loss by about half. So the live line
+keeps `V²/2g`, which is what it always drew, and the corrected line is one more
+thing Average mode is for. `n` and `d_n` follow the line they are measured off,
+so a number quoted here is an Average-mode number.
 
 This matters because the effective resistance is **not** just `C_f`: the no-slip
 wall adds stress through the eddy viscosity, and a sloping bed rasterised onto a

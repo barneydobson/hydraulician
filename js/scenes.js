@@ -86,6 +86,27 @@ const SCENES = (() => {
   // puts the depth in zone 1, 2 or 3.
   const TH = 1.4;                          // bed thickness — reaches below z=0
 
+  /** A scene states the DEPTH its arriving profile wants (`inletDepth`, always
+   *  a measured number — m1's is the weir backwater, m2's the measured d_n).
+   *  The reservoir level that delivers it is that depth plus its velocity
+   *  head, because the level is an ENERGY line: the boundary solves
+   *  E = d + q²/2gd² for what it hands over (SIM.inletStage).
+   *
+   *  Doing the conversion HERE is what lets every `inletDepth` in this file go
+   *  on meaning exactly what its comment says it means. Set the level to the
+   *  bare depth instead and every scene is pinned a velocity head too shallow
+   *  — 11 mm on m1, 26 mm on m2, 271 mm on the steep pair — which is the
+   *  failure the engineering notes already describe: an inlet pinned under
+   *  what the flow wants chokes the profile and sheds ripples for ever. It
+   *  cost two physics gates when it was tried: m1's mean column flux spread
+   *  0.0109 against a 0.01 limit (0.0022 settled), and m3 turned in a positive
+   *  energy sample.
+   *
+   *  Head-driven inflow prescribes no discharge, so there is no velocity head
+   *  to add: its level is a still-water head and stays one. */
+  const inletLevel = (bed, depth, q, free) =>
+    bed + depth + (free || !(q > 0) ? 0 : (q * q) / (2 * 9.81 * depth * depth));
+
   function channel(o) {
     const W = o.W, H = o.H, xEnd = o.xEnd === undefined ? W : o.xEnd;
     // tilt: draw the bed FLAT (grid-aligned, so there is no rasterisation
@@ -103,7 +124,11 @@ const SCENES = (() => {
     const off = (TH / 2) * Math.sqrt(1 + S0g * S0g);
     const offB = (TH / 2) * Math.sqrt(1 + S0b * S0b);
     const outBed = bedTop(xEnd);
-    const inLevel = o.bed0 + o.inletDepth;
+    const inLevel = inletLevel(o.bed0, o.inletDepth, o.q, o.free);
+    // The SURFACE that depth stands at. inLevel is an energy line and is a
+    // velocity head above it, so it must never be handed to `still()` — filling
+    // a gate pool to the energy line starts the scene with water it has to shed.
+    const inSurf = o.bed0 + o.inletDepth;
     const twLevel = o.tail === undefined ? 0 : outBed + o.tail;
 
     // A butt-ended sloping slab is cut PERPENDICULAR to its axis, so its top
@@ -136,7 +161,7 @@ const SCENES = (() => {
     const water = (x, z, P) => {
       if (x >= xEnd || z <= bedTop(x)) return 0;
       let lev;
-      if (o.gate && x < o.gate.x) lev = inLevel;                 // pool behind the gate
+      if (o.gate && x < o.gate.x) lev = inSurf;                  // pool behind the gate
       else if (o.weir && x < o.weir.x) lev = Math.max(crest, bedTop(x) + d0);
       else lev = Math.max(bedTop(x) + d0, twLevel);
       return still(lev, z, P);
@@ -203,7 +228,8 @@ const SCENES = (() => {
     // recession (overlapping the approach slab, which is harmless).
     const ext = (TH / 2) * sr / Math.sqrt(1 + sr * sr) * 1.3;
     const twLevel = apron(W) + o.tail;
-    const inLevel = o.hi + o.inletDepth;
+    const inLevel = inletLevel(o.hi, o.inletDepth, o.q, 0);
+    const inSurf = o.hi + o.inletDepth;      // the surface, not the energy line
     return Object.assign({
       chan: 1, group: "Open channel — surface profiles",
       id: o.id, name: o.name, key: o.key, blurb: o.blurb, tips: o.tips,
@@ -221,7 +247,7 @@ const SCENES = (() => {
       water: (x, z, P) => {
         const bed = x < o.xa ? o.hi : (x < o.xb ? o.hi - sr * (x - o.xa) : apron(x));
         if (z <= bed) return 0;
-        const lev = x < o.xa ? inLevel : Math.max(bed + 0.10, twLevel);
+        const lev = x < o.xa ? inSurf : Math.max(bed + 0.10, twLevel);
         return still(lev, z, P);
       },
     }, o.extra || {});
@@ -479,20 +505,20 @@ const SCENES = (() => {
     // z = 0.35, flat both sides of the crest (a mild reach, same bed level
     // m1/m2 use, but no slope — the point here is the crest, not the reach).
     //   d_c = (q²/g)^⅓ = 0.1854 m at q = 0.25. inletDepth 0.34 m is a
-    // subcritical approach depth comfortably above d_c. NO velocity head
-    // goes into the inflow level: on THIS branch (polygon-geometry, off
-    // main) there is no energy-line inlet solve — sim.js's inletVel() finds
-    // the boundary VELOCITY from level and q (v = q / depth-at-boundary), it
-    // does not back-solve level from an energy target — and channel()'s own
-    // inLevel is bed0 + inletDepth, same convention, no velocity head. So
-    // `inflow.level` here IS the pinned boundary surface, plain:
-    //   level = bed0 + d = 0.35 + 0.34 = 0.69 m.
-    // (Adding q²/2gd² on top was tried and measured wrong: with the hump
-    // removed the approach settled at 0.7172 m — the boundary pins the
-    // surface directly, so the extra term just bought 27 mm of unwanted
-    // depth. The reservoir-energy-line branch, unmerged as of this writing,
-    // adds a real energy-line inlet solve; once that lands this scene should
-    // revisit whether to hand it a level or an energy line.)
+    // subcritical approach depth comfortably above d_c. The inflow level is
+    // an ENERGY line, not the surface (see `inletLevel` above and
+    // SIM.inletStage): the boundary solves E = d + q²/2gd² for the depth it
+    // delivers, so the level that delivers d = 0.34 m is the surface plus its
+    // velocity head — the same conversion channel() applies to every scene
+    // built through it, written out here because this entry bypasses it:
+    //   level = bed0 + d + q²/2gd² = 0.35 + 0.34 + 0.0276 = 0.7176 m.
+    // (History: while this scene was built on the polygon-geometry branch the
+    // inlet still pinned the SURFACE at `level`, so 0.69 was right then and
+    // adding the velocity head measured 27 mm too deep. The energy-line inlet
+    // landed with the reservoir-energy-line merge, and this is the revisit
+    // that comment asked for: handing 0.69 to the new boundary would pin the
+    // approach 28 mm under the depth it wants, which is the choked-inlet
+    // ripple failure the engineering notes describe.)
     // Tailwater stands at bed0 + 0.30 = 0.65 m — a tail depth of 0.30 m
     // against d_c = 0.1854 m is 1.3 d_c ≈ 0.241 m clear, the AGENTS.md floor
     // for a subcritical downstream control.
@@ -532,7 +558,8 @@ const SCENES = (() => {
       // station to read.
       spinup: 10, dyeLine: 0.9,
       open: [1, 1, 0, 0],
-      inflow: { level: 0.69, q: 0.25, on: 1, free: 0 },
+      // 0.35 + 0.34 + 0.25²/(2·9.81·0.34²): the energy line that delivers d = 0.34.
+      inflow: { level: 0.7176, q: 0.25, on: 1, free: 0 },
       tailwater: { level: 0.65, on: 1 },     // mild control downstream
       params: [{ key: "hump_h", label: "Hump height", min: 0, max: 0.45,
                  step: 0.005, value: 0.15, unit: "m" }],

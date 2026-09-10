@@ -2,12 +2,10 @@
 /**
  * exercises.js — the teaching pack as data.
  *
- * Forty verified demos live in `exercises/<folder>/README.md`, each with a
- * lecturer setup, a student worksheet and a verification record. This file is
- * the machine-readable half of that: enough to put a student in front of the
- * SAME correctly-plumbed rig as everybody else, and to tell them what their own
- * numbers are. The README stays authoritative for everything a human needs to
- * read, and every card links to it.
+ * The card is the complete student exercise: setup, assignment, actions and
+ * readings, including any data/formulas needed to do it without another
+ * document. Each folder's README is lecturer-only: derivation, worked
+ * answers and verification. HS-1 is the model for a concise standalone card.
  *
  * Every number here is the SHIPPED value from the demo's own README —
  * remeasured constants, not the ones the original programme sheet promised.
@@ -30,7 +28,7 @@
  *                  captured at, the open/closed edges, which supplies and
  *                  controls exist, and the levels/constants a README documents
  *                  as load-bearing (FR-1's 2.50 m tailwater, DA-2's 0.04 m
- *                  draining apron, QS-2's C_s = 0.40). CONTROLS ids → values;
+ *                  draining apron). CONTROLS ids → values;
  *                  key ORDER matters, because ticking a level control opens its
  *                  own edge, so edges come first.
  *   viewParams     APPLIED. Display and readout only — Field, Gauges plot,
@@ -118,13 +116,11 @@
  *            everything in one click, which is what keeps the standing
  *            acceptance test (the sandbox reproduces any scene by hand) true.
  *
- * HOW SHORT `start` AND `task` ARE IS THE POINT. This pack is read in a lecture
- * theatre by somebody whose lecturer is already saying what to do, or at home
- * beside the README. The card carries no cautions, no reasons, no procedure for
- * a drawn personalisation and nothing about handing work in — a `submit` list
- * and a `notes` paragraph were both tried on the card and removed, because the
- * card that says everything is the card nobody reads. All of it is still in
- * `exercises/<folder>/README.md`, which every card links to.
+ * A card must stand alone. `start` describes the bench, `instruments.where`
+ * gives the stations and `task` says what to do and read afterwards. Use
+ * `setup` for ordered steps and necessary calculation data. Do not send the
+ * student to the README for an equation, a procedure or what to record.
+ * Derivations, worked answers and verification remain in lecturer notes.
  *
  * Standing rules every worksheet carries: Resolution Medium · wait out the
  * settle · median-of-the-wobble reads, never one frame · after changing q,
@@ -721,35 +717,28 @@ const EXERCISES = [
   },
   {
     id: "QS-2",
-    title: "Two reservoirs finding a level",
+    title: "Two tanks and two parallel ducts",
     topic: "Quasi-steady flow",
     folder: "QS-2-twin-tanks",
-    scene: "sandbox",
-    rig: "QS-2",
-    // C_s = 0.40 is load-bearing (at the stock 0.16 the tanks equalise in
-    // 2–6 s); the reservoir is on so the fill in step 2 has a source.
-    rigParams: { budget: "Medium", spoutOn: false, cs: 0.40,
-                 openL: "0", openR: "0", openB: "0", openT: "0",
-                 inflowOn: true, inQ: 0, inLevel: 2.00 },
-    rigWhy: { cs: "at the stock 0.16 the tanks equalise in 2–6 s and there is nothing to time.",
-              inLevel: "the fill source for step 2; step 3 unticks it again." },
-    viewParams: { gaugeField: "h", mode: "0" },
-    digitNote: "your tank 2 width is DRAWN: A₂ = 0.50 + 0.25·d m, so its far wall goes at x = 3.60 + A₂. Your target level h* = (3.96 + 1.25·A₂)/(1.978 + A₂)",
-    setup: ["Move tank 2's far wall to x = 3.60 + your own A₂ (erase the shipped one first).",
-            "With the valve OPEN, fill tank 1 to 2.00 m from the reservoir; shut it (V) as tank 2 reaches 0.50 m.",
-            "Untick Upstream reservoir AND set the Left edge back to Wall, or it leaks through the run.",
-            "Let it stand, read both cards while the water is still, then press V and time the fall."],
+    scene: "two-tank",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { gaugeField: "h", mode: "1", grade: true, speed: 1 },
+    digit: { label: "Left reservoir width B₁", control: "geom0", base: 6.75, step: 0.25, unit: "m",
+      rule: "B₁ = 6.75 + 0.25·d",
+      also: [{ label: "Right reservoir width B₂", control: "geom1", base: 3.75, step: 0.25, unit: "m",
+        rule: "B₂ = 3.75 + 0.25·d" }] },
     instruments: [
-      { tool: "gauge", where: "x ≈ 0.9 m, z ≈ 0.30 m", why: "tank 1 — the fall you time" },
-      { tool: "gauge", where: "x ≈ 4.6 m, z ≈ 0.30 m", why: "tank 2 — the level it is finding" },
+      { tool: "gauge", where: "Head gauges at (5, 0.35) and (26.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
+      { tool: "flux", where: "optional Flux lines at x = 17 m, drawn upwards across each duct", why: "the two parallel discharges add; both branches see the same head difference" },
     ],
-    // Step 1 moves tank 2's far wall and step 2 slams the valve, so Wall,
-    // Erase and Valve all have to stay. The instruments above are gauges
-    // only, and without this the derived profile would hide BUILD entirely.
     ui: { build: true },
-    start: "twin tanks joined by a valved pipe, both empty",
-    task: "Follow the steps to fill and isolate, then press V and time tank 1 falling from 2.00 m to your own h*.",
-    settle: 5,
+    start: "two reservoirs at 3.00 and 1.20 m, joined by two full, identical 15 m × 0.10 m ducts; all quantities are per metre width",
+    setup: ["Set both widths from your digit using the fields above or Controls → Geometry. Changing a width restarts the water and clock; keep Medium resolution.",
+      "Predict the difference at 120 s: Δ = [√1.8 − 2.16(1/B₁ + 1/B₂)]². The total discharge law is q = 0.036√Δ m²/s.",
+      "Predicted left fall = B₂(1.8−Δ)/(B₁+B₂); right rise = B₁(1.8−Δ)/(B₁+B₂)."],
+    task: "Place two Head gauges (5), press R and watch the left reservoir fall as the right rises. Pause at 120 s on the simulation clock; record both changes, compare with your predictions to within 0.05 m, and explain why the narrower reservoir changes level faster.",
+    settle: 0,
   },
 
   // ------------------------------------------------------------- metering

@@ -868,7 +868,7 @@ function syncPanel() {
       input.parentElement.classList.toggle("gone", !d);
       if (note) note.classList.toggle("gone", !d);
       if (d) {
-        c.min = d.min; c.max = d.max; c.step = d.step;
+        c.label = d.label; c.min = d.min; c.max = d.max; c.step = d.step;
         input.step = d.step;           // the range input's own step, not just c's
         input.parentElement.querySelector(".lbl").textContent = d.label;
       }

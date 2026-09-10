@@ -130,13 +130,35 @@ settling at the end of a run.
   stops waterfalling ripples into the drawn-down interior surface; submerged
   ducts (level above the whole run) keep the full plug. Levels are
   ELEVATIONS above the domain floor (the datum), not depths over the bed —
-  the panel prints both. The inlet pins the surface AT its level, so a scene
-  must set the level the arriving profile actually wants (m1's inletDepth is
-  the MEASURED weir backwater at the inlet, not d_n): pinned lower, the
-  boundary chokes the backwater and shed ripples for ever. An adaptive
-  "ride the backwater" inlet was tried and reverted — it hunts (visibly on
-  M2) and can self-feed at steep crests; so was a pressure-feedback rating
-  on the plug — it neither hurt nor helped.
+  the panel prints both. A scene must still set the depth the arriving profile
+  actually wants (m1's inletDepth is the MEASURED weir backwater at the inlet,
+  not d_n): pinned lower, the boundary chokes the backwater and sheds ripples
+  for ever. An adaptive "ride the backwater" inlet was tried and reverted — it
+  hunts (visibly on M2) and can self-feed at steep crests; so was a
+  pressure-feedback rating on the plug — it neither hurt nor helped.
+- **The reservoir level is an ENERGY line, and the inlet solves for its own
+  depth.** The inlet used to pin the surface AT the level, which adds the
+  velocity head on top of the reservoir instead of taking it out: measured on
+  s2, the inlet energy line stood 0.26 m above its own 2.07 m reservoir at the
+  shipped q = 1.2 and 0.66 m above it at q = 1.8, while the surface moved 32 mm
+  across that whole 3x range. It now solves E = d + q²/2gd² (RECON.inletDepth
+  via SIM.inletStage), so the delivered depth FALLS as q rises, and refuses
+  above q_max = √(g(2E/3)³) — holding d_c and saying so, which is what a crest
+  does. Three things this cost, all of them measured:
+    * Scenes state a DEPTH; `inletLevel()` in js/scenes.js turns it into the
+      energy line. Skip that and every scene sits a velocity head too shallow
+      (11 mm on m1, 26 mm on m2, 271 mm on the steep pair) — m1's mean column
+      flux then spread 0.0109 against its 0.01 conservation gate, and m3
+      returned a POSITIVE energy sample.
+    * The energy line is a head, NEVER a water surface. `inSurf` (bed +
+      inletDepth) initialises the water; handing `inLevel` to `still()` filled
+      h23's approach 110 mm deep and it stopped forming a hydraulic jump at
+      all — deterministically, three runs each way.
+    * Head-driven inflow prescribes no discharge, so it has no velocity head to
+      subtract and keeps a still-water level; the drawdown happens inside the
+      compartment the scene builds. Measured on estab, H holds at 3.80–3.83 m
+      against a 3.80 m level the whole length of the pipe. Submerged runs and
+      scenes pinning `inflow.v` likewise bypass the solve.
 - **A tailwater must stand clear of critical depth.** Re-check it every time
   `q` changes, because `d_c = (q²/g)^⅓` moves with it. A subcritical level
   control set AT d_c is degenerate: the outlet chokes at critical, the reach
@@ -340,6 +362,29 @@ Normal depth and Manning's n are read off the solver rather than derived from
 ```
 d_n = d·(S_f/S₀)^⅓        n = d^⅔ √S_f / V
 ```
+
+**What "H" means in that formula.** The energy line is drawn at the surface plus
+the KINETIC ENERGY the flow actually carries per unit weight of it, not at the
+mean-velocity head `V²/2g` — the two differ by the correction coefficient `α`,
+and `α` is neither 1 nor constant. Measured on m2 off the Favre mean it runs
+1.58 at x = 2 down to 1.22 at x = 13.3. A constant `α` would only lift the
+line; a VARYING one tilts it, and because it falls towards a drawdown the old
+line sagged exactly there — the head it was short by grew from 11 mm through
+the uniform reach to 16 mm at the lip, which reads as an energy loss that is
+not happening. The integrals ride `SIM.hydraulicGrade`'s existing full-field
+readback (`RECON.columnEnergy`), so they cost flops and not a second sync, and
+the vertical velocity is in them: at a brink it is most of the kinetic energy.
+
+**Only under Average**, and that is physics rather than thrift. `α` is defined
+on a MEAN profile; the third moment of an instantaneous field is dominated by
+the fluctuation instead. The same seven m2 stations read 2.35, 1.93, 1.58,
+2.41, 1.43, 1.75, 1.43 live — a whole unit of scatter with no trend, and a
+reach loss of 0.1405 m against the mean flow's 0.0775 m. Time-averaging that
+instantaneous head does not rescue it: it converges on `α ≈ 1.9` roughly
+uniformly, which UNDERSTATES the reach loss by about half. So the live line
+keeps `V²/2g`, which is what it always drew, and the corrected line is one more
+thing Average mode is for. `n` and `d_n` follow the line they are measured off,
+so a number quoted here is an Average-mode number.
 
 This matters because the effective resistance is **not** just `C_f`: the no-slip
 wall adds stress through the eddy viscosity, and a sloping bed rasterised onto a
@@ -598,6 +643,96 @@ picture saturated or flat is the symptom of the two having drifted apart.
   s1's roller — never fall below tolerance at all; for those the mean profile
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
+
+## Hydropower scheme (`hydro`): the surge shaft
+
+The first scene built entirely from `params` (six of them: the knee's x and
+z, the headrace, penstock and shaft bores, the nozzle gap) and the reason the
+Geometry panel grew from four rows to six. Every solid is derived from the
+params in one place (`geom` in js/scenes.js): the penstock is a slab along
+the axis knee → (60, 3) whose two wall lines are intersected with the
+headrace invert, the shaft's right wall and the level tailpipe, so moving a
+slider re-mitres the corners rather than leaving a notch. Three big solids
+(ground, headrace roof, penstock roof) and two nozzle plates; the shaft is the
+gap between the two roofs. Three small hooks were needed and all are
+additive — a scene taking the old arguments never sees them:
+
+- `walls(W, H, par)` and `valves(W, H, par)` get the live params, so the
+  valve seg can span exactly the penstock bore its solids() drew (a valve
+  seg reaching into the roof turns roof cells into valve texels, which are
+  OPEN while the valve is open — a notch in the rock).
+- `water(x, z, P, par)` gets them too, plus `P.level` (the live reservoir
+  slider, NaN when the control is off), so the fill follows both the
+  geometry and the slider. It fills no solid cell, on purpose: a column read
+  mid-headrace has to be the bore alone or V = q/d is not the bore-mean.
+- `flow(x, z, P, par)` — an initial velocity field, written by
+  `resetWater()` onto the staggered faces. From rest the establishment IS a
+  load-acceptance surge: the shaft swung ±4 m and was still ±1 m at 60 s
+  (measured), because quadratic friction damps a mass oscillation
+  algebraically. Seeded with the estimated steady plug
+  (q₀ = 0.76·gap·√(2g(level − 3)), the shaft started k·u₀² down, both
+  constants measured at the defaults) the residual is ±0.3 m for the first
+  20 s and ±0.1 m after. A slider the estimate does not follow just costs
+  settle time.
+
+Measured, at Medium (dx = 0.161 m; the ladder is HP-3's, D_s = 2.5–7.0 m):
+
+| quantity | value |
+| --- | --- |
+| headrace bore-mean u₀, mid-length | 2.50 ± 0.02 m/s, identical across the ladder |
+| reservoir free surface by the wall | 24.87–24.92 m against the 25.0 slider |
+| shaft drawdown z₀ | 0.31–0.43 m, of which u₀²/2g is 0.32 |
+| headrace HGL drop, x = 22 → 44 m, 30 s mean | 0.02–0.05 m → Darcy f ≈ 0.03 with D_H = 2D_h |
+| first crest above the reservoir | 5.16 → 3.22 m; 0.91–0.98 of u₀√(L·D_h/(g·D_s)); within ±5% of the rigid-column crest with the measured k |
+| period, first two crests | 14.9 → 23.7 s; 1.17–1.26 × 2π√(L·D_s/(g·D_h)) |
+| valve head after the slam | peak ≈ 42 m, minimum 1.8–9 m (no cavitation) |
+
+Things that were tried and what they taught:
+
+- **The friction knobs barely move a 19-cell bore's loss.** cf 0.004 → 0.3
+  and cs 0.05 → 0.3 changed the 22 m HGL drop between 0.02 and 0.05 m; what
+  they change is the bore-mean velocity (2.5 → 2.06 m/s at cf = 0.3),
+  because a strong wall function stalls the wall cells and the core runs
+  through a narrower pipe. The delivered f ≈ 0.03 is a realistic rough-pipe
+  number; it is simply that 14 bores of pipe lose a tenth of a velocity
+  head. The scene ships cf = 0.05 (twice the HGL drop of hammer's 0.004).
+- **Instantaneous heads in the bore wobble ±0.3 m** at the slot's organ
+  mode, against a 0.04 m friction drop: the friction-factor measurement
+  needs Average (a 30 s window reproduces the 30 s probe means to 0.01 m).
+  The entry vena contracta depresses the head to x ≈ 15 m and it recovers
+  by x ≈ 22; gauges in that stretch read a NEGATIVE friction slope.
+- **The column surface is quantised to whole cells** here (the top cell is
+  either over-full or empty under the slot EOS), so the d channel moves in
+  0.16 m steps; the h channel is continuous — and under the accelerating
+  column at the crest it reads a·D/g low, about a metre for a gauge 12 m
+  under the crest at D_s = 3 (a = (D_h/D_s)(g/L)·z_max ≈ 0.9 m/s²). Hence
+  the brief's protocol: h for the still levels, d for the crest.
+- **Narrow shafts throttle themselves**: at D_s = 2.0 the crest is 16%
+  under the curve, at 1.5 m 21% under (the entry loss into the shaft), so
+  the ladder starts at 2.5. **Wide shafts reflect the water hammer in
+  full**: at c = 70 the valve's downsurge reached 0.4 m of head at D_s = 8
+  (the slider's top), so the scene runs c = 60 (1.8 m at 7, 0.8 at 8).
+- **The nozzle gap stops at 0.9 m — and the cap has to be found from
+  BELOW.** It first read 1.2 m, set by measuring 1.44 m (9 cells) fail and
+  stepping back a guess. That guess was wrong: swept in 0.1 m steps at
+  Medium, with no slam at all, the steady run is clean to 0.9 (q₂₀ = +12.2,
+  and the discharge past the nozzle stays dry: p/ρg = 0, f = 0 at (67, 2)),
+  marginal at 1.0 (f = 0.08, 9.4 m/s down the penstock — the same 9 m/s the
+  1.44 m note already blamed), pressurising at 1.1 (p/ρg = 2.5 m, f = 1.01)
+  and fully collapsed at 1.2, the old stop itself: **q₂₀ = −17.6 m²/s,
+  reversed, with 36 m of head standing in what should be atmosphere.** The
+  tell on screen is a saturated block past the nozzle and a chaotic bore.
+  Part C of the tutorial sheet asks the student to sweep this slider to its
+  top, so the broken rung was on the worksheet's own path. 0.9 holds 7.0 m/s
+  in the penstock and survives a slam (p/ρg = 0 in the discharge, no
+  cavitation, 7.7 m minimum at the valve).
+- **The jet stays at √(2gH)** over the whole gap range (20.6–21 m/s against
+  20.7), so the maximum-power coda (h_f = H/3) cannot be reached on this rig
+  any more than on hammer's — HP-1's throttle plate is the answer there too.
+- **The period's excess** is mostly the shaft's own inertia
+  (L + h_s·D_h/D_s closes half of it, h_s ≈ 9 m) and the slot's elastic
+  storage (a 42 × 3 m headrace at c = 60 stores 0.34 m² per metre of head
+  — 14% of a 2.5 m shaft's area).
 
 ## Polygon geometry
 

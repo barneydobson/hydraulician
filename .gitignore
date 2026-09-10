@@ -15,3 +15,6 @@ exercises/*/_archive/
 __pycache__/
 
 tmp/
+
+# Word's owner-lock files (~$name.docx) while a sheet is open for editing.
+~$*

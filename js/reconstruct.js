@@ -188,6 +188,106 @@ const RECON = (() => {
     return { bed, d2d, bodies: all };
   }
 
-  return { accumStep, welford, sigma, geomFill, columnDepth, bodyDepth, WET, DRY_BREAK, SURF, bodies,
+  /** The depth a reservoir of specific energy `E` delivers at discharge `q`.
+   *
+   *  A reservoir level is an ENERGY grade line: the water in it is at rest, so
+   *  its surface IS the total head. What arrives in the channel is therefore
+   *  the depth that solves
+   *
+   *      E  =  d  +  q^2 / (2 g d^2),        E = level - bed,
+   *
+   *  and the delivered depth FALLS as q rises. Pinning the surface at the
+   *  level instead adds the velocity head on top of it, which manufactures
+   *  head out of nothing: measured on s2 at the shipped q = 1.2, the inlet
+   *  energy line stood 0.264 m above the 2.07 m reservoir feeding it, and at
+   *  q = 1.8 it stood 0.655 m above.
+   *
+   *  Two roots straddle critical depth and the caller says which it wants,
+   *  because the choice is the reach's, not the boundary's: a mild reach
+   *  enters subcritical, a chute passes through critical at the crest and runs
+   *  supercritical below it.
+   *
+   *  Below E_min = 1.5 d_c there is NO root — the reservoir cannot pass that
+   *  discharge at that level. The honest answer is critical depth with
+   *  `choked` set and `qmax` saying what it could actually deliver, so the
+   *  caller can say so rather than quietly inventing a section.
+   *
+   *  Bisection, not Newton: F is convex with its minimum exactly at d_c, so
+   *  both brackets below are guaranteed and 100 halvings reach float64's
+   *  precision for a few dozen flops, once a frame. A Newton step from a bad
+   *  start walks straight through the minimum into the other root.
+   */
+  function inletDepth(E, q, g, branch) {
+    const dc = Math.pow(q * q / g, 1 / 3);
+    const Emin = 1.5 * dc;
+    // The most a reservoir of this energy can pass, at critical: d = 2E/3.
+    const qmax = E > 0 ? Math.sqrt(g * Math.pow(2 * E / 3, 3)) : 0;
+    const out = { d: 0, dc, Emin, qmax, choked: false };
+    if (!(E > 0)) { out.choked = true; return out; }
+    if (!(q > 0)) { out.d = E; return out; }          // still water: level = surface
+
+    // At E = E_min the two roots coincide AT d_c, and float64 rounding on
+    // 1.5 * dc must not tip that case into "choked". Treat the band as
+    // critical and hand back d_c from either branch.
+    const slack = 1e-9 * Math.max(1, Emin);
+    if (E < Emin - slack) { out.d = dc; out.choked = true; return out; }
+    if (E <= Emin + slack) { out.d = dc; return out; }
+
+    const F = (d) => d + q * q / (2 * g * d * d) - E;
+    // Subcritical: F(d_c) = 1.5 d_c - E < 0 and F(E) = q^2/2gE^2 > 0.
+    // Supercritical: at d = q/sqrt(2gE) the velocity head is exactly E, so
+    // F = d > 0, and F(d_c) < 0 — a bracket that needs no search.
+    let lo, hi;
+    if (branch === "super") { lo = q / Math.sqrt(2 * g * E); hi = dc; }
+    else                    { lo = dc; hi = E; }
+    // F is negative at the d_c end of both brackets, positive at the other.
+    const negAtLo = branch === "super" ? false : true;
+    for (let k = 0; k < 100; k++) {
+      const mid = 0.5 * (lo + hi);
+      const neg = F(mid) < 0;
+      if (neg === negAtLo) lo = mid; else hi = mid;
+    }
+    out.d = 0.5 * (lo + hi);
+    return out;
+  }
+
+  /** One column's depth, discharge and TRUE velocity head.
+   *
+   *  The energy grade line is drawn at h + hv, and hv was the mean-velocity
+   *  head V^2/2g — which sets the kinetic-energy correction coefficient alpha
+   *  to 1 by construction and leaves w out altogether. The honest quantity is
+   *  the kinetic energy the flow actually carries per unit weight of it,
+   *
+   *      hv  =  ( int f u (u^2 + w^2)/2 dz )  /  ( g int f u dz )  =  a V^2/2g,
+   *
+   *  with alpha falling out of the same integrals rather than being assumed.
+   *  Measured on m2 off the Favre mean, alpha runs 1.44 at x = 3 down to 1.21
+   *  at x = 13.3; because it VARIES the drawn line has a slope error, and
+   *  because it falls towards the drawdown the line sags exactly there — about
+   *  25 mm of head "lost" over the last 0.3 m before the brink that is not
+   *  lost at all.
+   *
+   *  `f` is the DENSITY as well as the fill, so the two integrals that are
+   *  fluxes take it raw (an over-full cell really does carry that mass) while
+   *  the depth takes it clamped — the same split FS_COL makes, for the same
+   *  reason. alpha is 1 where there is no flow to correct, so a still or dry
+   *  column returns a finite number instead of poisoning a polyline. */
+  function columnEnergy(f, u, w, dx, g) {
+    let d = 0, q = 0, ke = 0;
+    for (let k = 0; k < f.length; k++) {
+      const fr = f[k];
+      if (!(fr > 0)) continue;
+      const uk = u[k], wk = w[k];
+      d  += (fr < 1 ? fr : 1) * dx;
+      q  += fr * uk * dx;
+      ke += fr * uk * (uk * uk + wk * wk) / 2 * dx;
+    }
+    const V = d > 0 ? q / d : 0;
+    const hv = Math.abs(q) > 1e-30 ? ke / (g * q) : 0;
+    const vh = V * V / (2 * g);
+    return { d, q, V, hv, alpha: vh > 1e-30 ? hv / vh : 1 };
+  }
+
+  return { accumStep, welford, sigma, geomFill, columnDepth, bodyDepth, WET, DRY_BREAK, SURF, bodies, inletDepth, columnEnergy,
            bandLevels, aerationGap, reconstruct };
 })();

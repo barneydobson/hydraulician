@@ -303,6 +303,10 @@ const EX = (() => {
    *  "set it on the Inflow q slider" rather than setting it. */
   function ctlLabel(id) {
     const c = CONTROLS.find((x) => x.id === id);
+    // A Geometry row (geom0…geom5) carries a placeholder label and takes the
+    // name of whatever param the loaded scene bound to it — the card has to
+    // say "Surge shaft width slider", not "— slider".
+    if (c && c.par) { const d = c.par(); if (d) return d.label; }
     return c ? c.label : id;
   }
   /** A control value as the panel would name it: an option's own text for a
@@ -330,9 +334,10 @@ const EX = (() => {
   function ctlWhere(id) {
     const c = CONTROLS.find((x) => x.id === id);
     if (!c) return "";
-    if (c.type === "check") return c.label + " tickbox";
-    if (c.type === "select") return c.label + " menu";
-    return c.label + (c.min !== undefined ? " slider" : "");
+    const label = ctlLabel(id);
+    if (c.type === "check") return label + " tickbox";
+    if (c.type === "select") return label + " menu";
+    return label + (c.min !== undefined ? " slider" : "");
   }
   /** "q = 0.51 m²/s (Inflow q slider) · tailwater 0.538 m" — the rules
    *  evaluated at a digit. No longer printed on the card (the card prints the
@@ -778,10 +783,9 @@ const EX = (() => {
    *  neighbour's shoulder in a lecture where the lecturer is already saying
    *  what to do: the id, your own numbers, one line on what is on the bench,
    *  one or two on what to do and what to read, a collapsed receipt of what was
-   *  applied, and the link to the full brief. Everything else — why a rule is
-   *  what it is, the flutter cautions, the procedure for a drawn
-   *  personalisation, what gets handed in — lives in the README. Adding a
-   *  coloured block here has been tried and was thrown out. */
+   *  applied, plus the optional lecturer-notes link. Student instructions,
+   *  required equations and what to record belong on the card; the README
+   *  contains worked answers and verification for the lecturer. */
   const card = (() => {
     let box = null, digitEl = null;
     const fields = [];        // {id, el} — the live controls in the brief
@@ -821,7 +825,13 @@ const EX = (() => {
       rb.onpointerleave = () => TIP.hide();
       // The × closes the BRIEF, not the exercise: the rig it set up is still on
       // the bench, and the strip's Exercises icon brings the brief back.
-      box.querySelector('[data-a="close"]').onclick = (e) => { e.currentTarget.blur(); hide(); };
+      // Embedded, there is no strip Exercises button worth hunting for — the
+      // chrome around the frame is the LMS page's, not ours — so the × parks
+      // the card on the edge tab instead of hiding it outright.
+      box.querySelector('[data-a="close"]').onclick = (e) => {
+        e.currentTarget.blur();
+        (window.APP && APP.embed) ? DOCK.fold(true) : hide();
+      };
       return box;
     }
     function show() {
@@ -885,7 +895,8 @@ const EX = (() => {
       const brief = "exercises/" + cur.folder +
         (/\.github\.io$/i.test(location.hostname) ? "/" : "/README.md");
       a.href = brief;
-      a.textContent = brief;
+      a.textContent = "Lecturer notes";
+      a.title = brief;
       tick();
     }
     /** The "Yours" block: the printed rule, and beside it the control the
@@ -974,7 +985,7 @@ const EX = (() => {
       // The brief is a form, not the canvas: its keystrokes are its own, or
       // typing 0.45 would pick the Erase tool and reset the view on the way.
       el.onkeydown = (e) => e.stopPropagation();
-      el.setAttribute("aria-label", c.label);
+      el.setAttribute("aria-label", ctlLabel(id));
       wrap.appendChild(el);
       if (c.type !== "check" && c.type !== "select") {
         const u = document.createElement("span");
@@ -1042,6 +1053,7 @@ const EX = (() => {
     function stationLabel() {
       const ins = cur.instruments || [];
       if (!ins.length) return "";
+      if (ins.some((n) => n.tool !== "gauge" && n.tool !== "rake")) return "Instruments:";
       const rake = ins.some((n) => n.tool === "rake"), g = ins.some((n) => n.tool !== "rake");
       if (rake && !g) return ins.length > 1 ? "Rakes:" : "Rake:";
       if (rake && g) return "Instruments:";
@@ -1146,4 +1158,3 @@ function syncURLEx(id) {
     history.replaceState(null, "", u.pathname + u.search);
   } catch (_) { /* file:// refuses — harmless */ }
 }
-

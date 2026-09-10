@@ -8,7 +8,7 @@ channel with the mouse and watch free-surface Navier–Stokes run through it.
 **Try it:** <https://barneydobson.github.io/hydraulician/> — runs in the
 browser, nothing to install (live once the repository is public).
 
-**Contents** — [Summary](#summary) · [Exercises](#exercises) ·
+**Contents** — [Summary](#summary) · [Syllabus](#syllabus) ·
 [Method](#method) · [Developer](#developer) ·
 [Appendix: controls, limits, credit](#appendix--controls-limits-and-credit)
 
@@ -25,32 +25,22 @@ wide, its resistance comes from the mesh rather than from a roughness table,
 and pressure cannot fall below zero gauge. Use it to see the shape of a
 result, then use a real model to get a number.
 
-## Exercises
+## Syllabus
 
-*Note, I have not checked the exercises yet!*
+Hydraulician includes a variety of exercise types: an **interactive demo** a
+lecturer runs in front of a class, a **quick exercise** students complete in
+class, and a **written tutorial with simulation comparison** — the derivation
+is done on paper, then checked against the solver. The exercises that have
+been checked are arranged on a teaching syllabus, ordered from hydrostatics
+through the conservation laws to unsteady pipe flow and similitude:
 
-Click a picture or an id to open that exercise in the app, set up and ready.
-Written briefs, data and plots for each one are in
-[`exercises/`](exercises/INDEX.md).
+**→ <https://barneydobson.github.io/hydraulician/docs/syllabus.html>**
+([docs/syllabus.md](docs/syllabus.md))
 
-|  |  |  |  |
-|---|---|---|---|
-| [<img src="docs/thumbs/DA-1.jpg" alt="DA-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-1)<br>**[DA-1](https://barneydobson.github.io/hydraulician/?ex=DA-1)** · scale ladder | [<img src="docs/thumbs/DA-2.jpg" alt="DA-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-2)<br>**[DA-2](https://barneydobson.github.io/hydraulician/?ex=DA-2)** · time scales | [<img src="docs/thumbs/DA-3.jpg" alt="DA-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=DA-3)<br>**[DA-3](https://barneydobson.github.io/hydraulician/?ex=DA-3)** · scale effects | [<img src="docs/thumbs/HP-1.jpg" alt="HP-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=HP-1)<br>**[HP-1](https://barneydobson.github.io/hydraulician/?ex=HP-1)** · penstock power |
-| [<img src="docs/thumbs/HP-2.jpg" alt="HP-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=HP-2)<br>**[HP-2](https://barneydobson.github.io/hydraulician/?ex=HP-2)** · Pelton jet | [<img src="docs/thumbs/NC-1.jpg" alt="NC-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-1)<br>**[NC-1](https://barneydobson.github.io/hydraulician/?ex=NC-1)** · slope–area gauging | [<img src="docs/thumbs/NC-2.jpg" alt="NC-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-2)<br>**[NC-2](https://barneydobson.github.io/hydraulician/?ex=NC-2)** · energy coefficient α | [<img src="docs/thumbs/NC-3.jpg" alt="NC-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=NC-3)<br>**[NC-3](https://barneydobson.github.io/hydraulician/?ex=NC-3)** · bed shear |
-| [<img src="docs/thumbs/QS-1.jpg" alt="QS-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=QS-1)<br>**[QS-1](https://barneydobson.github.io/hydraulician/?ex=QS-1)** · tank draining | [<img src="docs/thumbs/QS-2.jpg" alt="QS-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=QS-2)<br>**[QS-2](https://barneydobson.github.io/hydraulician/?ex=QS-2)** · two reservoirs | [<img src="docs/thumbs/UN-1.jpg" alt="UN-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-1)<br>**[UN-1](https://barneydobson.github.io/hydraulician/?ex=UN-1)** · celerity | [<img src="docs/thumbs/UN-2.jpg" alt="UN-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-2)<br>**[UN-2](https://barneydobson.github.io/hydraulician/?ex=UN-2)** · flow establishment |
-| [<img src="docs/thumbs/UN-3.jpg" alt="UN-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=UN-3)<br>**[UN-3](https://barneydobson.github.io/hydraulician/?ex=UN-3)** · surge tank | [<img src="docs/thumbs/WV-1.jpg" alt="WV-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-1)<br>**[WV-1](https://barneydobson.github.io/hydraulician/?ex=WV-1)** · dispersion | [<img src="docs/thumbs/WV-2.jpg" alt="WV-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-2)<br>**[WV-2](https://barneydobson.github.io/hydraulician/?ex=WV-2)** · pressure under waves | [<img src="docs/thumbs/WV-3.jpg" alt="WV-3" width="220">](https://barneydobson.github.io/hydraulician/?ex=WV-3)<br>**[WV-3](https://barneydobson.github.io/hydraulician/?ex=WV-3)** · wave reflection |
-| [<img src="docs/thumbs/MO-1.jpg" alt="MO-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=MO-1)<br>**[MO-1](https://barneydobson.github.io/hydraulician/?ex=MO-1)** · sluice gate | [<img src="docs/thumbs/MO-2.jpg" alt="MO-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=MO-2)<br>**[MO-2](https://barneydobson.github.io/hydraulician/?ex=MO-2)** · jet on a vane | [<img src="docs/thumbs/FR-1.jpg" alt="FR-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=FR-1)<br>**[FR-1](https://barneydobson.github.io/hydraulician/?ex=FR-1)** · pipe friction | [<img src="docs/thumbs/LL-1.jpg" alt="LL-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=LL-1)<br>**[LL-1](https://barneydobson.github.io/hydraulician/?ex=LL-1)** · sudden expansion |
-| [<img src="docs/thumbs/LL-2.jpg" alt="LL-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=LL-2)<br>**[LL-2](https://barneydobson.github.io/hydraulician/?ex=LL-2)** · hidden throttle | [<img src="docs/thumbs/PU-1.jpg" alt="PU-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=PU-1)<br>**[PU-1](https://barneydobson.github.io/hydraulician/?ex=PU-1)** · system curve | [<img src="docs/thumbs/WE-1.jpg" alt="WE-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=WE-1)<br>**[WE-1](https://barneydobson.github.io/hydraulician/?ex=WE-1)** · sharp-crested weir | [<img src="docs/thumbs/UF-1.jpg" alt="UF-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=UF-1)<br>**[UF-1](https://barneydobson.github.io/hydraulician/?ex=UF-1)** · normal depth |
-| [<img src="docs/thumbs/FB-1.jpg" alt="FB-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=FB-1)<br>**[FB-1](https://barneydobson.github.io/hydraulician/?ex=FB-1)** · choked hump | [<img src="docs/thumbs/FB-2.jpg" alt="FB-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=FB-2)<br>**[FB-2](https://barneydobson.github.io/hydraulician/?ex=FB-2)** · critical depth | [<img src="docs/thumbs/HJ-1.jpg" alt="HJ-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=HJ-1)<br>**[HJ-1](https://barneydobson.github.io/hydraulician/?ex=HJ-1)** · hydraulic jump | [<img src="docs/thumbs/GV-1.jpg" alt="GV-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=GV-1)<br>**[GV-1](https://barneydobson.github.io/hydraulician/?ex=GV-1)** · backwater profile |
-| [<img src="docs/thumbs/GV-2.jpg" alt="GV-2" width="220">](https://barneydobson.github.io/hydraulician/?ex=GV-2)<br>**[GV-2](https://barneydobson.github.io/hydraulician/?ex=GV-2)** · profile classification | [<img src="docs/thumbs/CS-1.jpg" alt="CS-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=CS-1)<br>**[CS-1](https://barneydobson.github.io/hydraulician/?ex=CS-1)** · CSO chamber | [<img src="docs/thumbs/HS-1.jpg" alt="HS-1" width="220">](https://barneydobson.github.io/hydraulician/?ex=HS-1)<br>**[HS-1](https://barneydobson.github.io/hydraulician/?ex=HS-1)** · dyke and piezometer |   |
-
-**Backups (B1–B10).** Spares, for a session with time left over.
-
-|  |  |  |  |
-|---|---|---|---|
-| [<img src="docs/thumbs/B1.jpg" alt="B1" width="220">](https://barneydobson.github.io/hydraulician/?ex=B1)<br>**[B1](https://barneydobson.github.io/hydraulician/?ex=B1)** · reflection period | [<img src="docs/thumbs/B2.jpg" alt="B2" width="220">](https://barneydobson.github.io/hydraulician/?ex=B2)<br>**[B2](https://barneydobson.github.io/hydraulician/?ex=B2)** · celerity and surge | [<img src="docs/thumbs/B3.jpg" alt="B3" width="220">](https://barneydobson.github.io/hydraulician/?ex=B3)<br>**[B3](https://barneydobson.github.io/hydraulician/?ex=B3)** · dam break | [<img src="docs/thumbs/B4.jpg" alt="B4" width="220">](https://barneydobson.github.io/hydraulician/?ex=B4)<br>**[B4](https://barneydobson.github.io/hydraulician/?ex=B4)** · wave orbits |
-| [<img src="docs/thumbs/B5.jpg" alt="B5" width="220">](https://barneydobson.github.io/hydraulician/?ex=B5)<br>**[B5](https://barneydobson.github.io/hydraulician/?ex=B5)** · breaker types | [<img src="docs/thumbs/B6.jpg" alt="B6" width="220">](https://barneydobson.github.io/hydraulician/?ex=B6)<br>**[B6](https://barneydobson.github.io/hydraulician/?ex=B6)** · Ursell number | [<img src="docs/thumbs/B7.jpg" alt="B7" width="220">](https://barneydobson.github.io/hydraulician/?ex=B7)<br>**[B7](https://barneydobson.github.io/hydraulician/?ex=B7)** · venturi meter | [<img src="docs/thumbs/B8.jpg" alt="B8" width="220">](https://barneydobson.github.io/hydraulician/?ex=B8)<br>**[B8](https://barneydobson.github.io/hydraulician/?ex=B8)** · orifice coefficients |
-| [<img src="docs/thumbs/B9.jpg" alt="B9" width="220">](https://barneydobson.github.io/hydraulician/?ex=B9)<br>**[B9](https://barneydobson.github.io/hydraulician/?ex=B9)** · three reservoirs | [<img src="docs/thumbs/B10.jpg" alt="B10" width="220">](https://barneydobson.github.io/hydraulician/?ex=B10)<br>**[B10](https://barneydobson.github.io/hydraulician/?ex=B10)** · pipe crest and HGL |   |   |
+The full pack — including exercises not yet checked — is in the app (press
+**`E`**) and indexed in [`exercises/`](exercises/INDEX.md); each exercise has
+a written brief in its folder there. To put one exercise inside a Blackboard
+or Canvas page, see [`docs/embedding.md`](docs/embedding.md).
 
 ## Method
 
@@ -186,7 +176,8 @@ Each is an object with an `id` (that is the `?ex=` id), `title`, `topic`,
 that turns the student's last digit into a personalised parameter, `task`,
 `submit`, `settle` and `notes`. `HJ-1` is a good template. Then write the
 brief in `exercises/<folder>/README.md` and add the row to `exercises/INDEX.md`
-— the id must match in all three.
+— the id must match in all three. Once the exercise has been checked, it also
+earns a row on the [syllabus](docs/syllabus.md) under its topic.
 
 **Testing headless.** `exercises/_runner/runner.py` (stdlib only) drives a
 real Chrome over CDP: `launch`, `eval`, `pump --sim-seconds`, `shot`, `bench`,

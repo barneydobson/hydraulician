@@ -395,7 +395,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #panel .row .lbl { flex: 1 1 auto; white-space: nowrap; }
 #panel input[type=range] { width: 138px; flex: 0 0 auto; accent-color: #4dc3ff; }
 #panel .notes { font: 11px ui-monospace, SFMono-Regular, monospace; opacity: .5; margin: 0 0 6px; min-height: 12px; }
-/* A dynamic row (Geometry's geom0…geom3) with nothing to bind to — most
+/* A dynamic row (Geometry's geom0…geom5) with nothing to bind to — most
    scenes declare no params, so these stay hidden rather than showing a dead
    slider. The section's own h3 rides the same class: when every one of its
    rows is gone (no declared params at all), the heading goes with them
@@ -669,7 +669,11 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #dockfold.show { display: flex; }
 #dockfold:hover, #docktab:hover { background: rgba(77,195,255,0.25); }
 #docktab {
-  right: 0; top: 50%; margin-top: -60px; width: 30px; padding: 12px 4px;
+  /* "open instructions" is longer than the old "exercise", so the tab reads
+     taller (measured ~194px) than the fold handle it centres against — half
+     that height keeps it centred on the seam the same way -26px does for
+     #dockfold above. */
+  right: 0; top: 50%; margin-top: -97px; width: 30px; padding: 12px 4px;
   border-right: 0; border-radius: 10px 0 0 10px;
   flex-direction: column; align-items: center; gap: 8px;
 }

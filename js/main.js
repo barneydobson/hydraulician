@@ -33,7 +33,7 @@ const state = {
   // The two grade lines, on their own switch beside the channel overlay. Off
   // by default: they cost a full-field readback, and most scenes are
   // free-surface, where the HGL lies on the water line and adds nothing.
-  grade: false, gradeBuf: null, gradeTick: 0,
+  grade: false, gradeBuf: null, gradeTick: 0, gradeAvg: false,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
@@ -79,6 +79,10 @@ const state = {
   fps: 60, rt: 1, simDt: 0,
   tipIdx: 0, tipAt: 0,
 };
+
+/** `?embed=1`: the app is sitting in an LMS iframe (docs/embedding.md). Read
+ *  once — an opt-in by URL, not `window !== top`, so a plain tab can test it. */
+const EMBED = new URLSearchParams(location.search).has("embed");
 
 let canvas, over, octx, view, sim;
 
@@ -446,17 +450,23 @@ const CONTROLS = [
         sim.p.autoL = 0; sim.p.open[0] = 0; SIM.rasterise();
       }
     },
-    info: "Holds a water level on the LEFT edge and feeds the set discharge through it. Ticking it opens the left edge automatically (and closes it again when unticked, unless you set that edge yourself); the ∇ marker shows the level." },
+    info: "Holds a reservoir on the LEFT edge and feeds the set discharge through it. The level is the reservoir's ENERGY line, so the water surface at the inlet sits a velocity head below it and draws down further as q rises. Ticking it opens the left edge automatically (and closes it again when unticked, unless you set that edge yourself); the ∇ marker shows the level." },
   { id: "inLevel", place: "res", label: "Reservoir level", min: 0, max: 1, step: 0.005, rel: "H",
     get: () => sim.p.inflow.level, set: (v) => sim.p.inflow.level = v,
     fmt: (v) => {
-      const b = SIM.bands(), D = state.deliv;
+      const b = SIM.bands(), D = state.deliv, st = SIM.inletStage();
       const d = Math.min(v, b.inB[1]) - b.inB[0];
-      return v.toFixed(2) + " m above datum" +
-        (d > 0 ? "  ·  " + d.toFixed(2) + " m deep at the inlet" : "  ·  below the inlet bed!") +
+      if (!(d > 0)) return v.toFixed(2) + " m above datum  ·  below the inlet bed!";
+      // The level is the ENERGY line; the surface sits a velocity head under
+      // it, and how far under is the number worth printing.
+      const surf = st.stage - b.inB[0];
+      const drawdown = d - surf;
+      return v.toFixed(2) + " m above datum  ·  " + surf.toFixed(2) + " m deep at the inlet" +
+        (drawdown > 0.005 ? "  (drawn down " + (drawdown * 1000).toFixed(0) + " mm)" : "") +
+        (st.choked ? "  ·  OVER-DRAWN: cannot pass this q" : "") +
         (D ? "  ·  delivering " + D.level.toFixed(2) + " m" : "");
     },
-    info: "Water level held on the left boundary, measured from the domain floor (the datum), NOT from the bed. Set it to the level the arriving flow actually wants — a level below a downstream control's backwater will choke the backwater at the inlet. The DELIVERED level is measured just clear of the relaxation sponge and sits below the slider by however much head the sponge is giving up." },
+    info: "The reservoir's ENERGY grade line, measured from the domain floor (the datum), NOT from the bed. The water in a reservoir is at rest, so its surface IS the total head, and what arrives in the channel is the depth that solves E = d + q²/2gd² — which falls as q rises. The velocity head between the two is printed as the drawdown. Raising q far enough exhausts the reservoir: past q_max = √(g(2E/3)³) there is no depth that satisfies the equation at all, and the inlet is held at critical depth and says so. The DELIVERED level is measured just clear of the relaxation sponge and sits below that by however much head the sponge is giving up." },
   { id: "inQ", place: "res", label: "Inflow q", min: 0, max: 2.0, step: 0.005,
     get: () => sim.p.inflow.q, set: (v) => sim.p.inflow.q = v,
     fmt: (v) => {
@@ -468,10 +478,13 @@ const CONTROLS = [
         return "head-driven  ·  q → " + (D ? D.q.toFixed(3) : "—") + " m²/s delivered" +
                (D ? "   d_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
       }
+      const st = SIM.inletStage();
       return v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
-             "   d_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m";
+             "   d_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m" +
+             (st.choked ? "  ·  MORE THAN THE RESERVOIR CAN PASS (q_max = "
+                          + st.qmax.toFixed(3) + " m²/s) — held at critical" : "");
     },
-    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth available over the bed. Critical depth d_c = (q²/g)^⅓ follows directly from it. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
+    info: "Unit discharge entering the domain, converted to an inlet velocity using the depth the reservoir DELIVERS at that discharge. Critical depth d_c = (q²/g)^⅓ follows directly from it. A reservoir has a ceiling: q_max = √(g(2E/3)³) on the head E it stands above the inlet bed, and asking for more than that is asking for energy the reservoir does not have — the note says so and the inlet holds critical depth, which is what a real crest does. Raise the reservoir level to pass more. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
   { id: "inFree", place: "res", type: "check", label: "Head-driven inflow",
     get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
@@ -510,7 +523,9 @@ const CONTROLS = [
     fmt: (v) => v.toFixed(2) + " m/s" },
 
   { h: "Geometry" },
-  ...[0, 1, 2, 3].map((k) => ({
+  // Six rows: the hydro scene declares six params (knee x/z, three bores,
+  // the nozzle gap). A scene declaring fewer hides the rest (syncPanel).
+  ...[0, 1, 2, 3, 4, 5].map((k) => ({
     id: "geom" + k, label: "—",
     min: 0, max: 1, step: 0.01,
     // The row binds to the k-th declared param of whatever scene is up.
@@ -712,7 +727,7 @@ const CONTROLS = [
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["h", "Piezometric head"], ["d", "Depth"], ["speed", "Speed"]],
+    opts: [["h", "Piezometric head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
@@ -857,7 +872,7 @@ function syncPanel() {
       if (note) note.textContent = c.fmt ? c.fmt() : "";
       return;
     }
-    // A dynamic row (Geometry's geom0…geom3) binds to whatever param its
+    // A dynamic row (Geometry's geom0…geom5) binds to whatever param its
     // scene declares at that index — none for most scenes. Hide the row and
     // its note when there is nothing to bind to, and when there is, adopt
     // that param's own range and label before reading its value below.
@@ -866,7 +881,7 @@ function syncPanel() {
       input.parentElement.classList.toggle("gone", !d);
       if (note) note.classList.toggle("gone", !d);
       if (d) {
-        c.min = d.min; c.max = d.max; c.step = d.step;
+        c.label = d.label; c.min = d.min; c.max = d.max; c.step = d.step;
         input.step = d.step;           // the range input's own step, not just c's
         input.parentElement.querySelector(".lbl").textContent = d.label;
       }
@@ -882,8 +897,8 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
-  // The "Geometry" heading fronts geom0…geom3, which hide themselves row by
-  // row above as the scene declares fewer than four params, down to none —
+  // The "Geometry" heading fronts geom0…geom5, which hide themselves row by
+  // row above as the scene declares fewer than six params, down to none —
   // but a heading is not a row, so nothing in the loop hides IT. A scene
   // with no declared params (most of them) would otherwise leave the
   // heading standing over an empty section.
@@ -941,6 +956,15 @@ function showToast(title, sub) {
   t.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 5200);
+}
+/** The first plain wheel over the canvas, embedded, is a surprise — nothing
+ *  seemed to happen because the page scrolled instead. Said once per page,
+ *  not once per wheel: `hinted` is a closure, not state, on purpose. */
+let hinted = false;
+function wheelHint() {
+  if (hinted) return;
+  hinted = true;
+  showToast("Ctrl + scroll zooms the flume", "Open in a new tab for the full window.");
 }
 
 // -------------------------------------------------------- minimisable boxes
@@ -1071,6 +1095,13 @@ const ICONS = {
            '<circle cx="13" cy="10" r="1.9" fill="#070b0f"/><circle cx="6.5" cy="14" r="1.9" fill="#070b0f"/>',
   keys:    '<rect x="2.5" y="6" width="15" height="8" rx="1.5"/><path d="M5.5 9h.01M8 9h.01M10.5 9h.01M13 9h.01M14.5 9h.01M6.5 11.6h7"/>',
   about:   '<path d="M10 3.5 17 7l-7 3.5L3 7Z"/><path d="M3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5" opacity=".55"/>',
+  // Four corner brackets opening outward — the frame the window is about to
+  // fill. `unfullscreen` is the same brackets turned to point back inward.
+  fullscreen:   '<path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4"/>',
+  unfullscreen: '<path d="M7.5 3.5v4h-4M12.5 3.5v4h4M7.5 16.5v-4h-4M12.5 16.5v-4h4"/>',
+  // A box with an arrow leaving its open corner — this exercise, elsewhere.
+  popout: '<path d="M8 4H4.5A1.5 1.5 0 0 0 3 5.5v9A1.5 1.5 0 0 0 4.5 16h9a1.5 1.5 0 0 0 1.5-1.5V11"/>' +
+          '<path d="M11 3h6v6M17 3l-7 7"/>',
   // ---- VIEW: what the water is painted with, and what is drawn over it.
   // A colour bar with its ticks; the dashes ARE the numbers under a legend.
   all:     '<circle cx="4.5" cy="10" r="1.45" fill="currentColor" stroke="none"/>' +
@@ -1656,6 +1687,20 @@ const TOOLBAR = [
     { id: "panelBtn", icon: "sliders", label: "Controls",
       hint: "Every slider: flow, boundaries, hydraulics, view, rig",
       act: () => togglePanel() },
+    { id: "fsBtn", icon: () => (document.fullscreenElement ? "unfullscreen" : "fullscreen"),
+      label: () => (document.fullscreenElement ? "Exit full screen" : "Full screen"), key: "F",
+      hint: "The whole screen for the flume — inside a module page, the way out of the frame",
+      on: () => !!document.fullscreenElement,
+      // A frame with no `allow="fullscreen"` reports the capability as false
+      // rather than throwing, so the button is simply not offered there —
+      // `when` is a boot-time read, and this is as close to boot-time as a
+      // capability check gets.
+      when: () => !!document.fullscreenEnabled,
+      act: () => toggleFullscreen() },
+    { id: "popBtn", icon: "popout", label: "Open in a new tab",
+      hint: "This exercise, and what you have drawn, in a full window",
+      when: () => EMBED,
+      act: () => popOut() },
     { id: "keysBtn", icon: "keys", label: "Keyboard", key: "?",
       hint: "The shortcut sheet",
       act: (b) => KEYS.toggle(b) },
@@ -1721,7 +1766,12 @@ function buildToolbar() {
     // read as a family with nothing in it, so the group goes with its last
     // button — and the rule keys off what has actually been appended, or a
     // hidden first group leaves a leading hairline.
-    const items = group.items.filter((it) => UIMODE.allows(group.family, it));
+    // The profile decides what an exercise WANTS shown; `when` decides what
+    // the boot CAN show (embedded, fullscreen-capable) — profile first, since
+    // narrowing is the thing a lecturer chose, then the capability check,
+    // which is fixed at boot and so is never re-read by `syncToolbar`.
+    const items = group.items.filter((it) =>
+      UIMODE.allows(group.family, it) && (!it.when || it.when()));
     if (!items.length) return;
     if (host.children.length) {
       const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
@@ -1849,7 +1899,9 @@ const KEYS = (() => {
     ["left-drag", "draw with the current tool"],
     ["right-drag", "pour water, whatever tool is in your hand"],
     ["shift", "snap to horizontal / vertical / 45°"],
-    ["wheel", "zoom"],
+    // Embedded, a plain wheel is left to the page (see the canvas wheel
+    // listener) — the sheet has to say what actually zooms in a frame.
+    [EMBED ? "ctrl + wheel" : "wheel", "zoom"],
     ["middle-drag", "pan"],
     ["0", "reset the view"],
     ["1 – 9", "pick a tool (Pour has no digit — right-drag instead)"],
@@ -1867,6 +1919,7 @@ const KEYS = (() => {
     ["N", "open-channel overlay"],
     ["A", "average the flow — the mean field, over one window"],
     ["M", "ruler"],
+    ["F", "full screen"],
     ["S", "scenes"],
     ["E", "exercises"],
     ["H", "the start screen"],
@@ -1969,7 +2022,10 @@ const DOCK = (() => {
     fold.classList.toggle("show", open);
     tab.classList.toggle("show", shown && folded);
     tab.querySelector(".eid").textContent = id;
-    tab.querySelector(".kind").textContent = kind.toLowerCase();
+    // The tab is the only thing a folded student sees: "Exercise" doesn't
+    // say there is a brief behind it, so name the action instead of the kind.
+    tab.querySelector(".kind").textContent =
+      kind === "Exercise" ? "open instructions" : "open " + kind.toLowerCase();
   }
   /** Show the panel with a header. `onClose` is what the × does — the caller
    *  owns what closing MEANS (an exercise stays loaded; only its brief goes). */
@@ -2458,9 +2514,13 @@ function tickFrame(realDt) {
   // number derived from it. Mixing a mean field with live markers would put
   // two flow states in one screenshot.
   const avgCols = state.avg && SIM.avgActive() ? SIM.avgColumns() : null;
+  refreshGrade();
+  // hv is the MEAN flow's velocity head or nothing (SIM.hydraulicGrade), so
+  // it only ever reaches analyse alongside the mean columns it belongs to.
+  const hv = avgCols && state.gradeBuf ? state.gradeBuf.hv : null;
   const analysis = avgCols
-    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true })
-    : OVERLAY.analyse(sim, col);
+    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true, hv })
+    : OVERLAY.analyse(sim, col, { hv });
   // T and the cursor readouts, which move every frame. Behind the same flag,
   // so a session with Average off pays one boolean for all of it.
   if (avgCols) LEGEND.avgTick(avgCols);
@@ -2543,7 +2603,9 @@ function sampleGauges(A) {
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
     const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
-    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], speed: pr.speed };
+    // η = z_b + d is the surface itself, so unlike h it carries no
+    // non-hydrostatic bias under an accelerating column.
+    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2749,6 +2811,41 @@ function emaFlux(prev, now, a) {
   return out;
 }
 
+/** The piezometric head per column, and with it the TRUE velocity head that
+ *  the energy line is drawn at (`hv` on the returned array — RECON.columnEnergy
+ *  through SIM.hydraulicGrade).
+ *
+ *  One buffer, one throttle, two consumers: the grade lines draw `h` and
+ *  `h + hv` directly, and OVERLAY.analyse takes `hv` for its own energy line
+ *  and for everything measured off that line's slope. They MUST be the same
+ *  numbers — two estimates of the same head that disagree is how you get an
+ *  overlay arguing with itself.
+ *
+ *  Throttled because this is a full-field readPixels: MEASURED on m2 at Medium
+ *  (1265 x 75) it costs 6.6 ms against a 12.6 ms frame, so it can never go on
+ *  the frame path undivided. Every 3rd frame while the grade lines are up (the
+ *  rate that switch already shipped with, ~2.2 ms/frame amortised); every 10th
+ *  otherwise, because alpha is a smooth, slowly-varying field and a third of a
+ *  second of lag in it is invisible in a steady reach — where it is NOT steady
+ *  the velocity head is being smoothed over 1.5 m of reach anyway.
+ *
+ *  The window flag is part of the key, not just the throttle: a buffer built
+ *  from the live field is the wrong flow state to hand an Average-mode
+ *  overlay, so switching modes refreshes at once rather than showing one of
+ *  each for three frames. */
+function refreshGrade() {
+  const avg = measuringAvg();
+  // Nobody is asking: the grade lines are off and there is no mean for the
+  // energy line's alpha to come from. Costs nothing and, more to the point,
+  // a stale buffer never reaches analyse — `hv` goes with the window it was
+  // measured in or it does not go at all.
+  if (!state.grade && !avg) { state.gradeBuf = null; state.gradeTick = 0; return; }
+  if (avg !== state.gradeAvg) { state.gradeAvg = avg; state.gradeTick = 0; }
+  if (--state.gradeTick > 0 && state.gradeBuf) return;
+  state.gradeTick = state.grade ? 3 : 10;
+  state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, avg);
+}
+
 /** What the reservoir is actually DELIVERING.
  *
  *  Neither reservoir number on the panel is a measurement: `inflow.q` is a
@@ -2898,19 +2995,11 @@ function drawOverlay(A) {
   // that wants a prediction before a number.
   const cards = UIMODE.shows("gauges")
     ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-        fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
+        fld === "h" ? "h" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);
-  if (state.grade) {
-    // Throttled for the same reason the hover probe is: this is a full-field
-    // readPixels, and a line a reader looks at does not need one every frame.
-    if (--state.gradeTick <= 0) {
-      state.gradeTick = 3;
-      state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, measuringAvg());
-    }
-    OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
-  }
+  if (state.grade) OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
   if (state.inside && !state.drag && UIMODE.shows("cursor")) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
@@ -3030,8 +3119,17 @@ function drawMarkers(ctx) {
     ctx.restore();
   };
   if (p.inflow.on > 0.5) {
+    // The marker rides the reservoir level, which is its ENERGY line — so
+    // under prescribed q it stands a velocity head ABOVE the water arriving
+    // at the inlet, and that gap is the point rather than a mismatch. It is
+    // named on the chip so nobody reads the marker as a promised surface.
+    const st = SIM.inletStage();
+    const drawn = p.inflow.level - st.stage;
     level("L", p.inflow.level,
-      "reservoir " + p.inflow.level.toFixed(2) + " m" + (p.inflow.free > 0.5 ? " · head-driven" : ""),
+      "reservoir " + p.inflow.level.toFixed(2) + " m"
+        + (p.inflow.free > 0.5 ? " · head-driven"
+           : st.choked ? " · energy line · over-drawn"
+           : drawn > 0.005 ? " · energy line" : ""),
       "#7fd4ff", "res");
   }
   if (p.tailwater.on > 0.5) {
@@ -3262,6 +3360,10 @@ function boot() {
   // A resize (or a rotated phone) changes what "fills the window" means, and
   // the panel opening or closing changes it too — DOCK.sync calls this as well.
   addEventListener("resize", () => { DOCK.sync(); fitBar(); applyAutoVex(); });
+  // The fullscreen request/exit is asynchronous, so the button's icon and
+  // label (both read `document.fullscreenElement` live) are repainted off
+  // the browser's own event rather than off the click that asked for it.
+  document.addEventListener("fullscreenchange", () => syncToolbar());
 
   buildPanel();
   const q = new URLSearchParams(location.search);
@@ -3275,6 +3377,9 @@ function boot() {
   const exId = q.get("ex");
   if (exId && !EX.pick(exId)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
+  // Embedded, the brief lives on the page around the frame; the card starts
+  // folded to its tab so the water keeps the width (spec §1.1).
+  if (EMBED && exId) EX.ready.then(() => DOCK.fold(true));
   // A `#rig=` link carries its own base scene, so it wins over `?scene=` —
   // but `?scene=` is loaded first anyway, so a link that fails to decode
   // leaves you on the scene you asked for rather than on a blank page.
@@ -3323,6 +3428,11 @@ function boot() {
   canvas.addEventListener("pointerenter", () => state.inside = true);
   canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
   canvas.addEventListener("wheel", (e) => {
+    // Embedded, a plain wheel is the LMS page scrolling past; the frame is
+    // not scrollable, so leaving the event alone (no preventDefault) chains
+    // it to the parent page. Ctrl + wheel zooms — the same key a trackpad
+    // pinch already reports.
+    if (EMBED && !e.ctrlKey) { wheelHint(); return; }
     e.preventDefault();
     const [px, py] = pointerPx(e);
     // pinch-to-zoom trackpads report ctrlKey; give them a stronger response
@@ -3368,6 +3478,10 @@ function boot() {
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "a") setAverage(!state.avg);
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
+    // requestFullscreen needs a user gesture; a keypress is one. A frame with
+    // no allow="fullscreen" simply rejects — toggleFullscreen already swallows
+    // that — so there is nothing to guard here beyond what the button hides.
+    else if (k === "f") toggleFullscreen();
     // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
     // so a tenth tool would have made "9" fail ("9" > "10" lexically).
     //
@@ -3440,10 +3554,45 @@ function toggleValve() {
       : "Flow re-established.");
 }
 
+/** The strip's full-screen button, and the F key. `.catch(() => {})` because
+ *  both calls reject when the browser refuses — no `allow="fullscreen"` on
+ *  an enclosing iframe, or no user gesture — and the button (hidden via
+ *  `when` when `document.fullscreenEnabled` is false) is the only feedback
+ *  needed; there is nothing else to roll back. `syncToolbar` runs off the
+ *  `fullscreenchange` event, not here, since the request is asynchronous. */
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+
+/** `url` with `embed` dropped from the query string — what the pop-out and
+ *  the lecturer's snippet both hand a plain tab. `URL` keeps a `#rig=`
+ *  fragment intact, which is the whole point: the pop-out carries the
+ *  student's own drawing, just not the framing. */
+function stripEmbed(url) {
+  const u = new URL(url);
+  u.searchParams.delete("embed");
+  return u.toString();
+}
+
+/** Open in a new tab, embedded boots only: the pop-out is the way OUT of a
+ *  700–1000 px frame to do the actual measuring. `RIG.link()` may be
+ *  asynchronous (deflate), so the window opens synchronously inside the
+ *  click — a popup blocker only tolerates that — and is navigated once the
+ *  link resolves. */
+function popOut() {
+  const w = window.open("", "_blank");
+  if (!w) return;                        // blocked: nothing else to do
+  w.opener = null;
+  RIG.link().then((u) => { w.location = stripEmbed(u); })
+            .catch(() => { w.location = stripEmbed(location.href.split("#")[0]); });
+}
+
 // Debug handle. `frames` drives the loop by hand — the render loop stops when
 // the page is hidden, so headless testing goes through here.
 window.APP = {
   get sim() { return sim; }, get view() { return view; },
+  embed: EMBED,                            // `?embed=1` — see docs/embedding.md
   state, loadScene, SIM, OVERLAY, SCENES, showToast, zoomAt, resetZoom,
   switchScene,                             // load a scene as a fresh ?scene= boot would
   PICKER,                                  // the scene menu

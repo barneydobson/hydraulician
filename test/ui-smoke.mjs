@@ -83,7 +83,13 @@ const PROBE = `
     startItems: document.querySelectorAll("#startlist .si").length,
     startSideways: (() => { const l = document.getElementById("startlist");
                             return l.scrollWidth > l.clientWidth + 1; })(),
-    specCount: APP.ui.TOOLBAR.reduce((n, grp) => n + grp.items.length, 0),
+    // A strip item can carry a boot-time \`when\` (full screen only where the
+    // browser allows it, pop-out only embedded) that buildToolbar filters on
+    // top of the UI profile — so the spec's raw item count overcounts by
+    // however many of those are hidden on THIS boot; only the surviving ones
+    // are ever rendered.
+    specCount: APP.ui.TOOLBAR.reduce((n, grp) =>
+      n + grp.items.filter((it) => !it.when || it.when()).length, 0),
     toolCount: APP.TOOLS.length,
     litTools: [...document.querySelectorAll("#groups .tbtn.on")].length,
     valveHot: document.getElementById("valveBtn").classList.contains("on") ||
@@ -100,6 +106,40 @@ async function main() {
   }
   const browser = await launch({ width: 1440, height: 900 });
   try {
+    console.log("\nQS-2 width fields and sliders describe and restart the same experiment");
+    {
+      const tab = await browser.open(INDEX + "?ex=QS-2");
+      await tab.evaluate("return APP.EX.ready;");
+      const r = await tab.evaluate(`
+        APP.state.paused=true; APP.tick(10);
+        const left=document.querySelector('#dock input[aria-label="Left reservoir width"]');
+        const right=document.querySelector('#dock input[aria-label="Right reservoir width"]');
+        const sliders=[document.getElementById('c_geom0'),document.getElementById('c_geom1')];
+        const bounds=[left.min,left.max,left.step,right.min,right.max,right.step];
+        left.value='7.5'; left.dispatchEvent(new Event('input'));
+        const leftTime=APP.sim.t, leftWidth=APP.SIM.params().values.tank_b1;
+        APP.tick(10); sliders[1].value='4.5'; sliders[1].dispatchEvent(new Event('input'));
+        const card=APP.EX.all().find(e=>e.id==='QS-2');
+        return {bounds,leftTime,leftWidth,rightTime:APP.sim.t,rightWidth:APP.SIM.params().values.tank_b2,
+          rightField:+right.value,leftSlider:+sliders[0].value,types:sliders.map(s=>s.type),
+          selfContained:! /readme|see the brief/i.test([card.start,card.task,...card.setup].join(' ')),
+          rule:card.digit.base===6.75 && card.digit.step===0.25 && card.digit.also[0].base===3.75,
+          lecturerLink:document.querySelector('#dock .exlink').textContent};
+      `);
+      eq("both Geometry controls are sliders",r.types.join(','),'range,range');
+      eq("card fields use the scene's own bounds",r.bounds.join(','),'6,9,0.25,3,6,0.25');
+      eq("left field changes physical width",r.leftWidth,7.5);
+      eq("left field updates its slider",r.leftSlider,7.5);
+      eq("right slider changes physical width",r.rightWidth,4.5);
+      eq("right slider updates its card field",r.rightField,4.5);
+      eq("left width restarts the clock",r.leftTime,0);
+      eq("right width restarts the clock",r.rightTime,0);
+      check("student instructions stand alone",r.selfContained);
+      check("both student-number rules are declared",r.rule);
+      eq("README link identifies its lecturer audience",r.lecturerLink,'Lecturer notes');
+      check("no uncaught errors",tab.errors.length===0,tab.errors[0]);
+      await tab.close();
+    }
     // ---------------------------------------------------------- bare visit
     console.log("\na bare visit opens the start screen");
     {
@@ -249,6 +289,8 @@ async function main() {
       eq("the overlay stops there too", p.overW, p.canvasW);
       check("the strip still shows every control", !p.groupsClipped);
       check("the fold handle is on the seam", p.foldShown);
+      // Fold-on-land is an EMBEDDED behaviour (spec §1.1 of the embed design);
+      // a plain `?ex=` boot must not pick it up by accident.
       check("the reopen tab is put away", !p.tabShown);
       check("the brief carries the task", await tab.evaluate(
         `return document.querySelector("#dock .extask").textContent.length > 20;`));
@@ -417,7 +459,10 @@ async function main() {
           orphans: [...document.querySelectorAll("#groups .tbtn")]
                      .filter((b) => !b.closest(".tgrp")).length,
           buttons: document.querySelectorAll("#groups .tbtn").length,
-          specCount: spec.reduce((n, g) => n + g.items.length, 0),
+          // See PROBE's specCount: a \`when\`-hidden item (full screen, pop-out)
+          // is not in the spec's UNCONDITIONAL count either.
+          specCount: spec.reduce((n, g) =>
+            n + g.items.filter((it) => !it.when || it.when()).length, 0),
           viewGroup: spec.find((g) => g.cap === "VIEW").items.map((i) =>
             typeof i.label === "function" ? i.label() : i.label),
           buildGroup: spec.find((g) => g.cap === "BUILD").items.map((i) =>
@@ -1015,13 +1060,13 @@ async function main() {
     // ------------------------------------------------- the Geometry section
     console.log("\nthe Geometry panel binds to whatever the scene actually declares");
     {
-      // hump declares one param (hump_h); the panel's four geom rows are a
+      // hump declares one param (hump_h); the panel's six geom rows are a
       // fixed pool that binds to a scene's params by INDEX (main.js's
-      // syncPanel), so exactly one of the four should be showing, and it
+      // syncPanel), so exactly one of the six should be showing, and it
       // should carry the scene's own label rather than a placeholder.
       const tab = await browser.open(INDEX + "?scene=hump");
       const r = await tab.evaluate(`
-        const rows = [0, 1, 2, 3].map((k) => {
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
           const input = document.getElementById("c_geom" + k);
           return !input.parentElement.classList.contains("gone");
         });
@@ -1039,11 +1084,11 @@ async function main() {
     }
     {
       // m1 has no declared params at all — a wall-segment scene, not a
-      // polygon one — so every one of the four rows should stay hidden, and
+      // polygon one — so every one of the six rows should stay hidden, and
       // the section's own heading should not be left fronting an empty list.
       const tab = await browser.open(INDEX + "?scene=m1");
       const r = await tab.evaluate(`
-        const rows = [0, 1, 2, 3].map((k) => {
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
           const input = document.getElementById("c_geom" + k);
           return !input.parentElement.classList.contains("gone");
         });
@@ -1055,6 +1100,38 @@ async function main() {
       eq("a scene with no params hides every geometry row", r.visible, 0);
       check("a scene with no params hides the Geometry heading too", !r.headingShown);
       await tab.close();
+    }
+    {
+      // hydro declares six params — the whole pool — and HP-3's digit rule
+      // rides the fifth (geom4, the shaft width). Every row must show under
+      // the scene's own label, and the exercise card's Yours field must be
+      // named after the bound param, not the row's "—" placeholder: that
+      // field is where a student types their shaft width.
+      const tab = await browser.open(INDEX + "?scene=hydro");
+      const r = await tab.evaluate(`
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
+          const el = document.getElementById("c_geom" + k).parentElement;
+          return { shown: !el.classList.contains("gone"), label: el.querySelector(".lbl").textContent };
+        });
+        return { visible: rows.filter((r) => r.shown).length, labels: rows.map((r) => r.label) };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("a six-param scene shows all six geometry rows", r.visible, 6);
+      eq("the fifth row is the shaft width", r.labels[4], "Surge shaft width D_s");
+      await tab.close();
+      const ex = await browser.open(INDEX + "?ex=HP-3",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const c = await ex.evaluate(`
+        const f = document.querySelector('#dock input[aria-label="Surge shaft width D_s"]');
+        const h = document.querySelector('#panel h3[data-sec="Geometry"]');
+        return { field: !!f, value: f ? +f.value : null,
+                 geomKept: !!h && !h.classList.contains("off") && !h.classList.contains("gone") };
+      `);
+      check("no uncaught errors", ex.errors.length === 0, ex.errors[0]);
+      check("the card's Yours field is named after the bound param", c.field);
+      eq("and opens on the scene's own default", c.value, 3);
+      check("the focused panel keeps the Geometry section", c.geomKept);
+      await ex.close();
     }
 
     // ------------------------------------------------- placing and removing
@@ -1350,6 +1427,90 @@ async function main() {
         check("and stays inside the width", !leg.shown || leg.right <= leg.inner);
         await tab.close();
       } finally { await phone.close(); }
+    }
+
+    // ------------------------------------------------------- embedded in an LMS
+    console.log("\nan embedded exercise keeps the water");
+    {
+      // 800 x 600 is inside the 700-1000 px band a module page's content
+      // column actually offers (docs/superpowers/specs/2026-09-10-embed-design.md).
+      const embed = await launch({ width: 800, height: 600 });
+      try {
+        const tab = await embed.open(INDEX + "?ex=HJ-1&embed=1");
+        // `pickExercise` lands its rig a microtask later, so wait for the
+        // pick before asking anything about the card or the water.
+        await tab.evaluate("return APP.EX.ready.then(() => true);");
+        await tab.evaluate("APP.frames(10); return true;");
+        const p = await tab.evaluate(`
+          const dock = document.getElementById("dock");
+          const dockTab = document.getElementById("docktab");
+          const c = document.getElementById("view");
+          const cs = getComputedStyle(document.documentElement);
+          return {
+            embed: APP.embed,
+            dockOpen: dock.classList.contains("open"),
+            tabShown: dockTab.classList.contains("show"),
+            tabKind: dockTab.querySelector(".kind").textContent,
+            canvasW: c.clientWidth, innerW: window.innerWidth,
+            dockVar: parseFloat(cs.getPropertyValue("--dock")) || 0,
+            popBtn: !!document.getElementById("popBtn"),
+            fsBtn: !!document.getElementById("fsBtn"),
+            fsEnabled: !!document.fullscreenEnabled,
+          };
+        `);
+        check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+        check("APP.embed is true", p.embed === true);
+        // Fold on land (spec §1.1): the brief lives on the page around the
+        // frame, so the card starts parked on its edge tab.
+        check("the dock is not open", !p.dockOpen);
+        check("the reopen tab is shown", p.tabShown);
+        eq("the tab says what it opens, not what it is", p.tabKind, "open instructions");
+        // THE invariant this whole case exists to guard: folded, the water
+        // takes the full frame rather than sitting behind an inset panel.
+        eq("the canvas keeps the whole frame", p.canvasW, p.innerW);
+        eq("no width is given away to the panel", p.dockVar, 0);
+        check("the pop-out button is on the strip", p.popBtn);
+        eq("the full-screen button follows what the browser allows", p.fsBtn, p.fsEnabled);
+
+        // The wheel yields to the page (spec's "wheel policy"): a plain wheel
+        // over the water must not zoom and must not be default-prevented, or
+        // an iframe would eat the scroll gesture the parent page needs.
+        // Ctrl + wheel (and a trackpad pinch, which reports the same flag)
+        // still zooms — that is the way out of the small frame.
+        const wheel = await tab.evaluate(`
+          const c = document.getElementById("view");
+          const r = c.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const before = JSON.stringify(APP.view);
+          const plain = new WheelEvent("wheel", { deltaY: -120, bubbles: true,
+            cancelable: true, clientX: cx, clientY: cy });
+          c.dispatchEvent(plain);
+          const afterPlain = JSON.stringify(APP.view);
+          const ctrl = new WheelEvent("wheel", { deltaY: -120, bubbles: true,
+            cancelable: true, clientX: cx, clientY: cy, ctrlKey: true });
+          c.dispatchEvent(ctrl);
+          const afterCtrl = JSON.stringify(APP.view);
+          return { before, afterPlain, afterCtrl,
+                   plainPrevented: plain.defaultPrevented, ctrlPrevented: ctrl.defaultPrevented };
+        `);
+        eq("a plain wheel leaves the view untouched", wheel.afterPlain, wheel.before);
+        check("and is left to the page", !wheel.plainPrevented);
+        check("ctrl + wheel zooms", wheel.afterCtrl !== wheel.afterPlain);
+        check("and is handled here, not the page", wheel.ctrlPrevented);
+
+        // The x on the opened card folds it instead of hiding it — embedded,
+        // there is no strip Exercises button to bring the brief back from.
+        const closed = await tab.evaluate(`
+          APP.ui.DOCK.fold(false);
+          document.querySelector('#dock [data-a="close"]').click();
+          return { dockOpen: document.getElementById("dock").classList.contains("open"),
+                   tabShown: document.getElementById("docktab").classList.contains("show") };
+        `);
+        check("the x folds the card rather than hiding it",
+              !closed.dockOpen && closed.tabShown, JSON.stringify(closed));
+        check("still no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+        await tab.close();
+      } finally { await embed.close(); }
     }
   } finally {
     await browser.close();

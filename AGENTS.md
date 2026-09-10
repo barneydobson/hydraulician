@@ -36,6 +36,7 @@ shallow water); this one resolves the depth.
 | `docs/averaging.md` | time averaging, user-facing: what Average shows, the Favre mean, the discrete balance it satisfies, surface reconstruction, reset conditions — section numbers are load-bearing (code and tests cite them) |
 | `docs/boundary-conditions.md` | every boundary in one place: the solid mask, wall mechanisms, the tri-state outer ring, level controls with their sponges and clamps, edge ownership |
 | `docs/making-exercises.md` | how a demo becomes a card: scene vs rig, the card's applied/displayed split, the `ui` profile, the rig wire format, the folder recipe, what `check_pack.py` enforces, the headless measuring recipe — HS-1 as the worked example |
+| `docs/embedding.md` | putting one exercise inside a Blackboard or Canvas page: the iframe tag, what `?embed=1` changes, the per-LMS clicks, sizes, and the confirmed-placements table |
 | `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
@@ -160,7 +161,7 @@ way. Run both locally, where a real GPU is available.
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
 `index.html`, `css/app.css`, `js/pickers.js`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
-`START`, `setAverage` or the boot wiring. Every
+`START`, `setAverage`, `EMBED` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
 expectation. Its `test/cdp.mjs` launcher passes a GPU-backed `--use-angle`

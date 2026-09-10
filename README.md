@@ -39,7 +39,8 @@ through the conservation laws to unsteady pipe flow and similitude:
 
 The full pack — including exercises not yet checked — is in the app (press
 **`E`**) and indexed in [`exercises/`](exercises/INDEX.md); each exercise has
-a written brief in its folder there.
+a written brief in its folder there. To put one exercise inside a Blackboard
+or Canvas page, see [`docs/embedding.md`](docs/embedding.md).
 
 ## Method
 

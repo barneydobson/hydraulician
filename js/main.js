@@ -80,6 +80,10 @@ const state = {
   tipIdx: 0, tipAt: 0,
 };
 
+/** `?embed=1`: the app is sitting in an LMS iframe (docs/embedding.md). Read
+ *  once — an opt-in by URL, not `window !== top`, so a plain tab can test it. */
+const EMBED = new URLSearchParams(location.search).has("embed");
+
 let canvas, over, octx, view, sim;
 
 // --------------------------------------------------------------- geometry
@@ -944,6 +948,15 @@ function showToast(title, sub) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 5200);
 }
+/** The first plain wheel over the canvas, embedded, is a surprise — nothing
+ *  seemed to happen because the page scrolled instead. Said once per page,
+ *  not once per wheel: `hinted` is a closure, not state, on purpose. */
+let hinted = false;
+function wheelHint() {
+  if (hinted) return;
+  hinted = true;
+  showToast("Ctrl + scroll zooms the flume", "Open in a new tab for the full window.");
+}
 
 // -------------------------------------------------------- minimisable boxes
 /** Collapse any fixed UI box to a small pill and back. Each box gets a "–" in
@@ -1073,6 +1086,13 @@ const ICONS = {
            '<circle cx="13" cy="10" r="1.9" fill="#070b0f"/><circle cx="6.5" cy="14" r="1.9" fill="#070b0f"/>',
   keys:    '<rect x="2.5" y="6" width="15" height="8" rx="1.5"/><path d="M5.5 9h.01M8 9h.01M10.5 9h.01M13 9h.01M14.5 9h.01M6.5 11.6h7"/>',
   about:   '<path d="M10 3.5 17 7l-7 3.5L3 7Z"/><path d="M3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5" opacity=".55"/>',
+  // Four corner brackets opening outward — the frame the window is about to
+  // fill. `unfullscreen` is the same brackets turned to point back inward.
+  fullscreen:   '<path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4"/>',
+  unfullscreen: '<path d="M7.5 3.5v4h-4M12.5 3.5v4h4M7.5 16.5v-4h-4M12.5 16.5v-4h4"/>',
+  // A box with an arrow leaving its open corner — this exercise, elsewhere.
+  popout: '<path d="M8 4H4.5A1.5 1.5 0 0 0 3 5.5v9A1.5 1.5 0 0 0 4.5 16h9a1.5 1.5 0 0 0 1.5-1.5V11"/>' +
+          '<path d="M11 3h6v6M17 3l-7 7"/>',
   // ---- VIEW: what the water is painted with, and what is drawn over it.
   // A colour bar with its ticks; the dashes ARE the numbers under a legend.
   all:     '<circle cx="4.5" cy="10" r="1.45" fill="currentColor" stroke="none"/>' +
@@ -1658,6 +1678,20 @@ const TOOLBAR = [
     { id: "panelBtn", icon: "sliders", label: "Controls",
       hint: "Every slider: flow, boundaries, hydraulics, view, rig",
       act: () => togglePanel() },
+    { id: "fsBtn", icon: () => (document.fullscreenElement ? "unfullscreen" : "fullscreen"),
+      label: () => (document.fullscreenElement ? "Exit full screen" : "Full screen"), key: "F",
+      hint: "The whole screen for the flume — inside a module page, the way out of the frame",
+      on: () => !!document.fullscreenElement,
+      // A frame with no `allow="fullscreen"` reports the capability as false
+      // rather than throwing, so the button is simply not offered there —
+      // `when` is a boot-time read, and this is as close to boot-time as a
+      // capability check gets.
+      when: () => !!document.fullscreenEnabled,
+      act: () => toggleFullscreen() },
+    { id: "popBtn", icon: "popout", label: "Open in a new tab",
+      hint: "This exercise, and what you have drawn, in a full window",
+      when: () => EMBED,
+      act: () => popOut() },
     { id: "keysBtn", icon: "keys", label: "Keyboard", key: "?",
       hint: "The shortcut sheet",
       act: (b) => KEYS.toggle(b) },
@@ -1723,7 +1757,12 @@ function buildToolbar() {
     // read as a family with nothing in it, so the group goes with its last
     // button — and the rule keys off what has actually been appended, or a
     // hidden first group leaves a leading hairline.
-    const items = group.items.filter((it) => UIMODE.allows(group.family, it));
+    // The profile decides what an exercise WANTS shown; `when` decides what
+    // the boot CAN show (embedded, fullscreen-capable) — profile first, since
+    // narrowing is the thing a lecturer chose, then the capability check,
+    // which is fixed at boot and so is never re-read by `syncToolbar`.
+    const items = group.items.filter((it) =>
+      UIMODE.allows(group.family, it) && (!it.when || it.when()));
     if (!items.length) return;
     if (host.children.length) {
       const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
@@ -1851,7 +1890,9 @@ const KEYS = (() => {
     ["left-drag", "draw with the current tool"],
     ["right-drag", "pour water, whatever tool is in your hand"],
     ["shift", "snap to horizontal / vertical / 45°"],
-    ["wheel", "zoom"],
+    // Embedded, a plain wheel is left to the page (see the canvas wheel
+    // listener) — the sheet has to say what actually zooms in a frame.
+    [EMBED ? "ctrl + wheel" : "wheel", "zoom"],
     ["middle-drag", "pan"],
     ["0", "reset the view"],
     ["1 – 9", "pick a tool (Pour has no digit — right-drag instead)"],
@@ -1869,6 +1910,7 @@ const KEYS = (() => {
     ["N", "open-channel overlay"],
     ["A", "average the flow — the mean field, over one window"],
     ["M", "ruler"],
+    ["F", "full screen"],
     ["S", "scenes"],
     ["E", "exercises"],
     ["H", "the start screen"],
@@ -1971,7 +2013,10 @@ const DOCK = (() => {
     fold.classList.toggle("show", open);
     tab.classList.toggle("show", shown && folded);
     tab.querySelector(".eid").textContent = id;
-    tab.querySelector(".kind").textContent = kind.toLowerCase();
+    // The tab is the only thing a folded student sees: "Exercise" doesn't
+    // say there is a brief behind it, so name the action instead of the kind.
+    tab.querySelector(".kind").textContent =
+      kind === "Exercise" ? "open instructions" : "open " + kind.toLowerCase();
   }
   /** Show the panel with a header. `onClose` is what the × does — the caller
    *  owns what closing MEANS (an exercise stays loaded; only its brief goes). */
@@ -3266,6 +3311,10 @@ function boot() {
   // A resize (or a rotated phone) changes what "fills the window" means, and
   // the panel opening or closing changes it too — DOCK.sync calls this as well.
   addEventListener("resize", () => { DOCK.sync(); fitBar(); applyAutoVex(); });
+  // The fullscreen request/exit is asynchronous, so the button's icon and
+  // label (both read `document.fullscreenElement` live) are repainted off
+  // the browser's own event rather than off the click that asked for it.
+  document.addEventListener("fullscreenchange", () => syncToolbar());
 
   buildPanel();
   const q = new URLSearchParams(location.search);
@@ -3279,6 +3328,9 @@ function boot() {
   const exId = q.get("ex");
   if (exId && !EX.pick(exId)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
+  // Embedded, the brief lives on the page around the frame; the card starts
+  // folded to its tab so the water keeps the width (spec §1.1).
+  if (EMBED && exId) EX.ready.then(() => DOCK.fold(true));
   // A `#rig=` link carries its own base scene, so it wins over `?scene=` —
   // but `?scene=` is loaded first anyway, so a link that fails to decode
   // leaves you on the scene you asked for rather than on a blank page.
@@ -3327,6 +3379,11 @@ function boot() {
   canvas.addEventListener("pointerenter", () => state.inside = true);
   canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
   canvas.addEventListener("wheel", (e) => {
+    // Embedded, a plain wheel is the LMS page scrolling past; the frame is
+    // not scrollable, so leaving the event alone (no preventDefault) chains
+    // it to the parent page. Ctrl + wheel zooms — the same key a trackpad
+    // pinch already reports.
+    if (EMBED && !e.ctrlKey) { wheelHint(); return; }
     e.preventDefault();
     const [px, py] = pointerPx(e);
     // pinch-to-zoom trackpads report ctrlKey; give them a stronger response
@@ -3372,6 +3429,10 @@ function boot() {
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "a") setAverage(!state.avg);
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
+    // requestFullscreen needs a user gesture; a keypress is one. A frame with
+    // no allow="fullscreen" simply rejects — toggleFullscreen already swallows
+    // that — so there is nothing to guard here beyond what the button hides.
+    else if (k === "f") toggleFullscreen();
     // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
     // so a tenth tool would have made "9" fail ("9" > "10" lexically).
     //
@@ -3444,10 +3505,45 @@ function toggleValve() {
       : "Flow re-established.");
 }
 
+/** The strip's full-screen button, and the F key. `.catch(() => {})` because
+ *  both calls reject when the browser refuses — no `allow="fullscreen"` on
+ *  an enclosing iframe, or no user gesture — and the button (hidden via
+ *  `when` when `document.fullscreenEnabled` is false) is the only feedback
+ *  needed; there is nothing else to roll back. `syncToolbar` runs off the
+ *  `fullscreenchange` event, not here, since the request is asynchronous. */
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+
+/** `url` with `embed` dropped from the query string — what the pop-out and
+ *  the lecturer's snippet both hand a plain tab. `URL` keeps a `#rig=`
+ *  fragment intact, which is the whole point: the pop-out carries the
+ *  student's own drawing, just not the framing. */
+function stripEmbed(url) {
+  const u = new URL(url);
+  u.searchParams.delete("embed");
+  return u.toString();
+}
+
+/** Open in a new tab, embedded boots only: the pop-out is the way OUT of a
+ *  700–1000 px frame to do the actual measuring. `RIG.link()` may be
+ *  asynchronous (deflate), so the window opens synchronously inside the
+ *  click — a popup blocker only tolerates that — and is navigated once the
+ *  link resolves. */
+function popOut() {
+  const w = window.open("", "_blank");
+  if (!w) return;                        // blocked: nothing else to do
+  w.opener = null;
+  RIG.link().then((u) => { w.location = stripEmbed(u); })
+            .catch(() => { w.location = stripEmbed(location.href.split("#")[0]); });
+}
+
 // Debug handle. `frames` drives the loop by hand — the render loop stops when
 // the page is hidden, so headless testing goes through here.
 window.APP = {
   get sim() { return sim; }, get view() { return view; },
+  embed: EMBED,                            // `?embed=1` — see docs/embedding.md
   state, loadScene, SIM, OVERLAY, SCENES, showToast, zoomAt, resetZoom,
   switchScene,                             // load a scene as a fresh ?scene= boot would
   PICKER,                                  // the scene menu

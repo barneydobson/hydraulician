@@ -83,7 +83,13 @@ const PROBE = `
     startItems: document.querySelectorAll("#startlist .si").length,
     startSideways: (() => { const l = document.getElementById("startlist");
                             return l.scrollWidth > l.clientWidth + 1; })(),
-    specCount: APP.ui.TOOLBAR.reduce((n, grp) => n + grp.items.length, 0),
+    // A strip item can carry a boot-time \`when\` (full screen only where the
+    // browser allows it, pop-out only embedded) that buildToolbar filters on
+    // top of the UI profile — so the spec's raw item count overcounts by
+    // however many of those are hidden on THIS boot; only the surviving ones
+    // are ever rendered.
+    specCount: APP.ui.TOOLBAR.reduce((n, grp) =>
+      n + grp.items.filter((it) => !it.when || it.when()).length, 0),
     toolCount: APP.TOOLS.length,
     litTools: [...document.querySelectorAll("#groups .tbtn.on")].length,
     valveHot: document.getElementById("valveBtn").classList.contains("on") ||
@@ -283,6 +289,8 @@ async function main() {
       eq("the overlay stops there too", p.overW, p.canvasW);
       check("the strip still shows every control", !p.groupsClipped);
       check("the fold handle is on the seam", p.foldShown);
+      // Fold-on-land is an EMBEDDED behaviour (spec §1.1 of the embed design);
+      // a plain `?ex=` boot must not pick it up by accident.
       check("the reopen tab is put away", !p.tabShown);
       check("the brief carries the task", await tab.evaluate(
         `return document.querySelector("#dock .extask").textContent.length > 20;`));
@@ -451,7 +459,10 @@ async function main() {
           orphans: [...document.querySelectorAll("#groups .tbtn")]
                      .filter((b) => !b.closest(".tgrp")).length,
           buttons: document.querySelectorAll("#groups .tbtn").length,
-          specCount: spec.reduce((n, g) => n + g.items.length, 0),
+          // See PROBE's specCount: a \`when\`-hidden item (full screen, pop-out)
+          // is not in the spec's UNCONDITIONAL count either.
+          specCount: spec.reduce((n, g) =>
+            n + g.items.filter((it) => !it.when || it.when()).length, 0),
           viewGroup: spec.find((g) => g.cap === "VIEW").items.map((i) =>
             typeof i.label === "function" ? i.label() : i.label),
           buildGroup: spec.find((g) => g.cap === "BUILD").items.map((i) =>
@@ -1416,6 +1427,90 @@ async function main() {
         check("and stays inside the width", !leg.shown || leg.right <= leg.inner);
         await tab.close();
       } finally { await phone.close(); }
+    }
+
+    // ------------------------------------------------------- embedded in an LMS
+    console.log("\nan embedded exercise keeps the water");
+    {
+      // 800 x 600 is inside the 700-1000 px band a module page's content
+      // column actually offers (docs/superpowers/specs/2026-09-10-embed-design.md).
+      const embed = await launch({ width: 800, height: 600 });
+      try {
+        const tab = await embed.open(INDEX + "?ex=HJ-1&embed=1");
+        // `pickExercise` lands its rig a microtask later, so wait for the
+        // pick before asking anything about the card or the water.
+        await tab.evaluate("return APP.EX.ready.then(() => true);");
+        await tab.evaluate("APP.frames(10); return true;");
+        const p = await tab.evaluate(`
+          const dock = document.getElementById("dock");
+          const dockTab = document.getElementById("docktab");
+          const c = document.getElementById("view");
+          const cs = getComputedStyle(document.documentElement);
+          return {
+            embed: APP.embed,
+            dockOpen: dock.classList.contains("open"),
+            tabShown: dockTab.classList.contains("show"),
+            tabKind: dockTab.querySelector(".kind").textContent,
+            canvasW: c.clientWidth, innerW: window.innerWidth,
+            dockVar: parseFloat(cs.getPropertyValue("--dock")) || 0,
+            popBtn: !!document.getElementById("popBtn"),
+            fsBtn: !!document.getElementById("fsBtn"),
+            fsEnabled: !!document.fullscreenEnabled,
+          };
+        `);
+        check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+        check("APP.embed is true", p.embed === true);
+        // Fold on land (spec §1.1): the brief lives on the page around the
+        // frame, so the card starts parked on its edge tab.
+        check("the dock is not open", !p.dockOpen);
+        check("the reopen tab is shown", p.tabShown);
+        eq("the tab says what it opens, not what it is", p.tabKind, "open instructions");
+        // THE invariant this whole case exists to guard: folded, the water
+        // takes the full frame rather than sitting behind an inset panel.
+        eq("the canvas keeps the whole frame", p.canvasW, p.innerW);
+        eq("no width is given away to the panel", p.dockVar, 0);
+        check("the pop-out button is on the strip", p.popBtn);
+        eq("the full-screen button follows what the browser allows", p.fsBtn, p.fsEnabled);
+
+        // The wheel yields to the page (spec's "wheel policy"): a plain wheel
+        // over the water must not zoom and must not be default-prevented, or
+        // an iframe would eat the scroll gesture the parent page needs.
+        // Ctrl + wheel (and a trackpad pinch, which reports the same flag)
+        // still zooms — that is the way out of the small frame.
+        const wheel = await tab.evaluate(`
+          const c = document.getElementById("view");
+          const r = c.getBoundingClientRect();
+          const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const before = JSON.stringify(APP.view);
+          const plain = new WheelEvent("wheel", { deltaY: -120, bubbles: true,
+            cancelable: true, clientX: cx, clientY: cy });
+          c.dispatchEvent(plain);
+          const afterPlain = JSON.stringify(APP.view);
+          const ctrl = new WheelEvent("wheel", { deltaY: -120, bubbles: true,
+            cancelable: true, clientX: cx, clientY: cy, ctrlKey: true });
+          c.dispatchEvent(ctrl);
+          const afterCtrl = JSON.stringify(APP.view);
+          return { before, afterPlain, afterCtrl,
+                   plainPrevented: plain.defaultPrevented, ctrlPrevented: ctrl.defaultPrevented };
+        `);
+        eq("a plain wheel leaves the view untouched", wheel.afterPlain, wheel.before);
+        check("and is left to the page", !wheel.plainPrevented);
+        check("ctrl + wheel zooms", wheel.afterCtrl !== wheel.afterPlain);
+        check("and is handled here, not the page", wheel.ctrlPrevented);
+
+        // The x on the opened card folds it instead of hiding it — embedded,
+        // there is no strip Exercises button to bring the brief back from.
+        const closed = await tab.evaluate(`
+          APP.ui.DOCK.fold(false);
+          document.querySelector('#dock [data-a="close"]').click();
+          return { dockOpen: document.getElementById("dock").classList.contains("open"),
+                   tabShown: document.getElementById("docktab").classList.contains("show") };
+        `);
+        check("the x folds the card rather than hiding it",
+              !closed.dockOpen && closed.tabShown, JSON.stringify(closed));
+        check("still no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+        await tab.close();
+      } finally { await embed.close(); }
     }
   } finally {
     await browser.close();

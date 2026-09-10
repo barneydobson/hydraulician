@@ -366,6 +366,48 @@ const RIG = (() => {
     });
   }
 
+  /** The lecturer's snippet: an iframe tag for a module page, carrying the
+   *  current exercise (or scene, sandbox included) plus whatever is drawn —
+   *  a pre-set rig is exactly what `?ex=…#rig=…` already means, so embedding
+   *  one is embedding that same link. `embed=1` is the switch main.js reads
+   *  at boot (docs/embedding.md): folded card, ctrl + wheel, the pop-out. */
+  function embedCode() {
+    const id = (window.APP && APP.EX && APP.EX.current)
+      ? "ex=" + APP.EX.current.id : "scene=" + state.scene.id;
+    const src0 = location.origin + location.pathname + "?" + id + "&embed=1";
+    // A rig-bearing link is `#rig=<code>` — link() builds the whole URL, so
+    // only its fragment is kept; a bare exercise or scene needs no fragment
+    // at all, which is the common case (most cards ARE the starting rig).
+    const withRig = (sim.segs.length || state.gauges.length)
+      ? link().then((full) => src0 + "#" + full.split("#")[1])
+      : Promise.resolve(src0);
+    return withRig.then((src) => {
+      const text = '<iframe src="' + src + '" width="100%" height="640" ' +
+        'allow="fullscreen" title="hydraulician · ' + id.split("=")[1] +
+        '" style="border:0"></iframe>';
+      box(text);
+      // A snippet generated from file:// or a dev server points students at
+      // an address that will not exist for them — say so, rather than hand
+      // over a tag that looks ready and is not.
+      const local = location.protocol === "file:" ||
+        location.hostname === "localhost" || location.hostname === "127.0.0.1";
+      const done = (how) => {
+        note = "embed code ready" + (local
+          ? " · generated from this address — run it from the published app for a link students can open"
+          : "");
+        flash(how); return text;
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text)
+          .then(() => done("copied to the clipboard"))
+          .catch(() => done("clipboard blocked — copy it from the box"));
+      }
+      const t = el(".rigtx");
+      if (t) { t.focus(); t.select(); }
+      return done("select-all done — press ⌘/Ctrl-C");
+    });
+  }
+
   function exportJSON() {
     const o = snapshot(), text = toText(o, true);
     const name = "hydraulician-rig-" + o.scene + "-" + o.segs.length + "seg.json";
@@ -391,6 +433,7 @@ const RIG = (() => {
     host.innerHTML =
       '<div class="rigrow">' +
         '<button data-a="share" title="Copy a link that rebuilds this rig">⇪ Share link</button>' +
+        '<button data-a="embed" title="Copy an iframe tag that puts this exercise in a module page">⧉ Embed code</button>' +
         '<button data-a="json" title="Download the rig as a .json file">⤓ Export JSON</button>' +
       '</div>' +
       '<textarea class="rigtx" spellcheck="false" placeholder="Share puts the link here to copy — ' +
@@ -405,6 +448,7 @@ const RIG = (() => {
         b.blur();
         const a = b.dataset.a;
         if (a === "share") share();
+        else if (a === "embed") embedCode();
         else if (a === "json") exportJSON();
         else if (a === "load") load(el(".rigtx").value).catch(() => {});
       };
@@ -434,7 +478,7 @@ const RIG = (() => {
   function syncUI() { const m = el(".rigmsg"); if (m) m.textContent = msg; }
 
   return { snapshot, apply, toText, encode, encodeSync, decode, link, load,
-           hashCode, share, exportJSON, buildUI, syncUI, statusLine,
+           hashCode, share, embedCode, exportJSON, buildUI, syncUI, statusLine,
            get note() { return note; } };
 })();
 

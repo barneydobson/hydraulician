@@ -825,7 +825,13 @@ const EX = (() => {
       rb.onpointerleave = () => TIP.hide();
       // The × closes the BRIEF, not the exercise: the rig it set up is still on
       // the bench, and the strip's Exercises icon brings the brief back.
-      box.querySelector('[data-a="close"]').onclick = (e) => { e.currentTarget.blur(); hide(); };
+      // Embedded, there is no strip Exercises button worth hunting for — the
+      // chrome around the frame is the LMS page's, not ours — so the × parks
+      // the card on the edge tab instead of hiding it outright.
+      box.querySelector('[data-a="close"]').onclick = (e) => {
+        e.currentTarget.blur();
+        (window.APP && APP.embed) ? DOCK.fold(true) : hide();
+      };
       return box;
     }
     function show() {

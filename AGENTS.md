@@ -35,6 +35,7 @@ shallow water); this one resolves the depth.
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
 | `docs/averaging.md` | time averaging, user-facing: what Average shows, the Favre mean, the discrete balance it satisfies, surface reconstruction, reset conditions — section numbers are load-bearing (code and tests cite them) |
 | `docs/boundary-conditions.md` | every boundary in one place: the solid mask, wall mechanisms, the tri-state outer ring, level controls with their sponges and clamps, edge ownership |
+| `docs/making-exercises.md` | how a demo becomes a card: scene vs rig, the card's applied/displayed split, the `ui` profile, the rig wire format, the folder recipe, what `check_pack.py` enforces, the headless measuring recipe — HS-1 as the worked example |
 | `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
@@ -213,7 +214,11 @@ one register: `js/exercises.js` is the machine-readable source, each folder's
 history. Briefs carry the minimum needed to run the demo; statistics and
 methodology live in each folder's uncommitted `_archive/`. Coordinates in a
 recipe are exact — rounding them makes a new geometry; re-measure before
-shipping. `spinup` values are measured settle times, not guesses.
+shipping. `spinup` values are measured settle times, not guesses. **Adding
+one, end to end** — which of these files it touches, in what order, and what
+each gate will ask of it — is
+[docs/making-exercises.md](docs/making-exercises.md); read it before
+writing a card or a scene.
 
 An entry may also carry a **`ui` profile** — which strip families and
 instruments it wants in front of a student, how focused the Controls panel

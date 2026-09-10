@@ -45,6 +45,17 @@ const state = {
   // null. Cleared on a tool change, a scene load, and the pointer leaving the
   // domain, so it never outlives the pick it was computed from.
   forceHover: null,
+  // The pressure diagram's scale, ONE per scene: {headMax} in metres of
+  // head, set from the largest pressure on any wall the first time a face is
+  // picked and shared by every selection after it, so the diagram does not
+  // resize as you move from face to face. Cleared on a scene load only.
+  forceScale: null,
+  // How big that diagram is drawn: a multiplier on the 56 px the largest
+  // head maps to. A Controls row (and so a viewParams key), because a
+  // submerged face in a narrow passage can have its diagram run into the
+  // opposite wall's — the culvert roof of HS-1's dyke hangs its arrows into
+  // a 0.6 m culvert — and the lecturer wants to shrink it, not the scale.
+  forceSize: 1,
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   // Average is a measurement mode, not a blur filter (docs/averaging.md
@@ -199,6 +210,7 @@ function loadScene(id, keepDrawing) {
   state.flux.length = 0; state.fluxDrag = null;
   state.force = null;
   state.forceHover = null;
+  state.forceScale = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -673,6 +685,10 @@ const CONTROLS = [
         ? "1 section · draw a SECOND one for the balance between them"
         : state.flux.length + " sections · the last two are compared",
     info: "A section reads what crosses it: the volume Q, the momentum flux M, the pressure force F and the energy ρgQH, all four at once and all normal to the line. M and F are kept apart because telling them apart is what a control-volume question asks. <b>Two sections are the point</b> — between them you get continuity, the energy lost, and the force on whatever lies in between, which is the momentum theorem without drawing a box. Drawn bottom-to-top puts the positive side downstream." },
+  { id: "forceSize", label: "Pressure diagram size", min: 0.25, max: 3, step: 0.05,
+    get: () => state.forceSize, set: (v) => state.forceSize = v,
+    fmt: (v) => "×" + v.toFixed(2) + (v === 1 ? " — the largest head on any wall is 56 px" : ""),
+    info: "How long the Pressure force tool draws its arrows. The scale itself is fixed per scene — the largest head standing on any wall, read at the first pick, maps to 56 px — so every face is drawn to the same pixels per metre and a bigger triangle is a bigger force; this only multiplies that length. Shrink it when a submerged face in a narrow passage hangs its diagram into the opposite wall's; enlarge it for a shallow face on a big window. An exercise sets it through viewParams." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
@@ -2225,6 +2241,7 @@ function onDown(e) {
     } else {
       state.force = { solidId: hit.solid.id, faceId: hit.faceId, data: null, t0: sim.t };
     }
+    state.force.scale = forceScale();
     return;
   }
   state.drag = { x0: x, z0: z, x1: x, z1: z };
@@ -2691,6 +2708,32 @@ function sampleForce() {
                           { samples, solidId: r.solidId, faceId: r.faceId, len: r.len });
 }
 
+/** The pressure diagram's scale for THIS scene: {headMax}, the largest head
+ *  (metres) standing on any named face of any solid, read once at the first
+ *  pick and shared by every selection after it. One scale for the scene is
+ *  what makes the diagram comparable between faces — the upstream face, the
+ *  downstream face and the culvert roof of HS-1's dyke are drawn with the same
+ *  pixels per metre, so a bigger triangle IS a bigger force — and what stops
+ *  it resizing as you click from one face to the next. `drawForce` only
+ *  ratchets `headMax` up if a later reading exceeds it, so the diagram can
+ *  never run off the canvas; it never comes back down. A few dozen
+ *  faceForce readbacks, once per scene, never on the frame path. */
+function forceScale() {
+  if (state.forceScale) return state.forceScale;
+  const g = Math.abs(sim.p.g) || 9.81;
+  let headMax = 0;
+  (sim.solids || []).forEach((so) => (so.faces || []).forEach((fc) => {
+    const r = SIM.faceForce(so.id, fc.id, false);
+    if (!r) return;
+    for (const s of r.samples) {
+      const h = Math.max(0, Math.min(s.f, 1) * s.p) / g;
+      if (h > headMax) headMax = h;
+    }
+  }));
+  state.forceScale = { headMax };
+  return state.forceScale;
+}
+
 /** Smooth every scalar of a control-volume budget, edge by edge. Written as a
  *  walk over the keys rather than by hand so that adding a quantity to
  *  `boxFlux` cannot leave it unsmoothed and jittering while its neighbours
@@ -2839,7 +2882,7 @@ function drawOverlay(A) {
   if (state.flux.length || state.fluxDrag) {
     OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
   }
-  if (state.force && state.force.data) OVERLAY.drawForce(ctx, view, sim, state.force);
+  if (state.force && state.force.data) OVERLAY.drawForce(ctx, view, sim, state.force, state.forceSize);
   // The hover pick, faint — drawn UNDER the selected face's full-strength
   // stroke conceptually, but skipped entirely when it IS the selected face:
   // drawForce above already owns that stroke, and a second one under it
@@ -3431,6 +3474,7 @@ window.APP = {
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
   faceForce: (sid, fid, avg) => SIM.faceForce(sid, fid, avg),   // the pressure diagram on one named face
+  forceScale,                              // the scene's held diagram scale, {headMax} — headless tests pick with it
   placeCV,                                 // the control volume, headless
   placeFlux, removeFluxAt,                 // a flux section, headless
   // The averaging mode's public surface.

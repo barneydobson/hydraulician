@@ -15,7 +15,9 @@ facts that are derivable from the register and leaves the prose to people:
      card's own `settle`
   5. when a card carries a base/step digit rule and the README prints a
      ten-value ladder, the ladder is what the rule produces
-  6. the UI profile: every tool/field/panel id it names actually exists, and
+  6. the UI profile: every tool/field/panel id it names actually exists (a
+     `view` list is matched against the strip's button ids, read from
+     js/main.js, because VIEW is a family of toggles rather than tools), and
      BUILD is not hidden from a card whose task, start or setup tells the
      student to draw, cut, erase or otherwise build something
   7. no orphans in either direction
@@ -203,6 +205,23 @@ def row_ids():
     return set(re.findall(r'"([^"]+)"', m.group(1)))
 
 
+def view_button_ids():
+    """The strip's VIEW buttons, read out of the TOOLBAR spec in js/main.js.
+
+    UIMODE matches a `ui.view` list against BUTTON ids (legendBtn, partBtn,
+    avgBtn...), not tool ids -- the VIEW family has no pointer tools in it. A
+    checker that only knew tool ids would fail every card that narrows VIEW,
+    which is a legal and useful thing for a lecture demo to do. Same
+    principle as row_ids(): parsed from the source, never copied."""
+    src = open(os.path.join(ROOT, "js", "main.js"), encoding="utf-8").read()
+    ids = set(re.findall(r'\{\s*id:\s*"([A-Za-z]+Btn)"', src))
+    if not ids:
+        print("check_pack.py cannot find any `id: \"...Btn\"` in js/main.js -- the "
+              "TOOLBAR spec moved or was renamed, and this check will not run blind.")
+        sys.exit(1)
+    return ids
+
+
 def main():
     verbose = "-v" in sys.argv
     ex = cards()
@@ -295,6 +314,9 @@ def main():
     # card to named lines and is validated against ROW_IDS below.
     READOUT_IDS = {"gauges", "cursor", "status", "rows"}
     ROW_IDS = row_ids()
+    # VIEW is a family of toggle BUTTONS, not tools, so its list is matched
+    # against button ids (UIMODE.keep tests both `it.tool` and `it.id`).
+    VIEW_IDS = TOOL_IDS | view_button_ids()
     BUILD_TOOLS = {"wall", "erase", "valve", "spout", "pour"}
     for e in ex:
         i, ui = e.get("id"), e.get("ui")
@@ -303,7 +325,8 @@ def main():
             for fam in ("build", "measure", "view"):
                 v = ui.get(fam)
                 if isinstance(v, list):
-                    bad = [t for t in v if t not in TOOL_IDS]
+                    known = VIEW_IDS if fam == "view" else TOOL_IDS
+                    bad = [t for t in v if t not in known]
                     if bad:
                         fail.append("%-5s ui.%s names tools that do not exist: %s"
                                     % (i, fam, ", ".join(bad)))

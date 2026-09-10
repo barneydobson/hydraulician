@@ -1135,7 +1135,7 @@ const OVERLAY = (() => {
    *  like drawCV's arrow, it is built in true screen proportion (no vex),
    *  because an angle on it is one a straightedge on the screen should be
    *  able to measure. */
-  function drawForce(ctx, V, sim, force) {
+  function drawForce(ctx, V, sim, force, size) {
     const D = force.data, samples = D.samples;
     const col = "#ff8fa3";
     ctx.save();
@@ -1159,14 +1159,32 @@ const OVERLAY = (() => {
     });
     if (maxHead > 1e-6) {
       // ONE scale for the whole face — the shape of the diagram is the
-      // reading, and a per-station scale would draw a lie. The largest head
-      // maps to `maxPx` SCREEN pixels, capped at a third of the view so a
-      // huge head on a small window cannot run the diagram off the canvas.
-      // This is now the ONLY scale in play — screen px per metre of head —
-      // because the arrow direction and length are both built in screen
-      // space (see the function comment).
-      const maxPx = Math.min(56, V.h / 3);
-      const pxPerHead = maxPx / maxHead;             // screen px per metre of head
+      // reading, and a per-station scale would draw a lie. This is the ONLY
+      // scale in play — screen px per metre of head — because the arrow
+      // direction and length are both built in screen space (see the
+      // function comment).
+      //
+      // And it is HELD, not refitted: `force.scale` is the SCENE's scale
+      // (main.js `forceScale`), {headMax} set from the largest head on any
+      // wall at the first pick and shared by every face picked after it, so
+      // the diagram neither breathes with the frame nor resizes as you click
+      // from face to face — a bigger triangle is a bigger force, anywhere in
+      // the scene. Refitting every frame made the diagram the same size
+      // whatever the pressure did: on HS-1's piezometer wall the column swung
+      // 2.75–3.52 m and the force 16–34 kN/m while the triangle on screen
+      // never changed, with the whole reading pushed into the scale chip.
+      // Same rule as the colour ranges (AGENTS.md): explicit and held, never
+      // tracked. The one concession is a ratchet: should a head later exceed
+      // headMax, the scale shrinks to keep the diagram on the canvas, and
+      // stays there — it never grows back to flatter a fall. `headMax` maps
+      // to `maxPx` screen pixels — 56 times the Controls row "Pressure
+      // diagram size" (`size`, default 1), capped at a third of the view — so
+      // a resize or the slider rescales the picture but never the comparison
+      // between faces.
+      const maxPx = Math.min(56 * (size > 0 ? size : 1), V.h / 3);
+      const sc = force.scale || (force.scale = { headMax: 0 });
+      if (maxHead > sc.headMax) sc.headMax = maxHead;
+      const pxPerHead = maxPx / sc.headMax;          // screen px per metre of head
 
       const P = samples.map((s) => [V.X(s.x), V.Y(s.z)]);
       // Screen px -> domain metres, per axis (the inverse of V.X/V.Y's

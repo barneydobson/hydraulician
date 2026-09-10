@@ -57,7 +57,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | NC-2 | Is α really 1? | NC-2-alpha/ | s2 stations + gate wake | (station, α) |
 | NC-3 | Bed shear and riprap | NC-3-bed-shear/ | s2 sweep + m2 anchor | (τ₀, D_min) |
 | QS-1 | Predict the drain | QS-1-drain-predict/ | jet | (t_pred, t_meas) |
-| QS-2 | Two tanks and two parallel ducts | QS-2-twin-tanks/ | two-tank scene | level changes at 120 s, per metre width |
+| QS-2 | Two tanks and two parallel ducts | QS-2-twin-tanks/ | adjustable two-tank scene | digit-based widths; predict and compare level changes at 120 s |
 | UN-1 | The class discovers c | UN-1-celerity/ | hammer + nozzle rungs | (v₀, ΔH) |
 | UN-2 | Flow establishment | UN-2-establishment/ | estab | (level, u_max, t_75) |
 | UN-3 | Surge tank: fit k to the decay | UN-3-surge-tank/ | hammer + standpipe | (k) |

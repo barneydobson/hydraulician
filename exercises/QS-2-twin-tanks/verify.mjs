@@ -39,14 +39,14 @@ try {
   }
   await page.evaluate(`APP.pickExercise('QS-2'); return EX.ready;`);
   const boot = await page.evaluate(`state.paused=true; SIM.resetWater();
-    APP.placeGauge(5,0.35); APP.placeGauge(27.5,0.35);
+    APP.placeGauge(5,0.35); APP.placeGauge(26.5,0.35);
     return {scene:state.scene.id, budget:state.budget, t:sim.t, rig:RIG.snapshot()};`);
   assert.equal(boot.scene, 'two-tank'); assert.equal(boot.budget, 'Medium'); assert.equal(boot.t,0);
   writeFileSync(new URL('hydraulician-rig-QS-2.json', import.meta.url), JSON.stringify(boot.rig,null,2)+'\n');
   const restored = await page.evaluate(`APP.switchScene('sandbox');
     RIG.apply(${JSON.stringify(boot.rig)}); state.paused=true;
     const C=SIM.columns(true), surface=x=>{const i=Math.floor(x/sim.dx)*4; return C[i]+C[i+1];};
-    return {scene:state.scene.id, t:sim.t, left:surface(5), right:surface(27.5), gauges:state.gauges.length};`);
+    return {scene:state.scene.id, t:sim.t, left:surface(5), right:surface(26.5), gauges:state.gauges.length};`);
   assert.equal(restored.scene,'two-tank'); assert.equal(restored.t,0); assert.equal(restored.gauges,2);
   assert.ok(Math.abs(restored.left-3)<0.04 && Math.abs(restored.right-1.2)<0.04, 'reload initial water');
   await page.evaluate('APP.tick(1); return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));');

@@ -286,16 +286,25 @@ const SCENES = (() => {
       blurb: "Two rectangular tanks exchange water through identical 15 m × 0.10 m ducts. Left starts high; the shallow right-hand charge keeps both outlets submerged.",
       W: 32, H: 4, c: 35, cf: 0.25, cs: 0.40, mode: 1, spinup: 0,
       hmax: 3.2, headMax: 3, vmax: 2,
-      // Clear tank widths 9 m and 6 m. All dimensions describe water faces,
+      params: [
+        { key: "tank_b1", label: "Left reservoir width", min: 6, max: 9,
+          step: 0.25, value: 9, unit: "m", resetWater: true },
+        { key: "tank_b2", label: "Right reservoir width", min: 3, max: 6,
+          step: 0.25, value: 6, unit: "m", resetWater: true },
+      ],
+      // Default clear tank widths 9 m and 6 m. All dimensions describe water faces,
       // not wall centrelines. Thick blocks leave no hidden under-floor void.
       // Three connected solids: ground/tank walls, the separator, and roof.
       // The wet faces retain the original segment coordinates; the ground
       // extends below the domain. Faces are named for the Pressure force tool.
-      solids: () => [
+      solids: (W, H, P, par = {}) => {
+        const left = 9.5 - (par.tank_b1 === undefined ? 9 : par.tank_b1);
+        const right = 24.5 + (par.tank_b2 === undefined ? 6 : par.tank_b2);
+        return [
         GEOM.poly([[-0.5,-0.5],[32.5,-0.5],[32.5,0.2],
-          [30.6,0.2],[30.6,4],[30.5,4],[30.5,0.2],
+          [right+0.1,0.2],[right+0.1,4],[right,4],[right,0.2],
           [24.5,0.2],[24.5,0.5],[9.5,0.5],[9.5,0.2],
-          [0.5,0.2],[0.5,4],[0.4,4],[0.4,0.2],[-0.5,0.2]], [
+          [left,0.2],[left,4],[left-0.1,4],[left-0.1,0.2],[-0.5,0.2]], [
           { id: "rightWall", label: "Right tank outer wall", e0: 5, e1: 5 },
           { id: "rightBed", label: "Right tank floor", e0: 6, e1: 6 },
           { id: "lowerFloor", label: "Lower duct floor", e0: 8, e1: 8 },
@@ -313,18 +322,21 @@ const SCENES = (() => {
           { id: "right", label: "Roof block: right tank face", e0: 1, e1: 1 },
           { id: "left", label: "Roof block: left tank face", e0: 3, e1: 3 },
         ] }),
-      ],
-      water: (x, z, P) => {
-        if (x < 0.5 || x > 30.5 || z < 0.2) return 0;
+        ];
+      },
+      water: (x, z, P, par = {}) => {
+        const left = 9.5 - (par.tank_b1 === undefined ? 9 : par.tank_b1);
+        const right = 24.5 + (par.tank_b2 === undefined ? 6 : par.tank_b2);
+        if (x < left || x > right || z < 0.2) return 0;
         if (x < 9.5) return still(3.0, z, P);
         if (x > 24.5) return still(1.2, z, P);
         return ((z > 0.5 && z < 0.60) || (z > 0.94 && z < 1.04))
           ? still(3.0 - 1.8 * (x - 9.5) / 15, z, P) : 0;
       },
-      tips: ["Tank widths are 9 m and 6 m; storage and discharge are per metre out of the screen.",
+      tips: ["Set both reservoir widths in Controls → Geometry. A width change restarts the water and clock.",
              "Each duct is 15 m long with a 0.10 m clear gap. Both branches see the same level difference.",
              "The left level starts at 3.00 m and the right at 1.20 m. R restores this initial condition.",
-             "Use the QS-2 brief for the measured resistance and the prediction. Circular-pipe friction factors do not transfer directly to this slice."] },
+             "Both ducts share the same head loss; their discharges add. Storage and discharge are per metre out of the screen."] },
 
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",
       blurb: "Water falls in at the top left. Left-drag to draw edges and route it; right-drag for a big flow.",

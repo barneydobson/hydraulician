@@ -316,6 +316,8 @@ const SIM = (() => {
    *  declared [min, max], writes S.params, and rebuilds the mask: a param a
    *  scene's `solids()` reads is geometry, so it takes the same rasterise()
    *  choke point (and the same averaging reset) as a drawn edge.
+   *  A declaration with resetWater:true restarts the experiment after a
+   *  changed value; resetWater passes the live params to scene.water too.
    *
    *  An undeclared key is a no-op — write nothing, rasterise nothing, return
    *  undefined. This entry point is fed straight off the rig wire (RIG.apply
@@ -327,8 +329,11 @@ const SIM = (() => {
     if (!decl) return undefined;
     if (!Number.isFinite(v)) return undefined;   // a hand-edited rig can carry NaN
     const clamped = Math.min(decl.max, Math.max(decl.min, v));
+    const changed = S.params[key] !== clamped;
     S.params[key] = clamped;
     rasterise();
+    // Storage dimensions define a fresh experiment, not a moving-wall flow.
+    if (changed && decl.resetWater) resetWater();
     return clamped;
   }
   const params = () => ({ decl: S.scene.params || [], values: S.params });
@@ -487,7 +492,7 @@ const SIM = (() => {
     for (let j = 0; j < S.ny; j++) {
       for (let i = 0; i < S.nx; i++) {
         const k = (j * S.nx + i) * 4;
-        d[k] = Math.max(0, water((i + 0.5) * S.dx, (j + 0.5) * S.dx, P) || 0);
+        d[k] = Math.max(0, water((i + 0.5) * S.dx, (j + 0.5) * S.dx, P, S.params) || 0);
       }
     }
     for (const b of [S.F.a, S.F.b]) {

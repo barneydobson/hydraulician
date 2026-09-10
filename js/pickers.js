@@ -778,10 +778,9 @@ const EX = (() => {
    *  neighbour's shoulder in a lecture where the lecturer is already saying
    *  what to do: the id, your own numbers, one line on what is on the bench,
    *  one or two on what to do and what to read, a collapsed receipt of what was
-   *  applied, and the link to the full brief. Everything else — why a rule is
-   *  what it is, the flutter cautions, the procedure for a drawn
-   *  personalisation, what gets handed in — lives in the README. Adding a
-   *  coloured block here has been tried and was thrown out. */
+   *  applied, plus the optional lecturer-notes link. Student instructions,
+   *  required equations and what to record belong on the card; the README
+   *  contains worked answers and verification for the lecturer. */
   const card = (() => {
     let box = null, digitEl = null;
     const fields = [];        // {id, el} — the live controls in the brief
@@ -885,7 +884,8 @@ const EX = (() => {
       const brief = "exercises/" + cur.folder +
         (/\.github\.io$/i.test(location.hostname) ? "/" : "/README.md");
       a.href = brief;
-      a.textContent = brief;
+      a.textContent = "Lecturer notes";
+      a.title = brief;
       tick();
     }
     /** The "Yours" block: the printed rule, and beside it the control the
@@ -1042,6 +1042,7 @@ const EX = (() => {
     function stationLabel() {
       const ins = cur.instruments || [];
       if (!ins.length) return "";
+      if (ins.some((n) => n.tool !== "gauge" && n.tool !== "rake")) return "Instruments:";
       const rake = ins.some((n) => n.tool === "rake"), g = ins.some((n) => n.tool !== "rake");
       if (rake && !g) return ins.length > 1 ? "Rakes:" : "Rake:";
       if (rake && g) return "Instruments:";
@@ -1146,4 +1147,3 @@ function syncURLEx(id) {
     history.replaceState(null, "", u.pathname + u.search);
   } catch (_) { /* file:// refuses — harmless */ }
 }
-

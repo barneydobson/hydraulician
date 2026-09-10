@@ -2,12 +2,10 @@
 /**
  * exercises.js — the teaching pack as data.
  *
- * Forty verified demos live in `exercises/<folder>/README.md`, each with a
- * lecturer setup, a student worksheet and a verification record. This file is
- * the machine-readable half of that: enough to put a student in front of the
- * SAME correctly-plumbed rig as everybody else, and to tell them what their own
- * numbers are. The README stays authoritative for everything a human needs to
- * read, and every card links to it.
+ * The card is the complete student exercise: setup, assignment, actions and
+ * readings, including any data/formulas needed to do it without another
+ * document. Each folder's README is lecturer-only: derivation, worked
+ * answers and verification. HS-1 is the model for a concise standalone card.
  *
  * Every number here is the SHIPPED value from the demo's own README —
  * remeasured constants, not the ones the original programme sheet promised.
@@ -118,13 +116,11 @@
  *            everything in one click, which is what keeps the standing
  *            acceptance test (the sandbox reproduces any scene by hand) true.
  *
- * HOW SHORT `start` AND `task` ARE IS THE POINT. This pack is read in a lecture
- * theatre by somebody whose lecturer is already saying what to do, or at home
- * beside the README. The card carries no cautions, no reasons, no procedure for
- * a drawn personalisation and nothing about handing work in — a `submit` list
- * and a `notes` paragraph were both tried on the card and removed, because the
- * card that says everything is the card nobody reads. All of it is still in
- * `exercises/<folder>/README.md`, which every card links to.
+ * A card must stand alone. `start` describes the bench, `instruments.where`
+ * gives the stations and `task` says what to do and read afterwards. Use
+ * `setup` for ordered steps and necessary calculation data. Do not send the
+ * student to the README for an equation, a procedure or what to record.
+ * Derivations, worked answers and verification remain in lecturer notes.
  *
  * Standing rules every worksheet carries: Resolution Medium · wait out the
  * settle · median-of-the-wobble reads, never one frame · after changing q,
@@ -703,14 +699,20 @@ const EXERCISES = [
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { gaugeField: "h", mode: "1", grade: true, speed: 1 },
-    digitNote: "lecturer demo: no personalised parameter",
+    digit: { label: "Left reservoir width B₁", control: "geom0", base: 6.75, step: 0.25, unit: "m",
+      rule: "B₁ = 6.75 + 0.25·d",
+      also: [{ label: "Right reservoir width B₂", control: "geom1", base: 3.75, step: 0.25, unit: "m",
+        rule: "B₂ = 3.75 + 0.25·d" }] },
     instruments: [
-      { tool: "gauge", where: "(5, 0.35) and (27.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
-      { tool: "flux", where: "x = 17 m, across each duct", why: "the two parallel discharges add; both branches see the same head difference" },
+      { tool: "gauge", where: "Head gauges at (5, 0.35) and (26.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
+      { tool: "flux", where: "optional Flux lines at x = 17 m, drawn upwards across each duct", why: "the two parallel discharges add; both branches see the same head difference" },
     ],
     ui: { build: true },
-    start: "9 m and 6 m wide tanks; two equal 15 m × 0.10 m ducts; left level 3.00 m, right level 1.20 m",
-    task: "Read the QS-2 brief and predict the two level changes from the measured 2D resistance. Place two gauges, press R, and compare at 120 s on the simulation clock. Storage and discharge are per metre of width.",
+    start: "two reservoirs at 3.00 and 1.20 m, joined by two full, identical 15 m × 0.10 m ducts; all quantities are per metre width",
+    setup: ["Set both widths from your digit using the fields above or Controls → Geometry. Changing a width restarts the water and clock; keep Medium resolution.",
+      "Predict the difference at 120 s: Δ = [√1.8 − 2.16(1/B₁ + 1/B₂)]². The total discharge law is q = 0.036√Δ m²/s.",
+      "Predicted left fall = B₂(1.8−Δ)/(B₁+B₂); right rise = B₁(1.8−Δ)/(B₁+B₂)."],
+    task: "Place two Head gauges (5), press R and watch the left reservoir fall as the right rises. Pause at 120 s on the simulation clock; record both changes, compare with your predictions to within 0.05 m, and explain why the narrower reservoir changes level faster.",
     settle: 0,
   },
 

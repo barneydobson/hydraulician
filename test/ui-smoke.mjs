@@ -100,6 +100,40 @@ async function main() {
   }
   const browser = await launch({ width: 1440, height: 900 });
   try {
+    console.log("\nQS-2 width fields and sliders describe and restart the same experiment");
+    {
+      const tab = await browser.open(INDEX + "?ex=QS-2");
+      await tab.evaluate("return APP.EX.ready;");
+      const r = await tab.evaluate(`
+        APP.state.paused=true; APP.tick(10);
+        const left=document.querySelector('#dock input[aria-label="Left reservoir width"]');
+        const right=document.querySelector('#dock input[aria-label="Right reservoir width"]');
+        const sliders=[document.getElementById('c_geom0'),document.getElementById('c_geom1')];
+        const bounds=[left.min,left.max,left.step,right.min,right.max,right.step];
+        left.value='7.5'; left.dispatchEvent(new Event('input'));
+        const leftTime=APP.sim.t, leftWidth=APP.SIM.params().values.tank_b1;
+        APP.tick(10); sliders[1].value='4.5'; sliders[1].dispatchEvent(new Event('input'));
+        const card=APP.EX.all().find(e=>e.id==='QS-2');
+        return {bounds,leftTime,leftWidth,rightTime:APP.sim.t,rightWidth:APP.SIM.params().values.tank_b2,
+          rightField:+right.value,leftSlider:+sliders[0].value,types:sliders.map(s=>s.type),
+          selfContained:! /readme|see the brief/i.test([card.start,card.task,...card.setup].join(' ')),
+          rule:card.digit.base===6.75 && card.digit.step===0.25 && card.digit.also[0].base===3.75,
+          lecturerLink:document.querySelector('#dock .exlink').textContent};
+      `);
+      eq("both Geometry controls are sliders",r.types.join(','),'range,range');
+      eq("card fields use the scene's own bounds",r.bounds.join(','),'6,9,0.25,3,6,0.25');
+      eq("left field changes physical width",r.leftWidth,7.5);
+      eq("left field updates its slider",r.leftSlider,7.5);
+      eq("right slider changes physical width",r.rightWidth,4.5);
+      eq("right slider updates its card field",r.rightField,4.5);
+      eq("left width restarts the clock",r.leftTime,0);
+      eq("right width restarts the clock",r.rightTime,0);
+      check("student instructions stand alone",r.selfContained);
+      check("both student-number rules are declared",r.rule);
+      eq("README link identifies its lecturer audience",r.lecturerLink,'Lecturer notes');
+      check("no uncaught errors",tab.errors.length===0,tab.errors[0]);
+      await tab.close();
+    }
     // ---------------------------------------------------------- bare visit
     console.log("\na bare visit opens the start screen");
     {

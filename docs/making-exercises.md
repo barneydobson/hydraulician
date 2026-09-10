@@ -27,7 +27,7 @@ and `exercises/_runner/check_pack.py` asserts that the pieces agree.
 | rig payload | `js/exercises-rigs.js` | drawn segments and panel state, **captured** from the app, never hand-edited |
 | folder | `exercises/<ID>-<slug>/` | `README.md` (lecturer notes), `rig.js` (console spot-check), `collect_plot.py` when a class submits |
 | index row | `exercises/INDEX.md` | one line of navigation |
-| thumbnail | `docs/thumbs/<ID>.jpg` | 480 × 289, linked from the repo `README.md` gallery |
+| syllabus row | `syllabus.md` | one row under its topic — id, type badge and a one-liner; **only once the exercise has been checked** |
 
 Worked example throughout: **HS-1**, the dyke with a piezometer
 (`exercises/HS-1-dyke-piezometer/`), a lecturer demo on a scene written for
@@ -215,8 +215,20 @@ the current version.
 - **`_archive/`** — untracked, local: the long verification record.
 
 Then one row in `exercises/INDEX.md` (`| ID | short title | folder/ | what it
-runs on | what students submit |`), and the thumbnail cell in the repo
-`README.md` gallery.
+runs on | what students submit |`).
+
+**The syllabus row is earned, not written with the card.** `syllabus.md`
+(root — the GitHub Pages page the README links) carries only the exercises
+that have been **checked**: run headless, measured, and read once more against
+what the brief claims to teach. When an exercise passes that, add one row to
+its topic's table — `**<ID>** · <title>` linking `[open it]` to
+`…/?ex=<ID>` and `[brief]` to the folder, the type badge (demo = interactive
+lecturer demo, quick = quick in-class exercise, tutorial = written tutorial
+with simulation comparison; copy the `<span>` from an existing row), and a
+one-line description. If its topic's section still says *Nothing here yet*,
+replace that with the table. Topics and their order live in the syllabus's
+Contents list — place the row where the topic teaches, not where the app's
+menu files it.
 
 ## 6. What the gates check
 

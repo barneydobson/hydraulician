@@ -59,6 +59,7 @@ done-NOT-FEASIBLE / redo.
 | B8 | B8-three-orifices | jet + drawn lips | sonnet | done-READY-CAVEATS | sharp 0.611 spot-on; bellmouth 0.856; Borda 0.611 NOT 0.5 (no detachment — taught); eye-read bias 5–30% high; hit P12 leak live |
 | B9 | B9-three-reservoirs | RIG-C ×3, dynamic version | sonnet | done-READY-CAVEATS | quasi-steady ruled out on evidence; junction head 1.68 m ±6 mm; zero-crossing +53–70% (opening transient, taught); continuity 7.9%; sign flip in-band |
 | B10 | B10-crest-vs-hgl | RIG-A + raised crest | opus (redo) | done-READY-CAVEATS | 1:1 slope 1.134 R²0.990 +1.2 cells (cause measured); soffit datum closed; pocket hysteresis (read going up); d mod 6 rule; inherited-rig bugs fixed |
+| HP-3 | HP-3-surge-tower | hydro (parametric scheme, six Geometry sliders) | fable | done-READY-CAVEATS | added 2026-09-02: crest 0.91–0.98 × u₀√(L·D_h/g·D_s), ±5% of the friction-corrected rigid column; T +17–26% (shaft inertia + slot storage); ladder D_s = 2.5 + 0.5·d (narrower throttles); friction knobs inert in a 19-cell bore (f ≈ 0.03, Average-mode read only); max-power coda unreachable (jet at √2gH) → HP-1; seeded steady start (flow hook) cut the spin-up surge from ±4 m to ±0.3 m |
 
 ## Code-change campaign (maintainer-authorised, 2026-08-14)
 

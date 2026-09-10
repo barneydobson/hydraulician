@@ -1,22 +1,18 @@
 # Syllabus
 
 The teaching pack, arranged as a syllabus: topics in the order we suggest
-teaching them, and under each one the exercises that have been **checked** —
-run headless, measured, and agreed to be teaching what they claim. The order
-is the module's own spine: hydrostatics first, then the three conservation
-laws, then the applications those laws hold up, ending with the topics where
-the model's own limits become part of the subject.
+teaching them, and under each one the exercises that have been checked. 
 
 Hydraulician includes a variety of exercise types, colour-coded below:
 
 - <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> **interactive demo** — a lecturer runs it in front of the class
 - <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> **quick exercise** — short enough to do in class
-- <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> **written tutorial with simulation comparison** — the derivation is done on paper, then compared against the solver
+- <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> **written tutorial with simulation comparison** — the derivation is done on paper, then compared against simulation results
 
 Every exercise opens in the app set up and ready to run; its written brief
 lives in the linked folder. The full pack — including exercises not yet
-checked — is in the app's Exercises menu (press `E`) and indexed in
-[exercises/INDEX.md](exercises/INDEX.md).
+checked or considered redundant — is in the app's Exercises menu (press `E`)
+and indexed in [exercises/INDEX.md](exercises/INDEX.md).
 
 ## Contents
 
@@ -35,8 +31,7 @@ checked — is in the app's Exercises menu (press `E`) and indexed in
 ## 1. Hydrostatics
 
 Pressure under still water, and the thrust it puts on a structure — how big it
-is, and where it acts. Everything later in the module assumes this distribution
-can be read on sight.
+is, and where it acts. Everything assumes this distribution can be read on sight.
 
 | exercise | type | what it does |
 |---|---|---|
@@ -44,13 +39,9 @@ can be read on sight.
 
 ## 2. Volume conservation
 
-What flows in must flow out or be stored: filling and draining tanks, levels
-equalising, and the quasi-steady assumption that turns a storage balance into
-an equation a student can integrate.
+What flows in must flow out or be stored.
 
-| exercise | type | what it does |
-|---|---|---|
-| **QS-2** · Two tanks and two parallel ducts ([open it](https://barneydobson.github.io/hydraulician/?ex=QS-2) · [brief](exercises/QS-2-twin-tanks/)) | quick | Two reservoirs joined by parallel ducts. Predict the level changes at 120 s from a storage balance, run it, and compare — per-student tank widths, so the class pools a spread of answers. |
+*Nothing here yet.*
 
 ## 3. Momentum conservation
 
@@ -67,7 +58,9 @@ returns later inside the hydraulic jump.
 Head, grade lines and losses: where a flow's energy goes, which losses can be
 measured, and how a contraction differs from an expansion.
 
-*Nothing here yet.*
+| exercise | type | what it does |
+|---|---|---|
+| **QS-2** · Two tanks and two parallel ducts ([open it](https://barneydobson.github.io/hydraulician/?ex=QS-2) · [brief](exercises/QS-2-twin-tanks/)) | quick | Two reservoirs joined by parallel ducts. Predict the level changes at 120 s from a storage balance, run it, and compare — per-student tank widths, so the class pools a spread of answers. |
 
 ## 5. Shear layers and velocity profiles
 

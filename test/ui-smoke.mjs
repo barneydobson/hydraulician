@@ -83,7 +83,13 @@ const PROBE = `
     startItems: document.querySelectorAll("#startlist .si").length,
     startSideways: (() => { const l = document.getElementById("startlist");
                             return l.scrollWidth > l.clientWidth + 1; })(),
-    specCount: APP.ui.TOOLBAR.reduce((n, grp) => n + grp.items.length, 0),
+    // A strip item can carry a boot-time \`when\` (full screen only where the
+    // browser allows it, pop-out only embedded) that buildToolbar filters on
+    // top of the UI profile — so the spec's raw item count overcounts by
+    // however many of those are hidden on THIS boot; only the surviving ones
+    // are ever rendered.
+    specCount: APP.ui.TOOLBAR.reduce((n, grp) =>
+      n + grp.items.filter((it) => !it.when || it.when()).length, 0),
     toolCount: APP.TOOLS.length,
     litTools: [...document.querySelectorAll("#groups .tbtn.on")].length,
     valveHot: document.getElementById("valveBtn").classList.contains("on") ||
@@ -417,7 +423,10 @@ async function main() {
           orphans: [...document.querySelectorAll("#groups .tbtn")]
                      .filter((b) => !b.closest(".tgrp")).length,
           buttons: document.querySelectorAll("#groups .tbtn").length,
-          specCount: spec.reduce((n, g) => n + g.items.length, 0),
+          // See PROBE's specCount: a \`when\`-hidden item (full screen, pop-out)
+          // is not in the spec's UNCONDITIONAL count either.
+          specCount: spec.reduce((n, g) =>
+            n + g.items.filter((it) => !it.when || it.when()).length, 0),
           viewGroup: spec.find((g) => g.cap === "VIEW").items.map((i) =>
             typeof i.label === "function" ? i.label() : i.label),
           buildGroup: spec.find((g) => g.cap === "BUILD").items.map((i) =>

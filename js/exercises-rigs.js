@@ -444,30 +444,6 @@ const EXERCISE_RIGS = {
    "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
   },
 
-  /* QS-2-twin-tanks/rig.js · QS2.build() — tank 2 at the card's own default A2 = 2.00 m (digit d = 6); A2 is per-student geometry, see NOTES */
-  "QS-2": {
-   "v": 2,
-   "scene": "sandbox",
-   "segs": [
-     [0.5, 3.45, 3.4, 2.85, 0.55, 0],
-     [3.2, 2.6, 7.1, 1.95, 0.55, 0],
-     [2.8, -0.2, 2.8, 3.2, 1.6, 255],
-     [5.65, -0.2, 5.65, 3.2, 0.1, 255],
-     [1.93, 0, 3.67, 0, 0.1208, 128]
-   ],
-   "open": [0, 0, 0, 0],
-   "valveClosed": 1,
-   "inflow": {"on": 0, "free": 0, "level": 0, "q": 0},
-   "tailwater": {"on": 0, "level": 0},
-   "source": {"on": 0, "x": 0.55, "z": 4.55, "r": 0.14, "vx": 1.1, "vz": -1.4},
-   "wave": {"on": 0, "amp": 0, "period": 1.5, "x": 0.15},
-   "hyd": {"c": 22, "cf": 0.02, "cs": 0.4, "bulk": 0.1, "ca": 0.6, "nu": 1e-05, "slip": 0, "g": 9.81},
-   "dye": {"line": 0, "decay": 0.02},
-   "gauges": [[0.9, 0.3], [4.6, 0.3]],
-   "rakes": [],
-   "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
-  },
-
   /* UN-3-surge-tank/rig.js · UN3.setup(0.98) on ?scene=hammer — b_s = 0.98 m (7 cells, digit d = 2), the width the README's seal audit is quoted at */
   "UN-3": {
    "v": 2,

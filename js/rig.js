@@ -118,6 +118,13 @@ const RIG = (() => {
             grade: b01(state.grade),
             dye: b01(state.dye) },
     };
+    // additive, optional — a scene with no `params` declaration writes none,
+    // and an old rig read back into one just keeps that scene's defaults.
+    const pd = SIM.params();
+    if (pd.decl && pd.decl.length) {
+      o.params = {};
+      pd.decl.forEach((d) => o.params[d.key] = r4(pd.values[d.key]));
+    }
     if (state.tracers) o.tracers = [r4(state.tracers.x), state.tracerN | 0,
                                     r4(state.tracers.trail)];
     if (state.cv) o.cv = [r4(state.cv.x0), r4(state.cv.z0), r4(state.cv.x1), r4(state.cv.z1)];
@@ -175,6 +182,11 @@ const RIG = (() => {
       if (o.dye.line !== undefined) p.dyeLine = +o.dye.line;
       if (o.dye.decay !== undefined) p.dyeDecay = +o.dye.decay;
     }
+    // additive, optional — SIM.setParam itself is the single writer (clamps
+    // to the scene's own declared range and ignores a key the current scene
+    // never declared), and rasterises on every call, which is redundant with
+    // the SIM.rasterise() a few lines down but harmless at apply time.
+    if (o.params) Object.keys(o.params).forEach((k) => SIM.setParam(k, +o.params[k]));
     p.pour = null;
     SIM.rasterise();                         // one stamp for the whole rig
 
@@ -212,6 +224,9 @@ const RIG = (() => {
                      if (state.tracers && o.tracers[2]) state.tracers.trail = +o.tracers[2]; }
     syncPanel();
 
+    // The loaded field can differ from the scene's default. Keep the legend
+    // in step with the heatmap after restoring ui.mode.
+    LEGEND.sync();
     const n = sim.segs.length;
     note = "rig loaded: " + n + " segment" + (n === 1 ? "" : "s") +
            (state.gauges.length ? " · " + state.gauges.length + " gauge" +
@@ -351,6 +366,48 @@ const RIG = (() => {
     });
   }
 
+  /** The lecturer's snippet: an iframe tag for a module page, carrying the
+   *  current exercise (or scene, sandbox included) plus whatever is drawn —
+   *  a pre-set rig is exactly what `?ex=…#rig=…` already means, so embedding
+   *  one is embedding that same link. `embed=1` is the switch main.js reads
+   *  at boot (docs/embedding.md): folded card, ctrl + wheel, the pop-out. */
+  function embedCode() {
+    const id = (window.APP && APP.EX && APP.EX.current)
+      ? "ex=" + APP.EX.current.id : "scene=" + state.scene.id;
+    const src0 = location.origin + location.pathname + "?" + id + "&embed=1";
+    // A rig-bearing link is `#rig=<code>` — link() builds the whole URL, so
+    // only its fragment is kept; a bare exercise or scene needs no fragment
+    // at all, which is the common case (most cards ARE the starting rig).
+    const withRig = (sim.segs.length || state.gauges.length)
+      ? link().then((full) => src0 + "#" + full.split("#")[1])
+      : Promise.resolve(src0);
+    return withRig.then((src) => {
+      const text = '<iframe src="' + src + '" width="100%" height="640" ' +
+        'allow="fullscreen" title="hydraulician · ' + id.split("=")[1] +
+        '" style="border:0"></iframe>';
+      box(text);
+      // A snippet generated from file:// or a dev server points students at
+      // an address that will not exist for them — say so, rather than hand
+      // over a tag that looks ready and is not.
+      const local = location.protocol === "file:" ||
+        location.hostname === "localhost" || location.hostname === "127.0.0.1";
+      const done = (how) => {
+        note = "embed code ready" + (local
+          ? " · generated from this address — run it from the published app for a link students can open"
+          : "");
+        flash(how); return text;
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text)
+          .then(() => done("copied to the clipboard"))
+          .catch(() => done("clipboard blocked — copy it from the box"));
+      }
+      const t = el(".rigtx");
+      if (t) { t.focus(); t.select(); }
+      return done("select-all done — press ⌘/Ctrl-C");
+    });
+  }
+
   function exportJSON() {
     const o = snapshot(), text = toText(o, true);
     const name = "hydraulician-rig-" + o.scene + "-" + o.segs.length + "seg.json";
@@ -376,6 +433,7 @@ const RIG = (() => {
     host.innerHTML =
       '<div class="rigrow">' +
         '<button data-a="share" title="Copy a link that rebuilds this rig">⇪ Share link</button>' +
+        '<button data-a="embed" title="Copy an iframe tag that puts this exercise in a module page">⧉ Embed code</button>' +
         '<button data-a="json" title="Download the rig as a .json file">⤓ Export JSON</button>' +
       '</div>' +
       '<textarea class="rigtx" spellcheck="false" placeholder="Share puts the link here to copy — ' +
@@ -390,6 +448,7 @@ const RIG = (() => {
         b.blur();
         const a = b.dataset.a;
         if (a === "share") share();
+        else if (a === "embed") embedCode();
         else if (a === "json") exportJSON();
         else if (a === "load") load(el(".rigtx").value).catch(() => {});
       };
@@ -419,7 +478,7 @@ const RIG = (() => {
   function syncUI() { const m = el(".rigmsg"); if (m) m.textContent = msg; }
 
   return { snapshot, apply, toText, encode, encodeSync, decode, link, load,
-           hashCode, share, exportJSON, buildUI, syncUI, statusLine,
+           hashCode, share, embedCode, exportJSON, buildUI, syncUI, statusLine,
            get note() { return note; } };
 })();
 

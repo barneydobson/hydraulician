@@ -60,6 +60,9 @@ solver merely extends `h` into the non-hydrostatic cells it resolves.
   unambiguous.
 - `q`, `Fr`, `S₀`, `S_f`, `n`, `f`, `c` — unit discharge, Froude number, bed
   and friction slopes, Manning n, fill fraction, slot celerity.
+- `F` — pressure force per metre width on a named face, N/m, with components
+  `Fx`, `Fz`; centre of pressure — the point on the face through which the
+  resultant acts.
 
 `y` survives only where it is genuinely something else: `y⁺` wall units, and
 chart reference lines like `y = 2x`.
@@ -76,9 +79,10 @@ component syntax — `U.g` still stores `w`) and screen-space pixel coordinates
 boundary between the two. Two consequences worth knowing:
 
 - The rig **wire format** (permalinks, `.json` rigs) is v2: it writes `z` /
-  `vz` for the spout and gauge-field keys `"h"` / `"d"` / `"speed"`. The v1
-  names (`y`, `vy`, `"head"`, `"depth"`) are gone and v1 links are rejected —
-  this is a prototype, and old wire formats are not migrated.
+  `vz` for the spout and gauge-field keys `"h"` / `"d"` / `"eta"` / `"speed"`
+  (`"eta"` is the ASCII wire key for `η`, the same pattern `"speed"` uses for
+  `|u|`). The v1 names (`y`, `vy`, `"head"`, `"depth"`) are gone and v1 links
+  are rejected — this is a prototype, and old wire formats are not migrated.
 - `APP.probe().phead` is the **pressure** head `p/ρg` alone — no elevation
   term. Rig scripts build the piezometric head themselves as
   `z + probe().phead`. It was renamed from `head` at v2 precisely because the

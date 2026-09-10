@@ -1,11 +1,12 @@
 name: Checks
 
-# The four zero-dependency, browser-free gates from AGENTS.md's Testing
+# The five zero-dependency, browser-free gates from AGENTS.md's Testing
 # table, run on every push and pull request: two Python checkers that assert
-# the exercise pack and the notation agree with themselves, and two Node
-# suites for js/reconstruct.js (recon-test.mjs, and mutation-test.mjs which
-# proves recon-test.mjs can actually fail). All four are instant-to-~10s, so
-# they gate every push rather than running on a schedule.
+# the exercise pack and the notation agree with themselves, and three Node
+# suites (recon-test.mjs and geom-test.mjs, the closed-form answers for
+# js/reconstruct.js and js/geom.js; mutation-test.mjs, which proves
+# recon-test.mjs can actually fail). All five are instant-to-~10s, so they
+# gate every push rather than running on a schedule.
 #
 # The browser gates (smoke.js, ui-smoke.mjs) are NOT here, and there is no
 # `workflow_dispatch` job for them either — deliberately, not an oversight.
@@ -83,6 +84,9 @@ jobs:
 
       - name: recon-test.mjs — RECON's closed-form answers
         run: node test/recon-test.mjs
+
+      - name: geom-test.mjs — GEOM's closed-form answers
+        run: node test/geom-test.mjs
 
       - name: mutation-test.mjs — proves recon-test.mjs can fail
         run: node test/mutation-test.mjs

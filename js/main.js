@@ -39,6 +39,23 @@ const state = {
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
   flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
   cvShow: "Q",                     // which per-edge quantity the box labels
+  force: null,                     // the pressure-force face: {solidId, faceId, data, t0}
+  // The face the Force tool is hovering over, BEFORE a click selects it: pure
+  // CPU pick (faceAtPx), never a faceForce readback — {solidId, faceId} or
+  // null. Cleared on a tool change, a scene load, and the pointer leaving the
+  // domain, so it never outlives the pick it was computed from.
+  forceHover: null,
+  // The pressure diagram's scale, ONE per scene: {headMax} in metres of
+  // head, set from the largest pressure on any wall the first time a face is
+  // picked and shared by every selection after it, so the diagram does not
+  // resize as you move from face to face. Cleared on a scene load only.
+  forceScale: null,
+  // How big that diagram is drawn: a multiplier on the 56 px the largest
+  // head maps to. A Controls row (and so a viewParams key), because a
+  // submerged face in a narrow passage can have its diagram run into the
+  // opposite wall's — the culvert roof of HS-1's dyke hangs its arrows into
+  // a 0.6 m culvert — and the lecturer wants to shrink it, not the scale.
+  forceSize: 1,
 
   paused: false, speed: 1.0, nsub: 24, nsubMax: 400,
   // Average is a measurement mode, not a blur filter (docs/averaging.md
@@ -62,6 +79,10 @@ const state = {
   fps: 60, rt: 1, simDt: 0,
   tipIdx: 0, tipAt: 0,
 };
+
+/** `?embed=1`: the app is sitting in an LMS iframe (docs/embedding.md). Read
+ *  once — an opt-in by URL, not `window !== top`, so a plain tab can test it. */
+const EMBED = new URLSearchParams(location.search).has("embed");
 
 let canvas, over, octx, view, sim;
 
@@ -191,6 +212,9 @@ function loadScene(id, keepDrawing) {
   state.measure = null; state.measDrag = null;
   state.cv = null; state.cvDrag = null;
   state.flux.length = 0; state.fluxDrag = null;
+  state.force = null;
+  state.forceHover = null;
+  state.forceScale = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -498,6 +522,23 @@ const CONTROLS = [
     get: () => sim.p.source.vz, set: (v) => sim.p.source.vz = v,
     fmt: (v) => v.toFixed(2) + " m/s" },
 
+  { h: "Geometry" },
+  // Six rows: the hydro scene declares six params (knee x/z, three bores,
+  // the nozzle gap). A scene declaring fewer hides the rest (syncPanel).
+  ...[0, 1, 2, 3, 4, 5].map((k) => ({
+    id: "geom" + k, label: "—",
+    min: 0, max: 1, step: 0.01,
+    // The row binds to the k-th declared param of whatever scene is up.
+    par: () => (SIM.params().decl || [])[k],
+    get: function () { const d = this.par(); return d ? SIM.params().values[d.key] : 0; },
+    set: function (v) { const d = this.par(); if (d) SIM.setParam(d.key, v); },
+    fmt: function (v) {
+      const d = this.par();
+      return d ? v.toFixed(3) + (d.unit ? " " + d.unit : "") : "";
+    },
+    info: "A dimension of the scene's own geometry. Moving it redraws the solid and re-rasterises the grid — and resets any averaging window, because the walls the mean was accumulated through are no longer the walls on screen.",
+  })),
+
   { h: "Boundaries" },
   ...[["openL", 0, "Left edge", "carries the reservoir control when it is on"],
       ["openR", 1, "Right edge", "carries the tailwater control when it is on"],
@@ -657,6 +698,10 @@ const CONTROLS = [
         ? "1 section · draw a SECOND one for the balance between them"
         : state.flux.length + " sections · the last two are compared",
     info: "A section reads what crosses it: the volume Q, the momentum flux M, the pressure force F and the energy ρgQH, all four at once and all normal to the line. M and F are kept apart because telling them apart is what a control-volume question asks. <b>Two sections are the point</b> — between them you get continuity, the energy lost, and the force on whatever lies in between, which is the momentum theorem without drawing a box. Drawn bottom-to-top puts the positive side downstream." },
+  { id: "forceSize", label: "Pressure diagram size", min: 0.25, max: 3, step: 0.05,
+    get: () => state.forceSize, set: (v) => state.forceSize = v,
+    fmt: (v) => "×" + v.toFixed(2) + (v === 1 ? " — the largest head on any wall is 56 px" : ""),
+    info: "How long the Pressure force tool draws its arrows. The scale itself is fixed per scene — the largest head standing on any wall, read at the first pick, maps to 56 px — so every face is drawn to the same pixels per metre and a bigger triangle is a bigger force; this only multiplies that length. Shrink it when a submerged face in a narrow passage hangs its diagram into the opposite wall's; enlarge it for a shallow face on a big window. An exercise sets it through viewParams." },
   { id: "channel", type: "check", label: "Open-channel overlay",
     get: () => state.channel, set: (v) => state.channel = v,
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
@@ -682,7 +727,7 @@ const CONTROLS = [
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["h", "Piezometric head"], ["d", "Depth"], ["speed", "Speed"]],
+    opts: [["h", "Piezometric head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
@@ -827,6 +872,20 @@ function syncPanel() {
       if (note) note.textContent = c.fmt ? c.fmt() : "";
       return;
     }
+    // A dynamic row (Geometry's geom0…geom5) binds to whatever param its
+    // scene declares at that index — none for most scenes. Hide the row and
+    // its note when there is nothing to bind to, and when there is, adopt
+    // that param's own range and label before reading its value below.
+    if (c.par) {
+      const d = c.par();
+      input.parentElement.classList.toggle("gone", !d);
+      if (note) note.classList.toggle("gone", !d);
+      if (d) {
+        c.label = d.label; c.min = d.min; c.max = d.max; c.step = d.step;
+        input.step = d.step;           // the range input's own step, not just c's
+        input.parentElement.querySelector(".lbl").textContent = d.label;
+      }
+    }
     const v = c.get();
     if (c.type === "check") input.checked = !!v;
     else if (c.type === "select") input.value = v;
@@ -838,6 +897,13 @@ function syncPanel() {
     }
     if (note) note.textContent = c.fmt ? c.fmt(v) : "";
   });
+  // The "Geometry" heading fronts geom0…geom5, which hide themselves row by
+  // row above as the scene declares fewer than six params, down to none —
+  // but a heading is not a row, so nothing in the loop hides IT. A scene
+  // with no declared params (most of them) would otherwise leave the
+  // heading standing over an empty section.
+  const geomHeading = document.querySelector('#panel h3[data-sec="Geometry"]');
+  if (geomHeading) geomHeading.classList.toggle("gone", !(SIM.params().decl || []).length);
   applyPanelFocus();
 }
 
@@ -890,6 +956,15 @@ function showToast(title, sub) {
   t.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 5200);
+}
+/** The first plain wheel over the canvas, embedded, is a surprise — nothing
+ *  seemed to happen because the page scrolled instead. Said once per page,
+ *  not once per wheel: `hinted` is a closure, not state, on purpose. */
+let hinted = false;
+function wheelHint() {
+  if (hinted) return;
+  hinted = true;
+  showToast("Ctrl + scroll zooms the flume", "Open in a new tab for the full window.");
 }
 
 // -------------------------------------------------------- minimisable boxes
@@ -965,6 +1040,10 @@ const TOOLS = [
   // arming the wrong tool. New tools go on the end, whatever group they
   // belong to on the strip.
   ["flux", "Flux line", "Left-drag a section — reads what crosses it. Draw TWO for the balance between them (Shift snaps; click a line to remove it)"],
+  // TWELFTH, appended for the same reason as Flux: it needs a scene solid to
+  // click on (Task 2 of the polygon-geometry work), which nothing draws yet,
+  // so it has no digit of its own either.
+  ["force", "Pressure force", "Click a wall or gate face for its pressure diagram — click the same solid again to cycle faces, click open water to clear"],
 ];
 
 /** The tools the number keys can reach. */
@@ -1016,6 +1095,13 @@ const ICONS = {
            '<circle cx="13" cy="10" r="1.9" fill="#070b0f"/><circle cx="6.5" cy="14" r="1.9" fill="#070b0f"/>',
   keys:    '<rect x="2.5" y="6" width="15" height="8" rx="1.5"/><path d="M5.5 9h.01M8 9h.01M10.5 9h.01M13 9h.01M14.5 9h.01M6.5 11.6h7"/>',
   about:   '<path d="M10 3.5 17 7l-7 3.5L3 7Z"/><path d="M3 10.5 10 14l7-3.5M3 14l7 3.5 7-3.5" opacity=".55"/>',
+  // Four corner brackets opening outward — the frame the window is about to
+  // fill. `unfullscreen` is the same brackets turned to point back inward.
+  fullscreen:   '<path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4"/>',
+  unfullscreen: '<path d="M7.5 3.5v4h-4M12.5 3.5v4h4M7.5 16.5v-4h-4M12.5 16.5v-4h4"/>',
+  // A box with an arrow leaving its open corner — this exercise, elsewhere.
+  popout: '<path d="M8 4H4.5A1.5 1.5 0 0 0 3 5.5v9A1.5 1.5 0 0 0 4.5 16h9a1.5 1.5 0 0 0 1.5-1.5V11"/>' +
+          '<path d="M11 3h6v6M17 3l-7 7"/>',
   // ---- VIEW: what the water is painted with, and what is drawn over it.
   // A colour bar with its ticks; the dashes ARE the numbers under a legend.
   all:     '<circle cx="4.5" cy="10" r="1.45" fill="currentColor" stroke="none"/>' +
@@ -1035,6 +1121,10 @@ const ICONS = {
   // The two grade lines over a wavy surface: what the overlay actually draws.
   channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
            '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
+  // A vertical face with three arrows of growing length pressing on it — the
+  // textbook pressure diagram drawForce paints on the canvas.
+  force:   '<path d="M13.5 3v14"/><path d="M4 6.5h5M6 10h3M8 13.5h1"/>' +
+           '<path d="M9 6.5 7.5 5.4M9 6.5 7.5 7.6M9 10l-1.2-1M9 10l-1.2 1M9 13.5l-.9-.8M9 13.5l-.9.8"/>',
 };
 
 /** An `<svg>` for one icon id. */
@@ -1541,7 +1631,7 @@ const TOOLBAR = [
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
   { cap: "MEASURE", family: "measure",
-    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux") },
+    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux", "force") },
   // VIEW: how the water is DRAWN. The three toggles were reachable only from
   // the P / D / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
@@ -1597,6 +1687,20 @@ const TOOLBAR = [
     { id: "panelBtn", icon: "sliders", label: "Controls",
       hint: "Every slider: flow, boundaries, hydraulics, view, rig",
       act: () => togglePanel() },
+    { id: "fsBtn", icon: () => (document.fullscreenElement ? "unfullscreen" : "fullscreen"),
+      label: () => (document.fullscreenElement ? "Exit full screen" : "Full screen"), key: "F",
+      hint: "The whole screen for the flume — inside a module page, the way out of the frame",
+      on: () => !!document.fullscreenElement,
+      // A frame with no `allow="fullscreen"` reports the capability as false
+      // rather than throwing, so the button is simply not offered there —
+      // `when` is a boot-time read, and this is as close to boot-time as a
+      // capability check gets.
+      when: () => !!document.fullscreenEnabled,
+      act: () => toggleFullscreen() },
+    { id: "popBtn", icon: "popout", label: "Open in a new tab",
+      hint: "This exercise, and what you have drawn, in a full window",
+      when: () => EMBED,
+      act: () => popOut() },
     { id: "keysBtn", icon: "keys", label: "Keyboard", key: "?",
       hint: "The shortcut sheet",
       act: (b) => KEYS.toggle(b) },
@@ -1637,7 +1741,7 @@ function toolItem([id, label, tip]) {
   return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
            key: n <= TOOL_KEYS ? String(n) : "",
            on: () => state.tool === id,
-           act: () => { state.tool = id; syncToolbar(); syncPanel(); } };
+           act: () => { state.tool = id; state.forceHover = null; syncToolbar(); syncPanel(); } };
 }
 
 /** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
@@ -1662,7 +1766,12 @@ function buildToolbar() {
     // read as a family with nothing in it, so the group goes with its last
     // button — and the rule keys off what has actually been appended, or a
     // hidden first group leaves a leading hairline.
-    const items = group.items.filter((it) => UIMODE.allows(group.family, it));
+    // The profile decides what an exercise WANTS shown; `when` decides what
+    // the boot CAN show (embedded, fullscreen-capable) — profile first, since
+    // narrowing is the thing a lecturer chose, then the capability check,
+    // which is fixed at boot and so is never re-read by `syncToolbar`.
+    const items = group.items.filter((it) =>
+      UIMODE.allows(group.family, it) && (!it.when || it.when()));
     if (!items.length) return;
     if (host.children.length) {
       const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
@@ -1790,7 +1899,9 @@ const KEYS = (() => {
     ["left-drag", "draw with the current tool"],
     ["right-drag", "pour water, whatever tool is in your hand"],
     ["shift", "snap to horizontal / vertical / 45°"],
-    ["wheel", "zoom"],
+    // Embedded, a plain wheel is left to the page (see the canvas wheel
+    // listener) — the sheet has to say what actually zooms in a frame.
+    [EMBED ? "ctrl + wheel" : "wheel", "zoom"],
     ["middle-drag", "pan"],
     ["0", "reset the view"],
     ["1 – 9", "pick a tool (Pour has no digit — right-drag instead)"],
@@ -1808,6 +1919,7 @@ const KEYS = (() => {
     ["N", "open-channel overlay"],
     ["A", "average the flow — the mean field, over one window"],
     ["M", "ruler"],
+    ["F", "full screen"],
     ["S", "scenes"],
     ["E", "exercises"],
     ["H", "the start screen"],
@@ -1910,7 +2022,10 @@ const DOCK = (() => {
     fold.classList.toggle("show", open);
     tab.classList.toggle("show", shown && folded);
     tab.querySelector(".eid").textContent = id;
-    tab.querySelector(".kind").textContent = kind.toLowerCase();
+    // The tab is the only thing a folded student sees: "Exercise" doesn't
+    // say there is a brief behind it, so name the action instead of the kind.
+    tab.querySelector(".kind").textContent =
+      kind === "Exercise" ? "open instructions" : "open " + kind.toLowerCase();
   }
   /** Show the panel with a header. `onClose` is what the × does — the caller
    *  owns what closing MEANS (an exercise stays loaded; only its brief goes). */
@@ -2164,6 +2279,25 @@ function onDown(e) {
     state.cvDrag = { x0: x, z0: z, x1: x, z1: z };
     return;
   }
+  if (state.tool === "force") {
+    // GEOM.faceAt's tolerance is domain-space and isotropic, so a single
+    // horizontal-axis conversion of GRAB_PX (the old approach here) makes
+    // the grab radius wrong under vex for sloped or horizontal faces — the
+    // same anisotropy nearSegment's per-axis scaling exists to handle. Pick
+    // in screen space instead, GRAB_PX applied directly as a screen radius.
+    const hit = faceAtPx(sim.solids || [], x, z, GRAB_PX);
+    if (!hit) { state.force = null; return; }
+    if (state.force && state.force.solidId === hit.solid.id) {
+      // Same solid again: cycle to its next named face.
+      const ids = hit.solid.faces.map((fc) => fc.id);
+      const k = (ids.indexOf(state.force.faceId) + 1) % ids.length;
+      state.force = { solidId: hit.solid.id, faceId: ids[k], data: null, t0: sim.t };
+    } else {
+      state.force = { solidId: hit.solid.id, faceId: hit.faceId, data: null, t0: sim.t };
+    }
+    state.force.scale = forceScale();
+    return;
+  }
   state.drag = { x0: x, z0: z, x1: x, z1: z };
 }
 
@@ -2190,6 +2324,18 @@ function onMove(e) {
   const [x, z] = pointerPos(e);
   state.cursor = [x, z];
   state.inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
+  // The Force tool's own hover pick: pure CPU (faceAtPx, screen-space),
+  // recomputed on every move so the surface under the cursor lights up
+  // BEFORE a click selects it — no SIM.faceForce call, so no GPU readback.
+  // Never live mid-drag or mid-pinch: both of those `return` above this
+  // point, and the Force tool itself never sets state.drag (onDown handles
+  // its click and returns), so there is no drag state to guard against here.
+  if (state.tool === "force") {
+    const hit = state.inside ? faceAtPx(sim.solids || [], x, z, GRAB_PX) : null;
+    state.forceHover = hit ? { solidId: hit.solid.id, faceId: hit.faceId } : null;
+  } else if (state.forceHover) {
+    state.forceHover = null;
+  }
   if (state.panDrag) {
     const px = pointerPx(e), d = state.panDrag;
     state.panC = [
@@ -2382,6 +2528,7 @@ function tickFrame(realDt) {
   sampleRakes();
   sampleCV();
   sampleFlux();
+  sampleForce();
   sampleInlet(analysis);
   advanceTracers(simAdvanced);
   // Scenes whose subject is the orbital motion seed their own tracer rake as
@@ -2456,7 +2603,9 @@ function sampleGauges(A) {
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
     const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
-    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], speed: pr.speed };
+    // η = z_b + d is the surface itself, so unlike h it carries no
+    // non-hydrostatic bias under an accelerating column.
+    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2570,6 +2719,77 @@ function sampleCV() {
   cv.hist.push({ t: sim.t, fx: r.fx });
   while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
   cv.last = r;
+}
+
+/** The pressure diagram on the selected face — same idiom as sampleCV, but
+ *  the EMA runs per SAMPLE rather than on the two scalars: it is `p` AND `f`
+ *  at each station that get the τ = 1 s filter, same `a`, same restart
+ *  conditions for both. `f` has to be smoothed alongside `p` — not left
+ *  raw — because `GEOM.faceForceFromSamples` gates every term AND `wetLen`
+ *  on `min(f,1)` and `f·p`; an EMA'd `p` sitting on a raw, wobbling `f`
+ *  would still make the integral jump at the waterline, which is the exact
+ *  transition this filter exists to smooth. Fx/Fz/F/cop/wetLen are then
+ *  re-integrated (GEOM.faceForceFromSamples) from the smoothed row, so the
+ *  resultant arrow is always consistent with the diagram it is drawn from
+ *  by construction — one filter, not `p` and `f` each smoothed and then a
+ *  third, separate filter on Fx/Fz that could drift from either.
+ *
+ *  A geometry change changes the sample count (a resolution rebuild
+ *  resamples every face at the new dx; a parameterised solid can change
+ *  shape under a scene control) — that is the restart signal, the same way
+ *  the clock going backwards is. */
+function sampleForce() {
+  const f = state.force;
+  if (!f || state.paused) return;
+  if (sim.t < f.t0) { f.data = null; f.t0 = sim.t; }
+  if (!(sim.t > f.t0) && f.data) return;
+  const av = measuringAvg();
+  const r = SIM.faceForce(f.solidId, f.faceId, av);
+  if (!r) { f.data = null; f.t0 = sim.t; return; }
+  if (av || !f.data || f.data.samples.length !== r.samples.length) {
+    // The window mean IS the instrument's aggregate (no second filter), a
+    // fresh face has nothing to blend against, and a sample-count change is
+    // a different station layout — averaging across it would be nonsense.
+    f.data = r;
+    f.t0 = sim.t;
+    return;
+  }
+  const a = 1 - Math.exp(-Math.min(sim.t - f.t0, 0.25) / 1.0);
+  f.t0 = sim.t;
+  const prev = f.data.samples;
+  const samples = r.samples.map((s, i) =>
+    Object.assign({}, s, { p: prev[i].p + (s.p - prev[i].p) * a,
+                            f: prev[i].f + (s.f - prev[i].f) * a }));
+  const ds = samples.length > 1 ? samples[1].s - samples[0].s : sim.dx;
+  const g = Math.abs(sim.p.g) || 9.81;
+  f.data = Object.assign(GEOM.faceForceFromSamples(samples, ds, 1000, g),
+                          { samples, solidId: r.solidId, faceId: r.faceId, len: r.len });
+}
+
+/** The pressure diagram's scale for THIS scene: {headMax}, the largest head
+ *  (metres) standing on any named face of any solid, read once at the first
+ *  pick and shared by every selection after it. One scale for the scene is
+ *  what makes the diagram comparable between faces — the upstream face, the
+ *  downstream face and the culvert roof of HS-1's dyke are drawn with the same
+ *  pixels per metre, so a bigger triangle IS a bigger force — and what stops
+ *  it resizing as you click from one face to the next. `drawForce` only
+ *  ratchets `headMax` up if a later reading exceeds it, so the diagram can
+ *  never run off the canvas; it never comes back down. A few dozen
+ *  faceForce readbacks, once per scene, never on the frame path. */
+function forceScale() {
+  if (state.forceScale) return state.forceScale;
+  const g = Math.abs(sim.p.g) || 9.81;
+  let headMax = 0;
+  (sim.solids || []).forEach((so) => (so.faces || []).forEach((fc) => {
+    const r = SIM.faceForce(so.id, fc.id, false);
+    if (!r) return;
+    for (const s of r.samples) {
+      const h = Math.max(0, Math.min(s.f, 1) * s.p) / g;
+      if (h > headMax) headMax = h;
+    }
+  }));
+  state.forceScale = { headMax };
+  return state.forceScale;
 }
 
 /** Smooth every scalar of a control-volume budget, edge by edge. Written as a
@@ -2755,6 +2975,16 @@ function drawOverlay(A) {
   if (state.flux.length || state.fluxDrag) {
     OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
   }
+  if (state.force && state.force.data) OVERLAY.drawForce(ctx, view, sim, state.force, state.forceSize);
+  // The hover pick, faint — drawn UNDER the selected face's full-strength
+  // stroke conceptually, but skipped entirely when it IS the selected face:
+  // drawForce above already owns that stroke, and a second one under it
+  // would only ever be redundant paint, never a visible style.
+  if (state.forceHover && !(state.force &&
+      state.forceHover.solidId === state.force.solidId &&
+      state.forceHover.faceId === state.force.faceId)) {
+    OVERLAY.drawForceHover(ctx, view, sim, state.forceHover);
+  }
   drawMarkers(ctx);
   drawSpout(ctx);
   ctx.restore();
@@ -2765,7 +2995,7 @@ function drawOverlay(A) {
   // that wants a prediction before a number.
   const cards = UIMODE.shows("gauges")
     ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-        fld === "h" ? "h" : fld === "d" ? "d" : "|u|",
+        fld === "h" ? "h" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);
@@ -2797,6 +3027,30 @@ function nearSegment(L, x, z) {
   const len2 = ax * ax + az * az;
   const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, (px * ax + pz * az) / len2));
   return Math.hypot(px - ax * t, pz - az * t);
+}
+
+/** The nearest named face across `solids`, within `tolPx` SCREEN pixels —
+ *  the Force tool's own pick, walking the same per-edge run GEOM.faceAt
+ *  does but testing distance in screen space via `nearSegment`'s per-axis
+ *  convention (dx and dz each scaled by their own view-w-over-sim-W /
+ *  view-h-over-sim-H factor before the hypot) rather than GEOM.faceAt's
+ *  single domain-space tolerance. GEOM.faceAt's distance is isotropic in
+ *  domain space, so one domain-space radius cannot represent a round screen
+ *  radius once vex makes the two axes' px-per-metre differ — a sloped or
+ *  horizontal face would grab too wide or too narrow depending on its angle
+ *  to the stretch. */
+function faceAtPx(solids, x, z, tolPx) {
+  let best = null;
+  for (const solid of solids) {
+    for (const face of solid.faces) {
+      for (const e of GEOM.faceEdges(solid, face.id)) {
+        const v0 = solid.verts[e], v1 = solid.verts[(e + 1) % solid.verts.length];
+        const dist = nearSegment({ x0: v0[0], z0: v0[1], x1: v1[0], z1: v1[1] }, x, z);
+        if (dist <= tolPx && (!best || dist < best.dist)) best = { solid, faceId: face.id, dist };
+      }
+    }
+  }
+  return best;
 }
 
 /** Place a gauge — or take away the one you just pointed at.
@@ -3045,9 +3299,25 @@ function boot() {
   // is what made a drowned gate on a 1-in-4 bed read "M1". Every path that
   // re-rasterises the walls goes through one of these; a resolution change or
   // a scene load builds a fresh grid and starts clean anyway.
+  //
+  // The Force selection has to drop here too: a drawn wrapper's id is its
+  // POSITION in S.segs at the moment rasterise() runs ("drawn0", "drawn1",
+  // …), not a stable identity, so an edit can renumber what a selection
+  // points at — draw A ("drawn0"), draw B ("drawn1"), select B's face, Undo,
+  // draw C, and without this C becomes "drawn1" and quietly inherits B's
+  // selection. A scene's own solids() carry fixed ids and never have this
+  // problem, but a drawn one always can — dropping the selection on every
+  // edit (the same choke point averaging already resets through) is the
+  // one answer that is right regardless of which id moved.
   ["rasterise", "addSeg", "undoSeg", "clearSegs"].forEach((k) => {
     const f = SIM[k];
-    SIM[k] = (...a) => { const r = f(...a); OVERLAY.resetEstimates(sim); return r; };
+    SIM[k] = (...a) => {
+      const r = f(...a);
+      OVERLAY.resetEstimates(sim);
+      state.force = null;
+      state.forceHover = null;
+      return r;
+    };
   });
 
   // The strip first: PICKER, EX and KEYS all light their own opener by id, so
@@ -3090,6 +3360,10 @@ function boot() {
   // A resize (or a rotated phone) changes what "fills the window" means, and
   // the panel opening or closing changes it too — DOCK.sync calls this as well.
   addEventListener("resize", () => { DOCK.sync(); fitBar(); applyAutoVex(); });
+  // The fullscreen request/exit is asynchronous, so the button's icon and
+  // label (both read `document.fullscreenElement` live) are repainted off
+  // the browser's own event rather than off the click that asked for it.
+  document.addEventListener("fullscreenchange", () => syncToolbar());
 
   buildPanel();
   const q = new URLSearchParams(location.search);
@@ -3103,6 +3377,9 @@ function boot() {
   const exId = q.get("ex");
   if (exId && !EX.pick(exId)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
+  // Embedded, the brief lives on the page around the frame; the card starts
+  // folded to its tab so the water keeps the width (spec §1.1).
+  if (EMBED && exId) EX.ready.then(() => DOCK.fold(true));
   // A `#rig=` link carries its own base scene, so it wins over `?scene=` —
   // but `?scene=` is loaded first anyway, so a link that fails to decode
   // leaves you on the scene you asked for rather than on a blank page.
@@ -3147,10 +3424,15 @@ function boot() {
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("pointercancel", onUp);
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-  canvas.addEventListener("pointerleave", () => state.inside = false);
+  canvas.addEventListener("pointerleave", () => { state.inside = false; state.forceHover = null; });
   canvas.addEventListener("pointerenter", () => state.inside = true);
   canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
   canvas.addEventListener("wheel", (e) => {
+    // Embedded, a plain wheel is the LMS page scrolling past; the frame is
+    // not scrollable, so leaving the event alone (no preventDefault) chains
+    // it to the parent page. Ctrl + wheel zooms — the same key a trackpad
+    // pinch already reports.
+    if (EMBED && !e.ctrlKey) { wheelHint(); return; }
     e.preventDefault();
     const [px, py] = pointerPx(e);
     // pinch-to-zoom trackpads report ctrlKey; give them a stronger response
@@ -3196,6 +3478,10 @@ function boot() {
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "a") setAverage(!state.avg);
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
+    // requestFullscreen needs a user gesture; a keypress is one. A frame with
+    // no allow="fullscreen" simply rejects — toggleFullscreen already swallows
+    // that — so there is nothing to guard here beyond what the button hides.
+    else if (k === "f") toggleFullscreen();
     // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
     // so a tenth tool would have made "9" fail ("9" > "10" lexically).
     //
@@ -3206,7 +3492,7 @@ function boot() {
       const t = TOOLS[+k - 1];
       const fam = familyOf(t[0]);
       if (UIMODE.allows(fam, { tool: t[0], id: t[0] })) {
-        state.tool = t[0]; window.syncTools();
+        state.tool = t[0]; state.forceHover = null; window.syncTools();
       } else {
         showToast(t[1] + " is off for this exercise",
                   "The ⋯ button at the end of the strip brings every control back.");
@@ -3251,6 +3537,7 @@ function setAverage(on) {
   // live EMA, and Live must not resume from a window mean.
   if (state.cv) { state.cv.ema = null; state.cv.flux = null; state.cv.hist.length = 0; state.cv.t0 = sim.t; }
   state.flux.forEach((L) => { L.ema = null; L.t0 = sim.t; });
+  if (state.force) { state.force.data = null; state.force.t0 = sim.t; }
   OVERLAY.resetEstimates(sim);
   LEGEND.sync(); syncPanel(); syncToolbar();
 }
@@ -3267,10 +3554,45 @@ function toggleValve() {
       : "Flow re-established.");
 }
 
+/** The strip's full-screen button, and the F key. `.catch(() => {})` because
+ *  both calls reject when the browser refuses — no `allow="fullscreen"` on
+ *  an enclosing iframe, or no user gesture — and the button (hidden via
+ *  `when` when `document.fullscreenEnabled` is false) is the only feedback
+ *  needed; there is nothing else to roll back. `syncToolbar` runs off the
+ *  `fullscreenchange` event, not here, since the request is asynchronous. */
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+
+/** `url` with `embed` dropped from the query string — what the pop-out and
+ *  the lecturer's snippet both hand a plain tab. `URL` keeps a `#rig=`
+ *  fragment intact, which is the whole point: the pop-out carries the
+ *  student's own drawing, just not the framing. */
+function stripEmbed(url) {
+  const u = new URL(url);
+  u.searchParams.delete("embed");
+  return u.toString();
+}
+
+/** Open in a new tab, embedded boots only: the pop-out is the way OUT of a
+ *  700–1000 px frame to do the actual measuring. `RIG.link()` may be
+ *  asynchronous (deflate), so the window opens synchronously inside the
+ *  click — a popup blocker only tolerates that — and is navigated once the
+ *  link resolves. */
+function popOut() {
+  const w = window.open("", "_blank");
+  if (!w) return;                        // blocked: nothing else to do
+  w.opener = null;
+  RIG.link().then((u) => { w.location = stripEmbed(u); })
+            .catch(() => { w.location = stripEmbed(location.href.split("#")[0]); });
+}
+
 // Debug handle. `frames` drives the loop by hand — the render loop stops when
 // the page is hidden, so headless testing goes through here.
 window.APP = {
   get sim() { return sim; }, get view() { return view; },
+  embed: EMBED,                            // `?embed=1` — see docs/embedding.md
   state, loadScene, SIM, OVERLAY, SCENES, showToast, zoomAt, resetZoom,
   switchScene,                             // load a scene as a fresh ?scene= boot would
   PICKER,                                  // the scene menu
@@ -3296,6 +3618,8 @@ window.APP = {
   placeGauge, placeRake,                   // place, or remove one already there
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
+  faceForce: (sid, fid, avg) => SIM.faceForce(sid, fid, avg),   // the pressure diagram on one named face
+  forceScale,                              // the scene's held diagram scale, {headMax} — headless tests pick with it
   placeCV,                                 // the control volume, headless
   placeFlux, removeFluxAt,                 // a flux section, headless
   // The averaging mode's public surface.

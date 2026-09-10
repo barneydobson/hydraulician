@@ -21,6 +21,7 @@ shallow water); this one resolves the depth.
 | `js/reconstruct.js` | `RECON` — the averaging numerics with no WebGL in them: running mean, Welford, geometric fill, connected bodies, column compaction, band level sets |
 | `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
 | `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
+| `js/geom.js` | `GEOM` — polygon solids with named faces: builders, samplers, point-in-polygon, face force integration; no WebGL |
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
 | `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
@@ -34,6 +35,8 @@ shallow water); this one resolves the depth.
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
 | `docs/averaging.md` | time averaging, user-facing: what Average shows, the Favre mean, the discrete balance it satisfies, surface reconstruction, reset conditions — section numbers are load-bearing (code and tests cite them) |
 | `docs/boundary-conditions.md` | every boundary in one place: the solid mask, wall mechanisms, the tri-state outer ring, level controls with their sponges and clamps, edge ownership |
+| `docs/making-exercises.md` | how a demo becomes a card: scene vs rig, the card's applied/displayed split, the `ui` profile, the rig wire format, the folder recipe, what `check_pack.py` enforces, the headless measuring recipe — HS-1 as the worked example |
+| `docs/embedding.md` | putting one exercise inside a Blackboard or Canvas page: the iframe tag, what `?embed=1` changes, the per-LMS clicks, sizes, and the confirmed-placements table |
 | `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
@@ -123,12 +126,13 @@ to look fine for a minute and explode in an exercise.
 
 ## Testing
 
-Eight gates, all zero-dependency and all non-zero on failure:
+Nine gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 | --- | --- | --- |
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
+| `node test/geom-test.mjs` | `GEOM`'s closed forms — winding, slab corners, arc lengths, ½ρgH² — no browser; runs in checks.yml with the other instant gates | instant |
 | `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
 | `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
 | `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
@@ -142,9 +146,9 @@ anything that touches `js/`. Run `mutation-test.mjs` after touching
 stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
 
-`.github/workflows/checks.yml` runs the first, second, fifth and sixth of
-these gates on every push and pull request — the ones that are instant and
-need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
+`.github/workflows/checks.yml` runs the first, second, third, sixth and
+seventh of these gates on every push and pull request — the ones that are
+instant and need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
 all, not even as a manual `workflow_dispatch` job: both need a real
 GPU-backed Chrome (see `angleArgs()` in `test/cdp.mjs` and
 `exercises/_runner/smoke.js`, which pick the ANGLE backend by platform —
@@ -157,7 +161,7 @@ way. Run both locally, where a real GPU is available.
 `ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
 `WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
 `index.html`, `css/app.css`, `js/pickers.js`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
-`START`, `setAverage` or the boot wiring. Every
+`START`, `setAverage`, `EMBED` or the boot wiring. Every
 case in it is a bug that reached the working tree while the strip was being
 built, so a failure there is a real regression rather than a tightened
 expectation. Its `test/cdp.mjs` launcher passes a GPU-backed `--use-angle`
@@ -211,7 +215,11 @@ one register: `js/exercises.js` is the machine-readable source, each folder's
 history. Briefs carry the minimum needed to run the demo; statistics and
 methodology live in each folder's uncommitted `_archive/`. Coordinates in a
 recipe are exact — rounding them makes a new geometry; re-measure before
-shipping. `spinup` values are measured settle times, not guesses.
+shipping. `spinup` values are measured settle times, not guesses. **Adding
+one, end to end** — which of these files it touches, in what order, and what
+each gate will ask of it — is
+[docs/making-exercises.md](docs/making-exercises.md); read it before
+writing a card or a scene.
 
 An entry may also carry a **`ui` profile** — which strip families and
 instruments it wants in front of a student, how focused the Controls panel
@@ -231,6 +239,12 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   `fetch(url, {cache:"reload"})` then `location.reload()`.
 - Resolution changes Δx, not the physics: the domain is a fixed physical
   rectangle and the grid is sized to a cell budget.
+- A scene's `params` (the Geometry sliders — six rows, bound by index) reach
+  its `solids()`, `walls()`, `valves()` and `water()`, and an optional `flow()`
+  seeds the initial velocity field (`hydro` opens near its steady flow instead
+  of surging from rest). A digit rule on a `geomN` row is cross-checked against
+  the scene's declaration by `check_pack.py`; the lore is in the engineering
+  notes under "Hydropower scheme".
 - `state.rt` in the status bar is the speed truth — m2 at ~0.9× real time is
   the design point, not a bug.
 - The vertical exaggeration is fitted to the window (`autoVex` in main.js),

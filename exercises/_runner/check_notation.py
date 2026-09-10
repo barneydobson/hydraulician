@@ -85,7 +85,9 @@ def walk(*globs):
         for tracked_path in _TRACKED:
             p = os.path.join(ROOT, tracked_path.replace("/", os.sep))
             f = os.path.basename(p)
-            if historical(p):
+            # An unstaged deletion remains in git ls-files but has no current
+            # source to check. Scan the working tree, as we do for edits.
+            if not os.path.isfile(p) or historical(p):
                 continue
             if any(f.endswith(g) for g in globs):
                 yield p
@@ -199,7 +201,7 @@ def main():
                      % (where, m.group(1)))
 
     # --- 4. gauge field keys --------------------------------------------------
-    LIVE_FIELDS = {"h", "d", "speed"}
+    LIVE_FIELDS = {"h", "d", "eta", "speed"}
     register = read(os.path.join(ROOT, "js", "exercises.js"))
     checked[0] += 1
     for n, line in enumerate(register.splitlines(), 1):

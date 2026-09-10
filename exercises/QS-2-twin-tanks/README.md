@@ -1,102 +1,150 @@
-# QS-2 · Two reservoirs finding a level
+# QS-2 · Two tanks and two parallel ducts
 
-Two open tanks stand side by side on a solid floor, joined by a pipe at the
-base with a valve in it. One tank starts 1.5 m higher than the other. Release
-the valve and the levels chase each other to a common level — the tall one
-falling, the short one rising, at rates in the inverse ratio of their widths.
-Each student runs the rig with **their own** tank-2 width, times how long the
-level *difference* takes to halve, and submits
-(A₂, t_½). Pooled, t_½ against A₂ is a curve that bends over; against the
-equivalent area A* = A₁A₂/(A₁+A₂) it is one straight line through the origin.
-The class derives that grouping from its own data before anyone writes the ODE
-down.
+## Lecturer notes
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
-and pick **QS-2**, or use the direct link
-[`?ex=QS-2`](https://barneydobson.github.io/hydraulician/?ex=QS-2).
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+Students vary reservoir storage while the two identical ducts keep the same
+resistance. They calculate their own widths from the final digit of their
+student number, predict the two level changes, then compare at 120 s. The
+smaller reservoir changes level faster because the transferred volume is the
+same on both sides. The exercise card contains the complete student task,
+including the number rule, equations, gauge stations and comparison tolerance.
+These notes supply the derivation, worked answers and verification.
 
-## Theory
+**Open it:** select **QS-2** with **E** in the [app](../../index.html), or
+use [`?ex=QS-2`](../../index.html?ex=QS-2). General operation is described in
+the [teaching pack index](../INDEX.md#running-an-exercise).
+The [captured rig JSON](hydraulician-rig-QS-2.json) opens the default 9 m / 6 m
+bench. Pressure head colouring and EGL/HGL grade lines are enabled.
 
-One tank empties into the other through a single resistance:
+![The adjustable two-tank rig](rig.png)
 
-    A₁·dh₁/dt = −Q,   A₂·dh₂/dt = +Q,   Q = C_d·a·√(2g·Δh)
-    ⇒  d(Δh)/dt = −(C_d·a·√2g / A*)·√Δh,     A* = A₁A₂/(A₁+A₂)
-    ⇒  t_½ = [2(1 − 1/√2)·√Δh₀ / (C_d·a·√2g)] · A*
+## Bench and student-number rule
 
-Only the combination **A₁A₂/(A₁+A₂)** ever appears — the two tanks behave as
-one tank of that area, and t_½ is proportional to it whatever the resistance
-law. As built: tank 1 delivers **A₁ = 1.978 m**, the pipe is 2 cells tall
-(**a = 0.0435 m**) and 1.60 m long, and everyone releases from
-**Δh₀ = 1.50 m** (2.00 m against 0.50 m).
+Two full, parallel ducts are each 15 m long and 0.10 m clear height. They
+remain at x = 9.5–24.5 m; the lower bore is z = 0.50–0.60 m and the upper
+z = 0.94–1.04 m. The common tank floor is z = 0.20 m. Initial levels are
+3.00 m left and 1.20 m right: only the left reservoir starts high, and the
+shallow right charge covers both outlets.
 
-## Your tank-2 width
+Let **d** be the last digit of the student number:
 
-**d** is the **last digit of your student number** — your lecturer will
-explain the assignment in class. Your width is **A₂ = 0.50 + 0.25·d metres**,
-so tank 2's far wall goes at **x = 3.60 + A₂**. Your target level — what tank
-1 reads once the difference has halved — is
-
-    h* = (3.96 + 1.25·A₂) / (1.978 + A₂)   metres
+    B₁ = 6.75 + 0.25d m    (left reservoir)
+    B₂ = 3.75 + 0.25d m    (right reservoir)
 
 | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **A₂ (m)** | 0.50 | 0.75 | 1.00 | 1.25 | 1.50 | 1.75 | 2.00 | 2.25 | 2.50 | 2.75 |
-| **h\* (m)** | 1.849 | 1.794 | 1.748 | 1.710 | 1.677 | 1.648 | 1.623 | 1.601 | 1.581 | 1.564 |
+| **B₁ (m)** | 6.75 | 7.00 | 7.25 | 7.50 | 7.75 | 8.00 | 8.25 | 8.50 | 8.75 | 9.00 |
+| **B₂ (m)** | 3.75 | 4.00 | 4.25 | 4.50 | 4.75 | 5.00 | 5.25 | 5.50 | 5.75 | 6.00 |
 
-## What to do
+The on-card number fields and **Controls → Geometry** sliders operate the
+same parameters. Left width ranges from 6 to 9 m, right from 3 to 6 m,
+with 0.25 m slider steps. A change restores the initial water and **t = 0**;
+it is a new storage experiment, not a moving-wall simulation. Pressing R
+keeps the chosen widths and resets the water again. Saved rigs retain both
+widths. The digit rule is displayed, not automatically applied: the student
+does the arithmetic and sets the two values.
 
-The rig arrives drawn with tank 2 at A₂ = 2.00 m, the valve shut and the
-upstream reservoir standing by at 2.00 m. This one needs its steps in order.
+The outer water faces move to x = 9.5 − B₁ and x = 24.5 + B₂. The duct
+mouths and 32 m × 4 m domain stay fixed, so Medium retains Δx ≈ 0.0367 m
+and two open rows in each duct for every student. Gauges at (5, 0.35) and
+(26.5, 0.35) m remain inside the tanks over the entire slider range.
 
-1. Erase (`2`) tank 2's far wall and redraw it with Wall (`1`), brush about
-   **0.10 m** — the width the shipped rig was drawn at, so your tank holds the
-   same wall as everyone else's — at **x = 3.60 + your A₂**, floor to about
-   z = 3.2. The Ruler (`M`) and Measure (`8`) put it on station.
-2. Place a Gauge (`5`) low in each tank, around (0.9, 0.30) and (4.6, 0.30):
-   card 1 is tank 1, card 2 is tank 2.
-3. With the valve **open** (`V` toggles it; the band through the divider is
-   green when open), let the **Upstream reservoir** fill tank 1 — and press
-   `V` to shut the valve the moment card 2 reads **0.50 m**. Wait for card 1
-   to settle at **2.00 m**.
-4. Untick **Upstream reservoir** *and* set **Left edge → Wall**, or it leaks
-   through the run. Let it stand about **5 s** until both cards are still,
-   then read them: that is your Δh₀, and it should be about 1.50 m.
-5. Note `t` on the status bar, press `V`, and note `t` again as card 1 falls
-   to your **h\***. Submit **A₂** — the width you can measure against the
-   metre grid, not the one you aimed for — and **t_½**, the difference between
-   the two clock readings.
+## Theory
 
-## For the instructor — pooling the class
+All quantities are per metre out of the screen. Unit discharge is
+q = C√Δη with **C = 0.036 m^(3/2)/s** and Δη = η₁ − η₂. Tank storage uses
+widths B₁ and B₂ (m), not circular areas. Conservation gives:
 
-Collect one row per student (`student,digit,A2_m,dh0_m,thalf_s`; `dh0_m` is
-optional and defaults to 1.50 m), export the CSV and run:
+    dη₁/dt = −q/B₁,   dη₂/dt = q/B₂
+    √Δη(t) = max[0, √1.8 − 0.018(1/B₁ + 1/B₂)t]
+    left fall = B₂(1.8 − Δη)/(B₁ + B₂)
+    right rise = B₁(1.8 − Δη)/(B₁ + B₂)
 
-```bash
-python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
-python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
-```
+At 120 s, the coefficient of the reciprocal-width sum is 2.16. All assigned
+widths remain short of equalisation then, so the card can omit the maximum.
+The final left level is 3.00 minus its fall; the final right level is 1.20
+plus its rise. The ratio rise/fall is B₁/B₂.
 
-The script computes A* for every submission, normalises t_½ to a common
-Δh₀ = 1.50 m, fits t_½ = slope·A* through the origin and turns the slope back
-into the pipe's own C_d·a; the left panel is what the class submitted, the
-right panel the same points against A*.
+Each duct sees the same head loss; discharges add, losses do not. With gap
+b = 0.10 m, q = 2bu and Δη = K_eff u²/(2g), giving K_eff ≈ 606. This is an
+**effective Medium-resolution coefficient**, calibrated from early drawdown,
+not a circular-pipe friction factor or a grid-converged material property.
+Changing resolution, duct dimensions or drag requires a new calibration.
+The original circular-pipe friction factor 0.007 is not the solver's wall
+roughness. Its separate calculation is retained in
+[the original-problem comparison](../../docs/qs2-two-tank.md).
 
-![pooled class plot](plots/pooled-demo.png)
+### Worked answers at 120 s
+
+| d | B₁ (m) | B₂ (m) | Difference (m) | Left fall (m) | Right rise (m) |
+|---|---:|---:|---:|---:|---:|
+| 0 | 6.75 | 3.75 | 0.199 | 0.572 | 1.029 |
+| 1 | 7.00 | 4.00 | 0.243 | 0.566 | 0.991 |
+| 2 | 7.25 | 4.25 | 0.287 | 0.559 | 0.954 |
+| 3 | 7.50 | 4.50 | 0.329 | 0.552 | 0.919 |
+| 4 | 7.75 | 4.75 | 0.370 | 0.543 | 0.887 |
+| 5 | 8.00 | 5.00 | 0.409 | 0.535 | 0.856 |
+| 6 | 8.25 | 5.25 | 0.447 | 0.526 | 0.827 |
+| 7 | 8.50 | 5.50 | 0.483 | 0.517 | 0.800 |
+| 8 | 8.75 | 5.75 | 0.517 | 0.509 | 0.774 |
+| 9 | 9.00 | 6.00 | 0.550 | 0.500 | 0.750 |
+
+Digit 9 reproduces the original 9 m / 6 m bench: Δη = 0.550031 m,
+fall = 0.499988 m, rise = 0.749981 m. Its predicted final levels are
+2.500012 m and 1.949981 m.
+
+## Teaching sequence
+
+1. Have students calculate both widths and set the fields/sliders while
+   paused. Keep **Medium**, wall roughness **0.250**, eddy viscosity **0.40**,
+   celerity **35 m/s**, and boundary sources off (the scene defaults).
+2. Ask for predictions before running. All required data and equations are
+   on the card; students do not need these notes.
+3. Place Head gauges (`5`) at (5, 0.35) and (26.5, 0.35) m, press **R**,
+   resume, and pause at 120 s on the simulation clock. Compare the level
+   changes with the predictions using a **0.05 m tolerance per level**.
+4. Discuss how the result varies with storage. There is no class CSV
+   submission requirement or collection script.
+5. Optionally use **MEASURE → Flux line** (no digit shortcut) at x = 17 m,
+   drawing upwards across each bore. The nearly equal branch discharges
+   add. Use tank drawdown to calibrate C; thin-bore section quadrature is
+   coarse at Medium.
+
+## Verification and console spot-check
+
+Paste [rig.js](rig.js) into the app console and run `await QS2.demo(d)` for
+a digit 0–9 (default 9). It selects the exercise, sets both widths through
+the same parameter setters as the sliders, resets, and prints 10 s readings
+through 180 s, an early 10–40 s calibration and the 120 s prediction.
+`QS2.sample()` reads the current gauges, flows and whole-domain mass;
+`QS2.prediction(120)` uses the current widths.
+
+Run `node exercises/QS-2-twin-tanks/verify.mjs` to verify the default bench
+and regenerate its captured JSON and previews. Run
+`node exercises/QS-2-twin-tanks/verify-widths.mjs` for all ten digits, dry
+exterior checks, parameter reset behaviour and rig round-trip. Both use
+Node 22+ and GPU-backed Chrome, with no application dependencies or build.
+Results are in [verification.json](verification.json) and
+[width-verification.json](width-verification.json).
+
+The original C was calibrated only from 10–40 s; the 120 s prediction is
+held out. The ten-digit sweep tests whether that coefficient transfers
+across the assigned storage widths: all ten passed, with a maximum level
+error of 0.046 m at 120 s. The grid and both ducts are fixed.
+The comparison tolerance accounts for compressibility, rasterised storage,
+free-surface fluctuations and the quasi-steady approximation.
+
+Conservation uses `APP.boxForce(0,0,W,H).mass / 1000`, the whole-domain
+water-equivalent area Σf Δx². The mass API already returns kg per metre
+width. `APP.volume()` is recorded only as a diagnostic: it misses the upper
+duct and is not a conservation test. Width changes intentionally alter
+initial storage; mass is compared only within a run at fixed widths.
 
 ### Discussion points
 
-- **The slope is the pipe, and it is not an orifice.** C_d·a = 0.0079 m
-  against a drawn 43 mm gap gives C_d = 0.18 — the lumped resistance of a
-  1.6 m duct plus its entry and exit, not a contraction coefficient. Drop
-  **Eddy viscosity C_s** back to 0.16 in the panel and run it again: the same
-  measurement returns 0.71, which *is* an orifice number.
-- **The same rig is a dry dock.** Take the widest tank (d = 9) and read tank 2
-  as the sea, tank 1 as the dock. The dry-dock flooding formula contains only
-  the dock's own area because A₂ → ∞ sends A* → A₁, and the left-hand panel is
-  already flattening towards that asymptote at d = 8–9. Reverse the two levels
-  and the identical measurement is the dock emptying on the ebb.
-
-The full verification record — the simulated class, the pipe geometry that
-made the timescale both slow enough to read and robust to a hand-drawn stroke,
-repeatability, safe bounds and troubleshooting — is kept locally, out of version control, at `exercises/QS-2-twin-tanks/_archive/README-full.md`.
+- Why does the narrower reservoir change level faster? Why does rise/fall
+  equal B₁/B₂ even though the discharge changes throughout the run?
+- Why do parallel discharges add, while each branch sees the full head loss?
+- Compare Pressure head colouring with the HGL in a still reservoir. Why
+  does pressure head vary vertically while piezometric head stays constant?
+- Why must calibration and prediction use different time intervals?

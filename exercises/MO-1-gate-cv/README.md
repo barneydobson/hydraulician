@@ -41,6 +41,13 @@ hydrostatic pressure and uniform velocity, and it holds the bed as well as the
 gate, so it carries the bed friction over the enclosed run (measured below:
 1.9 – 6.3% of the reading).
 
+The **Pressure force** tool (pick it on the strip — it has no digit key) closes
+the loop a third way: click the gate itself and it draws the textbook pressure
+diagram straight off the plate — arrows perpendicular to the face, the
+resultant through the centre of pressure — and reads **F→** with no box to
+drag at all. Measured at the shipped 7-cell opening: **1.53 kN/m**, within a
+few percent of the Control volume's own ~1.6.
+
 ## Your gate opening
 
 **d** is the **last digit of your student number** — your lecturer will
@@ -75,8 +82,11 @@ q = 0.330 at that opening, so it needs no iteration.
    3.20)**: upstream face at the gauge station, downstream face at the vena
    station, bottom face inside the bed, top face clear of the gate. Give the
    card a few seconds to fill its average, then read **F→**. Drag a second box
-   — **(4.50, 0.50) → (5.63, 2.00)** — and check the reading holds. Submit
-   **a, d₀, d₁, C_d, F_R, F→** (with your digit `d`).
+   — **(4.50, 0.50) → (5.63, 2.00)** — and check the reading holds.
+7. Pick the **Pressure force** tool and click the gate face itself for a third
+   **F→** — the same number, read off the diagram it is drawn from, with no
+   box at all. Submit **a, d₀, d₁, C_d, F_R, F→ (box), F→ (gate)** (with your
+   digit `d`).
 
 ![the Control volume on the shipped 7-cell rig, reading about 1.6 kN/m](shots/04-force-box.png)
 
@@ -109,7 +119,10 @@ the thing they estimate, and the table below is where each of them lands.
 Expect roughly 6.5 / 3 / 1.6 / 0.9 kN/m at the four openings. At every one the
 box lands within a few percent of `naive` and about 5–15% under `F_R`; moving
 the box, or restarting the rig, changes the reading by a percent or two. The
-full measured table is in the archive.
+**Pressure force** tool, clicked straight on the gate, tracks the box closely
+too — 1.53 kN/m against the box's ~1.6 at the 7-cell opening — which is the
+point: a box built around the plate and a diagram read off its face are two
+routes to the same F→. The full measured table is in the archive.
 
 ### Discussion points
 

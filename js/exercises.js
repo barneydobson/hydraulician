@@ -2,12 +2,10 @@
 /**
  * exercises.js — the teaching pack as data.
  *
- * Forty verified demos live in `exercises/<folder>/README.md`, each with a
- * lecturer setup, a student worksheet and a verification record. This file is
- * the machine-readable half of that: enough to put a student in front of the
- * SAME correctly-plumbed rig as everybody else, and to tell them what their own
- * numbers are. The README stays authoritative for everything a human needs to
- * read, and every card links to it.
+ * The card is the complete student exercise: setup, assignment, actions and
+ * readings, including any data/formulas needed to do it without another
+ * document. Each folder's README is lecturer-only: derivation, worked
+ * answers and verification. HS-1 is the model for a concise standalone card.
  *
  * Every number here is the SHIPPED value from the demo's own README —
  * remeasured constants, not the ones the original programme sheet promised.
@@ -30,7 +28,7 @@
  *                  captured at, the open/closed edges, which supplies and
  *                  controls exist, and the levels/constants a README documents
  *                  as load-bearing (FR-1's 2.50 m tailwater, DA-2's 0.04 m
- *                  draining apron, QS-2's C_s = 0.40). CONTROLS ids → values;
+ *                  draining apron). CONTROLS ids → values;
  *                  key ORDER matters, because ticking a level control opens its
  *                  own edge, so edges come first.
  *   viewParams     APPLIED. Display and readout only — Field, Gauges plot,
@@ -118,13 +116,11 @@
  *            everything in one click, which is what keeps the standing
  *            acceptance test (the sandbox reproduces any scene by hand) true.
  *
- * HOW SHORT `start` AND `task` ARE IS THE POINT. This pack is read in a lecture
- * theatre by somebody whose lecturer is already saying what to do, or at home
- * beside the README. The card carries no cautions, no reasons, no procedure for
- * a drawn personalisation and nothing about handing work in — a `submit` list
- * and a `notes` paragraph were both tried on the card and removed, because the
- * card that says everything is the card nobody reads. All of it is still in
- * `exercises/<folder>/README.md`, which every card links to.
+ * A card must stand alone. `start` describes the bench, `instruments.where`
+ * gives the stations and `task` says what to do and read afterwards. Use
+ * `setup` for ordered steps and necessary calculation data. Do not send the
+ * student to the README for an equation, a procedure or what to record.
+ * Derivations, worked answers and verification remain in lecturer notes.
  *
  * Standing rules every worksheet carries: Resolution Medium · wait out the
  * settle · median-of-the-wobble reads, never one frame · after changing q,
@@ -325,9 +321,10 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "x = 4.5 m, z ≈ 0.75 m", why: "the approach pool — H = h − 0.50" },
       { tool: "cv", where: "Control volume (9), optional: drag about (2.0, 0.3) → (6.7, 1.6) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
+      { tool: "force", where: "the plate itself — pick the Pressure force tool and click it", why: "the same thrust, read straight off the pressure diagram cut off at the crest — no box to place at all" },
     ],
     start: "an approach pool behind a sharp-crested weir",
-    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Control volume round the plate reads F→ a few percent above ρgP(h − P/2).",
+    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Control volume round the plate, or the Pressure force tool clicked on the plate itself, both read F→ a few percent above ρgP(h − P/2).",
     settle: 60,
   },
 
@@ -355,10 +352,11 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "x = 3.5 m, z ≈ 0.65 m", why: "the upstream pool — reads d₀" },
       { tool: "cv", where: "Control volume (9): drag (3.50, 0.30) → (5.63, 3.20) — gauge station to vena station, bottom face inside the bed", why: "measures the thrust F_R predicts, on the same control volume and without its two assumptions" },
+      { tool: "force", where: "the gate face itself — pick the Pressure force tool on the strip and click it", why: "the pressure diagram and F→ straight off the gate, a third reading beside F_R and the box" },
     ],
     ui: { build: true },
     start: "a pool behind a drawn sluice gate — its opening is yours to adjust",
-    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, and measure that thrust with the Control volume on the same control volume.",
+    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, measure that thrust with the Control volume, and click the gate itself with the Pressure force tool for the diagram it is drawn from.",
     settle: 70,
   },
   {
@@ -378,10 +376,11 @@ const EXERCISES = [
       { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20) — it encloses all four shapes and clears the spout", why: "F→ is the force each turn actually delivers, to set against ρqv(1−cosθ)" },
       { tool: "gauge", where: "in the free jet, ~0.25 m clear of the plate (README uses 0.95, 2.50)", why: "the approach head" },
       { tool: "gauge", where: "on the stagnation point, ~0.03 m off the plate face (README uses 1.32, 2.46)", why: "the stagnation head — the ratio is the answer" },
+      { tool: "force", where: "the flat plate only — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, on the ONE drawn wall the plate is. The ramp's face is oblique enough that the same click reads a third under the box (measured), and the corner and deep-V are two and three strokes the tool cannot sum — so the Control volume is what the series is actually read on" },
     ],
     ui: { build: true },
     start: "a horizontal jet from a spout striking a flat plate",
-    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each. The deep-V under-delivers because it floods.",
+    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each. On the flat plate only, the Pressure force tool clicked on the plate reads the same number with no box. The deep-V under-delivers because it floods.",
     settle: 5,
   },
 
@@ -548,11 +547,37 @@ const EXERCISES = [
     instruments: [
       { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
       { tool: "gauge", where: "optionally in the free jet and on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
+      { tool: "force", where: "the flat plate only — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, on the ONE drawn wall the plate is; the 6-stroke cup and the deep-V's three strokes are why the Control volume stays how the rest of the demo is read" },
     ],
     ui: { build: true },
     start: "the jet-on-a-plate rig, as a lecturer demonstration",
-    task: "Read F→ off the Control volume: about 4 kN/m on the flat plate; redraw as the 6-stroke cup (README table) and the same box reads about 7 — close to the factor of two. The textbook deep-V reads only about 5 because it floods.",
+    task: "Read F→ off the Control volume — or, on the flat plate only, click the deflector with the Pressure force tool for the same number with no box: about 4 kN/m. Redraw as the 6-stroke cup (README table) and the box reads about 7 — close to the factor of two; the cup is six drawn walls, so only the box sums it. The textbook deep-V reads only about 5 because it floods.",
     settle: 5,
+  },
+
+  {
+    id: "HP-3",
+    title: "Design the surge tower: the class measures the upsurge",
+    topic: "Hydropower",
+    folder: "HP-3-surge-tower",
+    scene: "hydro",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "1", gaugeField: "h" },
+    // The shaft width is the FIFTH declared param of the hydro scene, and the
+    // Geometry panel binds its rows by index — so geom4 IS d_shaft. Reorder
+    // the scene's params and this rule silently moves onto another slider;
+    // check_pack.py cross-checks the index against js/scenes.js for that reason.
+    digit: { label: "surge shaft width D_s", control: "geom4", base: 2.5, step: 0.5, unit: "m",
+             rule: "D_s = 2.5 + 0.5·d" },
+    instruments: [
+      { tool: "gauge", where: "in the reservoir strip by the wall, x ≈ 6.6 m, z ≈ 20 m", why: "the reservoir level — every drawdown and upsurge is measured from it; the strip is the free surface the headrace actually sees" },
+      { tool: "gauge", where: "in the surge shaft, x ≈ 50 m, z ≈ 18 m — expand its card (⤢) for the trace", why: "the shaft level: z₀ on h before the slam, the crest on d after it (the h channel under an accelerating column reads low by a·D/g — see the README)" },
+    ],
+    start: "a reservoir, a 42 m headrace, a surge shaft at the knee and a penstock down to a nozzle, running steadily",
+    task: "Set your shaft width, wait out the settle, gauge the reservoir and the shaft and hover the headrace for u₀; then switch Gauges plot to d, press V, and read the first crest and the period off the shaft trace.",
+    note: "The green bar at x = 63.5 m is the valve — V is the instantaneous shutdown. The nozzle beyond it sets the steady discharge; its gap is a Geometry slider, which is what the maximum-power coda moves.",
+    settle: 60,
   },
 
   // ------------------------------------------------------- unsteady flow
@@ -692,35 +717,28 @@ const EXERCISES = [
   },
   {
     id: "QS-2",
-    title: "Two reservoirs finding a level",
+    title: "Two tanks and two parallel ducts",
     topic: "Quasi-steady flow",
     folder: "QS-2-twin-tanks",
-    scene: "sandbox",
-    rig: "QS-2",
-    // C_s = 0.40 is load-bearing (at the stock 0.16 the tanks equalise in
-    // 2–6 s); the reservoir is on so the fill in step 2 has a source.
-    rigParams: { budget: "Medium", spoutOn: false, cs: 0.40,
-                 openL: "0", openR: "0", openB: "0", openT: "0",
-                 inflowOn: true, inQ: 0, inLevel: 2.00 },
-    rigWhy: { cs: "at the stock 0.16 the tanks equalise in 2–6 s and there is nothing to time.",
-              inLevel: "the fill source for step 2; step 3 unticks it again." },
-    viewParams: { gaugeField: "h", mode: "0" },
-    digitNote: "your tank 2 width is DRAWN: A₂ = 0.50 + 0.25·d m, so its far wall goes at x = 3.60 + A₂. Your target level h* = (3.96 + 1.25·A₂)/(1.978 + A₂)",
-    setup: ["Move tank 2's far wall to x = 3.60 + your own A₂ (erase the shipped one first).",
-            "With the valve OPEN, fill tank 1 to 2.00 m from the reservoir; shut it (V) as tank 2 reaches 0.50 m.",
-            "Untick Upstream reservoir AND set the Left edge back to Wall, or it leaks through the run.",
-            "Let it stand, read both cards while the water is still, then press V and time the fall."],
+    scene: "two-tank",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { gaugeField: "h", mode: "1", grade: true, speed: 1 },
+    digit: { label: "Left reservoir width B₁", control: "geom0", base: 6.75, step: 0.25, unit: "m",
+      rule: "B₁ = 6.75 + 0.25·d",
+      also: [{ label: "Right reservoir width B₂", control: "geom1", base: 3.75, step: 0.25, unit: "m",
+        rule: "B₂ = 3.75 + 0.25·d" }] },
     instruments: [
-      { tool: "gauge", where: "x ≈ 0.9 m, z ≈ 0.30 m", why: "tank 1 — the fall you time" },
-      { tool: "gauge", where: "x ≈ 4.6 m, z ≈ 0.30 m", why: "tank 2 — the level it is finding" },
+      { tool: "gauge", where: "Head gauges at (5, 0.35) and (26.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
+      { tool: "flux", where: "optional Flux lines at x = 17 m, drawn upwards across each duct", why: "the two parallel discharges add; both branches see the same head difference" },
     ],
-    // Step 1 moves tank 2's far wall and step 2 slams the valve, so Wall,
-    // Erase and Valve all have to stay. The instruments above are gauges
-    // only, and without this the derived profile would hide BUILD entirely.
     ui: { build: true },
-    start: "twin tanks joined by a valved pipe, both empty",
-    task: "Follow the steps to fill and isolate, then press V and time tank 1 falling from 2.00 m to your own h*.",
-    settle: 5,
+    start: "two reservoirs at 3.00 and 1.20 m, joined by two full, identical 15 m × 0.10 m ducts; all quantities are per metre width",
+    setup: ["Set both widths from your digit using the fields above or Controls → Geometry. Changing a width restarts the water and clock; keep Medium resolution.",
+      "Predict the difference at 120 s: Δ = [√1.8 − 2.16(1/B₁ + 1/B₂)]². The total discharge law is q = 0.036√Δ m²/s.",
+      "Predicted left fall = B₂(1.8−Δ)/(B₁+B₂); right rise = B₁(1.8−Δ)/(B₁+B₂)."],
+    task: "Place two Head gauges (5), press R and watch the left reservoir fall as the right rises. Pause at 120 s on the simulation clock; record both changes, compare with your predictions to within 0.05 m, and explain why the narrower reservoir changes level faster.",
+    settle: 0,
   },
 
   // ------------------------------------------------------------- metering
@@ -1056,5 +1074,33 @@ const EXERCISES = [
     start: "your own DA-1 weir, at the Resolution it was captured on",
     task: "Keep your own DA-1 weir, q and level exactly as they are and change ONLY the Resolution, then re-read H at the same station and recompute C_d.",
     settle: 55,
+  },
+
+  // ------------------------------------------------------- hydrostatics
+  // A lecturer demo on the `dyke` scene: no rig payload, because the scene's
+  // own polygons ARE the rig, and no digit, because the point is watched, not
+  // pooled. `settle: 0` is deliberate — the water boots at rest and there is
+  // nothing to wait out; the wait that matters is the ~20 s after V, which
+  // the README states and the card's task says to watch, not to time.
+  {
+    id: "HS-1",
+    title: "Three surfaces, one level: a dyke and its piezometer",
+    topic: "Hydrostatics",
+    folder: "HS-1-dyke-piezometer",
+    scene: "dyke",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", particles: true, gaugeField: "h" },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "gauge", where: "x ≈ 1.2 m, z ≈ 1.3 m — the left basin", why: "h in the left basin: 4.00 m at boot" },
+      { tool: "gauge", where: "x ≈ 4.4 m, z ≈ 1.3 m — inside the culvert, under the piezometer", why: "h in the culvert reads the LEFT level while the valve is shut — the number the piezometer column stands at, without the tube" },
+      { tool: "gauge", where: "x ≈ 5.6 m, z ≈ 1.3 m — the right basin", why: "h in the right basin: 3.10 m, then the common level after V" },
+      { tool: "force", where: "the sloped Upstream face of the dyke; click the same block again to cycle to its Culvert roof; the Downstream face is on the block past the piezometer", why: "½ρg·d² sideways on each face, plus the weight of the water on the slope downward on the upstream one, and the uplift on the roof; after V both faces read the same horizontal force" },
+    ],
+    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead", "head"], panel: "shut" },
+    start: "a dyke between two reservoirs at 4.00 and 3.10 m, joined by a shut culvert with a piezometer tapped into its roof",
+    task: "Read the three levels and the two face forces while the valve is shut, then press V: watch the culvert run and the small basin fill, and read them again once the water is still — one level, equal forces.",
+    settle: 0,
   },
 ];

@@ -1,6 +1,6 @@
 // DA-2 · "Time scales as sqrt(lambda)" — paste into the dev console to
 // rebuild this rig. Inherits RIG-C's build knowledge from QS-2
-// (exercises/QS-2-twin-tanks/rig.js): Sandbox at Medium (414x230, dx 21.7mm),
+// (the retired single-duct exercise): Sandbox at Medium (414x230, dx 21.7mm),
 // the two default ledges erased, and the floor-trim orifice trick (a VALVE
 // stroke drawn ALONG the domain's closed bottom edge; rasterise() stamps the
 // closed ring LAST, so it trims the stroke's lowest row and the surviving
@@ -13,7 +13,7 @@
 // base is cut by the same floor-trim trick. Water that passes the orifice
 // lands on an open apron and leaves through the right edge.
 //
-//   QS2.build({A2:1.5})                  // twin tanks, for comparison
+//   APP.pickExercise("QS-2")            // the replacement parallel-duct tanks
 //   DA2.build(0.5)                       // this rig at lambda = 1/2
 //   DA2.fill(DA2.P.startFrac*DA2.P.h0*0.5)   // fill to the start mark
 //   DA2.settle(4)

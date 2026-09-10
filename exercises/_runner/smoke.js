@@ -554,16 +554,35 @@ SUITES.api = async (B) => {
   // verified read (docs/engineering-notes.md) is Fr1 2.24, d2 0.416 against
   // Belanger 0.438. Settle by simulated time so the count is independent of
   // Δt, then warm the analyse EMA the way the overlay does.
+  //
+  // Then read a WINDOW, not a frame. The box flutters — its own README says
+  // so — and measured on 2026-09-10 (Medium, t = 30–90 s, one read per
+  // second) a single frame landed inside the 30% band only 63–91% of the
+  // time depending on the commit, while the 60 s mean sat 5–20% over
+  // Belanger at every commit tried back to 6cc91ca. The assertion is about
+  // the momentum balance, which is a property of the mean flow, so it reads
+  // the mean of 20 s of frames and asks that a jump be found in a third of
+  // them at least (at the Low grid the box comes and goes: 68% of frames
+  // carried one in the same measurement).
   const j = await B.evaluate(`(() => {
     __low();
     const t = __settle(30, 120000);
-    const A = __warm(25);
-    const J = OVERLAY.findJumps(A, APP.sim)[0];
-    return J ? { t, keys: Object.keys(J).sort(),
-                 d1: J.d1, d2: J.d2, d2p: J.d2p, Fr1: J.Fr1, dE: J.dE } : { t };
+    const acc = { n: 0, d1: 0, d2: 0, d2p: 0, Fr1: 0, dE: 0 }, frames = 40;
+    let keys;
+    for (let k = 0; k < frames; k++) {
+      APP.tick(Math.round(0.5 / APP.SIM.dt()));
+      const A = __warm(25);                    // the overlay EMA needs its warm-up every read
+      const J = OVERLAY.findJumps(A, APP.sim)[0];
+      if (!J) continue;
+      keys = keys || Object.keys(J).sort();
+      acc.n++; acc.d1 += J.d1; acc.d2 += J.d2; acc.d2p += J.d2p; acc.Fr1 += J.Fr1; acc.dE += J.dE;
+    }
+    if (!acc.n) return { t: APP.sim.t, frames, n: 0 };
+    return { t: APP.sim.t, keys, frames, n: acc.n, d1: acc.d1 / acc.n, d2: acc.d2 / acc.n,
+             d2p: acc.d2p / acc.n, Fr1: acc.Fr1 / acc.n, dE: acc.dE / acc.n };
   })()`);
-  if (ok("PHYSICS h23 still forms a hydraulic jump", j.keys !== undefined,
-         "settled to t = " + (j.t || 0).toFixed(1) + " s with no free jump found")) {
+  if (ok("PHYSICS h23 still forms a hydraulic jump", j.n >= j.frames / 3,
+         "settled to t = " + (j.t || 0).toFixed(1) + " s; a jump was found in " + (j.n || 0) + " of " + j.frames + " frames")) {
     ok("API findJumps() exposes d1/d2/d2p",
       ["d1", "d2", "d2p"].every((k) => j.keys.includes(k)) &&
       !["y1", "y2", "y2p"].some((k) => j.keys.includes(k)),
@@ -575,7 +594,7 @@ SUITES.api = async (B) => {
     // against the momentum balance breaking, not a calibration.
     ok("PHYSICS conjugate depth is within 30% of Belanger",
       near(j.d2, j.d2p, 0.30 * j.d2p),
-      `d2 ${j.d2.toFixed(3)} vs Belanger ${j.d2p.toFixed(3)} at t ${j.t.toFixed(1)} s`);
+      `d2 ${j.d2.toFixed(3)} vs Belanger ${j.d2p.toFixed(3)}, mean of ${j.n} frames to t ${j.t.toFixed(1)} s`);
     ok("PHYSICS the jump dissipates energy", j.dE > 0, "dE = " + j.dE);
   }
 

@@ -255,10 +255,9 @@ async function main() {
       eq("the overlay stops there too", p.overW, p.canvasW);
       check("the strip still shows every control", !p.groupsClipped);
       check("the fold handle is on the seam", p.foldShown);
+      // Fold-on-land is an EMBEDDED behaviour (spec §1.1 of the embed design);
+      // a plain `?ex=` boot must not pick it up by accident.
       check("the reopen tab is put away", !p.tabShown);
-      // Fold-on-land is an EMBEDDED behaviour (spec §1.1); a plain `?ex=` boot
-      // must not pick it up by accident.
-      check("without embed the tab is not up", !p.tabShown);
       check("the brief carries the task", await tab.evaluate(
         `return document.querySelector("#dock .extask").textContent.length > 20;`));
       check("the brief carries the personalised rule", await tab.evaluate(

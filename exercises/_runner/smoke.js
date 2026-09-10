@@ -17,6 +17,8 @@
  *   PHYSICS  volume is conserved, hydrostatic water stays put, no NaN
  *            reaches the field, and a jump still reads its conjugates
  *   SCENES   every scene boots and steps
+ *   HYDRO    the parametric hydropower scheme: params move the mask, the
+ *            seeded start runs, the slam is a rigid-column surge
  *   PACK     every exercise applies its rig and lands on its scene
  *
  * Usage:  node exercises/_runner/smoke.js [--keep] [--only=api,rig,...]
@@ -1619,6 +1621,91 @@ SUITES.scenes = async (B) => {
       r.t > 0 && r.finite && r.dOk && r.vol > 0,
       JSON.stringify(r));
   }
+};
+
+// The hydropower scheme (js/scenes.js `hydro`): the first scene built wholly
+// from params, a seeded steady start, a surge shaft. What has to hold, at Low
+// (the physics is resolution-independent; only the delivered roughness is
+// not, and nothing here reads that):
+//   - a Geometry param moves the geometry: the shaft's clear width in the
+//     mask follows d_shaft to within a cell either side;
+//   - the seeded start runs: the headrace flows, and the shaft stands BELOW
+//     the reservoir by a drawdown of the order of a velocity head — a cold
+//     start would leave it AT the reservoir level, swinging;
+//   - the slam is a mass oscillation: within 15 s the shaft is metres above
+//     the reservoir, whose FREE SURFACE barely moves (a piezometric probe in
+//     the strip jumps metres for a second as the slam's pressure wave reaches
+//     the mouth — measured ±4 m at Medium — which is not the reservoir
+//     moving), the crest is the rigid-column scale u₀√(L·D_h/(g·D_s))
+//     (measured 0.91–0.98 of it at Medium, gated at 30% for Low's coarser
+//     bore), and the valve never sees zero head. Settled PAST the scene's own
+//     60 s spin-up first: inside it the frame loop runs flat out, so a slam
+//     recorded there is sampled seconds apart, not tenths.
+SUITES.hydro = async (B) => {
+  await B.goto(`http://localhost:${PORT}/?scene=hydro`);
+  const r = await B.evaluate(`(() => {
+    __low();
+    const S = APP.sim, sc = S.scene, dx = S.dx;
+    const g = sc.geom(APP.SIM.params().values);
+    const width = (x, z) => {
+      const j = Math.round(z / dx - 0.5), i = Math.round(x / dx - 0.5);
+      if (S.mask[j * S.nx + i]) return 0;
+      let lo = i, hi = i;
+      while (lo > 0 && !S.mask[j * S.nx + lo - 1]) lo--;
+      while (hi < S.nx - 1 && !S.mask[j * S.nx + hi + 1]) hi++;
+      return (hi - lo + 1) * dx;
+    };
+    const w3 = width(g.xk, 18);
+    APP.SIM.setParam("d_shaft", 6.0);
+    const w6 = width(g.xk, 18);
+    APP.SIM.setParam("d_shaft", 3.0);
+    APP.SIM.resetWater();
+    const t = __settle(65, 150000);
+    // a free surface to sub-cell accuracy: the fill summed up the column from
+    // well under the surface (the column reduction quantises to whole cells)
+    const surf = (x) => {
+      const i = Math.floor(x / dx); let z = Math.floor(16 / dx) * dx;
+      for (let j = Math.floor(16 / dx); j < S.ny - 1; j++) {
+        const p = APP.probe((i + 0.5) * dx, (j + 0.5) * dx);
+        if (p.solid || p.f <= 0.02) break;
+        z += Math.min(p.f, 1) * dx;
+      }
+      return z;
+    };
+    const res0 = surf(6.6), shaft0 = surf(g.xk);
+    const A = __warm(40), u0 = A.V[Math.floor(27 / dx)];
+    APP.SIM.setValve(1);
+    let crest = shaft0, resMax = res0, resMin = res0, pvMin = 1e9;
+    APP.state.paused = false;
+    for (let k = 0; k < 150; k++) {
+      APP.frames(1, 0.1);
+      const sh = surf(g.xk), rr = surf(6.6), pv = APP.probe(62.5, 3.0).phead;
+      if (sh > crest) crest = sh;
+      if (rr > resMax) resMax = rr;
+      if (rr < resMin) resMin = rr;
+      if (pv < pvMin) pvMin = pv;
+    }
+    APP.SIM.setValve(0);                       // put the scene back
+    return { t, dx, w3, w6, res0, shaft0, u0, crest, resSwing: resMax - resMin, pvMin,
+             zf: u0 * Math.sqrt((g.xk - g.xw) * g.Dh / (9.81 * g.Ds)) };
+  })()`);
+  ok("HYDRO the shaft width follows its Geometry param",
+    near(r.w6 - r.w3, 3.0, 2 * r.dx + 0.05),
+    `3 → 6 m moved the clear width by ${(r.w6 - r.w3).toFixed(2)} m (dx ${r.dx.toFixed(3)})`);
+  ok("HYDRO the seeded start runs: the headrace flows",
+    r.u0 > 1.5 && r.u0 < 3.5, `u0 = ${r.u0.toFixed(2)} m/s at t = ${r.t.toFixed(0)} s`);
+  ok("HYDRO the shaft stands below the reservoir, a piezometer at the knee",
+    r.res0 - r.shaft0 > 0.1 && r.res0 - r.shaft0 < 1.5,
+    `drawdown ${(r.res0 - r.shaft0).toFixed(2)} m against u0²/2g = ${(r.u0 * r.u0 / 19.62).toFixed(2)}`);
+  ok("HYDRO the slam sends the column up the shaft",
+    r.crest - r.shaft0 > 2.0 && r.crest - r.shaft0 < 10, `rise ${(r.crest - r.shaft0).toFixed(2)} m in 15 s`);
+  ok("HYDRO the crest is the rigid-column scale",
+    near(r.crest - r.res0, r.zf, 0.3 * r.zf),
+    `${(r.crest - r.res0).toFixed(2)} m above the reservoir vs u0·√(L·Dh/(g·Ds)) = ${r.zf.toFixed(2)}`);
+  ok("HYDRO the reservoir is a reservoir: its surface barely moves", r.resSwing < 1.0,
+    `free-surface swing ${r.resSwing.toFixed(2)} m over the slam`);
+  ok("HYDRO the valve never cavitates", r.pvMin > 0.5,
+    `min p/ρg at the valve ${r.pvMin.toFixed(2)} m`);
 };
 
 SUITES.docs = async (B) => {

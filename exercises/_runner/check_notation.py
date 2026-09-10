@@ -199,7 +199,7 @@ def main():
                      % (where, m.group(1)))
 
     # --- 4. gauge field keys --------------------------------------------------
-    LIVE_FIELDS = {"h", "d", "speed"}
+    LIVE_FIELDS = {"h", "d", "eta", "speed"}
     register = read(os.path.join(ROOT, "js", "exercises.js"))
     checked[0] += 1
     for n, line in enumerate(register.splitlines(), 1):

@@ -236,8 +236,11 @@ const SIM = (() => {
     // registration block below can wrap the SAME arrays instead of
     // re-invoking sc.walls()/sc.valves() a second time — every stampSeg call
     // and its order are exactly what they were before this existed.
-    const wallSegs = sc.walls ? sc.walls(sc.W, sc.H) || [] : [];
-    const valveSegs = sc.valves ? sc.valves(sc.W, sc.H) : [];
+    // `par` rides along so a parametric scene can size its valve (and its
+    // shim walls) to the same geometry its solids() just built — ignored by
+    // every scene that takes (W, H) only.
+    const wallSegs = sc.walls ? sc.walls(sc.W, sc.H, par) || [] : [];
+    const valveSegs = sc.valves ? sc.valves(sc.W, sc.H, par) : [];
     wallSegs.forEach((s) => stampSeg(m, s, 255));
     valveSegs.forEach((s) => stampSeg(m, s, 128));
     S.segs.forEach((s) => stampSeg(m, s, s[5]));
@@ -482,22 +485,51 @@ const SIM = (() => {
   /** Reload the scene's initial water (and clear all momentum). */
   function resetWater() {
     const n = S.nx * S.ny, d = new Float32Array(n * 4);
-    const P = { g: Math.abs(S.p.g), c: S.p.c };
+    // `level` rides along too: a scene that fills a reservoir to the live
+    // slider (hydro) rather than to a constant reads it here. NaN when the
+    // control is off, so a scene cannot mistake 0 for a level.
+    const P = { g: Math.abs(S.p.g), c: S.p.c,
+                level: S.p.inflow.on > 0.5 ? S.p.inflow.level : NaN };
     const water = S.scene.water;
+    // The live params go with the call: a parametric scene fills the pipe
+    // its solids() actually drew, not the default one. Scenes taking
+    // (x, z, P) never see the extra argument.
+    const par = S.params || {};
     for (let j = 0; j < S.ny; j++) {
       for (let i = 0; i < S.nx; i++) {
         const k = (j * S.nx + i) * 4;
-        d[k] = Math.max(0, water((i + 0.5) * S.dx, (j + 0.5) * S.dx, P) || 0);
+        d[k] = Math.max(0, water((i + 0.5) * S.dx, (j + 0.5) * S.dx, P, par) || 0);
       }
     }
     for (const b of [S.F.a, S.F.b]) {
       gl.bindTexture(gl.TEXTURE_2D, b.tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, d);
     }
-    const zero = new Float32Array(n * 4);
+    const vel = new Float32Array(n * 4);
+    // An initial velocity field, when the scene can say what its steady flow
+    // looks like. On the staggered faces the U texture uses — `r` = u at the
+    // cell's WEST face, `g` = w at its SOUTH face; p (`b`) and the divergence
+    // (`a`) stay 0, the EOS recomputes both. Every other scene starts from
+    // rest exactly as before. The hydro scene needs this: from rest its
+    // surge shaft swings ±4 m and is still ±1 m at 60 s (measured), because
+    // the establishment IS a load-acceptance surge and quadratic friction
+    // damps one algebraically. Faces against a solid are zeroed by the first
+    // vel pass, so the hook need not know the mask.
+    const flow = S.scene.flow;
+    if (flow) {
+      for (let j = 0; j < S.ny; j++) {
+        for (let i = 0; i < S.nx; i++) {
+          const k = (j * S.nx + i) * 4;
+          const fu = flow(i * S.dx, (j + 0.5) * S.dx, P, par);
+          const fw = flow((i + 0.5) * S.dx, j * S.dx, P, par);
+          vel[k] = fu ? fu[0] || 0 : 0;
+          vel[k + 1] = fw ? fw[1] || 0 : 0;
+        }
+      }
+    }
     for (const b of [S.U.a, S.U.b]) {
       gl.bindTexture(gl.TEXTURE_2D, b.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, zero);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, vel);
     }
     S.t = 0;
     // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex, whose

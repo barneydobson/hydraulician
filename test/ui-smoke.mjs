@@ -1015,13 +1015,13 @@ async function main() {
     // ------------------------------------------------- the Geometry section
     console.log("\nthe Geometry panel binds to whatever the scene actually declares");
     {
-      // hump declares one param (hump_h); the panel's four geom rows are a
+      // hump declares one param (hump_h); the panel's six geom rows are a
       // fixed pool that binds to a scene's params by INDEX (main.js's
-      // syncPanel), so exactly one of the four should be showing, and it
+      // syncPanel), so exactly one of the six should be showing, and it
       // should carry the scene's own label rather than a placeholder.
       const tab = await browser.open(INDEX + "?scene=hump");
       const r = await tab.evaluate(`
-        const rows = [0, 1, 2, 3].map((k) => {
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
           const input = document.getElementById("c_geom" + k);
           return !input.parentElement.classList.contains("gone");
         });
@@ -1039,11 +1039,11 @@ async function main() {
     }
     {
       // m1 has no declared params at all — a wall-segment scene, not a
-      // polygon one — so every one of the four rows should stay hidden, and
+      // polygon one — so every one of the six rows should stay hidden, and
       // the section's own heading should not be left fronting an empty list.
       const tab = await browser.open(INDEX + "?scene=m1");
       const r = await tab.evaluate(`
-        const rows = [0, 1, 2, 3].map((k) => {
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
           const input = document.getElementById("c_geom" + k);
           return !input.parentElement.classList.contains("gone");
         });
@@ -1055,6 +1055,38 @@ async function main() {
       eq("a scene with no params hides every geometry row", r.visible, 0);
       check("a scene with no params hides the Geometry heading too", !r.headingShown);
       await tab.close();
+    }
+    {
+      // hydro declares six params — the whole pool — and HP-3's digit rule
+      // rides the fifth (geom4, the shaft width). Every row must show under
+      // the scene's own label, and the exercise card's Yours field must be
+      // named after the bound param, not the row's "—" placeholder: that
+      // field is where a student types their shaft width.
+      const tab = await browser.open(INDEX + "?scene=hydro");
+      const r = await tab.evaluate(`
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
+          const el = document.getElementById("c_geom" + k).parentElement;
+          return { shown: !el.classList.contains("gone"), label: el.querySelector(".lbl").textContent };
+        });
+        return { visible: rows.filter((r) => r.shown).length, labels: rows.map((r) => r.label) };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("a six-param scene shows all six geometry rows", r.visible, 6);
+      eq("the fifth row is the shaft width", r.labels[4], "Surge shaft width D_s");
+      await tab.close();
+      const ex = await browser.open(INDEX + "?ex=HP-3",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const c = await ex.evaluate(`
+        const f = document.querySelector('#dock input[aria-label="Surge shaft width D_s"]');
+        const h = document.querySelector('#panel h3[data-sec="Geometry"]');
+        return { field: !!f, value: f ? +f.value : null,
+                 geomKept: !!h && !h.classList.contains("off") && !h.classList.contains("gone") };
+      `);
+      check("no uncaught errors", ex.errors.length === 0, ex.errors[0]);
+      check("the card's Yours field is named after the bound param", c.field);
+      eq("and opens on the scene's own default", c.value, 3);
+      check("the focused panel keeps the Geometry section", c.geomKept);
+      await ex.close();
     }
 
     // ------------------------------------------------- placing and removing

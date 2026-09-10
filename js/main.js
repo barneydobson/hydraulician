@@ -80,6 +80,10 @@ const state = {
   tipIdx: 0, tipAt: 0,
 };
 
+/** `?embed=1`: the app is sitting in an LMS iframe (docs/embedding.md). Read
+ *  once — an opt-in by URL, not `window !== top`, so a plain tab can test it. */
+const EMBED = new URLSearchParams(location.search).has("embed");
+
 let canvas, over, octx, view, sim;
 
 // --------------------------------------------------------------- geometry
@@ -1969,7 +1973,10 @@ const DOCK = (() => {
     fold.classList.toggle("show", open);
     tab.classList.toggle("show", shown && folded);
     tab.querySelector(".eid").textContent = id;
-    tab.querySelector(".kind").textContent = kind.toLowerCase();
+    // The tab is the only thing a folded student sees: "Exercise" doesn't
+    // say there is a brief behind it, so name the action instead of the kind.
+    tab.querySelector(".kind").textContent =
+      kind === "Exercise" ? "open instructions" : "open " + kind.toLowerCase();
   }
   /** Show the panel with a header. `onClose` is what the × does — the caller
    *  owns what closing MEANS (an exercise stays loaded; only its brief goes). */
@@ -3275,6 +3282,9 @@ function boot() {
   const exId = q.get("ex");
   if (exId && !EX.pick(exId)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
+  // Embedded, the brief lives on the page around the frame; the card starts
+  // folded to its tab so the water keeps the width (spec §1.1).
+  if (EMBED && exId) EX.ready.then(() => DOCK.fold(true));
   // A `#rig=` link carries its own base scene, so it wins over `?scene=` —
   // but `?scene=` is loaded first anyway, so a link that fails to decode
   // leaves you on the scene you asked for rather than on a blank page.
@@ -3444,6 +3454,7 @@ function toggleValve() {
 // the page is hidden, so headless testing goes through here.
 window.APP = {
   get sim() { return sim; }, get view() { return view; },
+  embed: EMBED,                            // `?embed=1` — see docs/embedding.md
   state, loadScene, SIM, OVERLAY, SCENES, showToast, zoomAt, resetZoom,
   switchScene,                             // load a scene as a fresh ?scene= boot would
   PICKER,                                  // the scene menu

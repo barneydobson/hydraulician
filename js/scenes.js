@@ -505,20 +505,20 @@ const SCENES = (() => {
     // z = 0.35, flat both sides of the crest (a mild reach, same bed level
     // m1/m2 use, but no slope — the point here is the crest, not the reach).
     //   d_c = (q²/g)^⅓ = 0.1854 m at q = 0.25. inletDepth 0.34 m is a
-    // subcritical approach depth comfortably above d_c. NO velocity head
-    // goes into the inflow level: on THIS branch (polygon-geometry, off
-    // main) there is no energy-line inlet solve — sim.js's inletVel() finds
-    // the boundary VELOCITY from level and q (v = q / depth-at-boundary), it
-    // does not back-solve level from an energy target — and channel()'s own
-    // inLevel is bed0 + inletDepth, same convention, no velocity head. So
-    // `inflow.level` here IS the pinned boundary surface, plain:
-    //   level = bed0 + d = 0.35 + 0.34 = 0.69 m.
-    // (Adding q²/2gd² on top was tried and measured wrong: with the hump
-    // removed the approach settled at 0.7172 m — the boundary pins the
-    // surface directly, so the extra term just bought 27 mm of unwanted
-    // depth. The reservoir-energy-line branch, unmerged as of this writing,
-    // adds a real energy-line inlet solve; once that lands this scene should
-    // revisit whether to hand it a level or an energy line.)
+    // subcritical approach depth comfortably above d_c. The inflow level is
+    // an ENERGY line, not the surface (see `inletLevel` above and
+    // SIM.inletStage): the boundary solves E = d + q²/2gd² for the depth it
+    // delivers, so the level that delivers d = 0.34 m is the surface plus its
+    // velocity head — the same conversion channel() applies to every scene
+    // built through it, written out here because this entry bypasses it:
+    //   level = bed0 + d + q²/2gd² = 0.35 + 0.34 + 0.0276 = 0.7176 m.
+    // (History: while this scene was built on the polygon-geometry branch the
+    // inlet still pinned the SURFACE at `level`, so 0.69 was right then and
+    // adding the velocity head measured 27 mm too deep. The energy-line inlet
+    // landed with the reservoir-energy-line merge, and this is the revisit
+    // that comment asked for: handing 0.69 to the new boundary would pin the
+    // approach 28 mm under the depth it wants, which is the choked-inlet
+    // ripple failure the engineering notes describe.)
     // Tailwater stands at bed0 + 0.30 = 0.65 m — a tail depth of 0.30 m
     // against d_c = 0.1854 m is 1.3 d_c ≈ 0.241 m clear, the AGENTS.md floor
     // for a subcritical downstream control.
@@ -558,7 +558,8 @@ const SCENES = (() => {
       // station to read.
       spinup: 10, dyeLine: 0.9,
       open: [1, 1, 0, 0],
-      inflow: { level: 0.69, q: 0.25, on: 1, free: 0 },
+      // 0.35 + 0.34 + 0.25²/(2·9.81·0.34²): the energy line that delivers d = 0.34.
+      inflow: { level: 0.7176, q: 0.25, on: 1, free: 0 },
       tailwater: { level: 0.65, on: 1 },     // mild control downstream
       params: [{ key: "hump_h", label: "Hump height", min: 0, max: 0.45,
                  step: 0.005, value: 0.15, unit: "m" }],

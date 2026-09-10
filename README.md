@@ -31,7 +31,8 @@ result, then use a real model to get a number.
 
 Click a picture or an id to open that exercise in the app, set up and ready.
 Written briefs, data and plots for each one are in
-[`exercises/`](exercises/INDEX.md).
+[`exercises/`](exercises/INDEX.md). To put one exercise inside a Blackboard
+or Canvas page, see [`docs/embedding.md`](docs/embedding.md).
 
 |  |  |  |  |
 |---|---|---|---|

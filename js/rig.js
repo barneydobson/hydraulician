@@ -224,6 +224,9 @@ const RIG = (() => {
                      if (state.tracers && o.tracers[2]) state.tracers.trail = +o.tracers[2]; }
     syncPanel();
 
+    // The loaded field can differ from the scene's default. Keep the legend
+    // in step with the heatmap after restoring ui.mode.
+    LEGEND.sync();
     const n = sim.segs.length;
     note = "rig loaded: " + n + " segment" + (n === 1 ? "" : "s") +
            (state.gauges.length ? " · " + state.gauges.length + " gauge" +

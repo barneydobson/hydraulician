@@ -5,6 +5,17 @@ file it touches and every rule the gates enforce. This is the how-to; the
 *why* of the pack's shape is in the header of `js/exercises.js`, and the
 model behind what the demo shows is in [numerics.md](numerics.md).
 
+**Two audiences, two documents.** The in-app card is the complete student
+exercise. The folder's README is for the lecturer: derivation, worked
+answers, teaching notes and verification. A student must be able to perform
+the task from the card alone, without opening the README or being referred
+to it. HS-1's on-screen description is the model: state the starting setup,
+where to measure, the action to take and the readings to compare afterwards.
+For a calculation exercise, also put the necessary data, student-number
+rule and formula on the card. Keep that concise; use `setup` for ordered
+steps rather than making `task` one long paragraph. An optional lecturer
+notes link is not a substitute for any student instruction.
+
 An exercise is **one scene plus one card plus one folder**, and optionally a
 captured rig payload. Nothing is generated: each piece is written by hand,
 and `exercises/_runner/check_pack.py` asserts that the pieces agree.
@@ -14,9 +25,9 @@ and `exercises/_runner/check_pack.py` asserts that the pieces agree.
 | scene | `js/scenes.js` | the geometry, water and controls the demo boots into — or `"sandbox"` |
 | card | `js/exercises.js` | the machine-readable entry the picker reads: what is applied, what is printed |
 | rig payload | `js/exercises-rigs.js` | drawn segments and panel state, **captured** from the app, never hand-edited |
-| folder | `exercises/<ID>-<slug>/` | `README.md` (the brief), `rig.js` (console spot-check), `collect_plot.py` when a class submits |
+| folder | `exercises/<ID>-<slug>/` | `README.md` (lecturer notes), `rig.js` (console spot-check), `collect_plot.py` when a class submits |
 | index row | `exercises/INDEX.md` | one line of navigation |
-| thumbnail | `docs/thumbs/<ID>.jpg` | 480 × 289, linked from the repo `README.md` gallery |
+| syllabus row | `docs/syllabus.md` | one row under its topic — id, type badge and a one-liner; **only once the exercise has been checked** |
 
 Worked example throughout: **HS-1**, the dyke with a piezometer
 (`exercises/HS-1-dyke-piezometer/`), a lecturer demo on a scene written for
@@ -82,6 +93,18 @@ draw it.
 (start polygons at `z = −0.5`), butt-ended segments, a bed above `z = 0`, a
 subcritical reach with a real downstream control, tailwater ≥ 1.3 d_c.
 `docs/boundary-conditions.md` has every boundary mechanism.
+
+**Adjustable storage dimensions.** Declare sliders in `params` (key, label,
+min/max/step/value and unit). `solids(W,H,P,params)` draws the chosen widths;
+`water(x,z,P,params)` seeds water inside those same bounds. Set
+`resetWater: true` on a storage dimension when changing it defines a new
+experiment: `SIM.setParam` then restores initial water and t = 0. State that
+behaviour on the card. Ordinary geometry controls such as gates can keep
+water moving and omit this flag. Parameters travel with saved rigs. A
+student-number rule names the matching `geom0`…`geom3` control in `digit`
+and `digit.also`; it prints the assignment, and the student sets the widths.
+Keep duct dimensions and the numerical grid fixed when comparing storage.
+Measure the prediction error across all ten assigned values.
 
 **Measure, do not guess.** `spinup` is the time for the profile to stop
 moving, from a headless run (§7). HS-1 boots at rest, so its `spinup` is 0
@@ -173,13 +196,13 @@ the current version.
 
 `exercises/<ID>-<slug>/`, and `check_pack.py` insists on the first two:
 
-- **`README.md`** — the brief. H1 exactly `# <ID> · <title>`, then the
-  pattern every brief follows: a paragraph on what the demo shows, the
-  **Open it** line with the `?ex=` link and the pointer to
-  `INDEX.md#running-an-exercise`, `## Theory`, the personalised rule and its
-  ten-value table when there is one, `## What to do` as numbered steps that
-  name the key for each tool, `## For the instructor` with the measured
-  numbers and `### Discussion points`. If the brief says the class waits
+- **`README.md`** — lecturer notes. H1 exactly `# <ID> · <title>`, followed
+  by what the exercise teaches and an **Open it** link for the lecturer.
+  Include theory and worked answers, the student-number rule and ten-value
+  table when applicable, the teaching sequence, measured results and limits,
+  and discussion points. The card carries every student-facing datum and
+  step; the README explains and validates them rather than filling gaps in
+  the on-screen instructions. If the notes say the class waits
   "about **N s**" in exactly that bold form, N must be the card's `settle`.
 - **`rig.js`** — a paste-into-the-console object that does what the student
   does by hand through the same entry points (`SIM.addSeg`, `toggleValve`,
@@ -192,8 +215,20 @@ the current version.
 - **`_archive/`** — untracked, local: the long verification record.
 
 Then one row in `exercises/INDEX.md` (`| ID | short title | folder/ | what it
-runs on | what students submit |`), and the thumbnail cell in the repo
-`README.md` gallery.
+runs on | what students submit |`).
+
+**The syllabus row is earned, not written with the card.** `docs/syllabus.md`
+(the GitHub Pages page the README links) carries only the exercises
+that have been **checked**: run headless, measured, and read once more against
+what the brief claims to teach. When an exercise passes that, add one row to
+its topic's table — `**<ID>** · <title>` linking `[open it]` to
+`…/?ex=<ID>` and `[brief]` to the folder, the type badge (demo = interactive
+lecturer demo, quick = quick in-class exercise, tutorial = written tutorial
+with simulation comparison; copy the `<span>` from an existing row), and a
+one-line description. If its topic's section still says *Nothing here yet*,
+replace that with the table. Topics and their order live in the syllabus's
+Contents list — place the row where the topic teaches, not where the app's
+menu files it.
 
 ## 6. What the gates check
 
@@ -244,9 +279,12 @@ candidate viscosity — the table in its README is that run.
 
 1. Scene written (or rig captured), booted with `?scene=`, geometry and
    water as intended, `spinup` measured.
-2. Card written: applied versus displayed sorted into the right fields, tool
-   ids real, `ui` declared when the derivation would hide something needed.
-3. Folder: README with the exact H1 and the measured numbers, `rig.js` that
+2. Card written: self-contained like HS-1, with the start state, station
+   locations, action and final readings; data/formulas and digit rule where
+   needed. No student instruction refers to the README. Applied versus
+   displayed values use the right fields, tool ids are real, and `ui`
+   restores anything the derived profile would otherwise hide.
+3. Folder: lecturer README with the exact H1 and measured numbers, `rig.js` that
    reproduces them, `collect_plot.py` if the class submits.
 4. INDEX row; thumbnail in `docs/thumbs/` and the README gallery cell.
 5. `check_pack.py`, `check_notation.py` clean; `smoke.js --only=api,rig`

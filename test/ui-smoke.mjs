@@ -106,6 +106,40 @@ async function main() {
   }
   const browser = await launch({ width: 1440, height: 900 });
   try {
+    console.log("\nQS-2 width fields and sliders describe and restart the same experiment");
+    {
+      const tab = await browser.open(INDEX + "?ex=QS-2");
+      await tab.evaluate("return APP.EX.ready;");
+      const r = await tab.evaluate(`
+        APP.state.paused=true; APP.tick(10);
+        const left=document.querySelector('#dock input[aria-label="Left reservoir width"]');
+        const right=document.querySelector('#dock input[aria-label="Right reservoir width"]');
+        const sliders=[document.getElementById('c_geom0'),document.getElementById('c_geom1')];
+        const bounds=[left.min,left.max,left.step,right.min,right.max,right.step];
+        left.value='7.5'; left.dispatchEvent(new Event('input'));
+        const leftTime=APP.sim.t, leftWidth=APP.SIM.params().values.tank_b1;
+        APP.tick(10); sliders[1].value='4.5'; sliders[1].dispatchEvent(new Event('input'));
+        const card=APP.EX.all().find(e=>e.id==='QS-2');
+        return {bounds,leftTime,leftWidth,rightTime:APP.sim.t,rightWidth:APP.SIM.params().values.tank_b2,
+          rightField:+right.value,leftSlider:+sliders[0].value,types:sliders.map(s=>s.type),
+          selfContained:! /readme|see the brief/i.test([card.start,card.task,...card.setup].join(' ')),
+          rule:card.digit.base===6.75 && card.digit.step===0.25 && card.digit.also[0].base===3.75,
+          lecturerLink:document.querySelector('#dock .exlink').textContent};
+      `);
+      eq("both Geometry controls are sliders",r.types.join(','),'range,range');
+      eq("card fields use the scene's own bounds",r.bounds.join(','),'6,9,0.25,3,6,0.25');
+      eq("left field changes physical width",r.leftWidth,7.5);
+      eq("left field updates its slider",r.leftSlider,7.5);
+      eq("right slider changes physical width",r.rightWidth,4.5);
+      eq("right slider updates its card field",r.rightField,4.5);
+      eq("left width restarts the clock",r.leftTime,0);
+      eq("right width restarts the clock",r.rightTime,0);
+      check("student instructions stand alone",r.selfContained);
+      check("both student-number rules are declared",r.rule);
+      eq("README link identifies its lecturer audience",r.lecturerLink,'Lecturer notes');
+      check("no uncaught errors",tab.errors.length===0,tab.errors[0]);
+      await tab.close();
+    }
     // ---------------------------------------------------------- bare visit
     console.log("\na bare visit opens the start screen");
     {
@@ -1026,13 +1060,13 @@ async function main() {
     // ------------------------------------------------- the Geometry section
     console.log("\nthe Geometry panel binds to whatever the scene actually declares");
     {
-      // hump declares one param (hump_h); the panel's four geom rows are a
+      // hump declares one param (hump_h); the panel's six geom rows are a
       // fixed pool that binds to a scene's params by INDEX (main.js's
-      // syncPanel), so exactly one of the four should be showing, and it
+      // syncPanel), so exactly one of the six should be showing, and it
       // should carry the scene's own label rather than a placeholder.
       const tab = await browser.open(INDEX + "?scene=hump");
       const r = await tab.evaluate(`
-        const rows = [0, 1, 2, 3].map((k) => {
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
           const input = document.getElementById("c_geom" + k);
           return !input.parentElement.classList.contains("gone");
         });
@@ -1050,11 +1084,11 @@ async function main() {
     }
     {
       // m1 has no declared params at all — a wall-segment scene, not a
-      // polygon one — so every one of the four rows should stay hidden, and
+      // polygon one — so every one of the six rows should stay hidden, and
       // the section's own heading should not be left fronting an empty list.
       const tab = await browser.open(INDEX + "?scene=m1");
       const r = await tab.evaluate(`
-        const rows = [0, 1, 2, 3].map((k) => {
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
           const input = document.getElementById("c_geom" + k);
           return !input.parentElement.classList.contains("gone");
         });
@@ -1066,6 +1100,38 @@ async function main() {
       eq("a scene with no params hides every geometry row", r.visible, 0);
       check("a scene with no params hides the Geometry heading too", !r.headingShown);
       await tab.close();
+    }
+    {
+      // hydro declares six params — the whole pool — and HP-3's digit rule
+      // rides the fifth (geom4, the shaft width). Every row must show under
+      // the scene's own label, and the exercise card's Yours field must be
+      // named after the bound param, not the row's "—" placeholder: that
+      // field is where a student types their shaft width.
+      const tab = await browser.open(INDEX + "?scene=hydro");
+      const r = await tab.evaluate(`
+        const rows = [0, 1, 2, 3, 4, 5].map((k) => {
+          const el = document.getElementById("c_geom" + k).parentElement;
+          return { shown: !el.classList.contains("gone"), label: el.querySelector(".lbl").textContent };
+        });
+        return { visible: rows.filter((r) => r.shown).length, labels: rows.map((r) => r.label) };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("a six-param scene shows all six geometry rows", r.visible, 6);
+      eq("the fifth row is the shaft width", r.labels[4], "Surge shaft width D_s");
+      await tab.close();
+      const ex = await browser.open(INDEX + "?ex=HP-3",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const c = await ex.evaluate(`
+        const f = document.querySelector('#dock input[aria-label="Surge shaft width D_s"]');
+        const h = document.querySelector('#panel h3[data-sec="Geometry"]');
+        return { field: !!f, value: f ? +f.value : null,
+                 geomKept: !!h && !h.classList.contains("off") && !h.classList.contains("gone") };
+      `);
+      check("no uncaught errors", ex.errors.length === 0, ex.errors[0]);
+      check("the card's Yours field is named after the bound param", c.field);
+      eq("and opens on the scene's own default", c.value, 3);
+      check("the focused panel keeps the Geometry section", c.geomKept);
+      await ex.close();
     }
 
     // ------------------------------------------------- placing and removing

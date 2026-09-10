@@ -946,6 +946,15 @@ function showToast(title, sub) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 5200);
 }
+/** The first plain wheel over the canvas, embedded, is a surprise — nothing
+ *  seemed to happen because the page scrolled instead. Said once per page,
+ *  not once per wheel: `hinted` is a closure, not state, on purpose. */
+let hinted = false;
+function wheelHint() {
+  if (hinted) return;
+  hinted = true;
+  showToast("Ctrl + scroll zooms the flume", "Open in a new tab for the full window.");
+}
 
 // -------------------------------------------------------- minimisable boxes
 /** Collapse any fixed UI box to a small pill and back. Each box gets a "–" in
@@ -1853,7 +1862,9 @@ const KEYS = (() => {
     ["left-drag", "draw with the current tool"],
     ["right-drag", "pour water, whatever tool is in your hand"],
     ["shift", "snap to horizontal / vertical / 45°"],
-    ["wheel", "zoom"],
+    // Embedded, a plain wheel is left to the page (see the canvas wheel
+    // listener) — the sheet has to say what actually zooms in a frame.
+    [EMBED ? "ctrl + wheel" : "wheel", "zoom"],
     ["middle-drag", "pan"],
     ["0", "reset the view"],
     ["1 – 9", "pick a tool (Pour has no digit — right-drag instead)"],
@@ -3333,6 +3344,11 @@ function boot() {
   canvas.addEventListener("pointerenter", () => state.inside = true);
   canvas.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });
   canvas.addEventListener("wheel", (e) => {
+    // Embedded, a plain wheel is the LMS page scrolling past; the frame is
+    // not scrollable, so leaving the event alone (no preventDefault) chains
+    // it to the parent page. Ctrl + wheel zooms — the same key a trackpad
+    // pinch already reports.
+    if (EMBED && !e.ctrlKey) { wheelHint(); return; }
     e.preventDefault();
     const [px, py] = pointerPx(e);
     // pinch-to-zoom trackpads report ctrlKey; give them a stronger response

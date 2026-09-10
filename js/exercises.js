@@ -703,6 +703,7 @@ const EXERCISES = [
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { gaugeField: "h", mode: "1", grade: true, speed: 1 },
+    digitNote: "lecturer demo: no personalised parameter",
     instruments: [
       { tool: "gauge", where: "(5, 0.35) and (27.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
       { tool: "flux", where: "x = 17 m, across each duct", why: "the two parallel discharges add; both branches see the same head difference" },

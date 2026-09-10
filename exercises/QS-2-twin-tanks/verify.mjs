@@ -1,22 +1,27 @@
 // Run from any directory with Node 22+ and a GPU-backed Chrome.
 import { launch } from '../../test/cdp.mjs';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const browser = await launch();
 try {
   const page = await browser.open(new URL('../../index.html?scene=two-tank', import.meta.url).href);
-  await page.evaluate(`state.paused = true; state.budget = 'Medium'; sim = SIM.build(state.scene, CONFIG.budgets.Medium, false); SIM.resetWater();`);
+  await page.evaluate(readFileSync(new URL('rig.js', import.meta.url), 'utf8'));
+  await page.evaluate('return QS2.setup();');
+  const geometry = await page.evaluate(`return (() => {
+    const i=Math.floor(17/sim.dx), count=(lo,hi)=>{
+      let n=0; for(let j=0;j<sim.ny;j++) {
+        const z=(j+0.5)*sim.dx;
+        if(z>lo && z<hi && sim.mask[j*sim.nx+i]===0) n++;
+      } return n;
+    };
+    return {solids:sim.scene.solids().length, lower:count(0.5,0.6), upper:count(0.94,1.04)};
+  })()`);
+  assert.deepEqual(geometry,{solids:3,lower:2,upper:2});
   const rows = [];
   for (let target = 0; target <= 180; target += 10) {
     let t = await page.evaluate('return sim.t');
     while (t < target) t = await page.evaluate('APP.tick(100); return sim.t');
-    const row = await page.evaluate(`return (() => {
-      const head = x => { let s=0; for(let k=0;k<5;k++) s += SIM.probe(x + (k-2)*0.15, 0.35).phead + 0.35; return s/5; };
-      SIM.columns(true);
-      return {t:sim.t, left:sim.t ? head(5) : null, right:sim.t ? head(27.5) : null,
-        q1:SIM.lineFlux(17,0.45,17,0.65).Q, q2:SIM.lineFlux(17,0.89,17,1.09).Q,
-        volume:APP.volume(), dx:sim.dx};
-    })()`);
+    const row = await page.evaluate('return QS2.sample();');
     rows.push(row); console.log(JSON.stringify(row));
   }
   writeFileSync(new URL('verification.json', import.meta.url), JSON.stringify(rows,null,2)+'\n');
@@ -30,7 +35,7 @@ try {
   for (const row of rows.slice(1)) {
     assert.ok(row.q1 > 0 && row.q2 > 0, 'both branches flow downstream');
     assert.ok(Math.abs(row.q1-row.q2)/((row.q1+row.q2)/2) < 0.02, 'branch balance');
-    assert.ok(Math.abs(row.volume/rows[0].volume-1) < 0.003, 'volume drift');
+    assert.ok(Math.abs(row.massArea/rows[0].massArea-1) < 0.001, 'whole-domain mass drift');
   }
   await page.evaluate(`APP.pickExercise('QS-2'); return EX.ready;`);
   const boot = await page.evaluate(`state.paused=true; SIM.resetWater();
@@ -44,9 +49,14 @@ try {
     return {scene:state.scene.id, t:sim.t, left:surface(5), right:surface(27.5), gauges:state.gauges.length};`);
   assert.equal(restored.scene,'two-tank'); assert.equal(restored.t,0); assert.equal(restored.gauges,2);
   assert.ok(Math.abs(restored.left-3)<0.04 && Math.abs(restored.right-1.2)<0.04, 'reload initial water');
-  await page.evaluate('APP.tick(1);');
+  await page.evaluate('APP.tick(1); return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));');
   const screenshot = await page.send('Page.captureScreenshot', {format:'png'});
   writeFileSync(new URL('rig.png', import.meta.url), Buffer.from(screenshot.data,'base64'));
+  const clip = await page.evaluate(`const r=document.getElementById('view').getBoundingClientRect();
+    const h=r.width*289/480; return {x:r.x,y:r.y+(r.height-h)/2,width:r.width,height:h,scale:480/r.width};`);
+  const thumb = await page.send('Page.captureScreenshot', {format:'jpeg',quality:85,clip});
+  writeFileSync(new URL('../../docs/thumbs/QS-2.jpg', import.meta.url), Buffer.from(thumb.data,'base64'));
+  console.log('Maximum whole-domain mass drift:', Math.max(...rows.map(r=>Math.abs(r.massArea/rows[0].massArea-1))));
   if (page.errors.length) throw new Error(page.errors.join('\n'));
   console.log('PASS: calibration, held-out prediction, branch balance, conservation, exercise boot and rig reload.');
 } finally { await browser.close(); }

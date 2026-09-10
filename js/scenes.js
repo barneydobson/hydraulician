@@ -284,16 +284,35 @@ const SCENES = (() => {
 
     { id: "two-tank", name: "Two tanks · parallel ducts", key: "QS-2 · per metre width", group: "Sandbox",
       blurb: "Two rectangular tanks exchange water through identical 15 m × 0.10 m ducts. Left starts high; the shallow right-hand charge keeps both outlets submerged.",
-      W: 32, H: 4, c: 35, cf: 0.25, cs: 0.40, hmax: 3.2, vmax: 2,
+      W: 32, H: 4, c: 35, cf: 0.25, cs: 0.40, mode: 1, spinup: 0,
+      hmax: 3.2, headMax: 3, vmax: 2,
       // Clear tank widths 9 m and 6 m. All dimensions describe water faces,
       // not wall centrelines. Thick blocks leave no hidden under-floor void.
-      walls: () => [
-        [0, 0.1, 32, 0.1, 0.2],
-        [0.45, 0, 0.45, 4, 0.1],
-        [30.55, 0, 30.55, 4, 0.1],
-        [9.5, 0.25, 24.5, 0.25, 0.5],
-        [9.5, 0.77, 24.5, 0.77, 0.34],
-        [9.5, 2.52, 24.5, 2.52, 2.96],
+      // Three connected solids: ground/tank walls, the separator, and roof.
+      // The wet faces retain the original segment coordinates; the ground
+      // extends below the domain. Faces are named for the Pressure force tool.
+      solids: () => [
+        GEOM.poly([[-0.5,-0.5],[32.5,-0.5],[32.5,0.2],
+          [30.6,0.2],[30.6,4],[30.5,4],[30.5,0.2],
+          [24.5,0.2],[24.5,0.5],[9.5,0.5],[9.5,0.2],
+          [0.5,0.2],[0.5,4],[0.4,4],[0.4,0.2],[-0.5,0.2]], [
+          { id: "rightWall", label: "Right tank outer wall", e0: 5, e1: 5 },
+          { id: "rightBed", label: "Right tank floor", e0: 6, e1: 6 },
+          { id: "lowerFloor", label: "Lower duct floor", e0: 8, e1: 8 },
+          { id: "leftBed", label: "Left tank floor", e0: 10, e1: 10 },
+          { id: "leftWall", label: "Left tank outer wall", e0: 11, e1: 11 },
+        ], "tankGround"),
+        GEOM.rect(9.5, 0.60, 24.5, 0.94, { id: "ductSeparator", faces: [
+          { id: "lowerRoof", label: "Lower duct roof", e0: 0, e1: 0 },
+          { id: "right", label: "Separator: right tank face", e0: 1, e1: 1 },
+          { id: "upperFloor", label: "Upper duct floor", e0: 2, e1: 2 },
+          { id: "left", label: "Separator: left tank face", e0: 3, e1: 3 },
+        ] }),
+        GEOM.rect(9.5, 1.04, 24.5, 4, { id: "ductRoof", faces: [
+          { id: "roof", label: "Upper duct roof", e0: 0, e1: 0 },
+          { id: "right", label: "Roof block: right tank face", e0: 1, e1: 1 },
+          { id: "left", label: "Roof block: left tank face", e0: 3, e1: 3 },
+        ] }),
       ],
       water: (x, z, P) => {
         if (x < 0.5 || x > 30.5 || z < 0.2) return 0;

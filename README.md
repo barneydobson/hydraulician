@@ -34,8 +34,8 @@ is done on paper, then checked against the solver. The exercises that have
 been checked are arranged on a teaching syllabus, ordered from hydrostatics
 through the conservation laws to unsteady pipe flow and similitude:
 
-**→ <https://barneydobson.github.io/hydraulician/syllabus.html>**
-([syllabus.md](syllabus.md))
+**→ <https://barneydobson.github.io/hydraulician/docs/syllabus.html>**
+([docs/syllabus.md](docs/syllabus.md))
 
 The full pack — including exercises not yet checked — is in the app (press
 **`E`**) and indexed in [`exercises/`](exercises/INDEX.md); each exercise has
@@ -176,7 +176,7 @@ that turns the student's last digit into a personalised parameter, `task`,
 `submit`, `settle` and `notes`. `HJ-1` is a good template. Then write the
 brief in `exercises/<folder>/README.md` and add the row to `exercises/INDEX.md`
 — the id must match in all three. Once the exercise has been checked, it also
-earns a row on the [syllabus](syllabus.md) under its topic.
+earns a row on the [syllabus](docs/syllabus.md) under its topic.
 
 **Testing headless.** `exercises/_runner/runner.py` (stdlib only) drives a
 real Chrome over CDP: `launch`, `eval`, `pump --sim-seconds`, `shot`, `bench`,

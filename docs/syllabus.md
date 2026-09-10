@@ -12,7 +12,7 @@ Hydraulician includes a variety of exercise types, colour-coded below:
 Every exercise opens in the app set up and ready to run; its written brief
 lives in the linked folder. The full pack — including exercises not yet
 checked or considered redundant — is in the app's Exercises menu (press `E`)
-and indexed in [exercises/INDEX.md](exercises/INDEX.md).
+and indexed in [exercises/INDEX.md](../exercises/INDEX.md).
 
 ## Contents
 
@@ -35,7 +35,7 @@ is, and where it acts. Everything assumes this distribution can be read on sight
 
 | exercise | type | what it does |
 |---|---|---|
-| **HS-1** · Three surfaces, one level — a dyke and its piezometer ([open it](https://barneydobson.github.io/hydraulician/?ex=HS-1) · [brief](exercises/HS-1-dyke-piezometer/)) | demo | A dyke between two reservoirs at different levels, with a piezometer tapped into the culvert through it. Read the levels and the face forces with the valve shut, then open it and watch one level and equal forces arrive. |
+| **HS-1** · Three surfaces, one level — a dyke and its piezometer ([open it](https://barneydobson.github.io/hydraulician/?ex=HS-1) · [brief](../exercises/HS-1-dyke-piezometer/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A dyke between two reservoirs at different levels, with a piezometer tapped into the culvert through it. Read the levels and the face forces with the valve shut, then open it and watch one level and equal forces arrive. |
 
 ## 2. Volume conservation
 
@@ -51,7 +51,7 @@ returns later inside the hydraulic jump.
 
 | exercise | type | what it does |
 |---|---|---|
-| **HP-2** · Why turbine buckets are cups, not plates ([open it](https://barneydobson.github.io/hydraulician/?ex=HP-2) · [brief](exercises/HP-2-pelton/)) | demo | A jet deflected by a flat plate, a deep-V and a six-stroke Pelton cup. Read the force off the control volume for each and see why the cup delivers nearly twice the plate — and why the flooded V does not. |
+| **HP-2** · Why turbine buckets are cups, not plates ([open it](https://barneydobson.github.io/hydraulician/?ex=HP-2) · [brief](../exercises/HP-2-pelton/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A jet deflected by a flat plate, a deep-V and a six-stroke Pelton cup. Read the force off the control volume for each and see why the cup delivers nearly twice the plate — and why the flooded V does not. |
 
 ## 4. Energy conservation
 
@@ -60,7 +60,7 @@ measured, and how a contraction differs from an expansion.
 
 | exercise | type | what it does |
 |---|---|---|
-| **QS-2** · Two tanks and two parallel ducts ([open it](https://barneydobson.github.io/hydraulician/?ex=QS-2) · [brief](exercises/QS-2-twin-tanks/)) | quick | Two reservoirs joined by parallel ducts. Predict the level changes at 120 s from a storage balance, run it, and compare — per-student tank widths, so the class pools a spread of answers. |
+| **QS-2** · Two tanks and two parallel ducts ([open it](https://barneydobson.github.io/hydraulician/?ex=QS-2) · [brief](../exercises/QS-2-twin-tanks/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Two reservoirs joined by parallel ducts. Predict the level changes at 120 s from a storage balance, run it, and compare — per-student tank widths, so the class pools a spread of answers. |
 
 ## 5. Shear layers and velocity profiles
 
@@ -110,8 +110,8 @@ limits become part of the subject.
 
 | exercise | type | what it does |
 |---|---|---|
-| **UN-1** · The class discovers the celerity ([open it](https://barneydobson.github.io/hydraulician/?ex=UN-1) · [brief](exercises/UN-1-celerity/)) | demo | A steady pipe from a reservoir to a valve. Read the steady v₀ and H₀, slam the valve, pause on the first plateau — and recover the wave celerity from the Joukowsky rise. |
-| **HP-3** · Design the surge tower: the class measures the upsurge ([open it](https://barneydobson.github.io/hydraulician/?ex=HP-3) · [brief](exercises/HP-3-surge-tower/)) | tutorial | The written tutorial with simulation comparison: size a surge shaft for a hydropower scheme from the unsteady balance, slam the load, and measure the upsurge and period against your prediction. Bridges hydropower and unsteady pipe flow. |
+| **UN-1** · The class discovers the celerity ([open it](https://barneydobson.github.io/hydraulician/?ex=UN-1) · [brief](../exercises/UN-1-celerity/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A steady pipe from a reservoir to a valve. Read the steady v₀ and H₀, slam the valve, pause on the first plateau — and recover the wave celerity from the Joukowsky rise. |
+| **HP-3** · Design the surge tower: the class measures the upsurge ([open it](https://barneydobson.github.io/hydraulician/?ex=HP-3) · [brief](../exercises/HP-3-surge-tower/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> | The written tutorial with simulation comparison: size a surge shaft for a hydropower scheme from the unsteady balance, slam the load, and measure the upsurge and period against your prediction. Bridges hydropower and unsteady pipe flow. |
 
 ## 11. Similitude and the limits of a model
 
@@ -126,4 +126,4 @@ grid effect. The capstone, on purpose: it presumes everything above it.
 run headless, measured against its brief, and read once more against what it
 is claiming to teach. Put it under its topic, in the order the topic teaches,
 with its type; how to build and check one is in
-[docs/making-exercises.md](docs/making-exercises.md).
+[making-exercises.md](making-exercises.md).

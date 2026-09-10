@@ -681,6 +681,75 @@ const SCENES = (() => {
              "A2 steepens as it goes: an adverse bed cannot sustain the flow for long.",
              "Flatten the apron back to level and the same two profiles become H2 and H3."] }),
 
+    // ------------------------------------------------------- hydrostatics
+    // A dyke between two reservoirs with a culvert under it, shut by a valve,
+    // and a piezometer tapped into the culvert roof. The geometry is three
+    // polygons and nothing else: in a vertical section any passage from one
+    // basin to the other separates the solid above it from the solid below,
+    // and the piezometer slot splits the upper part again — so a ground slab
+    // and two dyke blocks standing on the culvert is the honest 2D section
+    // through a bottom outlet, not a simplification of one.
+    //
+    // Shape from the lecturer's sketch: the upstream face is a short vertical
+    // toe and then a slope up to the crest — an embankment, not a wall — so
+    // the Pressure force tool reads a resultant with a real vertical part
+    // (the weight of the water standing on the slope) as well as the ½ρg·d²
+    // horizontal one. The culvert is tall enough to be a channel in its own
+    // right rather than a pipe.
+    //
+    // Levels: 4.00 m left, 3.10 m right, both well above the culvert roof at
+    // 1.60 m, so the culvert stays drowned throughout. The right basin is
+    // narrow so it fills in seconds when the valve opens; the common level
+    // follows from the volume the left body loses (its plan area shrinks as
+    // it drops down the slope) — 3.82 m here, measured and closed-form.
+    // The ground top sits at 1.0 m, not near the floor, so the pressure
+    // diagram the Force tool hangs under the culvert roof has room to draw.
+    //
+    // nu is an EDDY viscosity, not water's. At the stock 1e-5 the jet that
+    // fills the small basin leaves a trapped eddy that never dies: 0.2 m/s
+    // RMS in both basins 60 s after V with the levels long since equal, and
+    // still 0.1 m/s at 150 s — a hydrostatics demo whose water will not
+    // stand still. Raising C_s to 0.4 or C_f to 0.05 barely moved it; 1e-3
+    // took the basins to 4 mm/s by 60 s, 2e-3 to under 5 mm/s by 45 s with
+    // the fill itself unchanged (culvert RMS 0.33 m/s at 12 s either way).
+    { id: "dyke", name: "Dyke with a piezometer", key: "Hydrostatics",
+      group: "Hydrostatics",
+      blurb: "Two reservoirs at different levels either side of a dyke, joined by a shut culvert with a piezometer tapped into its roof. Read the three levels and the face forces, then press V and watch them find one level.",
+      W: 6.0, H: 5.1, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
+      hmax: 4.2, headMax: 3.3, vmax: 4,
+      valveOpen: 0, particles: 1,
+      open: [0, 0, 0, 0],
+      solids: () => {
+        const zg = 1.00, zr = 1.60, zc = 4.30;            // ground top, culvert roof, crest
+        const xt = 2.40, zt = 2.40, xs = 3.30;            // toe, top of the toe, slope meets crest
+        const s0 = 4.30, s1 = 4.50, x1 = 5.20;            // piezometer slot, downstream face
+        return [
+          GEOM.rect(-0.5, -0.5, 6.5, zg, { id: "ground",
+            faces: [{ id: "top", label: "Ground", e0: 2, e1: 2 }] }),
+          // CCW: along the culvert roof, up the piezometer wall, back along
+          // the crest, down the slope, down the toe.
+          GEOM.poly([[xt, zr], [s0, zr], [s0, zc], [xs, zc], [xt, zt]],
+            [{ id: "roof", label: "Culvert roof (upstream block)", e0: 0, e1: 0 },
+             { id: "piezo", label: "Piezometer wall", e0: 1, e1: 1 },
+             { id: "crest", label: "Crest", e0: 2, e1: 2 },
+             { id: "us", label: "Upstream face (slope and toe)", e0: 3, e1: 4 }], "dykeL"),
+          GEOM.rect(s1, zr, x1, zc, { id: "dykeR",
+            faces: [{ id: "ds", label: "Downstream face", e0: 1, e1: 1 },
+                    { id: "roof", label: "Culvert roof (downstream block)", e0: 0, e1: 0 },
+                    { id: "piezo", label: "Piezometer wall", e0: 3, e1: 3 },
+                    { id: "crest", label: "Crest", e0: 2, e1: 2 }] }),
+        ];
+      },
+      valves: () => [[5.00, 1.00, 5.00, 1.60, 0.08]],   // across the culvert, downstream of the tap
+      water: (x, z, P) => (z <= 1.00 ? 0
+                           : x < 5.00 ? still(4.00, z, P)   // left basin, culvert, piezometer
+                           : still(3.10, z, P)),            // right basin
+      tips: ["Three water surfaces, one level: the left basin, the culvert and the piezometer are the same connected body.",
+             "Hover the dyke's faces with the <b>Pressure force</b> tool — the sloped upstream face carries ½ρg·d² sideways AND the weight of the water standing on the slope downward; the vertical downstream face only the first.",
+             "Press <b>V</b> to open the culvert. The narrow right basin fills in seconds; the common level is where the volume the left body loses equals what the right one gains.",
+             "Once still again — about 45 s — both faces carry the same horizontal force: the dyke feels no net thrust.",
+             "Switch the field to Piezometric head — still water is one colour everywhere, however deep."] },
+
     // -------------------------------------------- pressure and transients
     // A real pipeline, not a lab flume: the static head has to exceed the
     // Joukowsky surge or the downsurge simply cavitates. 49 m of 3 m bore

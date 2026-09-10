@@ -286,11 +286,16 @@ const OVERLAY = (() => {
         const lim = Math.min(nx - win - 2, i + reach);
         while (k < lim && A.Fr[k] > 0.9) k++;
         if (k < lim && A.dRaw[k + win] > 1.6 * A.dRaw[i]) {
-          // d₁ is the THINNEST section upstream, d₂ the deepest downstream.
-          // Averaging instead drags the roller into d₁ and the conjugate-depth
-          // check then reads 100% high.
+          // d₁ is the THINNEST section upstream: averaging there drags the
+          // roller into d₁ and the conjugate-depth check reads 100% high.
+          // d₂ is the MEAN depth behind the roller, not the deepest point:
+          // the surface there flutters, and the maximum of a fluttering
+          // signal is biased high by however far it flutters. Measured on
+          // h23 (2026-09-10, t = 30–70 s): the deepest point read 31% over
+          // Bélanger at Low and 14% at Medium, the mean over the same window
+          // 11% and −5%.
           const d1 = ext(A.dRaw, i - 2 * win, i, false);
-          const d2 = ext(A.dRaw, k + win, k + 4 * win, true);
+          const d2 = mean(A.dRaw, k + win, k + 4 * win);
           const q = Math.abs(mean(A.qRaw, i - 2 * win, i));
           const Fr1 = d1 > 1e-4 ? (q / d1) / Math.sqrt(g * d1) : 0;
           // 1.35: near-critical undulations (Fr₁ ≈ 1.1–1.3) are transitions,

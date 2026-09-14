@@ -64,7 +64,7 @@ solver merely extends $h$ into the non-hydrostatic cells it resolves.
   $F_x$, $F_z$; centre of pressure — the point on the face through which the
   resultant acts.
 
-$y$ survives only where it is genuinely something else: $y^+$ wall units, and
+$y$ is used only where it is something else: $y^+$ wall units, and
 chart reference lines like $y = 2x$.
 
 ## Illustration
@@ -87,9 +87,8 @@ energy grade line steps down, and a free overfall where the profile passes
 through critical depth d_c.](notation-reach.svg)
 
 The same set along a reach. Where the flow is hydrostatic the HGL rides the
-surface ($h = \eta$); it departs at the vena contracta and in the roller, and
-that departure is the non-hydrostatic signal the register means. $H$ falls
-only where energy is lost — at the gate and through the jump — while $d$
+surface ($h = \eta$). $H$ falls
+with friction, with additional local losses at the gate and through the jump, while $d$
 takes the special names: $d_n$ in uniform flow, $d_c$ at the critical
 control, $d_1$, $d_2$ conjugate across the jump.
 

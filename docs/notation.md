@@ -74,11 +74,11 @@ domain floor, bed elevation z_b, depth d, water level η, a standpipe standing
 at piezometric head h = z + p/ρg, one velocity head kV²/2g up to the energy
 grade line H, and specific energy E measured from the bed.](notation-heads.svg)
 
-*The heads of one column, in uniform flow. Every head is a length above the
+The heads of one column, in uniform flow. Every head is a length above the
 datum: $z$ to the point, $p/\rho g$ from the point to where a standpipe
 stands, $h = z + p/\rho g$; one velocity head $kV^2/2g$ more reaches the
 energy line $H$. $E$ is the same climb re-datumed to the bed. $p/\rho g$
-carries no letter — that is what leaves bare $h$ unambiguous.*
+carries no letter — that is what leaves bare $h$ unambiguous.
 
 ![Definition sketch: a channel reach with normal depth d_n in uniform flow, a
 sluice gate backing the flow up, a supercritical jet where h dips below η at
@@ -86,12 +86,12 @@ the vena contracta, a hydraulic jump with conjugate depths d_1 and d_2 as the
 energy grade line steps down, and a free overfall where the profile passes
 through critical depth d_c.](notation-reach.svg)
 
-*The same set along a reach. Where the flow is hydrostatic the HGL rides the
+The same set along a reach. Where the flow is hydrostatic the HGL rides the
 surface ($h = \eta$); it departs at the vena contracta and in the roller, and
 that departure is the non-hydrostatic signal the register means. $H$ falls
 only where energy is lost — at the gate and through the jump — while $d$
 takes the special names: $d_n$ in uniform flow, $d_c$ at the critical
-control, $d_1$, $d_2$ conjugate across the jump.*
+control, $d_1$, $d_2$ conjugate across the jump.
 
 ## Code follows the register — with two exceptions
 

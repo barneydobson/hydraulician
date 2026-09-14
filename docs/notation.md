@@ -18,8 +18,8 @@ particular carries three incompatible meanings across them:
 | Groundwater (Darcy) and pipe practice | — | `h` = piezometric head; `h_f` losses, the HGL | `H` total head |
 | Open-channel turbulence research (Nezu & Nakagawa) | `h` | — | — |
 
-"$h$ = depth" is the convention of the communities the solver simulates *with*
-(the shallow-water equations, wave theory, turbulence papers); "$h$ = head" is
+$h$ = depth is the convention of the communities the solver simulates *with*
+(the shallow-water equations, wave theory, turbulence papers); $h$ = head is
 the convention of the ones it teaches *from* (GVF classification, hydraulic
 grade lines, Darcy). One letter cannot serve both, so the app follows the
 **Battjes & Labeur** set — depth $d$, free-surface / piezometric head $h$,

@@ -850,9 +850,11 @@ function buildPanel() {
     if (infoEl && c.type !== "custom") row.appendChild(infoEl);
     if (c.type === "custom") c.build(input);
     row.dataset.sec = section;
+    row.dataset.control = c.id;
     p.appendChild(row);
     const note = document.createElement("div"); note.className = "notes"; note.id = "n_" + c.id;
     note.dataset.sec = section;
+    note.dataset.control = c.id;
     p.appendChild(note);
   });
 }
@@ -915,11 +917,11 @@ function syncPanel() {
  *  Derived from what the entry declares rather than from its prose: a brief
  *  that asks for a control nothing declares would send a student looking, and
  *  the fix for that is to declare the control, which is worth knowing anyway. */
-function focusedSections() {
+function focusedSections(explicitControls) {
   const ex = EX.current;
-  const secs = ["View"];
+  const secs = explicitControls ? [] : ["View"];
   if (!ex) return secs;
-  const ids = Object.keys(ex.rigParams || {})
+  const ids = explicitControls || Object.keys(ex.rigParams || {})
     .concat(Object.keys(ex.viewParams || {}))
     .concat(EX.studentControls ? EX.studentControls(ex) : []);
   let section = "";
@@ -936,9 +938,13 @@ function focusedSections() {
 function applyPanelFocus() {
   const u = state.ui || UIMODE.full();
   const level = u.lifted ? "full" : u.panel;
-  const keep = level === "full" ? null : focusedSections();
+  const controls = level === "full" || !Array.isArray(u.controls) ? null : u.controls;
+  const keep = level === "full" ? null : focusedSections(controls);
   document.querySelectorAll("#panel [data-sec]").forEach((el) => {
-    el.classList.toggle("off", !!keep && keep.indexOf(el.dataset.sec) < 0);
+    const sectionOff = !!keep && keep.indexOf(el.dataset.sec) < 0;
+    const controlOff = !!controls && !!el.dataset.control &&
+                       controls.indexOf(el.dataset.control) < 0;
+    el.classList.toggle("off", sectionOff || controlOff);
   });
   const sw = document.getElementById("panelAll");
   if (sw) {
@@ -1451,7 +1457,7 @@ const UIMODE = (() => {
 
   function full() {
     return { build: true, measure: true, view: true, fields: true,
-             legend: true, panel: "full",
+             legend: true, panel: "full", controls: true,
              readouts: { gauges: true, cursor: true, status: true },
              lifted: false };
   }
@@ -1493,7 +1499,8 @@ const UIMODE = (() => {
     const u = state.ui;
     if (!u || u.lifted) return false;
     return ["build", "measure", "view"].some((f) => u[f] !== true) ||
-           u.fields !== true || u.panel !== "full" || u.legend !== true ||
+           u.fields !== true || u.panel !== "full" || u.controls !== true ||
+           u.legend !== true ||
            Object.keys(u.readouts || {}).some((k) => u.readouts[k] === false);
   }
 

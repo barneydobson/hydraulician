@@ -161,9 +161,12 @@ top:
 - `ui.fields`: the `FIELDS` ids the legend offers (`water speed ehead head
   phead vort froude mom`); if the live field is not among them, the first one
   is applied.
-- `ui.panel`: `"full"`, `"focused"` or `"shut"`. `ui.legend: false` closes
-  the legend. `ui.readouts`: `{gauges, cursor, status}` booleans and `rows:
-  [...]`, validated against `OVERLAY`'s row register.
+- `ui.panel`: `"full"`, `"focused"` or `"shut"`. `ui.controls` is a list of
+  individual `CONTROLS` row ids when even a focused section contains more than
+  the exercise needs; the section headings are retained automatically.
+  `ui.legend: false` closes the legend. `ui.readouts`:
+  `{gauges, cursor, status}` booleans and `rows: [...]`, validated against
+  `OVERLAY`'s row register.
 
 **The rule that fails the pack:** a card whose `task`, `start` or `setup`
 tells the student to draw, cut, erase or move something must declare a build

@@ -222,6 +222,27 @@ def view_button_ids():
     return ids
 
 
+def panel_control_ids():
+    """The literal row ids in the Controls-panel spec in js/main.js.
+
+    `ui.controls` narrows the panel to individual rows, so a typo there would
+    otherwise produce an empty section in front of a class. Keep the checker
+    tied to the spec rather than maintaining a second list by hand."""
+    src = open(os.path.join(ROOT, "js", "main.js"), encoding="utf-8").read()
+    start = src.find("const CONTROLS = [")
+    end = src.find("function buildPanel", start)
+    if start < 0 or end < 0:
+        print("check_pack.py cannot find the CONTROLS spec in js/main.js -- "
+              "ui.controls validation cannot run blind.")
+        sys.exit(1)
+    ids = set(re.findall(r'\bid:\s*"([A-Za-z0-9]+)"', src[start:end]))
+    if not ids:
+        print("check_pack.py cannot find any row ids in the CONTROLS spec -- "
+              "ui.controls validation cannot run blind.")
+        sys.exit(1)
+    return ids
+
+
 def main():
     verbose = "-v" in sys.argv
     ex = cards()
@@ -314,6 +335,7 @@ def main():
     # card to named lines and is validated against ROW_IDS below.
     READOUT_IDS = {"gauges", "cursor", "status", "rows"}
     ROW_IDS = row_ids()
+    CONTROL_IDS = panel_control_ids()
     # VIEW is a family of toggle BUTTONS, not tools, so its list is matched
     # against button ids (UIMODE.keep tests both `it.tool` and `it.id`).
     VIEW_IDS = TOOL_IDS | view_button_ids()
@@ -340,6 +362,17 @@ def main():
             if panel is not None and panel not in PANEL:
                 fail.append("%-5s ui.panel is %r, not one of %s"
                             % (i, panel, sorted(PANEL)))
+            controls = ui.get("controls")
+            if isinstance(controls, list):
+                if not controls:
+                    fail.append("%-5s ui.controls must not be an empty list" % i)
+                bad = [c for c in controls if c not in CONTROL_IDS]
+                if bad:
+                    fail.append("%-5s ui.controls names panel rows that do not exist: %s"
+                                % (i, ", ".join(map(str, bad))))
+            elif controls is not None and controls is not True:
+                fail.append("%-5s ui.controls is %r, not true or a list of row ids"
+                            % (i, controls))
             readouts = ui.get("readouts")
             if isinstance(readouts, dict):
                 bad = [k for k in readouts if k not in READOUT_IDS]

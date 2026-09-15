@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="446" viewBox="0 0 940 446" role="img" aria-label="Definition sketch of the HP-3 hydropower scheme: reservoir, level headrace, surge shaft open to the air, penstock and nozzle, with the sheet's symbols on it.">
+<title>HP-3 — the scheme and its notation</title>
+<defs><pattern id="bh" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="#555555" stroke-width="0.8"/></pattern><marker id="ah" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#1a1a1a"/></marker></defs>
+<rect x="0" y="0" width="940" height="446" fill="#ffffff"/>
+<polygon points="50.0,290.0 567.3,290.0 567.3,296.0 50.0,296.0" fill="url(#bh)"/>
+<line x1="50.0" y1="290.0" x2="567.3" y2="290.0" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="567.3,290.0 668.5,401.3 664.0,405.3 562.9,294.0" fill="url(#bh)"/>
+<line x1="567.3" y1="290.0" x2="668.5" y2="401.3" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="668.5,401.3 778.0,401.3 778.0,407.3 668.5,407.3" fill="url(#bh)"/>
+<line x1="668.5" y1="401.3" x2="778.0" y2="401.3" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="679.5,376.3 726.0,376.3 726.0,370.3 679.5,370.3" fill="url(#bh)"/>
+<line x1="679.5" y1="376.3" x2="726.0" y2="376.3" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="726.0,376.3 726.0,56.0 720.0,56.0 720.0,376.3" fill="url(#bh)"/>
+<line x1="726.0" y1="376.3" x2="726.0" y2="56.0" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="585.6,273.0 679.5,376.3 684.0,372.3 590.0,269.0" fill="url(#bh)"/>
+<line x1="585.6" y1="273.0" x2="679.5" y2="376.3" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="585.6,273.0 585.6,56.0 591.6,56.0 591.6,273.0" fill="url(#bh)"/>
+<line x1="585.6" y1="273.0" x2="585.6" y2="56.0" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="554.4,258.3 554.4,56.0 548.4,56.0 548.4,258.3" fill="url(#bh)"/>
+<line x1="554.4" y1="258.3" x2="554.4" y2="56.0" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="129.6,258.3 554.4,258.3 554.4,252.3 129.6,252.3" fill="url(#bh)"/>
+<line x1="129.6" y1="258.3" x2="554.4" y2="258.3" stroke="#1a1a1a" stroke-width="1.6"/>
+<polygon points="129.6,258.3 129.6,56.0 135.6,56.0 135.6,258.3" fill="url(#bh)"/>
+<line x1="129.6" y1="258.3" x2="129.6" y2="56.0" stroke="#1a1a1a" stroke-width="1.6"/>
+<rect x="50.0" y="421.0" width="728.0" height="11" fill="url(#bh)"/>
+<line x1="50.0" y1="420.0" x2="778.0" y2="420.0" stroke="#1a1a1a" stroke-width="1.8"/>
+<text x="54.0" y="415.0" text-anchor="start" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="15.0" fill="#1a1a1a">z = 0</text>
+<line x1="50.0" y1="290.0" x2="50.0" y2="56.0" stroke="#999999" stroke-width="1.0" stroke-dasharray="3 3"/>
+<line x1="50.0" y1="161.0" x2="129.6" y2="161.0" stroke="#1a1a1a" stroke-width="1.8"/>
+<path d="M56.2,168.3 h8 M71.8,168.3 h8 M88.5,168.3 h8 M106.2,168.3 h8 M120.7,168.3 h8" stroke="#444444" stroke-width="0.9" fill="none" opacity="0.85"/>
+<path d="M63.5,177.7 h8 M80.2,177.7 h8 M97.8,177.7 h8 M113.4,177.7 h8" stroke="#444444" stroke-width="0.9" fill="none" opacity="0.85"/>
+<path d="M70.8,187.0 h8 M91.6,187.0 h8 M109.3,187.0 h8" stroke="#444444" stroke-width="0.9" fill="none" opacity="0.85"/>
+<line x1="554.4" y1="165.0" x2="585.6" y2="165.0" stroke="#1a1a1a" stroke-width="1.8"/>
+<path d="M558.0,172.3 h7 M572.1,172.3 h6" stroke="#444444" stroke-width="0.9" fill="none" opacity="0.85"/>
+<line x1="554.4" y1="109.3" x2="585.6" y2="109.3" stroke="#1a1a1a" stroke-width="1.2" stroke-dasharray="3 3"/>
+<line x1="50.0" y1="161.0" x2="846.0" y2="161.0" stroke="#999999" stroke-width="1.0" stroke-dasharray="10 3 2 3"/>
+<text x="137.6" y="155.0" text-anchor="start" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="15.0" fill="#1a1a1a">reservoir level 24.9 m</text>
+<line x1="728.6" y1="391.3" x2="778.0" y2="391.3" stroke="#1a1a1a" stroke-width="1.2"/>
+<line x1="728.6" y1="386.3" x2="778.0" y2="386.3" stroke="#1a1a1a" stroke-width="1.2"/>
+<rect x="723.4" y="391.3" width="5.2" height="10.0" fill="#1a1a1a"/>
+<rect x="723.4" y="376.3" width="5.2" height="10.0" fill="#1a1a1a"/>
+<line x1="226.8" y1="274.1" x2="289.2" y2="274.1" stroke="#1a1a1a" stroke-width="2.2" marker-end="url(#ah)"/>
+<text x="220.8" y="279.1" text-anchor="end" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="18.2" font-style="italic" fill="#1a1a1a">V<tspan font-size="12.3" dy="3">0</tspan><tspan dy="-3"></tspan></text>
+<line x1="623.2" y1="332.9" x2="644.2" y2="356.0" stroke="#1a1a1a" stroke-width="2.0" marker-end="url(#ah)"/>
+<line x1="739.5" y1="388.8" x2="771.8" y2="388.8" stroke="#1a1a1a" stroke-width="2.0" marker-end="url(#ah)"/>
+<text x="756.2" y="379.8" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="16.9" font-style="italic" fill="#1a1a1a">V<tspan font-size="12.3" dy="3">jet</tspan><tspan dy="-3"></tspan></text>
+<line x1="129.6" y1="289.0" x2="129.6" y2="313.9" stroke="#999999" stroke-width="1.0" stroke-dasharray="3 3"/>
+<line x1="570.0" y1="289.0" x2="570.0" y2="313.9" stroke="#999999" stroke-width="1.0" stroke-dasharray="3 3"/>
+<line x1="129.6" y1="309.8" x2="570.0" y2="309.8" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="349.8" y="327.8" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="16.9" font-style="italic" fill="#1a1a1a">L = 42.4 m</text>
+<line x1="362.0" y1="290.0" x2="362.0" y2="258.3" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="368.0" y="278.1" text-anchor="start" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="16.9" font-style="italic" fill="#1a1a1a">D<tspan font-size="12.3" dy="3">h</tspan><tspan dy="-3"> = 3.05 m</tspan></text>
+<line x1="530.4" y1="66.4" x2="554.4" y2="66.4" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#ah)"/>
+<line x1="609.6" y1="66.4" x2="585.6" y2="66.4" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#ah)"/>
+<text x="570.0" y="47.0" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="16.9" font-style="italic" fill="#1a1a1a">D<tspan font-size="12.3" dy="3">s</tspan><tspan dy="-3"> = 3.0 m</tspan></text>
+<line x1="592.0" y1="317.1" x2="610.4" y2="300.3" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="617.8" y="295.4" text-anchor="start" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="15.6" font-style="italic" fill="#1a1a1a">D<tspan font-size="12.3" dy="3">p</tspan><tspan dy="-3"> = 2.4 m</tspan></text>
+<text x="595.8" y="355.4" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="15.0" fill="#595959" transform="rotate(47.7 595.8 355.4)">L<tspan font-size="12.3" dy="3">p</tspan><tspan dy="-3"> ≈ 20 m</tspan></text>
+<line x1="778.0" y1="388.8" x2="832.0" y2="388.8" stroke="#999999" stroke-width="1.0" stroke-dasharray="3 3"/>
+<line x1="824.0" y1="161.0" x2="824.0" y2="388.8" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="832.0" y="278.9" text-anchor="start" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="16.9" font-style="italic" fill="#1a1a1a">H = 21.9 m</text>
+<line x1="601.6" y1="161.0" x2="601.6" y2="109.3" stroke="#1a1a1a" stroke-width="1.2" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="608.6" y="139.2" text-anchor="start" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="16.9" font-style="italic" fill="#1a1a1a">η<tspan font-size="12.3" dy="3">max</tspan><tspan dy="-3"></tspan></text>
+<text x="608.6" y="177.0" text-anchor="start" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-size="16.9" font-style="italic" fill="#1a1a1a">η<tspan font-size="12.3" dy="3">0</tspan><tspan dy="-3"></tspan></text>
+</svg>

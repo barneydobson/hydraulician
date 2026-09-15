@@ -1262,6 +1262,32 @@ async function main() {
       check("Show everything brings the tools back", lifted.wall);
       eq("every control is back", lifted.n, base.buttons);
       check("and the way out goes away", !lifted.showAll && !lifted.narrowed);
+
+      // UN-2 starts on the one measurement mode it needs, removes the four
+      // irrelevant VIEW toggles, and pares the Controls panel down below the
+      // section level: Flow ordinarily contains the whole inlet setup and
+      // View contains every overlay, but this card needs only two rows.
+      const un2 = await tab.evaluate(`
+        APP.pickExercise("UN-2");
+        return APP.EX.ready.then(() => {
+          const labels = [...document.querySelectorAll("#groups .tbtn")]
+                           .map((b) => b.getAttribute("aria-label"));
+          const controls = [...document.querySelectorAll("#panel .row[data-control]")]
+            .filter((e) => !e.classList.contains("off") && !e.classList.contains("gone"))
+            .map((e) => e.dataset.control);
+          return { labels, controls, avg: APP.state.avg,
+                   active: APP.SIM.avgActive(), narrowed: APP.UIMODE.narrowed() };
+        });
+      `);
+      check("UN-2 starts averaging", un2.avg && un2.active, JSON.stringify(un2));
+      check("UN-2 keeps Average in VIEW", un2.labels.includes("Average"));
+      check("UN-2 hides the unused VIEW toggles",
+            !un2.labels.includes("Particles") && !un2.labels.includes("Dye") &&
+            !un2.labels.includes("Open-channel overlay") &&
+            !un2.labels.includes("Grade lines"), un2.labels.join(","));
+      eq("UN-2 keeps only its two panel controls", un2.controls.sort().join(","),
+         "inLevel,speed");
+      check("the two-row panel remains liftable", un2.narrowed);
       await tab.close();
     }
 

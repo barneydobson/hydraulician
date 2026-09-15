@@ -94,8 +94,9 @@
  *            front of a student (UIMODE in js/main.js). Families are `build`,
  *            `measure` and `view` — each `true`, `false`, or the list of tool
  *            ids that survive — plus `fields` (which colourings the legend
- *            offers), `panel` ("full" / "focused" / "shut") and `readouts`
- *            ({gauges, cursor, status}).
+ *            offers), `panel` ("full" / "focused" / "shut"), `controls`
+ *            (the individual Controls-panel row ids that survive) and
+ *            `readouts` ({gauges, cursor, status}).
  *
  *            MOSTLY IT IS DERIVED, so most entries carry no `ui` at all.
  *            `instruments` narrows MEASURE to the tools it names; an entry
@@ -608,12 +609,16 @@ const EXERCISES = [
     scene: "estab",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { gaugeField: "speed" },
+    viewParams: { gaugeField: "speed", avg: true },
     digit: { label: "reservoir level", control: "inLevel", base: 3.4, step: 0.1, unit: "m",
              rule: "level = 3.4 + 0.1·d" },
     instruments: [
       { tool: "gauge", where: "mid-pipe, x = 14 m, z = 2.4 m — expand its card (⤢) to read the trace", why: "the speed trace u_max and t_75 are read on" },
     ],
+    ui: {
+      view: ["legendBtn", "avgBtn"],
+      controls: ["speed", "inLevel"],
+    },
     start: "a reservoir feeding a 23 m pipe, full and still behind a shut valve",
     task: "Set your level, press R, let it settle; open the valve (V) and read the settled band as u_max and the first crossing of 0.75·u_max as t_75, timed from where the trace leaves zero. Read the reservoir level off its marker while the pipe flows.",
     settle: 30,

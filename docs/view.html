@@ -98,6 +98,8 @@
     border-radius: 10px; padding: 12px 14px; overflow-x: auto; margin: 0 0 14px;
   }
   main pre code { background: none; padding: 0; font-size: 12.5px; line-height: 1.55; }
+  /* Definition sketches (docs/*.svg) scale to the card like everything else. */
+  main img { max-width: 100%; height: auto; border-radius: 10px; margin: 4px 0 10px; }
   /* Wide tables scroll inside their own box rather than pushing the page. */
   .tablewrap { overflow-x: auto; margin: 0 0 15px; }
   main table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
@@ -176,11 +178,16 @@ var esc = function (s) {
 
 /* Inline markdown, applied to already-escaped text. Code spans are pulled out
    first and put back last, so a backtick span containing an asterisk is not
-   also read as emphasis — which the notation register does constantly. */
+   also read as emphasis — which the notation register does constantly.
+   $…$ maths is pulled out second (after code, so a dollar inside a code span
+   is safe) and comes back as \(…\), which MathJax picks up. */
 function inline(s) {
-  var code = [];
+  var code = [], math = [];
   s = s.replace(/`([^`]+)`/g, function (_, c) {
     code.push(c); return "\u0000" + (code.length - 1) + "\u0000";
+  });
+  s = s.replace(/\$([^$\n]+)\$/g, function (_, m) {
+    math.push(m); return "\u0001" + (math.length - 1) + "\u0001";
   });
   s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g,
                 function (_, alt, src) { return '<img alt="' + alt + '" src="' + link(src) + '">'; });
@@ -188,6 +195,8 @@ function inline(s) {
                 function (_, t, href) { return '<a href="' + link(href) + '">' + t + "</a>"; });
   s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   s = s.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<em>$2</em>");
+  s = s.replace(/\u0001(\d+)\u0001/g,
+                function (_, i) { return "\\(" + math[+i] + "\\)"; });
   return s.replace(/\u0000(\d+)\u0000/g,
                    function (_, i) { return "<code>" + code[+i] + "</code>"; });
 }
@@ -303,7 +312,8 @@ function render(md) {
 }
 
 function mathjax() {
-  if (!document.querySelector(".mathblock")) return;
+  if (!document.querySelector(".mathblock") &&
+      document.getElementById("doc").innerHTML.indexOf("\\(") < 0) return;
   var s = document.createElement("script");
   s.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js";
   s.async = true;

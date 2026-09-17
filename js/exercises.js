@@ -609,7 +609,7 @@ const EXERCISES = [
     scene: "estab",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { gaugeField: "speed", avg: true },
+    viewParams: { gaugeField: "speed" },
     digit: { label: "reservoir level", control: "inLevel", base: 3.4, step: 0.1, unit: "m",
              rule: "level = 3.4 + 0.1·d" },
     instruments: [

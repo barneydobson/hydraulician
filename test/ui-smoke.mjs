@@ -1263,7 +1263,7 @@ async function main() {
       eq("every control is back", lifted.n, base.buttons);
       check("and the way out goes away", !lifted.showAll && !lifted.narrowed);
 
-      // UN-2 starts on the one measurement mode it needs, removes the four
+      // UN-2 starts live, keeps Average available, removes the four
       // irrelevant VIEW toggles, and pares the Controls panel down below the
       // section level: Flow ordinarily contains the whole inlet setup and
       // View contains every overlay, but this card needs only two rows.
@@ -1279,7 +1279,7 @@ async function main() {
                    active: APP.SIM.avgActive(), narrowed: APP.UIMODE.narrowed() };
         });
       `);
-      check("UN-2 starts averaging", un2.avg && un2.active, JSON.stringify(un2));
+      check("UN-2 starts live", !un2.avg && !un2.active, JSON.stringify(un2));
       check("UN-2 keeps Average in VIEW", un2.labels.includes("Average"));
       check("UN-2 hides the unused VIEW toggles",
             !un2.labels.includes("Particles") && !un2.labels.includes("Dye") &&

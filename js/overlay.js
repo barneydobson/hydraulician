@@ -723,7 +723,13 @@ const OVERLAY = (() => {
     const qNow = sum * sim.dx;
     rk.qE = rk.qE === undefined ? qNow : rk.qE + 0.10 * (qNow - rk.qE);
     const q = rk.qE;
-    const scale = Math.min(V.w * 0.13, 110) / umax;
+    // Hold the largest section speed this rake has experienced. Scaling every
+    // frame by the instantaneous maximum made an unsteady profile breathe in
+    // and out, so its shape was hard to follow just when a wave passed. The
+    // scale may contract when a genuinely faster section arrives, but never
+    // expands again until the rake is removed and placed afresh.
+    rk.uScaleMax = Math.max(rk.uScaleMax || 1e-3, umax);
+    const scale = Math.min(V.w * 0.13, 110) / rk.uScaleMax;
 
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1;

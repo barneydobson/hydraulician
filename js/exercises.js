@@ -584,21 +584,24 @@ const EXERCISES = [
   // ------------------------------------------------------- unsteady flow
   {
     id: "UN-1",
-    title: "The class discovers the celerity",
+    title: "Celerity and water-hammer reflections",
     topic: "Water hammer",
     folder: "UN-1-celerity",
     scene: "hammer",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { speed: 0.2, gaugeField: "h" },
-    digitNote: "your nozzle gap is DRAWN: gap = 0.14 × (1 + (d mod 6)) m, in two pieces about z = 3.5",
+    viewParams: { speed: 0.02, gaugeField: "h" },
     instruments: [
-      { tool: "gauge", where: "x = 30 m, z = 3.5 m — expand its card (⤢) to read the trace", why: "mid-pipe, on the axis — reads H₀ then the plateau H₁" },
-      { tool: "rake", where: "mid-pipe, x ≈ 30 m", why: "the rake chip's V is the bore-mean — that is v₀" },
+      { tool: "gauge", where: "on the pipe axis (z = 3.5 m) at x = 10 m, 30 m and 50 m", why: "the 20 m spacing makes the wave celerity readable from successive arrival times and shows the reflected high- and low-pressure fronts" },
+      { tool: "rake", where: "x = 20 m and 40 m", why: "the two velocity sections show the change in flow as each incident and reflected front passes" },
     ],
-    ui: { build: true },
+    ui: {
+      build: false,
+      view: ["legendBtn"],
+      controls: ["speed", "cel", "geom0"],
+    },
     start: "a 60 m pipe from a reservoir to a valve, running steadily",
-    task: "Redraw the plate to your own nozzle gap, read v₀ off a mid-pipe rake and H₀ off the expanded gauge trace, then press V to slam the valve and pause on the first flat top for H₁.",
+    task: "Set the nozzle width, place gauges at x = 10, 30 and 50 m and rakes at x = 20 and 40 m, then press V. Measure c from the arrival times, calculate the Joukowsky rise ΔH = ΔV·c/g, and follow the high- and low-pressure reflections.",
     settle: 15,
   },
   {

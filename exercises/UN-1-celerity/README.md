@@ -1,11 +1,9 @@
-# UN-1 · The class discovers the celerity
+# UN-1 · Celerity and water-hammer reflections
 
 A 49 m penstock runs from a reservoir 21 m above it to a valve at the far end.
-Every student fits their own nozzle, and so gets their own steady pipe
-velocity; they slam the valve, read the head rise off the square wave, and
-submit the pair. Pooled, the points lie on a straight line **through the
-origin** whose slope, multiplied by g, is the celerity of the pressure wave in
-that pipe — a quantity nobody was told and nobody computed.
+The demonstrator slams the valve on the steady flow, measures the pressure
+wave's celerity from its travel time between three gauges, and follows the
+successive high- and low-pressure reflections with gauges and velocity rakes.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **UN-1**, or use the direct link
@@ -17,73 +15,65 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 Shutting a valve on a moving column turns its momentum into pressure. The head
 rise is Joukowsky's, and the wave then runs to the reservoir and back:
 
-    ΔH = (c/g)·Δv          T = 4L/c
+    ΔH = ΔV·c/g            T = 4L/c
 
 c is the celerity — the speed of sound in that pipe, set by the water's
-compressibility and the pipe's elasticity, and it is what the class is about
-to measure. Here the static head is **21.1 m** (measured: reservoir surface
-above the pipe axis) and the penstock is **L = 49 m**. Δv is the whole steady
-velocity v₀, because the valve shuts completely.
+compressibility and the pipe's elasticity. Here the static head is **21.1 m**
+(measured: reservoir surface above the pipe axis) and the penstock is
+**L = 49 m**. For a complete valve closure, ΔV is the change from the steady
+pipe velocity to the velocity behind the pressure front. In the ideal first
+upsurge that is the whole initial velocity v₀.
 
-## Your nozzle gap
+For two gauges separated by Δx, the same wave front reaches them Δt apart:
 
-**d** is the **last digit of your student number** — your lecturer will
-explain the assignment in class. Your gap is **0.14 × (1 + (d mod 6))**
-metres:
+    c = Δx/Δt
 
-| d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **gap (m)** | 0.14 | 0.28 | 0.42 | 0.56 | 0.70 | 0.84 | 0.14 | 0.28 | 0.42 | 0.56 |
+The three gauges below are 20 m apart, so the two independent travel-time
+measurements can be compared. At the upstream reservoir the returning
+pressure wave reflects with the opposite sign; the gauge traces therefore
+make the high- and low-pressure passages visible as well as their speed.
 
 ## What to do
 
-1. Erase the shipped nozzle plate at x = 56.5 m — Erase (`2`), but press `]`
-   four times first, because the default brush is narrower than the plate.
-   Stroke it away from z = 2.05 up to z = 4.95.
-2. Draw your own gap in two pieces at the same station — Wall (`1`), Shift
-   held to snap vertical: pipe floor (z = 2.0) up to z = 3.5 − gap/2, and
-   z = 3.5 + gap/2 up to the pipe roof (z = 5.0). Measure (toolbar) checks it.
-3. Press `R` and let it reach steady state — about **15 s**; the card counts
-   it down. Drop a Rake (`6`) mid-pipe: its chip prints **V**, the bore-mean
-   velocity — that is your **v₀**. Drop a Gauge (`5`) at x = 30 m on the pipe
-   axis and expand its card (the **⤢** button opens the gauge inspector, a
-   full-width trace that is much easier to read than the corner card). Its
-   steady **h** is your **H₀**.
-4. Press `V` to slam the valve, then **space** to pause. Read **H₁** off the
-   first flat top of the inspector trace — the plateau, not the ringing spike
-   on the wave front — and submit **gap, v₀, ΔH = H₁ − H₀**.
-
-## For the instructor — pooling the class
-
-Collect one row per student (`student_id,digit,gap_m,celerity,v0_ms,dH_m`),
-export the CSV and run:
-
-```bash
-python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
-python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
-```
-
-`celerity` is 70 for the main run and 140 for the coda below. The script fits
-ΔH = mΔv through the origin for each celerity series, reports m·g as the
-celerity the class has just measured, and plots the points against Joukowsky
-at the slider's own c.
-
-![pooled class plot](plots/pooled-demo.png)
+1. Choose the **Nozzle width** in Controls → Geometry, or leave its 0.40 m
+   default. Changing it restarts the water; let the flow settle for about
+   **15 s** before slamming the valve.
+2. Put Gauges (`5`) on the pipe axis, **z = 3.5 m**, at **x = 10 m, 30 m and
+   50 m**. Expand their cards with **⤢** so their head histories can be read
+   clearly.
+3. Put Rakes (`6`) at **x = 20 m and 40 m**. Each profile is scaled by the
+   largest speed that section has experienced, so it remains visually stable
+   while the fronts pass.
+4. Press `V` to slam the valve and leave the simulation running. Identify the
+   same first pressure rise at the 50 m, 30 m and 10 m gauges. Use each 20 m
+   spacing and the difference between its two arrival times to calculate
+   **c = 20/Δt**.
+5. Read the velocity before and behind the first front from a rake and form
+   **ΔV**. Read the corresponding gauge-head change and compare it with the
+   Joukowsky prediction **ΔH = ΔV·c/g** (with g = 9.81 m/s²). The measured
+   pressure rise should be close to this value; front smearing and the finite
+   grid account for the remaining difference.
+6. Keep watching after the first arrival. Talk through the high-pressure wave
+   travelling towards the reservoir, its low-pressure reflection travelling
+   back towards the valve, and the accompanying velocity changes at the two
+   rakes. Pause with **space** whenever a front needs a closer look.
 
 ### Discussion points
 
-- **Keep the Controls panel shut until the fit is on the board.** The Slot
-  celerity slider's own note line reads `70 m/s (Δh from Δv: 7.1 m per m/s)`
-  — it prints the answer.
-- **Then move it.** Set c = 140, re-run one nozzle, and every ΔH doubles while
-  the period halves: the class's point jumps onto the second line. This is the
-  experiment no physical rig can run — you cannot change a real pipe's
-  elasticity between two readings. At that celerity anything above
-  v₀ ≈ 1.5 m/s takes the downsurge to zero absolute pressure and the column
-  separates, so only the two smallest nozzles give a clean coda; that is why
-  surge protection exists, and where UN-3 starts.
+- **Measure before revealing.** The Slot celerity control's note line states
+  the configured value and the corresponding Joukowsky rise per m/s. Keep the
+  panel closed until the class has estimated c from the gauge timings.
+- **Then change c.** Reset, set c = 140 m/s, let the flow settle and repeat the
+  slam. The fronts cross each gauge spacing in half the time, the head rise is
+  larger, and the reflection period halves. This is the experiment no
+  physical rig can run: changing the pipe's effective elasticity while
+  keeping its geometry in place.
+- **Use the rakes as section histories.** Their horizontal scale only updates
+  when a section experiences a new maximum speed. A falling velocity therefore
+  shortens against a fixed reference instead of making the whole profile
+  rescale from frame to frame.
 
-The full verification record — the six-rung velocity ladder, the Joukowsky
-check at both celerities, settle-time evidence, safe gap bounds and
+The full verification record — including the earlier nozzle-ladder celerity
+exercise, the Joukowsky check at both celerities, settle-time evidence and
 troubleshooting — is kept locally, out of version control, at
 `exercises/UN-1-celerity/_archive/README-full.md`.

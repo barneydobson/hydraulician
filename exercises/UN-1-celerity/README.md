@@ -3,7 +3,8 @@
 A 49 m penstock runs from a reservoir 21 m above it to a valve at the far end.
 The demonstrator slams the valve on the steady flow, measures the pressure
 wave's celerity from its travel time between three gauges, and follows the
-successive high- and low-pressure reflections with gauges and velocity rakes.
+successive high- and low-pressure reflections with gauges, velocity rakes and
+particles.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **UN-1**, or use the direct link
@@ -41,22 +42,24 @@ make the high- and low-pressure passages visible as well as their speed.
 2. Put Gauges (`5`) on the pipe axis, **z = 3.5 m**, at **x = 10 m, 30 m and
    50 m**. Expand their cards with **⤢** so their head histories can be read
    clearly.
-3. Put Rakes (`6`) at **x = 20 m and 40 m**. Each profile is scaled by the
-   largest speed that section has experienced, so it remains visually stable
+3. Put Rakes (`6`) at **x = 20 m and 40 m** and note the steady bore-mean
+   **V₀**. Particles are already switched on. Each rake profile is scaled by
+   the largest speed its section has experienced, so it stays visually stable
    while the fronts pass.
 4. Press `V` to slam the valve and leave the simulation running. Identify the
    same first pressure rise at the 50 m, 30 m and 10 m gauges. Use each 20 m
    spacing and the difference between its two arrival times to calculate
    **c = 20/Δt**.
-5. Read the velocity before and behind the first front from a rake and form
-   **ΔV**. Read the corresponding gauge-head change and compare it with the
-   Joukowsky prediction **ΔH = ΔV·c/g** (with g = 9.81 m/s²). The measured
-   pressure rise should be close to this value; front smearing and the finite
-   grid account for the remaining difference.
+5. Pause after the first front has crossed a rake and note **V₁** there. Form
+   **ΔV = |V₁ − V₀|**, then compare the measured gauge-head change with the
+   Joukowsky prediction
+   **ΔH = ΔV·c/g** (with g = 9.81 m/s²). The pressure rise should be close to
+   this value; front smearing and the finite grid account for the remaining
+   difference.
 6. Keep watching after the first arrival. Talk through the high-pressure wave
    travelling towards the reservoir, its low-pressure reflection travelling
-   back towards the valve, and the accompanying velocity changes at the two
-   rakes. Pause with **space** whenever a front needs a closer look.
+   back towards the valve, and the accompanying particle motion. Pause with
+   **space** whenever a front needs a closer look.
 
 ### Discussion points
 
@@ -68,6 +71,9 @@ make the high- and low-pressure passages visible as well as their speed.
   larger, and the reflection period halves. This is the experiment no
   physical rig can run: changing the pipe's effective elasticity while
   keeping its geometry in place.
+- **Watch the particles, not just the pressure trace.** They distinguish the
+  pressure wave's fast travel from the water's much slower motion and make the
+  stopping and reversal behind successive fronts visible.
 - **Use the rakes as section histories.** Their horizontal scale only updates
   when a section experiences a new maximum speed. A falling velocity therefore
   shortens against a fixed reference instead of making the whole profile

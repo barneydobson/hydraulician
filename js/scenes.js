@@ -816,7 +816,7 @@ const SCENES = (() => {
       group: "Pressure & transients",
       blurb: "A reservoir feeding a full pipe through a nozzle. Slam the valve and the pressure wave runs back and forth at the slot celerity.",
       W: 60, H: 30, c: 70, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
-      valveOpen: 1, spinup: 10,   // measured: bore established by 7 s
+      valveOpen: 1, particles: 1, spinup: 10,   // measured: bore established by 7 s
       mode: 1, headMax: 42, hmax: 22, vmax: 6,
       open: [1, 1, 0, 0],
       spongeIn: 5.5,                           // hold the whole reservoir tank

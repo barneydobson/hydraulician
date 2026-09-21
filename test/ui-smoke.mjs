@@ -1288,6 +1288,78 @@ async function main() {
       eq("UN-2 keeps only its two panel controls", un2.controls.sort().join(","),
          "inLevel,speed");
       check("the two-row panel remains liftable", un2.narrowed);
+
+      // UN-1 is a fixed lecturer demo: only gauges, rakes, the field key,
+      // particles and the three controls used during the demonstration should
+      // be in front of the class. The rake scale is a running maximum, so a
+      // slower frame cannot make the profile swell back out.
+      const un1 = await tab.evaluate(`
+        APP.pickExercise("UN-1");
+        return APP.EX.ready.then(() => {
+          const labels = [...document.querySelectorAll("#groups .tbtn")]
+                           .map((b) => b.getAttribute("aria-label"));
+          const controls = [...document.querySelectorAll("#panel .row[data-control]")]
+            .filter((e) => !e.classList.contains("off") && !e.classList.contains("gone"))
+            .map((e) => e.dataset.control);
+          const particlesButtonOn = document.getElementById("partBtn")
+            .classList.contains("on");
+
+          const ctx = document.createElement("canvas").getContext("2d");
+          const V = { w: 800, X: (x) => x, Y: (z) => 100 - z };
+          const sim = { dx: 1, ny: 3 };
+          const A = { bed: [0], surf: [3] };
+          const rk = { i: 0, buf: new Float32Array(12) };
+          const paint = (u) => {
+            for (let j = 0; j < 3; j++) rk.buf[j * 4] = u;
+            APP.OVERLAY.drawRake(ctx, V, sim, rk, A);
+            return rk.uScaleMax;
+          };
+          const scale = [paint(2), paint(0.5), paint(3)];
+
+          const gap = APP.SIM.params().decl[0];
+          const gapInput = document.getElementById("c_geom0");
+          const openRows = () => {
+            const i = Math.round(56.5 / APP.sim.dx);
+            let n = 0;
+            for (let j = Math.floor(2 / APP.sim.dx); j < Math.ceil(5 / APP.sim.dx); j++) {
+              if (!APP.sim.mask[j * APP.sim.nx + i]) n++;
+            }
+            return n;
+          };
+          const before = openRows();
+          gapInput.value = "0.8";
+          gapInput.dispatchEvent(new Event("input"));
+          const after = openRows();
+          return { labels, controls, scale, speed: APP.state.speed,
+                   particles: APP.state.particles, particlesButtonOn,
+                   sceneParticles: APP.state.scene.particles,
+                   gap: { key: gap.key, label: gap.label, value: APP.SIM.params().values[gap.key],
+                          before, after } };
+        });
+      `);
+      check("UN-1 has no BUILD family", !un1.labels.includes("Wall") &&
+            !un1.labels.includes("Erase"), un1.labels.join(","));
+      check("UN-1 keeps gauges and rakes", un1.labels.includes("Gauge") &&
+            un1.labels.includes("Rake"), un1.labels.join(","));
+      check("UN-1 keeps only the field key and particles in VIEW",
+            un1.labels.includes("Field & legend") &&
+            un1.labels.includes("Particles") && !un1.labels.includes("Dye") &&
+            !un1.labels.includes("Open-channel overlay") &&
+            !un1.labels.includes("Grade lines") && !un1.labels.includes("Average"),
+            un1.labels.join(","));
+      check("UN-1 inherits the hammer scene's particle default",
+            un1.sceneParticles === 1 && un1.particles, JSON.stringify(un1));
+      check("UN-1 visibly lights the Particles button", un1.particlesButtonOn);
+      eq("UN-1 keeps only speed, celerity and nozzle controls",
+         un1.controls.sort().join(","), "cel,geom0,speed");
+      eq("UN-1 starts at two-hundredths speed", un1.speed, 0.02);
+      eq("the hammer geometry declares the nozzle slider", un1.gap.key,
+         "nozzle_gap");
+      eq("the nozzle slider is plainly labelled", un1.gap.label, "Nozzle width");
+      check("widening the nozzle opens more cells", un1.gap.after > un1.gap.before,
+            JSON.stringify(un1.gap));
+      eq("a slower rake frame keeps the experienced maximum", un1.scale.join(","),
+         "2,2,3");
       await tab.close();
     }
 

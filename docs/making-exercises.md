@@ -168,6 +168,11 @@ top:
   `{gauges, cursor, status}` booleans and `rows: [...]`, validated against
   `OVERLAY`'s row register.
 
+Keep the profile as small as the exercise can manage: expose only the tools,
+view toggles, fields and Controls rows that the student or demonstrator will
+actually use. The `⋯ Show everything` escape remains available whenever an
+unplanned control is needed.
+
 **The rule that fails the pack:** a card whose `task`, `start` or `setup`
 tells the student to draw, cut, erase or move something must declare a build
 tool — `ui: { build: true }` or a build tool in `instruments` — or the tool

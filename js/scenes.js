@@ -816,21 +816,29 @@ const SCENES = (() => {
       group: "Pressure & transients",
       blurb: "A reservoir feeding a full pipe through a nozzle. Slam the valve and the pressure wave runs back and forth at the slot celerity.",
       W: 60, H: 30, c: 70, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
-      valveOpen: 1, spinup: 10,   // measured: bore established by 7 s
+      valveOpen: 1, particles: 1, spinup: 10,   // measured: bore established by 7 s
       mode: 1, headMax: 42, hmax: 22, vmax: 6,
       open: [1, 1, 0, 0],
       spongeIn: 5.5,                           // hold the whole reservoir tank
       inflow: { level: 25.0, q: 0, on: 1, free: 1 },
-      walls: () => [
-        [0.0, 1.0, 58.5, 1.0, 2.0],              // invert — top face at z = 2.0
-        [6.0, 5.35, 58.5, 5.35, 0.7],            // soffit — 3 m clear bore
-        [6.0, 5.0, 6.0, 30.0, 0.7],              // reservoir wall above the pipe
-        [56.5, 2.0, 56.5, 3.30, 0.5],            // nozzle plate, 0.4 m gap …
-        [56.5, 3.70, 56.5, 5.0, 0.5],            // … which sets the pipe velocity
+      params: [
+        { key: "nozzle_gap", label: "Nozzle width", min: 0.14, max: 0.84,
+          step: 0.02, value: 0.40, unit: "m", resetWater: true },
       ],
+      walls: (W, H, par = {}) => {
+        const gap = par.nozzle_gap === undefined ? 0.40 : par.nozzle_gap;
+        return [
+          [0.0, 1.0, 58.5, 1.0, 2.0],              // invert — top face at z = 2.0
+          [6.0, 5.35, 58.5, 5.35, 0.7],            // soffit — 3 m clear bore
+          [6.0, 5.0, 6.0, 30.0, 0.7],              // reservoir wall above the pipe
+          [56.5, 2.0, 56.5, 3.5 - gap / 2, 0.5],   // nozzle plate around the …
+          [56.5, 3.5 + gap / 2, 56.5, 5.0, 0.5],   // … adjustable clear width
+        ];
+      },
       valves: () => [[55.0, 2.0, 55.0, 5.0, 0.5]],
       water: (x, z, P) => (x < 5.6 || (z > 2.0 && z < 5.0) ? still(25.0, z, P) : 0),
       tips: ["Drop a <b>gauge</b> on the pipe, then press <b>V</b> to slam the valve.",
+             "The nozzle width in Controls → Geometry sets the steady pipe velocity; changing it restarts the water.",
              "Upsurge is ΔH = c·Δv/g ≈ 20 m on top of 21 m static — read it off the trace.",
              "The trace is a square wave of period 4L/c ≈ 2.8 s. Halve c and it halves too.",
              "Push the celerity past ~90 m/s and the downsurge hits zero: column separation.",

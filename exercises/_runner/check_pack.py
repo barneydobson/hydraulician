@@ -223,11 +223,13 @@ def view_button_ids():
 
 
 def panel_control_ids():
-    """The literal row ids in the Controls-panel spec in js/main.js.
+    """The row ids in the Controls-panel spec in js/main.js.
 
     `ui.controls` narrows the panel to individual rows, so a typo there would
     otherwise produce an empty section in front of a class. Keep the checker
-    tied to the spec rather than maintaining a second list by hand."""
+    tied to the spec rather than maintaining a second list by hand. Geometry
+    rows are generated as `id: "geom" + k`, so derive their numeric suffixes
+    from that map's own literal index list as well as reading ordinary ids."""
     src = open(os.path.join(ROOT, "js", "main.js"), encoding="utf-8").read()
     start = src.find("const CONTROLS = [")
     end = src.find("function buildPanel", start)
@@ -236,6 +238,11 @@ def panel_control_ids():
               "ui.controls validation cannot run blind.")
         sys.exit(1)
     ids = set(re.findall(r'\bid:\s*"([A-Za-z0-9]+)"', src[start:end]))
+    dynamic_geom = re.search(
+        r'\.\.\.\[([^\]]+)\]\.map\(\(k\)\s*=>\s*\(\{\s*\n?\s*id:\s*"geom"\s*\+\s*k',
+        src[start:end])
+    if dynamic_geom:
+        ids.update("geom" + n for n in re.findall(r'\d+', dynamic_geom.group(1)))
     if not ids:
         print("check_pack.py cannot find any row ids in the CONTROLS spec -- "
               "ui.controls validation cannot run blind.")

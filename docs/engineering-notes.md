@@ -675,7 +675,8 @@ additive — a scene taking the old arguments never sees them:
   20 s and ±0.1 m after. A slider the estimate does not follow just costs
   settle time.
 
-Measured, at Medium (dx = 0.161 m; the ladder is HP-3's, D_s = 2.5–7.0 m):
+Measured, at Medium (dx = 0.161 m; the verification sweep is D_s = 2.5–7.0 m,
+while the revised HP-3 tutorial uses the fixed D_s = 3.0 m case):
 
 | quantity | value |
 | --- | --- |
@@ -722,10 +723,10 @@ Things that were tried and what they taught:
   and fully collapsed at 1.2, the old stop itself: **q₂₀ = −17.6 m²/s,
   reversed, with 36 m of head standing in what should be atmosphere.** The
   tell on screen is a saturated block past the nozzle and a chaotic bore.
-  Part C of the tutorial sheet asks the student to sweep this slider to its
-  top, so the broken rung was on the worksheet's own path. 0.9 holds 7.0 m/s
-  in the penstock and survives a slam (p/ρg = 0 in the discharge, no
-  cavitation, 7.7 m minimum at the valve).
+  The earlier width-sweep extension exposed this slider, so the broken rung
+  was on a teaching path. The revised fixed-geometry tutorial hides it. 0.9
+  holds 7.0 m/s in the penstock and survives a slam (p/ρg = 0 in the
+  discharge, no cavitation, 7.7 m minimum at the valve).
 - **The jet stays at √(2gH)** over the whole gap range (20.6–21 m/s against
   20.7), so the maximum-power coda (h_f = H/3) cannot be reached on this rig
   any more than on hammer's — HP-1's throttle plate is the answer there too.

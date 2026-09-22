@@ -1,154 +1,154 @@
-# HP-3 · Design the surge tower: the class measures the upsurge
+# HP-3 · Hydropower and unsteady flow: test the tutorial predictions
 
-A reservoir feeds a level headrace; at the knee a surge shaft rises off the
-pipe, and a penstock drops to a nozzle at the power house. Slam the valve
-and the headrace column has nowhere to go but up the shaft. Each student
-runs a different shaft width and reads how high the water rises; pooled,
-the class traces the curve a surge tower is sized from. The tutorial sheet
-sets the same calculation on this scheme, so every answer on it can be
-checked on screen.
+HP-3 is the simulation half of the hydropower and unsteady-flow tutorial.
+Students first calculate the steady penstock quantities and the first surge
+crest for one fixed scheme, then use the app to fill the measured column beside
+their predictions. This is no longer a student-number shaft-width sweep: leave
+the geometry at the sheet values, let the 60 s settle finish, and compare like
+with like.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **HP-3**, or use the direct link
 [`?ex=HP-3`](https://barneydobson.github.io/hydraulician/?ex=HP-3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
-The hand calculation to do before the session is
-[`tutorial-sheet.docx`](tutorial-sheet.docx) in this folder, set on this
-scheme's own dimensions; `tutorial-sheet.py` regenerates it, answers
-included, from the same constants.
+The student handout is
+[`tutorial-sheet-questions.docx`](tutorial-sheet-questions.docx). The tutor copy,
+[`tutorial-sheet.docx`](tutorial-sheet.docx), includes the worked answers;
+`tutorial-sheet.py` regenerates it from the same constants.
 
-## Theory
+## The fixed scheme
 
-Rigid column, free surface in the shaft, losses ∝ u². With z the shaft
-level measured DOWN from the reservoir and A/A_s = D_h/D_s (a slice one
-metre wide, so areas are heights):
+The exercise opens at Resolution Medium with the tutorial geometry already set:
 
-    (L/g)·du/dt = z − k·u|u|          dz/dt = −(A/A_s)·u
+| quantity | value |
+|---|---:|
+| reservoir surface | 24.9 m above datum |
+| headrace length, L | 42.4 m |
+| headrace depth, D_h | 3.05 m |
+| surge-shaft width, D_s | 3.0 m |
+| penstock depth, D_p | 2.4 m |
+| penstock length, L_p | approximately 20 m |
+| nozzle width | 0.48 m |
+| nozzle elevation | 3.0 m above datum |
+| discharge, q₀ | 7.6 m²/s per metre width |
+| Darcy friction factor, λ | 0.03 |
 
-Steady running: z₀ = k·u₀². Instantaneous closure without friction:
+The app's nominal geometry sliders say 25.0 m, 3.0 m and 42 m where the
+calculation uses the measured free surface and rasterised dimensions above.
+Those measured values are the ones on the tutorial sheet. The HP-3 interface
+therefore hides the geometry sliders, exposes the Gauge and Rake tools, and
+leaves only the **Gauges plot** selector in Controls. That selector changes from
+Level η to Depth d. **⋯ Show everything** remains available for an extension,
+but changing a geometry control makes a different experiment.
 
-    z_max = u₀·√(L·A/(g·A_s))         T = 2π·√(L·A_s/(g·A))
+## Calculation before the session
 
-With friction (the tutorial sheet's solution): u² = C·e^(z/Z) + (z + Z)/k,
-with Z = L·A/(2·g·k·A_s) and C = −(Z/k)·e^(−z₀/Z); the crest is where
-u = 0, found by trial. Here z₀/Z is small and the crest lands close to
-u₀√(LA/gA_s) − z₀: the shaft starts z₀ below the reservoir and rises by
-about the frictionless amount.
+The conduits are slots of unit width, so area is their depth and the hydraulic
+diameter in Darcy–Weisbach is 2D. For the headrace,
 
-Rig constants (measured at Medium): **L = 42.4 m** (reservoir wall to
-shaft centre), **D_h = 3.05 m**, **u₀ ≈ 2.5 m/s**, reservoir level
-**≈ 24.9 m** (the slider says 25.0; the free surface by the wall stands
-0.1 m lower under draw), **z₀ ≈ 0.35 m**. Nearly all of z₀ is velocity
-head (u₀²/2g = 0.32 m): this headrace is 14 bores long, so friction is a
-tenth of the drawdown, where in a real headrace a thousand bores long it
-is all of it.
+    V₀ = q₀/D_h
+    h_f = λ·(L/2D_h)·V₀²/2g
 
-## Your shaft width
+From the reservoir surface to the atmospheric jet,
 
-**d** is the **last digit of your student number** — your lecturer will
-explain the assignment in class. Your shaft width is **2.5 + 0.5·d**
-metres, set on the **Surge shaft width D_s** slider (Controls →
-Geometry, or the field on the card). Nothing is drawn.
+    V_jet = √[2g(H − h_f,total)]
+    P = ρgq₀(H − h_f,total) = ½ρq₀V_jet²
 
-| d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **D_s (m)** | 2.5 | 3.0 | 3.5 | 4.0 | 4.5 | 5.0 | 5.5 | 6.0 | 6.5 | 7.0 |
+where H = 24.9 − 3.0 = 21.9 m and the total loss includes the headrace and
+penstock. Because h_f ∝ q², maximum transmitted power occurs at h_f = H/3.
 
-## What to do
+For the shutdown, η is the shaft level relative to the reservoir surface,
+positive upwards. The steady running level is
 
-1. Set **Surge shaft width D_s** to your own value and press `R`. Let it
-   reach steady state — about **60 s**; the card counts it down. The scene
-   opens near its steady flow; what is left to settle is a ±0.1 m wobble
-   of the shaft level.
-2. Gauge (`5`) the reservoir at **x = 6.6 m, z = 20 m** and the shaft at
-   **x = 50 m, z = 18 m**. Gauges plot is on **h**. Read each as the centre
-   of its trace over ten seconds: **z₀ = reservoir − shaft**. Hover the
-   headrace at x ≈ 27 m and read **V**: that is **u₀**.
-3. Controls → **Gauges plot → d**. Press `V` to slam the valve and watch
-   the shaft. On the shaft trace (expand its card, ⤢) read the flat level
-   before the slam d₀ and the first crest d_max: **rise = d_max − d₀**. The
-   depth moves in whole cells of 0.16 m; take the crest as the highest
-   step. **T** is the time from the first crest to the second.
-4. Submit **D_s, u₀, z₀, rise, T**.
+    η₀ = −(V₀²/2g + h_f) = −kV₀²
 
-Why d and not h for the crest: under the crest the shaft's water is
-decelerating at about 1 m/s², so the pressure 12 m down is not hydrostatic
-and a gauge on h there reads the crest about a metre low. The depth
-channel is counted from the fill, not the pressure.
-The reservoir gauge jumps by metres for a second or two after the slam
-as the pressure wave reaches the mouth; that is not the reservoir moving,
-and its level before the slam is the one every reading uses.
+and the first crest is the positive root of
+
+    η_max = Y·[1 − exp((η₀ − η_max)/Y)]
+    Y = L·D_h/(2gkD_s)
+
+The sheet's predicted column is:
+
+| quantity | prediction |
+|---|---:|
+| V₀ | 2.49 m/s |
+| h_f along the headrace | 0.066 m |
+| V_jet | 20.7 m/s |
+| P | 1.62 MW/m |
+| q* for maximum P | 57 m²/s |
+| η₀ | −0.38 m |
+| k | 0.0616 s²/m |
+| Y | 35.7 m |
+| η_max | 4.97 m |
+
+## In the app
+
+1. Let the exercise's **60 s** settle finish. Do not move a geometry slider.
+   Use the **Rake** tool at **x = 27 m** through the headrace and read the
+   rake's depth-averaged **V** as V₀. This is the conduit mean q/D required by
+   the sheet, rather than a point velocity from one cell. Hover the horizontal
+   jet just past the nozzle near **x = 66 m, z = 3 m** and read its u component
+   as V_jet; w is nearly zero there.
+2. Leave **Gauges plot** on **Level η**. Place one gauge in the reservoir by
+   the wall at **x = 6.6 m, z = 20 m** and one in the shaft at
+   **x = 50 m, z = 18 m**. Read the centre of each settled trace over about ten
+   seconds, then calculate
+
+       η₀ = η_shaft − η_reservoir
+       h_f = −η₀ − V₀²/2g
+       k = −η₀/V₀²
+
+   The first h_f expression is the simulation comparison for the worksheet's
+   headrace loss. A direct HGL fit over x = 24–44 m gives the tutor value below.
+3. Calculate the measured power from the measured jet speed,
+   **P = ½ρq₀V_jet²**.
+4. Change **Gauges plot** to **Depth d**, press **V** once to close the turbine,
+   and expand the shaft gauge (⤢). Read its level immediately before closure,
+   d₀, and its first crest, d_max. Then
+
+       rise = d_max − d₀
+       η_max = rise + η₀
+
+5. Fill the measured column for V₀, h_f, V_jet, P, η₀, k and η_max.
+   For another run press **R**, wait out the full settle again, then press V.
+
+Read η₀ on **Level η**, not on h: the open shaft surface is the level the
+calculation defines, while pressure head part-way down the slowly circulating
+column is noisier and biased. Read the crest on **Depth d**: under the crest the
+shaft water is decelerating, so a submerged h gauge can read about a metre low.
+The d trace moves in whole cells (about 0.16 m at Medium); take the highest step.
 
 ![the D_s = 3 m run](plots/surge-trace-Ds3.png)
 
-### Optional: the Darcy friction factor
+## Tutor check
 
-Two more gauges on the headrace axis, at **x = 22 m** and **x = 44 m**,
-both at **z = 14 m**, then press `A` (Average) and wait 30 s: the heads
-wobble ±0.3 m frame to frame against a drop of about 0.04 m, so the
-averaged reading is the only one worth having. Then
+One verified Medium run, settled for 60 s before shutdown, gives:
 
-    f = 2·g·D_H·(h₁ − h₂) / (L₁₂·u₀²)      D_H = 2·D_h = 6.1 m,  L₁₂ = 22 m
+| quantity | sheet | app |
+|---|---:|---:|
+| V₀ | 2.49 m/s | 2.51 m/s |
+| h_f along the headrace | 0.066 m | 0.068 m |
+| V_jet | 20.7 m/s | 20.6 m/s |
+| P | 1.62 MW/m | 1.62 MW/m |
+| η₀ | −0.38 m | −0.38 ± 0.02 m |
+| k | 0.0616 s²/m | 0.0602 s²/m |
+| η_max | 4.97 m | 4.95 m |
 
-f comes out near 0.03. D_H is the hydraulic diameter of a slot one metre
-wide (R_h = D_h/2): the solver's pipe is a slice, not a circle. The
-stations matter: over the first 15 m the entry vena contracta depresses the
-head and then recovers, and gauges placed in it read a negative slope.
+The app h_f is a 60 s least-squares HGL fit over x = 24–44 m, clear of the
+entry recovery; its slope is 1.61×10⁻³ and gives λ = 0.030. The simpler
+student calculation from −η₀ − V₀²/2g is more sensitive to the shaft's
+cell-sized level steps, so a result around 0.06–0.07 m is the expected agreement.
 
-## For the instructor — pooling the class
+The sheet asks for q* as a calculation, not an app measurement. The delivered
+nozzle range keeps V_jet close to √(2gH) and cannot reach h_f = H/3; HP-1 is the
+separate maximum-power experiment with enough throttling to turn that curve
+over.
 
-Collect one row per student (`student_id,digit,Ds_m,u0_ms,z0_m,rise_m,T_s`),
-export the CSV and run:
+## Optional extension
 
-```bash
-python3 collect_plot.py class.csv                # -> plots/pooled-demo.png
-python3 collect_plot.py data/simulated-class.csv # the shipped dry-run class
-```
-
-The script takes z_max = rise − z₀ and k = z₀/u₀² per row, plots z_max
-against D_s with the frictionless curve and the rigid-column-with-friction
-curve at the class-mean u₀ and k, prints the log–log slope (−0.45 on the
-dry-run class against the −½ of the design law), and plots T against the
-textbook period underneath.
-
-![pooled class plot](plots/pooled-demo.png)
-
-### Running it in a 40-minute session
-
-- 0–5 min: the sheet's answers on the board — z₀ = k·u₀², the frictionless
-  upsurge, what friction did to it, whether the shaft clears the roof.
-- 5–10 min: everyone opens HP-3, types their digit, sets D_s, waits out
-  the settle.
-- 10–25 min: steps 2–4; submit. The optional friction factor is for those
-  who finish early.
-- 25–35 min: the pooled plot. Each point is one tower; the curve is the
-  design rule. Read a required height off it for a shaft of any width.
-- 35–40 min: the discussion points below, or the water hammer in the
-  penstock.
-
-### Discussion points
-
-- **The period runs 20–25% long.** Measured T sits above 2π√(L·A_s/(g·A))
-  on every rung. The shaft's own water (9 m of it) has inertia the formula
-  leaves out — L + h_s·A/A_s closes half the gap — and the slot's
-  compressibility at c = 60 m/s stores a little of the swing as well.
-- **Narrow shafts throttle.** Below the ladder the entry into the shaft
-  costs head: a 2.0 m shaft reads 16% under the curve and 1.5 m reads 21%
-  under — the throttled surge tank, which real designs use on purpose.
-  Widen past 7 m (the slider goes to 8) and the penstock's water hammer
-  reflects off the shaft in full: the downsurge at the valve is down to
-  1 m of head at 8 m.
-- **The penstock still takes the hammer.** Gauge x = 62.5 m, z = 3 m on h
-  and slam again: +21 m at the valve at c = 60 m/s, a period of 4L_p/c, on
-  top of the slow swing in the shaft — the two time scales the tower keeps
-  apart.
-- **The knee sliders.** Knee x sets L: z_max ∝ √L and T ∝ √L. Knee z
-  moves the whole headrace up or down and changes nothing in the surge —
-  only the static head at the knee. The two bores do what A/A_s says.
-- **Maximum power (h_f = H/3) stays on the sheet.** The nozzle gap is a
-  slider (0.16–0.9 m), and the jet speed stays at √(2gH) all the way up it
-  (measured 20.6–21 m/s against 20.7): this model's pipe losses are too
-  small to bend the power curve over. HP-1 puts a throttle plate in its
-  penstock for exactly that reason; run the coda there. Past about 1.0 m the
-  penstock cavitates and the run collapses — a chaotic bore and a saturated
-  block past the nozzle, cured by R — which is why the slider stops at 0.9.
+The earlier class-width sweep remains available to an instructor after
+**⋯ Show everything**: vary D_s, reset and re-settle each run, and compare the
+crest with the rigid-column prediction. `rig.js` automates that verification,
+and `collect_plot.py` still pools rows of
+`student_id,digit,Ds_m,u0_ms,z0_m,rise_m,T_s`. It is an extension, not part of
+the revised tutorial sheet or the default HP-3 controls.

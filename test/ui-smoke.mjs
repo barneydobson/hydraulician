@@ -1102,11 +1102,10 @@ async function main() {
       await tab.close();
     }
     {
-      // hydro declares six params — the whole pool — and HP-3's digit rule
-      // rides the fifth (geom4, the shaft width). Every row must show under
-      // the scene's own label, and the exercise card's Yours field must be
-      // named after the bound param, not the row's "—" placeholder: that
-      // field is where a student types their shaft width.
+      // hydro declares six params — the whole pool. Every row must show under
+      // the scene's own label on the unrestricted scene, while HP-3 narrows
+      // that generic scene to the fixed geometry on its revised tutorial
+      // sheet and leaves only the gauge-channel selector in Controls.
       const tab = await browser.open(INDEX + "?scene=hydro");
       const r = await tab.evaluate(`
         const rows = [0, 1, 2, 3, 4, 5].map((k) => {
@@ -1124,13 +1123,25 @@ async function main() {
       const c = await ex.evaluate(`
         const f = document.querySelector('#dock input[aria-label="Surge shaft width D_s"]');
         const h = document.querySelector('#panel h3[data-sec="Geometry"]');
-        return { field: !!f, value: f ? +f.value : null,
-                 geomKept: !!h && !h.classList.contains("off") && !h.classList.contains("gone") };
+        const rows = [...document.querySelectorAll('#panel .row[data-control]')]
+          .filter((el) => !el.classList.contains('off') && !el.classList.contains('gone'))
+          .map((el) => el.dataset.control);
+        return { field: !!f,
+                 title: document.querySelector('#dock .extitle').textContent,
+                 geomKept: !!h && !h.classList.contains("off") && !h.classList.contains("gone"),
+                 rows, gaugeField: APP.state.gaugeField, mode: APP.state.mode,
+                 measure: APP.state.ui.measure, fields: APP.state.ui.fields };
       `);
       check("no uncaught errors", ex.errors.length === 0, ex.errors[0]);
-      check("the card's Yours field is named after the bound param", c.field);
-      eq("and opens on the scene's own default", c.value, 3);
-      check("the focused panel keeps the Geometry section", c.geomKept);
+      check("the fixed tutorial has no personalised shaft field", !c.field);
+      eq("the revised tutorial title reaches the card", c.title,
+         "Hydropower and unsteady flow: test the tutorial predictions");
+      check("the fixed tutorial hides Geometry", !c.geomKept);
+      eq("only Gauges plot survives in Controls", c.rows.join(","), "gaugeField");
+      eq("the gauges open on Level eta", c.gaugeField, "eta");
+      eq("the field opens on Speed", c.mode, 2);
+      eq("the measurement strip keeps rake and gauge", c.measure.join(","), "rake,gauge");
+      eq("the legend offers only Speed", c.fields.join(","), "speed");
       await ex.close();
     }
 

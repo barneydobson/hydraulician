@@ -969,9 +969,8 @@ const SCENES = (() => {
         // landed inside the headrace mouth and printed the soffit).
         spongeIn: 5.0,
         inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
-        // ORDER IS LOAD-BEARING: the Geometry panel binds its rows by index,
-        // and HP-3's digit rule names the shaft width as `geom4`. check_pack.py
-        // cross-checks that against this list.
+        // The Geometry panel binds its rows by index, so keep this in the same
+        // physical order as the scheme: knee, conduits, shaft, nozzle.
         params: [
           { key: "knee_x", label: "Knee x", min: 30, max: 54, step: 0.5, value: DEF.knee_x, unit: "m" },
           { key: "knee_z", label: "Knee z", min: 8, max: 20, step: 0.5, value: DEF.knee_z, unit: "m" },

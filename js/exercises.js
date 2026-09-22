@@ -572,10 +572,10 @@ const EXERCISES = [
     ],
     ui: {
       build: false,
-      measure: ["rake", "gauge"],
+      measure: ["rake", "gauge", "cv"],
       view: ["legendBtn"],
       fields: ["speed"],
-      controls: ["gaugeField"],
+      controls: ["gaugeField", "cvShow"],
       readouts: { rows: ["pos", "eta", "V", "uw"] },
     },
     start: "the fixed tutorial scheme: a 24.9 m reservoir, 42.4 m headrace, 3.0 m surge shaft and 0.48 m nozzle, running steadily",

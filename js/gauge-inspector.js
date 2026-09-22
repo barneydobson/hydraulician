@@ -33,6 +33,7 @@ const GINSP = (() => {
   // no back-compat.
   const SERIES = [
     ["h",     "h", "m",   "piezometric head, h = z + p/ρg"],
+    ["H",     "H", "m",   "total head, H = z + p/ρg + |u|²/2g"],
     ["d",     "d", "m",   "water depth of the column"],
     ["eta",   "η", "m",   "water level, η = z_b + d"],
     ["speed", "|u|", "m/s", "speed at the gauge cell"],

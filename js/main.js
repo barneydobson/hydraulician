@@ -727,7 +727,7 @@ const CONTROLS = [
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["h", "Piezometric head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
+    opts: [["h", "Piezometric head"], ["H", "Total head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
     get: () => state.gaugeField, set: (v) => state.gaugeField = v },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
@@ -2612,7 +2612,13 @@ function sampleGauges(A) {
     const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
     // η = z_b + d is the surface itself, so unlike h it carries no
     // non-hydrostatic bias under an accelerating column.
-    const s = { t: sim.t, h: z + pr.phead, d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
+    // H = h + |u|²/2g is the total (energy) head: the EGL, which the HGL h
+    // sits a velocity head below. Two gauges in the SAME moving reach differ
+    // by the friction loss between them; a still column (reservoir, shaft) has
+    // |u| ≈ 0, so there H = h = η.
+    const g = Math.abs(sim.p.g) || 9.81;
+    const s = { t: sim.t, h: z + pr.phead, H: z + pr.phead + pr.speed * pr.speed / (2 * g),
+                d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -3002,7 +3008,7 @@ function drawOverlay(A) {
   // that wants a prediction before a number.
   const cards = UIMODE.shows("gauges")
     ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-        fld === "h" ? "h" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
+        fld === "h" ? "h" : fld === "H" ? "H" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
         fld === "speed" ? "m/s" : "m")
     : [];
   GINSP.tick(cards);

@@ -558,26 +558,34 @@ const EXERCISES = [
 
   {
     id: "HP-3",
-    title: "Design the surge tower: the class measures the upsurge",
+    title: "Hydropower and unsteady flow: test the tutorial predictions",
     topic: "Hydropower",
     folder: "HP-3-surge-tower",
     scene: "hydro",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "1", gaugeField: "h" },
-    // The shaft width is the FIFTH declared param of the hydro scene, and the
-    // Geometry panel binds its rows by index — so geom4 IS d_shaft. Reorder
-    // the scene's params and this rule silently moves onto another slider;
-    // check_pack.py cross-checks the index against js/scenes.js for that reason.
-    digit: { label: "surge shaft width D_s", control: "geom4", base: 2.5, step: 0.5, unit: "m",
-             rule: "D_s = 2.5 + 0.5·d" },
+    viewParams: { mode: "2", gaugeField: "eta" },
     instruments: [
-      { tool: "gauge", where: "in the reservoir strip by the wall, x ≈ 6.6 m, z ≈ 20 m", why: "the reservoir level — every drawdown and upsurge is measured from it; the strip is the free surface the headrace actually sees" },
-      { tool: "gauge", where: "in the surge shaft, x ≈ 50 m, z ≈ 18 m — expand its card (⤢) for the trace", why: "the shaft level: z₀ on h before the slam, the crest on d after it (the h channel under an accelerating column reads low by a·D/g — see the README)" },
+      { tool: "rake", where: "through the headrace at x ≈ 27 m; read the rake's depth-averaged V as V₀", why: "the worksheet needs the conduit mean velocity q/D, not a point velocity from one cell" },
+      { tool: "gauge", where: "in the reservoir strip by the wall, x ≈ 6.6 m, z ≈ 20 m", why: "the reservoir level used as the datum for η₀" },
+      { tool: "gauge", where: "in the surge shaft, x ≈ 50 m, z ≈ 18 m — expand its card (⤢) for the trace", why: "the shaft level on η before shutdown and the crest rise on d afterwards" },
     ],
-    start: "a reservoir, a 42 m headrace, a surge shaft at the knee and a penstock down to a nozzle, running steadily",
-    task: "Set your shaft width, wait out the settle, gauge the reservoir and the shaft and hover the headrace for u₀; then switch Gauges plot to d, press V, and read the first crest and the period off the shaft trace.",
-    note: "The green bar at x = 63.5 m is the valve — V is the instantaneous shutdown. The nozzle beyond it sets the steady discharge; its gap is a Geometry slider, which is what the maximum-power coda moves.",
+    ui: {
+      build: false,
+      measure: ["rake", "gauge"],
+      view: ["legendBtn"],
+      fields: ["speed"],
+      controls: ["gaugeField"],
+      readouts: { rows: ["pos", "eta", "V", "uw"] },
+    },
+    start: "the fixed tutorial scheme: a 24.9 m reservoir, 42.4 m headrace, 3.0 m surge shaft and 0.48 m nozzle, running steadily",
+    task: "Complete the sheet's measured column: V₀, headrace h_f, V_jet, P, η₀, k and η_max. Use the rake for depth-averaged V₀ and hover the horizontal jet for V_jet; read the two gauges on Level η, then switch them to Depth d, press V and read the first crest.",
+    setup: [
+      "Before the session calculate the predicted column from q₀ = 7.6 m²/s, L = 42.4 m, D_h = 3.05 m, D_s = 3.0 m, D_p = 2.4 m and λ = 0.03.",
+      "After the settle, use η₀ = η_shaft − η_reservoir, h_f = −η₀ − V₀²/(2g), k = −η₀/V₀² and P = ½ρq₀V_jet².",
+      "For the shutdown use rise = d_max − d₀ and η_max = rise + η₀. Press R and let the 60 s settle finish before any repeat.",
+    ],
+    note: "The green bar at x = 63.5 m is the turbine valve; V closes it instantaneously. Leave the fixed sheet geometry alone — the hidden Geometry controls and the maximum-power flow sweep are not part of this comparison.",
     settle: 60,
   },
 

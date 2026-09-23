@@ -1389,9 +1389,11 @@ async function main() {
         eq("the canvas keeps the whole window", p.canvasW, p.innerW);
         // At this width twenty controls genuinely do not fit, and the strip is
         // built to SCROLL rather than to drop one. What must hold is that
-        // every control is still reachable.
+        // every control is still reachable. HJ-1's own profile is short enough
+        // to fit, so ⋯ first: the whole strip is what has to cope.
         check("the strip compacted itself", await tab.evaluate(
-          `return document.getElementById("bar").classList.contains("tighter");`));
+          `APP.UIMODE.lift();
+           return document.getElementById("bar").classList.contains("tighter");`));
         check("the last control can still be scrolled to", await tab.evaluate(`
           const g = document.getElementById("groups");
           if (getComputedStyle(g).overflowX !== "auto") return false;

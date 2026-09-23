@@ -739,7 +739,7 @@ const EXERCISES = [
     scene: "two-tank",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { gaugeField: "h", mode: "1", grade: true, speed: 1 },
+    viewParams: { gaugeField: "h", mode: "1", grade: true, channel: false, particles: false, speed: 1 },
     digit: { label: "Left reservoir width B₁", control: "geom0", base: 6.75, step: 0.25, unit: "m",
       rule: "B₁ = 6.75 + 0.25·d",
       also: [{ label: "Right reservoir width B₂", control: "geom1", base: 3.75, step: 0.25, unit: "m",
@@ -748,7 +748,12 @@ const EXERCISES = [
       { tool: "gauge", where: "Head gauges at (5, 0.35) and (26.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
       { tool: "flux", where: "optional Flux lines at x = 17 m, drawn upwards across each duct", why: "the two parallel discharges add; both branches see the same head difference" },
     ],
-    ui: { build: true },
+    // Nothing is drawn — the widths are sliders — so BUILD goes with the
+    // derivation, and the panel keeps only the two widths and the speed.
+    ui: {
+      view: ["legendBtn", "gradeBtn"],
+      controls: ["speed", "geom0", "geom1"],
+    },
     start: "two reservoirs at 3.00 and 1.20 m, joined by two full, identical 15 m × 0.10 m ducts; all quantities are per metre width",
     setup: ["Set both widths from your digit using the fields above or Controls → Geometry. Changing a width restarts the water and clock; keep Medium resolution.",
       "Predict the difference at 120 s: Δ = [√1.8 − 2.16(1/B₁ + 1/B₂)]². The total discharge law is q = 0.036√Δ m²/s.",

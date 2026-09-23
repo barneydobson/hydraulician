@@ -267,6 +267,7 @@ function switchScene(id) {
   state.dye = true;
   state.jumps = true;
   state.particles = false;            // scenes that want them set `sc.particles`
+  state.grade = false;                // an exercise that wants them says so in viewParams
   state.gaugeField = "h";
   state.tracerN = 9;
   UIMODE.reset();                     // a new scene is a whole interface again

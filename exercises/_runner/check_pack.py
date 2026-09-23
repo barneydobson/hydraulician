@@ -16,8 +16,9 @@ facts that are derivable from the register and leaves the prose to people:
   5. when a card carries a base/step digit rule and the README prints a
      ten-value ladder, the ladder is what the rule produces
   6. the UI profile: every tool/field/panel id it names actually exists (a
-     `view` list is matched against the strip's button ids, read from
-     js/main.js, because VIEW is a family of toggles rather than tools), and
+     `view` or `build` list is also matched against the strip's button ids,
+     read from js/main.js, because VIEW is a family of toggles and BUILD
+     carries Undo and Clear beside its tools), and
      BUILD is not hidden from a card whose task, start or setup tells the
      student to draw, cut, erase or otherwise build something
   7. no orphans in either direction
@@ -243,6 +244,11 @@ def panel_control_ids():
         src[start:end])
     if dynamic_geom:
         ids.update("geom" + n for n in re.findall(r'\d+', dynamic_geom.group(1)))
+    # The Boundaries rows are generated the same way, from a literal table
+    # whose rows lead with the id: `...[["openL", 0, "Left edge", ...], ...]
+    # .map(([id, ...`. Read the first string of each row.
+    for table in re.finditer(r'\.\.\.\[(\[.*?\])\]\.map\(\(\[id\b', src[start:end], re.S):
+        ids.update(re.findall(r'\[\s*"([A-Za-z0-9]+)"', table.group(1)))
     if not ids:
         print("check_pack.py cannot find any row ids in the CONTROLS spec -- "
               "ui.controls validation cannot run blind.")
@@ -344,7 +350,9 @@ def main():
     ROW_IDS = row_ids()
     CONTROL_IDS = panel_control_ids()
     # VIEW is a family of toggle BUTTONS, not tools, so its list is matched
-    # against button ids (UIMODE.keep tests both `it.tool` and `it.id`).
+    # against button ids (UIMODE.allows tests both `it.tool` and `it.id`).
+    # BUILD carries buttons too -- Undo and Clear -- and a card that narrows
+    # BUILD to the tools it draws with has to name Undo to keep it.
     VIEW_IDS = TOOL_IDS | view_button_ids()
     BUILD_TOOLS = {"wall", "erase", "valve", "spout", "pour"}
     for e in ex:
@@ -354,7 +362,7 @@ def main():
             for fam in ("build", "measure", "view"):
                 v = ui.get(fam)
                 if isinstance(v, list):
-                    known = VIEW_IDS if fam == "view" else TOOL_IDS
+                    known = TOOL_IDS if fam == "measure" else VIEW_IDS
                     bad = [t for t in v if t not in known]
                     if bad:
                         fail.append("%-5s ui.%s names tools that do not exist: %s"

@@ -364,6 +364,95 @@ const SCENES = (() => {
              "The left level starts at 3.00 m and the right at 1.20 m. R restores this initial condition.",
              "Both ducts share the same head loss; their discharges add. Storage and discharge are per metre out of the screen."] },
 
+    // --------------------------------------------------------- similitude
+    // DA-1 / DA-2: a tank and an exact λ-scale copy of it, side by side,
+    // each draining through a slot in its floor. V opens both slots at once.
+    //
+    // THE WHOLE RIG SCALES. The prototype (left) is fixed; the model (right)
+    // is the same drawing multiplied by λ about its own bottom-left corner
+    // (x = 5.2 m, z = 0) — walls, floor, slot, the shaft under the slot, the
+    // fill depth. So the model's depth d, gauge station and level marks are
+    // the prototype's times λ, and Froude similarity says its drain times are
+    // the prototype's times √λ.
+    //
+    // GRID-EXACT, OR IT IS NOT A SCALE MODEL. Every base dimension is a
+    // multiple of 20 cells at Medium (Δx = 0.02 m exactly: 9.5 × 4.0 m on
+    // the 95 000-cell budget gives 475 × 200), and λ moves in steps of 0.05,
+    // so every scaled edge lands on a cell face — the λ = ¼ slot is exactly
+    // 5 cells. Measured before snapping: an unsnapped slot rounds by up to
+    // ±½ cell per edge and moved the drain time by 7% between two copies of
+    // the SAME tank drawn at different x. Coordinates are still snapped to the
+    // live Δx (SIM.get(), which build() assigns before rasterise() calls
+    // this), so another Resolution gives the best similar drawing it can.
+    //
+    // WHY THE NUMBERS (measured headless, Medium, depth gauges at the
+    // quarter-width, marks d = 2.5 → 1.0 m scaled by λ): prototype window
+    // T_p = 4.06 s; the model drains FASTER than √λ·T_p by 9.3% at λ = ¼,
+    // falling steadily to 2.9% at λ = 0.65. Not compressibility (c = 80
+    // changes it by <0.5%), not Smagorinsky (cs = 0: <0.3%), not wall
+    // friction (cf = 0: <0.2%), not the outfall under the shaft (a fixed-
+    // height pedestal changes nothing). At High the λ = ½ residual vanishes
+    // (+1.2%) while λ = ¼ stays near −9.7% — a resolution effect that the
+    // smallest model has not grown out of: this solver's version of a scale
+    // effect, and DA-2's pooled plot is built on it.
+    //
+    //  c = 40, not the default 25: at 25 the prototype's jet (≈ 7 m/s) runs
+    //  at Mach 0.28 and adds ≈ 1% of its own; 40 halves that at 1.6× the
+    //  cost. The shafts drain through an OUTFALL floor (open = 2): with the
+    //  zero-gradient floor (1) the shafts filled and drowned both slots
+    //  within 2 s, and the tanks then took minutes to empty.
+    (() => {
+      const TW = 0.4, B = 4.0, T = 0.4, ZF = 0.8, H0 = 2.8, FB = 0.4, A = 0.4, SH = 1.2;
+      const XP = 0.2, XM = 5.2;
+      const snap = (v) => {
+        const S = typeof SIM !== "undefined" && SIM.get ? SIM.get() : null;
+        const dx = S && S.dx ? S.dx : 0.02;
+        return Math.round(v / dx) * dx;
+      };
+      const lamOf = (par) => (par && par.lam !== undefined ? par.lam : 0.25);
+      // One tank, scale s, outer left wall at X. Two solids, because the slot
+      // splits the U in two: each is a wall, its half of the floor, and a leg
+      // down to z = −0.5 either side of the shaft under the slot.
+      const tank = (X, s, tag, name) => {
+        const u = (v) => snap(X + s * v);
+        const xi0 = u(TW), xi1 = u(TW + B), xo1 = u(2 * TW + B);
+        const s0 = u(TW + B / 2 - A / 2), s1 = u(TW + B / 2 + A / 2);
+        const sh0 = u(TW + B / 2 - SH / 2), sh1 = u(TW + B / 2 + SH / 2);
+        const zb = snap(s * (ZF - T)), zf = snap(s * ZF), zt = Math.min(snap(s * (ZF + H0 + FB)), 4.0);
+        const Xs = snap(X);
+        const L = GEOM.poly([[Xs, -0.5], [sh0, -0.5], [sh0, zb], [s0, zb], [s0, zf], [xi0, zf], [xi0, zt], [Xs, zt]],
+          [{ id: "floor", label: name + ": floor (left of the slot)", e0: 4, e1: 4 },
+           { id: "wall", label: name + ": left wall", e0: 5, e1: 5 }], tag + "L");
+        const R = GEOM.poly([[sh1, -0.5], [xo1, -0.5], [xo1, zt], [xi1, zt], [xi1, zf], [s1, zf], [s1, zb], [sh1, zb]],
+          [{ id: "wall", label: name + ": right wall", e0: 3, e1: 3 },
+           { id: "floor", label: name + ": floor (right of the slot)", e0: 4, e1: 4 }], tag + "R");
+        return { solids: [L, R], valve: [s0, (zb + zf) / 2, s1, (zb + zf) / 2, zf - zb],
+                 inside: (x, z) => x > xi0 && x < xi1 && z > zf, level: zf + s * H0 };
+      };
+      const proto = () => tank(XP, 1, "proto", "Prototype");
+      const model = (par) => tank(XM, lamOf(par), "model", "Model");
+      return {
+        id: "scale-tanks", name: "Two tanks at two scales", key: "Froude time scale", group: "Similitude",
+        blurb: "A 4 m tank and an exact λ-scale copy, each draining through a slot in its floor. Press V to open both at once: which empties first, and by how much?",
+        W: 9.5, H: 4.0, c: 40, cf: 0.01, cs: 0.12, mode: 0, hmax: 3.0, headMax: 3.6, vmax: 7,
+        open: [0, 0, 2, 0], valveOpen: 0, particles: 0, spinup: 0,
+        params: [
+          { key: "lam", label: "Model scale λ", min: 0.25, max: 0.70, step: 0.05, value: 0.25, unit: "", resetWater: true },
+        ],
+        solids: (W, H, P, par) => [...proto().solids, ...model(par).solids],
+        valves: (W, H, par) => [proto().valve, model(par).valve],
+        water: (x, z, P, par) => {
+          const p = proto(), m = model(par);
+          if (p.inside(x, z)) return still(p.level, z, P);
+          if (m.inside(x, z)) return still(m.level, z, P);
+          return 0;
+        },
+        tips: ["Press <b>V</b> to open both slots at the same instant.",
+               "The right-hand tank is the left one scaled by λ: every length, the slot and the fill depth. Change λ in Controls → Geometry (it restarts the water).",
+               "Gauges on <b>Depth d</b> read the water depth above each tank's floor; expand a gauge card (⤢) and hover its trace to read times.",
+               "Froude scaling: lengths × λ, velocities × √λ, times × √λ, discharge per metre × λ^1.5."] };
+    })(),
+
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",
       blurb: "Water falls in at the top left. Left-drag to draw edges and route it; right-drag for a big flow.",
       W: 9, H: 5, c: 22, cf: 0.02, hmax: 1.2, vmax: 5,

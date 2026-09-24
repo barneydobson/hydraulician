@@ -18,9 +18,10 @@
    rig.js-built original on an FNV-1a hash of sim.mask plus wall/valve cell
    counts and 18 further state keys. All 26 round-trip byte-identical.
 
-   DA-3 (scale effects) has no payload of its own: it drives DA-1's and DA-2's
-   rigs around the Resolution control, so it maps onto DA-1@1 / DA-1@0.5 /
-   DA-1@0.25 (its resolution sweep) and DA-2@0.25 (its orifice exhibit).
+   DA-3 (the weir model study) keeps the three weir rungs first captured for
+   the scale-ladder demo: the same broad-crested weir at λ = 1, ½ and ¼, one
+   payload per rung, picked by the card's `rigTable`. DA-1 and DA-2 need no
+   payload — their two tanks are a scene (scale-tanks in js/scenes.js).
 
    Regenerate: exercises/_runner/runner.py + the rig.js of each folder; the
    build call used for every entry is quoted above its key.  Do not hand-edit
@@ -282,8 +283,8 @@ const EXERCISE_RIGS = {
    "ui": {"mode": 3, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
   },
 
-  /* DA-1-scale-ladder/rig.js · DA1.build(1, 0.72) */
-  "DA-1@1": {
+  /* DA-3-weir-model-study/rig.js · DA1.build(1, 0.72) */
+  "DA-3@1": {
    "v": 2,
    "scene": "sandbox",
    "segs": [
@@ -306,8 +307,8 @@ const EXERCISE_RIGS = {
    "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
   },
 
-  /* DA-1-scale-ladder/rig.js · DA1.build(0.5, 0.72) */
-  "DA-1@0.5": {
+  /* DA-3-weir-model-study/rig.js · DA1.build(0.5, 0.72) */
+  "DA-3@0.5": {
    "v": 2,
    "scene": "sandbox",
    "segs": [
@@ -329,8 +330,8 @@ const EXERCISE_RIGS = {
    "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
   },
 
-  /* DA-1-scale-ladder/rig.js · DA1.build(0.25, 0.72) */
-  "DA-1@0.25": {
+  /* DA-3-weir-model-study/rig.js · DA1.build(0.25, 0.72) */
+  "DA-3@0.25": {
    "v": 2,
    "scene": "sandbox",
    "segs": [
@@ -352,97 +353,9 @@ const EXERCISE_RIGS = {
    "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
   },
 
-  /* DA-2-time-scales/rig.js · DA2.build(1) — 4-cell orifice */
-  "DA-2@1": {
-   "v": 2,
-   "scene": "sandbox",
-   "segs": [
-     [0.5, 3.45, 3.4, 2.85, 0.55, 0],
-     [3.2, 2.6, 7.1, 1.95, 0.55, 0],
-     [4.5, -0.2, 4.5, 3.2, 0.12, 255],
-     [4.35, 0, 4.65, 0, 0.204211, 128]
-   ],
-   "open": [0, 1, 0, 0],
-   "valveClosed": 1,
-   "inflow": {"on": 0, "free": 0, "level": 0, "q": 0},
-   "tailwater": {"on": 1, "level": 0.04},
-   "source": {"on": 0, "x": 0.55, "z": 4.55, "r": 0.14, "vx": 1.1, "vz": -1.4},
-   "wave": {"on": 0, "amp": 0, "period": 1.5, "x": 0.15},
-   "hyd": {"c": 22, "cf": 0.02, "cs": 0.16, "bulk": 0.1, "ca": 0.6, "nu": 1e-05, "slip": 0, "g": 9.81},
-   "dye": {"line": 0, "decay": 0.02},
-   "gauges": [[2.25, 0.1], [5.5, 0.02]],
-   "rakes": [],
-   "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
-  },
 
-  /* DA-2-time-scales/rig.js · DA2.build(0.75) — 3-cell orifice */
-  "DA-2@0.75": {
-   "v": 2,
-   "scene": "sandbox",
-   "segs": [
-     [0.5, 3.45, 3.4, 2.85, 0.55, 0],
-     [3.2, 2.6, 7.1, 1.95, 0.55, 0],
-     [3.375, -0.2, 3.375, 3.2, 0.12, 255],
-     [3.225, 0, 3.525, 0, 0.157086, 128]
-   ],
-   "open": [0, 1, 0, 0],
-   "valveClosed": 1,
-   "inflow": {"on": 0, "free": 0, "level": 0, "q": 0},
-   "tailwater": {"on": 1, "level": 0.04},
-   "source": {"on": 0, "x": 0.55, "z": 4.55, "r": 0.14, "vx": 1.1, "vz": -1.4},
-   "wave": {"on": 0, "amp": 0, "period": 1.5, "x": 0.15},
-   "hyd": {"c": 22, "cf": 0.02, "cs": 0.16, "bulk": 0.1, "ca": 0.6, "nu": 1e-05, "slip": 0, "g": 9.81},
-   "dye": {"line": 0, "decay": 0.02},
-   "gauges": [[1.6875, 0.075], [4.375, 0.02]],
-   "rakes": [],
-   "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
-  },
 
-  /* DA-2-time-scales/rig.js · DA2.build(0.5) — 2-cell orifice */
-  "DA-2@0.5": {
-   "v": 2,
-   "scene": "sandbox",
-   "segs": [
-     [0.5, 3.45, 3.4, 2.85, 0.55, 0],
-     [3.2, 2.6, 7.1, 1.95, 0.55, 0],
-     [2.25, -0.2, 2.25, 3.2, 0.12, 255],
-     [2.1, 0, 2.4, 0, 0.120835, 128]
-   ],
-   "open": [0, 1, 0, 0],
-   "valveClosed": 1,
-   "inflow": {"on": 0, "free": 0, "level": 0, "q": 0},
-   "tailwater": {"on": 1, "level": 0.04},
-   "source": {"on": 0, "x": 0.55, "z": 4.55, "r": 0.14, "vx": 1.1, "vz": -1.4},
-   "wave": {"on": 0, "amp": 0, "period": 1.5, "x": 0.15},
-   "hyd": {"c": 22, "cf": 0.02, "cs": 0.16, "bulk": 0.1, "ca": 0.6, "nu": 1e-05, "slip": 0, "g": 9.81},
-   "dye": {"line": 0, "decay": 0.02},
-   "gauges": [[1.125, 0.05], [3.25, 0.02]],
-   "rakes": [],
-   "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
-  },
 
-  /* DA-2-time-scales/rig.js · DA2.build(0.25) — 1-cell orifice */
-  "DA-2@0.25": {
-   "v": 2,
-   "scene": "sandbox",
-   "segs": [
-     [0.5, 3.45, 3.4, 2.85, 0.55, 0],
-     [3.2, 2.6, 7.1, 1.95, 0.55, 0],
-     [1.125, -0.2, 1.125, 3.2, 0.12, 255],
-     [0.975, 0, 1.275, 0, 0.09295, 128]
-   ],
-   "open": [0, 1, 0, 0],
-   "valveClosed": 1,
-   "inflow": {"on": 0, "free": 0, "level": 0, "q": 0},
-   "tailwater": {"on": 1, "level": 0.04},
-   "source": {"on": 0, "x": 0.55, "z": 4.55, "r": 0.14, "vx": 1.1, "vz": -1.4},
-   "wave": {"on": 0, "amp": 0, "period": 1.5, "x": 0.15},
-   "hyd": {"c": 22, "cf": 0.02, "cs": 0.16, "bulk": 0.1, "ca": 0.6, "nu": 1e-05, "slip": 0, "g": 9.81},
-   "dye": {"line": 0, "decay": 0.02},
-   "gauges": [[0.5625, 0.025], [2.125, 0.02]],
-   "rakes": [],
-   "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
-  },
 
   /* UN-3-surge-tank/rig.js · UN3.setup(0.98) on ?scene=hammer — b_s = 0.98 m (7 cells, digit d = 2), the width the README's seal audit is quoted at */
   "UN-3": {

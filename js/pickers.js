@@ -863,8 +863,12 @@ const EX = (() => {
       // (DA-1's λ = ¼ weir is a different rig, not a different number), so the
       // input survives only on those cards.
       box.querySelector(".exd").style.display = cur.rigTable ? "flex" : "none";
+      // A card whose drawings are not a per-student assignment (DA-3's three
+      // weir rungs, which every student loads in turn) names the box itself:
+      // `rigPrompt` replaces the student-number label and its gloss.
+      box.querySelector(".exd label").textContent = cur.rigPrompt || "student number ends in";
       box.querySelector(".exval").textContent =
-        cur.rigTable ? "picks which captured drawing loads" : "";
+        cur.rigTable && !cur.rigPrompt ? "picks which captured drawing loads" : "";
       // Where the personalised thing is a stroke or a station there is no value
       // to print, so the rule itself is the instruction.
       line(box.querySelector(".exrule"), "", cur.digitNote || "");

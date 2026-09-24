@@ -29,8 +29,9 @@ assignment); you work the rule out, look your row up in the brief's table
 where there is one, and set, place or draw it yourself. Coupled values,
 instrument positions and staged sequences stay in the student's hands:
 getting them wrong and seeing why is the exercise. The one card that still
-takes a typed digit is a variant-rig one (DA-1, DA-3, B8), where the digit
-picks which captured drawing loads. `↻ Reset to the starting point` on the
+takes a typed digit is a variant-rig one (B8), where the digit picks which
+captured drawing loads; DA-3 uses the same box to load its three weir rungs
+in turn. `↻ Reset to the starting point` on the
 card restores the common setup.
 
 How to run an exercise is described once, above — it is the same for all of
@@ -47,9 +48,9 @@ pause-and-read promptly (the chart buffer keeps moving).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|
-| DA-1 | The scale ladder | DA-1-scale-ladder/ | RIG-B weir ×3 scales | (λ, q, H) |
-| DA-2 | Time scales as √λ | DA-2-time-scales/ | RIG-C tank ×λ | (λ, t between marks) |
-| DA-3 | Scale effects, live | DA-3-scale-effects/ | DA-1/DA-2 rigs × resolutions | optional (λ, q, resolution, C_d) |
+| DA-1 | Which tank empties first? | DA-1-which-empties-first/ | scale-tanks (λ = ¼) | — (lecturer demo) |
+| DA-2 | Time scales as √λ | DA-2-time-scales/ | scale-tanks, λ = 0.25 + 0.05·d | (λ, T_p, T_m, error %) |
+| DA-3 | A weir model study | DA-3-weir-model-study/ | RIG-B weir ×3 rungs (tutorial sheet) | (H, C_d per rung) |
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |
 | HP-2 | Cups vs plates | HP-2-pelton/ | shared jet rig | — (lecturer demo) |
 | HP-3 | Hydropower and unsteady flow | HP-3-surge-tower/ | hydro (fixed tutorial scheme) | (V₀, h_f, V_jet, P, η₀, k, η_max) |

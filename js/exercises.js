@@ -27,8 +27,8 @@
  *                  physically working rig: the resolution the geometry was
  *                  captured at, the open/closed edges, which supplies and
  *                  controls exist, and the levels/constants a README documents
- *                  as load-bearing (FR-1's 2.50 m tailwater, DA-2's 0.04 m
- *                  draining apron). CONTROLS ids → values;
+ *                  as load-bearing (FR-1's 2.50 m tailwater, DA-3's q-driven
+ *                  reservoir with no tailwater). CONTROLS ids → values;
  *                  key ORDER matters, because ticking a level control opens its
  *                  own edge, so edges come first.
  *   viewParams     APPLIED. Display and readout only — Field, Gauges plot,
@@ -37,8 +37,8 @@
  *                  LOOKED at (UN-3 is unreadable on the Head channel).
  *   studentParams  DISPLAYED, NEVER APPLIED. Values the worksheet asks the
  *                  student to set, that no digit rule covers — a staged step
- *                  (B9's two level controls), a per-scale start level (DA-2's
- *                  h_start), an assigned cell (B5). Each is
+ *                  (B9's two level controls), a per-rung discharge and level
+ *                  (DA-3's weir), an assigned cell (B5). Each is
  *                  {control, value?, unit?, rule?}.
  *   digit          DISPLAYED, NEVER APPLIED (with one exception, below). The
  *                  personalised parameter: `base` + `step`·d, or a per-digit
@@ -51,9 +51,11 @@
  *                  number's last digit and the lecturer owns explaining it.
  *                  Nothing is computed or written for them.
  *
- * The exception: `rigTable` picks WHICH captured drawing loads, because DA-1's
+ * The exception: `rigTable` picks WHICH captured drawing loads, because DA-3's
  * λ = ¼ weir is a different rig, not a different number, and nobody is going to
- * hand-draw it. Geometry is part of the common starting point.
+ * hand-draw it. Geometry is part of the common starting point. Where the
+ * drawings are not a per-student assignment (DA-3 loads all three rungs in
+ * turn) `rigPrompt` relabels the box that picks them.
  *
  * OTHER FIELDS
  *   id       programme id, e.g. "HJ-1"           title    the README's own h1
@@ -1061,106 +1063,84 @@ const EXERCISES = [
   // ------------------------------------------------------ dimensional analysis
   {
     id: "DA-1",
-    title: "The scale ladder",
+    title: "Which tank empties first?",
     topic: "Similitude",
-    folder: "DA-1-scale-ladder",
-    scene: "sandbox",
-    rig: "DA-1@1",
-    // The λ third is d mod 3, and each third is a different DRAWING — so the
-    // digit picks which captured rig loads. Nobody hand-draws a λ = ¼ weir.
-    rigTable: ["DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1", "DA-1@0.5",
-               "DA-1@0.25", "DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1"],
-    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
-                 inflowOn: true, inFree: false, twOn: false,
-                 spoutOn: false, waveOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
-    digit: { label: "q (already scaled by λ^1.5)", control: "inQ", unit: "m²/s",
-             rule: "q_base = 0.60 + 0.06·d, then scaled by λ^1.5 for your third",
-             table: [0.600, 0.235, 0.090, 0.780, 0.295, 0.115, 0.960, 0.360, 0.135, 1.140],
-             also: [{ label: "reservoir", control: "inLevel", unit: "m",
-                      rule: "the level paired with your scaled q",
-                      table: [1.795, 1.165, 0.840, 1.890, 1.210, 0.865,
-                              1.975, 1.250, 0.880, 2.055] }] },
-    digitNote: "your scale third is d mod 3: λ = 1, ½ or ¼, and the drawing loads with your digit",
+    folder: "DA-1-which-empties-first",
+    scene: "scale-tanks",
+    rig: null,
+    // The scene boots at λ = ¼, which is the demo. Nothing personal: the
+    // lecturer takes the class vote, presses V and reads the two traces.
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digitNote: "lecturer demo: no personalised parameter",
     instruments: [
-      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼ (z ≈ 1.25 / 0.90 / 0.72)", why: "h, and H = h − P" },
+      { tool: "gauge", where: "one in each tank, a quarter of the way across: prototype x = 1.6 m, model x = 5.55 m, anywhere below the water", why: "depth d above each floor; the two traces are the whole demo" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
-    start: "a broad-crested weir, drawn at your own scale",
-    task: "Set your scaled q and its paired reservoir level, then read the gauge depth h and report the head over the crest, H = h − P.",
-    settle: 55,
+    ui: { view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed"], panel: "shut" },
+    start: "a 4 m tank and an exact quarter-scale copy, both full, slots shut",
+    setup: ["Vote before pressing anything: does the small tank empty in the same time, a quarter of the time, half the time or a sixteenth?",
+            "Place the two Depth gauges, then press V: both slots open at the same instant.",
+            "Expand each gauge (⤢) and hover its trace: the prototype falls from d = 2.50 to 1.00 m in about 4.1 s, the model from 0.625 to 0.25 m in about 1.8 s."],
+    task: "Open both slots together and compare the two drain times. Their ratio is close to √¼ = ½, not ¼: a Froude model runs slow.",
+    settle: 0,
   },
+
+
   {
     id: "DA-2",
     title: "Time scales as √λ",
     topic: "Similitude",
     folder: "DA-2-time-scales",
-    scene: "sandbox",
-    rig: "DA-2@1",
-    rigTable: ["DA-2@1", "DA-2@0.75", "DA-2@0.5", "DA-2@0.25", "DA-2@1",
-               "DA-2@0.75", "DA-2@0.5", "DA-2@0.25", "DA-2@1", "DA-2@0.75"],
-    // The 0.04 m tailwater on an open right edge is load-bearing: a bare open
-    // edge ponds and chokes the orifice within ~27 s. The tank loads EMPTY —
-    // filling it is the experiment.
-    rigParams: { budget: "Medium", spoutOn: false,
-                 openL: "0", openR: "1", openB: "0", openT: "0",
-                 twOn: true, twLevel: 0.04, inQ: 0 },
-    rigWhy: { twLevel: "the apron must drain actively: a bare open edge ponds and chokes the orifice within ~27 s." },
-    viewParams: { gaugeField: "h", mode: "0" },
-    studentParams: [
-      { control: "inflowOn", value: true, rule: "step 2 — the fill source, then untick it again for step 3" },
-      { control: "inLevel", unit: "m", rule: "your own h_start: 1.80 / 1.35 / 0.90 / 0.45 m for λ = 1 / ¾ / ½ / ¼" },
-    ],
-    digitNote: "your scale is r = d mod 4, λ = 1 − 0.25·r. Fill to h_start = 1.80 / 1.35 / 0.90 / 0.45 m and stop at 0.60 / 0.45 / 0.30 / 0.15 m",
-    setup: ["The tank loads empty with the valve shut: the fill is part of the experiment.",
-            "Fill from the reservoir to your own h_start.",
-            "Untick Upstream reservoir AND set the Left edge back to Wall, then let it stand.",
-            "Press V and time the fall to h_stop on the status-bar clock."],
+    scene: "scale-tanks",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digit: { label: "Model scale λ", control: "geom0", base: 0.25, step: 0.05, rule: "λ = 0.25 + 0.05·d" },
     instruments: [
-      { tool: "gauge", where: "in the tank, near the floor: x ≈ 2.25 / 1.69 / 1.13 / 0.56 m for λ = 1 / ¾ / ½ / ¼", why: "the falling level you time" },
-      { tool: "gauge", where: "on the apron beyond the plate (x ≈ 5.5 / 4.4 / 3.3 / 2.1 m, z ≈ 0.02 m)", why: "confirms the apron is draining, not ponding" },
+      { tool: "gauge", where: "prototype: x = 1.6 m, 1.4 m in from the tank's outer left edge at x = 0.2 m (any height below the water)", why: "prototype depth d" },
+      { tool: "gauge", where: "model: the same station scaled by λ from the model's outer left edge at x = 5.2 m, i.e. x = 5.2 + 1.4λ m", why: "model depth d; the scaled station is the first length-scale step" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inflowOn", "inLevel", "openL"] },
-    start: "a tank and orifice at your own scale, loaded empty",
-    task: "Follow the steps to fill and isolate, then press V and time the fall from h_start to h_stop on the status-bar clock.",
-    settle: 5,
+    ui: { view: ["legendBtn"], fields: ["water"], controls: ["speed", "geom0"] },
+    start: "a 4 m prototype tank and a λ-scale copy of it, both full, slots shut; per metre width",
+    setup: ["Set Model scale λ from your digit (the field above, or Controls → Geometry). The water restarts full.",
+            "Place both Depth gauges (5), press V to open the two slots together, and let both tanks empty (about 10 s).",
+            "Expand each gauge (⤢) and hover its trace. Prototype: read the times at which d passes 2.50 m and 1.00 m; their difference is T_p. Model: the same at d = 2.50λ and 1.00λ; that difference is T_m.",
+            "Froude similarity predicts T_m = √λ·T_p. Your error = 100 × (T_m − √λ·T_p) / (√λ·T_p) %."],
+    task: "Time both tanks between their depth marks, then submit λ, T_p, T_m and your % error. The class pools the errors into one plot against λ.",
+    settle: 0,
   },
+
+
   {
     id: "DA-3",
-    title: "Scale effects, live",
+    title: "A weir model study",
     topic: "Similitude",
-    folder: "DA-3-scale-effects",
+    folder: "DA-3-weir-model-study",
     scene: "sandbox",
-    // DA-3 has no rig of its own: it drives DA-1's weir around the Resolution
-    // control, so it rebuilds YOUR λ third and then changes only Δx.
-    rig: "DA-1@1",
-    rigTable: ["DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1", "DA-1@0.5",
-               "DA-1@0.25", "DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1"],
-    // Medium is the capture resolution and therefore the common starting
-    // point; moving OFF it is the whole exercise, so the digit's resolution is
-    // the student's to set — after the rig has loaded, never before.
-    rigParams: { budget: "Medium", spoutOn: false,
-                 openL: "1", openR: "1", openB: "1", openT: "0",
-                 inflowOn: true, inFree: false, twOn: false },
+    // The same broad-crested weir drawn at three scales; the box picks the
+    // rung. Every student loads all three in turn, so it is not a student
+    // number (rigPrompt relabels it).
+    rig: "DA-3@1",
+    rigTable: ["DA-3@1", "DA-3@0.5", "DA-3@0.25"],
+    rigPrompt: "rung: 0 = prototype (λ = 1), 1 = 1:2 model, 2 = 1:4 model",
+    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
+                 inflowOn: true, inFree: false, twOn: false,
+                 spoutOn: false, waveOn: false },
     viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
-    digit: { label: "q", control: "inQ", unit: "m²/s",
-             rule: "your own DA-1 row — q must not move when the resolution does",
-             table: [0.600, 0.235, 0.090, 0.780, 0.295, 0.115, 0.960, 0.360, 0.135, 1.140],
-             also: [{ label: "reservoir", control: "inLevel", unit: "m",
-                      rule: "your own DA-1 level, unchanged between the two runs",
-                      table: [1.795, 1.165, 0.840, 1.890, 1.210, 0.865,
-                              1.975, 1.250, 0.880, 2.055] },
-                    { label: "resolution", control: "budget",
-                      rule: "even digit → Low, odd → High. Set it AFTER the rig has loaded, and never Very high or Ultra",
-                      table: ["Low", "High", "Low", "High", "Low",
-                              "High", "Low", "High", "Low", "High"] }] },
-    digitNote: "even digit gives Low, odd gives High. Never Very high or Ultra - DA-1's weir will not settle there",
-    instruments: [
-      { tool: "gauge", where: "the same approach-pool station as DA-1: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼", why: "h, and it must not move between the two resolutions" },
+    studentParams: [
+      { control: "inQ", unit: "m²/s", rule: "0.780 at λ = 1; your Froude-scaled q_m on the two models" },
+      { control: "inLevel", unit: "m", rule: "1.891 / 1.195 / 0.848 m for λ = 1 / ½ / ¼ (the reservoir level paired with that q)" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel", "budget"] },
-    start: "your own DA-1 weir, at the Resolution it was captured on",
-    task: "Keep your own DA-1 weir, q and level exactly as they are and change ONLY the Resolution, then re-read H at the same station and recompute C_d.",
+    digitNote: "the weir is the prototype at λ = 1: crest height P = 0.696 m above the bed, per-metre discharge q_p = 0.780 m²/s",
+    instruments: [
+      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼, just above the crest height", why: "the pool depth d above the bed, and H = d − P" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
+    start: "a broad-crested weir; the box above loads the prototype or one of its two scale models",
+    setup: ["Before the session answer the sheet's questions on the dimensionless groups and the model design.",
+            "For each rung: load it with the box above, type Inflow q and Reservoir level into the fields above (the slider steps in 0.005, so type q), press R and wait for the settle (55 / 40 / 28 s at λ = 1 / ½ / ¼).",
+            "Place a Gauge (5) at the station and read the steady pool depth d (the median of the wobble). H = d − P, with P = 0.696λ m; C_d = q / (√g · H^1.5)."],
+    task: "Fill the sheet's measured column: H and C_d for the prototype and both models, then compare with your Froude-scaled predictions.",
     settle: 55,
   },
 

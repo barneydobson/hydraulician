@@ -1,18 +1,18 @@
-# DA-2 · Time scales as √λ
+# DA-2 · Time scales as √L_r
 
 ## Lecturer notes
 
 A quick in-class exercise, 10–15 minutes, on the Froude time scale. Each
-student gets their own model scale λ from their student number and runs a
-4 m prototype tank beside an exact λ-scale copy. Both drain through a slot
+student gets their own model scale L_r from their student number and runs a
+4 m prototype tank beside an exact scale copy at length ratio L_r. Both drain through a slot
 in the floor, and V opens the two slots together. Students do three things:
 
-- scale a gauge station and two depth marks by λ, which is length scaling;
+- scale a gauge station and two depth marks by L_r, which is length scaling;
 - time both tanks between their marks;
-- compare the model time with Froude's prediction T_m = √λ·T_p.
+- compare the model time with Froude's prediction T_m = √L_r·T_p.
 
 They submit the percentage error. The class then pools the errors into one
-plot against λ.
+plot against L_r.
 
 It is the quick-exercise partner of DA-1, the lecturer demo on the same
 scene. The DA-1 vote establishes *that* a quarter-scale tank drains in about
@@ -34,18 +34,18 @@ The `scale-tanks` scene is a 9.5 m × 4.0 m slice, per metre width, with
 | | prototype (left) | model (right) |
 |---|---|---|
 | outer left edge | x = 0.2 m | x = 5.2 m |
-| clear width B | 4.0 m | 4.0λ m |
-| walls, floor | 0.4 m thick | 0.4λ m |
-| floor top | z = 0.8 m | z = 0.8λ m |
-| slot in the floor, a | 0.40 m (20 cells) | 0.40λ m (5 cells at λ = ¼) |
-| fill depth above the floor | 2.8 m | 2.8λ m |
-| gauge station | x = 1.6 m | x = 5.2 + 1.4λ m |
+| clear width B | 4.0 m | 4.0 L_r m |
+| walls, floor | 0.4 m thick | 0.4 L_r m |
+| floor top | z = 0.8 m | z = 0.8L_r m |
+| slot in the floor, a | 0.40 m (20 cells) | 0.40 L_r m (5 cells at L_r = ¼) |
+| fill depth above the floor | 2.8 m | 2.8 L_r m |
+| gauge station | x = 1.6 m | x = 5.2 + 1.4 L_r m |
 
-The whole model is the prototype multiplied by λ about the model's
+The whole model is the prototype multiplied by L_r about the model's
 bottom-left corner. That includes the shaft under the slot, which drains to
-an outfall floor. Every base dimension is a multiple of 20 cells and λ moves
-in steps of 0.05, so every scaled edge lands on a cell face. At λ = ¼ the
-slot is exactly 5 cells wide. Changing λ (Controls → Geometry) restarts the
+an outfall floor. Every base dimension is a multiple of 20 cells and L_r moves
+in steps of 0.05, so every scaled edge lands on a cell face. At L_r = ¼ the
+slot is exactly 5 cells wide. Changing L_r (Controls → Geometry) restarts the
 water with both tanks full. V opens both slots at once.
 
 **Gauges read depth.** A gauge on **Depth d** reads the water above the
@@ -55,17 +55,17 @@ x of the gauge matters: any height below the water gives the same d.
 ## Theory
 
 Torricelli drainage of a tank of plan width B through a slot of width a,
-per metre width:
+per metre width, with η the water level and Δh the head over the slot:
 
-    B dh/dt = −C_d a √(2gh)   ⇒   T = 2B/(C_d a √2g) · (√h₁ − √h₂)
+    B dη/dt = −C_d a √(2gΔh)   ⇒   T = 2B/(C_d a √2g) · (√Δh₀ − √Δhₜ)
 
-Scale every length by λ (B, a, h₁, h₂). The ratio B/a is unchanged and
-√h₁ − √h₂ scales as √λ, so
+between heads Δh₀ and Δhₜ (the marks). Scale every length by L_r (B, a, Δh₀,
+Δhₜ). The ratio B/a is unchanged and √Δh₀ − √Δhₜ scales as √L_r, so
 
-    T_m / T_p = √λ   (if C_d is the same at both scales)
+    T_m / T_p = √L_r   (if C_d is the same at both scales)
 
 This is the Froude time scale, T_r = L_r/V_r = L_r/√L_r = √L_r, reached
-from a formula the class already knows. The naive guesses are T_m/T_p = λ
+from a formula the class already knows. The naive guesses are T_m/T_p = L_r
 ("it's four times smaller") or 1 ("same shape, same time"). Both are off by
 far more than any scatter.
 
@@ -73,27 +73,27 @@ far more than any scatter.
 
 **d** is the last digit of the student number:
 
-> **λ = 0.25 + 0.05·d**
+> **L_r = 0.25 + 0.05·d**
 
 | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **λ** | 0.25 | 0.30 | 0.35 | 0.40 | 0.45 | 0.50 | 0.55 | 0.60 | 0.65 | 0.70 |
+| **L_r** | 0.25 | 0.30 | 0.35 | 0.40 | 0.45 | 0.50 | 0.55 | 0.60 | 0.65 | 0.70 |
 
-The digit is displayed, not applied. The student sets **Model scale λ**
+The digit is displayed, not applied. The student sets **Length ratio L_r**
 themselves, on the card's field or in Controls → Geometry.
 
 ## What the students do
 
-1. Set λ from the digit. The water restarts, full.
+1. Set L_r from the digit. The water restarts, full.
 2. Place a Depth gauge (`5`) in the prototype at x = 1.6 m. Work out the
-   model's station, 5.2 + 1.4λ, and place the second gauge there.
+   model's station, 5.2 + 1.4 L_r, and place the second gauge there.
 3. Press **V** and let both tanks empty, about 10 s of simulated time.
 4. Expand each gauge (⤢) and hover the trace. Read the prototype's time
-   passing d = 2.50 m and 1.00 m, and the model's passing 2.50λ and 1.00λ.
+   passing d = 2.50 m and 1.00 m, and the model's passing 2.50 L_r and 1.00 L_r.
    The two differences are T_p and T_m. The absolute clock does not matter,
    only differences, so nobody has to note when V was pressed.
-5. Predict √λ·T_p, compute the error 100·(T_m − √λ·T_p)/(√λ·T_p), and submit
-   **λ, T_p, T_m, error**.
+5. Predict √L_r·T_p, compute the error 100·(T_m − √L_r·T_p)/(√L_r·T_p), and submit
+   **L_r, T_p, T_m, error**.
 
 The upper marks are clear of the valve-opening transient: the prototype
 passes 2.50 m at 0.71 s. The lower marks are clear of the last few cells
@@ -103,9 +103,9 @@ over the slot.
 
 Headless at Medium, sampling depth every 5 ms of simulated time; `rig.js`
 reproduces these. T_p = **4.056 s** for every digit, because the prototype
-does not change with λ.
+does not change with L_r.
 
-| d | λ | √λ·T_p (s) | T_m (s) | error (%) |
+| d | L_r | √L_r·T_p (s) | T_m (s) | error (%) |
 |---|---|---:|---:|---:|
 | 0 | 0.25 | 2.028 | 1.840 | −9.3 |
 | 1 | 0.30 | 2.222 | 2.030 | −8.6 |
@@ -124,7 +124,7 @@ across the class.
 
 ## Pooling the class
 
-Collect one row per student, `student_id,digit,lambda,T_p_s,T_m_s,error_pct`
+Collect one row per student, `student_id,digit,L_r,T_p_s,T_m_s,error_pct`
 (extra columns are ignored), export the CSV and run:
 
 ```bash
@@ -134,24 +134,24 @@ python3 collect_plot.py data/simulated-class.csv  # the shipped dry-run class
 
 The dry-run class has three rows per digit: the measured value and two with
 ±0.03 s of reading noise on each time. The script recomputes each error from
-the times and flags any submitted error that disagrees. It fits T_m/T_p ∝ λⁿ
+the times and flags any submitted error that disagrees. It fits T_m/T_p ∝ L_rⁿ
 (the dry run gives n = 0.56 against Froude's 0.5), and it extrapolates a
-straight line through the errors to λ = 1, where the model *is* the
+straight line through the errors to L_r = 1, where the model *is* the
 prototype. The dry run lands at +1%, i.e. zero within the scatter.
 
 ![pooled class plot](plots/pooled-demo.png)
 
 ## Discussion points
 
-- **Nobody got a quarter.** Every row sits within 10% of √λ and a factor of
-  two or more from λ. A Froude model runs slow: a 1:25 model of a 2-hour
+- **Nobody got a quarter.** Every row sits within 10% of √L_r and a factor of
+  two or more from L_r. A Froude model runs slow: a 1:25 model of a 2-hour
   prototype drain takes 24 minutes, not 5.
-- **The errors are not noise: they trend with λ.** The smaller the model,
+- **The errors are not noise: they trend with L_r.** The smaller the model,
   the faster it drains relative to Froude, and the line heads to zero at
-  λ = 1. This is a scale effect: something about the model does not shrink
+  L_r = 1. This is a scale effect: something about the model does not shrink
   with it.
 - **What does not shrink here is the grid.** The slot is 20 cells wide in
-  the prototype and 5 at λ = ¼, and the solver's effective viscosity is tied
+  the prototype and 5 at L_r = ¼, and the solver's effective viscosity is tied
   to the cell size. That is this model's Reynolds number, and it is
   Froude-scaled no better than a real flume's. The mechanism was checked on
   this rig:
@@ -159,10 +159,10 @@ prototype. The dry run lands at +1%, i.e. zero within the scatter.
     0.5%, so it is not compressibility.
   - Switching off the Smagorinsky term or the wall friction changes nothing.
   - The shaft under the slot is irrelevant.
-  - At High resolution the λ = ½ error falls from −4.5% to +1.2%.
-  - The λ = ¼ error stays near −9% at High, so the smallest model is still
+  - At High resolution the L_r = ½ error falls from −4.5% to +1.2%.
+  - The L_r = ¼ error stays near −9% at High, so the smallest model is still
     short of cells.
 - **In a real laboratory** the same role is played by viscosity and surface
-  tension in a small orifice: Re and We fall as λ^1.5 and λ² under Froude
+  tension in a small orifice: Re and We fall as L_r^1.5 and L_r² under Froude
   scaling. The rule of thumb is the same: keep the model large enough that
   those groups stay in the range where C_d no longer depends on them.

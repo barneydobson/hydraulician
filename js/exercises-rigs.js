@@ -19,7 +19,7 @@
    counts and 18 further state keys. All 26 round-trip byte-identical.
 
    DA-3 (the weir model study) keeps the three weir rungs first captured for
-   the scale-ladder demo: the same broad-crested weir at λ = 1, ½ and ¼, one
+   the scale-ladder demo: the same broad-crested weir at L_r = 1, ½ and ¼, one
    payload per rung, picked by the card's `rigTable`. DA-1 and DA-2 need no
    payload — their two tanks are a scene (scale-tanks in js/scenes.js).
 

@@ -1,5 +1,5 @@
 /* ============================================================================
- * DA-3 · A WEIR MODEL STUDY — RIG-B + a broad-crested weir block, at λ = 1, ½, ¼
+ * DA-3 · A WEIR MODEL STUDY — RIG-B + a broad-crested weir block, at L_r = 1, ½, ¼
  * ----------------------------------------------------------------------------
  * The three rungs were first built for the scale-ladder demo (then DA-1) and
  * are captured as DA-3@1 / DA-3@0.5 / DA-3@0.25 in js/exercises-rigs.js.
@@ -9,7 +9,7 @@
  *     DA3.tutorial()            // the tutorial's measured column: q_p = 0.78
  *                               //   Froude-scaled to each rung, the sheet's levels
  *     DA3.build(1, 0.72)        // rebuild one rung at BASE q = 0.72 (sets q = 0.72)
- *     DA3.build(0.25, 0.72)     // λ = ¼ rung at BASE q = 0.72 (sets q = 0.09)
+ *     DA3.build(0.25, 0.72)     // L_r = ¼ rung at BASE q = 0.72 (sets q = 0.09)
  *     DA3.check()               // crest cells, seal, geometry of the last build
  *
  * (student(d)/sweep() are the old scale-ladder class run, kept because they
@@ -17,20 +17,20 @@
  *
  * The rig is WE-1's RIG-B with FB-2's crest-block-ends-at-the-brink pattern:
  *
- *  λ = 1        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~┌─────────────┐        crest 1.196
+ *  L_r = 1        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~┌─────────────┐        crest 1.196
  *          pool  ↑H       ●gauge             │  broad crest│ ←brink
  *   z=0.50 ├─────────────────────────────────┴─────────────┤ bed top (PEDESTAL)
  *   z=0.00 └─────────────────────────────────────────────────────────┘ floor
  *          0        x_g=2.174           x_b=4.783      x_e=6.522     9.0
  *
- *  λ = ¼   ~~~~~~~┌──┐                            (the SAME weir, quarter size)
+ *  L_r = ¼   ~~~~~~~┌──┐                            (the SAME weir, quarter size)
  *   z=0.50 ├──────┴──┤ ................................ nothing past the brink
  *
  * WHAT SCALES (the model) — P, crest length, approach length, weir station,
- *   gauge station, and q by λ^1.5.  Every base dimension is a multiple of
- *   4 CELLS so λ = 1, ½, ¼ rasterise to EXACT cell counts (the tanks' trick in DA-1/DA-2):
+ *   gauge station, and q by L_r^1.5.  Every base dimension is a multiple of
+ *   4 CELLS so L_r = 1, ½, ¼ rasterise to EXACT cell counts (the tanks' trick in DA-1/DA-2):
  *
- *      quantity        λ=1        λ=½        λ=¼
+ *      quantity        L_r=1        L_r=½        L_r=¼
  *      P              32 cells   16 cells    8 cells
  *      crest length   80         40         20
  *      block u/s face 220        110        55
@@ -41,11 +41,11 @@
  *     flume floor above the domain floor is not part of the modelled weir,
  *     it is what the model stands on (the old orifice exercise's "why the plate does not scale").
  *     Keeping it fixed also keeps WE-1's 10-second bed self-check valid on
- *     all three rungs and keeps the free overfall free at every λ.
- *   · Δx (21.7 mm at Medium) — so H is resolved in 4× fewer cells at λ = ¼.
+ *     all three rungs and keeps the free overfall free at every L_r.
+ *   · Δx (21.7 mm at Medium) — so H is resolved in 4× fewer cells at L_r = ¼.
  *     That is Question 6 of the tutorial; see the README.
  *   · the reservoir relaxation sponge (~10 cells, CLAUDE.md) — a fixed number
- *     of CELLS, so it eats a 4× larger fraction of the λ=¼ approach.
+ *     of CELLS, so it eats a 4× larger fraction of the L_r=¼ approach.
  *
  * Every call below is a documented app entry point — nothing here is private:
  *   SIM.addSeg(x0,y0,x1,y1,th,kind)   kind 255 wall, 128 valve, 0 ERASE
@@ -60,7 +60,7 @@ window.DA3 = {
   BRUSH: 0.50,          // the sandbox brush maximum (js/main.js: min(0.5,…))
   SINK: 0.06,           // how far the crest block is sunk into the bed slab
 
-  /* base (λ = 1) dimensions, in CELLS at Medium — all multiples of 4 */
+  /* base (L_r = 1) dimensions, in CELLS at Medium — all multiples of 4 */
   N_P: 32, N_LC: 80, N_XB: 220, N_XG: 100,
 
   /* base-q rule and the thirds rule (see README §2) */
@@ -71,14 +71,14 @@ window.DA3 = {
 
   /* The q→reservoir-level rule (WE-1's fixed point: the reservoir PINS the
    * surface, so it must be set to what the weir's own backwater wants).
-   * MEASURED at λ = 1 on this solver:   H = A₁·q^n,  A₁ = 0.799, n = 0.562.
+   * MEASURED at L_r = 1 on this solver:   H = A₁·q^n,  A₁ = 0.799, n = 0.562.
    *
    * n is NOT 2/3, because C_d is not constant (it rises with H/P — the same
-   * story as WE-1/Rehbock).  Exact Froude similarity (H_λ = λH₁ at
-   * q_λ = q₁λ^1.5) then forces the coefficient — and ONLY the coefficient —
-   * to carry a λ:
-   *          A_λ = A₁ · λ^(1 − 1.5n) = A₁ · λ^0.157
-   * so one closed form serves all three rungs.  That λ^0.157 is not a scale
+   * story as WE-1/Rehbock).  Exact Froude similarity (H_L_r = L_rH₁ at
+   * q_L_r = q₁L_r^1.5) then forces the coefficient — and ONLY the coefficient —
+   * to carry a L_r:
+   *          A_L_r = A₁ · L_r^(1 − 1.5n) = A₁ · L_r^0.157
+   * so one closed form serves all three rungs.  That L_r^0.157 is not a scale
    * effect: it is the price of writing a DIMENSIONAL rating.  Re-plot the
    * same data as C_d against H/P and it vanishes — which is the whole demo. */
   A1: 0.799, NEXP: 0.562,
@@ -104,7 +104,7 @@ window.DA3 = {
   crestOf: function (lam) { return +DA3.geom(lam).crest.toFixed(5); },
 
   /* ---- build one rung ----------------------------------------------------
-   * lam = 1 | 0.5 | 0.25 ; qb = the student's BASE q (q = qb·λ^1.5).
+   * lam = 1 | 0.5 | 0.25 ; qb = the student's BASE q (q = qb·L_r^1.5).
    * o.level overrides the level rule; o.q overrides the scaled q. */
   build: function (lam, qb, o) {
     o = o || {};
@@ -282,7 +282,7 @@ window.DA3 = {
     return r;
   },
 
-  /** Settle time scales as √λ (the Froude time scale, DA-2) — the λ=¼ rig fills 2× faster. */
+  /** Settle time scales as √L_r (the Froude time scale, DA-2) — the L_r=¼ rig fills 2× faster. */
   settleFor: function (lam) { return Math.max(18, Math.round(55 * Math.sqrt(lam))); },
 
   sweep: function (ds) {
@@ -290,10 +290,10 @@ window.DA3 = {
   },
 
   /** The tutorial sheet's measured column: q_p = 0.78 m²/s Froude-scaled to
-   *  each rung (q = 0.78·λ^1.5, typed, not snapped to the slider's 0.005),
-   *  the level the card prints, the √λ settle, then an 8 s median read.
+   *  each rung (q = 0.78·L_r^1.5, typed, not snapped to the slider's 0.005),
+   *  the level the card prints, the √L_r settle, then an 8 s median read.
    *  Measured at Medium: H = 0.6937 / 0.3461 / 0.1730 m, C_d = 0.4310 /
-   *  0.4325 / 0.4327 — the models within 0.3% of λ·H_p. */
+   *  0.4325 / 0.4327 — the models within 0.3% of L_r·H_p. */
   TUT_LEVEL: { 1: 1.891, 0.5: 1.195, 0.25: 0.848 },
   tutorial: function () {
     var out = [1, 0.5, 0.25].map(function (lam) {

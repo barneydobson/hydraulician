@@ -14,9 +14,10 @@ never typed in, so they cannot drift from the questions; the `APP_*` values
 are what the app measured (README, "Measured column"). Edit this file, not the
 documents — rerunning overwrites both.
 
-Notation follows the 4A15 dimensional-analysis lecture: λ is the model scale
-L_m/L_p here (the lecture's L_r), H the head over the crest, P the crest
-height, q the discharge per metre width, C_d = q/(√g·H^1.5).
+Notation follows the 4A15 register (hydraulician docs/notation.md): L_r is the
+model-to-prototype length ratio (λ is reserved for the Darcy friction factor),
+Δh the head over the crest (H is the energy head), P the crest height, q the
+discharge per metre width, C_d = q/(√g·Δh^1.5).
 """
 import math
 import os
@@ -31,7 +32,7 @@ from docx.shared import Cm, Pt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# ------------------------------------------------------------ the rig (λ = 1)
+# ------------------------------------------------------------ the rig (L_r = 1)
 g, rho, nu, sigma = 9.81, 1000.0, 1.0e-6, 0.073
 DX = 9 / 414                      # Medium cell on the sandbox, m
 P = 32 * DX                       # crest height above the bed: 0.696 m
@@ -89,7 +90,7 @@ def figure(path):
     zs = [surf, surf, surf - 0.01, crest + 0.62 * (surf - crest), crest + 0.52 * (surf - crest), crest + 0.40 * (surf - crest)]
     ax.plot(xs, zs, color="#17365D", lw=1.6)
     ax.annotate("", xy=(3.2, crest), xytext=(3.2, surf), arrowprops=dict(arrowstyle="<->", lw=1))
-    ax.text(3.28, (crest + surf) / 2, "H", fontsize=11, style="italic", va="center")
+    ax.text(3.28, (crest + surf) / 2, r"$\Delta h$", fontsize=11, va="center")
     ax.plot([3.0, xb], [crest, crest], color="#999999", lw=0.8, ls="--")
     ax.annotate("", xy=(xb - 0.25, bed), xytext=(xb - 0.25, crest), arrowprops=dict(arrowstyle="<->", lw=1))
     ax.text(xb - 0.2, (bed + crest) / 2, "P", fontsize=11, style="italic", va="center")
@@ -140,79 +141,79 @@ def build(answers):
     doc.add_picture(fp, width=Cm(15.5)); doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     para("1. Dimensional analysis", bold=True, size=12)
-    para("The discharge per metre width q over the weir depends on the head H, the crest height P, the crest "
+    para("The discharge per metre width q over the weir depends on the head Δh, the crest height P, the crest "
          "length L_c, gravity g, and the water's density ρ, viscosity μ and surface tension σ.")
-    para("(a) How many Π groups describe the problem? Using ρ, g and H as repeating variables, find them.")
-    answer("m = 8 variables, n = 3 dimensions, so 5 groups: q/(g^{1/2}H^{3/2}), P/H, L_c/H, "
-           "μ/(ρg^{1/2}H^{3/2}) and σ/(ρgH^{2}).")
-    para("(b) Hence show that q = C_d √g H^{3/2} with C_d = φ(H/P, L_c/H, Re_H, We_H), where "
-         "Re_H = ρ√g H^{3/2}/μ and We_H = ρgH²/σ. Which force ratio does each of Re_H and We_H compare?")
-    answer("Invert the fourth and fifth groups (any power of a group is a group). With √(gH) as the velocity "
-           "scale, Re_H = ρ√(gH)H/μ is inertia/viscous and We_H = ρ(gH)H/σ is inertia/surface tension.")
+    para("(a) How many Π groups describe the problem? Using ρ, g and Δh as repeating variables, find them.")
+    answer("m = 8 variables, n = 3 dimensions, so 5 groups: q/(g^{1/2}Δh^{3/2}), P/Δh, L_c/Δh, "
+           "μ/(ρg^{1/2}Δh^{3/2}) and σ/(ρgΔh^{2}).")
+    para("(b) Hence show that q = C_d √g Δh^{3/2} with C_d = φ(Δh/P, L_c/Δh, Re, We), where "
+         "Re = ρ√g Δh^{3/2}/μ and We = ρgΔh²/σ. Which force ratio does each of Re and We compare?")
+    answer("Invert the fourth and fifth groups (any power of a group is a group). With √(gΔh) as the velocity "
+           "scale, Re = ρ√(gΔh)Δh/μ is inertia/viscous and We = ρ(gΔh)Δh/σ is inertia/surface tension.")
 
     para("2. Designing the models", bold=True, size=12)
     para("(a) Which dimensionless group must be the same in model and prototype for gravity-dominated flow "
-         "over a weir, and why can Re_H and We_H not be matched at the same time with water in both?")
-    answer("The Froude number, which for a weir is the group q/(g^{1/2}H^{3/2}) = C_d itself, with the geometric ratios H/P and L_c/H: gravity drives the flow over the crest. With the "
-           "same g, ρ, μ and σ, Froude scaling makes Re_H fall as λ^{3/2} and We_H as λ²; neither can be held.")
-    para("(b) For λ = ½ and λ = ¼ find the model crest height, crest length and the discharge per metre width "
-         "that must be supplied. (In this vertical slice q is per metre, so it scales as λ^{3/2}, not λ^{5/2}.)")
-    answer("; ".join("λ = %s: P = %s m, L_c = %s m, q = %s m²/s" % (("½" if l == 0.5 else "¼"), f(R[l]["P"]),
+         "over a weir, and why can Re and We not be matched at the same time with water in both?")
+    answer("The Froude number, which for a weir is the group q/(g^{1/2}Δh^{3/2}) = C_d itself, with the geometric ratios Δh/P and L_c/Δh: gravity drives the flow over the crest. With the "
+           "same g, ρ, μ and σ, Froude scaling makes Re fall as L_{r}^{3/2} and We as L_{r}²; neither can be held.")
+    para("(b) For L_{r} = ½ and L_{r} = ¼ find the model crest height, crest length and the discharge per metre width "
+         "that must be supplied. (In this vertical slice q is per metre, so it scales as L_{r}^{3/2}, not L_{r}^{5/2}.)")
+    answer("; ".join("L_{r} = %s: P = %s m, L_c = %s m, q = %s m²/s" % (("½" if l == 0.5 else "¼"), f(R[l]["P"]),
                      f(R[l]["Lc"]), f(R[l]["q"], 4)) for l in (0.5, 0.25)) + ".")
     para("(c) The prototype takes about %d s to settle to steady flow. How long should each model take?"
          % SETTLE_P)
-    answer("Times scale as √λ: %d s at λ = ½ and %d s at λ = ¼ (the card's 40 and 28 s)."
+    answer("Times scale as √L_{r}: %d s at L_{r} = ½ and %d s at L_{r} = ¼ (the card's 40 and 28 s)."
            % (round(R[0.5]["settle"]), round(R[0.25]["settle"])))
 
     para("3. Predictions", bold=True, size=12)
     para("(a) For an ideal broad-crested weir (critical depth over a long crest, no losses, approach velocity "
-         "neglected) q = (2/3)^{3/2} √g H^{3/2}. Predict the prototype head from q_p.")
-    answer("C_{d,ideal} = %s; H = (q/(0.544√g))^{2/3} = %s m." % (f(CD_IDEAL), f(H_IDEAL)))
-    para("(b) If the prototype head turns out to be H_p, what heads do you predict for the two models, and what "
+         "neglected) q = (2/3)^{3/2} √g Δh^{3/2}. Predict the prototype head from q_p.")
+    answer("C_{d,ideal} = %s; Δh = (q/(0.544√g))^{2/3} = %s m." % (f(CD_IDEAL), f(H_IDEAL)))
+    para("(b) If the prototype head turns out to be Δh_p, what heads do you predict for the two models, and what "
          "C_d? Write the relationship; you will fill in the numbers in the session.")
-    answer("H_m = λH_p and C_{d,m} = C_{d,p} (Froude similarity with geometric similarity keeps every Π group except "
-           "Re_H and We_H).")
+    answer("Δh_m = L_{r}Δh_p and C_{d,m} = C_{d,p} (Froude similarity with geometric similarity keeps every Π group except "
+           "Re and We).")
 
     para("4. In the app (exercise DA-3)", bold=True, size=12)
     para("For each rung (the box on the card: 0 = prototype, 1 = 1:2, 2 = 1:4) set Inflow q to your value "
          "from 2(b) (0.780 m²/s for the prototype) and the Reservoir level printed on the card, press R, wait for "
          "the settle, then read the steady approach-pool depth d on a gauge at the card's station. "
-         "Compute H = d − P and C_d, and complete the table.")
-    rows = [("", "prototype λ = 1", "1:2 model", "1:4 model"),
+         "Compute Δh = d − P and C_d, and complete the table.")
+    rows = [("", "prototype L_{r} = 1", "1:2 model", "1:4 model"),
             ("q (m²/s)",) + tuple(f(R[l]["q"], 4) for l in LAMS),
             ("P (m)",) + tuple(f(R[l]["P"]) for l in LAMS),
             ("d measured (m)",) + tuple((f(APP_D[l], 4) if answers else "") for l in LAMS),
-            ("H = d − P (m)",) + tuple((f(R[l]["H"], 4) if answers else "") for l in LAMS),
-            ("H predicted = λH_p (m)",) + tuple((f(R[l]["Hpred"], 4) if answers else "") for l in LAMS),
+            ("Δh = d − P (m)",) + tuple((f(R[l]["H"], 4) if answers else "") for l in LAMS),
+            ("Δh predicted = L_{r}Δh_p (m)",) + tuple((f(R[l]["Hpred"], 4) if answers else "") for l in LAMS),
             ("C_{d}",) + tuple((f(R[l]["cd"], 4) if answers else "") for l in LAMS)]
     t = doc.add_table(rows=len(rows), cols=4); t.style = "Table Grid"
     for i, row in enumerate(rows):
         for j, v in enumerate(row):
             runs(t.cell(i, j).paragraphs[0], v, bold=(i == 0 or j == 0), size=9.5)
     para("", space=2)
-    answer("The models reproduce the prototype to within %.1f%% in H and %.1f%% in C_d: the three rungs are "
+    answer("The models reproduce the prototype to within %.1f%% in Δh and %.1f%% in C_d: the three rungs are "
            "Froude-similar. The measured C_d (%s) is %d%% below the ideal %s."
            % (max(abs(R[l]["H"] / R[l]["Hpred"] - 1) for l in (0.5, 0.25)) * 100,
               max(abs(R[l]["cd"] / R[1.0]["cd"] - 1) for l in (0.5, 0.25)) * 100,
               f(R[1.0]["cd"]), round((1 - R[1.0]["cd"] / CD_IDEAL) * 100), f(CD_IDEAL)))
 
     para("5. Scale effects", bold=True, size=12)
-    para("(a) Evaluate Re_H and We_H for the prototype and both models, with ν = 1.0×10⁻⁶ m²/s and "
+    para("(a) Evaluate Re and We for the prototype and both models, with ν = 1.0×10⁻⁶ m²/s and "
          "σ = 0.073 N/m. Would a real 1:4 model of this weir, in water, suffer from viscous or surface-tension "
          "scale effects?")
-    answer("; ".join("λ = %s: Re_H = %s, We_H = %s" % (("1" if l == 1 else "½" if l == 0.5 else "¼"),
+    answer("; ".join("L_{r} = %s: Re = %s, We = %s" % (("1" if l == 1 else "½" if l == 0.5 else "¼"),
                      sci(R[l]["ReH"]), sci(R[l]["WeH"])) for l in LAMS) +
            ". All are large (fully turbulent, surface tension negligible), so a 1:4 model is safe.")
     para("(b) A lower limit often used for model weir heads is a few centimetres; take 30 mm. What is the "
          "smallest scale at which this weir could be modelled?")
-    answer("λ = 0.030/%s = %s, about 1:%d." % (f(R[1.0]["H"]), f(LAM_MIN_ST), round(1 / LAM_MIN_ST)))
+    answer("L_{r} = 0.030/%s = %s, about 1:%d." % (f(R[1.0]["H"]), f(LAM_MIN_ST), round(1 / LAM_MIN_ST)))
 
     para("6. The simulation's own scale effect", bold=True, size=12)
     para("The app has no real viscosity or surface tension at these scales; its equivalent is the grid. Its "
-         "cells are Δx = 21.7 mm at Medium and do not shrink with the model. How many cells span H on each "
-         "rung? If H needs at least about 8 cells to be resolved, what is the smallest model this simulation "
-         "can represent at Medium? What would you expect to happen to C_d at λ = ¼ on a coarser grid?")
-    answer("H spans %s, %s and %s cells. λ_min = 8Δx/H_p = %s, i.e. the 1:4 rung is right at the limit. A "
+         "cells are Δx = 21.7 mm at Medium and do not shrink with the model. How many cells span Δh on each "
+         "rung? If Δh needs at least about 8 cells to be resolved, what is the smallest model this simulation "
+         "can represent at Medium? What would you expect to happen to C_d at L_{r} = ¼ on a coarser grid?")
+    answer("Δh spans %s, %s and %s cells. L_{r,min} = 8Δx/Δh_p = %s, i.e. the 1:4 rung is right at the limit. A "
            "coarser grid (Resolution Low) puts H_¼ under 6 cells and moves C_d by a few per cent with nothing "
            "physical changed: the numerical counterpart of Re and We falling below their thresholds."
            % (f(R[1.0]["cells"], 0), f(R[0.5]["cells"], 0), f(R[0.25]["cells"], 0), f(LAM_MIN_GRID, 2)))

@@ -1,4 +1,4 @@
-student_id,digit,lambda,T_p_s,T_m_s,error_pct,source
+student_id,digit,L_r,T_p_s,T_m_s,error_pct,source
 23140870,0,0.25,4.056,1.840,-9.3,sim
 23140871,1,0.30,4.056,2.030,-8.6,sim
 23140872,2,0.35,4.056,2.244,-6.5,sim

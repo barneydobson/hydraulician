@@ -275,7 +275,7 @@ const EX = (() => {
    *  worksheet makes the student derive.
    *
    *  These are DISPLAYED, never applied. The one thing a digit does write is
-   *  `rigTable` — which captured drawing loads — because DA-1's λ = ¼ weir is a
+   *  `rigTable` — which captured drawing loads — because DA-1's L_r = ¼ weir is a
    *  different rig, not a different number. */
   function rules(ex) {
     if (!ex || !ex.digit) return [];
@@ -567,7 +567,7 @@ const EX = (() => {
     }
     const nd = Math.max(0, Math.min(9, +d | 0));
     // A variant rig is chosen by the digit, so changing it is a re-setup, not
-    // a slider move: DA-1's λ = ¼ weir is a different drawing, not a number.
+    // a slider move: DA-1's L_r = ¼ weir is a different drawing, not a number.
     if (cur.rigTable && rigKey(cur, nd) !== rigKey(cur, digit)) { pick(cur.id, { digit: nd }); return; }
     digit = nd;
     memo[cur.id] = digit; lastDigit = digit;
@@ -860,7 +860,7 @@ const EX = (() => {
       line(box.querySelector(".exyours"), "Yours (d = last digit of your student number):",
            yourRows(cur).length ? "" : ruleLines(cur).join("\n"));
       // The one thing a digit still DOES is pick which captured drawing loads
-      // (DA-1's λ = ¼ weir is a different rig, not a different number), so the
+      // (DA-1's L_r = ¼ weir is a different rig, not a different number), so the
       // input survives only on those cards.
       box.querySelector(".exd").style.display = cur.rigTable ? "flex" : "none";
       // A card whose drawings are not a per-student assignment (DA-3's three

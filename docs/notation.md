@@ -63,6 +63,22 @@ solver merely extends $h$ into the non-hydrostatic cells it resolves.
 - $F$ — pressure force per metre width on a named face, N/m, with components
   $F_x$, $F_z$; centre of pressure — the point on the face through which the
   resultant acts.
+- $\Delta h$ — a head difference that drives a discharge law: the head over a
+  weir crest or an orifice, $q = C_d\sqrt{g}\,\Delta h^{3/2}$, or the level
+  difference between two reservoirs, $q = K\sqrt{\Delta h}$. Never $H$, which
+  is the energy head above, and never a bare $h$, which is the piezometric
+  head. Heads at the start and end of a drain are $\Delta h_0$ and
+  $\Delta h_t$.
+- $\lambda$ — the Darcy friction factor, $h_f = \lambda (L/D) V^2/2g$, with
+  $h_f$ the friction head loss and $D$ the pipe (or hydraulic) diameter. Not
+  the Fanning $4f$ form: $f$ is already the fill fraction.
+- Model and prototype — subscripts $m$ and $p$; subscript $r$ is the
+  model-to-prototype ratio of a quantity, $X_r = X_m/X_p$. The model scale is
+  the length ratio $L_r$ (a 1:4 model has $L_r = ¼$); Froude similarity then
+  gives $V_r = \sqrt{L_r}$, $T_r = \sqrt{L_r}$ and, per metre width,
+  $q_r = L_r^{3/2}$. The scale is never written $\lambda$, which is the
+  friction factor.
+- $Re$, $We$ — Reynolds and Weber numbers; $C_d$ — a discharge coefficient.
 
 $y$ is used only where it is something else: $y^+$ wall units, and
 chart reference lines like $y = 2x$.

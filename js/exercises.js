@@ -52,7 +52,7 @@
  *                  Nothing is computed or written for them.
  *
  * The exception: `rigTable` picks WHICH captured drawing loads, because DA-3's
- * λ = ¼ weir is a different rig, not a different number, and nobody is going to
+ * L_r = ¼ weir is a different rig, not a different number, and nobody is going to
  * hand-draw it. Geometry is part of the common starting point. Where the
  * drawings are not a per-student assignment (DA-3 loads all three rungs in
  * turn) `rigPrompt` relabels the box that picks them.
@@ -1068,7 +1068,7 @@ const EXERCISES = [
     folder: "DA-1-which-empties-first",
     scene: "scale-tanks",
     rig: null,
-    // The scene boots at λ = ¼, which is the demo. Nothing personal: the
+    // The scene boots at L_r = ¼, which is the demo. Nothing personal: the
     // lecturer takes the class vote, presses V and reads the two traces.
     rigParams: { budget: "Medium" },
     viewParams: { mode: "0", gaugeField: "d", particles: false },
@@ -1088,25 +1088,25 @@ const EXERCISES = [
 
   {
     id: "DA-2",
-    title: "Time scales as √λ",
+    title: "Time scales as √L_r",
     topic: "Similitude",
     folder: "DA-2-time-scales",
     scene: "scale-tanks",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "0", gaugeField: "d", particles: false },
-    digit: { label: "Model scale λ", control: "geom0", base: 0.25, step: 0.05, rule: "λ = 0.25 + 0.05·d" },
+    digit: { label: "Length ratio L_r", control: "geom0", base: 0.25, step: 0.05, rule: "L_r = 0.25 + 0.05·d" },
     instruments: [
       { tool: "gauge", where: "prototype: x = 1.6 m, 1.4 m in from the tank's outer left edge at x = 0.2 m (any height below the water)", why: "prototype depth d" },
-      { tool: "gauge", where: "model: the same station scaled by λ from the model's outer left edge at x = 5.2 m, i.e. x = 5.2 + 1.4λ m", why: "model depth d; the scaled station is the first length-scale step" },
+      { tool: "gauge", where: "model: the same station scaled by L_r from the model's outer left edge at x = 5.2 m, i.e. x = 5.2 + 1.4 L_r m", why: "model depth d; the scaled station is the first length-scale step" },
     ],
     ui: { view: ["legendBtn"], fields: ["water"], controls: ["speed", "geom0"] },
-    start: "a 4 m prototype tank and a λ-scale copy of it, both full, slots shut; per metre width",
-    setup: ["Set Model scale λ from your digit (the field above, or Controls → Geometry). The water restarts full.",
+    start: "a 4 m prototype tank and a scale copy of it at length ratio L_r, both full, slots shut; per metre width",
+    setup: ["Set Length ratio L_r from your digit (the field above, or Controls → Geometry). The water restarts full.",
             "Place both Depth gauges (5), press V to open the two slots together, and let both tanks empty (about 10 s).",
-            "Expand each gauge (⤢) and hover its trace. Prototype: read the times at which d passes 2.50 m and 1.00 m; their difference is T_p. Model: the same at d = 2.50λ and 1.00λ; that difference is T_m.",
-            "Froude similarity predicts T_m = √λ·T_p. Your error = 100 × (T_m − √λ·T_p) / (√λ·T_p) %."],
-    task: "Time both tanks between their depth marks, then submit λ, T_p, T_m and your % error. The class pools the errors into one plot against λ.",
+            "Expand each gauge (⤢) and hover its trace. Prototype: read the times at which d passes 2.50 m and 1.00 m; their difference is T_p. Model: the same at d = 2.50 L_r and 1.00 L_r; that difference is T_m.",
+            "Froude similarity predicts T_m = √L_r·T_p. Your error = 100 × (T_m − √L_r·T_p) / (√L_r·T_p) %."],
+    task: "Time both tanks between their depth marks, then submit L_r, T_p, T_m and your % error. The class pools the errors into one plot against L_r.",
     settle: 0,
   },
 
@@ -1122,25 +1122,25 @@ const EXERCISES = [
     // number (rigPrompt relabels it).
     rig: "DA-3@1",
     rigTable: ["DA-3@1", "DA-3@0.5", "DA-3@0.25"],
-    rigPrompt: "rung: 0 = prototype (λ = 1), 1 = 1:2 model, 2 = 1:4 model",
+    rigPrompt: "rung: 0 = prototype (L_r = 1), 1 = 1:2 model, 2 = 1:4 model",
     rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
                  inflowOn: true, inFree: false, twOn: false,
                  spoutOn: false, waveOn: false },
     viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
     studentParams: [
-      { control: "inQ", unit: "m²/s", rule: "0.780 at λ = 1; your Froude-scaled q_m on the two models" },
-      { control: "inLevel", unit: "m", rule: "1.891 / 1.195 / 0.848 m for λ = 1 / ½ / ¼ (the reservoir level paired with that q)" },
+      { control: "inQ", unit: "m²/s", rule: "0.780 at L_r = 1; your Froude-scaled q_m on the two models" },
+      { control: "inLevel", unit: "m", rule: "1.891 / 1.195 / 0.848 m for L_r = 1 / ½ / ¼ (the reservoir level paired with that q)" },
     ],
-    digitNote: "the weir is the prototype at λ = 1: crest height P = 0.696 m above the bed, per-metre discharge q_p = 0.780 m²/s",
+    digitNote: "the weir is the prototype at L_r = 1: crest height P = 0.696 m above the bed, per-metre discharge q_p = 0.780 m²/s",
     instruments: [
-      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼, just above the crest height", why: "the pool depth d above the bed, and H = d − P" },
+      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for L_r = 1 / ½ / ¼, just above the crest height", why: "the pool depth d above the bed, and Δh = d − P" },
     ],
     ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
     start: "a broad-crested weir; the box above loads the prototype or one of its two scale models",
     setup: ["Before the session answer the sheet's questions on the dimensionless groups and the model design.",
-            "For each rung: load it with the box above, type Inflow q and Reservoir level into the fields above (the slider steps in 0.005, so type q), press R and wait for the settle (55 / 40 / 28 s at λ = 1 / ½ / ¼).",
-            "Place a Gauge (5) at the station and read the steady pool depth d (the median of the wobble). H = d − P, with P = 0.696λ m; C_d = q / (√g · H^1.5)."],
-    task: "Fill the sheet's measured column: H and C_d for the prototype and both models, then compare with your Froude-scaled predictions.",
+            "For each rung: load it with the box above, type Inflow q and Reservoir level into the fields above (the slider steps in 0.005, so type q), press R and wait for the settle (55 / 40 / 28 s at L_r = 1 / ½ / ¼).",
+            "Place a Gauge (5) at the station and read the steady pool depth d (the median of the wobble). Δh = d − P, with P = 0.696 L_r m; C_d = q / (√g · Δh^1.5)."],
+    task: "Fill the sheet's measured column: Δh and C_d for the prototype and both models, then compare with your Froude-scaled predictions.",
     settle: 55,
   },
 

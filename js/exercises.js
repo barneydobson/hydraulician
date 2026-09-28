@@ -1076,12 +1076,12 @@ const EXERCISES = [
     instruments: [
       { tool: "gauge", where: "one in each tank, a quarter of the way across: prototype x = 1.6 m, model x = 5.55 m, anywhere below the water", why: "depth d above each floor; the two traces are the whole demo" },
     ],
-    ui: { view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed"], panel: "shut" },
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed"], panel: "shut" },
     start: "a 4 m tank and an exact quarter-scale copy, both full, slots shut",
     setup: ["Vote before pressing anything: does the small tank empty in the same time, a quarter of the time, half the time or a sixteenth?",
             "Place the two Depth gauges, then press V: both slots open at the same instant.",
             "Expand each gauge (⤢) and hover its trace: the prototype falls from d = 2.50 to 1.00 m in about 4.1 s, the model from 0.625 to 0.25 m in about 1.8 s."],
-    task: "Open both slots together and compare the two drain times. Their ratio is close to √¼ = ½, not ¼: a Froude model runs slow.",
+    task: "Open both slots together and compare the two drain times.",
     settle: 0,
   },
 

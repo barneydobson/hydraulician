@@ -2,70 +2,156 @@
 
 ## Lecturer notes
 
-A two-minute lecturer demo of the Froude time scale. A 4 m tank stands beside
-an exact quarter-scale copy of itself. Both are full to the same relative
-depth, and each drains through a slot in its floor. Before anything runs,
-the class votes on whether the small tank empties in:
+A five-minute lecturer demo of Froude scaling, and of what breaks it. A 4 m
+tank stands beside an exact half-scale copy of itself, both full to the same
+relative depth, each draining through a slot in its floor. It runs twice:
+
+1. **In water.** The half-scale tank empties in √½ ≈ 0.71 of the
+   prototype's time, as Froude scaling predicts.
+2. **In syrup.** Same tanks, same prediction, and the model is 17% slow.
+   Viscosity is the force the model does not scale.
+
+Before the first run, the class votes on whether the small tank empties in:
 
 - the same time;
-- a quarter of the time;
+- 0.71 (√½) of the time;
 - half the time;
-- a sixteenth of the time.
-
-Then V opens both slots at the same instant. The small tank wins, but only
-by about half, not a quarter. That is T_r = √L_r, seen rather than derived.
+- a quarter of the time.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **DA-1**, or use the direct link
 [`?ex=DA-1`](https://barneydobson.github.io/hydraulician/?ex=DA-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
-It runs on the `scale-tanks` scene, which boots at L_r = ¼, and is the lecturer
-half of [DA-2](../DA-2-time-scales/), where every student repeats it at
-their own L_r. The rig and its dimensions are described there.
+It runs on the `fluid-tanks` scene at **Resolution Very high**, which the
+card sets. [DA-2](../DA-2-time-scales/) is its student half: the same tanks
+in water at each student's own L_r.
+
+## The rig
+
+The `fluid-tanks` scene is an 8.75 m × 4.0 m slice, per metre width. At Very
+high Δx = 0.01 m exactly (875 × 400 cells), so every scaled edge lands on a
+cell face.
+
+| | prototype (left) | model (right), L_r = ½ |
+|---|---|---|
+| outer left edge | x = 0.2 m | x = 5.2 m |
+| clear width | 4.0 m | 2.0 m |
+| slot in the floor, a | 0.40 m | 0.20 m |
+| fill depth above the floor | 2.8 m | 1.4 m |
+| gauge station | x = 1.6 m | x = 5.9 m |
+
+Controls → Geometry has two sliders:
+
+- **Length ratio L_r** (default ½) resizes the model.
+- **Fluid** switches BOTH tanks between water (ν = 10⁻⁶ m²/s) and a thick
+  syrup (ν = 0.03 m²/s, 30 000 times water). Changing either refills both
+  tanks.
+
+Gauges on **Depth d** read the depth above each tank's own floor.
 
 ## Running it
 
-1. Open DA-1. Both tanks are full and the slots are shut. The clock can run
-   while you talk; nothing moves.
-2. Take the vote. Put the four options on the board and make people commit.
-3. Place two gauges (`5`, the card's Gauges plot is already on **Depth d**):
-   - the prototype at x = 1.6 m;
-   - the model at x = 5.55 m, which is the same station scaled by ¼.
+1. Open DA-1. Both tanks are full of water and the slots are shut.
+2. Take the vote.
+3. Place two Depth gauges (`5`): prototype at x = 1.6 m, model at x = 5.9 m.
+4. Press **V**. Expand both gauge cards (⤢) and hover the traces:
+   - the prototype falls from d = 2.50 m to 1.00 m in **4.10 s**;
+   - the model falls from 1.25 m to 0.50 m (the same marks × ½) in **2.86 s**.
+5. Set **Fluid** to syrup. Both tanks refill. Press **V** again and read the
+   same marks:
+   - the prototype takes **3.98 s**;
+   - the model takes **3.28 s**.
 
-   Any height below the water works.
-4. Press **V**. At Speed ×1 the model is visibly empty while the prototype is
-   still at about half depth. The whole prototype drain takes about 10 s of
-   simulated time. Slow it down with the Speed slider if the room needs longer.
-5. Expand both gauge cards (⤢) and hover the traces:
-   - the prototype falls from d = 2.50 m to 1.00 m in **4.06 s**;
-   - the model falls from 0.625 m to 0.25 m (the same marks × ¼) in **1.84 s**.
+## Recalculating the scaling in both cases
 
-   The ratio is 0.45.
+### Water: Froude scaling
 
-## Why ½
+Every length scales by L_r. With gravity and inertia the forces that
+matter, velocities scale as √L_r (V ∼ √(gd), Torricelli or Froude), and a
+time is a length over a velocity:
 
-Every length scales by L_r, so velocities scale by √L_r (V ∼ √(gd), Torricelli
-or Froude, whichever the class prefers), and times by length ÷ velocity:
+    V_r = √L_r,     T_r = L_r / V_r = L_r / √L_r = √L_r
 
-    T_r = L_r / V_r = L_r / √L_r = √L_r = ½ at L_r = ¼
+So the predicted model time is √L_r times the MEASURED prototype time:
 
-The same argument gives the discharge per metre width as q_r = V_r·L_r =
-L_r^1.5 = ⅛. The small tank holds 1/16 of the water and releases it at ⅛ of
-the rate, so it empties in (1/16)/(1/8) = ½ of the time. Per metre width, in
-this vertical slice, "holds" means area: B·d scales as L_r².
+    T_m = √L_r · T_p = 0.707 × 4.105 s = 2.90 s        measured 2.86 s   (−1.5%)
 
-## What the measured 0.45 is
+### Syrup: the same prediction, recalculated
 
-The simulation gives 0.454, not 0.500. The small tank drains about 9%
-faster than Froude predicts, which is a scale effect. This solver's
-effective viscosity is tied to the grid, and the grid does not shrink with
-the model: the quarter-scale slot is 5 cells wide against the prototype's 20.
-DA-2 measures the effect across L_r = 0.25–0.70 and shows it vanishing towards
-L_r = 1. For the demo, "about half, and certainly not a quarter" is the point;
-the 9% is a good question to leave the room with.
+Froude's rule does not care what the fluid is, so it predicts √L_r times
+the prototype's time in syrup:
+
+    T_m = √L_r · T_p = 0.707 × 3.975 s = 2.81 s        measured 3.28 s   (+17%)
+
+The model is 0.47 s slow. Froude assumed viscosity is negligible, and in
+syrup it is not.
+
+### Why: the Reynolds numbers
+
+Add ν to the variable list and the drain time depends on a second group:
+
+    T √(g/L) = φ(Re),    Re = V a / ν
+
+Froude scaling works while Re is high enough in BOTH tanks that φ no longer
+depends on it. Take the jet velocity through the slot at mid-window
+(d ≈ 1.75 m in the prototype, 0.875 m in the model), V = √(2gd):
+
+| | V (m/s) | a (m) | Re in water | Re in syrup |
+|---|---:|---:|---:|---:|
+| prototype | 5.86 | 0.40 | 2.3 × 10⁶ | 78 |
+| model (L_r = ½) | 4.14 | 0.20 | 8.3 × 10⁵ | 28 |
+
+With the same fluid in both tanks, Re_r = V_r L_r = √L_r · L_r = L_r^1.5
+(0.35 here), so the model's Re is always the smaller. In water both are in
+the hundreds of thousands and the difference does not matter. In syrup the
+prototype, at Re ≈ 80, drains only 3% slower than in water, while the model,
+at Re ≈ 30, has crossed into the range where viscosity controls the flow.
+
+### The other limit: fully viscous scaling
+
+If viscosity dominated completely, inertia would drop out instead of
+viscosity. A creeping flow through the slot has V ∼ g d a² / (ν × floor
+thickness), and every one of those lengths scales by L_r, so with the same
+fluid:
+
+    V_r = L_r · L_r² / L_r = L_r²,     T_r = L_r / V_r = 1 / L_r = 2
+
+A fully viscous half-scale model would take TWICE as long as the prototype.
+The measured syrup ratio, 3.28 / 3.975 = 0.83, sits between Froude's 0.71
+and that viscous 2, closer to Froude: the syrup model is in transition,
+which is where a small real model in water ends up too.
+
+### What would restore similarity?
+
+Match Re as well as Fr: Re_r = L_r^1.5 / ν_r = 1, so the model needs a
+fluid with ν_m = L_r^1.5 · ν_p = 0.35 × 0.03 = 0.011 m²/s: a THINNER syrup in
+the smaller tank. Real laboratories rarely can (with water in the prototype
+the model would need a fluid 3 times less viscous than water), which is why
+they keep models large enough that Re stays high. This scene puts one fluid
+in both tanks, so it cannot show the fix, only the problem.
+
+## Discussion points
+
+- **Nobody got a quarter.** A Froude model runs slow in water: a 1:25 model
+  of a 2-hour drain takes 24 minutes, not 5.
+- **The water result is not exact either:** −1.5%. That is the grid, the
+  scale effect DA-2 measures; at Medium it is −4.5% at L_r = ½.
+- **Syrup at L_r = ¼** (move the slider) breaks harder still, because the
+  model's Re falls as L_r^1.5.
+- **This is the complete-turbulence rule.** A model must keep Re in the
+  range where the coefficient (C_d here, λ on the Moody diagram) has stopped
+  depending on it.
 
 ## Console spot-check
 
-Paste [DA-2's rig.js](../DA-2-time-scales/rig.js) and then [rig.js](rig.js)
-into the console and run `await DA1.run()`. It returns T_p = 4.056 s,
-T_m = 1.840 s, ratio 0.454.
+Paste [rig.js](rig.js) into the console and run `await DA1.run(0)` (water)
+or `await DA1.run(1)` (syrup). Measured at Very high, flat out:
+
+| fluid | ν (m²/s) | T_p (s) | T_m (s) | T_m / T_p | vs √½ = 0.707 |
+|---|---:|---:|---:|---:|---:|
+| water | 10⁻⁶ | 4.105 | 2.860 | 0.697 | −1.5% |
+| syrup | 0.03 | 3.975 | 3.281 | 0.825 | +16.7% |
+
+The syrup viscosity was chosen so that only the smaller tank breaks: at
+ν = 0.01 the half-scale model still follows Froude (−0.8%); at ν = 0.1 the
+prototype slows too.

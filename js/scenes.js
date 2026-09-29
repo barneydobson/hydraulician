@@ -401,7 +401,7 @@ const SCENES = (() => {
     //  cost. The shafts drain through an OUTFALL floor (open = 2): with the
     //  zero-gradient floor (1) the shafts filled and drowned both slots
     //  within 2 s, and the tanks then took minutes to empty.
-    (() => {
+    ...(() => {
       const TW = 0.4, B = 4.0, T = 0.4, ZF = 0.8, H0 = 2.8, FB = 0.4, A = 0.4, SH = 1.2;
       const XP = 0.2, XM = 5.2;
       const snap = (v) => {
@@ -431,7 +431,7 @@ const SCENES = (() => {
       };
       const proto = () => tank(XP, 1, "proto", "Prototype");
       const model = (par) => tank(XM, lamOf(par), "model", "Model");
-      return {
+      const scaleTanks = {
         id: "scale-tanks", name: "Two tanks at two scales", key: "Froude time scale", group: "Similitude",
         blurb: "A 4 m tank and an exact scale copy, each draining through a slot in its floor. Press V to open both at once: which empties first, and by how much?",
         W: 9.5, H: 4.0, c: 40, cf: 0.01, cs: 0.12, mode: 0, hmax: 3.0, headMax: 3.6, vmax: 7,
@@ -451,6 +451,50 @@ const SCENES = (() => {
                "The right-hand tank is the left one scaled by L_r: every length, the slot and the fill depth. Change L_r in Controls → Geometry (it restarts the water).",
                "Gauges on <b>Depth d</b> read the water depth above each tank's floor; expand a gauge card (⤢) and hover its trace to read times.",
                "Froude scaling: lengths × L_r, velocities × √L_r, times × √L_r, discharge per metre × L_r^1.5."] };
+
+      // DA-1: the same pair of tanks, run once in water and once in a thick
+      // syrup. Froude scaling holds in water and fails in syrup, because the
+      // model's Reynolds number falls with L_r^1.5 while the prototype's
+      // stays high: viscosity is the force the model does not scale.
+      //
+      // 8.75 m wide, not 9.5, so that Very high (350 000 cells) is Δx =
+      // 0.01 m exactly and every scaled edge is a whole cell (the widest
+      // model, L_r = 0.7, ends at x = 8.56 m). Measured headless at Very
+      // high, L_r = ½, marks d = 2.5 → 1.0 m (× L_r in the model):
+      //
+      //   water  ν = 1e-6   T_p = 4.105 s  T_m = 2.860 s  ratio 0.697  (√½ = 0.707, −1.5%)
+      //   syrup  ν = 3e-2   T_p = 3.975 s  T_m = 3.281 s  ratio 0.825  (+16.7%)
+      //
+      // At ν = 1e-2 the ½ model still follows Froude (−0.8%); at 1e-1 the
+      // prototype slows too and the model has not reached its lower mark
+      // within 7 s. 3e-2 is the value where only the smaller tank breaks.
+      //
+      // The fluid is a Geometry slider because a scene param is the only
+      // per-scene control that reaches the solver: solids() gets the live
+      // hydraulic parameters P and sets P.nu from it on every rasterise
+      // (load, resolution rebuild, and the resetWater a fluid change makes).
+      const NU = [1e-6, 3e-2];
+      const fluidTanks = {
+        id: "fluid-tanks", name: "Two tanks, two fluids", key: "Froude and viscosity", group: "Similitude",
+        blurb: "A 4 m tank and its half-scale copy, filled with water or with syrup. In water the model drains in √½ of the prototype's time; in syrup it does not.",
+        W: 8.75, H: 4.0, c: 40, cf: 0.01, cs: 0.12, nu: NU[0], mode: 0, hmax: 3.0, headMax: 3.6, vmax: 7,
+        open: [0, 0, 2, 0], valveOpen: 0, particles: 0, spinup: 0,
+        params: [
+          { key: "lam", label: "Length ratio L_r", min: 0.25, max: 0.70, step: 0.05, value: 0.5, unit: "", resetWater: true },
+          { key: "fluid", label: "Fluid", min: 0, max: 1, step: 1, value: 0, unit: "", resetWater: true,
+            fmt: (v) => (v > 0.5 ? "syrup, ν = 0.03 m²/s" : "water, ν = 10⁻⁶ m²/s") },
+        ],
+        solids: (W, H, P, par) => {
+          P.nu = par && par.fluid > 0.5 ? NU[1] : NU[0];
+          return [...proto().solids, ...model(par).solids];
+        },
+        valves: scaleTanks.valves,
+        water: scaleTanks.water,
+        tips: ["Press <b>V</b> to open both slots at the same instant.",
+               "Controls → Geometry: <b>Fluid</b> switches both tanks between water and syrup (it restarts the water); <b>Length ratio L_r</b> resizes the model.",
+               "Gauges on <b>Depth d</b> read the depth above each tank's floor; expand a gauge card (⤢) and hover its trace to read times.",
+               "Froude predicts T_m = √L_r · T_p in any fluid. It holds only while viscosity is negligible in BOTH tanks."] };
+      return [scaleTanks, fluidTanks];
     })(),
 
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",

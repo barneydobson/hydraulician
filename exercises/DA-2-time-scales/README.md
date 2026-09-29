@@ -15,9 +15,10 @@ They submit the percentage error. The class then pools the errors into one
 plot against L_r.
 
 It is the quick-exercise partner of DA-1, the lecturer demo on the same
-scene. The DA-1 vote establishes *that* a quarter-scale tank drains in about
-half the time. DA-2 makes every student do the scaling, and the pooled
-errors reveal a scale effect that nobody is told to look for.
+pair of tanks. DA-1 establishes *that* a half-scale tank drains in √½ of the
+time in water, and that viscosity breaks the rule (in syrup). DA-2 makes
+every student do the scaling, and the pooled errors reveal a scale effect
+that nobody is told to look for: here the grid, not the fluid.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **DA-2**, or use the direct link

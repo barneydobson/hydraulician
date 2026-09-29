@@ -1066,22 +1066,25 @@ const EXERCISES = [
     title: "Which tank empties first?",
     topic: "Similitude",
     folder: "DA-1-which-empties-first",
-    scene: "scale-tanks",
+    scene: "fluid-tanks",
     rig: null,
-    // The scene boots at L_r = ¼, which is the demo. Nothing personal: the
-    // lecturer takes the class vote, presses V and reads the two traces.
-    rigParams: { budget: "Medium" },
+    // Two runs of the same pair of tanks at L_r = ½: water, where Froude
+    // holds, then syrup, where it does not. Very high is Δx = 0.01 m exactly
+    // on this 8.75 m scene, so every scaled edge is a whole cell. Nothing
+    // personal: the lecturer takes the vote, presses V and reads the traces.
+    rigParams: { budget: "Very high" },
     viewParams: { mode: "0", gaugeField: "d", particles: false },
     digitNote: "lecturer demo: no personalised parameter",
     instruments: [
-      { tool: "gauge", where: "one in each tank, a quarter of the way across: prototype x = 1.6 m, model x = 5.55 m, anywhere below the water", why: "depth d above each floor; the two traces are the whole demo" },
+      { tool: "gauge", where: "one in each tank, 1.4 m (× L_r) in from its outer left edge: prototype x = 1.6 m, model x = 5.9 m, anywhere below the water", why: "depth d above each floor; the two traces are the whole demo" },
     ],
-    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed"], panel: "shut" },
-    start: "a 4 m tank and an exact quarter-scale copy, both full, slots shut",
-    setup: ["Vote before pressing anything: does the small tank empty in the same time, a quarter of the time, half the time or a sixteenth?",
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1"], panel: "shut" },
+    start: "a 4 m tank and an exact half-scale copy, both full of water, slots shut",
+    setup: ["Vote before pressing anything: does the half-scale tank empty in the same time, in 0.71 (√½) of the time, in half the time or in a quarter?",
             "Place the two Depth gauges, then press V: both slots open at the same instant.",
-            "Expand each gauge (⤢) and hover its trace: the prototype falls from d = 2.50 to 1.00 m in about 4.1 s, the model from 0.625 to 0.25 m in about 1.8 s."],
-    task: "Open both slots together and compare the two drain times.",
+            "Expand each gauge (⤢) and hover its trace: the prototype falls from d = 2.50 to 1.00 m in about 4.1 s, the model from 1.25 to 0.50 m in about 2.9 s. Ratio 0.70, Froude's √½.",
+            "Now set Controls → Geometry → Fluid to syrup (both tanks refill) and press V again: about 4.0 s and 3.3 s. Ratio 0.83: in syrup the model no longer follows Froude."],
+    task: "Open both slots together and compare the two drain times, in water and then in syrup.",
     settle: 0,
   },
 

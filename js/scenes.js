@@ -365,7 +365,7 @@ const SCENES = (() => {
              "Both ducts share the same head loss; their discharges add. Storage and discharge are per metre out of the screen."] },
 
     // --------------------------------------------------------- similitude
-    // DA-1 / DA-2: a tank and an exact scale copy of it, side by side,
+    // DA-1: a tank and an exact scale copy of it, side by side,
     // each draining through a slot in its floor. V opens both slots at once.
     //
     // THE WHOLE RIG SCALES. The prototype (left) is fixed; the model (right)
@@ -394,7 +394,8 @@ const SCENES = (() => {
     // height pedestal changes nothing). At High the L_r = ½ residual vanishes
     // (+1.2%) while L_r = ¼ stays near −9.7% — a resolution effect that the
     // smallest model has not grown out of: this solver's version of a scale
-    // effect, and DA-2's pooled plot is built on it.
+    // effect. (These tanks were DA-2, now retired; the numbers stay as the
+    // record of the grid effect. The menu scene is fluid-tanks below.)
     //
     //  c = 40, not the default 25: at 25 the prototype's jet (≈ 7 m/s) runs
     //  at Mach 0.28 and adds ≈ 1% of its own; 40 halves that at 1.6× the
@@ -494,7 +495,9 @@ const SCENES = (() => {
                "Controls → Geometry: <b>Fluid</b> switches both tanks between water and syrup (it restarts the water); <b>Length ratio L_r</b> resizes the model.",
                "Gauges on <b>Depth d</b> read the depth above each tank's floor; expand a gauge card (⤢) and hover its trace to read times.",
                "Froude predicts T_m = √L_r · T_p in any fluid. It holds only while viscosity is negligible in BOTH tanks."] };
-      return [scaleTanks, fluidTanks];
+      // scale-tanks itself left the menu with DA-2; fluid-tanks reuses its
+      // valves and water and, with Fluid on water, is the same experiment.
+      return [fluidTanks];
     })(),
 
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",

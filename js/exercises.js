@@ -1090,31 +1090,6 @@ const EXERCISES = [
 
 
   {
-    id: "DA-2",
-    title: "Time scales as √L_r",
-    topic: "Similitude",
-    folder: "DA-2-time-scales",
-    scene: "scale-tanks",
-    rig: null,
-    rigParams: { budget: "Medium" },
-    viewParams: { mode: "0", gaugeField: "d", particles: false },
-    digit: { label: "Length ratio L_r", control: "geom0", base: 0.25, step: 0.05, rule: "L_r = 0.25 + 0.05·d" },
-    instruments: [
-      { tool: "gauge", where: "prototype: x = 1.6 m, 1.4 m in from the tank's outer left edge at x = 0.2 m (any height below the water)", why: "prototype depth d" },
-      { tool: "gauge", where: "model: the same station scaled by L_r from the model's outer left edge at x = 5.2 m, i.e. x = 5.2 + 1.4 L_r m", why: "model depth d; the scaled station is the first length-scale step" },
-    ],
-    ui: { view: ["legendBtn"], fields: ["water"], controls: ["speed", "geom0"] },
-    start: "a 4 m prototype tank and a scale copy of it at length ratio L_r, both full, slots shut; per metre width",
-    setup: ["Set Length ratio L_r from your digit (the field above, or Controls → Geometry). The water restarts full.",
-            "Place both Depth gauges (5), press V to open the two slots together, and let both tanks empty (about 10 s).",
-            "Expand each gauge (⤢) and hover its trace. Prototype: read the times at which d passes 2.50 m and 1.00 m; their difference is T_p. Model: the same at d = 2.50 L_r and 1.00 L_r; that difference is T_m.",
-            "Froude similarity predicts T_m = √L_r·T_p. Your error = 100 × (T_m − √L_r·T_p) / (√L_r·T_p) %."],
-    task: "Time both tanks between their depth marks, then submit L_r, T_p, T_m and your % error. The class pools the errors into one plot against L_r.",
-    settle: 0,
-  },
-
-
-  {
     id: "DA-3",
     title: "A weir model study",
     topic: "Similitude",

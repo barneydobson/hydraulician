@@ -28,7 +28,7 @@
  *
  * WHAT SCALES (the model) — P, crest length, approach length, weir station,
  *   gauge station, and q by L_r^1.5.  Every base dimension is a multiple of
- *   4 CELLS so L_r = 1, ½, ¼ rasterise to EXACT cell counts (the tanks' trick in DA-1/DA-2):
+ *   4 CELLS so L_r = 1, ½, ¼ rasterise to EXACT cell counts (the tanks' trick in DA-1):
  *
  *      quantity        L_r=1        L_r=½        L_r=¼
  *      P              32 cells   16 cells    8 cells
@@ -282,7 +282,7 @@ window.DA3 = {
     return r;
   },
 
-  /** Settle time scales as √L_r (the Froude time scale, DA-2) — the L_r=¼ rig fills 2× faster. */
+  /** Settle time scales as √L_r (the Froude time scale, DA-1) — the L_r=¼ rig fills 2× faster. */
   settleFor: function (lam) { return Math.max(18, Math.round(55 * Math.sqrt(lam))); },
 
   sweep: function (ds) {

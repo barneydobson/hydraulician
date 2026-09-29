@@ -20,8 +20,8 @@
 
    DA-3 (the weir model study) keeps the three weir rungs first captured for
    the scale-ladder demo: the same broad-crested weir at L_r = 1, ½ and ¼, one
-   payload per rung, picked by the card's `rigTable`. DA-1 and DA-2 need no
-   payload — their two tanks are a scene (scale-tanks in js/scenes.js).
+   payload per rung, picked by the card's `rigTable`. DA-1 needs no
+   payload — its two tanks are a scene (fluid-tanks in js/scenes.js).
 
    Regenerate: exercises/_runner/runner.py + the rig.js of each folder; the
    build call used for every entry is quoted above its key.  Do not hand-edit

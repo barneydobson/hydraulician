@@ -23,8 +23,7 @@ and pick **DA-1**, or use the direct link
 [`?ex=DA-1`](https://barneydobson.github.io/hydraulician/?ex=DA-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 It runs on the `fluid-tanks` scene at **Resolution Very high**, which the
-card sets. [DA-2](../DA-2-time-scales/) is its student half: the same tanks
-in water at each student's own L_r.
+card sets.
 
 ## The rig
 
@@ -134,8 +133,9 @@ in both tanks, so it cannot show the fix, only the problem.
 
 - **Nobody got a quarter.** A Froude model runs slow in water: a 1:25 model
   of a 2-hour drain takes 24 minutes, not 5.
-- **The water result is not exact either:** −1.5%. That is the grid, the
-  scale effect DA-2 measures; at Medium it is −4.5% at L_r = ½.
+- **The water result is not exact either:** −1.5%. That is the grid: the
+  solver's effective viscosity is tied to the cell size, which does not
+  shrink with the model. At Medium it is −4.5% at L_r = ½ and −9% at ¼.
 - **Syrup at L_r = ¼** (move the slider) breaks harder still, because the
   model's Re falls as L_r^1.5.
 - **This is the complete-turbulence rule.** A model must keep Re in the

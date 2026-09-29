@@ -1061,35 +1061,32 @@ const EXERCISES = [
   // ------------------------------------------------------ dimensional analysis
   {
     id: "DA-1",
-    title: "The scale ladder",
+    title: "Which tank empties first?",
     topic: "Similitude",
-    folder: "DA-1-scale-ladder",
-    scene: "sandbox",
-    rig: "DA-1@1",
-    // The λ third is d mod 3, and each third is a different DRAWING — so the
-    // digit picks which captured rig loads. Nobody hand-draws a λ = ¼ weir.
-    rigTable: ["DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1", "DA-1@0.5",
-               "DA-1@0.25", "DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1"],
-    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
-                 inflowOn: true, inFree: false, twOn: false,
-                 spoutOn: false, waveOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
-    digit: { label: "q (already scaled by λ^1.5)", control: "inQ", unit: "m²/s",
-             rule: "q_base = 0.60 + 0.06·d, then scaled by λ^1.5 for your third",
-             table: [0.600, 0.235, 0.090, 0.780, 0.295, 0.115, 0.960, 0.360, 0.135, 1.140],
-             also: [{ label: "reservoir", control: "inLevel", unit: "m",
-                      rule: "the level paired with your scaled q",
-                      table: [1.795, 1.165, 0.840, 1.890, 1.210, 0.865,
-                              1.975, 1.250, 0.880, 2.055] }] },
-    digitNote: "your scale third is d mod 3: λ = 1, ½ or ¼, and the drawing loads with your digit",
+    folder: "DA-1-which-empties-first",
+    scene: "fluid-tanks",
+    rig: null,
+    // Two runs of the same pair of tanks at L_r = ½: water, where Froude
+    // holds, then syrup, where it does not. Very high is the resolution the
+    // README's numbers were measured at (the scene comment says why). Nothing
+    // personal: the lecturer takes the vote, presses V and reads the traces.
+    rigParams: { budget: "Very high" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digitNote: "lecturer demo: no personalised parameter",
     instruments: [
-      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼ (z ≈ 1.25 / 0.90 / 0.72)", why: "h, and H = h − P" },
+      { tool: "gauge", where: "one in each tank, 1.4 m (× L_r) in from its outer left edge: prototype x = 1.6 m, model x = 5.9 m, anywhere below the water", why: "depth d above each floor; the two traces are the whole demo" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
-    start: "a broad-crested weir, drawn at your own scale",
-    task: "Set your scaled q and its paired reservoir level, then read the gauge depth h and report the head over the crest, H = h − P.",
-    settle: 55,
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1"], panel: "shut" },
+    start: "a 4 m tank and an exact half-scale copy, both full of water, slots shut",
+    setup: ["Vote before pressing anything: does the half-scale tank empty in the same time, in 0.71 (√½) of the time, in half the time or in a quarter?",
+            "Place the two Depth gauges, then press V: both slots open at the same instant.",
+            "Expand each gauge (⤢) and hover its trace: the prototype falls from d = 2.50 to 1.00 m in about 4.1 s, the model from 1.25 to 0.50 m in about 2.9 s. Ratio 0.70, Froude's √½.",
+            "Now set Controls → Geometry → Fluid to syrup (both tanks refill) and press V again: about 4.0 s and 3.3 s. Ratio 0.83: in syrup the model no longer follows Froude."],
+    task: "Open both slots together and compare the two drain times, in water and then in syrup.",
+    settle: 0,
   },
+
+
   {
     id: "DA-2",
     title: "Time scales as √λ",

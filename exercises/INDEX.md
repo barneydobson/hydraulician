@@ -47,7 +47,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|
-| DA-1 | The scale ladder | DA-1-scale-ladder/ | RIG-B weir ×3 scales | (λ, q, H) |
+| DA-1 | Which tank empties first? | DA-1-which-empties-first/ | fluid-tanks (L_r = ½; water, then syrup; Very high) | — (lecturer demo) |
 | DA-2 | Time scales as √λ | DA-2-time-scales/ | RIG-C tank ×λ | (λ, t between marks) |
 | DA-3 | Scale effects, live | DA-3-scale-effects/ | DA-1/DA-2 rigs × resolutions | optional (λ, q, resolution, C_d) |
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |

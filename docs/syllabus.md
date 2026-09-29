@@ -116,10 +116,12 @@ limits become part of the subject.
 
 ## 11. Similitude and the limits of a model
 
-Scaling a model result up to the prototype, and telling a scale effect from a
-grid effect. The capstone, on purpose: it presumes everything above it.
+Scaling a model result up to the prototype, and knowing when a model stops
+scaling. The capstone, on purpose: it presumes everything above it.
 
-*Nothing here yet.*
+| exercise | type | what it does |
+|---|---|---|
+| **DA-1** · Which tank empties first? ([open it](https://barneydobson.github.io/hydraulician/?ex=DA-1) · [brief](../exercises/DA-1-which-empties-first/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | Drain a tank and its half-scale copy together: in water the model takes √½ of the prototype's time, as Froude scaling predicts; refill both with syrup and the model runs 17% slow, because its Reynolds number has fallen into the range where viscosity matters. |
 
 ---
 

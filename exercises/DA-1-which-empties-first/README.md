@@ -22,14 +22,11 @@ Before the first run, the class votes on whether the small tank empties in:
 and pick **DA-1**, or use the direct link
 [`?ex=DA-1`](https://barneydobson.github.io/hydraulician/?ex=DA-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
-It runs on the `fluid-tanks` scene at **Resolution Very high**, which the
-card sets.
+It runs on the `fluid-tanks` scene; the card sets everything up.
 
 ## The rig
 
-The `fluid-tanks` scene is an 8.75 m × 4.0 m slice, per metre width. At Very
-high Δx = 0.01 m exactly (875 × 400 cells), so every scaled edge lands on a
-cell face.
+The `fluid-tanks` scene is an 8.75 m × 4.0 m slice, per metre width.
 
 | | prototype (left) | model (right), L_r = ½ |
 |---|---|---|
@@ -133,11 +130,10 @@ in both tanks, so it cannot show the fix, only the problem.
 
 - **Nobody got a quarter.** A Froude model runs slow in water: a 1:25 model
   of a 2-hour drain takes 24 minutes, not 5.
-- **The water result is not exact either:** −1.5%. That is the grid: the
-  solver's effective viscosity is tied to the cell size, which does not
-  shrink with the model. At Medium it is −4.5% at L_r = ½ and −9% at ¼.
-- **Syrup at L_r = ¼** (move the slider) breaks harder still, because the
-  model's Re falls as L_r^1.5.
+- **Syrup at L_r = ¼** (move the slider) breaks much harder, because the
+  model's Re falls as L_r^1.5. The quarter-scale model now takes LONGER than
+  the prototype: 4.73 s against 3.98 s, a ratio of 1.19 where Froude says
+  0.5. It is heading for the fully viscous 1/L_r = 4.
 - **This is the complete-turbulence rule.** A model must keep Re in the
   range where the coefficient (C_d here, λ on the Moody diagram) has stopped
   depending on it.
@@ -145,7 +141,7 @@ in both tanks, so it cannot show the fix, only the problem.
 ## Console spot-check
 
 Paste [rig.js](rig.js) into the console and run `await DA1.run(0)` (water)
-or `await DA1.run(1)` (syrup). Measured at Very high, flat out:
+or `await DA1.run(1)` (syrup). Measured on the card's settings:
 
 | fluid | ν (m²/s) | T_p (s) | T_m (s) | T_m / T_p | vs √½ = 0.707 |
 |---|---:|---:|---:|---:|---:|

@@ -6,7 +6,7 @@
  *     await DA1.run(0)       // water  → { T_p: 4.105, T_m: 2.860, ratio: 0.697 }
  *     await DA1.run(1)       // syrup  → { T_p: 3.975, T_m: 3.281, ratio: 0.825 }
  *
- * It picks DA-1 (the fluid-tanks scene at Very high, Δx = 0.01 m), sets the
+ * It picks DA-1 (the fluid-tanks scene, as the card sets it up), sets the
  * Fluid slider with SIM.setParam (what Controls → Geometry calls), opens both
  * slots with SIM.setValve (what V calls) and times each tank between its
  * marks: the prototype's d = 2.50 → 1.00 m and the model's L_r × those. Depth

@@ -1069,8 +1069,8 @@ const EXERCISES = [
     scene: "fluid-tanks",
     rig: null,
     // Two runs of the same pair of tanks at L_r = ½: water, where Froude
-    // holds, then syrup, where it does not. Very high is Δx = 0.01 m exactly
-    // on this 8.75 m scene, so every scaled edge is a whole cell. Nothing
+    // holds, then syrup, where it does not. Very high is the resolution the
+    // README's numbers were measured at (the scene comment says why). Nothing
     // personal: the lecturer takes the vote, presses V and reads the traces.
     rigParams: { budget: "Very high" },
     viewParams: { mode: "0", gaugeField: "d", particles: false },

@@ -48,7 +48,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|
-| DA-1 | Which tank empties first? | DA-1-which-empties-first/ | fluid-tanks (L_r = ½; water, then syrup; Very high) | — (lecturer demo) |
+| DA-1 | Empty a tank of honey | DA-1-empty-a-tank-of-honey/ | fluid-tanks, L_r = 0.25 + 0.05·d, water then honey | (Lr_water, Vr_water, Lr_honey, Vr_honey) |
 | DA-3 | A weir model study | DA-3-weir-model-study/ | RIG-B weir ×3 rungs (tutorial sheet) | (H, C_d per rung) |
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |
 | HP-2 | Cups vs plates | HP-2-pelton/ | shared jet rig | — (lecturer demo) |

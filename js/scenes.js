@@ -453,8 +453,8 @@ const SCENES = (() => {
                "Gauges on <b>Depth d</b> read the water depth above each tank's floor; expand a gauge card (⤢) and hover its trace to read times.",
                "Froude scaling: lengths × L_r, velocities × √L_r, times × √L_r, discharge per metre × L_r^1.5."] };
 
-      // DA-1: the same pair of tanks, run once in water and once in a thick
-      // syrup. Froude scaling holds in water and fails in syrup, because the
+      // DA-1: the same pair of tanks, run once in water and once in honey
+      // (ν = 0.03 m²/s). Froude scaling holds in water and fails in honey, because the
       // model's Reynolds number falls with L_r^1.5 while the prototype's
       // stays high: viscosity is the force the model does not scale.
       //
@@ -464,7 +464,7 @@ const SCENES = (() => {
       // high, L_r = ½, marks d = 2.5 → 1.0 m (× L_r in the model):
       //
       //   water  ν = 1e-6   T_p = 4.105 s  T_m = 2.860 s  ratio 0.697  (√½ = 0.707, −1.5%)
-      //   syrup  ν = 3e-2   T_p = 3.975 s  T_m = 3.281 s  ratio 0.825  (+16.7%)
+      //   honey  ν = 3e-2   T_p = 3.975 s  T_m = 3.281 s  ratio 0.825  (+16.7%)
       //
       // At ν = 1e-2 the ½ model still follows Froude (−0.8%); at 1e-1 the
       // prototype slows too and the model has not reached its lower mark
@@ -477,13 +477,13 @@ const SCENES = (() => {
       const NU = [1e-6, 3e-2];
       const fluidTanks = {
         id: "fluid-tanks", name: "Two tanks, two fluids", key: "Froude and viscosity", group: "Similitude",
-        blurb: "A 4 m tank and its half-scale copy, filled with water or with syrup. In water the model drains in √½ of the prototype's time; in syrup it does not.",
+        blurb: "A 4 m tank and its half-scale copy, filled with water or with honey. In water the model drains in √½ of the prototype's time; in honey it does not.",
         W: 8.75, H: 4.0, c: 40, cf: 0.01, cs: 0.12, nu: NU[0], mode: 0, hmax: 3.0, headMax: 3.6, vmax: 7,
         open: [0, 0, 2, 0], valveOpen: 0, particles: 0, spinup: 0,
         params: [
           { key: "lam", label: "Length ratio L_r", min: 0.25, max: 0.70, step: 0.05, value: 0.5, unit: "", resetWater: true },
           { key: "fluid", label: "Fluid", min: 0, max: 1, step: 1, value: 0, unit: "", resetWater: true,
-            fmt: (v) => (v > 0.5 ? "syrup, ν = 0.03 m²/s" : "water, ν = 10⁻⁶ m²/s") },
+            fmt: (v) => (v > 0.5 ? "honey, ν = 0.03 m²/s" : "water, ν = 10⁻⁶ m²/s") },
         ],
         solids: (W, H, P, par) => {
           P.nu = par && par.fluid > 0.5 ? NU[1] : NU[0];
@@ -492,7 +492,7 @@ const SCENES = (() => {
         valves: scaleTanks.valves,
         water: scaleTanks.water,
         tips: ["Press <b>V</b> to open both slots at the same instant.",
-               "Controls → Geometry: <b>Fluid</b> switches both tanks between water and syrup (it restarts the water); <b>Length ratio L_r</b> resizes the model.",
+               "Controls → Geometry: <b>Fluid</b> switches both tanks between water and honey (it restarts the water); <b>Length ratio L_r</b> resizes the model.",
                "Gauges on <b>Depth d</b> read the depth above each tank's floor; expand a gauge card (⤢) and hover its trace to read times.",
                "Froude predicts T_m = √L_r · T_p in any fluid. It holds only while viscosity is negligible in BOTH tanks."] };
       // scale-tanks itself left the menu with DA-2; fluid-tanks reuses its

@@ -121,7 +121,7 @@ scaling. The capstone, on purpose: it presumes everything above it.
 
 | exercise | type | what it does |
 |---|---|---|
-| **DA-1** · Which tank empties first? ([open it](https://barneydobson.github.io/hydraulician/?ex=DA-1) · [brief](../exercises/DA-1-which-empties-first/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | Drain a tank and its half-scale copy together: in water the model takes √½ of the prototype's time, as Froude scaling predicts; refill both with syrup and the model runs 17% slow, because its Reynolds number has fallen into the range where viscosity matters. |
+| **DA-1** · Empty a tank of honey ([open it](https://barneydobson.github.io/hydraulician/?ex=DA-1) · [brief](../exercises/DA-1-empty-a-tank-of-honey/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Drain a tank and a scale copy at your own L_r, once in water and once in honey, and measure the velocity ratio V_r. Pool the class: water follows Froude's √L_r; honey falls away from it as the model shrinks, because the model's Reynolds number has fallen into the range where viscosity matters. |
 
 ---
 

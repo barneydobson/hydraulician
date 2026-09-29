@@ -1063,28 +1063,31 @@ const EXERCISES = [
   // ------------------------------------------------------ dimensional analysis
   {
     id: "DA-1",
-    title: "Which tank empties first?",
+    title: "Empty a tank of honey",
     topic: "Similitude",
-    folder: "DA-1-which-empties-first",
+    folder: "DA-1-empty-a-tank-of-honey",
     scene: "fluid-tanks",
     rig: null,
-    // Two runs of the same pair of tanks at L_r = ½: water, where Froude
-    // holds, then syrup, where it does not. Very high is the resolution the
-    // README's numbers were measured at (the scene comment says why). Nothing
-    // personal: the lecturer takes the vote, presses V and reads the traces.
+    // A quick exercise: each student drains the same pair of tanks at their
+    // own L_r, once in water and once in honey, and submits V_r for each.
+    // Pooled, water follows Froude's √L_r and honey falls away from it as the
+    // model shrinks. Very high is the resolution the README's numbers were
+    // measured at (the scene comment says why).
     rigParams: { budget: "Very high" },
     viewParams: { mode: "0", gaugeField: "d", particles: false },
-    digitNote: "lecturer demo: no personalised parameter",
+    digit: { label: "Length ratio L_r", control: "geom0", base: 0.25, step: 0.05, rule: "L_r = 0.25 + 0.05·d" },
     instruments: [
-      { tool: "gauge", where: "one in each tank, 1.4 m (× L_r) in from its outer left edge: prototype x = 1.6 m, model x = 5.9 m, anywhere below the water", why: "depth d above each floor; the two traces are the whole demo" },
+      { tool: "gauge", where: "prototype: x = 1.6 m, 1.4 m in from the tank's outer left edge at x = 0.2 m (any height below the water)", why: "prototype depth d" },
+      { tool: "gauge", where: "model: the same station scaled by L_r from the model's outer left edge at x = 5.2 m, i.e. x = 5.2 + 1.4 L_r m", why: "model depth d" },
     ],
-    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1"], panel: "shut" },
-    start: "a 4 m tank and an exact half-scale copy, both full of water, slots shut",
-    setup: ["Vote before pressing anything: does the half-scale tank empty in the same time, in 0.71 (√½) of the time, in half the time or in a quarter?",
-            "Place the two Depth gauges, then press V: both slots open at the same instant.",
-            "Expand each gauge (⤢) and hover its trace: the prototype falls from d = 2.50 to 1.00 m in about 4.1 s, the model from 1.25 to 0.50 m in about 2.9 s. Ratio 0.70, Froude's √½.",
-            "Now set Controls → Geometry → Fluid to syrup (both tanks refill) and press V again: about 4.0 s and 3.3 s. Ratio 0.83: in syrup the model no longer follows Froude."],
-    task: "Open both slots together and compare the two drain times, in water and then in syrup.",
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1"] },
+    start: "a 4 m prototype tank and a scale copy of it at length ratio L_r, both full of water, slots shut; per metre width",
+    setup: ["Set Length ratio L_r from your digit (the field above, or Controls → Geometry). Both tanks refill.",
+            "Place both Depth gauges (5): prototype at x = 1.6 m, model at x = 5.2 + 1.4 L_r m. Press V to open both slots together and let the tanks empty.",
+            "Expand each gauge (⤢) and hover its trace. T_p is the time the prototype takes to fall from d = 2.50 m to 1.00 m; T_m is the model's time from 2.50 L_r to 1.00 L_r.",
+            "Work out the time ratio T_r = T_m / T_p and the velocity ratio V_r = L_r / T_r. Froude scaling predicts V_r = √L_r.",
+            "Set Controls → Geometry → Fluid to honey (both tanks refill) and repeat at the same L_r. The honey drains more slowly: allow about 15 s."],
+    task: "Measure V_r in water and in honey, then submit Lr_water, Vr_water, Lr_honey and Vr_honey. The class pools them into one plot against L_r.",
     settle: 0,
   },
 

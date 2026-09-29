@@ -29,7 +29,7 @@ assignment); you work the rule out, look your row up in the brief's table
 where there is one, and set, place or draw it yourself. Coupled values,
 instrument positions and staged sequences stay in the student's hands:
 getting them wrong and seeing why is the exercise. The one card that still
-takes a typed digit is a variant-rig one (DA-1, DA-3, B8), where the digit
+takes a typed digit is a variant-rig one (DA-3, B8), where the digit
 picks which captured drawing loads. `↻ Reset to the starting point` on the
 card restores the common setup.
 
@@ -47,7 +47,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|
-| DA-1 | The scale ladder | DA-1-scale-ladder/ | RIG-B weir ×3 scales | (λ, q, H) |
+| DA-1 | Empty a tank of honey | DA-1-empty-a-tank-of-honey/ | fluid-tanks, L_r = 0.25 + 0.05·d, water then honey | (Lr_water, Vr_water, Lr_honey, Vr_honey) |
 | DA-2 | Time scales as √λ | DA-2-time-scales/ | RIG-C tank ×λ | (λ, t between marks) |
 | DA-3 | Scale effects, live | DA-3-scale-effects/ | DA-1/DA-2 rigs × resolutions | optional (λ, q, resolution, C_d) |
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |

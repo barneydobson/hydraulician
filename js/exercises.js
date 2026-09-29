@@ -1061,35 +1061,35 @@ const EXERCISES = [
   // ------------------------------------------------------ dimensional analysis
   {
     id: "DA-1",
-    title: "The scale ladder",
+    title: "Empty a tank of honey",
     topic: "Similitude",
-    folder: "DA-1-scale-ladder",
-    scene: "sandbox",
-    rig: "DA-1@1",
-    // The λ third is d mod 3, and each third is a different DRAWING — so the
-    // digit picks which captured rig loads. Nobody hand-draws a λ = ¼ weir.
-    rigTable: ["DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1", "DA-1@0.5",
-               "DA-1@0.25", "DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1"],
-    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
-                 inflowOn: true, inFree: false, twOn: false,
-                 spoutOn: false, waveOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
-    digit: { label: "q (already scaled by λ^1.5)", control: "inQ", unit: "m²/s",
-             rule: "q_base = 0.60 + 0.06·d, then scaled by λ^1.5 for your third",
-             table: [0.600, 0.235, 0.090, 0.780, 0.295, 0.115, 0.960, 0.360, 0.135, 1.140],
-             also: [{ label: "reservoir", control: "inLevel", unit: "m",
-                      rule: "the level paired with your scaled q",
-                      table: [1.795, 1.165, 0.840, 1.890, 1.210, 0.865,
-                              1.975, 1.250, 0.880, 2.055] }] },
-    digitNote: "your scale third is d mod 3: λ = 1, ½ or ¼, and the drawing loads with your digit",
+    folder: "DA-1-empty-a-tank-of-honey",
+    scene: "fluid-tanks",
+    rig: null,
+    // A quick exercise: each student drains the same pair of tanks at their
+    // own L_r, once in water and once in honey, and submits V_r for each.
+    // Pooled, water follows Froude's √L_r and honey falls away from it as the
+    // model shrinks. Very high is the resolution the README's numbers were
+    // measured at (the scene comment says why).
+    rigParams: { budget: "Very high" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digit: { label: "Length ratio L_r", control: "geom0", base: 0.25, step: 0.05, rule: "L_r = 0.25 + 0.05·d" },
     instruments: [
-      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼ (z ≈ 1.25 / 0.90 / 0.72)", why: "h, and H = h − P" },
+      { tool: "gauge", where: "prototype: x = 1.6 m, 1.4 m in from the tank's outer left edge at x = 0.2 m (any height below the water)", why: "prototype depth d" },
+      { tool: "gauge", where: "model: the same station scaled by L_r from the model's outer left edge at x = 5.2 m, i.e. x = 5.2 + 1.4 L_r m", why: "model depth d" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
-    start: "a broad-crested weir, drawn at your own scale",
-    task: "Set your scaled q and its paired reservoir level, then read the gauge depth h and report the head over the crest, H = h − P.",
-    settle: 55,
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1"] },
+    start: "a 4 m prototype tank and a scale copy of it at length ratio L_r, both full of water, slots shut; per metre width",
+    setup: ["Set Length ratio L_r from your digit (the field above, or Controls → Geometry). Both tanks refill.",
+            "Place both Depth gauges (5): prototype at x = 1.6 m, model at x = 5.2 + 1.4 L_r m. Press V to open both slots together and let the tanks empty.",
+            "Expand each gauge (⤢) and hover its trace. T_p is the time the prototype takes to fall from d = 2.50 m to 1.00 m; T_m is the model's time from 2.50 L_r to 1.00 L_r.",
+            "Work out the time ratio T_r = T_m / T_p and the velocity ratio V_r = L_r / T_r. Froude scaling predicts V_r = √L_r.",
+            "Set Controls → Geometry → Fluid to honey (both tanks refill) and repeat at the same L_r. The honey drains more slowly: allow about 15 s."],
+    task: "Measure V_r in water and in honey, then submit Lr_water, Vr_water, Lr_honey and Vr_honey. The class pools them into one plot against L_r.",
+    settle: 0,
   },
+
+
   {
     id: "DA-2",
     title: "Time scales as √λ",

@@ -535,7 +535,8 @@ const CONTROLS = [
     set: function (v) { const d = this.par(); if (d) SIM.setParam(d.key, v); },
     fmt: function (v) {
       const d = this.par();
-      return d ? v.toFixed(3) + (d.unit ? " " + d.unit : "") : "";
+      if (!d) return "";
+      return d.fmt ? d.fmt(v) : v.toFixed(3) + (d.unit ? " " + d.unit : "");
     },
     info: "A dimension of the scene's own geometry. Moving it redraws the solid and re-rasterises the grid — and resets any averaging window, because the walls the mean was accumulated through are no longer the walls on screen.",
   })),

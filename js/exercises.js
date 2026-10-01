@@ -27,8 +27,8 @@
  *                  physically working rig: the resolution the geometry was
  *                  captured at, the open/closed edges, which supplies and
  *                  controls exist, and the levels/constants a README documents
- *                  as load-bearing (FR-1's 2.50 m tailwater, DA-3's q-driven
- *                  reservoir with no tailwater). CONTROLS ids → values;
+ *                  as load-bearing (FR-1's 2.50 m tailwater, DA-1's Very high
+ *                  resolution). CONTROLS ids → values;
  *                  key ORDER matters, because ticking a level control opens its
  *                  own edge, so edges come first.
  *   viewParams     APPLIED. Display and readout only — Field, Gauges plot,
@@ -37,8 +37,7 @@
  *                  LOOKED at (UN-3 is unreadable on the Head channel).
  *   studentParams  DISPLAYED, NEVER APPLIED. Values the worksheet asks the
  *                  student to set, that no digit rule covers — a staged step
- *                  (B9's two level controls), a per-rung discharge and level
- *                  (DA-3's weir), an assigned cell (B5). Each is
+ *                  (B9's two level controls), an assigned cell (B5). Each is
  *                  {control, value?, unit?, rule?}.
  *   digit          DISPLAYED, NEVER APPLIED (with one exception, below). The
  *                  personalised parameter: `base` + `step`·d, or a per-digit
@@ -51,11 +50,9 @@
  *                  number's last digit and the lecturer owns explaining it.
  *                  Nothing is computed or written for them.
  *
- * The exception: `rigTable` picks WHICH captured drawing loads, because DA-3's
- * L_r = ¼ weir is a different rig, not a different number, and nobody is going to
- * hand-draw it. Geometry is part of the common starting point. Where the
- * drawings are not a per-student assignment (DA-3 loads all three rungs in
- * turn) `rigPrompt` relabels the box that picks them.
+ * The exception: `rigTable` picks WHICH captured drawing loads, because B8's
+ * three orifice lips are different rigs, not different numbers, and nobody is
+ * going to hand-draw them. Geometry is part of the common starting point.
  *
  * OTHER FIELDS
  *   id       programme id, e.g. "HJ-1"           title    the README's own h1
@@ -1094,35 +1091,31 @@ const EXERCISES = [
 
   {
     id: "DA-3",
-    title: "A weir model study",
+    title: "Sloshing in a tank",
     topic: "Similitude",
-    folder: "DA-3-weir-model-study",
-    scene: "sandbox",
-    // The same broad-crested weir drawn at three scales; the box picks the
-    // rung. Every student loads all three in turn, so it is not a student
-    // number (rigPrompt relabels it).
-    rig: "DA-3@1",
-    rigTable: ["DA-3@1", "DA-3@0.5", "DA-3@0.25"],
-    rigPrompt: "rung: 0 = prototype (L_r = 1), 1 = 1:2 model, 2 = 1:4 model",
-    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
-                 inflowOn: true, inFree: false, twOn: false,
-                 spoutOn: false, waveOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
-    studentParams: [
-      { control: "inQ", unit: "m²/s", rule: "0.780 at L_r = 1; your Froude-scaled q_m on the two models" },
-      { control: "inLevel", unit: "m", rule: "1.891 / 1.195 / 0.848 m for L_r = 1 / ½ / ¼ (the reservoir level paired with that q)" },
-    ],
-    digitNote: "the weir is the prototype at L_r = 1: crest height P = 0.696 m above the bed, per-metre discharge q_p = 0.780 m²/s",
+    folder: "DA-3-sloshing-tank",
+    scene: "slosh-tank",
+    rig: null,
+    // The tutorial sheet's in-app part: dimensional analysis says the period
+    // depends on B/d alone (a/d small), so one run per B/d draws the whole
+    // design chart K = T√(g/d) = φ(B/d). Nothing personal — every student
+    // runs the same five tanks. The scene releases the tilt at t = 0, so
+    // there is nothing to settle.
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digitNote: "tutorial sheet: every student runs the same five tanks",
     instruments: [
-      { tool: "gauge", where: "the approach pool: x = 2.17 / 1.09 / 0.54 m for L_r = 1 / ½ / ¼, just above the crest height", why: "the pool depth d above the bed, and Δh = d − P" },
+      { tool: "gauge", where: "near the left wall: x = 0.5 m, low in the water", why: "the depth d there rises and falls once per period. Not right against the wall: a gauge's depth is smoothed over ±0.09 m and would take in the wall's own columns" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
-    start: "a broad-crested weir; the box above loads the prototype or one of its two scale models",
-    setup: ["Before the session answer the sheet's questions on the dimensionless groups and the model design.",
-            "For each rung: load it with the box above, type Inflow q and Reservoir level into the fields above (the slider steps in 0.005, so type q), press R and wait for the settle (55 / 40 / 28 s at L_r = 1 / ½ / ¼).",
-            "Place a Gauge (5) at the station and read the steady pool depth d (the median of the wobble). Δh = d − P, with P = 0.696 L_r m; C_d = q / (√g · Δh^1.5)."],
-    task: "Fill the sheet's measured column: Δh and C_d for the prototype and both models, then compare with your Froude-scaled predictions.",
-    settle: 55,
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1", "geom2"] },
+    start: "a closed tank, length B = 4 m, depth d = 1.0 m, its surface tilted by a = 0.2 d and released at t = 0; per metre width",
+    setup: ["Place a Depth gauge (5) near the left wall: x = 0.5 m, low in the water.",
+            "Set Tank length B, Water depth d and Initial tilt a/d in Controls → Geometry. Each change restarts the slosh from t = 0; R also restarts it.",
+            "Expand the gauge (⤢) and hover its trace. Read the times t₁ and t₄ of the first and fourth crests after the release; the period is T = (t₄ − t₁) / 3.",
+            "The sheet's five models, one per value of B/d, all at a/d = 0.2 (B, d in m): A 1, 1.0; B 2, 1.0; C 4, 1.0; D 8, 1.0; E 8, 0.5.",
+            "For each, K = T√(g/d): the period with the tank's size divided out, so any two tanks can be compared."],
+    task: "Time the five tanks, work out K = T√(g/d) for each and plot K against B/d on the sheet's chart: the design chart, from five models instead of 125.",
+    settle: 0,
   },
 
   // ------------------------------------------------------- hydrostatics

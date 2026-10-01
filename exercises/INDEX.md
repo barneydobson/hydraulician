@@ -30,8 +30,7 @@ where there is one, and set, place or draw it yourself. Coupled values,
 instrument positions and staged sequences stay in the student's hands:
 getting them wrong and seeing why is the exercise. The one card that still
 takes a typed digit is a variant-rig one (B8), where the digit picks which
-captured drawing loads; DA-3 uses the same box to load its three weir rungs
-in turn. `↻ Reset to the starting point` on the
+captured drawing loads. `↻ Reset to the starting point` on the
 card restores the common setup.
 
 How to run an exercise is described once, above — it is the same for all of
@@ -49,7 +48,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|
 | DA-1 | Empty a tank of honey | DA-1-empty-a-tank-of-honey/ | fluid-tanks, L_r = 0.25 + 0.05·d, water then honey | (Lr_water, Vr_water, Lr_honey, Vr_honey) |
-| DA-3 | A weir model study | DA-3-weir-model-study/ | RIG-B weir ×3 rungs (tutorial sheet) | (H, C_d per rung) |
+| DA-3 | Sloshing in a tank | DA-3-sloshing-tank/ | slosh-tank, four tanks from the tutorial sheet | (T and T√(g/d) per tank, on the sheet) |
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |
 | HP-2 | Cups vs plates | HP-2-pelton/ | shared jet rig | — (lecturer demo) |
 | HP-3 | Hydropower and unsteady flow | HP-3-surge-tower/ | hydro (fixed tutorial scheme) | (V₀, h_f, V_jet, P, η₀, k, η_max) |

@@ -122,6 +122,7 @@ scaling. The capstone, on purpose: it presumes everything above it.
 | exercise | type | what it does |
 |---|---|---|
 | **DA-1** · Empty a tank of honey ([open it](https://barneydobson.github.io/hydraulician/?ex=DA-1) · [brief](../exercises/DA-1-empty-a-tank-of-honey/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Drain a tank and a scale copy at your own L_r, once in water and once in honey, and measure the velocity ratio V_r. Pool the class: water follows Froude's √L_r; honey falls away from it as the model shrinks, because the model's Reynolds number has fallen into the range where viscosity matters. |
+| **DA-3** · Sloshing in a tank ([open it](https://barneydobson.github.io/hydraulician/?ex=DA-3) · [brief](../exercises/DA-3-sloshing-tank/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> | Use dimensional analysis to design a set of runs: 125 planned runs for the sloshing period of a tank collapse to one curve, K = T√(g/d) against B/d. In the app, five runs, one per value of B/d, draw that design chart against linear theory and its shallow and deep limits. |
 
 ---
 

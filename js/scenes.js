@@ -500,6 +500,63 @@ const SCENES = (() => {
       return [fluidTanks];
     })(),
 
+    // DA-3: a closed rectangular tank released from a first-mode tilt,
+    // η = d + a·cos(πx'/B). Dimensional analysis gives T√(g/d) = φ(B/d, a/d);
+    // linear theory is T = 2π/√(gk·tanh kd), k = π/B, with Merian's
+    // T = 2B/√(gd) as the shallow limit.
+    //
+    // a is a slider in units of d (the Π group itself), and it cannot go
+    // small: surface waves here are damped by RESOLUTION (engineering notes,
+    // "Surface waves are damped by RESOLUTION"), so a tilt of one cell dies
+    // in two periods. a/d = 0.2 rings for five. Its own effect on the period
+    // is a few per cent — see the DA-3 README for the measured table.
+    //
+    // The tank is one U polygon: inner faces snapped to the live Δx, so B
+    // and d are whole cells at any Resolution. Closed on all four edges and
+    // walled to the lid, so nothing leaves. 9 × 2.6 m gives Δx = 15.7 mm at
+    // Medium. spinup 0: the slosh IS the experiment, and R releases it again.
+    (() => {
+      const XL = 0.3, FL = 0.2;
+      const snap = (v) => {
+        const S = typeof SIM !== "undefined" && SIM.get ? SIM.get() : null;
+        const dx = S && S.dx ? S.dx : 0.02;
+        return Math.round(v / dx) * dx;
+      };
+      const dims = (par) => {
+        const B = par && par.B !== undefined ? par.B : 4, d = par && par.d !== undefined ? par.d : 1;
+        const ad = par && par.ad !== undefined ? par.ad : 0.2;
+        const xl = snap(XL), xr = snap(XL + B), fl = snap(FL);
+        return { xl, xr, fl, B: xr - xl, d, a: ad * d };
+      };
+      return {
+        id: "slosh-tank", name: "Sloshing tank", key: "Period of a standing wave", group: "Similitude",
+        blurb: "A closed tank released from a tilted surface. How does the sloshing period depend on the tank's length and depth?",
+        W: 9.0, H: 2.6, c: 25, cf: 0.01, mode: 0, hmax: 1.4, headMax: 1.6, vmax: 1.5,
+        open: [0, 0, 0, 0], particles: 0, spinup: 0,
+        params: [
+          { key: "B", label: "Tank length B", min: 1, max: 8, step: 0.5, value: 4, unit: "m", resetWater: true },
+          { key: "d", label: "Water depth d", min: 0.25, max: 1.2, step: 0.05, value: 1, unit: "m", resetWater: true },
+          { key: "ad", label: "Initial tilt a/d", min: 0.05, max: 0.3, step: 0.05, value: 0.2, unit: "", resetWater: true },
+        ],
+        solids: (W, H, P, par) => {
+          const t = dims(par), top = H + 0.5;
+          return [GEOM.poly([[-0.5, -0.5], [W + 0.5, -0.5], [W + 0.5, top], [t.xr, top], [t.xr, t.fl],
+                             [t.xl, t.fl], [t.xl, top], [-0.5, top]],
+            [{ id: "right", label: "Right wall", e0: 3, e1: 3 },
+             { id: "floor", label: "Floor", e0: 4, e1: 4 },
+             { id: "left", label: "Left wall", e0: 5, e1: 5 }], "tank")];
+        },
+        water: (x, z, P, par) => {
+          const t = dims(par);
+          if (x <= t.xl || x >= t.xr || z <= t.fl) return 0;
+          return still(t.fl + t.d + t.a * Math.cos(Math.PI * (x - t.xl) / t.B), z, P);
+        },
+        tips: ["The surface starts tilted and is released at t = 0; press <b>R</b> to release it again.",
+               "Controls → Geometry sets the tank length B, the depth d and the tilt a/d; each change restarts the slosh.",
+               "A <b>Depth d</b> gauge against the left wall records the slosh; expand it (⤢) and hover the trace to time the peaks.",
+               "Long shallow tanks follow Merian's T = 2B/√(gd); in deep tanks the depth stops mattering."] };
+    })(),
+
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",
       blurb: "Water falls in at the top left. Left-drag to draw edges and route it; right-drag for a big flow.",
       W: 9, H: 5, c: 22, cf: 0.02, hmax: 1.2, vmax: 5,

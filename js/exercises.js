@@ -27,8 +27,8 @@
  *                  physically working rig: the resolution the geometry was
  *                  captured at, the open/closed edges, which supplies and
  *                  controls exist, and the levels/constants a README documents
- *                  as load-bearing (FR-1's 2.50 m tailwater, DA-2's 0.04 m
- *                  draining apron). CONTROLS ids → values;
+ *                  as load-bearing (FR-1's 2.50 m tailwater, DA-1's Very high
+ *                  resolution). CONTROLS ids → values;
  *                  key ORDER matters, because ticking a level control opens its
  *                  own edge, so edges come first.
  *   viewParams     APPLIED. Display and readout only — Field, Gauges plot,
@@ -37,8 +37,7 @@
  *                  LOOKED at (UN-3 is unreadable on the Head channel).
  *   studentParams  DISPLAYED, NEVER APPLIED. Values the worksheet asks the
  *                  student to set, that no digit rule covers — a staged step
- *                  (B9's two level controls), a per-scale start level (DA-2's
- *                  h_start), an assigned cell (B5). Each is
+ *                  (B9's two level controls), an assigned cell (B5). Each is
  *                  {control, value?, unit?, rule?}.
  *   digit          DISPLAYED, NEVER APPLIED (with one exception, below). The
  *                  personalised parameter: `base` + `step`·d, or a per-digit
@@ -51,9 +50,9 @@
  *                  number's last digit and the lecturer owns explaining it.
  *                  Nothing is computed or written for them.
  *
- * The exception: `rigTable` picks WHICH captured drawing loads, because DA-1's
- * λ = ¼ weir is a different rig, not a different number, and nobody is going to
- * hand-draw it. Geometry is part of the common starting point.
+ * The exception: `rigTable` picks WHICH captured drawing loads, because B8's
+ * three orifice lips are different rigs, not different numbers, and nobody is
+ * going to hand-draw them. Geometry is part of the common starting point.
  *
  * OTHER FIELDS
  *   id       programme id, e.g. "HJ-1"           title    the README's own h1
@@ -1091,77 +1090,32 @@ const EXERCISES = [
 
 
   {
-    id: "DA-2",
-    title: "Time scales as √λ",
-    topic: "Similitude",
-    folder: "DA-2-time-scales",
-    scene: "sandbox",
-    rig: "DA-2@1",
-    rigTable: ["DA-2@1", "DA-2@0.75", "DA-2@0.5", "DA-2@0.25", "DA-2@1",
-               "DA-2@0.75", "DA-2@0.5", "DA-2@0.25", "DA-2@1", "DA-2@0.75"],
-    // The 0.04 m tailwater on an open right edge is load-bearing: a bare open
-    // edge ponds and chokes the orifice within ~27 s. The tank loads EMPTY —
-    // filling it is the experiment.
-    rigParams: { budget: "Medium", spoutOn: false,
-                 openL: "0", openR: "1", openB: "0", openT: "0",
-                 twOn: true, twLevel: 0.04, inQ: 0 },
-    rigWhy: { twLevel: "the apron must drain actively: a bare open edge ponds and chokes the orifice within ~27 s." },
-    viewParams: { gaugeField: "h", mode: "0" },
-    studentParams: [
-      { control: "inflowOn", value: true, rule: "step 2 — the fill source, then untick it again for step 3" },
-      { control: "inLevel", unit: "m", rule: "your own h_start: 1.80 / 1.35 / 0.90 / 0.45 m for λ = 1 / ¾ / ½ / ¼" },
-    ],
-    digitNote: "your scale is r = d mod 4, λ = 1 − 0.25·r. Fill to h_start = 1.80 / 1.35 / 0.90 / 0.45 m and stop at 0.60 / 0.45 / 0.30 / 0.15 m",
-    setup: ["The tank loads empty with the valve shut: the fill is part of the experiment.",
-            "Fill from the reservoir to your own h_start.",
-            "Untick Upstream reservoir AND set the Left edge back to Wall, then let it stand.",
-            "Press V and time the fall to h_stop on the status-bar clock."],
-    instruments: [
-      { tool: "gauge", where: "in the tank, near the floor: x ≈ 2.25 / 1.69 / 1.13 / 0.56 m for λ = 1 / ¾ / ½ / ¼", why: "the falling level you time" },
-      { tool: "gauge", where: "on the apron beyond the plate (x ≈ 5.5 / 4.4 / 3.3 / 2.1 m, z ≈ 0.02 m)", why: "confirms the apron is draining, not ponding" },
-    ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inflowOn", "inLevel", "openL"] },
-    start: "a tank and orifice at your own scale, loaded empty",
-    task: "Follow the steps to fill and isolate, then press V and time the fall from h_start to h_stop on the status-bar clock.",
-    settle: 5,
-  },
-  {
     id: "DA-3",
-    title: "Scale effects, live",
+    title: "Sloshing in a tank",
     topic: "Similitude",
-    folder: "DA-3-scale-effects",
-    scene: "sandbox",
-    // DA-3 has no rig of its own: it drives DA-1's weir around the Resolution
-    // control, so it rebuilds YOUR λ third and then changes only Δx.
-    rig: "DA-1@1",
-    rigTable: ["DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1", "DA-1@0.5",
-               "DA-1@0.25", "DA-1@1", "DA-1@0.5", "DA-1@0.25", "DA-1@1"],
-    // Medium is the capture resolution and therefore the common starting
-    // point; moving OFF it is the whole exercise, so the digit's resolution is
-    // the student's to set — after the rig has loaded, never before.
-    rigParams: { budget: "Medium", spoutOn: false,
-                 openL: "1", openR: "1", openB: "1", openT: "0",
-                 inflowOn: true, inFree: false, twOn: false },
-    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
-    digit: { label: "q", control: "inQ", unit: "m²/s",
-             rule: "your own DA-1 row — q must not move when the resolution does",
-             table: [0.600, 0.235, 0.090, 0.780, 0.295, 0.115, 0.960, 0.360, 0.135, 1.140],
-             also: [{ label: "reservoir", control: "inLevel", unit: "m",
-                      rule: "your own DA-1 level, unchanged between the two runs",
-                      table: [1.795, 1.165, 0.840, 1.890, 1.210, 0.865,
-                              1.975, 1.250, 0.880, 2.055] },
-                    { label: "resolution", control: "budget",
-                      rule: "even digit → Low, odd → High. Set it AFTER the rig has loaded, and never Very high or Ultra",
-                      table: ["Low", "High", "Low", "High", "Low",
-                              "High", "Low", "High", "Low", "High"] }] },
-    digitNote: "even digit gives Low, odd gives High. Never Very high or Ultra - DA-1's weir will not settle there",
+    folder: "DA-3-sloshing-tank",
+    scene: "slosh-tank",
+    rig: null,
+    // The tutorial sheet's in-app part: dimensional analysis says the period
+    // depends on B/d alone (a/d small), so one run per B/d draws the whole
+    // design chart K = T√(g/d) = φ(B/d). Nothing personal — every student
+    // runs the same five tanks. The scene releases the tilt at t = 0, so
+    // there is nothing to settle.
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digitNote: "tutorial sheet: every student runs the same five tanks",
     instruments: [
-      { tool: "gauge", where: "the same approach-pool station as DA-1: x = 2.17 / 1.09 / 0.54 m for λ = 1 / ½ / ¼", why: "h, and it must not move between the two resolutions" },
+      { tool: "gauge", where: "near the left wall: x = 0.5 m, low in the water", why: "the depth d there rises and falls once per period. Not right against the wall: a gauge's depth is smoothed over ±0.09 m and would take in the wall's own columns" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel", "budget"] },
-    start: "your own DA-1 weir, at the Resolution it was captured on",
-    task: "Keep your own DA-1 weir, q and level exactly as they are and change ONLY the Resolution, then re-read H at the same station and recompute C_d.",
-    settle: 55,
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1", "geom2"] },
+    start: "a closed tank, length B = 4 m, depth d = 1.0 m, its surface tilted by a = 0.2 d and released at t = 0; per metre width",
+    setup: ["Place a Depth gauge (5) near the left wall: x = 0.5 m, low in the water.",
+            "Set Tank length B, Water depth d and Initial tilt a/d in Controls → Geometry. Each change restarts the slosh from t = 0; R also restarts it.",
+            "Expand the gauge (⤢) and hover its trace. Read the times t₁ and t₄ of the first and fourth crests after the release; the period is T = (t₄ − t₁) / 3.",
+            "The sheet's five models, one per value of B/d, all at a/d = 0.2 (B, d in m): A 1, 1.0; B 2, 1.0; C 4, 1.0; D 8, 1.0; E 8, 0.5.",
+            "For each, K = T√(g/d): the period with the tank's size divided out, so any two tanks can be compared."],
+    task: "Time the five tanks, work out K = T√(g/d) for each and plot K against B/d on the sheet's chart: the design chart, from five models instead of 125.",
+    settle: 0,
   },
 
   // ------------------------------------------------------- hydrostatics

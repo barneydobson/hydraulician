@@ -164,16 +164,15 @@ def cards():
 # The prose scanned for "this exercise makes the student build something".
 # task, start and setup (an ORDERED list of steps -- joined) are all places a
 # worksheet instructs the student directly. digitNote is deliberately left
-# out: it is where a personalised RULE gets explained, and three cards in the
+# out: it is where a personalised RULE gets explained, and two cards in the
 # pack talk about drawing there only to say it is NOT what is happening --
 #   UN-3   "your reservoir level is a SLIDER, not a drawing"
-#   DA-1   "the drawing loads with your digit"        (automatic, not manual)
 #   B8     "d mod 3 gives 0 sharp edge (draw nothing)"
 # A negation-aware regex ("not a drawing", "loads with", "draw nothing", ...)
 # was the other option, and was rejected: it is exactly one future phrasing
 # away from the next false negative, and a maintainer trusting a "no drawing
 # here" guard is worse than a maintainer who knows digitNote is simply never
-# checked. Every one of these three has its actual build instruction (if any)
+# checked. Each of these has its actual build instruction (if any)
 # in task/start/setup, which IS scanned, so nothing about the real defect
 # (CS-1, QS-2) is missed by leaving digitNote out.
 def draws_text(e):

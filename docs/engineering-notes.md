@@ -433,6 +433,39 @@ wave is also wide enough to erase the reaches that matter.
   On a STEEP bed expect the measured d₂ to sit well under the prediction
   (s1: −39%): the horizontal-bed momentum balance has no weight component,
   and s1's bed falls 1 in 4.
+- **Sloshing period** (`slosh-tank`, DA-3): the first standing mode, released
+  from a tilt a/d = 0.2. Against T = 2π/√(gk·tanh kd), k = π/B, timed crest
+  to crest on a Depth gauge at x = 0.5 m, Medium: +2.2% (B/d = 4, d = 1 m,
+  64 cells), +5.1% (B/d = 4, d = 0.5 m, 32 cells), +2.8% (B/d = 16), +5.6%
+  (B/d = 1). At High the first two read +1.2% and +3.7%: the error falls with
+  d/Δx, and a tank 16 cells deep reads +18% (High: +4.4%) and rings for two
+  crests only. The tilt cannot be small — see "Surface waves are damped by
+  RESOLUTION" below: at a/d = 0.05 (one cell) the slosh dies in two periods.
+  Two traps in timing it: a gauge's depth is the OVERLAY's (smoothed ±0.09 m
+  in space, so a station within that of a wall reads the wall's empty
+  columns, 0.2–0.3 m shallow), and its 10%-per-frame running mean delays
+  every crest ~0.15 s, so time crest to crest, never from t = 0.
+- **Broad-crested weir C_d against real weirs** (the retired DA-3 weir rig:
+  P = 0.696 m, L_c = 1.739 m, q = 0.78 m²/s, so Δh/L_c = 0.40, Δh/P = 1.0).
+  C_d = q/(√g Δh^1.5) = 0.431 against 0.49–0.50 for published sharp-cornered
+  rectangular weirs at that geometry (Bos 1989, ILRI Pub. 20 §4.4, with its
+  short-crest factor; Zachoval et al. 2014, J. Hydrol. Hydromech. 62:145):
+  10–17% low across Δh/L_c = 0.27–0.49, worst at low head. One knob at a
+  time: C_f = 0, C_s = 0 and free-slip walls change nothing; Low/High
+  resolution ±1.4%; rounding the upstream corner (r = 0.3 m) +10%; doubling
+  the crest −5%; C_d on the energy head −3.5%. The directions all match the
+  literature; the offset does not close. A model and its prototype in this
+  solver agree to 0.3% — that is the solver being Froude-similar to itself,
+  not evidence that its C_d is a real weir's.
+- **A straight drop drowns.** A q-driven channel falling Δz onto a floor that
+  drains (drop number D = q²/gΔz³ = 0.03–0.3) never forms Rand's (1955) free
+  drop: the nappe plunges into a mound just past the wall and the flow
+  downstream sits at about d_c, with ~60% of the drop's energy gone (pool
+  0.8–0.9 Δz against Rand's 0.60 at D = 0.1; d₁ ≈ 0.4–0.5 Δz against 0.20).
+  Same-D runs at Δz = 0.5/0.75/1.0 still collapse onto each other. Unmoved by
+  High resolution, c = 40, C_f = C_s = bulk = 0, or a downstream floor
+  shortened to 4 Δz. Cause not found — do not build a demo that needs Rand's
+  numbers.
 
 Every scene has been run headless to t = 120 s and measured for steadiness
 (d h/dt), temporal flutter, surface waviness and discharge continuity. The

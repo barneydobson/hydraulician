@@ -241,8 +241,8 @@ const EX = (() => {
   function byId(id) { return all().find((e) => e.id === id) || null; }
   /** The rig pack is consumed defensively: absent file, absent key and a
    *  payload in any of the shapes RIG understands all end somewhere sane. */
-  /** Some rigs come in variants the digit chooses between — DA-1 is the same
-   *  weir at three scales, B8 three different orifice lips — so the key is a
+  /** Some rigs come in variants the digit chooses between — B8's three
+   *  different orifice lips — so the key is a
    *  per-digit `rigTable` where one exists. With no digit yet, the d = 0 rig
    *  is the one that matches the d = 0 settings in `params`. */
   function rigKey(ex, d) {
@@ -275,7 +275,7 @@ const EX = (() => {
    *  worksheet makes the student derive.
    *
    *  These are DISPLAYED, never applied. The one thing a digit does write is
-   *  `rigTable` — which captured drawing loads — because DA-1's λ = ¼ weir is a
+   *  `rigTable` — which captured drawing loads — because B8's re-entrant lip is a
    *  different rig, not a different number. */
   function rules(ex) {
     if (!ex || !ex.digit) return [];
@@ -567,7 +567,7 @@ const EX = (() => {
     }
     const nd = Math.max(0, Math.min(9, +d | 0));
     // A variant rig is chosen by the digit, so changing it is a re-setup, not
-    // a slider move: DA-1's λ = ¼ weir is a different drawing, not a number.
+    // a slider move: B8's re-entrant lip is a different drawing, not a number.
     if (cur.rigTable && rigKey(cur, nd) !== rigKey(cur, digit)) { pick(cur.id, { digit: nd }); return; }
     digit = nd;
     memo[cur.id] = digit; lastDigit = digit;
@@ -860,7 +860,7 @@ const EX = (() => {
       line(box.querySelector(".exyours"), "Yours (d = last digit of your student number):",
            yourRows(cur).length ? "" : ruleLines(cur).join("\n"));
       // The one thing a digit still DOES is pick which captured drawing loads
-      // (DA-1's λ = ¼ weir is a different rig, not a different number), so the
+      // (B8's re-entrant lip is a different rig, not a different number), so the
       // input survives only on those cards.
       box.querySelector(".exd").style.display = cur.rigTable ? "flex" : "none";
       box.querySelector(".exval").textContent =

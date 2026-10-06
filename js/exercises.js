@@ -218,30 +218,6 @@ const EXERCISES = [
 
   // ---------------------------------------------------- natural channels
   {
-    id: "NC-1",
-    title: "Slope-area method: estimate the mystery discharge",
-    topic: "Natural channels",
-    folder: "NC-1-slope-area",
-    scene: "sa1",
-    rig: null,
-    rigParams: { budget: "Medium" },
-    viewParams: { channel: false, gaugeField: "h" },
-    digitNote: "your window: x₀ = 5.0 + 0.5·(d mod 8) m, from x₀ to x₀ + 7, midpoint x₀ + 3.5",
-    instruments: [
-      { tool: "gauge", where: "x = x₀ (your own window's upstream end)", why: "head at the top of the reach" },
-      { tool: "gauge", where: "x = x₀ + 7 m", why: "head at the bottom — F is the fall between the two" },
-    ],
-    ui: {
-      view: ["legendBtn"],
-      panel: "shut",
-      controls: ["speed"],
-      readouts: { rows: ["pos", "d", "eta", "Sf"] },
-    },
-    start: "a natural-looking reach with the discharge hidden — keep the panel shut",
-    task: "Gauge x₀ and x₀ + 7, read the head fall F between them and h and n at the midpoint, then Q̂ = K√(F/L) with K = h^(5/3)/n.",
-    settle: 120,
-  },
-  {
     id: "NC-2",
     title: "Is α really 1?",
     topic: "Natural channels",

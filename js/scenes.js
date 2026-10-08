@@ -758,24 +758,8 @@ const SCENES = (() => {
         { q: 0.40, d: 0.44 },               // shallow: under the 0.75 m line
         { q: 1.70, d: 1.00 },               // deep: over it
       ];
-      // The reservoir has to supply the energy a DEVELOPED profile carries,
-      // d + αV²/2g, not a plug's d + V²/2g. channel()'s level assumes α = 1;
-      // short of the α head the inlet chokes (the failure the engineering
-      // notes describe) — on the deep run a drawdown to Fr ≈ 1 a few
-      // decimetres in, then a roller whose slow surface the flow carries the
-      // whole length of the reach. α here is the log law's own,
-      // 1 + 3a² − 2a³ with a = u*/(κV): 1.13 deep, 1.19 shallow.
-      const alphaOf = (F) => {
-        const a = Math.sqrt(9.81 * reach.S0 * F.d) / (KAPPA * F.q / F.d);
-        return 1 + 3 * a * a - 2 * a * a * a;
-      };
-      const make = (F) => {
-        const c = channel(Object.assign({}, reach,
-          { q: F.q, inletDepth: F.d, tail: F.d, start: F.d }));
-        const head = (alphaOf(F) - 1) * F.q * F.q / (2 * 9.81 * F.d * F.d);
-        c.inflow = Object.assign({}, c.inflow, { level: c.inflow.level + head });
-        return c;
-      };
+      const make = (F) => channel(Object.assign({}, reach,
+        { q: F.q, inletDepth: F.d, tail: F.d, start: F.d }));
       const C = FLOWS.map(make);
       const which = (par) => (par && par.flow > 0.5 ? 1 : 0);
       return Object.assign({}, C[0], {

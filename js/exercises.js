@@ -224,7 +224,7 @@ const EXERCISES = [
     id: "NC-2",
     title: "Is α really 1?",
     topic: "Natural channels",
-    folder: "NC-2-alpha",
+    folder: "NC-2-gauging-methods",
     scene: "s2",
     rig: null,
     rigParams: { budget: "Medium" },

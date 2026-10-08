@@ -53,7 +53,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | HP-2 | Cups vs plates | HP-2-pelton/ | shared jet rig | — (lecturer demo) |
 | HP-3 | Hydropower and unsteady flow | HP-3-surge-tower/ | hydro (fixed tutorial scheme) | (V₀, h_f, V_jet, P, η₀, k, η_max) |
 | HS-1 | Dyke, culvert and piezometer | HS-1-dyke-piezometer/ | dyke | — (lecturer demo) |
-| NC-2 | Is α really 1? | NC-2-alpha/ | s2 stations + gate wake | (station, α) |
+| NC-2 | Is α really 1? | NC-2-gauging-methods/ | s2 stations + gate wake | (station, α) |
 | NC-3 | Bed shear and riprap | NC-3-bed-shear/ | s2 sweep + m2 anchor | (τ₀, D_min) |
 | QS-1 | Predict the drain | QS-1-drain-predict/ | jet | (t_pred, t_meas) |
 | QS-2 | Two tanks and two parallel ducts | QS-2-twin-tanks/ | adjustable two-tank scene | digit-based widths; predict and compare level changes at 120 s |

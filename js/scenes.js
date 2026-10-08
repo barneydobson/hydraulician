@@ -732,6 +732,67 @@ const SCENES = (() => {
              "Only right at the far brink does the surface draw down through critical depth.",
              "Compare with M2: same channel, but here the drawdown is pushed out of sight."] }),
 
+    // NC-2's gauging reach: one prismatic channel run at two discharges, so a
+    // current-meter rule can be tried on a vertical shallower than 0.75 m and
+    // on one deeper — the depth at which the 0.6-depth method hands over to
+    // the 0.2/0.8 pair. Both flows share the bed, the slope and the roughness;
+    // the Geometry switch `flow` changes only q and the two level controls,
+    // and refills the reach (resetWater), exactly as DA-1's Fluid switch does.
+    //   Held uniform at BOTH ends, not by a brink: the backwater length
+    // d(1 − Fr²)/(10/3 · S₀) is ~45 m shallow and ~90 m deep, so a brink's M2
+    // would reach the inlet. The inlet is pinned at the measured normal depth
+    // (channel() adds the velocity head) and the tailwater stands at it too,
+    // which is how a laboratory flume is set to uniform flow with its tailgate.
+    //   The switch writes q and the two levels into the live params only when
+    // it MOVES (`P.gaugeFlow` remembers which set is in force). A rasterise
+    // from anything else — an edge toggled, a resolution change — leaves a
+    // hand-set q or level alone, so the sandbox rule still holds.
+    //   The start is the answer: uniform depth and a log-law u, from
+    // u* = √(g S₀ d) and κ = 0.41 about the reach's own mean V = q/d. From
+    // rest the deep reach takes a whole flow-through to establish.
+    (() => {
+      const KAPPA = 0.41;
+      const reach = { W: 24, H: 1.6, bed0: 0.20, S0: 0.0025, cf: 0.25, tilt: true,
+                      vmax: 2.2, dyeLine: 0 };
+      const FLOWS = [
+        { q: 0.40, d: 0.44 },               // shallow: under the 0.75 m line
+        { q: 1.70, d: 1.00 },               // deep: over it
+      ];
+      const make = (F) => channel(Object.assign({}, reach,
+        { q: F.q, inletDepth: F.d, tail: F.d, start: F.d }));
+      const C = FLOWS.map(make);
+      const which = (par) => (par && par.flow > 0.5 ? 1 : 0);
+      return Object.assign({}, C[0], {
+        id: "gauging", name: "Gauging reach", key: "Uniform, 1 in 400",
+        mode: 2, hmax: 1.2, spinup: 30,
+        params: [{ key: "flow", label: "Flow", min: 0, max: 1, step: 1, value: 0, unit: "",
+                   resetWater: true,
+                   fmt: (v) => (v > 0.5 ? "deep: q = 1.70 m²/s, d ≈ 1.0 m"
+                                        : "shallow: q = 0.40 m²/s, d ≈ 0.44 m") }],
+        solids: (W, H, P, par) => {
+          const k = which(par);
+          if (P.gaugeFlow !== k) {
+            P.gaugeFlow = k;
+            Object.assign(P.inflow, C[k].inflow);
+            Object.assign(P.tailwater, C[k].tailwater);
+          }
+          return [];
+        },
+        water: (x, z, P, par) => C[which(par)].water(x, z, P),
+        flow: (x, z, P, par) => {
+          const F = FLOWS[which(par)], h = z - reach.bed0;
+          if (h <= 0 || h >= F.d) return null;
+          const V = F.q / F.d, us = Math.sqrt(9.81 * reach.S0 * F.d);
+          return [Math.max(0, V + (us / KAPPA) * (1 + Math.log(h / F.d))), 0];
+        },
+        blurb: "A long, straight mild channel held at uniform flow, with a switch for a shallow run (0.44 m) and a deep one (1.0 m) — the place to try the current-meter rules against the whole profile.",
+        tips: ["Colour is speed: the water is fastest at the surface and slows towards the bed.",
+               "Controls → Geometry → Flow switches between the shallow and the deep run, and refills the reach.",
+               "A Rake (6) draws u against depth; its V is the full depth-integral of that curve.",
+               "Hover anywhere in the water: the box prints u at the cursor, the depth d and the level η.",
+               "Average (A) turns every reading into a time mean — what a current meter's count does."] });
+    })(),
+
     // A dedicated entry, not through channel(): the hump IS the subject, and
     // channel() has no hump concept to bolt one onto. Approach bed at
     // z = 0.35, flat both sides of the crest (a mild reach, same bed level

@@ -155,10 +155,10 @@ settling at the end of a run.
   (venturi 1.35 m, hammer 5.5 m) or it draws down and the bore cavitates;
   and the nudge is asymmetric (fill 12·s, drain 2·s²) because deleting wave
   crests column-by-column against an incoming jet paints standing striations
-  in the pond. The prescribed inlet plug is likewise feathered over its top
-  three cells (`inletVel` repays the lost discharge) so its hard top edge
-  stops waterfalling ripples into the drawn-down interior surface; submerged
-  ducts (level above the whole run) keep the full plug. Levels are
+  in the pond. The prescribed inlet plug fills the delivered depth to its
+  surface; it was once feathered over its top three cells against ripples,
+  and since issue #72 that feather was a slow surface layer the reach could
+  not shed (see "The surface is stress-free"). Levels are
   ELEVATIONS above the domain floor (the datum), not depths over the bed —
   the panel prints both. A scene must still set the depth the arriving profile
   actually wants (m1's inletDepth is the MEASURED weir backwater at the inlet,
@@ -539,6 +539,33 @@ surface at 1.22–1.27 V; u(0.6 d below the surface)/V = 1.015–1.025;
 κ = 0.41–0.43; α = 1.17–1.19; n = 0.031–0.033 at C_f = 0.25. Two GPU mutants
 in `smoke.js` (`surface-sink`, `no-mixing-length`) put each half back and
 watch the suite fail; their recorded numbers are the old profile.
+
+**The inflow plug is full to the surface.** A prescribed-q inlet's plug used
+to taper to zero over its top three cells, which kept a hard step at the
+waterline from shedding ripples while the surface was a drag boundary. With
+the surface stress-free that taper is a slow layer injected at the inlet, and
+nothing takes it out: `ν_t` vanishes at the surface, so only `g·S₀`
+(0.025 m/s² at 1 in 400) re-accelerates it, and the flow carries it down the
+reach. In shallow water it fades within 10–20 depths — which is why sa1's
+PROFILE stations, 20–40 depths out, never saw it — but not in deep water.
+MEASURED on a 1.0 m uniform reach (1 in 400, q = 1.70 m²/s, C_f 0.25; NC-2's
+gauging scene), u at the surface / u_max, both over V:
+
+```
+                    x = 2 m      4 m          8 m          12 m         16 m
+tapered (Low, 8 s)  0.66/1.28    0.86/1.18    1.01/1.14    1.09/1.17    1.30 at top
+full    (Low, 8 s)  0.97/1.11    1.02/1.14    1.16 at top  1.22 at top  1.28 at top
+```
+
+and at Medium the tapered reach's slow layer had reached x ≈ 20 m by
+t = 15 s, with the 0.6-depth rule reading 4–8% high under it while the
+0.2/0.8 pair held at +2%. Letting the stress-free extension into a
+prescribed-q sponge instead changed nothing; the taper was the whole of it.
+The full plug does not bring the ripples back: on m2 (Low, 8 s after a 15 s
+spin-up) the surface's RMS fluctuation is 9–12 mm at x = 0.5–2 m with the
+taper and 10–12 mm without, and the profile within 4 m of the inlet is the
+same either way. `inletVel`'s 1.5 Δx repayment went with the taper; the
+delivered discharge rises 1–2%.
 
 Settle times fell with it — m2 from 85 s to 30 s, c13 from 95 s to 30 s — and
 the steep chutes run shallower against the same d_c (s1/s2 d_n 0.32 → ~0.20).

@@ -225,13 +225,16 @@ nobody reads it as a promised surface.
 
 - *Prescribed-q* (`free` = 0): the interior column `i = 1` carries a velocity
   plug over the control band, at the velocity `inletVel()` derives from `q`
-  and the depth the reservoir **delivers**. The plug's top three cells taper
-  to zero — a hard velocity step at the waterline waterfalls into the slightly
-  drawn-down interior surface and sheds ripples forever — and `inletVel()`
-  repays the lost discharge with a `1.5 Δx` offset (mass before energy: a
-  reach fed the wrong discharge is wrong everywhere). A submerged duct (band
-  top below the nominal level) keeps the full plug and the level goes back to
-  being a piezometric head; there is no free surface there to draw down.
+  and the depth the reservoir **delivers**, and the plug fills that depth up
+  to the delivered surface. It used to taper to zero over its top three cells
+  (a hard step at the waterline shed ripples while the surface was a drag
+  boundary), with `inletVel()` repaying the lost discharge by a `1.5 Δx`
+  offset. With the surface stress-free the taper was a slow surface layer
+  that nothing removed and the flow carried down the reach, so both are gone
+  — the engineering notes, "The surface is stress-free", have the numbers.
+  A submerged duct (band top below the nominal level) has always had the
+  full plug, and there the level goes back to being a piezometric head;
+  there is no free surface to draw down.
   Scenes may pin the velocity directly (`inflow.v`), which likewise bypasses
   the solve.
 - *Head-driven* (`free` = 1): only the level is pinned and the head difference

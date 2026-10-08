@@ -368,15 +368,18 @@ void main(){
     if (distance(pw, u_src1.xy) < u_src1.z) wn = u_sv1.y;
   }
   if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) {
-    // Feathered plug: a hard velocity step at the waterline waterfalls into
-    // the slightly drawn-down interior surface and sheds ripples forever.
-    // The top three cells taper to zero instead (inletVel() compensates the
-    // lost discharge), so the surface at the inlet can breathe. A submerged
-    // duct (band top below the nominal level, e.g. plan view) keeps the
-    // full plug — there is no free surface there to protect.
-    float taper = (u_inBand.y < u_in.x - 1e-4)
-      ? 1.0 : smoothstep(u_inBand.y, u_inBand.y - 3.0 * u_dx, pu.y);
-    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y * taper : 0.0;
+    // The full plug, up to the delivered surface. It used to taper to zero
+    // over its top three cells, because a hard step at the waterline shed
+    // ripples while the surface was a drag boundary. With the surface
+    // stress-free that taper was a slow layer injected at the inlet with
+    // nothing to take it out — ν_t vanishes at the surface, so only g·S₀
+    // re-accelerates it — and it was carried down the reach: on a 1.0 m
+    // uniform reach the surface ran at 0.66 V two metres in and the slow
+    // layer reached x ≈ 20 m in 15 s. Full, the plug enters near uniform and
+    // the surface is the fastest water within ~8 depths; m2's inlet
+    // fluctuates no more than it did with the taper (engineering notes, "The
+    // surface is stress-free").
+    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
   }
   if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
     un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker

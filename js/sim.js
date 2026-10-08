@@ -1057,17 +1057,16 @@ const SIM = (() => {
 
   /** Inlet velocity implied by the prescribed unit discharge and the depth
    *  the reservoir DELIVERS (`inletStage`), not the depth up to its level.
-   *  The 1.5 Δx offset repays the discharge lost to the shader's 3-cell
-   *  surface taper on the prescribed plug — mass before energy: the taper eats
-   *  area, and a reach fed the wrong discharge is wrong everywhere, where a
-   *  velocity head short by a taper's worth is wrong at the inlet. */
+   *  The plug fills that whole depth (FS_VEL), so q over the depth is the
+   *  velocity. It used to be divided by the depth less 1.5 Δx, repaying a
+   *  three-cell taper at the plug's top; the taper is gone (issue #72's
+   *  inlet), and so is the offset. */
   function inletVel() {
     const inf = S.p.inflow;
     const b = bands().inB;
     if (inf.v !== undefined) return inf.v;          // scenes may pin velocity
     const surf = inletStage().stage;
-    const feather = b[1] < surf ? 0 : 1.5 * S.dx;   // none for a submerged duct
-    return (inf.q || 0) / Math.max(Math.min(surf, b[1]) - b[0] - feather, S.dx);
+    return (inf.q || 0) / Math.max(Math.min(surf, b[1]) - b[0], S.dx);
   }
 
   /** Uniforms shared by the two simulation passes. */

@@ -93,7 +93,8 @@ to look fine for a minute and explode in an exercise.
   void face keep the bleed. Do not bleed `u` over the water again (the
   surface becomes a drag boundary, the profile peaks mid-depth and `n` jumps
   to ~0.08), do not extrapolate `w` (the interface free-falls), and keep the
-  extension out of the reservoir sponge. The mixing length acts on the
+  extension out of the reservoir sponge, and do not feather the inflow plug
+  (its slow top layer is never shed). The mixing length acts on the
   VORTICITY in conservative form: on the strain it kills the deep flume's
   waves, and as `ν_t∇²u` it puts the maximum back at mid-depth.
   `smoke.js --only=profile` is the gate.

@@ -11,7 +11,7 @@
  *     RECIPES.steepGate()      // small gate on a steep bed -> S1 (pool), S3
  *     RECIPES.flatGate()       // gate on a flat bed, truncated+open -> H2, H3
  *     RECIPES.adverseTail()    // gate + tailwater on a rising bed -> A2
- *     RECIPES.criticalKnife()  // gate + weir at S0=1:8.5 -> C1/C3 (FLICKERS, see README)
+ *     RECIPES.criticalKnife()  // gate + tailwater at S0=1:37 -> C1/C3
  *
  * All of these are addSeg-drawn geometry + panel-slider settings, exactly
  * what a student does by hand — nothing here is private. Every number was
@@ -19,6 +19,14 @@
  * (m1/m2/m3/s1/s2/s3/c13 in js/scenes.js) and re-measuring on THIS domain
  * (sandbox is a fixed 9m x 5m rectangle, most shipped scenes are longer, so
  * every recipe below is the shipped physics compressed to fit).
+ *
+ * RE-MEASURED with the stress-free surface and the mixing length (issue #72),
+ * Medium: since then the bed carries the whole resistance and a C_f of 0.25
+ * delivers n ≈ 0.031–0.035, so the mild bed is 1 in 125, not 1 in 50, and the
+ * critical one 1 in 37, not 1 in 8.5 — on the sandbox's coarser cells than
+ * c13's (2.2 cm against 1.2 cm) the critical slope is steeper than c13's
+ * 1 in 57. Every recipe's stable classes are as stated on it, 10/10 or 14/14
+ * samples.
  * ==========================================================================*/
 
 window.CHAN = {
@@ -144,8 +152,8 @@ window.RECIPES = {
    *  (drawdown to the brink). ~32s settle. All three stable 10/10 samples. */
   mild123: function () {
     APP.loadScene("sandbox", false); CHAN.C("budget").set("Medium"); syncPanel();
-    CHAN.build({ S0: 0.02, bed0: 0.5, xEnd: 8.0, gate: { x: 1.0, a: 0.06 },
-                 q: 0.25, inletDepth: 1.3, cf: 0.125, cs: 0.08, mode: 3 });
+    CHAN.build({ S0: 0.008, bed0: 0.5, xEnd: 8.0, gate: { x: 1.0, a: 0.06 },
+                 q: 0.25, inletDepth: 1.3, cf: 0.25, cs: 0.08, mode: 3 });
     CHAN.settle(32);
     return CHAN.read(30, 10);
   },
@@ -164,24 +172,24 @@ window.RECIPES = {
    *  a jump forms; below it S1 (backed up), above it S2/S3 roll-wave bands
    *  (both letters appear as standing bands, not a single monotone S2 —
    *  see README "chip traps"). Needs a LONG settle (~110s) from a dry start —
-   *  the shipped s1/s2 start pre-filled near equilibrium, the sandbox can't. */
+   *  the shipped s1/s2 start pre-filled near equilibrium, the sandbox can't.
+   *  Re-measured: the jump at x ≈ 3.9 m, S2 10/10 and S1 behind it 7/10. */
   steepTail: function () {
     APP.loadScene("sandbox", false); CHAN.C("budget").set("Medium"); syncPanel();
     CHAN.build({ S0: 0.25, bed0: 1.90, xEnd: 7.0, q: 1.2, inletDepth: 0.52,
-                 tail: 0.90, cf: 0.010, cs: 0.08, mode: 3 });
+                 tail: 1.20, cf: 0.25, cs: 0.08, mode: 3 });
     CHAN.settle(110);
     return CHAN.read(60, 10);
   },
 
-  /** Small gate on a steep bed, NO tailwater -> S1 (still pool behind the
-   *  gate), S3 (the whole apron, asymptoting toward d_n, no jump anywhere).
-   *  Clean and fast (~35s) — this is the better S3 demo than the roll-wave
-   *  bands above. a = 0.35 (the shipped s3 value) DROWNS from a dry start;
-   *  0.15 is the safe sandbox opening. */
+  /** Gate on a steep bed, NO tailwater -> S3 (the whole apron, rising
+   *  toward d_n, no jump anywhere), 10/10. s3's own geometry: 1 in 10, not
+   *  1 in 4 — on the steeper bed d_n (~0.2 m) is too shallow for a gate jet
+   *  to undercut it, and a gate small enough to try cannot pass q = 1.2. */
   steepGate: function () {
     APP.loadScene("sandbox", false); CHAN.C("budget").set("Medium"); syncPanel();
-    CHAN.build({ S0: 0.25, bed0: 1.40, xEnd: 5.6, gate: { x: 1.2, a: 0.15 },
-                 q: 1.2, inletDepth: 1.40, cf: 0.010, cs: 0.08, mode: 3 });
+    CHAN.build({ S0: 0.1, bed0: 0.91, xEnd: 5.6, gate: { x: 1.2, a: 0.35 },
+                 q: 1.2, inletDepth: 1.60, cf: 0.25, cs: 0.08, mode: 3 });
     CHAN.settle(35);
     return CHAN.read(30, 10);
   },
@@ -205,25 +213,22 @@ window.RECIPES = {
   adverseTail: function () {
     APP.loadScene("sandbox", false); CHAN.C("budget").set("Medium"); syncPanel();
     CHAN.build({ S0: -0.03, bed0: 1.0, xEnd: 9.0, gate: { x: 1.0, a: 0.09 },
-                 q: 0.22, inletDepth: 0.88, tail: 0.26, cf: 0.008, cs: 0.06, mode: 3 });
+                 q: 0.22, inletDepth: 0.88, tail: 0.24, cf: 0.25, cs: 0.06, mode: 3 });
     CHAN.settle(30);
     return CHAN.read(30, 10);
   },
 
-  /** Gate + weir at S0 = 1-in-8.5 (c13's own slope), scaled to fit the
-   *  sandbox — the knife edge. C1 and C3 BOTH appear (confirmed by direct
-   *  probe: d_n ~ 0.23-0.24 m sits within the classifier's +-5% band of the
-   *  local d_c much of the time) but FLICKER between C1/C3/M1/M3/S1 sample
-   *  to sample, exactly like the shipped c13 scene (which ships with labels
-   *  OFF by default for this reason — CLAUDE.md/js/scenes.js). Needed the
-   *  longest settle of anything in this safari (~110s) and never reached
-   *  the 10/10-stable bar. Kept here so a lecturer can show the FLICKER
-   *  itself as the lesson (see README verification record). */
+  /** Gate + tailwater at the sandbox's critical slope — the knife edge, as
+   *  c13 now builds it (a tailwater at 1.3 d_c, not a weir: on a critical
+   *  bed C1 is horizontal, and a weir's ~1.5 d_c of head backs it up the
+   *  whole reach). Re-measured: C1 behind the gate and C3 from it to the
+   *  tailwater's C1, 14/14 samples, d_n 0.188 against d_c 0.187. Bracketed:
+   *  at 1 in 45 it flickers M/C, at 1 in 30 it reads S. Slow (~110 s). */
   criticalKnife: function () {
     APP.loadScene("sandbox", false); CHAN.C("budget").set("Medium"); syncPanel();
-    CHAN.build({ S0: 0.118, bed0: 1.3, xEnd: 7.5, gate: { x: 1.0, a: 0.15 },
-                 weir: { x: 7.0, h: 0.12, w: 0.5 }, q: 0.25, inletDepth: 0.45,
-                 cf: 0.02, cs: 0.08, mode: 3 });
+    CHAN.build({ S0: 0.027, bed0: 0.59, xEnd: 9.0, gate: { x: 1.0, a: 0.15 },
+                 tail: 0.24, q: 0.25, inletDepth: 0.36,
+                 cf: 0.25, cs: 0.08, mode: 3 });
     CHAN.settle(110);
     return CHAN.read(60, 14);
   },

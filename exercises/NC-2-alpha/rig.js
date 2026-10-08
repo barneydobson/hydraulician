@@ -32,8 +32,9 @@
  *     is therefore INSTANTANEOUS, not a running average -- confirmed by
  *     reading js/main.js (sampleRakes() every frame) and js/overlay.js
  *     (drawRake()), and independently by measurement: a fixed station's
- *     alpha swings by a factor of 3-4x frame to frame on this scene (see
- *     README §5). Read the chip the way every other demo's "median of the
+ *     alpha swung by a factor of 3-4x frame to frame on this scene under the
+ *     old surface-drag physics; since issue #72 the chute is far steadier,
+ *     but a roll wave still passes. Read the chip the way every other demo's "median of the
  *     wobble" habit says to -- watch it, do not trust one glance.
  *   · js/overlay.js's drawRake row loop computes
  *     `u = 0.5*(buf[j*4] + (j+1<ny ? buf[j*4] : 0))` -- both branches read
@@ -44,19 +45,19 @@
  *     this rig does) reproduces the screen exactly; this is a documentation
  *     note, not a bug report -- it has zero numerical effect.
  *   · "Free-slip walls" (CONTROLS id "slip") only flips the wall-aware
- *     LAPLACIAN's ghost condition (js/shaders.js:175-180,
+ *     LAPLACIAN's ghost condition (js/shaders.js, FS_VEL,
  *     `ghost = mix(-1.0, 1.0, u_slip)`) -- i.e. it removes the
  *     Smagorinsky-diffused viscous boundary layer. It does NOT touch the
- *     separate, unconditional bed-friction drag (`u_cf`, js/shaders.js
- *     195-196, `un /= 1.0 + dt*u_cf*...`). A channel's near-bed shear
- *     therefore only partly collapses under free-slip -- see README §3(i).
- *   · The top 1-2 included rake rows sit inside the free-surface interface
- *     band (f transitions from ~1 to 0 over ~1 cell here) and can read a
- *     genuine, sometimes large, near-surface deceleration that is part
- *     numerical (partial-fill velocity handling) and part real (the passing
- *     roll wave's own near-surface kinematics) -- confirmed by probing f
- *     alongside u (README §5). Treat the very top of a hand-read profile as
- *     "just under the surface", not the literal last pixel.
+ *     separate, unconditional bed-friction drag (`u_cf`, the implicit
+ *     `un /= 1.0 + dt*u_cf*...`), which is what carries a channel's bed
+ *     stress, through the mixing length, up the whole column. MEASURED
+ *     since issue #72: alpha 1.18 at x = 3.5 m either way.
+ *   · The top included rake row sits in the free-surface interface band (f
+ *     from ~1 to 0 over about a cell). Before issue #72 the air above the
+ *     surface was a momentum sink and that row read a large, spurious
+ *     deceleration; the surface is stress-free now and the top of the
+ *     profile is its fastest part. Still treat the very top of a hand-read
+ *     profile as "just under the surface", not the literal last pixel.
  * ==========================================================================*/
 window.NC2 = {
   C: (id) => CONTROLS.find((c) => c.id === id),

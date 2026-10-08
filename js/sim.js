@@ -12,6 +12,12 @@ const SIM = (() => {
 
   const CFL = 0.45;          // acoustic Courant number for the staggered update
   const UREF = 6.0;          // headroom for advective velocity in the dt estimate
+  const KAPPA = 0.41;        // von Kármán: the mixing length is κy (FS_VEL's lmix)
+  // Substeps between refreshes of the closure's columns. The column walk is
+  // serial down each column, so the pass is latency-bound (~0.08 ms on m2,
+  // nearly a whole vel pass): every 8 substeps it cost hammer 20%. A length
+  // scale lagging 32 substeps (6 ms on m2, 26 on hammer) is still current.
+  const TCOL_EVERY = 32;
   // How long a particle's trail lives, in SIMULATED seconds. About a second of
   // flow: long enough to read a path, short enough that a jet does not fill
   // the screen with a solid wash.
@@ -48,6 +54,7 @@ const SIM = (() => {
     // Average must pay exactly what it paid before this existed.
     prog.vofA = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF_ACC);
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
+    prog.tcol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TCOL);
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
     // The Favre display accumulator (§4.1 of docs/averaging.md) — a separate
     // pass from prog.vofA's transport accumulator, and a separate program
@@ -292,6 +299,8 @@ const SIM = (() => {
     gl.bindTexture(gl.TEXTURE_2D, S.solid);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
+    wallDistance();
+    S.tcolDirty = true;                // the closure's columns are stale too
 
     S.bandKey = null;                  // invalidate the cached control bands
 
@@ -304,6 +313,69 @@ const SIM = (() => {
     // this, so it can neither double-start nor fight build()'s own wasAvg
     // restore.
     if (S.avg) avgReset();
+  }
+
+  /** Distance from every cell corner to the nearest solid, in metres — the
+   *  y of the mixing length l = κy (FS_VEL's lmix). Corners, because that is
+   *  where the MAC grid keeps the shear stress the closure acts through; a
+   *  corner touching any solid cell is ON a wall and reads 0, so the closure
+   *  hands the wall stress to the wall function and never doubles it.
+   *  Exact Euclidean (Felzenszwalb & Huttenlocher's two 1D passes), O(cells),
+   *  so it is re-run on every mask change and every valve flip rather than
+   *  cached: a few milliseconds at Ultra. Texel (i, j) is corner (i, j), the
+   *  south-west corner of cell (i, j). */
+  function wallDistance() {
+    const nx = S.nx, ny = S.ny, m = S.mask;
+    // Far beyond any real squared distance (nx² + ny² < 1.4e8) yet small
+    // enough that q² is not lost to rounding in the parabola intersections.
+    const INF = 1e12;
+    const shut = S.p ? S.p.valveClosed : 1;
+    const solid = (i, j) => {
+      if (i < 0 || j < 0) return false;
+      const v = m[j * nx + i];
+      return v >= 192 || (v >= 64 && shut > 0.5);
+    };
+    const g = new Float64Array(nx * ny);
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const on = solid(i, j) || solid(i - 1, j) || solid(i, j - 1) || solid(i - 1, j - 1);
+        g[j * nx + i] = on ? 0 : INF;
+      }
+    }
+    const n = Math.max(nx, ny);
+    const f = new Float64Array(n), d = new Float64Array(n), z = new Float64Array(n + 1);
+    const v = new Int32Array(n);
+    const pass = (len) => {
+      let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+      for (let q = 1; q < len; q++) {
+        let r = v[k];
+        let s = ((f[q] + q * q) - (f[r] + r * r)) / (2 * q - 2 * r);
+        while (s <= z[k]) {
+          k--; r = v[k];
+          s = ((f[q] + q * q) - (f[r] + r * r)) / (2 * q - 2 * r);
+        }
+        k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+      }
+      k = 0;
+      for (let q = 0; q < len; q++) {
+        while (z[k + 1] < q) k++;
+        d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+      }
+    };
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) f[j] = g[j * nx + i];
+      pass(ny);
+      for (let j = 0; j < ny; j++) g[j * nx + i] = d[j];
+    }
+    const out = S.wallD && S.wallD.length === nx * ny ? S.wallD : (S.wallD = new Float32Array(nx * ny));
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) f[i] = g[j * nx + i];
+      pass(nx);
+      for (let i = 0; i < nx; i++) out[j * nx + i] = Math.min(Math.sqrt(d[i]), 1e4) * S.dx;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, S.wallTex);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, out);
   }
 
   /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */
@@ -360,6 +432,7 @@ const SIM = (() => {
     const v = closed ? 1 : 0;
     if (S.p.valveClosed === v) return;
     S.p.valveClosed = v;
+    wallDistance();                 // a shut valve is a wall to the closure too
     if (S.avg) avgReset();
   }
 
@@ -386,10 +459,14 @@ const SIM = (() => {
     if (g.avg) { disposeAvg(g.avg); g.avg = null; }
     for (const b of [g.U, g.F, g.P]) if (b && b.dispose) b.dispose();
     if (g.colFbo) gl.deleteFramebuffer(g.colFbo);
+    if (g.tcolFbo) gl.deleteFramebuffer(g.tcolFbo);
     if (g.solid) gl.deleteTexture(g.solid);
     if (g.colTex) gl.deleteTexture(g.colTex);
+    if (g.tcolTex) gl.deleteTexture(g.tcolTex);
+    if (g.wallTex) gl.deleteTexture(g.wallTex);
     g.U = null; g.F = null; g.P = null;
     g.solid = null; g.colTex = null; g.colFbo = null;
+    g.tcolTex = null; g.tcolFbo = null; g.wallTex = null;
     // The trail belongs to the CANVAS, not to the grid, so it survives a
     // rebuild — but what is drawn in it does not: those pixels are the old
     // geometry's particles. Marking it undrawn clears it on the next frame.
@@ -459,6 +536,13 @@ const SIM = (() => {
     S.solid = GLH.createTexture(gl, nx, ny, gl.R8, gl.RED, gl.UNSIGNED_BYTE, null);
     S.colTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
     S.colFbo = GLH.createFBO(gl, S.colTex);
+    // The closure's two inputs (FS_VEL's lmix): the open-channel columns,
+    // refreshed every TCOL_EVERY substeps, and the wall distance, rebuilt by
+    // rasterise() whenever the mask moves.
+    S.tcolTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
+    S.tcolFbo = GLH.createFBO(gl, S.tcolTex);
+    S.wallTex = GLH.createTexture(gl, nx, ny, gl.R32F, gl.RED, FL, null);
+    S.nsteps = 0;
 
     const pn = 128;
     S.pn = pn;
@@ -510,6 +594,10 @@ const SIM = (() => {
       gl.bindTexture(gl.TEXTURE_2D, b.tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, d);
     }
+    // A fresh experiment restarts the closure's refresh cadence, so the same
+    // reset followed by the same substeps is the same run — the F1 gate in
+    // smoke.js compares two of them cell for cell.
+    S.nsteps = 0; S.tcolDirty = true;
     const vel = new Float32Array(n * 4);
     // An initial velocity field, when the scene can say what its steady flow
     // looks like. On the staggered faces the U texture uses — `r` = u at the
@@ -1021,13 +1109,32 @@ const SIM = (() => {
     }
   }
 
+  /** The open-channel columns the mixing length reads (FS_TCOL): where each
+   *  column's bed and surface are, and whether it is open-channel water at
+   *  all. A turbulence length scale, so it may lag the surface by a few
+   *  substeps; counted on S.nsteps rather than per step() call so a headless
+   *  APP.tick(1) loop and the frame loop refresh it at the same cadence. */
+  function turbColumns() {
+    gl.useProgram(prog.tcol);
+    GLH.bindTex(gl, prog.tcol, [["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform2f(prog.tcol.u("u_res"), S.nx, S.ny);
+    gl.uniform1f(prog.tcol.u("u_dx"), S.dx);
+    gl.uniform1f(prog.tcol.u("u_valve"), S.p.valveClosed);
+    GLH.bindTarget(gl, S.tcolFbo, S.nx, 1);
+    quad.draw();
+  }
+
   function step(nsub) {
     const p = S.p, h = dt();
     for (let n = 0; n < nsub; n++) {
+      if (S.tcolDirty || S.nsteps % TCOL_EVERY === 0) { turbColumns(); S.tcolDirty = false; }
+      S.nsteps++;
       // --- velocity: advection, viscosity, gravity, friction, ∇p
       gl.useProgram(prog.vel);
-      GLH.bindTex(gl, prog.vel, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+      GLH.bindTex(gl, prog.vel, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
+                                 ["u_Wd", S.wallTex], ["u_Tc", S.tcolTex]]);
       simUniforms(prog.vel, h);
+      gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
       gl.uniform1f(prog.vel.u("u_nu"), p.nu);
       gl.uniform1f(prog.vel.u("u_cs"), p.cs);
       gl.uniform1f(prog.vel.u("u_cf"), p.cf);

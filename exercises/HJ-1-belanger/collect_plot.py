@@ -143,7 +143,7 @@ def main():
              sum(errs) / len(errs), max(errs) - min(errs)) if flat else "no h23 points")
     if steep:
         serrs = [100.0 * (r["_ratio"] - belanger(r["_Fr1"])) / belanger(r["_Fr1"]) for r in steep]
-        print("s1 coda:    %d points, mean error %+.1f%% (expected strongly negative)"
+        print("s1 coda:    %d points, mean error %+.1f%% (expected negative, ~5-15%%)"
               % (len(steep), sum(serrs) / len(serrs)))
 
 

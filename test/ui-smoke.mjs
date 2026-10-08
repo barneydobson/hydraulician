@@ -584,7 +584,12 @@ async function main() {
       const tab = await browser.open(INDEX + "?scene=m1");
       const p = await tab.evaluate(`
         const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
-        APP.tick(1200); APP.frames(3);
+        // Settled, at the scene's own measured spin-up — not part-way through
+        // it. m1 starts 0.28 m deep and its inlet holds 0.49 m, so for the
+        // first ~12 s the pool is filling and the surface runs 0.1-0.7 dx off
+        // the head (median, Low); settled it sits within 0.05 dx.
+        while (APP.sim.t < APP.sim.scene.spinup) APP.tick(2000);
+        APP.frames(3);
         const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
         const h = APP.SIM.hydraulicGrade(null, false);
         const dx = APP.sim.dx;

@@ -50,7 +50,10 @@ Weakly-compressible Navier–Stokes on a MAC grid, with the VOF fill fraction
 `f` doubling as the density and the EOS `P = c² max(f−1, 0)` acting as a 2D
 Preissmann slot: an unfilled cell has `p = 0` (that *is* the free surface —
 no interface reconstruction), an over-full cell is pressurised water with
-celerity `c`. No Poisson solve; two fullscreen passes per substep. The whole
+celerity `c`. No Poisson solve; two fullscreen passes per substep. In an
+open channel the free surface is stress-free (the void over it carries the
+water's `u`) and a depth-scale mixing length carries the bed's stress up the
+column, so the profile is a log law and the bed sets the resistance. The whole
 derivation, including what is deliberately not represented, is in
 [docs/numerics.md](docs/numerics.md).
 
@@ -85,12 +88,23 @@ to look fine for a minute and explode in an exercise.
   identical flux. Read the Conservation section before touching the vof pass.
 - **Gravity and `∇p` stay additive in the vel pass** — anything interposed
   breaks the discrete hydrostatic equilibrium.
+- **The free surface is stress-free and the bed carries the resistance.**
+  Over a channel the dry `u`-faces take the water's `u`; `w` and every other
+  void face keep the bleed. Do not bleed `u` over the water again (the
+  surface becomes a drag boundary, the profile peaks mid-depth and `n` jumps
+  to ~0.08), do not extrapolate `w` (the interface free-falls), and keep the
+  extension out of the reservoir sponge. The mixing length acts on the
+  VORTICITY in conservative form: on the strain it kills the deep flume's
+  waves, and as `ν_t∇²u` it puts the maximum back at mid-depth.
+  `smoke.js --only=profile` is the gate.
 - **Geometry contracts:** wall segments have butt ends; slabs leaving the
   domain are extrapolated, not clamped; a scene's bed stays above `z = 0`;
   ground is solid all the way down; the closed outer ring is stamped last.
 - **Controls:** a subcritical reach needs a real downstream control; a
   tailwater stands clear of critical (`≥ 1.3 d_c`, rechecked when `q`
-  changes); outfall edges (`open` = 2) are for brinks, never ponds.
+  changes), and one holding a jump stands near its conjugate; outfall edges
+  (`open` = 2) are for brinks, never ponds; under gravity an open edge that
+  no level control owns passes outflow only.
 - **The panel toggles are self-configuring** — the sandbox must be able to
   reproduce any scene by hand; that is the acceptance test for control
   changes. An exercise may narrow the interface (`UIMODE`), but never lock
@@ -126,18 +140,19 @@ to look fine for a minute and explode in an exercise.
 
 ## Testing
 
-Nine gates, all zero-dependency and all non-zero on failure:
+Ten gates, all zero-dependency and all non-zero on failure:
 
 | Command | Guards | Cost |
 | --- | --- | --- |
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
 | `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node test/geom-test.mjs` | `GEOM`'s closed forms — winding, slab corners, arc lengths, ½ρgH² — no browser; runs in checks.yml with the other instant gates | instant |
-| `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, every scene, every exercise | ~9 min |
+| `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, the open-channel velocity profile, every scene, every exercise | ~9 min |
 | `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
 | `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
 | `node test/mutation-test.mjs` | that `recon-test.mjs` can actually FAIL: fifteen known bugs patched into `RECON` one at a time, each required to kill the assertion it targets | ~9 s |
 | `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, every reset condition, the Favre display field, the mean columns, the overlay, the display pass painting the mean and the legend's Fit — 46 assertions | ~4 min |
+| `node exercises/_runner/smoke.js --only=profile` | uniform open-channel flow (sa1, Medium) has a channel's velocity profile: the maximum at the surface, the 0.6-depth and 0.2/0.8 rules, a log law with κ 0.33–0.50, α, and the bed delivering the `n` — 7 assertions; `--mutate=surface-sink` and `--mutate=no-mixing-length` put each half of issue #72 back | ~1 min |
 | `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
 
 Run the first two before printing worksheets, and `smoke.js` before pushing
@@ -245,8 +260,13 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   of surging from rest). A digit rule on a `geomN` row is cross-checked against
   the scene's declaration by `check_pack.py`; the lore is in the engineering
   notes under "Hydropower scheme".
-- `state.rt` in the status bar is the speed truth — m2 at ~0.9× real time is
-  the design point, not a bug.
+- `state.rt` in the status bar is the speed truth — m2 at ~0.8–0.9× real
+  time is the design point, not a bug (the closure costs 11–14% a substep).
+- A steady sloping surface sits in one-cell terraces: the VOF surface locks to
+  cell faces while the pressure carries the sub-cell slope. The overlay's
+  energy line (and so `S_f`, `n`, `d_n`) is built on the HGL for that reason;
+  a gauge's depth still steps by a whole Δx. "Steady surfaces terrace" in
+  the engineering notes.
 - The vertical exaggeration is fitted to the window (`autoVex` in main.js),
   not 1:1 — a scene's `view.vex`, the slider or a drag on the letterbox band
   takes the number over, and `0` resets to the fitted value, not to 1:1. The

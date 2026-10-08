@@ -4,7 +4,7 @@ Every student runs the same hydraulic jump at their own discharge, reads three
 numbers off the jump box, and posts (Fr₁, d₂/d₁). Pooled on one axis the
 class's points trace the Bélanger curve — a momentum balance that none of them
 solved individually, drawn by twenty laptops at once. A few volunteers then
-take the same jump onto a 1-in-4 bed, where their points fall visibly below
+take the same jump onto a 1-in-4 bed, where their points fall below
 the curve: the horizontal-bed assumption failing in public, discovered rather
 than announced.
 
@@ -31,27 +31,29 @@ both.
 **d** is the **last digit of your student number** — your lecturer will
 explain the assignment in class. Set **Inflow q** to `q = 0.42 + 0.03·d`, and
 the **Tailwater level** to the row that goes with it. The tailwater is
-1.3·d_c above the apron, except at d = 6 and d = 9 where it is 1.5·d_c; the q
-slider prints your own d_c, so the pairing is yours to check.
+1.75·d_c above the apron — about the conjugate depth of the sheet that lands
+on it, so the jump stands on the apron rather than being swept off it or
+pushed back up the chute; the q slider prints your own d_c, so the pairing
+is yours to check.
 
 | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **q (m²/s)** | 0.42 | 0.45 | 0.48 | 0.51 | 0.54 | 0.57 | 0.60 | 0.63 | 0.66 | 0.69 |
 | **d_c (m)** | 0.262 | 0.274 | 0.286 | 0.298 | 0.310 | 0.321 | 0.332 | 0.343 | 0.354 | 0.365 |
-| **tailwater (m)** | 0.490 | 0.507 | 0.522 | 0.538 | 0.553 | 0.567 | 0.648 | 0.596 | 0.610 | 0.700 |
+| **tailwater (m)** | 0.609 | 0.630 | 0.650 | 0.671 | 0.693 | 0.712 | 0.731 | 0.750 | 0.769 | 0.789 |
 
 ## What to do
 
 1. Set **Inflow q** and **Tailwater level** to your own row.
-2. Press `R` and let it reach steady state — about **35 s**; the card counts
+2. Press `R` and let it reach steady state — about **20 s**; the card counts
    it down.
 3. Watch the orange **HYDRAULIC JUMP** box on the apron for ~10 s and take a
    typical middle reading rather than a peak, then submit **Fr₁** and
    **d₂/d₁** (with your `d` and `q`).
 
 Also, for the coda volunteers: switch to scene **s1** (Scenes menu) for the
-same jump on a 1-in-4 bed at tailwater 0.95 / 1.00 / 1.05 m, and submit that
-point too — expect d₂ well under Bélanger.
+same jump on a 1-in-4 bed at tailwater 1.15 / 1.25 / 1.35 m, and submit that
+point too — expect d₂ under Bélanger.
 
 ## For the instructor — pooling the class
 

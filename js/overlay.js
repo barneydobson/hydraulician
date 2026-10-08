@@ -83,21 +83,65 @@ const OVERLAY = (() => {
     const out = { bed: [], d: [], q: [], surf: [], dc: [], dn: [], S0: [], V: [], Fr: [], hv: [] };
 
     const win = Math.max(5, Math.round(nx * 0.09));
+    // Which columns stand on a solid — see the onBed note below. Only those
+    // describe a bed, so only those enter the slope: past a brink the falling
+    // sheet's lowest cell steps down a cell or two a column, which passes the
+    // cliff test, and a window snapped out to those "steps" read the last
+    // metre above m2's lip as S1.
+    const standing = (i) => {
+      const jb = Math.round(col[i * 4] / dx);
+      return jb >= 1 && S.mask[(jb - 1) * nx + i] >= 64;
+    };
     const bd = new Float32Array(nx), use = new Float32Array(nx);
     for (let i = 0; i < nx - 1; i++) {
       const drop = (col[i * 4] - col[(i + 1) * 4]) / dx;
-      if (Math.abs(drop) <= CLIFF) { bd[i] = drop; use[i] = 1; }
+      if (Math.abs(drop) <= CLIFF && standing(i) && standing(i + 1)) { bd[i] = drop; use[i] = 1; }
     }
     const pv = new Float32Array(nx + 1), pn = new Float32Array(nx + 1);
     for (let i = 0; i < nx; i++) { pv[i + 1] = pv[i] + bd[i]; pn[i + 1] = pn[i] + use[i]; }
+    // The window's ends are SNAPPED OUT to the rasterisation steps either side
+    // of them: rise over run between two steps is exactly the drawn slope,
+    // wherever the window happens to fall. Unsnapped, a gentle bed — one step
+    // every dx/S₀, three metres at 1 in 250 — reads 0 whenever the window
+    // sits between two steps and 1/(window) when it holds one, so a mild
+    // reach flickered "H" and "M" along its length. Steep beds, with a step
+    // every few cells, read what they always did.
+    const prevStep = new Int32Array(nx), nextStep = new Int32Array(nx);
+    let ps = -1;
+    for (let i = 0; i < nx; i++) { if (use[i] && bd[i] !== 0) ps = i; prevStep[i] = ps; }
+    ps = -1;
+    for (let i = nx - 1; i >= 0; i--) { if (use[i] && bd[i] !== 0) ps = i; nextStep[i] = ps; }
     // A tilted-gravity scene draws its bed flat and carries the slope in
     // gravity instead — add it back, it is the dynamic slope the GVF sees.
     const tilt = S.scene.tiltS0 || 0;
     const slope = new Float32Array(nx);
     for (let i = 0; i < nx; i++) {
-      const lo = Math.max(0, i - win), hi = Math.min(nx - 1, i + win);
-      const n = pn[hi] - pn[lo];
-      slope[i] = (n > 0 ? (pv[hi] - pv[lo]) / n : 0) + tilt;
+      const lo0 = Math.max(0, i - win), hi0 = Math.min(nx - 1, i + win);
+      // Out to the step beyond each end; where there is none (the ends of
+      // the domain), IN to the nearest one, so the run still starts and ends
+      // on a step. A one-sided snap counted the inlet's step against half a
+      // window and read 1 in 130 for 1 in 250.
+      let lo = prevStep[lo0] >= 0 ? prevStep[lo0] : nextStep[lo0];
+      let hi = nextStep[hi0] >= 0 ? nextStep[hi0] : prevStep[hi0];
+      // A window the domain's END has clipped, holding one step or none,
+      // reaches on to the next step inward: m1's inlet metre (1 in 250, its
+      // first step 2–3 m in) otherwise read level and labelled the pool H2.
+      // Only at the ends — anywhere else that would hand a level apron the
+      // slope of the chute above it.
+      if (!(lo >= 0 && hi > lo)) {
+        if (lo0 === 0 && lo >= 0 && lo + 1 < nx && nextStep[lo + 1] > lo) hi = nextStep[lo + 1];
+        else if (hi0 === nx - 1 && hi > 0 && prevStep[hi - 1] >= 0) lo = prevStep[hi - 1];
+      }
+      let s;
+      if (lo >= 0 && hi > lo) {
+        // (lo, hi]: the step AT lo is the one before the run, the one at hi ends it
+        const n = pn[hi + 1] - pn[lo + 1];
+        s = n > 0 ? (pv[hi + 1] - pv[lo + 1]) / n : 0;
+      } else {                                     // under two steps in reach
+        const n = pn[hi0] - pn[lo0];
+        s = n > 0 ? (pv[hi0] - pv[lo0]) / n : 0;
+      }
+      slope[i] = s + tilt;
     }
 
     // Columns beside a cliff — a brink, a weir face, a gate sill — have no
@@ -124,8 +168,7 @@ const OVERLAY = (() => {
     // there and the readout has no business hiding them.
     const onBed = new Uint8Array(nx);
     for (let i = 0; i < nx; i++) {
-      const jb = Math.round(col[i * 4] / dx);
-      onBed[i] = jb >= 1 && S.mask[(jb - 1) * nx + i] >= 64 ? 1 : 0;
+      onBed[i] = standing(i) ? 1 : 0;
       if (!onBed[i]) ok[i] = 0;
     }
     out.ok = ok;
@@ -202,12 +245,23 @@ const OVERLAY = (() => {
     //     reasoning, and the measurements that settled it, are on
     //     SIM.hydraulicGrade. The same fallback covers a column the head walk
     //     found dry.
-    const hv = opts && opts.hv;
+    //
+    //     And the line is built on the HYDRAULIC GRADE LINE, the piezometric
+    //     head z + p/ρg at the bed (`opts.hgl`, SIM.hydraulicGrade), not on
+    //     the VOF surface. In a steady reach the VOF surface sits in whole-cell
+    //     terraces — a partly full top row holds one fill along a tread and the
+    //     depth changes a cell at a time — while the pressure carries the
+    //     sub-cell slope continuously. MEASURED on m1 (1 in 250, deep pool):
+    //     the surface was level to 0.2 mm over 10 m, so S_f read ~0.0002, while
+    //     the HGL fell 5.4 mm and the energy line on it gives S_f = 0.00061,
+    //     the Manning value for that pool. Without an HGL (a caller that does
+    //     not pass one) the VOF surface is what there is.
+    const hv = opts && opts.hv, hgl = opts && opts.hgl;
     const Efull = new Float32Array(nx);
     for (let i = 0; i < nx; i++) {
       const k = hv && isFinite(hv[i]) ? hv[i] : out.V[i] * out.V[i] / (2 * g);
       out.hv.push(k);
-      Efull[i] = out.surf[i] + k;
+      Efull[i] = (hgl && isFinite(hgl[i]) ? hgl[i] : out.surf[i]) + k;
     }
     const ew = Math.max(3, Math.round(Math.min(1.5, S.W * 0.10) / dx));
     const pe = new Float32Array(nx + 1);

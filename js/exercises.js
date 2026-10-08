@@ -148,7 +148,7 @@ const EXERCISES = [
     },
     start: "a steep chute running uniform flow, with your own inflow to set",
     task: "Set your q, then hover mid-chute at x ≈ 3.5 m and read the MEASURED d_n off the hover box.",
-    settle: 26,
+    settle: 15,
   },
   {
     id: "GV-1",
@@ -204,16 +204,19 @@ const EXERCISES = [
     digit: { label: "q", control: "inQ", base: 0.42, step: 0.03, unit: "m²/s",
              rule: "q = 0.42 + 0.03·d",
              also: [{ label: "tailwater", control: "twLevel", unit: "m",
-                      // 1.3·d_c everywhere except d = 6 and d = 9, which need
-                      // 1.5·d_c to stop the reading pumping (measured).
-                      rule: "1.3 · d_c (1.5 · d_c at d = 6 and 9) — check it yourself against the d_c the q slider prints",
-                      table: [0.490, 0.507, 0.522, 0.538, 0.553,
-                              0.567, 0.648, 0.596, 0.610, 0.700] }] },
-    secondScene: { scene: "s1", when: "optional coda - switch to s1 (Scenes menu) for the same jump on a 1-in-4 bed, tailwater 0.95 / 1.00 / 1.05 m, and expect d₂ well under Bélanger." },
+                      // 1.75·d_c above the apron (0.15 m), every digit: the
+                      // conjugate of the sheet landing on the apron. MEASURED
+                      // across the ladder (Medium): the jump stands on the
+                      // apron with d₂ −2% to +5% of Bélanger; at 1.6·d_c it is
+                      // against the outlet, at 1.9·d_c on the chute toe.
+                      rule: "0.15 + 1.75 · d_c — check it yourself against the d_c the q slider prints",
+                      table: [0.609, 0.630, 0.650, 0.671, 0.693,
+                              0.712, 0.731, 0.750, 0.769, 0.789] }] },
+    secondScene: { scene: "s1", when: "optional coda - switch to s1 (Scenes menu) for the same jump on a 1-in-4 bed, tailwater 1.15 / 1.25 / 1.35 m, and expect d₂ under Bélanger." },
     ui: { measure: false, view: ["legendBtn"], controls: ["speed", "inQ", "twLevel"] },
     start: "a chute onto a level apron, with a tailwater control",
     task: "Set your q and its paired tailwater, let the jump settle on the apron, then read Fr₁ and d₂/d₁ off the jump box over ~10 s.",
-    settle: 35,
+    settle: 20,
   },
 
   // ---------------------------------------------------- natural channels
@@ -233,7 +236,7 @@ const EXERCISES = [
     ui: { view: ["legendBtn"], controls: ["speed"] },
     start: "the steep flume at its own discharge; leave q alone",
     task: "Rake your station, watch 15–20 s, pause on a typical moment and read u_max/V, then integrate 4–5 points off the curve into α.",
-    settle: 45,
+    settle: 15,
   },
   {
     id: "NC-3",
@@ -246,7 +249,7 @@ const EXERCISES = [
     viewParams: { channel: false },
     digit: { label: "q", control: "inQ", base: 0.80, step: 0.04, unit: "m²/s",
              rule: "q = 0.80 + 0.04·d" },
-    secondScene: { scene: "m2", when: "Part B - open m2 (Scenes menu), touch nothing, wait out the 90 s spin-up and compare at x ≈ 7 m." },
+    secondScene: { scene: "m2", when: "Part B - open m2 (Scenes menu), touch nothing, wait out the 30 s spin-up and compare at x ≈ 7 m." },
     ui: {
       measure: false,
       view: ["legendBtn"],
@@ -255,7 +258,7 @@ const EXERCISES = [
     },
     start: "the steep flume, with your own inflow to set",
     task: "Hover at x ≈ 3.5 m and read h and S_f, then τ₀ = ρg·h·S_f and D_min = τ₀/[0.056(ρₛ−ρ)g].",
-    settle: 26,
+    settle: 15,
   },
 
   // -------------------------------------------------- specific energy etc.
@@ -283,7 +286,7 @@ const EXERCISES = [
     ],
     ui: { build: ["wall", "undoBtn"], view: ["legendBtn"], controls: ["speed", "inQ"] },
     start: "a level reach held at both ends, and a hump to grow at x = 4.5 m",
-    task: "Read d₁ at the gauge and commit a prediction Δz = E₁ − 1.5·d_c. Then grow a 1 m flat-topped hump at x = 4.5 m in ~7 steps, jotting d₁ at each and re-settling, until the crest chokes — the d₁ from the LAST pre-choke step redoes the prediction as Δz_pred*.",
+    task: "Read d₁ at the gauge and commit a prediction Δz = E₁ − 1.5·d_c. Then grow a 1 m flat-topped hump at x = 4.5 m in steps (about 2 cm at a time near the end), jotting d₁ at each and re-settling, until the crest chokes — the d₁ from the LAST pre-choke step redoes the prediction as Δz_pred*.",
     settle: 60,
   },
   {

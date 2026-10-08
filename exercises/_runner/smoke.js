@@ -16,6 +16,9 @@
  *            older one is refused rather than silently half-loaded
  *   PHYSICS  volume is conserved, hydrostatic water stays put, no NaN
  *            reaches the field, and a jump still reads its conjugates
+ *   PROFILE  uniform open-channel flow has a channel's velocity profile:
+ *            fastest at the surface, the 0.6-depth and 0.2/0.8 gauging rules,
+ *            a log law with von Kármán's κ, and the bed delivering the n
  *   SCENES   every scene boots and steps
  *   HYDRO    the parametric hydropower scheme: params move the mask, the
  *            seeded start runs, the slam is a rigid-column surge
@@ -57,6 +60,25 @@ const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
  *  Expect the named assertion to FAIL. If it passes, that assertion is not
  *  guarding what it claims to guard. */
 const GPU_MUTANTS = [
+  // -------- the stress-free surface and the mixing length (issue #72) --------
+  { id: "surface-sink", file: "/js/shaders.js",
+    why: "the u-faces above the water keep the bled air instead of the water's velocity",
+    find: "    eU = dryU * (wU1 + wU2);",
+    replace: "    eU = 0.0;",
+    kills: "PROFILE the velocity maximum is at the surface, not mid-depth",
+    measured: "the old profile comes straight back: u_max at y/d = 0.34-0.36 with "
+            + "the surface at 0.09-0.22 of it, u(0.4 d)/V 1.28-1.31, kappa 0.63-0.68 and "
+            + "n 0.082-0.087 against a clean 0.031-0.033 — the surface carrying the drag" },
+
+  { id: "no-mixing-length", file: "/js/shaders.js",
+    why: "the depth-scale closure returns no length, leaving Smagorinsky alone in the channel",
+    find: "  return u_kappa * min(yw, above) * sqrt(below / d) * smoothstep(2.0 * u_dx, 4.0 * u_dx, d);",
+    replace: "  return 0.0;",
+    kills: "PROFILE the near-bed profile is a log law with von Kármán's constant",
+    measured: "kappa 0.30-0.33 against a clean 0.41-0.43, and the maximum back at "
+            + "y/d = 0.55-0.58: Smagorinsky's (C_s dx)^2 is ~100x too small to carry "
+            + "the bed stress up the column. Six of the seven PROFILE checks fail" },
+
   { id: "favre-reynolds", file: "/js/shaders.js",
     why: "FS_ACC stores the plain velocity, so the mean is Reynolds, not Favre",
     find: "vec4 phi = vec4(f * uc, f * wc, f, U.b);",
@@ -1504,7 +1526,10 @@ SUITES.physics = async (B) => {
   const dis = await B.evaluate(`(() => {
     APP.loadScene("m3", false); __low();
     const t0 = Date.now();
-    while (APP.sim.t < 30 && Date.now() - t0 < 90000) APP.tick(200);
+    // 60 s, not 30: since the stress-free surface (#72) m3 takes ~45 s to
+    // settle, and at 30 s it is still draining — the box then exports more
+    // energy than it receives, +2.2 kW/m measured, for the wrong reason.
+    while (APP.sim.t < 60 && Date.now() - t0 < 120000) APP.tick(200);
     const W = APP.sim.W, H = APP.sim.H, Es = [];
     for (let k = 0; k < 24; k++) {
       const t1 = Date.now(), tgt = APP.sim.t + 0.2;
@@ -1514,8 +1539,8 @@ SUITES.physics = async (B) => {
     const mean = Es.reduce((a, b) => a + b, 0) / Es.length;
     return { mean, worst: Math.max.apply(null, Es), n: Es.length, t: APP.sim.t };
   })()`);
-  ok("PHYSICS m3 settled before its energy budget is read", dis.t >= 29.5,
-    "reached t = " + dis.t.toFixed(1) + " s of 30");
+  ok("PHYSICS m3 settled before its energy budget is read", dis.t >= 59.5,
+    "reached t = " + dis.t.toFixed(1) + " s of 60");
   ok("PHYSICS the reach loses energy through the box",
     dis.mean < -200 && dis.worst < 0,
     `mean ${dis.mean.toFixed(0)} W/m over ${dis.n} samples, ` +
@@ -1608,6 +1633,90 @@ SUITES.physics = async (B) => {
   ok("PHYSICS boxFlux and boxForce report the same force",
     Math.abs(cv.fx - cv.gx) < 1e-6 * Math.max(1, Math.abs(cv.gx)),
     cv.fx + " vs " + cv.gx);
+};
+
+// The velocity profile of uniform open-channel flow (issue #72). The free
+// surface used to be a drag boundary — the bled air above it was a momentum
+// sink — so the profile peaked at mid-depth, ran at HALF speed at the surface,
+// and the 0.6-depth gauging rule read 40-60% high. A stress-free surface and a
+// depth-scale mixing length put the bed's drag through the whole column; what
+// this asserts is the textbook result that follows, on the one reach in the set
+// that is genuinely uniform.
+//
+// MEDIUM, not Low: the log fit wants a dozen cells in its 0.05-0.35 d band and
+// sa1 at Low has thirteen in the whole depth. On a GPU it costs ~15 s.
+//
+// MEASURED (Medium, Average mode, 15 s window after the 40 s spin-up), stations
+// x = 6, 8, 10 m: u(0.4 d above the bed)/V = 1.015-1.025; ½(u(0.2 d) + u(0.8 d))/V
+// = 1.02; the maximum at y/d = 0.93-0.98, with the surface at 1.22-1.27 V;
+// kappa fitted to u = (u*/κ) ln y + C over 0.05-0.35 d, u* = √(g S₀ d), 0.41-0.43;
+// alpha 1.17-1.19; Manning n 0.031-0.033 at C_f = 0.25. With the old surface:
+// 1.38-1.48, max at mid-depth, surface at 0.5 V.
+SUITES.profile = async (B) => {
+  await B.goto(`http://localhost:${PORT}/?scene=sa1`);
+  const r = await B.evaluate(`(() => {
+    const S = APP.sim;
+    const t = __settle(40, 120000);
+    APP.SIM.avgStart();
+    APP.state.speed = 10;
+    const t1 = Date.now(), tgt = S.t + 15;
+    while (S.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const T = APP.SIM.avgT();
+    const AC = APP.SIM.avgColumns(true).C;
+    const hg = APP.SIM.hydraulicGrade(null, true);
+    const A = OVERLAY.analyse(S, AC, { averaged: true, hv: hg.hv, hgl: hg });
+    const M = APP.SIM.avgField();
+    const g = Math.abs(S.p.g), S0 = S.scene.tiltS0, nx = S.nx, ny = S.ny, dx = S.dx;
+    const st = [6, 8, 10].map((x) => {
+      const i = Math.floor(x / dx);
+      const bed = AC[i * 4], d = AC[i * 4 + 1], V = AC[i * 4 + 2] / d;
+      const ys = [], us = [], fs = [];
+      for (let j = 1; j < ny - 1; j++) {
+        const k = j * nx + i, zc = (j + 0.5) * dx;
+        if (S.mask[k] >= 192 || zc < bed) continue;
+        if (zc > bed + d + 2 * dx) break;
+        ys.push(zc - bed); us.push(M.ubar[k]); fs.push(M.fbar[k]);
+      }
+      const at = (y) => {
+        for (let n = 0; n + 1 < ys.length; n++) if (ys[n] <= y && ys[n + 1] >= y) {
+          const a = (y - ys[n]) / (ys[n + 1] - ys[n]); return us[n] * (1 - a) + us[n + 1] * a;
+        }
+        return NaN;
+      };
+      let umax = -1e9, ymax = 0, utop = NaN, m3 = 0;
+      for (let n = 0; n < ys.length; n++) {
+        m3 += Math.min(fs[n], 1) * dx * us[n] * us[n] * us[n];
+        if (fs[n] > 0.5) { utop = us[n]; if (us[n] > umax) { umax = us[n]; ymax = ys[n]; } }
+      }
+      let sx = 0, sy = 0, sxx = 0, sxy = 0, nn = 0;
+      for (let n = 0; n < ys.length; n++) {
+        if (ys[n] < Math.max(0.05 * d, 1.4 * dx) || ys[n] > 0.35 * d) continue;
+        const lx = Math.log(ys[n]); sx += lx; sy += us[n]; sxx += lx * lx; sxy += lx * us[n]; nn++;
+      }
+      const slope = (nn * sxy - sx * sy) / (nn * sxx - sx * sx);
+      return { x, d, V, u06: at(0.4 * d) / V, u28: 0.5 * (at(0.8 * d) + at(0.2 * d)) / V,
+               ymax: ymax / d, utop: utop / V, umax: umax / V, nlog: nn,
+               kappa: Math.sqrt(g * S0 * d) / slope, alpha: m3 / (V * V * V * d), n: A.n[i] };
+    });
+    return { t, T, st };
+  })()`);
+  ok("PROFILE sa1 settled and averaged before its profile is read",
+    r.t >= 39.5 && r.T >= 14.5, `t ${r.t.toFixed(1)} s of 40, window ${r.T.toFixed(1)} s of 15`);
+  const fmt = (k, p) => r.st.map((s) => s[k].toFixed(p === undefined ? 3 : p)).join(", ");
+  ok("PROFILE the velocity maximum is at the surface, not mid-depth",
+    r.st.every((s) => s.ymax > 0.85 && s.utop > 0.95 * s.umax),
+    `y(u_max)/d ${fmt("ymax")}; u_top/u_max ${r.st.map((s) => (s.utop / s.umax).toFixed(3)).join(", ")}`);
+  ok("PROFILE the mean velocity sits at 0.6 d below the surface (0.6-depth rule)",
+    r.st.every((s) => Math.abs(s.u06 - 1) < 0.06), "u(0.4 d)/V " + fmt("u06"));
+  ok("PROFILE the two-point (0.2 d / 0.8 d) rule holds",
+    r.st.every((s) => Math.abs(s.u28 - 1) < 0.05), "½(u(0.2d)+u(0.8d))/V " + fmt("u28"));
+  ok("PROFILE the near-bed profile is a log law with von Kármán's constant",
+    r.st.every((s) => s.nlog >= 5 && s.kappa > 0.33 && s.kappa < 0.50),
+    "fitted kappa " + fmt("kappa") + " over " + r.st.map((s) => s.nlog).join("/") + " cells");
+  ok("PROFILE the energy coefficient is a turbulent channel's",
+    r.st.every((s) => s.alpha > 1.05 && s.alpha < 1.30), "alpha " + fmt("alpha"));
+  ok("PROFILE the bed delivers the roughness, at a channel's n",
+    r.st.every((s) => s.n > 0.025 && s.n < 0.040), "Manning n " + fmt("n", 4));
 };
 
 SUITES.scenes = async (B) => {
@@ -1784,7 +1893,9 @@ SUITES.pack = async (B) => {
       continue;
     }
     ok("PACK " + id + " applies onto its scene",
-      r.ex === id && !!r.scene && ["h", "d", "speed"].includes(r.field),
+      // Every option the "Gauges plot" select offers (js/main.js) — HP-3
+      // plots the level η, and a list missing it failed the pack on main.
+      r.ex === id && !!r.scene && ["h", "H", "d", "eta", "speed"].includes(r.field),
       JSON.stringify(r));
   }
 };
@@ -1871,8 +1982,18 @@ SUITES.avg = async (B) => {
   // path, identical to four decimal places across five runs, about 1.15x the
   // √T prediction. 2.6 is 1.30x that measurement and
   // 1.50x the prediction, with linear growth (3.0) still outside it.
-  ok("F1 residual grows no faster than sqrt(T)", r.max2 < r.max * 2.6 + 1e-9,
-     `max ${r.max} -> ${r.max2} (ratio ${(r.max2 / r.max).toFixed(3)})` +
+  //   Each window's maximum is taken in units of the float32 ulp of its OWN
+  // ‖⟨F⟩‖∞. The drift is ½·ulp per step, and the ulp doubles whenever the
+  // largest face mean crosses a power of two — which the window opens too
+  // early to rule out (600 substeps in, the chute is still speeding up).
+  // MEASURED after the stress-free surface (#72): Fmax 1.74 → 2.07 across the
+  // window, the worst cell moving to where it crossed 2.0, a raw ratio of
+  // 3.26 against an ulp-normalised 1.63 — a precision step, not a leak.
+  const ulp = (F) => Math.pow(2, Math.floor(Math.log2(Math.max(F, 1e-30))) - 23);
+  const inUlp1 = r.max / ulp(r.Fmax), inUlp2 = r.max2 / ulp(r.Fmax2);
+  ok("F1 residual grows no faster than sqrt(T)", inUlp2 < inUlp1 * 2.6 + 1e-9,
+     `max ${r.max} -> ${r.max2} (raw ratio ${(r.max2 / r.max).toFixed(3)}, in ulps of ` +
+     `Fmax ${r.Fmax.toFixed(3)} -> ${r.Fmax2.toFixed(3)}: ${(inUlp2 / inUlp1).toFixed(3)})` +
      ` over T ${r.T} -> ${r.T2}`);
 
   // F4: the sponge, the Dirichlet bands and every positivity-clamp event live
@@ -2217,6 +2338,13 @@ SUITES.avg = async (B) => {
     __low(); APP.tick(600);
     const gl = document.querySelector("canvas").getContext("webgl2");
     const S = APP.sim, nx = S.nx, ny = S.ny, n = nx * ny;
+    // Past the scene's spin-up BEFORE the window opens. tickFrame restarts
+    // the window on the spin-up edge (averaging.md §9) and the CPU sums below
+    // cannot know it did: a probe straddling h23's 20 s compared a 0.71 s GPU
+    // mean against a 3.04 s CPU one and read it as a Favre error. Where the
+    // clock stands here is set by the governor-paced APP.frames() tests
+    // above, i.e. by wall-clock speed, so it has to be made true, not assumed.
+    while (S.t < (APP.state.scene.spinup || 0) + 0.25) APP.tick(2000);
     const F = new Float32Array(n * 4);
     const sFu = new Float64Array(n), sF = new Float64Array(n), sU = new Float64Array(n);
     let T = 0, frames = 0;
@@ -2239,7 +2367,7 @@ SUITES.avg = async (B) => {
       }
       T += dt; frames++;
     }
-    const A = APP.SIM.avgField();
+    const A = APP.SIM.avgField(), gpuT = APP.SIM.avgT();
     const cand = [];
     for (let j = 2; j < ny - 2; j++) {
       for (let i = 2; i < nx - 3; i++) {
@@ -2261,7 +2389,7 @@ SUITES.avg = async (B) => {
       dF += a; dR += b; if (a < b) nearFavre++;
     }
     const m = top.length || 1;
-    return { frames, T, nCand: cand.length, nTop: top.length, nearFavre,
+    return { frames, T, gpuT, nCand: cand.length, nTop: top.length, nearFavre,
              dFavre: dF / m, dReyn: dR / m,
              sepMax: top.length ? top[0].sep : 0,
              sepMin: top.length ? top[top.length - 1].sep : 0,
@@ -2277,8 +2405,11 @@ SUITES.avg = async (B) => {
   // The probe is worthless unless the two references actually separate — a
   // green assertion on cells where they coincide proves nothing, which is the
   // failure this test was written to end.
+  // ...and only if both means cover the SAME window: any reset condition
+  // firing mid-probe shortens the GPU one and nothing else would say so.
   ok("Favre/Reynolds probe found partially filled cells that separate the two",
-     fr.nTop >= 10 && fr.sepMin > 0.02, JSON.stringify({ ...fr, best: undefined }));
+     fr.nTop >= 10 && fr.sepMin > 0.02 && Math.abs(fr.gpuT - fr.T) <= 1e-6 * fr.T,
+     JSON.stringify({ ...fr, best: undefined }));
   // "Nearer Favre than Reynolds" is NOT enough on its own, and the negative
   // control is what showed it: storing uc instead of f*uc leaves avgField
   // dividing by fbar anyway, so ubar becomes <u_c>/fbar — at fbar = 0.3 that

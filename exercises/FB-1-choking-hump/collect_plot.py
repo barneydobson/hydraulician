@@ -161,10 +161,10 @@ def main():
         print("\n  -- re-timed prediction: E1 at the LAST pre-choke step (adopted protocol) --")
         print("  dzc / dzpred*          %.3f - %.3f, mean %.3f"
               % (min(ratio_star), max(ratio_star), mean_ratio_star))
-        print("  (naive committed-E1 ratio was %.3f - %.3f, mean %.3f -- re-timing removes"
+        print("  (committed-E1 ratio was %.3f - %.3f, mean %.3f -- the pool rises a cell"
               % (min(ratio), max(ratio), sum(ratio) / len(ratio)))
-        print("   most of the gap: the pool rises as the hump is raised, so most of the")
-        print("   1.9x bias was E1 itself changing, not a large real entrance loss.)")
+        print("   or so as the hump is raised, so re-timing moves the prediction up and")
+        print("   the two readings bracket the 1:1 line.)")
 
     # ------------------------------------------------------------------ plot
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(11.5, 5.2),
@@ -208,10 +208,10 @@ def main():
     bx.axhline(1.0, color="#444", lw=1.0, ls="--", label="1:1")
     bx.set_xlabel("unit discharge q  (m²/s per m width)")
     bx.set_ylabel(r"$\Delta z_c\ /\ \Delta z_{pred}$")
-    bx.set_ylim(0, max(2.4, max(ratio) * 1.15))
+    bx.set_ylim(0, max(1.6, max(ratio) * 1.15))
     bx.grid(True, alpha=0.25)
-    bx.legend(loc="right", fontsize=7.5)
-    bx.set_title("committed-E1 bias ~constant; re-timed E1 removes most of it", fontsize=9.5)
+    bx.legend(loc="lower left", fontsize=7.5)
+    bx.set_title("committed E1 reads high, re-timed E1 reads low", fontsize=9.5)
 
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     d = os.path.dirname(a.out)

@@ -47,8 +47,9 @@ The 1-pointers fall out of almost any control standing on the right bed — a
 pool behind a gate, a drawdown to a free brink. The 2s need a gate opening
 small enough not to drown, a real tailwater, or a bed truncated short of the
 domain edge. A2 is priced for the adverse bed itself, not for any one trick.
-The 5s are open bounties: the pack's own play-through bagged nine of the
-thirteen, never reached A3, and could not hold the C family still.
+The 5s are open bounties: the pack's own play-through never reached A3, and
+the C family only appears on a slope found by measurement — about 1 in 37 on
+this sandbox — not by eye.
 
 ## What to do
 
@@ -93,10 +94,12 @@ the rare-spawn tail tinted, over a histogram of the totals.
 
 - **Nobody has to bag a C for the lesson to land.** A tail sitting at zero
   *is* the finding: a channel at critical slope is the least stable
-  configuration in open-channel hydraulics. Show it live — load
-  `?scene=c13` and switch **Profile labels** on (that scene ships with them
-  off for exactly this reason): the chip flickers C1/C3/M1 from one second to
-  the next on a tuned, shipped scene, never mind a hand-drawn one.
+  configuration in open-channel hydraulics, and the slope that makes one is
+  a knife edge. Show it live — load `?scene=c13`, switch **Profile labels**
+  on (that scene ships with them off), and watch C3 then C1 along the reach;
+  then drag **Bed roughness C_f** from 0.25 down to 0.05 and the same reach
+  reads S3, S2 and S1 — a fifth of the roughness moves d_n only 9%, which is
+  all it takes.
 - **Adjudicating a suspicious chip.** A drowned control flips the *letter*,
   not just the zone: `d_c` is local and collapses with the local discharge,
   while `d_n` comes from a domain-wide median that goes stale — so a fully

@@ -184,15 +184,15 @@ window.FB1 = {
     return FB1.TW;       // pairing rule: reservoir = tailwater, unadjusted
   },
 
-  /** MEASURED choking-height bias: Δz_c ≈ 1.90 × Δz_pred, tight across the
-   *  whole class range (ratio 1.87–1.94, see data/simulated-class.csv and
-   *  README §4 for why — the short, flat, doubly-level-controlled reach
-   *  stays subcritical/hydraulically-connected end to end for any hump
-   *  height, so the tailwater backpropagates through the WHOLE pool well
-   *  before the crest itself reaches critical, unlike the textbook's
-   *  isolated-uniform-approach assumption). Use this to jump straight near
-   *  the true Δz_c instead of bisecting from zero. */
-  K_BIAS: 1.90,
+  /** MEASURED choking-height ratio: Δz_c ≈ 1.0–1.18 × Δz_pred across the
+   *  class (1.12–1.18 at q 0.15–0.30, 1.00–1.04 at q 0.35–0.55; see
+   *  data/simulated-class.csv). The pool rises a cell or so as the hump goes
+   *  up, so the committed E1 reads a little low. Before the stress-free
+   *  surface and mixing-length closure (issue #72) this was 1.90: the void
+   *  dragged the surface layer back and the reach lost far more head than a
+   *  real flume. Use it to jump near the true Δz_c instead of bisecting from
+   *  zero. */
+  K_BIAS: 1.08,
   dzTarget: function (q, d1) { return FB1.K_BIAS * FB1.dzPred(q, d1); },
 
   /** Build (or rebuild) the bare channel + tailwater, no hump yet. Records
@@ -318,13 +318,13 @@ window.FB1 = {
              d1Choked: choked.d1 };
   },
 };
-/* MEASURED, this machine, Medium (414 × 230, Δx 0.02174 m, Δt 3.494e-4 s):
+/* MEASURED, this machine, Medium (414 × 230, Δx 0.02174 m), after issue #72:
    q = 0.15 + 0.05·d, reservoir level = tailwater level = 1.00 m (fixed).
-   Baseline (no hump) d1 ranges 0.499 (d=0) to 0.532 m (d=8); margin over
-   critical (d1/d_c) 3.78 → 1.70, comfortably above the 1.3–1.5·d_c rule
-   at every digit. Δz_c ≈ 1.90 × Δz_pred, tight (ratio 1.87–1.94) across
-   the whole class — see data/simulated-class.csv and README §4/§5 for the
-   full table, the physical reason for the bias, and the d=0 (q=0.10)
-   robustness failure that set the range's floor. Example:
-   FB1.student(4) -> q=0.35, d1≈0.517, dc=0.232, E1≈0.540, dzPred≈0.193,
-                     dzc measured ≈17 cells (0.370 m), crest Fr ≈1.0 there. */
+   Baseline (no hump) d1 reads 0.498 (d=0–3) or 0.520 m (d=4–8): the steady
+   surface sits on a cell face, so the gauge steps a whole Δx. Margin over
+   critical (d1/d_c) 3.78 → 1.66, above the 1.3–1.5·d_c rule at every digit.
+   Hump raised one cell at a time from 0.8·Δz_pred, 25 s per step: Δz_c =
+   1.00–1.18 × Δz_pred (mean 1.08); from the d1 at the last pre-choke step,
+   Δz_c = 0.88–1.00 × Δz_pred* (mean 0.94). Example:
+   FB1.student(4) -> q=0.35, d1≈0.520, dc=0.232, E1≈0.543, dzPred≈0.195,
+                     dzc measured 9 cells (0.196 m), crest Fr ≈1.0 there. */

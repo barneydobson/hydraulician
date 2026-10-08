@@ -570,11 +570,11 @@ const CONTROLS = [
   { id: "cf", label: "Bed roughness C_f", min: 0, max: 0.25, step: 0.002,
     get: () => sim.p.cf, set: (v) => sim.p.cf = v,
     fmt: (v) => v.toFixed(3) + (v === 0 ? "   frictionless" : ""),
-    info: "Wall-function drag in the cells touching a solid. Controls normal depth, and therefore whether a slope is mild or steep. Hover the channel to read the Manning n it is actually delivering." },
+    info: "Wall-function drag in the cells touching a solid — the bed's roughness, and in an open channel the whole of its resistance: the mixing length carries the bed's drag up the column, and the free surface carries none. Controls normal depth, and therefore whether a slope is mild or steep. At Medium resolution 0.02 delivers a Manning n of about 0.024 and 0.25 about 0.031. Hover the channel to read the n it is actually delivering." },
   { id: "cs", label: "Eddy viscosity C_s", min: 0, max: 0.4, step: 0.005,
     get: () => sim.p.cs, set: (v) => sim.p.cs = v,
     fmt: (v) => v === 0 ? "laminar" : "Smagorinsky " + v.toFixed(2),
-    info: "Turbulent mixing. Raise it and the velocity–depth profile flattens from parabolic towards the log law." },
+    info: "Subgrid mixing at the cell scale (Smagorinsky). In open-channel water the depth-scale mixing length does the work — it is what makes the velocity profile a log law, fastest at the surface — so this matters for jets, pipes and the plan view, and hardly at all in a channel." },
   { id: "bulk", label: "Wave damping", min: 0, max: 0.5, step: 0.005,
     get: () => sim.p.bulk, set: (v) => sim.p.bulk = v,
     fmt: (v) => v === 0 ? "none — surges ring forever" : v.toFixed(3),
@@ -2527,9 +2527,12 @@ function tickFrame(realDt) {
   // hv is the MEAN flow's velocity head or nothing (SIM.hydraulicGrade), so
   // it only ever reaches analyse alongside the mean columns it belongs to.
   const hv = avgCols && state.gradeBuf ? state.gradeBuf.hv : null;
+  // The HGL rides the same buffer and goes with it whichever window it is:
+  // the energy line analyse measures S_f off is h + hv, the line drawn.
+  const hgl = state.gradeBuf && state.gradeAvg === !!avgCols ? state.gradeBuf : null;
   const analysis = avgCols
-    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true, hv })
-    : OVERLAY.analyse(sim, col, { hv });
+    ? OVERLAY.analyse(sim, avgCols.C, { averaged: true, hv, hgl })
+    : OVERLAY.analyse(sim, col, { hv, hgl });
   // T and the cursor readouts, which move every frame. Behind the same flag,
   // so a session with Average off pays one boolean for all of it.
   if (avgCols) LEGEND.avgTick(avgCols);
@@ -2854,7 +2857,11 @@ function refreshGrade() {
   // energy line's alpha to come from. Costs nothing and, more to the point,
   // a stale buffer never reaches analyse — `hv` goes with the window it was
   // measured in or it does not go at all.
-  if (!state.grade && !avg) { state.gradeBuf = null; state.gradeTick = 0; return; }
+  // A channel scene always wants it: the energy line the overlay measures S_f,
+  // n and d_n off is built on the HGL (see OVERLAY.analyse), not on the VOF
+  // surface, which in a steady reach sits in whole-cell terraces.
+  const chan = state.channel && sim.p.g > 0.5;
+  if (!state.grade && !avg && !chan) { state.gradeBuf = null; state.gradeTick = 0; return; }
   if (avg !== state.gradeAvg) { state.gradeAvg = avg; state.gradeTick = 0; }
   if (--state.gradeTick > 0 && state.gradeBuf) return;
   state.gradeTick = state.grade ? 3 : 10;

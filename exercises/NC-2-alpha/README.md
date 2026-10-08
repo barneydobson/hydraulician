@@ -2,12 +2,13 @@
 
 Every student drops a velocity rake into the same steep chute, at their own
 station, and reads a shear profile the depth-averaged solver never shows
-anywhere else in this app: a curve of `u` against depth, bulging out near
-mid-depth and falling away to almost nothing at the bed. The real assignment
-is to turn that curve into the one number every open-channel formula quietly
-assumes away — `α`, the kinetic-energy correction factor — by hand, from 4–5
-points read off the screen, mid-ordinate style. Pooled, the class sits well
-above 1 in perfectly ordinary "uniform" flow.
+anywhere else in this app: a curve of `u` against depth, fastest at the
+surface and falling away to almost nothing at the bed — the turbulent log
+profile. The real assignment is to turn that curve into the one number every
+open-channel formula quietly assumes away — `α`, the kinetic-energy
+correction factor — by hand, from 4–5 points read off the screen,
+mid-ordinate style. Pooled, the class sits around 1.15–1.2, not 1, in
+perfectly ordinary flow.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **NC-2**, or use the direct link
@@ -45,7 +46,7 @@ explain the assignment in class.
 
 ## What to do
 
-1. Press `R` and let it reach steady state — about **45 s**; the card counts
+1. Press `R` and let it reach steady state — about **15 s**; the card counts
    it down. Leave **Inflow q** alone: this demo personalises the station, not
    the discharge.
 2. Place a rake — Rake (`6`) — at your station, anywhere in the water, and
@@ -87,15 +88,17 @@ the coarse-sampling bias shows up as a systematic offset below the 1:1 line.
 
 ### Discussion points
 
-- **The gate wake, live.** Paste this folder's `rig.js` into the console and
+- **The gate jet, live.** Paste this folder's `rig.js` into the console and
   run `NC2.gate.run(6)`: it rebuilds MO-1's sluice gate and rakes the jet.
-  The vena contracta reads α ≈ 1.8 and the wake half a metre downstream
-  2.3 — past N6's `α > 2` line, from pure vertical shear, in a solver with
-  no lateral dimension to blame it on.
+  The vena contracta reads α ≈ 1.03 and the flow half a metre downstream
+  1.11 — a jet that has just left an orifice is nearly a plug, and the
+  shear profile that pushes α up in the chute is something the bed has to
+  grow over distance. Ask which of the two a `V²/2g` at a gate gets right.
 - **"Free-slip" is not "frictionless."** Ask the class to predict the
-  free-slip number before anyone ticks the box. It falls only a few percent:
-  the toggle removes the wall's viscous boundary layer, while the bed-friction
-  drag `C_f` stays on regardless — two different things a channel does to the
+  free-slip number before anyone ticks the box. It barely moves (α 1.18
+  either way at x = 3.5 m): the toggle removes the walls' viscous no-slip
+  condition, while the bed's resistance is its wall-function drag `C_f`,
+  which stays on regardless — two different things a channel does to the
   water touching it.
 
 The full verification record — why s2 rather than m3's near-uniform apron, the

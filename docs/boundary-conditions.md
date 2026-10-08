@@ -1,7 +1,7 @@
 # Boundary conditions
 
 Every boundary the solver has, in one place: the solid mask and the four
-mechanisms that act at a wall, the tri-state outer ring, the level controls
+mechanisms that act at a wall, the free surface, the tri-state outer ring, the level controls
 with their sponges and clamps, and the sources that bypass the ring entirely.
 This consolidates §5–§6 of [numerics.md](numerics.md) with the implementation
 detail in `js/shaders.js` / `js/sim.js` and the measured lore in
@@ -10,12 +10,13 @@ blow-up, the story is there, not here.
 
 [Solid mask](#1-the-solid-mask) ·
 [Walls](#2-conditions-at-a-solid) ·
-[Outer ring](#3-the-outer-ring) ·
-[Level controls](#4-level-controls) ·
-[Sponges & clamps](#5-what-keeps-a-level-control-stable) ·
-[Interior sources](#6-sources-that-bypass-the-ring) ·
-[Edge ownership](#7-who-owns-an-edge) ·
-[Uniform map](#8-uniform-map)
+[Free surface](#3-the-free-surface) ·
+[Outer ring](#4-the-outer-ring) ·
+[Level controls](#5-level-controls) ·
+[Sponges & clamps](#6-what-keeps-a-level-control-stable) ·
+[Interior sources](#7-sources-that-bypass-the-ring) ·
+[Edge ownership](#8-who-owns-an-edge) ·
+[Uniform map](#9-uniform-map)
 
 ---
 
@@ -36,7 +37,7 @@ The shaders never read the texel directly; `SO()` in the shared shader prelude
 folds the valve state in (`s > 0.75` is wall, `0.25 < s ≤ 0.75` is solid iff
 `u_valve` = 1). Flipping the valve therefore changes the *solid set without
 touching the mask* — which is a geometry edit in everything but name, and
-`setValve` treats it as one (see §7).
+`setValve` treats it as one (see §8).
 
 Stamping order matters and is a contract: scene walls, then user-drawn
 segments (wall / valve / eraser), then the **closed edges of the outer ring
@@ -49,7 +50,7 @@ section of the engineering notes; each was bought with a measured failure.
 ## 2. Conditions at a solid
 
 Four separate mechanisms, not one (numerics.md §5, vel pass in
-`js/shaders.js`):
+`js/shaders.js`), and a distance the turbulence closure reads:
 
 **Normal condition — exact.** At the end of the vel pass, `u = 0` on any face
 with a solid on either side. Because the VOF pass is flux-form and both
@@ -76,14 +77,49 @@ size*, not the depth. The gating is transverse to the component it acts on:
 `u` keys on solids above and below (a bed), `w` on solids left and right — so
 a wide pond feels no friction on its vertical motion.
 
-**Resistance is emergent, not prescribed.** The delivered roughness is the sum
-of the wall function, the stress the no-slip ghost feeds through the eddy
-viscosity, and the form drag of the rasterised staircase. Cells per depth is
-the lever, not `C_f`; normal depth and Manning's `n` are *measured* off the
-computed energy grade line. Numbers in numerics.md §5 and the
+**Distance — for the mixing length.** The open-channel closure's length is
+capped by `y`, the distance to the nearest solid, from a Euclidean distance
+transform of the mask at cell corners done on the CPU (`wallDistance()` in
+`js/sim.js`, an `R32F` texture). It is rebuilt on every `rasterise()` and
+when a valve moves; a shut valve counts as solid.
+
+**Resistance is measured, not prescribed.** The delivered roughness is the
+wall function's, carried up the column by the mixing length (numerics.md
+§2, step 1), plus the form drag of the rasterised staircase where a bed is
+drawn sloping. Manning's `n` follows `C_f` and cannot pass about 0.04, a log
+law's own outer layer; normal depth and `n` are *measured* off the computed
+energy grade line. Numbers in numerics.md §5 and the
 [Measured, not assumed](engineering-notes.md#measured-not-assumed) section.
 
-## 3. The outer ring
+## 3. The free surface
+
+No condition is imposed at the free surface itself. The equation of state
+returns `P = 0` in any cell short of full, so the dynamic condition — zero
+pressure — is the EOS, and the kinematic one is the VOF transport. What the
+solver does choose is the velocity stored in the void beside the water, and
+that sets the tangential stress the surface feels:
+
+- **Over an open channel, stress-free.** A dry `u`-face with water one or two
+  faces below takes that water's `u` — `∂u/∂z = 0` at the surface — weighted
+  by `smoothstep(0.3, 0.6, f)` of the cells below, so spray and thin films do
+  not lend their velocity, and only in the few rows over a column's main
+  surface. Not inside the reservoir's sponge, where the fill is rewritten
+  every substep and a copied `u` ran away (5.6 m/s currents on estab's still
+  reservoir); the tailwater sponge keeps it.
+- **`w`, and every other void face, relaxes.** It is advected and diffused,
+  then bled at 1.5 s⁻¹: unforced, so a free jet does not meet a rigid wall of
+  still air, and slowly brought to rest. `w` is never extrapolated — copied
+  up, the top interface face free-falls (−11 m/s within 0.1 s).
+- **The mixing length vanishes at the surface** (`l ∝ √((η − z)/d)`), so the
+  closure puts no stress there either.
+
+Before issue #72 every void face relaxed: the air over a channel held slow
+fluid, the wobbling surface kept refilling interface cells with it, and the
+surface was a drag boundary carrying most of each scene's resistance, the
+velocity peaking at mid-depth. The measurements are in the engineering notes,
+"The surface is stress-free; the bed carries the resistance".
+
+## 4. The outer ring
 
 The outermost cell ring is **tri-state per edge**, `open = [L, R, B, T]` with
 values:
@@ -96,7 +132,7 @@ values:
 
 The ghost ring is written by the VOF pass: a ghost cell copies its interior
 neighbour (zero-gradient), is overwritten by a level control if one rides that
-edge (§4), or is held at `vec4(0)` for an outfall. Ghost fill is boundary
+edge (§5), or is held at `vec4(0)` for an outfall. Ghost fill is boundary
 state, not conserved storage — the averaging engine's accounting of the real
 flux through the ring's inner faces is [averaging.md](averaging.md) §4's
 business, not this document's.
@@ -107,9 +143,13 @@ junk that leaks inward through the advection stencil. Ring cells therefore
 take the interior neighbour's **tangential** velocity (zero-gradient copy) and
 keep only the **exchange-face** momentum update — that is what lets a level
 control drive flow through the edge — clamped to the transport limit and, on
-level-controlled edges, to the torricellian bound of §5.
+level-controlled edges, to the torricellian bound of §6. On the right edge
+that update advects `u` first-order upwind in `x` (and not at all while the
+flow is entering): the 3rd-order stencil reached into the pinned tailwater
+ghost, and the outlet could settle as a sharp-crested weir at the tailwater
+level instead of a level, with the rows below recirculating.
 
-Two standing rules, both measured:
+Three standing rules, all measured:
 
 - **A subcritical reach needs a real downstream control** — tailwater, brink,
   or outfall edge. Zero-gradient outflow is correct for supercritical flow and
@@ -121,8 +161,15 @@ Two standing rules, both measured:
   *negative* `q` while the reach behind them floods. The full post-mortem is
   in [engineering-notes.md](engineering-notes.md#guard-rails-each-bought-with-an-explosion).
   No shipped scene uses mode 2; the sandbox floor drains fine on mode 1.
+- **Under gravity an open edge lets water out, never in.** Zero-gradient
+  mirrors the interior, so on its own it passes inflow as readily as outflow,
+  and once the surface stopped being dragged s2, s3, hammer and jet each drew
+  water in through an open edge and blew up. Wherever no level control owns
+  the edge, the exchange face is clamped to outflow (`u ≤ 0` left, `u ≥ 0`
+  right, `w ≤ 0` bottom, `w ≥ 0` top). Not in plan view (`g = 0`): the plane
+  is full by construction and the clamp destabilised it.
 
-## 4. Level controls
+## 5. Level controls
 
 Level controls — upstream reservoir on the left edge, tailwater on the right —
 ride on an **open** edge and take precedence over outfall there. Each sets a
@@ -215,11 +262,13 @@ flux outside its conservation gate.
 **The tailwater edge** pins the level only. It must stand clear of critical
 depth — `≥ 1.3 d_c` is the floor to clear, rechecked whenever `q` changes,
 because a control set at `d_c` is degenerate: the outlet chokes at critical
-and the Dirichlet argues with the flow it is supposed to set. The h23/a23/m3
-case histories, including why m3 deliberately runs at the margin, are in the
+and the Dirichlet argues with the flow it is supposed to set. A tailwater
+holding a hydraulic jump has a second condition: it must stand near the
+jump's conjugate depth (h23 runs at 1.75 `d_c`). The h23/a23/m3 case
+histories, including why m3 now ends in a brink instead, are in the
 engineering notes.
 
-## 5. What keeps a level control stable
+## 6. What keeps a level control stable
 
 A one-cell Dirichlet is a hard impedance step: pond slosh reflects off it,
 and with the momentum update supplying the exchange velocity the reflection
@@ -255,7 +304,7 @@ The panel's "delivered level" readout is measured just clear of the sponge —
 the first columns the boundary treatment no longer touches — and sits below
 the slider by however much head the sponge is giving up.
 
-## 6. Sources that bypass the ring
+## 7. Sources that bypass the ring
 
 Two mechanisms add water inside the domain rather than through an edge; both
 are source terms the averaging balance accounts for, not boundary exchange:
@@ -269,7 +318,7 @@ are source terms the averaging balance accounts for, not boundary exchange:
   the water, not an edge condition — the wave scenes run with all four edges
   closed.
 
-## 7. Who owns an edge
+## 8. Who owns an edge
 
 The Controls panel exposes each edge as a Wall / Open / Outfall select, and
 the level-control toggles are **self-configuring**: ticking "Upstream
@@ -295,7 +344,7 @@ Serialized, the edge states and control settings travel in the rig wire
 format (v2) through `RIG.migrate` in `js/main.js`; keys change only with a
 version bump.
 
-## 8. Uniform map
+## 9. Uniform map
 
 Where each piece of the above enters the GPU passes; all are set in
 `simUniforms()` in `js/sim.js`.
@@ -305,12 +354,15 @@ Where each piece of the above enters the GPU passes; all are set in
 | `u_S` (texture) | the solid mask (0 / 128 / 255, as 0 / 0.5 / 1) | both passes via `SO()` |
 | `u_valve` | 1 = valves solid | `SO()` |
 | `u_openMode` | `[L, R, B, T]`, 0 wall / 1 open / 2 outfall | vof ghost ring |
-| `u_in` | inflow: **delivered stage** (not the level — see §4), `inletVel()`, on, free | vel plug, vof ghost + sponge |
+| `u_in` | inflow: **delivered stage** (not the level — see §5), `inletVel()`, on, free | vel plug, vof ghost + sponge |
 | `u_tw` | tailwater: level, on | vel clamp, vof ghost + sponge |
 | `u_inBand`, `u_twBand` | the control band z-range from `columnBand` | vel plug, vof ghost + sponge |
 | `u_spongeN` | sponge widths in columns (from metres per scene) | vof sponges |
 | `u_slip` | 0 no-slip / 1 free-slip | vel mirror ghost |
 | `u_cf` | wall-function coefficient | vel drag |
+| `u_Wd` (texture) | distance to the nearest solid, at cell corners | vel mixing length |
+| `u_Tc` (texture) | per column: bed, surface, open-channel flag (`FS_TCOL`) | vel mixing length, surface extension |
+| `u_kappa` | von Kármán's κ (0 = closure off) | vel mixing length |
 | `u_wave` | amplitude, ω, on, piston column | vel wavemaker |
 | `u_src0`, `u_src1`, `u_sv0`, `u_sv1` | point sources: position, radius, on; velocity + dye | both passes |
 

@@ -371,14 +371,13 @@ void main(){
     // The full plug, up to the delivered surface. It used to taper to zero
     // over its top three cells, because a hard step at the waterline shed
     // ripples while the surface was a drag boundary. With the surface
-    // stress-free that taper was a slow layer injected at the inlet with
-    // nothing to take it out — ν_t vanishes at the surface, so only g·S₀
-    // re-accelerates it — and it was carried down the reach: on a 1.0 m
-    // uniform reach the surface ran at 0.66 V two metres in and the slow
-    // layer reached x ≈ 20 m in 15 s. Full, the plug enters near uniform and
-    // the surface is the fastest water within ~8 depths; m2's inlet
-    // fluctuates no more than it did with the taper (engineering notes, "The
-    // surface is stress-free").
+    // stress-free that taper is a slow layer injected at the inlet that
+    // nothing takes out (ν_t vanishes at the surface): on a 1.0 m reach at
+    // Low the surface ran at 0.66 V two metres in, and at 0.97 V with the
+    // full plug; m2's inlet fluctuates no more than it did with the taper.
+    // It is not the whole story: at Medium a deep, fast inlet still sheds a
+    // slow surface layer, taper or not — an open problem, engineering notes
+    // "The surface is stress-free".
     un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
   }
   if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {

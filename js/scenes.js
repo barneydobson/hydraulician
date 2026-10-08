@@ -750,6 +750,13 @@ const SCENES = (() => {
     //   The start is the answer: uniform depth and a log-law u, from
     // u* = √(g S₀ d) and κ = 0.41 about the reach's own mean V = q/d. From
     // rest the deep reach takes a whole flow-through to establish.
+    //   MEASURED (Medium, Average, 16 s after the 30 s settle), shallow:
+    // 0.442 m deep and the same at every station from x = 14 m, the surface
+    // the fastest water at 1.32 V; the hover reads the 0.6-depth rule at
+    // −0.2% and the 0.2/0.8 pair at +1.9%. Inside x ≈ 12 m the profile is
+    // still developing from the inlet. The DEEP run's inlet sheds a slow
+    // surface layer at Medium that reaches the far end (engineering notes,
+    // "The surface is stress-free" — open), so NC-2 treats it as provisional.
     (() => {
       const KAPPA = 0.41;
       const reach = { W: 24, H: 1.6, bed0: 0.20, S0: 0.0025, cf: 0.25, tilt: true,

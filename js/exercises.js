@@ -220,23 +220,41 @@ const EXERCISES = [
   },
 
   // ---------------------------------------------------- natural channels
+  // A current-meter gauging, done twice on the `gauging` reach: on a vertical
+  // shallower than 0.75 m, where field practice takes one point at 0.6 d, and
+  // on one deeper, where it takes 0.2 d and 0.8 d. The student reads all three
+  // points both times and judges each rule against the rake's full integral,
+  // in Average mode, because a current meter's count is a time mean.
+  // Stations start at x = 13 m: nearer the inlet the profile is still
+  // developing and the one-point rule reads up to 10% high (README).
   {
     id: "NC-2",
-    title: "Is α really 1?",
+    title: "Gauging a vertical: the 0.6-depth and two-point methods",
     topic: "Natural channels",
     folder: "NC-2-gauging-methods",
-    scene: "s2",
+    scene: "gauging",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { channel: false },
-    digitNote: "your station: x = 1.5 + 0.5·(d mod 8) metres",
+    viewParams: { mode: "2", channel: false, particles: false },
+    digitNote: "your station: x = 13 + (d mod 8) metres",
     instruments: [
-      { tool: "rake", where: "your own station x", why: "the velocity–depth profile α is integrated from" },
+      { tool: "rake", where: "at your station x, through the whole depth", why: "the rake's V is the full depth-integral both rules are judged against" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed"] },
-    start: "the steep flume at its own discharge; leave q alone",
-    task: "Rake your station, watch 15–20 s, pause on a typical moment and read u_max/V, then integrate 4–5 points off the curve into α.",
-    settle: 15,
+    ui: {
+      view: ["legendBtn", "avgBtn"],
+      fields: ["speed"],
+      controls: ["speed", "geom0"],
+      readouts: { rows: ["pos", "d", "eta", "uw"] },
+    },
+    start: "a 24 m channel at 1 in 400 held at uniform flow; Controls → Geometry → Flow switches the shallow run (q = 0.40 m²/s, d ≈ 0.44 m) for the deep one (q = 1.70 m²/s, d ≈ 1.0 m)",
+    setup: [
+      "It opens on the shallow run. Place a Rake (6) at your station x and press A (Average). Wait until the legend's T passes 15 s: every reading is then a time mean, as a current meter's count is.",
+      "Hover the rake's column and read the depth d and the level η off the box. Put the cursor at z = η − 0.2 d, η − 0.6 d and η − 0.8 d in turn (the box's x, z row shows where you are) and read u off its u, w row at each: u₀.₂, u₀.₆ and u₀.₈.",
+      "Read V off the rake's chip: the depth-average of the whole profile. One-point rule V₁ = u₀.₆; two-point rule V₂ = ½(u₀.₂ + u₀.₈). Each rule's error is 100·(V_rule/V − 1) %.",
+      "Controls → Geometry → Flow → deep. The reach refills and settles again (the card counts it down) and the window restarts: repeat at the same x.",
+    ],
+    task: "Submit d, u₀.₂, u₀.₆, u₀.₈ and V for both runs. Field practice uses one point below 0.75 m and two above it: which rule lands closer to V on each run, and by how much?",
+    settle: 30,
   },
   {
     id: "NC-3",

@@ -1,207 +1,190 @@
 #!/usr/bin/env python3
-"""
-NC-2 "Is alpha really 1?" -- pooled class plot.
+"""NC-2 · Gauging a vertical — pool the class CSV.
 
-Usage:
-    python3 collect_plot.py class.csv [-o plots/pooled-demo.png]
+    python3 collect_plot.py class.csv                 # -> plots/pooled-demo.png
+    python3 collect_plot.py data/simulated-class.csv  # the shipped dry-run class
 
-Input CSV (Blackboard export, or data/simulated-class.csv):
-    student,digit,kind,x_m,n_points,h_m,chip_umax,chip_V,chip_ratio,
-    alpha_student5,alpha_student4,alpha_full_verify,source
+Input CSV (Blackboard export, header row required, extra columns ignored),
+one row per student per run, read in Average mode:
 
-`kind` separates the personalised uniform-reach submissions ("uniform", one
-per digit) from the two SHARED, not-personalised contrast readings every
-student also logs: "freeslip" and "gatewake_vena" / "gatewake_wake". Only
-`alpha_student5` (each student's own 4-5-point mid-ordinate arithmetic) is
-required for a "uniform" row -- `chip_ratio` (the printed u_max/V ratio) is
-accepted as a fallback if a student ran out of time and only has the
-"minimal version" (the programme spec's own phrase). Contrast rows carry
-`alpha_full_verify` instead (the lecturer/rig.js verification number -- see
-rig.js's NC2.freeSlip / NC2.gate) since those two are reference lines, not
-class data to histogram.
+    student_id,digit,run,x_m,d_m,u02,u06,u08,V
+    23140870,0,shallow,10,0.442,1.02,0.92,0.80,0.91
 
-This script does NOT re-derive alpha from raw (depth-fraction, u) points --
-unlike a q/d0/d1-style formula, each student reads their OWN 4-5 points off
-the curve, so there is no fixed set of raw columns to recompute from. The
-spot-check this demo relies on instead is at the METHOD level: rig.js's
-NC2.windowStats() independently measures the full-resolution alpha at every
-digit's own station (`alpha_full_verify`), so the systematic 4-5-point bias
-is quantified once, empirically, and quoted in the README/right-hand panel
-below, rather than re-checked reading-by-reading.
+`run` is `shallow` or `deep`. u02, u06 and u08 are the point velocities
+0.2 d, 0.6 d and 0.8 d below the surface (m/s), V the rake's depth-averaged
+velocity — the full integration the two current-meter rules are judged
+against:
+
+    one-point  V1 = u06                    (the d < 0.75 m rule)
+    two-point  V2 = (u02 + u08) / 2        (the d >= 0.75 m rule)
+
+Two panels:
+
+  left   each rule's error against the rake, 100·(V_rule/V − 1) %, at the
+         class's two depths, with the 0.75 m handover and the log-law
+         prediction (both rules read 0.084·u*/κ high on a log law)
+  right  every student's three points as u/V against height above the bed
+         over the depth, (z − z_b)/d, beside the log law for each run — the
+         profile the two rules are sampling
 """
 import argparse
 import csv
+import math
 import os
-import sys
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+G, S0, KAPPA = 9.81, 1.0 / 400.0, 0.41        # the gauging reach: 1 in 400
+INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
+ONE, TWO = "#2a78d6", "#eb6834"                 # one-point, two-point
+RUNS = (("shallow", "#1baf7a", "o"), ("deep", "#4a3aa7", "s"))
 
-def fnum(row, key):
-    v = (row.get(key) or "").strip()
-    if v == "":
-        return None
+
+def num(r, k):
     try:
-        return float(v)
-    except ValueError:
+        return float(r[k])
+    except (KeyError, ValueError, TypeError):
         return None
 
 
-def read_rows(path):
-    with open(path, newline="") as fh:
-        lines = [ln for ln in fh if not ln.lstrip().startswith("#")]
+def read(path):
     rows = []
-    for row in csv.DictReader(lines):
-        row = {(k or "").strip(): (v if v is not None else "") for k, v in row.items()}
-        row["_kind"] = (row.get("kind") or "uniform").strip() or "uniform"
-        row["_alpha5"] = fnum(row, "alpha_student5")
-        row["_alpha4"] = fnum(row, "alpha_student4")
-        row["_ratio"] = fnum(row, "chip_ratio")
-        row["_full"] = fnum(row, "alpha_full_verify")
-        row["_digit"] = fnum(row, "digit")
-        row["_x"] = fnum(row, "x_m")
-        rows.append(row)
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        lines = [ln for ln in fh if not ln.lstrip().startswith("#")]
+    for r in csv.DictReader(lines):
+        run = (r.get("run") or "").strip().lower()
+        v = {k: num(r, k) for k in ("d_m", "u02", "u06", "u08", "V", "x_m")}
+        if run not in ("shallow", "deep") or any(v[k] is None for k in ("d_m", "u02", "u06", "u08", "V")):
+            print("  dropped (incomplete): %s" % dict(r))
+            continue
+        if not (0.1 < v["d_m"] < 1.6 and 0.1 < v["V"] < 4 and all(0 < v[k] < 4 for k in ("u02", "u06", "u08"))):
+            print("  dropped (out of range): %s" % dict(r))
+            continue
+        v["run"] = run
+        v["e1"] = 100 * (v["u06"] / v["V"] - 1)
+        v["e2"] = 100 * (0.5 * (v["u02"] + v["u08"]) / v["V"] - 1)
+        rows.append(v)
     return rows
 
 
 def mean_sd(xs):
-    n = len(xs)
-    m = sum(xs) / n
-    sd = (sum((x - m) ** 2 for x in xs) / (n - 1)) ** 0.5 if n > 1 else 0.0
+    m = sum(xs) / len(xs)
+    sd = math.sqrt(sum((x - m) ** 2 for x in xs) / (len(xs) - 1)) if len(xs) > 1 else 0.0
     return m, sd
+
+
+def loglaw_bias(d, V):
+    """Both rules' error on a pure log law, per cent: 0.084·u*/(κV)."""
+    return 100 * (1 + math.log(0.4)) * math.sqrt(G * S0 * d) / (KAPPA * V)
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("csvfile")
-    ap.add_argument("-o", "--out", default="plots/pooled-demo.png")
-    ap.add_argument("--title", default="NC-2 · is α really 1?")
-    args = ap.parse_args()
+    ap.add_argument("csv")
+    ap.add_argument("-o", "--out", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                        "plots", "pooled-demo.png"))
+    a = ap.parse_args()
+    rows = read(a.csv)
+    if not rows:
+        raise SystemExit("no usable rows")
 
-    rows = read_rows(args.csvfile)
-    uni = [r for r in rows if r["_kind"] == "uniform"]
-    if not uni:
-        sys.exit("no usable 'uniform' rows (need alpha_student5 or chip_ratio)")
+    print("%-8s %3s  %-24s %-24s %s" % ("run", "n", "one-point (u0.6)", "two-point (u0.2+u0.8)/2", "log law"))
+    for run, _, _ in RUNS:
+        rr = [r for r in rows if r["run"] == run]
+        if not rr:
+            continue
+        m1, s1 = mean_sd([r["e1"] for r in rr])
+        m2, s2 = mean_sd([r["e2"] for r in rr])
+        d, _ = mean_sd([r["d_m"] for r in rr])
+        V, _ = mean_sd([r["V"] for r in rr])
+        print("%-8s %3d  %+5.1f %% ± %.1f            %+5.1f %% ± %.1f            %+.1f %%  (d = %.2f m)"
+              % (run, len(rr), m1, s1, m2, s2, loglaw_bias(d, V), d))
 
-    # class submission: alpha_student5 if present, else the minimal-version ratio
-    submitted = []
-    for r in uni:
-        v = r["_alpha5"] if r["_alpha5"] is not None else r["_ratio"]
-        if v is not None:
-            submitted.append((r, v))
-    if not submitted:
-        sys.exit("no row has alpha_student5 or chip_ratio")
-    vals = [v for _, v in submitted]
-    m_sub, sd_sub = mean_sd(vals)
+    plt.rcParams.update({"font.size": 10, "axes.edgecolor": MUTED, "axes.labelcolor": INK,
+                         "xtick.color": MUTED, "ytick.color": MUTED})
+    fig, (ax, bx) = plt.subplots(1, 2, figsize=(12, 5.2))
 
-    fullvals = [r["_full"] for r in uni if r["_full"] is not None]
-    m_full, sd_full = mean_sd(fullvals) if fullvals else (float("nan"), float("nan"))
+    # ---- left: each rule's error, at the two depths
+    for k, (key, col, mk, lab, off) in enumerate((("e1", ONE, "o", "one-point  u₀.₆", -0.018),
+                                                   ("e2", TWO, "s", "two-point  ½(u₀.₂ + u₀.₈)", 0.018))):
+        xs = [r["d_m"] + off for r in rows]
+        ax.scatter(xs, [r[key] for r in rows], s=34, marker=mk, color=col, alpha=0.55,
+                   edgecolors="white", linewidths=0.8, label=lab, zorder=3)
+        for run, _, _ in RUNS:
+            rr = [r for r in rows if r["run"] == run]
+            if len(rr) < 2:
+                continue
+            d, _ = mean_sd([r["d_m"] for r in rr])
+            m, sd = mean_sd([r[key] for r in rr])
+            ax.errorbar([d + 2.4 * off], [m], yerr=[sd], fmt=mk, color=col, ms=8, capsize=4,
+                        lw=2, mec="white", mew=1.2, zorder=4)
+    for run, _, _ in RUNS:
+        rr = [r for r in rows if r["run"] == run]
+        if not rr:
+            continue
+        d, _ = mean_sd([r["d_m"] for r in rr])
+        V, _ = mean_sd([r["V"] for r in rr])
+        b = loglaw_bias(d, V)
+        ax.plot([d - 0.09, d + 0.09], [b, b], color=MUTED, lw=2, ls=(0, (4, 2)), zorder=2)
+        ax.annotate("log law %+.1f %%" % b, (d + 0.095, b), va="center", fontsize=9, color=MUTED)
+        ax.annotate(run, (d, 0.0), xycoords=("data", "axes fraction"), xytext=(0, 6),
+                    textcoords="offset points", ha="center", fontsize=9, color=MUTED)
+    ax.axvline(0.75, color=MUTED, lw=1, ls=":")
+    ax.annotate("0.75 m: one-point below,\ntwo-point above", (0.75, 0.97), xycoords=("data", "axes fraction"),
+                xytext=(6, 0), textcoords="offset points", va="top", fontsize=9, color=MUTED)
+    errs = [r[k] for r in rows for k in ("e1", "e2")]
+    ax.set_ylim(min(-2.0, min(errs) - 1.0), max(4.0, max(errs) + 1.5))
+    ax.axhline(0, color=INK, lw=0.8)
+    ax.set_xlim(0.2, 1.3)
+    ax.set_xlabel("depth d (m)")
+    ax.set_ylabel("error against the rake's V  (%)")
+    ax.set_title("Each rule against the full integration", loc="left", fontsize=11, color=INK)
+    ax.grid(axis="y", color=GRID, lw=0.8)
+    ax.legend(loc="center right", frameon=False, fontsize=9)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
 
-    def ref(kind):
-        for r in rows:
-            if r["_kind"] == kind and r["_full"] is not None:
-                return r["_full"]
-        return None
+    # ---- right: the class's profile points against the log law
+    for run, col, mk in RUNS:
+        rr = [r for r in rows if r["run"] == run]
+        if not rr:
+            continue
+        ys, us = [], []
+        for r in rr:
+            for frac, k in ((0.8, "u02"), (0.4, "u06"), (0.2, "u08")):
+                ys.append(frac)
+                us.append(r[k] / r["V"])
+        bx.scatter(us, ys, s=30, marker=mk, color=col, alpha=0.5, edgecolors="white", linewidths=0.8,
+                   label="%s (d ≈ %.2f m)" % (run, mean_sd([r["d_m"] for r in rr])[0]), zorder=3)
+        d, _ = mean_sd([r["d_m"] for r in rr])
+        V, _ = mean_sd([r["V"] for r in rr])
+        a_ = math.sqrt(G * S0 * d) / (KAPPA * V)
+        yy = [0.02 + 0.98 * i / 200 for i in range(201)]
+        bx.plot([1 + a_ * (1 + math.log(y)) for y in yy], yy, color=col, lw=2, zorder=2)
+    bx.axvline(1.0, color=INK, lw=0.8)
+    bx.axhline(1 / math.e, color=MUTED, lw=1, ls=":")
+    bx.annotate("d/e: a log law equals V here", (0.62, 1 / math.e), xytext=(0, -12),
+                textcoords="offset points", fontsize=9, color=MUTED)
+    for frac, lab in ((0.8, "0.2 d"), (0.4, "0.6 d"), (0.2, "0.8 d")):
+        bx.annotate(lab + " below the surface", (1.36, frac), va="center", fontsize=8.5, color=MUTED)
+    bx.set_xlim(0.6, 1.6)
+    bx.set_ylim(0, 1.0)
+    bx.set_xlabel("u / V")
+    bx.set_ylabel("height above the bed over the depth, (z − z_b) / d")
+    bx.set_title("The class's points on the profile", loc="left", fontsize=11, color=INK)
+    bx.grid(color=GRID, lw=0.8)
+    bx.legend(loc="upper left", frameon=False, fontsize=9)
+    for s in ("top", "right"):
+        bx.spines[s].set_visible(False)
 
-    fs = ref("freeslip")
-    gv = ref("gatewake_vena")
-    gw = ref("gatewake_wake")
-
-    fig, (axh, axb) = plt.subplots(1, 2, figsize=(12.0, 5.2),
-                                    gridspec_kw={"width_ratios": [1.35, 1]})
-
-    # --------------------------------------------------- left: pooled histogram
-    axh.axvspan(1.05, 1.20, color="#999", alpha=0.14, label="textbook uniform-reach\nrange 1.05–1.2 (N6)")
-    axh.axvline(1.0, color="#666", lw=1.2, ls=":", label=r"$\alpha=1$ (assumed)")
-
-    bins = [0.9 + 0.1 * k for k in range(int((2.6 - 0.9) / 0.1) + 1)]
-    counts, _, _ = axh.hist(vals, bins=bins, color="#5fa8d3", edgecolor="white", zorder=3,
-             label="class submissions (own station,\nuniform reach, s2, 4-5 pt method)")
-    axh.axvline(m_sub, color="#1f5a86", lw=2.0, zorder=4,
-                label=r"class mean (4-5 pt) $\alpha$ = %.2f $\pm$ %.2f" % (m_sub, sd_sub))
-    if fullvals:
-        axh.axvline(m_full, color="#1f5a86", lw=1.3, ls=(0, (1, 1)), zorder=4,
-                    label=r"class mean (lecturer full-res verify) $\alpha$ = %.2f" % m_full)
-
-    # free-slip / gate-wake reference lines are the FULL-RESOLUTION verification
-    # number (the most accurate value we have for that condition) -- they are
-    # therefore on the SAME basis as the dotted "full-res verify" line above,
-    # not the solid histogram, which is the coarser 4-5 point student method.
-    if fs is not None:
-        axh.axvline(fs, color="#5fd08a", lw=2.0, ls="--", zorder=4,
-                    label=r"free-slip walls (full-res), $\alpha$ = %.2f" % fs)
-    if gv is not None:
-        axh.axvline(gv, color="#ff8fa3", lw=1.6, ls="-.", zorder=4,
-                    label=r"gate vena contracta (full-res), $\alpha$ = %.2f" % gv)
-    if gw is not None:
-        axh.axvline(gw, color="#d1495b", lw=2.2, ls="-.", zorder=4,
-                    label=r"gate WAKE (full-res), $\alpha$ = %.2f" % gw)
-    axh.axvline(2.0, color="#b33", lw=1.0, ls=":", alpha=0.7)
-    ytop = max(3, int(max(counts)) + 1) * 1.18
-    axh.annotate("N6's “>2 needs a\ncompound channel” —\nthe wake clears it on\nvertical shear alone",
-                 xy=(2.0, 0), xytext=(2.05, ytop * 0.34), fontsize=6.7, color="#b33",
-                 arrowprops=dict(arrowstyle="-", color="#b33", lw=0.6, alpha=0.6))
-
-    axh.set_xlabel(r"energy coefficient $\alpha = \sum u^3\Delta z \,/\, (V^3 h)$")
-    axh.set_ylabel("students")
-    axh.set_title(args.title + "\n“assume $\\alpha=1$”, judged")
-    axh.set_xlim(0.9, 2.6)
-    axh.set_ylim(0, ytop)
-    axh.legend(loc="upper left", fontsize=7, framealpha=0.95)
-    axh.grid(alpha=0.2)
-
-    # ------------------------------------------- right: coarse-vs-full bias
-    have_full = [r for r in uni if r["_alpha5"] is not None and r["_full"] is not None]
-    if have_full:
-        xs = [r["_full"] for r in have_full]
-        y5 = [r["_alpha5"] for r in have_full]
-        y4 = [r["_alpha4"] for r in have_full if r["_alpha4"] is not None]
-        x4 = [r["_full"] for r in have_full if r["_alpha4"] is not None]
-        lo, hi = min(xs + y5) * 0.92, max(xs + y5) * 1.05
-        axb.plot([lo, hi], [lo, hi], "-", color="#999", lw=1.2, label="1:1 (no bias)")
-        axb.scatter(xs, y5, s=70, color="#1f5a86", edgecolor="white", linewidth=0.7,
-                    zorder=5, label="5-point student read")
-        if x4:
-            axb.scatter(x4, y4, s=48, color="#e07a1f", marker="^", edgecolor="white",
-                        linewidth=0.6, zorder=4, label="4-point student read")
-        bias5 = sum((a - b) / b for a, b in zip(y5, xs)) / len(xs) * 100
-        axb.set_xlim(lo, hi)
-        axb.set_ylim(lo, hi)
-        axb.set_xlabel(r"lecturer verification: full-resolution $\alpha$ (all rake points)")
-        axb.set_ylabel(r"student's own coarse-point $\alpha$")
-        axb.set_title("coarse sampling bias\nmean 5-pt error %+.1f%%" % bias5)
-        axb.legend(loc="upper left", fontsize=7.5, framealpha=0.95)
-        axb.grid(alpha=0.2)
-    else:
-        axb.axis("off")
-        axb.text(0.5, 0.5, "no paired full-resolution\nreadings in this CSV", ha="center", va="center")
-
+    fig.suptitle("NC-2 · gauging a vertical: n = %d readings" % len(rows), x=0.01, ha="left",
+                 fontsize=12, color=INK)
     fig.tight_layout()
-    os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
-    fig.savefig(args.out, dpi=150, bbox_inches="tight")
-
-    print("wrote %s" % args.out)
-    print("NC-2 uniform-reach class: %d submissions   alpha %.2f - %.2f" % (len(vals), min(vals), max(vals)))
-    print("class mean alpha (student 4-5 point method) = %.3f +/- %.3f (mean +/- sd)" % (m_sub, sd_sub))
-    if fullvals:
-        print("lecturer full-resolution verification, SAME stations: mean %.3f +/- %.3f" % (m_full, sd_full))
-        if have_full:
-            print("coarse-sampling bias: 5-point mean %+.1f%%  (n=%d paired stations)"
-                  % (sum((a - b) / b for a, b in zip([r['_alpha5'] for r in have_full], [r['_full'] for r in have_full])) / len(have_full) * 100,
-                     len(have_full)))
-            have4 = [r for r in have_full if r["_alpha4"] is not None]
-            if have4:
-                bias4 = sum((r["_alpha4"] - r["_full"]) / r["_full"] for r in have4) / len(have4) * 100
-                print("coarse-sampling bias: 4-point mean %+.1f%%  (n=%d paired stations)" % (bias4, len(have4)))
-    print("textbook uniform-reach expectation: 1.05-1.2 (N6)")
-    if fs is not None:
-        print("free-slip walls contrast:  alpha = %.3f  (vs no-slip at the same station -- see README for why this is NOT a clean collapse to 1.0)" % fs)
-    if gv is not None:
-        print("gate vena contracta:       alpha = %.3f" % gv)
-    if gw is not None:
-        print("gate WAKE (0.5 m further): alpha = %.3f  %s" % (gw, "-- exceeds N6's >2/compound-channel line from pure vertical shear" if gw > 2 else ""))
+    os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
+    fig.savefig(a.out, dpi=150)
+    print("wrote", a.out)
 
 
 if __name__ == "__main__":

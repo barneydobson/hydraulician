@@ -24,8 +24,8 @@ energy grade line and reports
 
     d_n = h·(S_f/S₀)^⅓             n = h^⅔·√S_f / V
 
-so the `n` in the hover box is whatever the wall function, the eddy viscosity
-and the rasterised bed actually deliver. This chute is **1 in 4**
+so the `n` in the hover box is whatever the bed's wall function, carried up
+the column by the eddy viscosity, actually delivers. This chute is **1 in 4**
 (`S₀ = 0.25`, printed as "1 : 4" in the box) and supercritical end to end, so
 nothing downstream controls it — there is no tailwater step in this exercise.
 
@@ -40,7 +40,7 @@ explain the assignment in class.
 
 1. Set **Controls → Inflow q** to your own `q` — the note under the slider
    prints your `d_c`.
-2. Press `R` and let it reach steady state — about **26 s**; the card counts
+2. Press `R` and let it reach steady state — about **15 s**; the card counts
    it down.
 3. Hover mid-chute at **x ≈ 3.5 m**, clear of the crest (x < 1 m) and of the
    brink (x > 5.5 m), and read the **d_n … (measured)** row off the box — the
@@ -65,15 +65,19 @@ Manning's 3/5, then histograms every student's back-calculated
 
 ### Discussion points
 
-- **Do not present the fit as "confirms 0.6".** The dry-run class fitted
-  0.72, and the gap is explainable rather than sloppy: the measured `d_n`
-  comes from `d_n = h·(S_f/S₀)^⅓`, a quadratic-drag closure whose own
-  idealised exponent is 2/3, not Manning's 3/5; and this solver's delivered
-  roughness falls as the flow deepens, so `n` is not quite constant across
-  the class's range. Ten independent runs collapsing onto one straight line
-  is the finding; the exact exponent is the discussion.
+- **Do not present the fit as "confirms 0.6".** Measured across the whole
+  ladder the class fits about 0.52, with every point within 2% of Manning at
+  n = 0.031, and the gap is explainable rather than sloppy: the back-calculated
+  `n` falls from 0.032 to 0.030 across the class's range, because the bed's
+  log-law resistance is relatively smoother under a deeper flow — Manning's
+  constant `n` is the approximation, not the solver. (The measured `d_n` also
+  comes from `d_n = h·(S_f/S₀)^⅓`, a quadratic-drag closure, which is a
+  second reason not to expect 3/5 exactly.) Ten independent runs collapsing
+  onto one straight line is the finding; the exact exponent is the
+  discussion.
 - **Why is there no tailwater to set?** Switch **Field → Froude**: the whole
-  chute reads supercritical (roughly 1–2.5 measured). Nothing downstream can
+  chute reads supercritical (Fr ≈ 2.8 at x = 3.5 m, measured, across the
+  whole ladder). Nothing downstream can
   influence this reach, which is why this worksheet — unlike the jump demos —
   never asks anyone to re-check a level against `d_c` after changing `q`.
 

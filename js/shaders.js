@@ -120,6 +120,28 @@ uniform float u_cf;      // bed friction coefficient
 uniform float u_slip;    // 0 = no-slip walls, 1 = free-slip
 uniform float u_bulk;    // artificial bulk viscosity (damps pressure waves)
 uniform vec4  u_wave;    // amplitude (m), omega (rad/s), on, piston column
+uniform sampler2D u_Wd;  // wall distance (m) at each cell's SW corner, CPU-built
+uniform sampler2D u_Tc;  // nx×1 open-channel columns: bed z, surface z, on, 0
+uniform float u_kappa;   // mixing-length constant (0 = closure off)
+
+// --- the depth-scale closure: Prandtl's mixing length, κy damped towards the
+//     free surface, l = κ·y·√((η − z)/d), y the distance to the nearest WALL
+//     (over a bed, z − z_b — the smaller of the two is taken). With
+//     l²|du/dz| for ν_t that gives ν_t = κu*y(1 − y/d) and the log law over
+//     the whole depth in uniform flow. Only where the column is open-channel
+//     water standing on a bed (FS_TCOL decides that): a nappe, a jet in air
+//     and a pressurised conduit keep the Smagorinsky term alone. l falls to 0
+//     on every solid face — the bed stress is the wall function's, not the
+//     mixing length's.
+float lmix(vec4 Ta, vec4 Tb, float z, float yw){
+  float wt = Ta.b + Tb.b;
+  if (wt < 0.5 || u_g == 0.0) return 0.0;
+  float zb = (Ta.r * Ta.b + Tb.r * Tb.b) / wt;
+  float zs = (Ta.g * Ta.b + Tb.g * Tb.b) / wt;
+  float d = zs - zb, above = z - zb, below = zs - z;
+  if (above <= 0.0 || below <= 0.0) return 0.0;
+  return u_kappa * min(yw, above) * sqrt(below / d) * smoothstep(2.0 * u_dx, 4.0 * u_dx, d);
+}
 
 // 3rd-order upwind derivative — O(dx³) dissipation, so jets and shear layers
 // survive the thousands of substeps a water-hammer run needs.
@@ -170,6 +192,20 @@ void main(){
                        + wAtU  * ud3(tSS.r, tS.r, u0, tN.r, tNN.r, wAtU,  dx) );
   float wn = w0 - dt * ( uAtW  * ud3(tWW.g, tW.g, w0, tE.g, tEE.g, uAtW,  dx)
                        + w0    * ud3(tSS.g, tS.g, w0, tN.g, tNN.g, w0,    dx) );
+  // The right edge's exchange face has no east neighbours — the stencil
+  // clamps them to the face itself — so the upwind-from-the-east branch reads
+  // (u₀ − u_west)/3Δx: an INWARD face next to an outgoing interior drives
+  // itself further inward, a runaway only the exchange clamp stops. Measured
+  // at a tailwater outlet (a23, m3 at Low): the air faces sat pinned at
+  // −√(2gL) − 1, and just under the level the inward rows pumped the corner
+  // cell to f ≈ 1.09 until the outlet behaved as a weir crest at its own
+  // level, ponding the apron 0.25–0.35 m above it. First-order upwind from
+  // the interior only: an outgoing face still advects, an incoming one is
+  // left to its pressure gradient.
+  if (i == NXY.x - 1) {
+    float dudx = u0 >= 0.0 ? (u0 - tW.r) / dx : 0.0;
+    un = u0 - dt * ( u0 * dudx + wAtU * ud3(tSS.r, tS.r, u0, tN.r, tNN.r, wAtU, dx) );
+  }
 
   // --- eddy viscosity (Smagorinsky). Without this the velocity–depth
   //     profile stays laminar-parabolic instead of turbulent-flat.
@@ -189,6 +225,46 @@ void main(){
   float wL = mix(tW.g, ghost*w0, sLf), wR = mix(tE.g, ghost*w0, sRt);
   un += dt * nuT * (tE.r + tW.r + uN + uS - 4.0*u0) / (dx*dx);
   wn += dt * nuT * (wR + wL + tN.g + tS.g - 4.0*w0) / (dx*dx);
+
+  // --- the mixing-length stress, in CONSERVATIVE, VORTICITY form. ν_t varies
+  //     through the depth, and ν_t∇²u (the Smagorinsky form above) drops the
+  //     ∇ν_t·∇u term — with a parabolic ν_t that alone puts the velocity
+  //     maximum at mid-depth. So the stress is built where the MAC grid keeps
+  //     ω, at the cell corners, and differenced: the force is −∇×(ν_t ω),
+  //     which for uniform ν is exactly ν∇²u (∇·u = 0), and for a channel's
+  //     shear (ω = −∂u/∂z) is ∂/∂z(ν_t ∂u/∂z) — the log law. u takes the
+  //     corners above and below its face, w the corners either side.
+  //     ν_t = l²|ω|, and the stress is ν_t ω rather than ν_t times the
+  //     strain, so irrotational motion carries no stress at ANY ν_t: on the
+  //     strain, the vorticity a breaking crest sheds near the paddle bought a
+  //     ν_t that damped the deep flume's whole wave train to one cell within
+  //     3 m (H 0.014 m from x = 3 against 0.05–0.07 on the old model);
+  //     on the vorticity it arrives at 0.04–0.07. Capped for the explicit
+  //     update: the stress is quadratic in the shear, so its diffusivity is
+  //     2ν_t.
+  vec4 TcW = vec4(0.0), TcC = vec4(0.0), TcE = vec4(0.0);
+  if (u_kappa > 0.0 && u_g != 0.0) {
+    TcW = texelFetch(u_Tc, ivec2(clamp(i-1, 0, NXY.x-1), 0), 0);
+    TcC = texelFetch(u_Tc, ivec2(i, 0), 0);
+    TcE = texelFetch(u_Tc, ivec2(clamp(i+1, 0, NXY.x-1), 0), 0);
+  }
+  // Only inside an open-channel column's water: everywhere else every lmix
+  // below is 0, and the six fetches would be paid for nothing.
+  float zLo = min(min(TcW.r, TcC.r), TcE.r), zHi = max(max(TcW.g, TcC.g), TcE.g);
+  if (TcW.b + TcC.b + TcE.b > 0.5 && float(j + 1) * dx > zLo && float(j) * dx < zHi) {
+    float lS = lmix(TcW, TcC, float(j)     * dx, texelFetch(u_Wd, c, 0).r);
+    float lN = lmix(TcW, TcC, float(j + 1) * dx, texelFetch(u_Wd, CL(ivec2(i,   j+1)), 0).r);
+    float lE = lmix(TcC, TcE, float(j)     * dx, texelFetch(u_Wd, CL(ivec2(i+1, j  )), 0).r);
+    float oS = (w0   - tW.g  - u0   + tS.r ) / dx;      // ω at corner (i,   j)
+    float oN = (tN.g - tNW.g - tN.r + u0   ) / dx;      //            (i,   j+1)
+    float oE = (tE.g - w0    - tE.r + tSE.r) / dx;      //            (i+1, j)
+    float nuCap = 0.125 * dx * dx / dt;
+    float tauS = -min(lS * lS * abs(oS), nuCap) * oS;
+    float tauN = -min(lN * lN * abs(oN), nuCap) * oN;
+    float tauE = -min(lE * lE * abs(oE), nuCap) * oE;
+    un += dt * (tauN - tauS) / dx;
+    wn -= dt * (tauE - tauS) / dx;
+  }
 
   // --- gravity, only where there is water to pull on
   float fFu = max(fC, fW), fFw = max(fC, fS);
@@ -217,10 +293,53 @@ void main(){
   //     usual free-surface velocity extrapolation — and only bleed it away
   //     slowly, so still air stays still. Nothing forces a void (gravity and
   //     ∇p are both gated on f), so this cannot run away.
+  //
+  //     ...except for u directly above the water. There the bled air used to
+  //     hold slow fluid, and the wobbling surface kept refilling its
+  //     interface cells with it — the advection stencil reads upwind from
+  //     the air whenever the surface falls — so the void was a momentum sink:
+  //     the profile peaked at mid-depth and most of a channel's resistance
+  //     came from its surface (issue #72). The two u-faces above a face of
+  //     WATER (more than half full: spray and films keep the bleed) take that
+  //     face's velocity instead, the zero-gradient extension a free-surface
+  //     code uses, so the surface is stress-free. Two, not one, because the
+  //     3rd-order upwind stencil reaches two faces into the air; with one,
+  //     m2 lost its resistance altogether. Measured on m2, the extension is
+  //     the whole cure: with the mixing length but no extension the surface
+  //     still ran at a quarter of the mean velocity.
+  //     Three exclusions, each measured:
+  //   · w keeps the bleed. The face between a part-full cell and the air has
+  //     no pressure gradient to hold it (both sides are p = 0), and the bled
+  //     air above is the only thing that stops it free-falling: extended, its
+  //     own upwind stencil reads (w − w_below)/3Δx at the kink and drives it
+  //     past the transport cap in a tenth of a second (m2).
+  //   · Not inside the INFLOW sponge. The sponge rewrites f at the surface
+  //     every substep, and with nothing damping the surface layer that
+  //     forcing wound estab's still reservoir up to 5 m/s; the sponge IS a
+  //     reservoir, so a stress-free surface there means nothing anyway. The
+  //     TAILWATER sponge keeps the extension: there the bled air is an outlet
+  //     loss, and it held h23's apron 0.19 m above its own tailwater.
+  //   · Not on a plain open edge's inflow — see the boundary ring below.
   float dryU = 1.0 - smoothstep(0.0, 0.02, fFu);
   float dryW = 1.0 - smoothstep(0.0, 0.02, fFw);
-  un *= 1.0 - min(dt * 1.5 * dryU, 1.0);
+  float eU = 0.0, uX = 0.0;
+  bool inSponge = u_in.z > 0.5 && float(i) < 1.0 + u_spongeN.x;
+  // Only in the few cells over a column's main surface (FS_TCOL, lagged a
+  // few substeps, hence the margin): the water skips the fetches, and so does
+  // the open air, which in a scene like hammer is most of the domain.
+  vec4 TcX = texelFetch(u_Tc, ivec2(i, 0), 0);
+  float zj = float(j) * dx;
+  if (dryU > 0.0 && !inSponge && TcX.g > TcX.r && zj > TcX.r && zj < TcX.g + 4.0 * dx) {
+    float fSW = TF(ivec2(i-1,j-1)).r;
+    float fS2 = TF(ivec2(i,j-2)).r, fSW2 = TF(ivec2(i-1,j-2)).r;
+    float wU1 = smoothstep(0.3, 0.6, max(fS, fSW));      // u-face below is water
+    float wU2 = smoothstep(0.3, 0.6, max(fS2, fSW2)) * (1.0 - wU1);
+    eU = dryU * (wU1 + wU2);
+    uX = (wU1 * tS.r + wU2 * tSS.r) / max(wU1 + wU2, 1e-6);
+  }
+  un *= 1.0 - min(dt * 1.5 * dryU * (1.0 - eU), 1.0);
   wn *= 1.0 - min(dt * 1.5 * dryW, 1.0);
+  un = mix(un, uX, eU);
 
   // --- transport-consistency cap. The VOF donor limiter cannot move mass
   //     faster than a quarter cell per substep (dx/4dt), but nothing above
@@ -249,15 +368,17 @@ void main(){
     if (distance(pw, u_src1.xy) < u_src1.z) wn = u_sv1.y;
   }
   if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) {
-    // Feathered plug: a hard velocity step at the waterline waterfalls into
-    // the slightly drawn-down interior surface and sheds ripples forever.
-    // The top three cells taper to zero instead (inletVel() compensates the
-    // lost discharge), so the surface at the inlet can breathe. A submerged
-    // duct (band top below the nominal level, e.g. plan view) keeps the
-    // full plug — there is no free surface there to protect.
-    float taper = (u_inBand.y < u_in.x - 1e-4)
-      ? 1.0 : smoothstep(u_inBand.y, u_inBand.y - 3.0 * u_dx, pu.y);
-    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y * taper : 0.0;
+    // The full plug, up to the delivered surface. It used to taper to zero
+    // over its top three cells, because a hard step at the waterline shed
+    // ripples while the surface was a drag boundary. With the surface
+    // stress-free that taper is a slow layer injected at the inlet that
+    // nothing takes out (ν_t vanishes at the surface): on a 1.0 m reach at
+    // Low the surface ran at 0.66 V two metres in, and at 0.97 V with the
+    // full plug; m2's inlet fluctuates no more than it did with the taper.
+    // It is not the whole story: at Medium a deep, fast inlet still sheds a
+    // slow surface layer, taper or not — an open problem, engineering notes
+    // "The surface is stress-free".
+    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
   }
   if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
     un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker
@@ -288,6 +409,21 @@ void main(){
   if (i == NXY.x - 1) { un = clamp(un, -min(capR, capBase), min(capR, capBase)); wn = tW.g; }
   if (j == 0)          un = tN.r;
   if (j == NXY.y - 1) { wn = clamp(wn, -capBase, capBase); un = tS.r; }
+  // A PLAIN open edge (no level control on it) is an outflow boundary: its
+  // ghost mirrors the interior fill, so any inward velocity on the exchange
+  // face draws water out of nothing, and nothing in the zero-gradient ghost
+  // pushes back once the flow there reverses. Measured on hammer, with the
+  // surface momentum sink gone (#72): the outlet shaft's recirculation turned
+  // the right edge inward and it fed 8–10 m²/s into the domain until the air
+  // chamber above the pipe was full. Inflow is the level controls' job.
+  // Not in plan view: there is no free surface, the plane is full by
+  // construction, and its wake legitimately crosses an open edge both ways.
+  if (u_g != 0.0) {
+    if (i == 1 && u_in.z < 0.5)          un = min(un, 0.0);
+    if (i == NXY.x - 1 && u_tw.y < 0.5) un = max(un, 0.0);
+    if (j == 1)                          wn = min(wn, 0.0);
+    if (j == NXY.y - 1)                  wn = max(wn, 0.0);
+  }
 
   // --- no flux through solids; outermost faces are outside the domain
   if (sC > 0.5 || sW > 0.5) un = 0.0;
@@ -608,6 +744,56 @@ void main(){
     if (f > 0.5) top = (float(j) + 1.0) * u_dx;
   }
   o = vec4(float(jb) * u_dx, d, q, top);
+}`;
+
+  // ----------------------------------------- pass 3b: open-channel columns
+  // What the mixing length in FS_VEL needs to know about each column: where
+  // the bed is, where the free surface is, and whether this is open-channel
+  // water at all. One texel per column — (bed z, surface z, on, 0) — re-run
+  // every few substeps by SIM.step, NOT FS_COL's output: that one is the
+  // overlay's and averaging's contract and is mirrored against RECON.
+  //
+  // "On" means the lowest wet body in the column stands on a solid and has
+  // air above it. A nappe falling through air, water floating on nothing,
+  // and a conduit running full to its soffit are all off — they keep the
+  // Smagorinsky viscosity alone, which is why the pressurised scenes are
+  // untouched by the closure.
+  const FS_TCOL = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 o;
+uniform sampler2D u_F, u_S;
+uniform vec2  u_res;
+uniform float u_dx, u_valve;
+
+float SO(ivec2 c){
+  float s = texelFetch(u_S, c, 0).r;
+  return s > 0.75 ? 1.0 : (s > 0.25 ? u_valve : 0.0);
+}
+
+void main(){
+  int i  = int(gl_FragCoord.x);
+  int NY = int(u_res.y);
+  int jb = -1;
+  for (int j = 1; j < NY - 1; j++) {
+    if (SO(ivec2(i,j)) < 0.5 && texelFetch(u_F, ivec2(i,j), 0).r > 0.25) { jb = j; break; }
+  }
+  if (jb < 1 || SO(ivec2(i, jb - 1)) < 0.5) { o = vec4(0.0); return; }
+  // The same connected walk as FS_COL (two dry cells end it), so an aerated
+  // roller is one body and a droplet above the surface is not part of it.
+  float d = 0.0, last = 0.0;
+  int dry = 0;
+  bool roof = false;
+  for (int j = jb; j < NY - 1; j++) {
+    if (SO(ivec2(i,j)) > 0.5) { roof = last > 0.5; break; }
+    float f = min(texelFetch(u_F, ivec2(i,j), 0).r, 1.0);
+    last = f;
+    if (f < 0.25) { dry++; if (dry > 2) break; continue; }
+    dry = 0;
+    d += f * u_dx;
+  }
+  float zb = float(jb) * u_dx;
+  o = vec4(zb, zb + d, roof ? 0.0 : 1.0, 0.0);
 }`;
 
   // ------------------------------------------------------------- particles
@@ -1095,6 +1281,6 @@ void main(){
   o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));
 }`;
 
-  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_PART, VS_PART,
+  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_PART, VS_PART,
            FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL };
 })();

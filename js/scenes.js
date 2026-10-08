@@ -72,18 +72,29 @@ const SCENES = (() => {
   // The two numbers that decide everything:
   //
   //     d_c = (q²/g)^⅓                        critical depth
-  //     d_n = [ C_f q² / (2.8 g S₀) ]^⅓        normal depth
+  //     d_n = (n q / √S₀)^⅗                   normal depth (Manning, R = d)
   //
-  // The 2.8 is the same wall-function-to-Manning factor the overlay uses
-  // (OVERLAY.KN); it drops out of the ratio, which is all that matters:
+  // with n the roughness the solver DELIVERS for a given C_f. Since the
+  // mixing-length closure (issue #72) the profile is a log law over the whole
+  // depth and the bed's wall function sets the resistance, so n follows C_f
+  // — measured on m2 at Medium (~20 cells of depth), Average mode:
   //
-  //     d_n / d_c = [ C_f / (2.8 S₀) ]^⅓   →   mild if C_f > 2.8 S₀,
-  //                                            steep if C_f < 2.8 S₀,
-  //                                            critical if equal.
+  //     C_f   0.02    0.125   0.25    0.5     3
+  //     n     0.024   0.028   0.031   0.034   0.038
+  //
+  // close to n ≈ 0.022 + 0.017·√C_f, and capped near 0.04 whatever C_f is: a
+  // log law cannot be rougher than its own outer layer. That cap is what sets
+  // the slopes below. Mild needs S₀ under the critical slope
+  // S_c = g n²/d_c^⅓ ≈ 0.016 at q = 0.25, C_f = 0.25 — the old 1 in 68 is now
+  // a critical channel — and d_n/d_c = (S_c/S₀)^0.3.
   //
   // So each profile below is produced by choosing S₀ and C_f either side of
   // that line, then adding the control (weir, gate, brink, tailwater) that
-  // puts the depth in zone 1, 2 or 3.
+  // puts the depth in zone 1, 2 or 3. Every number quoted in a scene's comment
+  // is measured, not computed from this.
+  /** The n the solver delivers at a given C_f, from the table above. Only the
+   *  initial condition uses it — every on-screen d_n and n is measured. */
+  const nOf = (cf) => 0.022 + 0.017 * Math.sqrt(Math.max(cf, 0));
   const TH = 1.4;                          // bed thickness — reaches below z=0
 
   /** A scene states the DEPTH its arriving profile wants (`inletDepth`, always
@@ -155,7 +166,7 @@ const SCENES = (() => {
     // deep at the toe, and a zero-gradient outflow cannot shift that much
     // water — the chute drowns before it ever runs.
     const ycE = Math.pow(o.q * o.q / 9.81, 1 / 3);
-    const ynE = S0 > 1e-5 ? Math.pow(o.cf * o.q * o.q / (2.8 * 9.81 * S0), 1 / 3) : ycE * 1.6;
+    const ynE = S0 > 1e-5 ? Math.pow(nOf(o.cf) * o.q / Math.sqrt(S0), 3 / 5) : ycE * 1.6;
     const d0 = o.start === undefined ? Math.min(Math.max(ycE, ynE), 0.6) : o.start;
     const crest = o.weir ? bedTop(o.weir.x) + o.weir.h : -1e9;
     const water = (x, z, P) => {
@@ -212,7 +223,14 @@ const SCENES = (() => {
    *  drowns its own jet, whereas a 1-in-4 chute delivers a clean fast sheet
    *  with air above it. */
   function drop(o) {
-    const W = o.W, H = o.H, S0 = o.S0 || 0;
+    const W = o.W, H = o.H;
+    // tilt: the apron is drawn FLAT and gravity tilted by S0, exactly as
+    // channel() does it — a mild apron at 1 in 250 rasterises to one step
+    // every three metres, which the overlay's slope window (±9% of the
+    // domain) sees as level ground between the steps. The chute and the
+    // approach take the same S0 on top of their own, which is a 2% change
+    // to a 1-in-5 chute and makes the approach mild instead of level.
+    const S0 = o.tilt ? 0 : (o.S0 || 0);
     // No upper clamp: the apron slab is drawn to W + 1 (a butt end inside the
     // domain would leave the last column short), and clamping the elevation at
     // W while extending the segment past it flattens the drawn slope by
@@ -227,7 +245,14 @@ const SCENES = (() => {
     // in the bed right at the brink. Start it upstream by the corner
     // recession (overlapping the approach slab, which is harmless).
     const ext = (TH / 2) * sr / Math.sqrt(1 + sr * sr) * 1.3;
-    const twLevel = apron(W) + o.tail;
+    // xEnd: the apron ends in a free overfall there (open bottom beyond, no
+    // tailwater), as channel()'s brinks do. A level control at the outlet has
+    // two stable modes on an apron like this — a level, or a sharp-crested
+    // weir at the level with the lower rows recirculating — and which one a
+    // run lands in is history: measured on m3 at Low, it settled drowned
+    // with the apron 0.6 m deep behind a 0.24 m tailwater, for good.
+    const brink = o.xEnd !== undefined && o.xEnd < W - 1e-6;
+    const twLevel = brink ? 0 : apron(W) + o.tail;
     const inLevel = inletLevel(o.hi, o.inletDepth, o.q, 0);
     const inSurf = o.hi + o.inletDepth;      // the surface, not the energy line
     return Object.assign({
@@ -236,15 +261,18 @@ const SCENES = (() => {
       W, H, c: 22, cf: o.cf, cs: o.cs === undefined ? 0.10 : o.cs,
       mode: o.mode === undefined ? 3 : o.mode,
       hmax: o.hmax || 0.5, vmax: o.vmax || 4, spinup: o.spinup || 26,
-      open: [1, 1, 0, 0],
+      open: [1, 1, brink ? 1 : 0, 0],
+      tiltS0: o.tilt ? o.S0 : 0,
       inflow: { level: inLevel, q: o.q, on: 1, free: 0 },
-      tailwater: { level: twLevel, on: 1 },
+      tailwater: brink ? { level: 0, on: 0 } : { level: twLevel, on: 1 },
       walls: () => [
         [-1.0, o.hi - TH / 2, o.xa, o.hi - TH / 2, TH],                       // approach
         [o.xa - ext, o.hi - offR + ext * sr, o.xb, o.lo - offR, TH],          // drop face
-        [o.xb, o.lo - off, W + 1, apron(W + 1) - off, TH],                    // apron
+        brink ? [o.xb, o.lo - off, o.xEnd, apron(o.xEnd) - off, TH]           // apron to its lip
+              : [o.xb, o.lo - off, W + 1, apron(W + 1) - off, TH],            // apron
       ],
       water: (x, z, P) => {
+        if (brink && x >= o.xEnd) return 0;
         const bed = x < o.xa ? o.hi : (x < o.xb ? o.hi - sr * (x - o.xa) : apron(x));
         if (z <= bed) return 0;
         const lev = x < o.xa ? inSurf : Math.max(bed + 0.10, twLevel);
@@ -594,16 +622,28 @@ const SCENES = (() => {
              "Controls has everything the scenes use: reservoir, tailwater, open edges, the wave piston.",
              "Close a pipe off completely and the water pressurises: watch the gold sheen."] },
 
-    // ------------------------------------------------- MILD  (C_f > 2.8 S₀)
-    // S₀ = 1 in 68, C_f = 0.125  →  d_n ≈ 0.27 m against d_c ≈ 0.19 m.
-    // inletDepth is the MEASURED backwater depth arriving from the weir
-    // (the M1 curve does not decay to d_n within this reach). The inlet
-    // level must meet the profile: pinned lower, the boundary chokes the
-    // backwater and sheds ripples; the level is an elevation above the
-    // datum, bed0 + inletDepth.
+    // ------------------------------------------------- MILD  (S₀ < S_c)
+    // THE mild channel, shared by m1, m2, m3's apron and sa1: S₀ = 1 in 250,
+    // C_f = 0.25, q = 0.25. Measured (Medium, Average mode): delivered
+    // n ≈ 0.031, d_n ≈ 0.25–0.27 against d_c = 0.185, so d_n/d_c ≈ 1.4. It
+    // used to be 1 in 68 at C_f = 0.125, mild only because the old surface
+    // drag delivered n ≈ 0.08; with a stress-free surface and the bed
+    // carrying the resistance, 1 in 68 is a CRITICAL slope (c13 now runs at
+    // 1 in 57), and no C_f on the panel gets a log-law bed past n ≈ 0.04.
+    //
+    // m1 keeps its bed DRAWN (one rasterised step every 3.2 m) rather than
+    // tilted like m2: the pool behind the weir is level, and a level surface
+    // on a drawn bed sits exactly on a cell boundary, so GV-1's surface
+    // readings are not touched by the one-cell terracing a sloping steady
+    // surface shows (docs/engineering-notes.md, "Steady surfaces terrace").
+    // inletDepth is the MEASURED pool depth arriving at the inlet (the M1
+    // does not decay to d_n within this reach): pinned lower, the boundary
+    // chokes the backwater and sheds ripples. Measured: the pool deepens
+    // 0.49 → 0.54 m from the inlet to the weir, M1 from x = 1.3 m to the
+    // weir face, d_n 0.249, settled by 28 s.
     Object.assign(channel({
-      W: 16, H: 1.05, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
-      inletDepth: 0.54, weir: { x: 13.4, h: 0.42, w: 0.7 }, xEnd: 14.6,
+      W: 16, H: 1.05, bed0: 0.35, S0: 0.004, cf: 0.25, q: 0.25,
+      inletDepth: 0.49, weir: { x: 13.4, h: 0.25, w: 0.7 }, xEnd: 14.6,
       mode: 0, hmax: 0.55, vmax: 2.0, spinup: 30, dyeLine: 0.9,
     }), {
       id: "m1", name: "M1 · backwater behind a weir", key: "Mild, zone 1",
@@ -614,24 +654,21 @@ const SCENES = (() => {
              "Erase the weir and the same channel relaxes towards M2."] }),
 
     // tilt: flat bed + tilted gravity, because at M2's working depth the
-    // rasterised bed staircase excites standing waves the demo cannot absorb
-    // (m1 runs deep enough to hide the same steps).
-    // inletDepth is the depth the arriving profile actually wants — here the
-    // measured d_n (0.36), since an M2 leaves normal depth and draws down to
-    // the brink. Pin it lower and the inlet chokes and sheds ripples for ever:
-    // measured surface fluctuation over t = 60–110 s at x = 1.3 m was 37 mm
-    // with the level held at 0.205 (the flow was standing at 0.354 regardless)
-    // against 17 mm once it was let up to 0.35. It also stops the class
-    // flickering M1 / M2 / M1 along a reach that should read M2 end to end —
-    // one run now, 0 → 13.5 m.
-    //   The 0.205 figure came from an earlier d_n measurement of 0.215 that
-    // was itself wrong: the free-fall columns past the brink were still in the
-    // d_n median (see the mask guard in overlay.analyse). With them excluded
-    // d_n measures 0.36, and the inlet has to follow.
+    // rasterised bed staircase excites standing waves the demo cannot absorb,
+    // and a 1 in 250 bed drawn would put a step only every 3.2 m.
+    // inletDepth is the depth the arriving profile actually wants — the
+    // depth measured just clear of the inlet, 0.265, since at 1 in 250 the
+    // drawdown reaches back past it. Pin it lower and the inlet chokes and
+    // sheds ripples for ever (with the old physics: 37 mm of surface
+    // fluctuation at x = 1.3 m against 17 mm once the level matched).
+    //   Measured (Medium, Average mode): one M2 run from the inlet to 12.2 m,
+    // d_n 0.24–0.25 against d_c 0.184, n 0.030–0.032; the velocity profile is
+    // fastest at the surface, u(0.6d)/V = 1.02–1.03, α = 1.17–1.19. Settled
+    // by 30 s (it took 85 s when the surface carried the resistance).
     Object.assign(channel({
-      W: 16, H: 0.95, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
-      inletDepth: 0.35, xEnd: 13.6, tilt: true,
-      hmax: 0.45, vmax: 2.0, spinup: 90, dyeLine: 1.2,
+      W: 16, H: 0.95, bed0: 0.35, S0: 0.004, cf: 0.25, q: 0.25,
+      inletDepth: 0.265, xEnd: 13.6, tilt: true,
+      hmax: 0.45, vmax: 2.0, spinup: 30, dyeLine: 1.2,
     }), {
       id: "m2", name: "M2 · drawdown to a free overfall", key: "Mild, zone 2",
       blurb: "The same mild channel ending in a brink. The surface is drawn down through critical depth at the lip — the M2 curve.",
@@ -649,42 +686,44 @@ const SCENES = (() => {
     drop({
       id: "m3", name: "Jump onto a mild apron", key: "Chute → jump → M2",
       blurb: "A chute delivers a supercritical sheet onto a mild bed. It cannot stay there: a hydraulic jump takes it back to subcritical, and the apron beyond runs M2.",
-      W: 16, H: 1.7, hi: 0.85, lo: 0.35, xa: 1.5, xb: 4.0, S0: 0.0147,
-      cf: 0.010, cs: 0.06, q: 0.25, inletDepth: 0.30, tail: 0.20,
-      hmax: 0.5, vmax: 4, spinup: 22,   // measured: profile arrives by 17 s
+      // The mild channel of m1/m2 on the apron (tilted, as m2), ending in a
+      // free overfall like m2's rather than a tailwater: the brink draws the
+      // apron down to d_c, so beyond the jump it is M2 by construction. With a
+      // tailwater the window was 1.3 d_c ≤ tail < d_n — 0.24 to 0.255 m — and
+      // the outlet could settle as a weir instead of a level (see drop()).
+      //   MEASURED (Medium, Average mode): S2 on the chute, the sheet landing
+      // at 0.10 m and running M3 to x ≈ 6.9 m, the jump there, then M2 at
+      // 0.24 m to the lip; settled by 20 s at Low and at Medium. The jump box
+      // reads d₂ ~20% under Bélanger: its d₁ is the THINNEST section, at the
+      // start of that long M3, not the depth the roller actually takes in.
+      W: 16, H: 1.7, hi: 0.85, lo: 0.35, xa: 1.5, xb: 4.0, S0: 0.004, tilt: true,
+      cf: 0.25, cs: 0.06, q: 0.25, inletDepth: 0.30, xEnd: 14.6,
+      hmax: 0.5, vmax: 4, spinup: 25,
       tips: ["Supercritical on the chute, subcritical on the apron — the jump is the only way across.",
              "The jump box compares the measured d₂ against ½d₁(√(1+8Fr₁²) − 1).",
-             "Past the jump the depth sits between d_n and d_c: that reach is M<b>2</b>.",
-             "Raise the tailwater and the jump marches upstream onto the chute."] }),
+             "Before the jump the sheet thickens along the apron below d_c: M<b>3</b>.",
+             "Past the jump the depth sits between d_n and d_c: that reach is M<b>2</b>, drawn down to the brink.",
+             "Turn on a tailwater in Controls and raise it: the jump marches upstream onto the chute."] }),
 
-    // Same mild channel as m1/m2 (S0 = 0.0147, cf = 0.125, q = 0.25 — proven
-    // physics, not re-derived), but built for a reach with NO slope break and
-    // NO close control: the inlet is pinned at the measured normal depth (as
-    // m2's is) so the profile starts flat and STAYS flat for a long way
-    // before the brink pulls it down — see m2's inletDepth note for why that
-    // trick works. The brink sits far past NC-1's own gauge window (x up to
-    // 15.5) so the window itself only feels the start of the drawdown.
-    // tilt: true for the same reason as m2 — the rasterised staircase would
-    // otherwise be excited at this depth — but tilt has a consequence a
+    // Same mild channel as m1/m2 (1 in 250, C_f = 0.25, q = 0.25), built for
+    // a reach with NO slope break and NO close control: the inlet is pinned at
+    // the measured normal depth so the profile starts flat and STAYS flat for
+    // a long way before the brink pulls it down.
+    // tilt: true for the same reason as m2 — but tilt has a consequence a
     // gauge-reading exercise has to respect: with the bed drawn flat, the
     // raw column/probe z does NOT carry the S₀·x the geometry represents —
     // main.js's gauge readout and OVERLAY's S₀/S_f already add tiltS0·x
     // back in, and any OTHER headless reader of `surf`/`z` on a tilted scene
-    // must do the same or its "head fall" is off by S₀·L (here 103 mm over
-    // NC-1's 7 m window — the entire signal).
-    //   MEASURED headless (Medium budget, digit ladder x₀ = 5.0…8.5, a 25–30 s
-    // Average-mode window after settling): delivered q = 0.266 m²/s (not the
-    // nominal 0.25), delivered n = 0.078–0.080, d/d_n = 0.97–0.99 at x₀ and
-    // 0.90–0.96 at x₀+7 (the window's downstream end drifts further from
-    // uniform as x₀ approaches the brink — the far end of the ladder is the
-    // least uniform, same qualitative lesson as m2). The tilt-corrected head
-    // fall F over L = 7 m runs 111–130 mm across the ladder, and the
-    // slope-area estimate (Q̂₂, both iterations) came out within 2% of the
-    // delivered q at every one of the 8 stations.
+    // must do the same or its "head fall" is off by S₀·L.
+    //   MEASURED (Medium, Average mode): uniform at 0.268 m from x ≈ 4 to
+    // 11 m, d_n 0.26–0.27 against d_c 0.184, n 0.031–0.033; the profile is a
+    // log law (fitted κ 0.41–0.43) with u(0.6d)/V = 1.015–1.025 and α ≈ 1.18.
+    // Settled by 37 s. NC-1's slope-area numbers were measured on the old
+    // 1-in-68 channel and are not carried over (NC-1 is being retired).
     Object.assign(channel({
-      W: 20, H: 0.95, bed0: 0.35, S0: 0.0147, cf: 0.125, q: 0.25,
-      inletDepth: 0.36, xEnd: 19, tilt: true,
-      hmax: 0.45, vmax: 2.0, spinup: 120, dyeLine: 1.2,
+      W: 20, H: 0.95, bed0: 0.35, S0: 0.004, cf: 0.25, q: 0.25,
+      inletDepth: 0.27, xEnd: 19, tilt: true,
+      hmax: 0.45, vmax: 2.0, spinup: 40, dyeLine: 1.2,
     }), {
       id: "sa1", name: "Long mild reach", key: "Uniform, no break",
       blurb: "The same mild channel as M1/M2, run long and flat with the control pushed far downstream — a reach with no weir, no jump, and (nearly) no drawdown to measure against.",
@@ -749,7 +788,13 @@ const SCENES = (() => {
       // wobble at 5-10x the relative amplitude and never reads "settled" by
       // this test, which is why the approach pool, not the crest, is the
       // station to read.
-      spinup: 10, dyeLine: 0.9,
+      //   Re-measured with the stress-free surface (issue #72), whole-reach
+      // depth profile against its final shape (3% RMS): settled by 34 s, the
+      // wobble gone. At the default 0.15 m the crest chokes — E₁ − E_c ≈
+      // 0.09 m is less than the hump — so the approach backs up to 0.41 m,
+      // the crest runs supercritical down its lee face and jumps back at
+      // x ≈ 9 m before the tailwater.
+      spinup: 35, dyeLine: 0.9,
       open: [1, 1, 0, 0],
       // 0.35 + 0.34 + 0.25²/(2·9.81·0.34²): the energy line that delivers d = 0.34.
       inflow: { level: 0.7176, q: 0.25, on: 1, free: 0 },
@@ -790,17 +835,29 @@ const SCENES = (() => {
              "Watch the Froude colours at the crest — a choked hump runs Fr ≈ 1 right over the top.",
              "The Force tool on the crest face reads the pressure pushing back on the bed as the depth over it thins."] },
 
-    // ------------------------------------------------ STEEP  (C_f < 2.8 S₀)
-    // S₀ = 1 in 4 at q = 1.2 m²/s. Against the MEASURED resistance that is
-    // d_n ≈ 0.32 m under d_c = 0.53 m, i.e. Fr ≈ 2.1 at normal depth — steep,
-    // and deep enough (≈ 24 cells) that the delivered n stays near 0.03.
+    // ------------------------------------------------ STEEP  (S₀ > S_c)
+    // S₀ = 1 in 4 at q = 1.2 m²/s, C_f = 0.25. MEASURED (Medium, Average
+    // mode): d_n ≈ 0.19–0.21 m under d_c = 0.53 m, n ≈ 0.03 — steep, and
+    // steeper-running than it was (d_n 0.32, Fr 2.1) when the surface carried
+    // most of the resistance; the chute still has not reached d_n by its
+    // brink, so the measured d_n is the extrapolation d·(S_f/S₀)^⅓.
     // Every steep scene keeps its bed above z = 0 for the whole modelled
     // reach: where the slab sinks below the domain floor the water runs on
     // the floor instead, which is not the channel the scene is describing.
     Object.assign(channel({
-      W: 7, H: 2.8, bed0: 1.90, S0: 0.25, cf: 0.010, cs: 0.08, q: 1.2,
-      inletDepth: 0.52, tail: 0.90, start: 0.30,
-      hmax: 0.9, vmax: 5, spinup: 26,
+      // tail 1.20 m (level 1.35), not the old 0.90: the sheet reaching the
+      // foot of the chute runs d ≈ 0.26 m at Fr ≈ 3, whose conjugate is
+      // ~0.96 m, and at 0.90 the jump washed out of the domain. (It only stood
+      // at 0.90 while the tailwater edge ponded ~0.3 m above its own level —
+      // the exchange-face bug fixed in FS_VEL with issue #72.)
+      //   MEASURED: the jump at x ≈ 4.2–6.0 m, d₁ 0.26 at Fr₁ 2.9, d₂ 0.88
+      // against Bélanger's 0.95 (−8%, the slope's weight component), then
+      // S1 for the last 1.1 m. The roller keeps a 5–9% flutter in the mean
+      // profile for good, so the spin-up is where the mean arrives (~15 s),
+      // not where the flutter stops (never).
+      W: 7, H: 2.8, bed0: 1.90, S0: 0.25, cf: 0.25, cs: 0.08, q: 1.2,
+      inletDepth: 0.52, tail: 1.20, start: 0.30,
+      hmax: 0.9, vmax: 5, spinup: 20,
     }), {
       id: "s1", name: "S1 · steep bed, drowned outlet", key: "Steep, zone 1",
       blurb: "A steep channel with the tailwater held above critical. The supercritical sheet jumps, and above the jump the surface climbs to the control — an S1 curve.",
@@ -810,9 +867,12 @@ const SCENES = (() => {
              "Upstream of the jump the same channel is running S2."] }),
 
     Object.assign(channel({
-      W: 7, H: 2.4, bed0: 1.55, S0: 0.25, cf: 0.010, cs: 0.08, q: 1.2,
+      // MEASURED: S2 from the crest to the brink, d 0.47 → 0.23 m, settled by
+      // 11 s; u(0.6d)/V = 1.01–1.07, α 1.11–1.26 (the reach is still
+      // accelerating, so the log fit reads κ ≈ 0.3 rather than 0.41).
+      W: 7, H: 2.4, bed0: 1.55, S0: 0.25, cf: 0.25, cs: 0.08, q: 1.2,
       inletDepth: 0.52, xEnd: 6.0, start: 0.30,
-      hmax: 0.7, vmax: 5, spinup: 22,
+      hmax: 0.7, vmax: 5, spinup: 15,
     }), {
       id: "s2", name: "S2 · chute from a reservoir", key: "Steep, zone 2",
       blurb: "Water spilling from a reservoir onto a steep bed passes through critical at the crest and accelerates down towards normal depth — the S2 curve.",
@@ -821,70 +881,63 @@ const SCENES = (() => {
              "Both d_c and d_n are drawn; note that d_n is the <i>lower</i> one here.",
              "Nothing downstream can influence this reach — it is supercritical throughout."] }),
 
-    // W = 5.6 is not arbitrary: at S₀ = 1 in 4 a bed starting at 1.40 reaches
-    // z = 0 exactly there. Run the reach any further (it used to go to 6.4)
-    // and the slab is below the domain floor, so the last 0.8 m was water
-    // sliding on the floor and draining out of the open bottom edge — the
-    // discharge fell from 1.20 to 0.98 along it and the overlay named the
-    // strip H3. bed0 cannot simply be raised instead: the gate pool already
-    // stands at bed0 + 1.40 = 2.80 in a 3.0 m domain.
+    // 1 in 10, NOT the 1 in 4 of s1/s2. An S3 needs the jet from under the
+    // gate thinner than d_n, and at 1 in 4 d_n is now ~0.2 m while a 0.35 m
+    // gate's jet leaves at ~0.25 m (the reach read S2); a smaller gate cannot
+    // pass q = 1.2 under the 1.4 m pool the domain has room for — at 0.14 m
+    // the pool rose to the lid and pressurised. Easing the slope raises d_n
+    // instead: MEASURED d_n 0.29, the jet leaving at 0.24 and climbing to 0.27
+    // by the outlet, S3 from the gate to the end, settled by 11 s.
+    //   The bed still has to stay above z = 0 for the whole reach (a bed that
+    // sinks below the domain floor leaves water sliding on the floor and
+    // draining out of the open bottom edge): 0.91 − 0.1 × 5.6 = 0.35.
+    // inletDepth 1.60 is the pool the gate holds to pass q = 1.2, measured;
+    // at the old 1.40 the pool piled 0.16 m above its own reservoir level and
+    // reached the lid of a 2.5 m domain, hence H = 3.0.
     Object.assign(channel({
-      W: 5.6, H: 3.0, bed0: 1.40, S0: 0.25, cf: 0.010, cs: 0.08, q: 1.2,
-      inletDepth: 1.40, gate: { x: 1.2, a: 0.35 }, start: 0.28,
-      hmax: 0.7, vmax: 6, spinup: 26,
+      W: 5.6, H: 3.0, bed0: 0.91, S0: 0.1, cf: 0.25, cs: 0.08, q: 1.2,
+      inletDepth: 1.60, gate: { x: 1.2, a: 0.35 }, start: 0.28,
+      hmax: 0.7, vmax: 6, spinup: 15,
     }), {
       id: "s3", name: "S3 · gate on a steep bed", key: "Steep, zone 3",
       blurb: "A gate opened tighter than normal depth. The flow leaves below d_n and climbs back up towards it — the S3 curve, with no jump anywhere.",
       tips: ["The opening is smaller than d_n, so the depth starts below <i>both</i> depths.",
              "The surface rises asymptotically towards d_n — zone 3, so S<b>3</b>.",
              "No jump anywhere: the flow is supercritical before and after, so none is needed.",
-             "Erase the gate and redraw it wider than d_n and the same channel runs S2."] }),
+             "Erase the gate and redraw it wider than d_n and the same channel runs S2.",
+             "This chute is 1 in 10, gentler than S1/S2's 1 in 4 — on the steeper bed d_n is too shallow for a gate to undercut it."] }),
 
     // ------------------------------------------ CRITICAL  (d_n = d_c)
-    // Tuned against the DELIVERED resistance, not the nominal C_f: at this
-    // depth-to-Δx the wall function + eddy viscosity + bed staircase deliver
-    // far more drag than C_f suggests, so the slope that balances them is
-    // 1 in 8.5 with C_f nearly zero. The weir is low (0.12 m) because a
-    // broad-crested weir ponds ~1.5 d_c of head above its crest — the old
-    // 0.30 m crest drowned the gate and turned the whole reach into one M1
-    // pool.
-    // 1 in 9.5 measured d_n = 0.205 against d_c = 0.192 — 7% high, which is
-    // outside classify()'s ±5% C band, so the "critical" scene reported M.
-    // d_n ∝ S₀^−⅓, so closing a 7% gap wants ~23% more slope; steepening
-    // also thins the flow, which raises the delivered roughness and pushes
-    // back, so this is deliberately short of that at 1 in 8.5.
+    // The critical slope of THE channel (C_f = 0.25, q = 0.25), MEASURED on a
+    // uniform tilted reach rather than computed: 1 in 83 runs d/d_c = 1.14
+    // (M), 1 in 62 runs 1.04 (C), 1 in 50 runs 0.98 (C). 1 in 57 sits in the
+    // middle of the ±5% C band; the old mild channel's 1 in 68 is next to it.
+    //   A TAILWATER at 1.3 d_c ends the reach, not the old weir. On a critical
+    // slope the C1 surface is horizontal, so the pool behind a control is
+    // (its depth − d_c)/S₀ long: a broad-crested weir ponds ~1.5 d_c of head
+    // above its own crest, which at 1 in 57 backed a C1 up the whole 11 m and
+    // left nothing for the C3 (it worked at the old 1 in 8.5 only because the
+    // slope was seven times steeper). The tailwater's 0.055 m above d_c is a
+    // ~3 m C1.
+    //   MEASURED (Medium, Average mode): C3 from the gate's jet (0.11 m) rising
+    // to d_c by x ≈ 9.8 m, then C1 into the tailwater; d_n 0.185 against d_c
+    // 0.183; steady and settled by 29 s. (The old scene was wavy, its
+    // surface flutter growing 18 → 48 mm along the reach; that has not
+    // reappeared, but a critical reach amplifies every disturbance — do not
+    // count on it staying quiet under a changed setting.)
     Object.assign(channel({
-      W: 12, H: 2.0, bed0: 1.45, S0: 0.118, cf: 0.02, q: 0.25,
-      inletDepth: 0.36, gate: { x: 2.0, a: 0.15 },
-      weir: { x: 9.6, h: 0.12, w: 0.7 }, xEnd: 10.8,
-      // 95 s, measured. A near-critical reach filling a weir pool is the
-      // slowest thing in the set — at 28 s the countdown finished while the
-      // profile was still a long way from its final shape.
-      mode: 3, hmax: 0.45, vmax: 3.0, spinup: 95,
+      W: 12, H: 1.0, bed0: 0.56, S0: 0.0175, cf: 0.25, q: 0.25,
+      inletDepth: 0.36, gate: { x: 1.5, a: 0.15 }, tail: 0.24,
+      mode: 3, hmax: 0.45, vmax: 3.0, spinup: 30,
     }), {
       id: "c13", name: "C1 / C3 · critical slope", key: "d_n = d_c",
       labels: 0,
-      // This scene is WAVY and cannot be made otherwise: at Fr ≈ 1 the
-      // (1 − Fr²) in dy/dx = (S₀ − S_f)/(1 − Fr²) vanishes, so every
-      // disturbance is amplified instead of decaying. Measured over
-      // t = 65–115 s, the surface starts quiet just below the gate (18 mm at
-      // x = 3.2) and GROWS along the reach to 48 mm — a quarter of the local
-      // depth — by x = 6. That growth is local, not inherited from a boundary.
-      // A channel at critical slope is the least stable configuration in
-      // open-channel hydraulics, which is exactly why it is a knife-edge
-      // demonstration; do not go hunting for a boundary setting to cure it.
-      //   inletDepth stays at 0.36 even though the inlet is pinned ~0.09 m
-      // above what the pool wants. Lowering it does quieten the pool a lot
-      // (28 → 1 mm at x = 0.4 at 0.27), but the gate pool then collapses to
-      // 0.147 m — under the gate's own 0.15 m opening, so the gate stops
-      // controlling, the C3 reach goes with it, and d_n/d_c falls to 0.905,
-      // outside the ±5% C band the whole scene is calibrated on.
       blurb: "The knife edge: a slope where the measured normal depth equals critical depth. Zone 2 vanishes, and the depth hugs d_c along the whole reach.",
       tips: ["The slope is tuned so the <i>measured</i> d_n equals d_c — the dashed lines overlap.",
-             "Below the gate is C<b>3</b>; behind the weir is C<b>1</b>. There is no zone 2.",
+             "Below the gate is C<b>3</b>; backed up by the tailwater is C<b>1</b>. There is no zone 2.",
              "The middle of the reach rides Fr ≈ 1: the Froude colours sit right at the white break.",
              "Profile labels are off here by default: on a knife edge the class genuinely flickers between M, C and S. Turn them on in Controls to watch it.",
-             "Nudge the roughness either way and watch it become decisively mild or steep."] }),
+             "Drag the roughness down to 0.05 and the same reach turns steep — S3, S2, S1. A fifth of the roughness moves d_n only 9%: the knife edge."] }),
 
     // ------------------------------------------- HORIZONTAL  (S₀ = 0, d_n = ∞)
     drop({
@@ -905,9 +958,22 @@ const SCENES = (() => {
       //    15× the roughness moved d_n by 7%). At q = 0.5 the apron runs ~37
       //    cells deep, the jump stands free on the apron, and d₂ = 0.416 m
       //    against a predicted 0.438 — within 5%.
+      //  · Since the surface stopped carrying the resistance (issue #72) the
+      //    tailwater is the CONJUGATE depth, 1.75 d_c, not 1.3: the sheet
+      //    lands on the apron at d₁ ≈ 0.155 m, Fr₁ ≈ 2.7, and a tailwater
+      //    below its conjugate (~0.52 m) sweeps the jump out. MEASURED, the
+      //    jump moves steadily with the tailwater — at 0.50 it stands at
+      //    x ≈ 4.4–6.2 m with d₂ 2% under Bélanger, at 0.53 at 3.6–5.5 m 2.5%
+      //    over, at 0.56 on the chute toe. At 0.52 it seats at x ≈ 5.5 m
+      //    within 10 s and flutters ±0.1 m; the mean profile keeps a 3–5%
+      //    flutter from the roller for good.
+      //    (Before the tailwater edge's exchange-face fix, the outlet ponded
+      //    up to ~0.3 m above its own level and the jump had no stable seat —
+      //    swept out at 0.40, up the chute at 0.44 — which looked like a
+      //    knife edge and was a boundary bug.)
       W: 7.5, H: 1.6, hi: 0.80, lo: 0.15, xa: 1.0, xb: 4.0, S0: 0,
-      cf: 0.008, cs: 0.06, q: 0.5, inletDepth: 0.34, tail: 0.38,
-      hmax: 0.65, vmax: 4, spinup: 20,   // measured: profile arrives by 15 s
+      cf: 0.25, cs: 0.06, q: 0.5, inletDepth: 0.34, tail: 0.52,
+      hmax: 0.65, vmax: 4, spinup: 20,
       tips: ["A horizontal bed has no normal depth — d_n is infinite, so there is no zone 1.",
              "The chute runs S2/S3; past the jump the level apron runs H<b>2</b>.",
              "The jump box reports d₁, d₂ and Fr₁ — check d₂/d₁ = ½(√(1+8Fr₁²) − 1).",
@@ -924,13 +990,20 @@ const SCENES = (() => {
       // The other half of this scene's cure was the apron() slope bug above:
       // the drawn adverse slope was −0.0233 instead of −0.030, and with it
       // the domain volume swung ±15% on a ~60 s cycle that never settled.
+      //   MEASURED (Medium, Average mode, tail 1.37 d_c): the jump stands on
+      // the lower chute (x ≈ 2.2–4.0 m, d₁ 0.10 at Fr₁ 2.3) and the whole
+      // apron runs A2, 0.36 m falling to the tailwater; the mean arrives by
+      // ~20 s, with a 4–6% roller flutter for good. The A3 sheet the old scene
+      // showed on the apron would need the jump pushed off the chute, and the
+      // A2 that the adverse bed builds upstream of a 1.3 d_c tailwater is
+      // already deeper (0.36 m) than the arriving sheet's conjugate (~0.30).
       W: 7.5, H: 1.7, hi: 0.85, lo: 0.12, xa: 1.0, xb: 4.0, S0: -0.03,
-      cf: 0.008, cs: 0.06, q: 0.22, inletDepth: 0.28, tail: 0.26,
-      hmax: 0.45, vmax: 4, spinup: 26,
+      cf: 0.25, cs: 0.06, q: 0.22, inletDepth: 0.28, tail: 0.24,
+      hmax: 0.45, vmax: 4, spinup: 20,
       tips: ["The apron climbs, so S₀ is negative and uniform flow is impossible — no d_n.",
              "Past the jump, running uphill against gravity, the apron is A<b>2</b>.",
              "A2 steepens as it goes: an adverse bed cannot sustain the flow for long.",
-             "Flatten the apron back to level and the same two profiles become H2 and H3."] }),
+             "The jump sits on the chute: the climbing apron backs the water up onto it. Lower the tailwater and watch it try to get out."] }),
 
     // ------------------------------------------------------- hydrostatics
     // A dyke between two reservoirs with a culvert under it, shut by a valve,

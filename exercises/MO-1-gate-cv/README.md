@@ -38,15 +38,15 @@ and its downstream face at the vena station and the box *is* the control volume
 the `F_R` formula is written on — with two differences. It uses the pressure
 and the velocity that are actually on those faces instead of assuming
 hydrostatic pressure and uniform velocity, and it holds the bed as well as the
-gate, so it carries the bed friction over the enclosed run (measured below:
-1.9 – 6.3% of the reading).
+gate, so it carries the bed friction over the enclosed run (measured: 4% of
+the reading at the smallest opening, 10% at the largest).
 
 The **Pressure force** tool (pick it on the strip — it has no digit key) closes
 the loop a third way: click the gate itself and it draws the textbook pressure
 diagram straight off the plate — arrows perpendicular to the face, the
 resultant through the centre of pressure — and reads **F→** with no box to
-drag at all. Measured at the shipped 7-cell opening: **1.53 kN/m**, within a
-few percent of the Control volume's own ~1.6.
+drag at all. Measured at the shipped 7-cell opening: **1.44 kN/m**, against
+the Control volume's ~1.54; the difference is the bed friction the box holds.
 
 ## Your gate opening
 
@@ -116,21 +116,22 @@ the thing they estimate, and the table below is where each of them lands.
 
 ### What the box reads
 
-Expect roughly 6.5 / 3 / 1.6 / 0.9 kN/m at the four openings. At every one the
-box lands within a few percent of `naive` and about 5–15% under `F_R`; moving
+Expect roughly 6.6 / 3.1 / 1.5 / 0.85 kN/m at the four openings. At every one the
+box lands within a few percent of `naive`, and between level with `F_R` at the smallest
+opening to about 10% under it at the largest; moving
 the box, or restarting the rig, changes the reading by a percent or two. The
 **Pressure force** tool, clicked straight on the gate, tracks the box closely
-too — 1.53 kN/m against the box's ~1.6 at the 7-cell opening — which is the
+too — 1.44 kN/m against the box's ~1.54 at the 7-cell opening — which is the
 point: a box built around the plate and a diagram read off its face are two
 routes to the same F→. The full measured table is in the archive.
 
 ### Discussion points
 
 - **Which number is the force?** F→; `F_R` and `naive` are estimates of it.
-  The box reads about 5–15% under `F_R` and within a few percent of `naive`.
-  Both of the formula's assumptions fail at the vena face: the pressure there
-  is well above hydrostatic, and Rake (`6`) at the vena shows the jet core
-  running faster than q/d₁ (about 3.2 against 2.3 m/s). `naive` does well
+  The box reads up to about 10% under `F_R` and within a few percent of
+  `naive`. Both of the formula's assumptions fail at the vena face: the
+  pressure there is above hydrostatic, and Rake (`6`) at the vena shows the
+  jet core running faster than q/d₁. `naive` does well
   here because the pool is nearly still and the gate's downstream face is
   dry, so the plate carries close to plain hydrostatic thrust.
 - **The `F_R` − `naive` gap tracks d₁, not the momentum flux.** This rig's

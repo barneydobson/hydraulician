@@ -130,6 +130,32 @@ dropped, a simplification exact only where `ν_T` is uniform. No wall damping is
 applied to `C_s`, so the subgrid length does not vanish at a solid the way a van
 Driest or dynamic model would; the near-wall stress is carried by step 5.
 
+**Open-channel flow needs a second, depth-scale closure.** A subgrid length of
+`C_sΔ` cannot carry the bed's stress up a water column: at `Δx = 12.7` mm,
+`(C_sΔ)²|S| ≈ 4·10⁻⁶|S|` m²/s, while a channel's eddy viscosity is about
+`κu*d/6 ≈ 4·10⁻³` m²/s, about a hundred times what Smagorinsky gives at any
+plausible shear (carrying the bed stress would take `|S|` ≈ 70 s⁻¹). In a
+column that is an open channel (water standing on a bed, under air) the solver
+adds Prandtl's mixing length:
+
+```math
+\nu_t = l^{2}\,|\omega|,
+\qquad l = \kappa\,\min\!\left(y,\, z - z_b\right)\sqrt{(\eta - z)/d},
+\qquad \kappa = 0.41
+```
+
+with `z − z_b` the height above the bed, `η − z` the depth below the
+surface, `d` the depth and `y` the distance to the nearest solid. Over a flat
+bed `y = z − z_b`, and in uniform flow the stress falls linearly to zero at
+the surface, `τ = u*²(1 − y/d)`; this length then gives `∂u/∂z = u*/(κy)` at
+every height — the log law over the whole depth — and `ν_t = κu*y(1 − y/d)`,
+the parabolic eddy viscosity of a channel.
+It is applied in conservative form, as the force `−∇×(ν_t ω)`; in a channel
+that is `∂/∂z(ν_t ∂u/∂z)`, and dropping `∇ν_t·∇u` here would put the velocity
+maximum at mid-depth by itself. It is built on the vorticity rather than the
+strain so that irrotational motion — surface waves, sloshing, potential flow
+over a crest — carries no stress from it at any `ν_t`.
+
 ### Step 2 — Relax incompressibility
 
 The constraint `∇·u = 0` makes pressure a global unknown and forces an elliptic
@@ -184,6 +210,14 @@ cell at `f ≈ 0.5` gets the full `g` — the water in it is in free fall. The
 pressure term needs no equivalent: the equation of state returns `P = 0` below
 `f = 1`, so with `χ` in place a void is force-free.
 
+**Which extension matters at the surface.** Unforced is not the same as
+stress-free. If the void velocity relaxes towards rest, the air just above the
+water holds slow fluid, and the advection stencil hands it back to every
+interface cell the surface refills: a momentum sink, with the surface as a
+drag boundary. So directly over an open channel's water the extension is the
+water's own `u` carried up (`∂u/∂z = 0`, a stress-free surface); `w`, and
+every other void face, relaxes as before.
+
 ### Step 5 — Model the wall rather than resolve it
 
 No-slip is a **boundary condition**, and the term it produces acts only at the
@@ -211,9 +245,7 @@ Two consequences follow directly, and both show up in how the model behaves:
   component it acts on: `u` keys on walls above and below (a bed), `v` on walls
   left and right. A wide pond has no friction on `v` at all.
 - It carries an explicit `Δ`. The delivered resistance is therefore a property of
-  the grid as much as of `C_f` — the origin of the emergent-roughness behaviour
-  in §5, where at ~8 cells of depth the delivered Manning `n` is ~0.07 almost
-  regardless of `C_f`.
+  the grid as well as of `C_f` — see §5 for what it delivers.
 
 ### The resulting model
 
@@ -226,11 +258,13 @@ Steps 1–5 applied to §1:
 ```math
 \frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u}\cdot\nabla)\mathbf{u}
 = -\nabla P + \chi(f)\,\mathbf{g} + \nu_T \nabla^{2}\mathbf{u}
+- \nabla\times\left(\nu_t\,\boldsymbol{\omega}\right)
 - \mathbb{1}_{\text{wall}}\,\frac{C_f |\mathbf{u}|\mathbf{u}}{\Delta}
 ```
 
-with `P = p/ρ₀` supplied by the equation of state of §3, and `𝟙_wall` the
-indicator of cells adjacent to a solid.
+with `P = p/ρ₀` supplied by the equation of state of §3, `𝟙_wall` the
+indicator of cells adjacent to a solid, and `ν_t` the mixing length of step 1,
+zero outside open-channel columns.
 
 `u` is the advected quantity and `f` the transported one: momentum is in
 advective (non-conservative) form and carries no `f` weighting, volume is in
@@ -473,6 +507,7 @@ continuous system to the two GPU passes.
 \mathcal{A}(\mathbf{u}) &= -(\mathbf{u}\cdot\nabla)\mathbf{u}
   &&\text{advection} \\
 \mathcal{D}(\mathbf{u}) &= \nu_T \nabla^{2}\mathbf{u}
+  - \nabla\times\left(\nu_t\,\boldsymbol{\omega}\right)
   &&\text{eddy-viscous diffusion} \\
 \mathcal{G}(f) &= \chi(f)\,\mathbf{g}
   &&\text{gravity} \\
@@ -519,9 +554,10 @@ a single stencil fetch. The difference from a sequential composition is
 `du/dt = F(u)` over `Δt` with `|u|` frozen at `|u*|`, so it is unconditionally
 stable and puts no bound on `Δt` at any roughness.
 
-**`Π` and `Π_f` are projections, not operators.** On velocity: the void bleed,
-the transport-consistency cap, the ±80 rails, prescribed sources, the boundary
-ring and the no-flux condition at solids. On volume: the relaxation sponges,
+**`Π` and `Π_f` are projections, not operators.** On velocity: the void bleed
+and the stress-free extension, the transport-consistency cap, the ±80 rails,
+prescribed sources, the boundary ring, the outflow-only open edges and the
+no-flux condition at solids. On volume: the relaxation sponges,
 sources and the positivity clamp. They are applied after the split and are not
 part of the PDE; each is documented where it appears below.
 
@@ -556,22 +592,35 @@ the viscous limit estimates the Smagorinsky contribution from an assumed strain
 rate. Fast-jet scenes therefore run at a higher effective CFL than the nominal
 0.45, backstopped by explicit clamps — a transport-consistency cap holding
 partial-fill cells to what the volume flux can follow, and ±80 m/s rails written
-as range tests so a fast-math compiler cannot fold them away.
+as range tests so a fast-math compiler cannot fold them away. The
+mixing-length `ν_t` does not enter the limit: it is capped at `0.125Δx²/Δt` in
+the shader instead (the stress is quadratic in the shear, so its effective
+diffusivity is `2ν_t`).
 
 ### Velocity pass
 
 Third-order upwind advection (its `O(Δx³)` dissipation is
 what lets jets and shear layers survive the thousands of substeps a hammer run
 takes), Smagorinsky eddy viscosity `ν_T = ν + (C_sΔ)²|S|`, a wall-aware
-Laplacian, gravity gated on fluid presence, implicit bed friction, then `∇P`
-from the EOS. An artificial bulk viscosity term `−u_bulk·c·Δx·(∇·u)` damps
+Laplacian, the mixing-length stress, gravity gated on fluid presence, implicit
+bed friction, then `∇P` from the EOS. The mixing-length stress `−ν_t ω` is
+formed at the cell corners, where the MAC grid holds `ω`, and differenced onto
+the faces: `u` from the corners above and below it, `w` from those either
+side. Its column geometry — bed, surface, and whether the column is an open
+channel — comes from a column pass refreshed every 32 substeps, and `y`
+from a distance transform of the solid mask done on the CPU when the mask
+changes. An artificial bulk viscosity term `−u_bulk·c·Δx·(∇·u)` damps
 acoustics; it vanishes where `∇·u ≈ 0` but not across a transient front, where
 it contributes of order 0.2 m of head on a 39 m hammer peak.
 
 Velocity in void cells is advected and slowly bled away rather than hard-zeroed.
 Zeroing it makes air behave as a rigid medium whose spurious shear layer shreds
-any free jet within a metre of its nozzle; the slow bleed stands in for the
-usual free-surface velocity extrapolation.
+any free jet within a metre of its nozzle. Over an open channel's surface the
+bleed gives way to extrapolation: a dry `u`-face with water one or two faces
+below takes that water's `u`, weighted by how full the cells below are
+(`smoothstep(0.3, 0.6, f)`), so spray and thin films do not lend their
+velocity. `w` is never extrapolated — copying it up turns the top interface
+face into free fall.
 
 ### Volume (VOF) pass
 
@@ -613,13 +662,16 @@ previous step, a zeroth-order no-slip that adds some near-wall dissipation.
 integrated implicitly as `u /= 1 + Δt·C_f|u|/Δx`, so any roughness is
 unconditionally stable. Note the `Δ` is the *cell size*, not the depth.
 
-**Resistance is therefore emergent, not prescribed.** The delivered roughness is
-the sum of the wall function, the extra stress the no-slip ghost feeds through
-the eddy viscosity, and the genuine form drag of a rasterised bed staircase. At
-about 8 cells of depth the delivered Manning `n` is ~0.07 almost regardless of
-`C_f`, dropping toward 0.02 at ~25 cells. **Cells per depth is the lever, not
-the roughness slider.** Consequently normal depth and `n` are *measured* off the
-computed energy grade line rather than derived from `C_f`:
+**Resistance is therefore measured, not prescribed.** The delivered roughness
+is the wall function's, carried up the column by the mixing length of step 1,
+plus the form drag of a rasterised bed staircase where the bed is drawn
+sloping. Measured at Medium (~20 cells of depth), Manning `n` follows `C_f` —
+0.024 at `C_f` = 0.02, 0.031 at 0.25, 0.038 at 3 — and cannot pass about 0.04,
+the roughness of a log law's own outer layer. Before the closure and the
+stress-free surface, most of the resistance came from the drag the void put on
+the surface, and `n` was ~0.07 at 8 cells of depth almost regardless of `C_f`.
+Normal depth and `n` are *measured* off the computed energy grade line rather
+than derived from `C_f`:
 
 ```math
 d_n = d\left(S_f/S_0\right)^{1/3} \qquad n = d^{2/3}\sqrt{S_f}\,/\,V
@@ -645,7 +697,11 @@ from a pond of level `L` faster than `√(2gL)`.
 
 A subcritical reach needs a real downstream control — tailwater, brink or
 outfall edge. Zero-gradient outflow is correct for supercritical flow and simply
-ponds a subcritical one.
+ponds a subcritical one. Under gravity an open edge that no level control owns
+passes outflow only: zero-gradient alone mirrors the interior and lets water
+in as readily as out. The tailwater's exchange face advects `u` first-order
+upwind, which keeps the pinned ghost out of the stencil.
+[boundary-conditions.md](boundary-conditions.md) has every edge in detail.
 
 ## 7. What is not represented
 
@@ -657,9 +713,14 @@ is no vapour-pressure model behind it. The domain is a vertical slice one metre
 wide, so everything is per metre of width and nothing three-dimensional
 (secondary currents, bend flow, spanwise structure) is available.
 
-Resistance comes from the mesh rather than a roughness table, `c` is chosen
-rather than physical, and depths are resolved at tens of cells rather than
-hundreds. Use it to see the shape of a result, then use a real model to get a
+Resistance comes from a wall function on the mesh rather than a roughness
+table, and a log-law bed caps it near `n ≈ 0.04`; `c` is chosen rather than
+physical, and depths are resolved at tens of cells rather than hundreds. The
+mixing length is algebraic — no turbulence is transported — so a roller or a
+separation zone has only its local shear to go on, and pipes, jets and plan
+view get Smagorinsky alone. A steady sloping surface sits in one-cell terraces
+(the VOF surface locks to cell faces; the pressure carries the sub-cell
+slope). Use it to see the shape of a result, then use a real model to get a
 number.
 
 Verified numbers — water hammer against Joukowsky, Torricelli efflux, venturi

@@ -13,7 +13,7 @@ with the cell fill fraction `f` doubling as the density:
 
 ```
 ∂f/∂t + ∇·(f u) = 0                      exact, flux form
-∂u/∂t + (u·∇)u  = −∇P + χ(f)·g + ν_T∇²u − 1_wall·C_f|u|u/Δ
+∂u/∂t + (u·∇)u  = −∇P + χ(f)·g + ν_T∇²u − ∇×(ν_t ω) − 1_wall·C_f|u|u/Δ
 P = p/ρ₀ = c² max(f − 1, 0)              equation of state
 ```
 
@@ -22,7 +22,11 @@ is what survives of the multiphase weight `ρg → f·ρ_w·g` in the heavy-flui
 (`ρ_w/ρ_a ≈ 800`): no water in a cell, no weight. With the air phase dropped
 `ρ → 0` in a void, the per-unit-mass momentum equation degenerates to `0/0`, and
 the velocity stored there is an extension field that must not be accelerated.
-`1_wall` restricts the friction to cells touching a
+Directly over an open channel's surface that extension is the water's own `u`
+carried up — a stress-free surface; elsewhere it is advected and bled away.
+`ν_t ω` is the mixing-length stress, `ν_t = l²|ω|`, applied in open-channel
+columns only (see "The surface is stress-free; the bed carries the
+resistance" below). `1_wall` restricts the friction to cells touching a
 solid: it is a **wall function** (a shear-stress BC divided by the cell height),
 not a bulk drag, which is why the delivered roughness is grid-dependent. And it
 is `ν_T∇²u`, *not* `∇·(ν_T∇u)` — the `∇ν_T·∇u` term is dropped.
@@ -58,11 +62,14 @@ No Poisson solve. Two fullscreen passes per substep: `vel` then `vof`.
 
 3rd-order upwind advection (low dissipation, so jets stay crisp over the
 thousands of substeps a hammer run needs), Smagorinsky eddy viscosity,
-wall-aware Laplacian (no-slip or free-slip), gravity gated on fluid presence,
-implicit bed friction, then `∇p` from the EOS. Velocity in voids is advected
-and slowly bled away rather than zeroed — hard-zeroing it makes the air a
-rigid medium whose fake shear layer shreds any free jet within a metre of its
-nozzle.
+wall-aware Laplacian (no-slip or free-slip), the mixing-length stress in
+open-channel columns, gravity gated on fluid presence, implicit bed friction,
+then `∇p` from the EOS. Velocity in voids is advected and slowly bled away
+rather than zeroed — hard-zeroing it makes the air a rigid medium whose fake
+shear layer shreds any free jet within a metre of its nozzle. The exception is
+the `u`-faces in the two rows over a channel's surface: they take the water's
+`u` from below, because bled air there was a momentum sink that held the
+whole surface back.
 
 **Keep gravity and `∇p` additive** and do not interpose anything new between
 them ([numerics.md](numerics.md) §4), or the hydrostatic state stops being a
@@ -108,6 +115,29 @@ settling at the end of a run.
   inward through the advection stencil of the last interior column. Ring cells
   take the interior neighbour's tangential velocity (zero gradient) and keep
   only the clamped momentum update on the exchange face.
+- **Open edges let water out, never in (under gravity).** A zero-gradient edge
+  mirrors the interior, so it passes inflow as readily as outflow. Once the air
+  over the water stopped bleeding momentum (issue #72), s2, s3, hammer and jet
+  each drew water IN through an open edge and ran to the ±80 rails within
+  20–40 s. Wherever no level control owns an edge, its exchange face now only
+  passes outflow (`u ≤ 0` on the left, `u ≥ 0` on the right, `w ≤ 0` at the
+  bottom, `w ≥ 0` at the top). Not in plan view: there the plane is full by
+  construction, there is no surface to protect, and the clamp destabilised it.
+- **The tailwater's exchange face is first-order upwind.** The 3rd-order
+  stencil reached into the ghost column, whose `f` is pinned, and with the
+  surface no longer dragged the outlet found a second steady state: a
+  sharp-crested weir at the tailwater level, the rows below it recirculating.
+  a23 and m3 (at Low) ponded behind it for good, and h23's jump had no stable
+  seat (swept out at 0.40 m, up the chute at 0.44 m), which looked like a
+  knife edge and was a boundary bug. Upwinding `u ∂u/∂x` on that one face —
+  zero when the flow is entering — removed the second state.
+- **The stress-free extension copies `u`, never `w`, and stays out of the
+  inflow sponge.** Copying `w` up makes the top interface face free-fall: the
+  dry face reached −11 m/s within 0.1 s. Inside the reservoir's sponge the
+  surface fill is rewritten every substep, and a copied `u` had nothing to
+  hold it: estab's still reservoir grew surface currents of 5.6 m/s against
+  0.17 m/s on the old model. The tailwater sponge keeps the extension —
+  excluding it there too cost h23 0.19 m of head at the outlet.
 - **Control bands.** A level control (reservoir / tailwater) applies only over
   the contiguous open run of cells in its boundary column that contains the
   level (`columnBand` in sim.js) — not the whole column. Applied column-wide it
@@ -125,10 +155,10 @@ settling at the end of a run.
   (venturi 1.35 m, hammer 5.5 m) or it draws down and the bore cavitates;
   and the nudge is asymmetric (fill 12·s, drain 2·s²) because deleting wave
   crests column-by-column against an incoming jet paints standing striations
-  in the pond. The prescribed inlet plug is likewise feathered over its top
-  three cells (`inletVel` repays the lost discharge) so its hard top edge
-  stops waterfalling ripples into the drawn-down interior surface; submerged
-  ducts (level above the whole run) keep the full plug. Levels are
+  in the pond. The prescribed inlet plug fills the delivered depth to its
+  surface; it was once feathered over its top three cells against ripples,
+  and since issue #72 that feather was a slow surface layer the reach could
+  not shed (see "The surface is stress-free"). Levels are
   ELEVATIONS above the domain floor (the datum), not depths over the bed —
   the panel prints both. A scene must still set the depth the arriving profile
   actually wants (m1's inletDepth is the MEASURED weir backwater at the inlet,
@@ -170,8 +200,11 @@ settling at the end of a run.
   1.3 d_c is a safe target, but it is a floor to clear, not a value to aim
   at: how far above d_c you can go is set by what the reach has to read.
   Raising m3 from 1.08 to 1.3 d_c lifted its apron above d_n and turned the
-  M2 the scene is about into M1, so m3 deliberately runs at the margin
-  (measured steady there) while h23 and a23 sit at 1.3 and 1.5.
+  M2 the scene is about into M1; since issue #72 that window (1.3 d_c ≤ tail
+  < d_n) is 15 mm wide, and m3 ends in a free overfall instead. A tailwater
+  for a JUMP has a second condition: it must stand at the jump's conjugate
+  depth, not merely clear of d_c — h23 runs at 0.52 m (1.75 d_c), and
+  below ~0.50 the jump sweeps off the apron. a23 sits at 0.24 m (1.4 d_c).
 - **Outfall edges (`open` = 2) are for brinks, not for ponds.** The ghost is
   held permanently empty, so the exchange face sees the full hydrostatic
   `c²(f−1)` of the interior with nothing opposing it. Against a thin,
@@ -272,6 +305,34 @@ One trap when you measure this yourself: use `analyse().qRaw`, not
 steady the drawn profile against roll waves, so a single call on the mean
 columns is still 90% full of the live frames before it — enough to report
 0.03 where the mean columns give 0.002.
+
+## Steady surfaces terrace
+
+In a steady sloping reach the VOF surface does not slope smoothly. It sits in
+treads one cell high and steps between them — 12.6 mm on m2, 21.7 mm on the
+sandbox at Medium. Along a tread the top partial row holds f ≈ 0.9 with
+nothing driving it: a partial cell has `p = 0`, so a sub-cell slope of the
+surface puts no horizontal pressure gradient on the top row. It was there
+before issue #72 as well, hidden under the surface wobble the old void drag
+kept up.
+
+Ruled out, measured on sa1: interface compression off (unchanged), and two
+face-weighted densities in `∇p` (unchanged). What does carry the sub-cell
+slope is the pressure: the hydraulic grade line from the bed pressure is
+smooth where the surface steps. So:
+
+- the overlay's energy line is built on the HGL (`hgl` in `OVERLAY.analyse`,
+  from `SIM.hydraulicGrade`, which a channel scene now always keeps), and
+  `S_f`, `n` and `d_n` come off it unstepped;
+- a gauge's depth `d`, the column reduction and the hover box still read the
+  VOF surface and step by a whole Δx — FB-1's baseline `d₁` reads 0.498 or
+  0.520 m at Medium and nothing between;
+- a LEVEL pool is untouched: a horizontal surface on a drawn bed sits on a
+  cell boundary by construction, which is why m1 keeps its bed drawn (GV-1
+  reads its surface) rather than tilted.
+
+A fix belongs in the VOF scheme — a sub-cell surface for the steady state —
+not in the momentum equation.
 
 ## Enclosed voids: holes inside the water are REAL, not a drawing artefact
 
@@ -386,26 +447,41 @@ keeps `V²/2g`, which is what it always drew, and the corrected line is one more
 thing Average mode is for. `n` and `d_n` follow the line they are measured off,
 so a number quoted here is an Average-mode number.
 
-This matters because the effective resistance is **not** just `C_f`: the no-slip
-wall adds stress through the eddy viscosity, and a sloping bed rasterised onto a
-Cartesian grid is a staircase whose steps are genuine form roughness. At ~8 cells
-of depth the delivered `n` is ~0.07 almost regardless of `C_f`; at ~25 cells it
-drops towards 0.02. **Deeper flows relative to Δx are the lever**, not the
-roughness slider.
+This matters because the effective resistance has not always been `C_f`'s.
+Before issue #72 most of it came from the free surface (next section): the
+delivered `n` was ~0.07–0.08 almost regardless of `C_f`, and cells per depth
+was the only lever. With the surface stress-free and the mixing length
+carrying the bed's stress up the column, the bed sets it, and `n` follows
+`C_f` — measured on m2 at Medium (~20 cells of depth), Average mode:
+
+```
+C_f   0.02    0.125   0.25    0.5     3
+n     0.024   0.028   0.031   0.034   0.038
+```
+
+close to `n ≈ 0.022 + 0.017·√C_f` (`nOf` in scenes.js, used for initial
+conditions only) and capped near 0.04 whatever `C_f` is: a log-law bed cannot
+be rougher than its own outer layer, so no setting on the panel (`C_f` ≤ 0.25)
+gets past ~0.031.
 
 Consequences for scene design:
-- Mild vs steep needs S₀ chosen against the *delivered* roughness, not the
-  nominal one. The steep scenes run at 1 in 4 with q ≈ 1.2 m²/s to get enough
-  cells per depth. The critical-slope scene is the extreme case: d_n = d_c
-  lands at S₀ ≈ 1 in 9.5 with C_f ≈ 0.02 — found by measuring `dnGlobal`
-  against d_c and iterating, because no closed-form C_f relation survives the
-  wall function + eddy viscosity + bed staircase. A broad-crested weir ponds
-  ~1.5 d_c of head above its crest, so a weir meant to make zone 1 without
-  drowning an upstream gate must be LOW (the old 0.30 m crest turned the whole
-  scene into one M1 pool).
-- Zone-3 reaches on mild/horizontal/adverse beds are short, because the high
-  delivered resistance pulls the jump close to the supercritical entry. A gate
-  that is even slightly drowned puts a roller directly on its own jet, and the
+- Mild vs steep is `S₀` against the critical slope `S_c = g n²/d_c^⅓`, with
+  the DELIVERED `n`. At q = 0.25, C_f = 0.25 that is about 1 in 57, measured
+  on a uniform tilted reach rather than computed: 1 in 83 runs d/d_c = 1.14
+  (M), 1 in 62 runs 1.04 and 1 in 50 runs 0.98 (both C). The old mild
+  channel's 1 in 68 is a critical slope now; the mild scenes run at 1 in 250
+  and c13 at 1 in 57. The steep chutes stay at 1 in 4 with q = 1.2 m²/s
+  (d_n ≈ 0.20 under d_c = 0.53), except s3 at 1 in 10: an S3 needs the jet
+  from under its gate thinner than d_n, and at 1 in 4 d_n is too shallow for
+  any gate the domain can feed.
+- A broad-crested weir ponds ~1.5 d_c of head above its crest, and on a
+  near-critical slope a pool is `(depth − d_c)/S₀` long. c13's old weir worked
+  at 1 in 8.5; at 1 in 57 it backed a C1 up the whole reach and left nothing
+  for the C3, so c13 ends at a tailwater just above d_c instead (a ~3 m C1).
+- Zone-3 reaches are long now — m3's M3 runs ~3 m from the chute toe — and a
+  jump's position follows the tailwater smoothly (h23: 0.50 m stands it at
+  x ≈ 4.4–6.2 m, 0.53 at 3.6–5.5, 0.56 on the chute toe). A gate that is even
+  slightly drowned still puts a roller directly on its own jet, and the
   depth-averaged Froude number then never reads supercritical — physically
   correct, useless as a demonstration.
 
@@ -413,6 +489,104 @@ Depth and discharge are averaged in **time** per column before classification,
 not space: roll waves travel and average out, while a jump or a short zone-3
 reach stands still and survives. A spatial window wide enough to swallow a roll
 wave is also wide enough to erase the reaches that matter.
+
+## The surface is stress-free; the bed carries the resistance
+
+Issue #72, measured on the old model (m2, uniform reach, d ≈ 0.34 m, Average
+mode): the velocity peaked at mid-depth and ran at half speed at the surface —
+
+```
+depth below surface  0.03  0.13  0.25  0.36  0.47  0.54  0.62  0.76  0.87  0.98
+u (m/s), m2 x = 7    0.51  0.56  0.73  0.94  1.09  1.12  1.08  0.81  0.54  0.10
+```
+
+— so the 0.6-depth gauging rule read 40–60% high. The cause was the void: dry
+faces were advected, diffused and bled at 1.5 s⁻¹, so the air just above the
+water held slow fluid and the wobbling surface kept refilling interface cells
+with it. The air was a momentum sink, and it was where most of every channel
+scene's resistance came from. Removing it alone is not a fix: sa1 accelerated
+from 0.34 to ~0.15 m deep and went supercritical, because Smagorinsky's
+`(C_s Δx)²|S|` is ~100× too small to carry the bed's stress up a column.
+Two parts, together:
+
+- **Stress-free surface.** A dry `u`-face with water one or two faces below
+  takes that water's `u` (weights `smoothstep(0.3, 0.6, f)` on the faces
+  below, so a thin film or spray does not lend its velocity), restricted to
+  the few rows over a column's main surface. `w` keeps the bleed, and so does
+  every other void face; the guard rails above say why.
+- **Mixing-length closure.** `ν_t = l²|ω|` with
+  `l = κ · min(y, z − z_b) · √((η − z)/d)`, κ = 0.41: `z_b`, `η` and `d` come
+  from a column pass (`FS_TCOL`: bed, surface, and whether the column is an
+  open channel — water standing on a bed under air, not a roof), and `y` is
+  the distance to the nearest solid (a CPU distance transform at cell
+  corners, rebuilt with the mask and when a valve moves). It fades out under
+  2–4 Δx of depth, so thin films get none. The stress is built at the cell
+  corners, where the MAC grid keeps `ω`, and differenced: the force is
+  `−∇×(ν_t ω)`, which is `∂/∂z(ν_t ∂u/∂z)` in a channel. On the VORTICITY
+  rather than the strain, so
+  irrotational motion — waves, sloshing, potential flow over a crest — carries
+  no stress at any `ν_t`: on the strain, the vorticity a breaking crest shed
+  near the paddle killed the deep flume's wave train. `ν_t` is capped at
+  `0.125 Δx²/Δt` for the explicit update. Not in pressurised columns, not in
+  plan view, not in jets (no bed under them); the conservative form matters —
+  `ν_t∇²u` drops `∇ν_t·∇u` and with a parabolic `ν_t` that alone puts the
+  maximum at mid-depth.
+
+What it delivers, on sa1's uniform reach at Medium (Average mode, x = 6–10 m,
+the `smoke.js` PROFILE suite): the maximum at y/d = 0.93–0.98 with the
+surface at 1.22–1.27 V; u(0.6 d below the surface)/V = 1.015–1.025;
+½(u(0.2d) + u(0.8d))/V = 1.02; a log law over 0.05–0.35 d with fitted
+κ = 0.41–0.43; α = 1.17–1.19; n = 0.031–0.033 at C_f = 0.25. Two GPU mutants
+in `smoke.js` (`surface-sink`, `no-mixing-length`) put each half back and
+watch the suite fail; their recorded numbers are the old profile.
+
+**The inflow plug is full to the surface.** A prescribed-q inlet's plug used
+to taper to zero over its top three cells, which kept a hard step at the
+waterline from shedding ripples while the surface was a drag boundary. With
+the surface stress-free that taper is a slow layer injected at the inlet, and
+nothing takes it out: `ν_t` vanishes at the surface, so only `g·S₀`
+(0.025 m/s² at 1 in 400) re-accelerates it, and the flow carries it down the
+reach. In shallow water it fades within 10–20 depths — which is why sa1's
+PROFILE stations, 20–40 depths out, never saw it — but not in deep water.
+MEASURED on a 1.0 m uniform reach (1 in 400, q = 1.70 m²/s, C_f 0.25; NC-2's
+gauging scene), u at the surface / u_max, both over V:
+
+```
+                    x = 2 m      4 m          8 m          12 m         16 m
+tapered (Low, 8 s)  0.66/1.28    0.86/1.18    1.01/1.14    1.09/1.17    1.30 at top
+full    (Low, 8 s)  0.97/1.11    1.02/1.14    1.16 at top  1.22 at top  1.28 at top
+```
+
+Letting the stress-free extension into a prescribed-q sponge instead
+changed nothing at Low. The full plug does not bring the ripples back: on m2
+(Low, 8 s after a 15 s spin-up) the surface's RMS fluctuation is 9–12 mm at
+x = 0.5–2 m with the taper and 10–12 mm without, and the profile within 4 m
+of the inlet is the same either way. `inletVel`'s 1.5 Δx repayment went with
+the taper; the delivered discharge rises 1–2%.
+
+**Open: a deep, fast inlet still sheds a slow surface layer at Medium.** On
+the same 1.0 m reach at Medium the full plug makes no difference: a pit
+0.2–0.25 m deep opens 0.2–1 m in (water pours over its upstream lip, the core
+under it reaches 2.5 m/s, Fr ≈ 0.9) and a roller at x ≈ 1 m sends a slow top
+layer down the reach — u_surface/u_max over V 0.61/1.21 at x = 2 m,
+0.89/1.14 at 8 m and 1.16/1.18 at 20 m by t = 15 s, the 0.6-depth rule
+reading 3–8% high under it. Shallow reaches recover from the same feature
+within ~20 depths (10 m at 0.44 m deep, Medium); this one has not by 20.
+Each of these was tried at Medium and is not the cause: the extension's
+exclusion from the sponge; a reservoir level short of the developed
+profile's α head (+19 mm); the start-up transient (a plug seed pits too);
+zero-velocity air faces on the inflow face (the plug carried 4 cells into
+the air); the sponge width (1 m removes the pit but not the slow layer; one
+cell deepens the pit); a log-law inflow profile (worse — a 0.3 m drawdown);
+and a gentler slope (V 1.07 m/s: no pit, the same slow layer, later). A
+floating-depth flux inlet — q imposed on the local depth, no sponge — is
+unstable here (the depth at the inlet collapses within a second) though
+stable and better at 0.44 m.
+
+Settle times fell with it — m2 from 85 s to 30 s, c13 from 95 s to 30 s — and
+the steep chutes run shallower against the same d_c (s1/s2 d_n 0.32 → ~0.20).
+`p.kappa` (headless only, not a panel control) sets κ; 0 turns the closure
+off.
 
 ## Verified numbers
 
@@ -426,13 +600,17 @@ wave is also wide enough to erase the reaches that matter.
   ladder fits at 101% of theory (R² 0.998), k = 4.2–4.3 throughout, and t₇₅ is
   c-independent (30 vs 60: ~2%). The scene exists because hammer cannot host
   this: there the rise finishes inside one wave transit.
-- **Conjugate depth** (`h23`, after the retune to q = 0.5): Fr₁ = 2.24,
-  d₁ = 0.162 m, d₂ = 0.416 m against ½d₁(√(1+8Fr₁²) − 1) = 0.438 m, −5%. At
-  the old q = 0.22 the same measurement read +65% — the jump was submerged,
-  not free, so the number the scene invites you to check was meaningless.
-  On a STEEP bed expect the measured d₂ to sit well under the prediction
-  (s1: −39%): the horizontal-bed momentum balance has no weight component,
-  and s1's bed falls 1 in 4.
+- **Conjugate depth** (`h23`, q = 0.5, tailwater 0.52 m since issue #72):
+  the sheet lands at d₁ ≈ 0.155 m, Fr₁ ≈ 2.7, and d₂ reads 2% under
+  ½d₁(√(1+8Fr₁²) − 1) with the tailwater at 0.50 m and 2.5% over at 0.53 m.
+  (Before #72: Fr₁ = 2.24, d₂ −5%. At the older q = 0.22 the same measurement
+  read +65% — the jump was submerged, not free, so the number the scene
+  invites you to check was meaningless.) On a STEEP bed expect the measured
+  d₂ under the prediction (s1: d₁ 0.26 at Fr₁ 2.9, d₂ 0.88 against 0.95,
+  −8%; −39% before #72): the horizontal-bed momentum balance has no weight
+  component, and s1's bed falls 1 in 4.
+- **Velocity profile** (`sa1`): the 0.6-depth and 0.2/0.8 gauging rules within
+  2.5%, κ 0.41–0.43 — see the section above; `smoke.js --only=profile`.
 - **Sloshing period** (`slosh-tank`, DA-3): the first standing mode, released
   from a tilt a/d = 0.2. Against T = 2π/√(gk·tanh kd), k = π/B, timed crest
   to crest on a Depth gauge at x = 0.5 m, Medium: +2.2% (B/d = 4, d = 1 m,
@@ -471,9 +649,9 @@ Every scene has been run headless to t = 120 s and measured for steadiness
 (d h/dt), temporal flutter, surface waviness and discharge continuity. The
 steady scenes hold their profile to <1%/s with volume flat to a fraction of
 a percent; m1's median surface curvature is 0.003% of its mean depth. The
-exceptions are honest physics, not drift: the 1-in-4 chutes (s1, s2, s3)
-carry roll waves at Fr ≈ 2, and s1's roller sloshes because a 1.6 m pool is
-far shorter than the ~6 d₂ a jump of that size wants.
+exceptions are honest physics, not drift: the steep chutes (s1, s2 at
+1 in 4, s3 at 1 in 10) carry roll waves, and the jump scenes' rollers (s1,
+h23, a23) keep a 3–9% flutter in the mean profile for good.
 
 **Residual surface waves are not all the same problem — localise them before
 tuning anything.** Record the per-column temporal standard deviation of the
@@ -490,7 +668,10 @@ is largest tells you the source, and the two sources want opposite fixes:
   brink (22 → 31 mm) — near-critical amplification at the overfall.
 
 So m2's waves were half boundary (fixed) and half brink (intrinsic); c13's
-are entirely intrinsic. Neither is solver drift.
+are entirely intrinsic. Neither is solver drift. (All of this was measured
+before issue #72. c13 has since been rebuilt — 1 in 57, a tailwater instead of
+a weir — and has not shown the growth again, but a critical reach amplifies
+every disturbance, so the diagnosis stands.)
 
 **The Froude view is the only display mode built from two different fields**,
 so it is the only one that can show structure the flow does not have. Water,
@@ -533,6 +714,12 @@ itself ~2 cells thick. Consequences:
   improved Δx but put the beach 3 m from the paddle: the reflection built a
   standing wave (H = 0.49 m at x = 1) and the orbit decay collapsed from 244×
   to 16×. Reverted.
+- The mixing-length closure acts on vorticity, so it leaves wave motion
+  alone. Measured against the old model: the intermediate and shallow flumes
+  and the slosh tank's period and decay unchanged within the reading; the
+  deep flume's train arrives at 0.04–0.07 m in its far half against 0.05–0.07
+  (a strain-based `ν_t` took it to one cell — no wave — by x = 3 m). The
+  stress-free surface itself did not make waves last longer.
 - **Plunging breakers are out of reach.** The Iribarren number on the 1 : 3.4
   beach is ξ ≈ 1.3, squarely in the plunging band, so the *conditions* are
   right — but an overturning tongue is thinner than the interface can hold.
@@ -549,8 +736,12 @@ and made deep water look like it had no decay at all.
 
 **Speed.** m2 is the heaviest scene in the set: 1265 × 75 cells at
 Δt = 2.0e-4 needs ~4900 substeps per second of simulated time, ~0.23 ms each,
-so it runs at roughly 0.9× real time and there is no bug to find. `analyse`
-costs 0.5 ms per frame against that — well under a percent. If a scene feels
+so it runs at roughly 0.9× real time and there is no bug to find. The
+stress-free surface and the mixing length cost 11–14% per substep (m2, hammer
+and h23 against the old model); most of that was the column pass `FS_TCOL`,
+whose walk down each column is serial — every 8 substeps it cost hammer 20%,
+so it refreshes every 32. `analyse` costs 0.5 ms per frame against that — well
+under a percent. If a scene feels
 slow, check `state.rt` in the status bar before suspecting the overlay.
 
 ## The view
@@ -659,20 +850,29 @@ picture saturated or flat is the symptom of the two having drifted apart.
 - Bed slope is estimated by a running mean of per-cell bed drops with outliers
   **dropped**, not clipped: a rasterisation step is exactly one cell and must be
   kept (clipping it reads the slope ~40% low), while a brink is tens of cells
-  and must be excluded entirely.
+  and must be excluded entirely. At 1 in 250 a drawn bed steps once every
+  3.2 m, so a window between two steps reads level and one straddling a step
+  reads several times S₀ — the class then flickered H/M along m1. The window
+  is therefore snapped outward to the nearest rasterisation steps either side
+  and the drop divided by the span between them, reaching inward only where
+  the domain edge cuts it off; with no step in reach it falls back to the
+  plain mean.
 - Only classify water that is **standing on something**. The ±0.12 m guard
   either side of a cliff is not enough on its own: past a brink the falling
   sheet keeps producing a "bed" (wherever the water happens to reach) and a
   depth, so m2 grew a confident M3 label over 2 m of waterfall, c13 the same
   and s3 an H3. Those columns were also feeding the d_n median. The test that
   works is the solid mask — a channel column has a wall directly under its
-  lowest wet cell, a nappe does not (`analyse` checks `mask[jb−1]`).
+  lowest wet cell, a nappe does not (`standing(i)` in `analyse` checks
+  `mask[jb−1]`). The slope statistics use the same test: a falling sheet's
+  "bed" read as an S-curve slope near every brink.
 - `spinup` is a MEASURED settle time, not a guess: the last moment the 10 s
   running-mean depth profile is still more than ~3% of mean depth away from
   its final shape. Measure it over a long run, because the answer is not
-  intuitive — m1 arrives in 25 s but m2, at the same slope and discharge,
-  takes 85 s (a drawdown has to propagate the length of the reach several
-  times). Scenes whose flutter is genuine — the steep chutes' roll waves,
+  intuitive — before issue #72 m1 arrived in 25 s but m2, at the same slope
+  and discharge, took 85 s (a drawdown has to propagate the length of the
+  reach several times); with the bed carrying the resistance both settle by
+  30 s. Scenes whose flutter is genuine — the steep chutes' roll waves,
   s1's roller — never fall below tolerance at all; for those the mean profile
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.

@@ -82,8 +82,9 @@ Fr = 1 crossing back to the lip in `d_c` units against the textbook 3–4 `d_c`.
 ### Discussion points
 
 - **Find critical, live.** On the Froude view, zoom the crest and look for the
-  pale break: it sits under one `d_c` back from the lip, not the 3–4 `d_c` the
-  textbook quotes. That figure is derived for a channel arriving at normal
+  pale break: measured, it sits 2–3 `d_c` back from the lip across the middle
+  of the class (5 at the smallest q, 1.6 at the largest), against the 3–4 `d_c`
+  the textbook quotes. That figure is derived for a channel arriving at normal
   depth on a real slope; a flat crest has no uniform-flow reach for a drawdown
   curve to depart from, so the whole crest *is* the drawdown curve.
 - Hover across the last three or four columns on the lip — the depth falls

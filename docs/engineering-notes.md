@@ -557,15 +557,31 @@ tapered (Low, 8 s)  0.66/1.28    0.86/1.18    1.01/1.14    1.09/1.17    1.30 at 
 full    (Low, 8 s)  0.97/1.11    1.02/1.14    1.16 at top  1.22 at top  1.28 at top
 ```
 
-and at Medium the tapered reach's slow layer had reached x ≈ 20 m by
-t = 15 s, with the 0.6-depth rule reading 4–8% high under it while the
-0.2/0.8 pair held at +2%. Letting the stress-free extension into a
-prescribed-q sponge instead changed nothing; the taper was the whole of it.
-The full plug does not bring the ripples back: on m2 (Low, 8 s after a 15 s
-spin-up) the surface's RMS fluctuation is 9–12 mm at x = 0.5–2 m with the
-taper and 10–12 mm without, and the profile within 4 m of the inlet is the
-same either way. `inletVel`'s 1.5 Δx repayment went with the taper; the
-delivered discharge rises 1–2%.
+Letting the stress-free extension into a prescribed-q sponge instead
+changed nothing at Low. The full plug does not bring the ripples back: on m2
+(Low, 8 s after a 15 s spin-up) the surface's RMS fluctuation is 9–12 mm at
+x = 0.5–2 m with the taper and 10–12 mm without, and the profile within 4 m
+of the inlet is the same either way. `inletVel`'s 1.5 Δx repayment went with
+the taper; the delivered discharge rises 1–2%.
+
+**Open: a deep, fast inlet still sheds a slow surface layer at Medium.** On
+the same 1.0 m reach at Medium the full plug makes no difference: a pit
+0.2–0.25 m deep opens 0.2–1 m in (water pours over its upstream lip, the core
+under it reaches 2.5 m/s, Fr ≈ 0.9) and a roller at x ≈ 1 m sends a slow top
+layer down the reach — u_surface/u_max over V 0.61/1.21 at x = 2 m,
+0.89/1.14 at 8 m and 1.16/1.18 at 20 m by t = 15 s, the 0.6-depth rule
+reading 3–8% high under it. Shallow reaches recover from the same feature
+within ~20 depths (10 m at 0.44 m deep, Medium); this one has not by 20.
+Each of these was tried at Medium and is not the cause: the extension's
+exclusion from the sponge; a reservoir level short of the developed
+profile's α head (+19 mm); the start-up transient (a plug seed pits too);
+zero-velocity air faces on the inflow face (the plug carried 4 cells into
+the air); the sponge width (1 m removes the pit but not the slow layer; one
+cell deepens the pit); a log-law inflow profile (worse — a 0.3 m drawdown);
+and a gentler slope (V 1.07 m/s: no pit, the same slow layer, later). A
+floating-depth flux inlet — q imposed on the local depth, no sponge — is
+unstable here (the depth at the inlet collapses within a second) though
+stable and better at 0.44 m.
 
 Settle times fell with it — m2 from 85 s to 30 s, c13 from 95 s to 30 s — and
 the steep chutes run shallower against the same d_c (s1/s2 d_n 0.32 → ~0.20).

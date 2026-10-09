@@ -813,8 +813,8 @@ const SCENES = (() => {
           const V = m.q / d, us = Math.sqrt(G * Sf(m.q, d, cell()) * d);
           return [Math.max(0, V + (us / KAPPA) * (1 + Math.log(h / d))), 0];
         },
-        blurb: "A long, straight mild channel fed by a reservoir and ending in a free overfall. The reservoir level sets the flow: about 0.68 m runs the reach 0.4 m deep, about 1.33 m runs it 0.9 m deep — the place to try the current-meter rules against the whole profile.",
-        tips: ["Colour is speed: the water is fastest at the surface and slows towards the bed.",
+        blurb: "A long, straight mild channel fed by a reservoir and ending in a free overfall. The reservoir level sets the flow: about 0.68 m runs the reach 0.4 m deep, about 1.33 m runs it 0.8–1.0 m deep — the place to try the current-meter rules against the whole profile.",
+        tips: ["Colour is speed: where the reach has recovered from the inlet the water is fastest at the surface and slows towards the bed.",
                "Controls → Reservoir level sets the flow (Inflow q follows it). Press R after changing it: the reach restarts near its new steady state.",
                "A Rake (6) draws u against depth; its V is the full depth-integral of that curve.",
                "Gauges (5) on Speed read u at a point — put three at 0.2 d, 0.6 d and 0.8 d below the surface.",

@@ -239,8 +239,8 @@ const EXERCISES = [
     viewParams: { mode: "2", gaugeField: "speed", channel: false, particles: false },
     digitNote: "no digit: choose your own station, clear of the inlet and the lip",
     studentParams: [
-      { control: "inLevel", value: 0.68, unit: "m", rule: "shallow run (d ≈ 0.4 m)" },
-      { control: "inLevel", value: 1.33, unit: "m", rule: "deep run (d ≈ 1.0 m)" },
+      { control: "inLevel", value: 0.68, unit: "m", rule: "shallow run (d ≈ 0.4 m all along the reach)" },
+      { control: "inLevel", value: 1.33, unit: "m", rule: "deep run (d ≈ 0.8–1.0 m, shallower near the lip)" },
     ],
     instruments: [
       { tool: "gauge", where: "three at your station x: at z = η − 0.2 d, η − 0.6 d and η − 0.8 d", why: "on Speed, each reads the point velocity a current meter would at that depth" },
@@ -259,7 +259,7 @@ const EXERCISES = [
       "Press A (Average) and wait until the legend's T passes 15 s. Read u₀.₂, u₀.₆ and u₀.₈ off the three gauge cards and V off the rake's chip. One-point rule V₁ = u₀.₆; two-point rule V₂ = ½(u₀.₂ + u₀.₈); each rule's error is 100·(V_rule/V − 1) %.",
       "Deep run: set the level to 1.33 m and press R. After the settle, read d and η again at the same x, click each gauge with the Gauge tool to clear it, place three at the new depths, and repeat.",
     ],
-    task: "Submit x, d, u₀.₂, u₀.₆, u₀.₈ and V for both runs. Field practice uses one point below 0.75 m and two above it: which rule lands closer to V on each run, and by how much?",
+    task: "Submit x, d, u₀.₂, u₀.₆, u₀.₈ and V for both runs. Field practice uses one point below 0.75 m and two above it: which rule lands closer to V on each run, by how much, and where does the rake put the fastest water?",
     settle: 40,
   },
   {

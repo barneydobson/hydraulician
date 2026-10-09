@@ -5,10 +5,11 @@
     python3 collect_plot.py data/simulated-class.csv  # the shipped dry-run class
 
 Input CSV (Blackboard export, header row required, extra columns ignored),
-one row per student per run, read in Average mode:
+one row per student per run, read in Average mode at the student's own
+station x:
 
-    student_id,digit,run,x_m,d_m,u02,u06,u08,V
-    23140870,0,shallow,10,0.442,1.02,0.92,0.80,0.91
+    student_id,run,x_m,d_m,u02,u06,u08,V
+    23140870,shallow,14,0.429,1.273,1.036,0.792,1.02
 
 `run` is `shallow` or `deep`. u02, u06 and u08 are the point velocities
 0.2 d, 0.6 d and 0.8 d below the surface (m/s), V the rake's depth-averaged
@@ -20,9 +21,12 @@ against:
 
 Two panels:
 
-  left   each rule's error against the rake, 100·(V_rule/V − 1) %, at the
-         class's two depths, with the 0.75 m handover and the log-law
-         prediction (both rules read 0.084·u*/κ high on a log law)
+  left   each rule's error against the rake, 100·(V_rule/V − 1) %, against
+         the station's distance from the inlet in depths, x/d, for both runs,
+         beside the log-law prediction (both rules read 0.084·u*/κ high on a
+         log law). The reach's profile is still recovering from its inlet
+         for the first few tens of depths, and a deep run is fewer depths
+         from the inlet than a shallow one at the same x
   right  every student's three points as u/V against height above the bed
          over the depth, (z − z_b)/d, beside the log law for each run — the
          profile the two rules are sampling
@@ -35,6 +39,7 @@ import os
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 G, S0, KAPPA = 9.81, 1.0 / 400.0, 0.41        # the gauging reach: 1 in 400
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
@@ -91,6 +96,7 @@ def main():
         raise SystemExit("no usable rows")
 
     print("%-8s %3s  %-24s %-24s %s" % ("run", "n", "one-point (u0.6)", "two-point (u0.2+u0.8)/2", "log law"))
+    print("(mean ± sd over the class; the spread is mostly the stations' distance from the inlet)")
     for run, _, _ in RUNS:
         rr = [r for r in rows if r["run"] == run]
         if not rr:
@@ -106,43 +112,39 @@ def main():
                          "xtick.color": MUTED, "ytick.color": MUTED})
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(12, 5.2))
 
-    # ---- left: each rule's error, at the two depths
-    for k, (key, col, mk, lab, off) in enumerate((("e1", ONE, "o", "one-point  u₀.₆", -0.018),
-                                                   ("e2", TWO, "s", "two-point  ½(u₀.₂ + u₀.₈)", 0.018))):
-        xs = [r["d_m"] + off for r in rows]
-        ax.scatter(xs, [r[key] for r in rows], s=34, marker=mk, color=col, alpha=0.55,
-                   edgecolors="white", linewidths=0.8, label=lab, zorder=3)
-        for run, _, _ in RUNS:
-            rr = [r for r in rows if r["run"] == run]
-            if len(rr) < 2:
-                continue
-            d, _ = mean_sd([r["d_m"] for r in rr])
-            m, sd = mean_sd([r[key] for r in rr])
-            ax.errorbar([d + 2.4 * off], [m], yerr=[sd], fmt=mk, color=col, ms=8, capsize=4,
-                        lw=2, mec="white", mew=1.2, zorder=4)
-    for run, _, _ in RUNS:
+    # ---- left: each rule's error, against the distance from the inlet in depths
+    sited = [r for r in rows if r["x_m"] is not None]
+    if len(sited) < len(rows):
+        print("  %d row(s) without x_m left off the left panel" % (len(rows) - len(sited)))
+    for run, _, mk in RUNS:
+        for key, col in (("e1", ONE), ("e2", TWO)):
+            rr = [r for r in sited if r["run"] == run]
+            ax.scatter([r["x_m"] / r["d_m"] for r in rr], [r[key] for r in rr], s=40, marker=mk,
+                       facecolors=col if run == "shallow" else "white", edgecolors=col,
+                       linewidths=1.4, alpha=0.85, zorder=3)
+    bias = [loglaw_bias(r["d_m"], r["V"]) for r in rows]
+    ax.axhspan(min(bias), max(bias), color=GRID, zorder=1)
+    ax.annotate("pure log law: both rules %+.1f to %+.1f %%" % (min(bias), max(bias)),
+                (0.48, min(bias)), xycoords=("axes fraction", "data"), xytext=(0, -4),
+                textcoords="offset points", ha="left", va="top", fontsize=9, color=MUTED)
+    handles = [Line2D([], [], ls="", marker="o", ms=7, mfc=ONE, mec=ONE, label="one-point  u₀.₆"),
+               Line2D([], [], ls="", marker="o", ms=7, mfc=TWO, mec=TWO, label="two-point  ½(u₀.₂ + u₀.₈)")]
+    for run, _, mk in RUNS:
         rr = [r for r in rows if r["run"] == run]
-        if not rr:
-            continue
-        d, _ = mean_sd([r["d_m"] for r in rr])
-        V, _ = mean_sd([r["V"] for r in rr])
-        b = loglaw_bias(d, V)
-        ax.plot([d - 0.09, d + 0.09], [b, b], color=MUTED, lw=2, ls=(0, (4, 2)), zorder=2)
-        ax.annotate("log law %+.1f %%" % b, (d + 0.095, b), va="center", fontsize=9, color=MUTED)
-        ax.annotate(run, (d, 0.0), xycoords=("data", "axes fraction"), xytext=(0, 6),
-                    textcoords="offset points", ha="center", fontsize=9, color=MUTED)
-    ax.axvline(0.75, color=MUTED, lw=1, ls=":")
-    ax.annotate("0.75 m: one-point below,\ntwo-point above", (0.75, 0.97), xycoords=("data", "axes fraction"),
-                xytext=(6, 0), textcoords="offset points", va="top", fontsize=9, color=MUTED)
+        if rr:
+            ds = [r["d_m"] for r in rr]
+            handles.append(Line2D([], [], ls="", marker=mk, ms=7, mec=MUTED, mew=1.4,
+                                  mfc=MUTED if run == "shallow" else "white",
+                                  label="%s, d = %.2f–%.2f m" % (run, min(ds), max(ds))))
     errs = [r[k] for r in rows for k in ("e1", "e2")]
     ax.set_ylim(min(-2.0, min(errs) - 1.0), max(4.0, max(errs) + 1.5))
+    ax.set_xlim(0, max([5.0] + [1.08 * r["x_m"] / r["d_m"] for r in sited]))
     ax.axhline(0, color=INK, lw=0.8)
-    ax.set_xlim(0.2, 1.3)
-    ax.set_xlabel("depth d (m)")
+    ax.set_xlabel("distance from the inlet in depths, x / d")
     ax.set_ylabel("error against the rake's V  (%)")
     ax.set_title("Each rule against the full integration", loc="left", fontsize=11, color=INK)
     ax.grid(axis="y", color=GRID, lw=0.8)
-    ax.legend(loc="center right", frameon=False, fontsize=9)
+    ax.legend(handles=handles, loc="upper right", frameon=False, fontsize=9)
     for s in ("top", "right"):
         ax.spines[s].set_visible(False)
 

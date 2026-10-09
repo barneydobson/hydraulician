@@ -2,6 +2,11 @@
 
 ## Lecturer notes
 
+> **Being revised (WIP).** The card now uses the reservoir level as the only
+> knob, a free overfall at the end of a 35 m reach, a station of the student's
+> own choosing and gauges on Speed. The sections below still describe the
+> earlier two-run Flow switch and are rewritten once the new reach is measured.
+
 A quick in-class exercise, 15–20 minutes, on current-meter gauging. A
 velocity-area gauging measures the mean velocity V on each vertical of a
 section from one or two point velocities, never the whole profile. Field
@@ -44,9 +49,9 @@ tailgate. Controls → Geometry has one switch:
 | shallow | 0.40 | 0.44 | 0.91 | 0.44 | 0.25 |
 | deep | 1.70 | 1.00 | 1.70 | 0.54 | 0.67 |
 
-Changing it refills the reach and restarts the clock, so the card's **30 s**
+Changing it refills the reach and restarts the clock, so the card's 40 s
 settle runs again. The scene starts at the answer — uniform depth and a
-log-law profile — and settles in about **30 s**. Cells are Δx = 20.1 mm at
+log-law profile — and settles in about **40 s**. Cells are Δx = 20.1 mm at
 Medium: 22 across the shallow depth, 50 across the deep one.
 
 ## Student-number rule

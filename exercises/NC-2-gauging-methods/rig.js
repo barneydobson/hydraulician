@@ -3,20 +3,20 @@
  * ----------------------------------------------------------------------------
  * Paste this file into the dev console of the app (any scene), then:
  *
- *     await NC2.run(0, 16)        // shallow run, station x = 16 m
- *     await NC2.run(1, 16)        // deep run, same station
- *     await NC2.sweep()           // both runs, every station on the card
+ *     await NC2.run(0.68, 20)     // shallow run, station x = 20 m
+ *     await NC2.run(1.33, 20)     // deep run, same station
+ *     await NC2.sweep()           // both runs, stations every 2 m
  *
  * It picks NC-2 (the gauging scene at Medium, as the card sets it up), sets
- * Controls → Geometry → Flow with SIM.setParam (which refills the reach),
- * waits out the card's settle, and then reads the vertical at x exactly as a
- * student does, twice: once from the live field, once from a 20 s Average
- * window.
+ * the reservoir level and presses R (SIM.resetWater, which restarts the
+ * reach near its steady state for that level), waits out the card's settle,
+ * and then reads the vertical at x exactly as a student does, twice: once
+ * from the live field, once from a 20 s Average window.
  *
  *   d, η      the hover box's "depth d" and "level η" rows (OVERLAY.analyse,
  *             on the mean columns under Average)
- *   u₀.₂ …    the hover box's u, with the cursor at z = η − 0.2 d, η − 0.6 d
- *             and η − 0.8 d: SIM.probe, the cell under the cursor. The
+ *   u₀.₂ …    a gauge on Speed at z = η − 0.2 d, η − 0.6 d and η − 0.8 d:
+ *             SIM.probe's speed, the cell the gauge sits in. The
  *             `exact` set reads the rake's column at those heights,
  *             interpolated between cell centres, for what the cell costs
  *   V         the rake chip's V: the plain mean of u over the wet cells of the
@@ -30,10 +30,8 @@
  * weighted by the simulated time that batch covered (main.js tickFrame).
  * ==========================================================================*/
 window.NC2 = {
-  SETTLE: 30, WINDOW: 20,
-  STATIONS: [13, 14, 15, 16, 17, 18, 19, 20],
-  /** The card's rule: x = 13 + (d mod 8) metres. */
-  stationFor: function (d) { return 13 + (((d % 10) + 10) % 10) % 8; },
+  SETTLE: 40, WINDOW: 20, LEVELS: [0.68, 1.33],
+  STATIONS: [6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32],
 
   // A MessageChannel yield, not setTimeout: a hidden tab throttles timers to
   // one a minute, which stalls a long run.
@@ -72,7 +70,7 @@ window.NC2 = {
       return z < zs[0] ? us[0] : us[us.length - 1];
     };
     var u = {}, e = {};
-    [0.2, 0.6, 0.8].forEach(function (k) { u[k] = SIM.probe(x, eta - k * d, avg).u; e[k] = at(eta - k * d); });
+    [0.2, 0.6, 0.8].forEach(function (k) { u[k] = SIM.probe(x, eta - k * d, avg).speed; e[k] = at(eta - k * d); });
     var r4 = function (v) { return +v.toFixed(4); };
     var pct = function (v) { return +(100 * (v / V - 1)).toFixed(2); };
     return { x: x, avg: !!avg, d: r4(d), eta: r4(eta), V: r4(V),
@@ -82,13 +80,14 @@ window.NC2 = {
                       err1_pct: pct(e[0.6]), err2_pct: pct(0.5 * (e[0.2] + e[0.8])) } };
   },
 
-  /** One run: Flow (0 shallow, 1 deep), settle, live read, 20 s window, mean read. */
-  run: async function (flow, x, settle, win) {
-    flow = flow ? 1 : 0; x = x === undefined ? 12 : x;
+  /** One run: reservoir level, R, settle, live read, 20 s window, mean read. */
+  run: async function (level, x, settle, win) {
+    level = level === undefined ? NC2.LEVELS[0] : level; x = x === undefined ? 20 : x;
     settle = settle === undefined ? NC2.SETTLE : settle; win = win === undefined ? NC2.WINDOW : win;
     await APP.pickExercise("NC-2"); await APP.EX.ready;
     APP.state.paused = true;
-    APP.SIM.setParam("flow", flow);            // refills the reach, t = 0
+    CONTROLS.find(function (c) { return c.id === "inLevel"; }).set(level);
+    APP.SIM.resetWater();                      // R: restarts the reach, t = 0
     await NC2.advance(settle, false);
     var xs = Array.isArray(x) ? x : [x];
     var live = xs.map(function (s) { return NC2.read(s, false); });
@@ -97,15 +96,15 @@ window.NC2 = {
     var mean = xs.map(function (s) { return NC2.read(s, true); });
     APP.SIM.avgStop();
     APP.state.paused = false;
-    return { flow: flow ? "deep" : "shallow", t: +APP.sim.t.toFixed(1), live: live, mean: mean };
+    return { level: level, t: +APP.sim.t.toFixed(1), live: live, mean: mean };
   },
 
   /** Both runs, every station on the card; the table the README quotes. */
   sweep: async function () {
     var out = [];
-    for (var f = 0; f < 2; f++) {
-      var r = await NC2.run(f, NC2.STATIONS);
-      r.mean.forEach(function (m) { out.push(Object.assign({ flow: r.flow }, m)); });
+    for (var f = 0; f < NC2.LEVELS.length; f++) {
+      var r = await NC2.run(NC2.LEVELS[f], NC2.STATIONS);
+      r.mean.forEach(function (m) { out.push(Object.assign({ level: r.level }, m)); });
     }
     console.table(out);
     return out;

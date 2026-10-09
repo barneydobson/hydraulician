@@ -220,13 +220,14 @@ const EXERCISES = [
   },
 
   // ---------------------------------------------------- natural channels
-  // A current-meter gauging, done twice on the `gauging` reach: on a vertical
-  // shallower than 0.75 m, where field practice takes one point at 0.6 d, and
-  // on one deeper, where it takes 0.2 d and 0.8 d. The student reads all three
-  // points both times and judges each rule against the rake's full integral,
-  // in Average mode, because a current meter's count is a time mean.
-  // Stations start at x = 13 m: nearer the inlet the profile is still
-  // developing and the one-point rule reads up to 10% high (README).
+  // A current-meter gauging, done twice on the `gauging` reach: once with the
+  // reservoir level giving a vertical shallower than 0.75 m, where field
+  // practice takes one point at 0.6 d, and once deeper, where it takes 0.2 d
+  // and 0.8 d. The student reads all three points both times, on gauges set
+  // to Speed, and judges each rule against the rake's full integral, in
+  // Average mode, because a current meter's count is a time mean. The
+  // station is the student's own choice; the README shows what a station
+  // near the inlet or the lip does to the answer.
   {
     id: "NC-2",
     title: "Gauging a vertical: the 0.6-depth and two-point methods",
@@ -235,26 +236,31 @@ const EXERCISES = [
     scene: "gauging",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "2", channel: false, particles: false },
-    digitNote: "your station: x = 13 + (d mod 8) metres",
+    viewParams: { mode: "2", gaugeField: "speed", channel: false, particles: false },
+    digitNote: "no digit: choose your own station, clear of the inlet and the lip",
+    studentParams: [
+      { control: "inLevel", value: 0.68, unit: "m", rule: "shallow run (d ≈ 0.4 m)" },
+      { control: "inLevel", value: 1.33, unit: "m", rule: "deep run (d ≈ 1.0 m)" },
+    ],
     instruments: [
-      { tool: "rake", where: "at your station x, through the whole depth", why: "the rake's V is the full depth-integral both rules are judged against" },
+      { tool: "gauge", where: "three at your station x: at z = η − 0.2 d, η − 0.6 d and η − 0.8 d", why: "on Speed, each reads the point velocity a current meter would at that depth" },
+      { tool: "rake", where: "at the same x, through the whole depth", why: "the rake's V is the full depth-integral both rules are judged against" },
     ],
     ui: {
       view: ["legendBtn", "avgBtn"],
       fields: ["speed"],
-      controls: ["speed", "geom0"],
+      controls: ["speed", "inLevel"],
       readouts: { rows: ["pos", "d", "eta", "uw"] },
     },
-    start: "a 24 m channel at 1 in 400 held at uniform flow; Controls → Geometry → Flow switches the shallow run (q = 0.40 m²/s, d ≈ 0.44 m) for the deep one (q = 1.70 m²/s, d ≈ 1.0 m)",
+    start: "a 35 m channel at 1 in 400 fed by a reservoir and ending in a free overfall; the reservoir level sets the flow",
     setup: [
-      "It opens on the shallow run. Place a Rake (6) at your station x and press A (Average). Wait until the legend's T passes 15 s: every reading is then a time mean, as a current meter's count is.",
-      "Hover the rake's column and read the depth d and the level η off the box. Put the cursor at z = η − 0.2 d, η − 0.6 d and η − 0.8 d in turn (the box's x, z row shows where you are) and read u off its u, w row at each: u₀.₂, u₀.₆ and u₀.₈.",
-      "Read V off the rake's chip: the depth-average of the whole profile. One-point rule V₁ = u₀.₆; two-point rule V₂ = ½(u₀.₂ + u₀.₈). Each rule's error is 100·(V_rule/V − 1) %.",
-      "Controls → Geometry → Flow → deep. The reach refills and settles again (the card counts it down) and the window restarts: repeat at the same x.",
+      "Shallow run: set Controls → Reservoir level to 0.68 m and press R; the card counts the settle down. Choose a station x well clear of the inlet and the lip.",
+      "Hover at x and read the depth d and the level η off the box. Place three Gauges (5) at x, at z = η − 0.2 d, η − 0.6 d and η − 0.8 d (the box's x, z row shows where the cursor is), and a Rake (6) at the same x.",
+      "Press A (Average) and wait until the legend's T passes 15 s. Read u₀.₂, u₀.₆ and u₀.₈ off the three gauge cards and V off the rake's chip. One-point rule V₁ = u₀.₆; two-point rule V₂ = ½(u₀.₂ + u₀.₈); each rule's error is 100·(V_rule/V − 1) %.",
+      "Deep run: set the level to 1.33 m and press R. After the settle, read d and η again at the same x, click each gauge with the Gauge tool to clear it, place three at the new depths, and repeat.",
     ],
-    task: "Submit d, u₀.₂, u₀.₆, u₀.₈ and V for both runs. Field practice uses one point below 0.75 m and two above it: which rule lands closer to V on each run, and by how much?",
-    settle: 30,
+    task: "Submit x, d, u₀.₂, u₀.₆, u₀.₈ and V for both runs. Field practice uses one point below 0.75 m and two above it: which rule lands closer to V on each run, and by how much?",
+    settle: 40,
   },
   {
     id: "NC-3",

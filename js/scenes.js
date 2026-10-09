@@ -732,71 +732,92 @@ const SCENES = (() => {
              "Only right at the far brink does the surface draw down through critical depth.",
              "Compare with M2: same channel, but here the drawdown is pushed out of sight."] }),
 
-    // NC-2's gauging reach: one prismatic channel run at two discharges, so a
-    // current-meter rule can be tried on a vertical shallower than 0.75 m and
-    // on one deeper — the depth at which the 0.6-depth method hands over to
-    // the 0.2/0.8 pair. Both flows share the bed, the slope and the roughness;
-    // the Geometry switch `flow` changes only q and the two level controls,
-    // and refills the reach (resetWater), exactly as DA-1's Fluid switch does.
-    //   Held uniform at BOTH ends, not by a brink: the backwater length
-    // d(1 − Fr²)/(10/3 · S₀) is ~45 m shallow and ~90 m deep, so a brink's M2
-    // would reach the inlet. The inlet is pinned at the measured normal depth
-    // (channel() adds the velocity head) and the tailwater stands at it too,
-    // which is how a laboratory flume is set to uniform flow with its tailgate.
-    //   The switch writes q and the two levels into the live params only when
-    // it MOVES (`P.gaugeFlow` remembers which set is in force). A rasterise
-    // from anything else — an edge toggled, a resolution change — leaves a
-    // hand-set q or level alone, so the sandbox rule still holds.
-    //   The start is the answer: uniform depth and a log-law u, from
-    // u* = √(g S₀ d) and κ = 0.41 about the reach's own mean V = q/d. From
-    // rest the deep reach takes a whole flow-through to establish.
-    //   MEASURED (Medium, Average, 16 s after the 30 s settle), shallow:
-    // 0.442 m deep and the same at every station from x = 14 m, the surface
-    // the fastest water at 1.32 V; the hover reads the 0.6-depth rule at
-    // −0.2% and the 0.2/0.8 pair at +1.9%. Inside x ≈ 12 m the profile is
-    // still developing from the inlet. The DEEP run's inlet sheds a slow
-    // surface layer at Medium that reaches the far end (engineering notes,
-    // "The surface is stress-free" — open), so NC-2 treats it as provisional.
+    // NC-2's gauging reach: a long, straight mild channel fed by a reservoir
+    // whose LEVEL is the one knob, ending in a free overfall. Around 0.68 m
+    // the reach runs ~0.4 m deep; around 1.33 m, ~0.9 m — either side of the
+    // 0.75 m at which field practice changes from the 0.6-depth current-meter
+    // rule to the 0.2/0.8 pair.
+    //   The inflow stays PRESCRIBED-q: the head-driven reservoir boundary was
+    // built to feed pipes, and feeding this channel it passed ~60% of the
+    // discharge the level should deliver (0.25 of 0.38 m²/s, 0.93 of
+    // 1.6) with a roller where the water left its sponge — measured at
+    // Medium, with the sponge at 0.24 m and at 1.5 m. Instead `qOfLevel`
+    // works out what a reservoir at that level delivers to THIS channel,
+    // and the Reservoir level control writes it into Inflow q (main.js):
+    // the brink holds critical depth at the lip, the M2 is integrated
+    // upstream from it on the solver's own resistance (the log law, with the
+    // wall function's z₀ ≈ Δx/4.5), and q is the discharge whose depth at the
+    // inlet, plus its velocity head, is the level. The inlet then delivers
+    // exactly the depth the drawdown wants there — pinned at normal depth
+    // instead, it would stand above the M2 and spill into the reach.
+    //   It is an M2 reach: the drawdown runs ~90 m upstream to 0.95 d_n, so the
+    // depth falls gently all the way along, and a station reads d where it
+    // stands. The start is that profile with a log-law u, so R after a level
+    // change settles in seconds.
     (() => {
-      const KAPPA = 0.41;
-      const reach = { W: 24, H: 1.6, bed0: 0.20, S0: 0.0025, cf: 0.25, tilt: true,
-                      vmax: 2.2, dyeLine: 0 };
-      const FLOWS = [
-        { q: 0.40, d: 0.44 },               // shallow: under the 0.75 m line
-        { q: 1.70, d: 1.00 },               // deep: over it
-      ];
-      const make = (F) => channel(Object.assign({}, reach,
-        { q: F.q, inletDepth: F.d, tail: F.d, start: F.d }));
-      const C = FLOWS.map(make);
-      const which = (par) => (par && par.flow > 0.5 ? 1 : 0);
-      return Object.assign({}, C[0], {
-        id: "gauging", name: "Gauging reach", key: "Uniform, 1 in 400",
-        mode: 2, hmax: 1.2, spinup: 30,
-        params: [{ key: "flow", label: "Flow", min: 0, max: 1, step: 1, value: 0, unit: "",
-                   resetWater: true,
-                   fmt: (v) => (v > 0.5 ? "deep: q = 1.70 m²/s, d ≈ 1.0 m"
-                                        : "shallow: q = 0.40 m²/s, d ≈ 0.44 m") }],
-        solids: (W, H, P, par) => {
-          const k = which(par);
-          if (P.gaugeFlow !== k) {
-            P.gaugeFlow = k;
-            Object.assign(P.inflow, C[k].inflow);
-            Object.assign(P.tailwater, C[k].tailwater);
-          }
-          return [];
+      const KAPPA = 0.41, BED = 0.20, S0 = 0.0025, G = 9.81, LEVEL = 0.68, XL = 35;
+      const cell = () => {
+        const S = typeof SIM !== "undefined" && SIM.get ? SIM.get() : null;
+        return S && S.dx ? S.dx : 0.0238;
+      };
+      const Sf = (q, d, dx) => {
+        const V = q / d, k = (Math.log(d / (dx / 4.5)) - 1) / KAPPA;
+        return V * V / (G * d * k * k);
+      };
+      // The M2 from just upstream of the lip (1.02 d_c) back to the inlet,
+      // as depths at 2 cm spacing from x = XL down to x = 0.
+      const profile = (q, dx) => {
+        const h = 0.02, n = Math.round(XL / h), out = new Float64Array(n + 1);
+        const slope = (d) => (S0 - Sf(q, d, dx)) / (1 - q * q / (G * d * d * d));
+        let d = 1.02 * Math.cbrt(q * q / G);
+        out[n] = d;
+        for (let k = n - 1; k >= 0; k--) {
+          d -= h * slope(d - 0.5 * h * slope(d));
+          out[k] = d;
+        }
+        return out;
+      };
+      const qOfLevel = (level, dx) => {
+        dx = dx || cell();
+        let lo = 0.01, hi = 4;
+        for (let k = 0; k < 40; k++) {
+          const q = 0.5 * (lo + hi), d = profile(q, dx)[0];
+          if (BED + d + q * q / (2 * G * d * d) > level) hi = q; else lo = q;
+        }
+        return 0.5 * (lo + hi);
+      };
+      // One profile per level and grid, for the seed's hundred thousand calls.
+      let memo = { key: "", q: 0, d: null };
+      const seed = (P) => {
+        const level = Number.isFinite(P.level) ? P.level : LEVEL, dx = cell();
+        const key = level + ":" + dx;
+        if (memo.key !== key) { const q = qOfLevel(level, dx); memo = { key, q, d: profile(q, dx) }; }
+        return memo;
+      };
+      const depthAt = (m, x) => m.d[Math.max(0, Math.min(m.d.length - 1, Math.round(x / 0.02)))];
+      const q0 = qOfLevel(LEVEL);
+      const c = channel({ W: 36, H: 1.5, bed0: BED, S0, cf: 0.25, tilt: true, xEnd: XL,
+                          q: q0, inletDepth: profile(q0, cell())[0], start: 0.43,
+                          vmax: 2.4, dyeLine: 0 });
+      return Object.assign({}, c, {
+        id: "gauging", name: "Gauging reach", key: "Reservoir → channel → brink",
+        mode: 2, hmax: 1.2, spinup: 40, qOfLevel,
+        water: (x, z, P) => {
+          if (x >= XL || z <= BED) return 0;
+          return SCENES.still(BED + depthAt(seed(P), x), z, P);
         },
-        water: (x, z, P, par) => C[which(par)].water(x, z, P),
-        flow: (x, z, P, par) => {
-          const F = FLOWS[which(par)], h = z - reach.bed0;
-          if (h <= 0 || h >= F.d) return null;
-          const V = F.q / F.d, us = Math.sqrt(9.81 * reach.S0 * F.d);
-          return [Math.max(0, V + (us / KAPPA) * (1 + Math.log(h / F.d))), 0];
+        flow: (x, z, P) => {
+          if (x >= XL) return null;
+          const m = seed(P), d = depthAt(m, x), h = z - BED;
+          if (h <= 0 || h >= d) return null;
+          const V = m.q / d, us = Math.sqrt(G * Sf(m.q, d, cell()) * d);
+          return [Math.max(0, V + (us / KAPPA) * (1 + Math.log(h / d))), 0];
         },
-        blurb: "A long, straight mild channel held at uniform flow, with a switch for a shallow run (0.44 m) and a deep one (1.0 m) — the place to try the current-meter rules against the whole profile.",
+        blurb: "A long, straight mild channel fed by a reservoir and ending in a free overfall. The reservoir level sets the flow: about 0.68 m runs the reach 0.4 m deep, about 1.33 m runs it 0.9 m deep — the place to try the current-meter rules against the whole profile.",
         tips: ["Colour is speed: the water is fastest at the surface and slows towards the bed.",
-               "Controls → Geometry → Flow switches between the shallow and the deep run, and refills the reach.",
+               "Controls → Reservoir level sets the flow (Inflow q follows it). Press R after changing it: the reach restarts near its new steady state.",
                "A Rake (6) draws u against depth; its V is the full depth-integral of that curve.",
-               "Hover anywhere in the water: the box prints u at the cursor, the depth d and the level η.",
+               "Gauges (5) on Speed read u at a point — put three at 0.2 d, 0.6 d and 0.8 d below the surface.",
                "Average (A) turns every reading into a time mean — what a current meter's count does."] });
     })(),
 

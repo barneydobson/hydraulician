@@ -453,7 +453,15 @@ const CONTROLS = [
     },
     info: "Holds a reservoir on the LEFT edge and feeds the set discharge through it. The level is the reservoir's ENERGY line, so the water surface at the inlet sits a velocity head below it and draws down further as q rises. Ticking it opens the left edge automatically (and closes it again when unticked, unless you set that edge yourself); the ∇ marker shows the level." },
   { id: "inLevel", place: "res", label: "Reservoir level", min: 0, max: 1, step: 0.005, rel: "H",
-    get: () => sim.p.inflow.level, set: (v) => sim.p.inflow.level = v,
+    get: () => sim.p.inflow.level,
+    // A scene that knows what its reservoir delivers to its own channel
+    // (gauging: the M2 to its brink) writes that discharge into Inflow q, so
+    // the level is the one knob. A rig carries both values, and setting q by
+    // hand afterwards still holds until the level moves again.
+    set: (v) => {
+      sim.p.inflow.level = v;
+      if (sim.scene.qOfLevel && !(sim.p.inflow.free > 0.5)) sim.p.inflow.q = sim.scene.qOfLevel(v);
+    },
     fmt: (v) => {
       const b = SIM.bands(), D = state.deliv, st = SIM.inletStage();
       const d = Math.min(v, b.inB[1]) - b.inB[0];

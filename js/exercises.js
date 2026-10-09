@@ -220,47 +220,47 @@ const EXERCISES = [
   },
 
   // ---------------------------------------------------- natural channels
-  {
-    id: "NC-1",
-    title: "Slope-area method: estimate the mystery discharge",
-    topic: "Natural channels",
-    folder: "NC-1-slope-area",
-    scene: "sa1",
-    rig: null,
-    rigParams: { budget: "Medium" },
-    viewParams: { channel: false, gaugeField: "h" },
-    digitNote: "your window: x₀ = 5.0 + 0.5·(d mod 8) m, from x₀ to x₀ + 7, midpoint x₀ + 3.5",
-    instruments: [
-      { tool: "gauge", where: "x = x₀ (your own window's upstream end)", why: "head at the top of the reach" },
-      { tool: "gauge", where: "x = x₀ + 7 m", why: "head at the bottom — F is the fall between the two" },
-    ],
-    ui: {
-      view: ["legendBtn"],
-      panel: "shut",
-      controls: ["speed"],
-      readouts: { rows: ["pos", "d", "eta", "Sf"] },
-    },
-    start: "a natural-looking reach with the discharge hidden — keep the panel shut",
-    task: "Gauge x₀ and x₀ + 7, read the head fall F between them and h and n at the midpoint, then Q̂ = K√(F/L) with K = h^(5/3)/n.",
-    settle: 120,
-  },
+  // A current-meter gauging, done twice on the `gauging` reach: once with the
+  // reservoir level giving a vertical shallower than 0.75 m, where field
+  // practice takes one point at 0.6 d, and once deeper, where it takes 0.2 d
+  // and 0.8 d. The student reads all three points both times, on gauges set
+  // to Speed, and judges each rule against the rake's full integral, in
+  // Average mode, because a current meter's count is a time mean. The
+  // station is the student's own choice; the README shows what a station
+  // near the inlet or the lip does to the answer.
   {
     id: "NC-2",
-    title: "Is α really 1?",
+    title: "Gauging a vertical: the 0.6-depth and two-point methods",
     topic: "Natural channels",
-    folder: "NC-2-alpha",
-    scene: "s2",
+    folder: "NC-2-gauging-methods",
+    scene: "gauging",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { channel: false },
-    digitNote: "your station: x = 1.5 + 0.5·(d mod 8) metres",
-    instruments: [
-      { tool: "rake", where: "your own station x", why: "the velocity–depth profile α is integrated from" },
+    viewParams: { mode: "2", gaugeField: "speed", channel: false, particles: false },
+    digitNote: "no digit: choose your own station, clear of the inlet and the lip",
+    studentParams: [
+      { control: "inLevel", value: 0.68, unit: "m", rule: "shallow run (d ≈ 0.4 m all along the reach)" },
+      { control: "inLevel", value: 1.33, unit: "m", rule: "deep run (d ≈ 0.8–1.0 m, shallower near the lip)" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed"] },
-    start: "the steep flume at its own discharge; leave q alone",
-    task: "Rake your station, watch 15–20 s, pause on a typical moment and read u_max/V, then integrate 4–5 points off the curve into α.",
-    settle: 15,
+    instruments: [
+      { tool: "gauge", where: "three at your station x: at z = η − 0.2 d, η − 0.6 d and η − 0.8 d", why: "on Speed, each reads the point velocity a current meter would at that depth" },
+      { tool: "rake", where: "at the same x, through the whole depth", why: "the rake's V is the full depth-integral both rules are judged against" },
+    ],
+    ui: {
+      view: ["legendBtn", "avgBtn"],
+      fields: ["speed"],
+      controls: ["speed", "inLevel"],
+      readouts: { rows: ["pos", "d", "eta", "uw"] },
+    },
+    start: "a 35 m channel at 1 in 400 fed by a reservoir and ending in a free overfall; the reservoir level sets the flow",
+    setup: [
+      "Shallow run: set Controls → Reservoir level to 0.68 m and press R; the card counts the settle down. Choose a station x well clear of the inlet and the lip.",
+      "Hover at x and read the depth d and the level η off the box. Place three Gauges (5) at x, at z = η − 0.2 d, η − 0.6 d and η − 0.8 d (the box's x, z row shows where the cursor is), and a Rake (6) at the same x.",
+      "Press A (Average) and wait until the legend's T passes 15 s. Read u₀.₂, u₀.₆ and u₀.₈ off the three gauge cards and V off the rake's chip. One-point rule V₁ = u₀.₆; two-point rule V₂ = ½(u₀.₂ + u₀.₈); each rule's error is 100·(V_rule/V − 1) %.",
+      "Deep run: set the level to 1.33 m and press R. After the settle, read d and η again at the same x, click each gauge with the Gauge tool to clear it, place three at the new depths, and repeat.",
+    ],
+    task: "Submit x, d, u₀.₂, u₀.₆, u₀.₈ and V for both runs. Field practice uses one point below 0.75 m and two above it: which rule lands closer to V on each run, by how much, and where does the rake put the fastest water?",
+    settle: 40,
   },
   {
     id: "NC-3",

@@ -732,6 +732,95 @@ const SCENES = (() => {
              "Only right at the far brink does the surface draw down through critical depth.",
              "Compare with M2: same channel, but here the drawdown is pushed out of sight."] }),
 
+    // NC-2's gauging reach: a long, straight mild channel fed by a reservoir
+    // whose LEVEL is the one knob, ending in a free overfall. Around 0.68 m
+    // the reach runs ~0.4 m deep; around 1.33 m, ~0.9 m — either side of the
+    // 0.75 m at which field practice changes from the 0.6-depth current-meter
+    // rule to the 0.2/0.8 pair.
+    //   The inflow stays PRESCRIBED-q: the head-driven reservoir boundary was
+    // built to feed pipes, and feeding this channel it passed ~60% of the
+    // discharge the level should deliver (0.25 of 0.38 m²/s, 0.93 of
+    // 1.6) with a roller where the water left its sponge — measured at
+    // Medium, with the sponge at 0.24 m and at 1.5 m. Instead `qOfLevel`
+    // works out what a reservoir at that level delivers to THIS channel,
+    // and the Reservoir level control writes it into Inflow q (main.js):
+    // the brink holds critical depth at the lip, the M2 is integrated
+    // upstream from it on the solver's own resistance (the log law, with the
+    // wall function's z₀ ≈ Δx/4.5), and q is the discharge whose depth at the
+    // inlet, plus its velocity head, is the level. The inlet then delivers
+    // exactly the depth the drawdown wants there — pinned at normal depth
+    // instead, it would stand above the M2 and spill into the reach.
+    //   It is an M2 reach: the drawdown runs ~90 m upstream to 0.95 d_n, so the
+    // depth falls gently all the way along, and a station reads d where it
+    // stands. The start is that profile with a log-law u, so R after a level
+    // change settles in seconds.
+    (() => {
+      const KAPPA = 0.41, BED = 0.20, S0 = 0.0025, G = 9.81, LEVEL = 0.68, XL = 35;
+      const cell = () => {
+        const S = typeof SIM !== "undefined" && SIM.get ? SIM.get() : null;
+        return S && S.dx ? S.dx : 0.0238;
+      };
+      const Sf = (q, d, dx) => {
+        const V = q / d, k = (Math.log(d / (dx / 4.5)) - 1) / KAPPA;
+        return V * V / (G * d * k * k);
+      };
+      // The M2 from just upstream of the lip (1.02 d_c) back to the inlet,
+      // as depths at 2 cm spacing from x = XL down to x = 0.
+      const profile = (q, dx) => {
+        const h = 0.02, n = Math.round(XL / h), out = new Float64Array(n + 1);
+        const slope = (d) => (S0 - Sf(q, d, dx)) / (1 - q * q / (G * d * d * d));
+        let d = 1.02 * Math.cbrt(q * q / G);
+        out[n] = d;
+        for (let k = n - 1; k >= 0; k--) {
+          d -= h * slope(d - 0.5 * h * slope(d));
+          out[k] = d;
+        }
+        return out;
+      };
+      const qOfLevel = (level, dx) => {
+        dx = dx || cell();
+        let lo = 0.01, hi = 4;
+        for (let k = 0; k < 40; k++) {
+          const q = 0.5 * (lo + hi), d = profile(q, dx)[0];
+          if (BED + d + q * q / (2 * G * d * d) > level) hi = q; else lo = q;
+        }
+        return 0.5 * (lo + hi);
+      };
+      // One profile per level and grid, for the seed's hundred thousand calls.
+      let memo = { key: "", q: 0, d: null };
+      const seed = (P) => {
+        const level = Number.isFinite(P.level) ? P.level : LEVEL, dx = cell();
+        const key = level + ":" + dx;
+        if (memo.key !== key) { const q = qOfLevel(level, dx); memo = { key, q, d: profile(q, dx) }; }
+        return memo;
+      };
+      const depthAt = (m, x) => m.d[Math.max(0, Math.min(m.d.length - 1, Math.round(x / 0.02)))];
+      const q0 = qOfLevel(LEVEL);
+      const c = channel({ W: 36, H: 1.5, bed0: BED, S0, cf: 0.25, tilt: true, xEnd: XL,
+                          q: q0, inletDepth: profile(q0, cell())[0], start: 0.43,
+                          vmax: 2.4, dyeLine: 0 });
+      return Object.assign({}, c, {
+        id: "gauging", name: "Gauging reach", key: "Reservoir → channel → brink",
+        mode: 2, hmax: 1.2, spinup: 40, qOfLevel,
+        water: (x, z, P) => {
+          if (x >= XL || z <= BED) return 0;
+          return SCENES.still(BED + depthAt(seed(P), x), z, P);
+        },
+        flow: (x, z, P) => {
+          if (x >= XL) return null;
+          const m = seed(P), d = depthAt(m, x), h = z - BED;
+          if (h <= 0 || h >= d) return null;
+          const V = m.q / d, us = Math.sqrt(G * Sf(m.q, d, cell()) * d);
+          return [Math.max(0, V + (us / KAPPA) * (1 + Math.log(h / d))), 0];
+        },
+        blurb: "A long, straight mild channel fed by a reservoir and ending in a free overfall. The reservoir level sets the flow: about 0.68 m runs the reach 0.4 m deep, about 1.33 m runs it 0.8–1.0 m deep — the place to try the current-meter rules against the whole profile.",
+        tips: ["Colour is speed: where the reach has recovered from the inlet the water is fastest at the surface and slows towards the bed.",
+               "Controls → Reservoir level sets the flow (Inflow q follows it). Press R after changing it: the reach restarts near its new steady state.",
+               "A Rake (6) draws u against depth; its V is the full depth-integral of that curve.",
+               "Gauges (5) on Speed read u at a point — put three at 0.2 d, 0.6 d and 0.8 d below the surface.",
+               "Average (A) turns every reading into a time mean — what a current meter's count does."] });
+    })(),
+
     // A dedicated entry, not through channel(): the hump IS the subject, and
     // channel() has no hump concept to bolt one onto. Approach bed at
     // z = 0.35, flat both sides of the crest (a mild reach, same bed level

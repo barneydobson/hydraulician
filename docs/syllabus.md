@@ -68,7 +68,9 @@ Boundary layers at walls and shear layers inside the fluid: how real velocity
 profiles depart from the one-dimensional ideal, and the coefficients that
 measure by how much.
 
-*Nothing here yet.*
+| exercise | type | what it does |
+|---|---|---|
+| **NC-2** · Gauging a vertical: the 0.6-depth and two-point methods ([open it](https://barneydobson.github.io/hydraulician/?ex=NC-2) · [brief](../exercises/NC-2-gauging-methods/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Gauge one vertical of a long reach twice, shallow and deep: read the velocity at 0.2, 0.6 and 0.8 of the depth and judge the one-point and two-point rules against the rake's full depth-average. Pool the class by distance from the inlet: where the fastest water is still below the surface, only the two-point rule holds. |
 
 ## 6. Pipe flow
 

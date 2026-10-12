@@ -461,7 +461,7 @@ const EX = (() => {
   }
   /** Instruments are NOT placed. Choosing where to measure is part of every one
    *  of these exercises — B1's entire failure mode is a gauge at the wrong
-   *  station, and NC-1's window IS the personalisation — so the card prints the
+   *  station, and NC-2's station IS the personalisation — so the card prints the
    *  station rule and the picker clears whatever a rig payload carried. */
   function clearInstruments() {
     GINSP.closeAll();

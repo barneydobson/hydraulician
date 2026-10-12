@@ -1495,25 +1495,28 @@ const SCENES = (() => {
     // One flume, three parameter sets — see `flume()` above for why the
     // stroke matters as much as the period.
     // Beach toe at 1.2, right off the paddle, at 1 : 10. Both numbers are
-    // measured, not chosen for looks. These waves lose ~63% of their height
-    // per wavelength to the discretisation, and shoaling on a beach only
-    // amplifies as h^-¼, so on anything gentle the damping wins and the wave
-    // dies BEFORE it can break: at 1 : 20 the ratio H/h sat at 0.35–0.45 the
-    // whole way in and never reached the 0.78 that breaks it. Shortening the
-    // beach (1 : 10 spans 3.5 m, not 7) lets shoaling get ahead — measured
-    // H/h now climbs 0.46 → 0.49 → 0.60 → 0.81 → 1.49 and breaks at x = 4.0.
-    // The surf zone is 0.7 m: small, but real, and five times what the
-    // original 1 : 3.4 beach managed.
+    // measured, not chosen for looks. These waves lose ~60% of their height
+    // per wavelength to the discretisation (58% at 1.5 s on the flat of
+    // `waveshallow`, same depth), and shoaling on a beach only amplifies as
+    // d^-¼, so on anything gentle the damping wins and the wave dies BEFORE it
+    // can break: at 1 : 20 the ratio H/d sat at 0.35–0.45 the whole way in
+    // and never reached the 0.78 that breaks it. Shortening the beach (1 : 10
+    // spans 3.5 m, not 7) lets shoaling get ahead. Re-measured October 2026
+    // (mean wave height over 15 s after the 25 s settle): H/d climbs 0.47 at
+    // the toe → 0.54 at x = 2 → 0.66 at 3 → 0.87 at 3.5, crosses 0.78 at
+    // x ≈ 3.4, where the front stands vertical, and the surf zone runs 1.3 m
+    // to the still shoreline at 4.7 — up from the 0.7 m first measured, which
+    // was already five times what the original 1 : 3.4 beach managed.
     flume({
       id: "wave", name: "Wave flume · shoaling & breaking", key: "Spilling, ξ ≈ 0.4",
       W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 1.2, slope: 0.10,
       amp: 0.18, period: 1.5, particles: 1, spinup: 25,
       view: { zoom: 2.2, cx: 3.2, cy: 0.42, vex: 2.2 },
       blurb: "Waves running onto a 1-in-10 beach. They steepen as the water shallows until the height is comparable with the depth, and then they break.",
-      tips: ["Watch H/h climb up the slope: measured 0.46 at the toe, 0.60, 0.81, then breaking at x ≈ 4.0 m.",
+      tips: ["Watch H/d climb up the slope: measured 0.47 at the toe, 0.54 at x = 2 m, 0.66 at 3 m, then past 0.78 at x ≈ 3.4 m, where the front stands vertical and breaks.",
              "A wave breaks when its height reaches roughly 0.78 of the local depth. That is the whole of the breaking criterion.",
              "Iribarren ξ = tanβ/√(H₀/L₀) ≈ 0.4 — the <b>spilling</b> band, where the crest crumbles down the face.",
-             "A GENTLER beach does not work here, and that is honest: these waves damp ~63% per wavelength, so over a 7 m beach they die before they can break.",
+             "A GENTLER beach does not work here, and that is honest: these waves damp ~60% per wavelength, so over a 7 m beach they die before they can break.",
              "Load the <b>surging</b> flume for the other end of the Iribarren scale."] }),
 
     // The other end of the Iribarren scale: steep beach, long wave. Same

@@ -1,98 +1,115 @@
-// WV-2 "The buried wave gauge" -- rig.js
-//
-// This demo needs no drawn geometry (both flumes ship complete), only two
-// instruments on one vertical, near the paddle, inside the coherent zone
-// WV-1 mapped. Paste into the dev console after loading the scene, or use
-// as a reference for the runner snippets used to build this folder.
-//
-// Gauge 1 = "bed" (near the floor, just clear of the wall).
-// Gauge 2 = "surface" (near the free surface, always wet through the trough).
-//
-// IMPORTANT read this before trusting a wavedeep bed number -- see
-// README.md "Why the bed gauge is worse than blind" for the evidence:
-// a literal 2-cell-above-bed point probe in wavedeep is NOISE-DOMINATED
-// (repeat runs of the identical T=0.90/amp=0.11 setup gave bed DFT
-// amplitudes of 0.0084, 0.0249, 0.0339, 0.0429 and 0.0452 m -- a 5x spread
-// with no sign of converging as the averaging window is lengthened to 38
-// periods). The wave (intermediate) flume does not show this problem.
+/* ============================================================================
+ * WV-2 · THE BURIED WAVE GAUGE — console spot-check
+ * ----------------------------------------------------------------------------
+ * Paste this file into the dev console of the app (any scene), then:
+ *
+ *     await WV2.run(1.50, 0.060)    // one row of the card: period, stroke
+ *     await WV2.sweep()             // every distinct row
+ *
+ * It does what the card asks, through the same entry points: picks WV-2 (the
+ * 1 : 10 beach flume at Medium, gauges on h), sets the period and stroke,
+ * presses R (SIM.resetWater, t = 0), waits out the 20 s settle, places the two
+ * gauges on the card's vertical (state.gauges, as the Gauge tool does),
+ * records RECORD seconds sampled once per 1/60 s of simulated time exactly as
+ * the frame loop samples them (main.js sampleGauges), and then takes the CSV
+ * the inspector's ⤓ CSV all gauges button downloads (APP.gaugeCSV).
+ *
+ * The ratio is worked from that CSV the way the card tells a student to work
+ * it in a spreadsheet: keep a whole number of periods, subtract each column's
+ * mean, average h'·cos(σt) and h'·sin(σt), and a = 2·√(C² + S²). That is the
+ * amplitude AT THE PADDLE FREQUENCY. It also reports the half peak-to-peak
+ * swing of the same traces, the read the card used to ask for, to show what
+ * it does to the ratio.
+ *
+ * Theory at the gauges' own heights: bed / surface = cosh(k z_b)/cosh(k z_s),
+ * z measured up from the bed, σ² = gk·tanh(kh). The idealised 1/cosh(kh) is
+ * the limit with the gauges at the bed and at the still surface.
+ * ==========================================================================*/
+window.WV2 = {
+  SETTLE: 20, RECORD: 15, X: 0.60, ZB: 0.27, ZS: 0.52,
+  ROWS: [[1.10, 0.055], [1.20, 0.055], [1.30, 0.060], [1.40, 0.060], [1.50, 0.060],
+         [1.65, 0.060], [1.85, 0.065], [2.10, 0.070]],
 
-const WV2 = {
-  C: (id) => CONTROLS.find(c => c.id === id),
-
-  // Still-water depth and measured bed elevation, read live off each scene
-  // (js/scenes.js gives lev/bed; the sim rasterises "bed" about half a cell
-  // off the nominal value, so these are the MEASURED numbers this dry-run
-  // used, not the nominal 0.35 / 0.74).
-  flumes: {
-    wave:     { h: 0.3528, bed: 0.2472, gaugeX: 0.6, bedY: 0.270, surfY: 0.517 },
-    wavedeep: { h: 0.7385, bed: 0.2615, gaugeX: 1.2, bedY: 0.290, surfY: 0.780 },
+  yieldNow: function () {
+    return new Promise(function (r) { var c = new MessageChannel(); c.port1.onmessage = function () { r(); }; c.port2.postMessage(0); });
   },
 
-  // Place the two gauges for a flume. Clears any existing gauges first
-  // (max 4 total; this demo only ever needs 2).
-  place(flumeId) {
-    const f = WV2.flumes[flumeId];
-    APP.state.gauges = [
-      { x: f.gaugeX, y: f.bedY,  hist: [], colour: '#7fd4ff' },  // gauge 1: bed
-      { x: f.gaugeX, y: f.surfY, hist: [], colour: '#ffb37f' },  // gauge 2: surface
-    ];
-    APP.state.tool = 'gauge';
-    if (window.syncTools) window.syncTools();
-    return f;
-  },
-
-  // Full student-style setup: load scene, set piston, settle PAST the
-  // scene's own spin-up (critical -- see README "The spin-up trap"),
-  // place gauges, run the recording window, and return both DFT amplitudes
-  // and the naive peak-to-peak/2 read for comparison.
-  run(flumeId, T, amp, opts) {
-    opts = opts || {};
-    const settlePeriods = opts.settlePeriods || 6;
-    const recordPeriods = opts.recordPeriods || 6;
-    APP.loadScene(flumeId, false);
-    WV2.C('speed').set(1);
-    WV2.C('waveOn').set(true); WV2.C('waveT').set(T); WV2.C('waveA').set(amp);
-    WV2.C('gaugeField').set('h');
-    syncPanel();
-    const spinup = APP.state.scene.spinup || 0;
-    // The scene runs FLAT OUT (ignoring dt/speed) until sim.t clears
-    // `spinup`; settling for fewer seconds than that leaves every
-    // subsequent APP.frames() call still in "warming" mode, advancing by
-    // an adaptive, uneven substep count instead of the nominal 1/60 s --
-    // the gauge timestamps come out wildly non-uniform. Always clear
-    // spin-up FIRST, in one tick() call, before placing gauges.
-    const settleSteps = Math.round((spinup + settlePeriods * T) / APP.SIM.dt());
-    APP.tick(settleSteps);
-    const f = WV2.place(flumeId);
-    APP.state.paused = false;
-    const nFrames = Math.min(850, Math.round(recordPeriods * T * 60));
-    APP.frames(nFrames, 1 / 60);
-    APP.state.paused = true;
-    const bed = APP.state.gauges[0].hist, surf = APP.state.gauges[1].hist;
-    function dftAmp(hist, freq) {
-      const t = hist.map(p => p.t), y = hist.map(p => p.h);
-      const n = t.length, mean = y.reduce((a, b) => a + b, 0) / n;
-      let re = 0, im = 0;
-      for (let i = 0; i < n; i++) {
-        const ph = 2 * Math.PI * freq * t[i];
-        re += (y[i] - mean) * Math.cos(ph);
-        im -= (y[i] - mean) * Math.sin(ph);
+  /** Advance `secs` of simulated time in 1/60 s chunks; with `sample`, record
+   *  the gauges after each chunk as the frame loop would. */
+  advance: async function (secs, sample) {
+    var S = APP.SIM, t1 = APP.sim.t + secs, ly = performance.now();
+    var k = Math.max(1, Math.round((1 / 60) / S.dt()));
+    while (APP.sim.t < t1) {
+      S.step(k);
+      if (sample) {
+        APP.state.paused = false;                  // sampleGauges records only while running
+        sampleGauges(OVERLAY.analyse(APP.sim, S.columns(true)));
+        APP.state.paused = true;
       }
-      return 2 * Math.sqrt(re * re + im * im) / n;
+      if (performance.now() - ly > 1000) { await WV2.yieldNow(); ly = performance.now(); }
     }
-    const freq = 1 / T;
-    const ampBed = dftAmp(bed, freq), ampSurf = dftAmp(surf, freq);
-    const yb = bed.map(p => p.h), ys = surf.map(p => p.h);
-    const p2pBed = (Math.max(...yb) - Math.min(...yb)) / 2;
-    const p2pSurf = (Math.max(...ys) - Math.min(...ys)) / 2;
-    return {
-      flume: flumeId, T, amp,
-      ampBedDFT: ampBed, ampSurfDFT: ampSurf, ratioDFT: ampBed / ampSurf,
-      p2pBed, p2pSurf, ratioP2P: p2pBed / p2pSurf,
-      n: bed.length,
-    };
+  },
+
+  kh: function (T, h) {
+    var w = 2 * Math.PI / T, k = w * w / 9.81;
+    for (var i = 0; i < 100; i++) {
+      var th = Math.tanh(k * h), f = 9.81 * k * th - w * w;
+      k = Math.max(k - f / (9.81 * th + 9.81 * k * h * (1 - th * th)), k / 2);
+    }
+    return k * h;
+  },
+
+  /** The spreadsheet's amplitude at period T over the first whole number of
+   *  periods of one CSV column. */
+  amp: function (t, y, T) {
+    var n = 0, t0 = t[0], tEnd = t0 + Math.floor((t[t.length - 1] - t0) / T) * T;
+    var mean = 0, i;
+    for (i = 0; i < t.length && t[i] < tEnd; i++) { mean += y[i]; n++; }
+    mean /= n;
+    var C = 0, S = 0, w = 2 * Math.PI / T;
+    for (i = 0; i < n; i++) { C += (y[i] - mean) * Math.cos(w * t[i]); S += (y[i] - mean) * Math.sin(w * t[i]); }
+    C /= n; S /= n;
+    return 2 * Math.sqrt(C * C + S * S);
+  },
+
+  run: async function (T, A) {
+    await APP.pickExercise("WV-2"); await APP.EX.ready;
+    APP.state.paused = true;
+    var C = function (id) { return CONTROLS.find(function (c) { return c.id === id; }); };
+    C("waveOn").set(true); C("waveT").set(T); C("waveA").set(A);
+    APP.SIM.resetWater(); clearGaugeHistory();          // R
+    await WV2.advance(WV2.SETTLE, false);
+    APP.state.gauges.length = 0;
+    [WV2.ZB, WV2.ZS].forEach(function (z, i) {
+      APP.state.gauges.push({ x: WV2.X, z: z, hist: [], log: [], id: i + 1, colour: i ? "#ffb37f" : "#7fd4ff" });
+    });
+    await WV2.advance(WV2.RECORD, true);
+    APP.state.paused = false;
+
+    var lines = APP.gaugeCSV().trim().split("\n"), hdr = lines[0].split(",");
+    var cb = hdr.findIndex(function (h) { return /^g1_.*_h_m$/.test(h); });
+    var cs = hdr.findIndex(function (h) { return /^g2_.*_h_m$/.test(h); });
+    var t = [], hb = [], hs = [];
+    lines.slice(1).forEach(function (l) { var c = l.split(","); t.push(+c[0]); hb.push(+c[cb]); hs.push(+c[cs]); });
+    var ab = WV2.amp(t, hb, T), as = WV2.amp(t, hs, T);
+    var pp = function (y) { return (Math.max.apply(null, y) - Math.min.apply(null, y)) / 2; };
+
+    var col = APP.SIM.columns(true), i = Math.floor(WV2.X / APP.sim.dx), bed = col[i * 4];
+    var h = 0.348, kh = WV2.kh(T, h), k = kh / h;
+    var r3 = function (v) { return +v.toFixed(3); };
+    return { T: T, A: A, kh: r3(kh), samples: t.length,
+             a_bed_mm: +(1000 * ab).toFixed(1), a_surf_mm: +(1000 * as).toFixed(1),
+             ratio: r3(ab / as),
+             theory: r3(Math.cosh(k * (WV2.ZB - bed)) / Math.cosh(k * (WV2.ZS - bed))),
+             ideal: r3(1 / Math.cosh(kh)),
+             ratio_peak_to_peak: r3(pp(hb) / pp(hs)) };
+  },
+
+  sweep: async function () {
+    var out = [];
+    for (var r = 0; r < WV2.ROWS.length; r++) out.push(await WV2.run(WV2.ROWS[r][0], WV2.ROWS[r][1]));
+    console.table(out);
+    return out;
   },
 };
-
-// Example: WV2.run('wave', 1.50, 0.060) -> {ratioDFT: 0.862, ...}
-// Example: WV2.run('wavedeep', 0.90, 0.11) -> {ratioDFT: ~2-8, unstable -- see README}
+JSON.stringify({ loaded: true, keys: Object.keys(WV2) });

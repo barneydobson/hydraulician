@@ -1,24 +1,19 @@
 #!/usr/bin/env python3
 """
 collect_plot.py -- pool the WV-2 "buried wave gauge" class CSV and plot the
-bed/surface pressure-amplitude ratio against kh, alongside the idealised
-linear-theory curve 1/cosh(kh).
+bed/surface pressure-amplitude ratio against kh, on linear theory at the
+card's gauge heights and on the idealised 1/cosh(kh).
 
 Usage:
-  python3 collect_plot.py data/simulated-class.csv -o plots/pooled-demo.png
+  python3 collect_plot.py class.csv                 # -> plots/pooled-demo.png
+  python3 collect_plot.py data/simulated-class.csv  # the shipped dry-run class
 
 Expected CSV columns (extra columns ignored):
-  student, digit, flume, T_s, ratio_dft
-  [, kh, h_m, z_bed_m, z_surf_m, ratio_p2p_naive, ratio_theory_actual,
-     ratio_theory_ideal, note]
+  T_s, ratio            (or a_bed_m and a_surf_m, from which the ratio is taken)
+  [, ratio_swing]       the half peak-to-peak ratio, drawn as a second series
 
-`flume` must be "wave" or "wavedeep" (h defaults to 0.3528 / 0.7385 m if not
-given). If `kh` is missing it is solved from T_s and h via the full
-dispersion relation. Rows whose `note` contains "NOISE" are plotted as a
-separate, clearly-marked series (see _archive/README-full.md: the wavedeep
-bed gauge, read as a raw point probe, is dominated by paddle-generated
-turbulence rather than the (tiny) true attenuated signal at every period
-tried).
+kh is solved from T_s at the flume's still depth, h = 0.348 m. The gauge
+heights are the card's: z = 0.27 and 0.52 m on a bed at z = 0.247 m.
 """
 import csv
 import math
@@ -26,26 +21,23 @@ import sys
 import argparse
 
 G = 9.81
-H_WAVE = 0.3528
-H_DEEP = 0.7385
+H = 0.348
+ZB = 0.27 - 0.247          # bed gauge, height above the bed
+ZS = 0.52 - 0.247          # surface gauge
 
 
-def solve_k(T, h, g=G):
+def solve_k(T, h=H, g=G):
     w = 2 * math.pi / T
     k = w * w / g
     for _ in range(200):
         t = math.tanh(k * h)
-        f = g * k * t - w * w
-        df = g * t + g * k * h * (1 - t * t)
-        step = f / df
-        k2 = k - step
-        if k2 <= 0:
-            k2 = k / 2
-        if abs(k2 - k) < 1e-13:
-            k = k2
-            break
-        k = k2
+        k2 = k - (g * k * t - w * w) / (g * t + g * k * h * (1 - t * t))
+        k = k2 if k2 > 0 else k / 2
     return k
+
+
+def at_gauges(k):
+    return math.cosh(k * ZB) / math.cosh(k * ZS)
 
 
 def load_rows(path):
@@ -54,26 +46,18 @@ def load_rows(path):
         for r in csv.DictReader(fh):
             try:
                 T = float(r["T_s"])
-                ratio = float(r["ratio_dft"])
-            except (KeyError, ValueError, TypeError):
+                if r.get("ratio") not in (None, ""):
+                    ratio = float(r["ratio"])
+                else:
+                    ratio = float(r["a_bed_m"]) / float(r["a_surf_m"])
+            except (KeyError, ValueError, TypeError, ZeroDivisionError):
                 continue
-            flume = (r.get("flume") or "").strip().lower()
-            h = r.get("h_m")
             try:
-                h = float(h)
+                swing = float(r.get("ratio_swing"))
             except (TypeError, ValueError):
-                h = H_DEEP if flume == "wavedeep" else H_WAVE
-            kh = r.get("kh")
-            try:
-                kh = float(kh)
-            except (TypeError, ValueError):
-                kh = solve_k(T, h) * h
-            note = (r.get("note") or "")
-            rows.append({
-                "student": r.get("student", ""), "digit": r.get("digit", ""),
-                "flume": flume, "T": T, "h": h, "kh": kh, "ratio": ratio,
-                "noisy": "NOISE" in note.upper(), "note": note,
-            })
+                swing = None
+            k = solve_k(T)
+            rows.append({"T": T, "kh": k * H, "k": k, "ratio": ratio, "swing": swing})
     return rows
 
 
@@ -85,75 +69,41 @@ def main():
 
     rows = load_rows(args.csv)
     if not rows:
-        print("no usable rows in", args.csv)
-        sys.exit(1)
+        sys.exit("no usable rows in " + args.csv)
+    err = [100 * (r["ratio"] / at_gauges(r["k"]) - 1) for r in rows]
+    print(f"{len(rows)} rows, kh {min(r['kh'] for r in rows):.2f}-{max(r['kh'] for r in rows):.2f}")
+    print(f"  ratio against theory at the gauge heights: mean {sum(err)/len(err):+.1f}%, "
+          f"range {min(err):+.1f}% to {max(err):+.1f}%")
+    sw = [r for r in rows if r["swing"] is not None]
+    if sw:
+        e2 = [100 * (r["swing"] / at_gauges(r["k"]) - 1) for r in sw]
+        print(f"  the half peak-to-peak swing instead: mean {sum(e2)/len(e2):+.1f}%, "
+              f"range {min(e2):+.1f}% to {max(e2):+.1f}%")
 
-    clean = [r for r in rows if not r["noisy"]]
-    noisy = [r for r in rows if r["noisy"]]
-
-    def stats(rs, label):
-        if not rs:
-            return
-        errs = []
-        for r in rs:
-            ideal = 1 / math.cosh(r["kh"])
-            errs.append(100 * (r["ratio"] - ideal) / ideal)
-        n = len(rs)
-        mean_e = sum(errs) / n
-        khr = (min(r["kh"] for r in rs), max(r["kh"] for r in rs))
-        print(f"{label}: {n} points  kh {khr[0]:.2f}-{khr[1]:.2f}  "
-              f"mean err vs idealised 1/cosh(kh) {mean_e:+.1f}%")
-
-    stats(clean, "clean (wave)     ")
-    stats(noisy, "noise-dom (wavedeep)")
-    if clean:
-        allkh = [r["kh"] for r in rows]
-        print(f"combined kh coverage: {min(allkh):.2f} - {max(allkh):.2f}")
-
-    # ---- plot
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(9, 6.2))
-
-    khs = [0.01 * i for i in range(10, 850)]
-    curve = [1 / math.cosh(k) for k in khs]
-    ax.plot(khs, curve, "-", color="#2a6f97", lw=2.0, zorder=3,
-            label=r"idealised linear theory  $1/\cosh(k h)$")
-
-    # shade the "recorder goes blind" zone: ratio below what a student can
-    # plausibly resolve against a 2-3 cm noise floor on a ~0.02-0.09 m
-    # surface signal, i.e. roughly ratio < 0.05 -> kh > 3.0
-    ax.axvspan(3.0, 8.6, color="#888", alpha=0.12, zorder=1)
-    ax.text(5.7, 0.55, "recorder goes blind\n(ratio < ~0.05)",
-            ha="center", va="center", fontsize=9, color="#555")
-
-    if clean:
-        ax.scatter([r["kh"] for r in clean], [r["ratio"] for r in clean],
-                   marker="o", s=70, color="#d95f02", edgecolor="white",
-                   zorder=5, label=f"wave flume, DFT ratio (n={len(clean)})")
-    if noisy:
-        ax.scatter([r["kh"] for r in noisy], [r["ratio"] for r in noisy],
-                   marker="x", s=90, color="#a11", linewidths=2.2,
-                   zorder=5, label=f"wavedeep, raw point-probe (n={len(noisy)}) -- noise-dominated")
-        # also show where those points' TRUE theoretical ratio sits, as a
-        # faint marker, so the size of the miss is visible on the same axes
-        ax.scatter([r["kh"] for r in noisy], [1 / math.cosh(r["kh"]) for r in noisy],
-                   marker="+", s=70, color="#a11", alpha=0.5, zorder=4,
-                   label="wavedeep, true idealised ratio (for comparison)")
-
-    ax.set_xlabel(r"$kh$  (paddle-frequency wavenumber $\times$ still-water depth)")
+    fig, ax = plt.subplots(figsize=(9, 6.0))
+    fig.patch.set_facecolor("#fcfcfb"); ax.set_facecolor("#fcfcfb")
+    khs = [0.02 * i for i in range(10, 110)]
+    ax.plot(khs, [at_gauges(k / H) for k in khs], "-", color="#2a78d6", lw=2.2, zorder=3,
+            label=r"linear theory at the gauges, $\cosh(kz_b)/\cosh(kz_s)$")
+    ax.plot(khs, [1 / math.cosh(k) for k in khs], "--", color="#52514e", lw=1.4, zorder=2,
+            label=r"idealised, gauges at bed and surface: $1/\cosh(kh)$")
+    ax.scatter([r["kh"] for r in rows], [r["ratio"] for r in rows], s=70, color="#eb6834",
+               edgecolor="white", zorder=5, label=f"amplitude at the paddle's period (n={len(rows)})")
+    if sw:
+        ax.scatter([r["kh"] for r in sw], [r["swing"] for r in sw], marker="x", s=60,
+                   color="#1baf7a", linewidths=1.8, zorder=4, label="half the peak-to-peak swing, for comparison")
+    ax.set_xlabel(r"$kh$  (wavenumber $\times$ still-water depth, $h$ = 0.348 m)")
     ax.set_ylabel("bed / surface pressure-amplitude ratio")
-    ax.set_title("WV-2 -- buried wave gauge: attenuation vs $kh$, class-pooled\n"
-                 r"$\sigma^2 = gk\tanh(kh)$,  ratio $\to 1/\cosh(kh)$", fontsize=12)
-    ax.set_ylim(-0.1, 2.2)
-    ax.set_xlim(0, 8.6)
-    ax.legend(fontsize=8.5, loc="upper right")
-    ax.grid(alpha=0.25)
-    ax.axhline(0, color="#999", lw=0.8)
-
-    fig.savefig(args.out, dpi=140, bbox_inches="tight")
+    ax.set_title("WV-2 · the buried wave gauge — 1 : 10 beach flume, gauges at x = 0.60 m", fontsize=12)
+    ax.set_xlim(0.2, 2.2); ax.set_ylim(0, 1.3)
+    ax.grid(alpha=0.3); ax.legend(fontsize=8.5, loc="lower left", frameon=False)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.savefig(args.out, dpi=140, bbox_inches="tight", facecolor=fig.get_facecolor())
     print("wrote", args.out)
 
 

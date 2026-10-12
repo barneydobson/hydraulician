@@ -943,6 +943,16 @@ const EXERCISES = [
     task: "Set your period and stroke, zoom onto the paddle, then pause and read one crest-to-crest wavelength off the scale bar.",
     settle: 40,
   },
+  // Two pressure gauges on one vertical of the 1 : 10 beach flume. The ratio
+  // is the amplitude AT THE PADDLE'S PERIOD, worked from the gauge CSV: half
+  // the peak-to-peak swing, which the card used to ask for, is 1.8-4.2 times
+  // that amplitude here, mostly the flume's slow surging, which reaches the
+  // bed undiminished and drags the ratio towards 1 and past it (+19% on
+  // average over the ladder). The deep-flume half is gone: at its periods
+  // the bed gauge swings coherently at the paddle's frequency, with a phase
+  // lag on the surface one, by more than linear theory allows (T = 1.2 s:
+  // 0.49 against 0.43, 70° out of phase), so neither "below noise" nor the
+  // 1/cosh curve describes it.
   {
     id: "WV-2",
     title: "The buried wave gauge",
@@ -953,19 +963,25 @@ const EXERCISES = [
     rigParams: { budget: "Medium", waveOn: true },
     viewParams: { gaugeField: "h", particles: false },
     digit: { label: "period", control: "waveT", unit: "s",
-             rule: "your row of the period table",
+             rule: "d 0–1: 1.10 · d 2: 1.20 · d 3: 1.30 · d 4: 1.40 · d 5: 1.50 · d 6: 1.65 · d 7: 1.85 · d 8–9: 2.10",
              table: [1.10, 1.10, 1.20, 1.30, 1.40, 1.50, 1.65, 1.85, 2.10, 2.10],
              also: [{ label: "stroke", control: "waveA", unit: "m",
-                      rule: "the amplitude paired with YOUR period",
+                      rule: "0.055 up to 1.20 s · 0.060 from 1.30 to 1.65 s · 0.065 at 1.85 s · 0.070 at 2.10 s",
                       table: [0.055, 0.055, 0.055, 0.060, 0.060, 0.060, 0.060, 0.065, 0.070, 0.070] }] },
     instruments: [
-      { tool: "gauge", where: "near the paddle, LOW — about a tenth of the depth above the floor", why: "the bed gauge" },
-      { tool: "gauge", where: "the same vertical, about three-quarters of the way up", why: "the surface gauge — leave a visible band of water above it or it flat-lines at a trough" },
+      { tool: "gauge", where: "x = 0.60 m, z = 0.27 m: 2.3 cm above the bed", why: "the bed gauge" },
+      { tool: "gauge", where: "x = 0.60 m, z = 0.52 m: 7.5 cm below the still surface", why: "the surface gauge, wet through every trough at these strokes" },
     ],
-    secondScene: { scene: "wavedeep", when: "even digits only - repeat on wavedeep (Scenes menu) with the same two gauges at x ≈ 1.2 m, where a bed trace of pure noise IS the answer." },
-    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
-    start: "a wave flume with a beach, paddle at the left end",
-    task: "Set your period and stroke, put two gauges on one vertical near the paddle - one low, one three-quarters up - then read each trace's peak-to-peak swing and divide bed by surface.",
+    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA", "gaugeInspect"] },
+    start: "a wave flume: still depth h = 0.348 m over a bed at z = 0.247 m, paddle at x = 0.30 m, a 1 : 10 beach from x = 1.2 m; gauges plot h = z + p/ρg",
+    setup: [
+      "Set Period and Amplitude (Controls → Wavemaker) from your digit and press R. The card counts the 20 s settle down.",
+      "Place two Gauges (5) on x = 0.60 m, one at z = 0.27 m and one at z = 0.52 m: the hover box shows the cursor's x and z.",
+      "Let it run at least 12 s, then expand either gauge (⤢) and press ⤓ CSV all gauges.",
+      "In a spreadsheet keep a whole number of periods, at least 8, of t and the two _h_m columns. For each h column subtract its mean, then C = average of h′·cos(2πt/T) and S = average of h′·sin(2πt/T): the amplitude at the paddle's period is a = 2√(C² + S²).",
+      "Linear theory: a_bed / a_surface = cosh(k z′_bed) / cosh(k z′_surface), z′ the height above the bed (0.023 and 0.273 m), σ² = gk·tanh(kh), σ = 2π/T. With the gauges at the bed and the surface it would be 1/cosh(kh).",
+    ],
+    task: "Submit T, a_bed, a_surface and the ratio a_bed / a_surface; the class pools the ratios against kh on the theory curve.",
     settle: 20,
   },
   {

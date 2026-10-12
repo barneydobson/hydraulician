@@ -1178,6 +1178,35 @@ async function main() {
       eq("the legend offers only Speed", c.fields.join(","), "speed");
       await ex.close();
     }
+    {
+      // A card's `secondScene` is the second half of the same exercise. Taking
+      // it from the Scenes menu reset the gauges to h and dropped the profile,
+      // so WV-3's contrast run lost the Depth gauge it measures on. Checked
+      // against the card's own declaration, so a redesign does not break it.
+      const ex = await browser.open(INDEX + "?ex=WV-3",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const r = await ex.evaluate(`
+        const card = APP.EX.current;
+        const go = (id) => { APP.PICKER.choose(id); if (APP.state.scene.id !== id) APP.PICKER.choose(id); };
+        go(card.secondScene.scene);
+        const second = { scene: APP.state.scene.id, field: APP.state.gaugeField,
+                         panel: APP.state.ui.panel, controls: APP.state.ui.controls,
+                         ex: APP.EX.current && APP.EX.current.id };
+        go("waveshallow");
+        const other = { field: APP.state.gaugeField, panel: APP.state.ui.panel };
+        return { want: { scene: card.secondScene.scene, field: card.viewParams.gaugeField,
+                         controls: card.ui.controls }, second, other };
+      `);
+      check("no uncaught errors", ex.errors.length === 0, ex.errors[0]);
+      eq("the card's second scene loads", r.second.scene, r.want.scene);
+      eq("the card stays loaded on it", r.second.ex, "WV-3");
+      eq("its gauges keep the card's channel", r.second.field, r.want.field);
+      eq("its panel stays focused", r.second.panel, "focused");
+      eq("its Controls rows stay the card's", String(r.second.controls), String(r.want.controls));
+      eq("any other scene gets h back", r.other.field, "h");
+      eq("and the whole interface", r.other.panel, "full");
+      await ex.close();
+    }
 
     // ------------------------------------------------- placing and removing
     console.log("\nan instrument you can place is an instrument you can remove");

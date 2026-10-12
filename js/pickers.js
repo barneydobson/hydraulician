@@ -123,7 +123,7 @@ const PICKER = (() => {
     }
     load(id);
   }
-  function load(id) { pending = null; close(); switchScene(id); }
+  function load(id) { pending = null; close(); switchScene(id); EX.carry(id); }
 
   /** Under the element that opened it, right-aligned to it, clamped on screen. */
   function place() {
@@ -559,6 +559,23 @@ const EX = (() => {
    *  the button a way to have the exercise done for you. The digit is kept,
    *  because it is who you are, not a setting. */
   function reset() { if (cur) pick(cur.id, { digit: digit }); }
+
+  /** The card's own `secondScene` is the second half of the SAME exercise
+   *  (WV-1's shallow rows, WV-3's contrast beach, B5's other beach), so
+   *  switching to it from the Scenes menu keeps how the exercise is read: its
+   *  `viewParams` (WV-3 measures on Depth, not the `h` a scene switch resets
+   *  to) and its UI profile. Its `rigParams` stay behind — they are the first
+   *  scene's plumbing — and the settle re-arms by itself, because the target
+   *  is a sim time and the new scene starts at t = 0. Any other scene is a
+   *  departure from the exercise and gets the whole interface, as before. */
+  function carry(id) {
+    if (!cur || !cur.secondScene || cur.secondScene.scene !== id) return false;
+    const v = cur.viewParams || {};
+    Object.keys(v).forEach((k) => setControl(k, v[k]));
+    UIMODE.apply(UIMODE.fromExercise(cur));
+    syncPanel();
+    return true;
+  }
 
   function setDigit(d) {
     if (!cur) return;
@@ -1137,7 +1154,7 @@ const EX = (() => {
   }
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
-           pick, reset, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
+           pick, reset, carry, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
            studentControls,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,

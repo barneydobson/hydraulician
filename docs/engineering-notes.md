@@ -752,7 +752,10 @@ about −0.07 m/s. Two consequences, both measured:
 - **The waves ride the current and read long.** Crest to crest near the
   paddle is 14–17% longer than linear dispersion for T = 1.2–2.0 s, and the
   phase gradient over 1.5 wavelengths from x = 0.8 m is 15–22% longer; before
-  #72, +10% at 1.2 s and +2% at 1.5 s. WV-1's deep rows are affected.
+  #72, +10% at 1.2 s and +2% at 1.5 s. Steepness is part of it: halving the
+  stroke at 1.5 s (0.14 m) halves the excess to +8%, with the current at the
+  bed barely weaker (−0.19 against −0.24 m/s). WV-1's deep rows are
+  affected.
 - **Orbit tracers drift.** Near the surface forward and near the bed back,
   0.2–0.3 m/s, so a 3 s trail is a spiral and a tracer is put back on its
   column every few seconds. B4 reads the height of one loop, which the drift
@@ -767,8 +770,12 @@ maximum #72 removed from every channel, so it is not the fix.
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from
 `cosh k(z+d)/sinh kd`, and the vertical component vanishes at the bed as it
-should. In the deep flume the vertical falls 244× and the horizontal 3.2×.
-When measuring this, fit the Fourier component AT THE PADDLE FREQUENCY — a
+should. In the deep flume, at B4's column (x = 5.84 m, T = 1.2–2.0 s), the
+height of one loop follows sinh(kz) from 1.7 cm above the bed to 2 cm below
+the surface: trail 8 over trail 2 within −5% to +15% of theory from 1.35 s
+up, and 28% low at 1.2 s, where the drift adds a few millimetres of vertical
+wobble to every near-bed trail. Read one loop, not the trail: since #72 the
+trails drift (above). When measuring this, fit the Fourier component AT THE PADDLE FREQUENCY — a
 raw standard deviation picks up the flume's own seiche, which is depth-uniform
 and made deep water look like it had no decay at all.
 

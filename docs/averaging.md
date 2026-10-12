@@ -241,6 +241,18 @@ the test suite does. A genuinely broken flux sits orders of magnitude above
 this bound. `APP.avg.residual()` computes the residual from the stored means
 on demand.
 
+The random walk needs each update `k(F − ⟨F⟩)` to be larger than half an ulp
+of `⟨F⟩`. In a steady enough flow it stops being: `k` falls as `1/n`, the
+fluctuation does not grow, and below half an ulp an update rounds away —
+systematically, not at random. Measured on `h23` at Low with the stress-free
+surface, settled, on its supercritical sheet (`f ≈ 1.001`, `|⟨F⟩|` 3.3–4.1):
+the maximum grows with log-log slope 0.4–0.6 to about 1 s of window, 0.9–1.1
+to 3 s and 1.4–1.5 to 8.5 s, where it reaches the bound above (`C = 3`);
+before the stress-free surface the rougher sheet held 0.4–0.6 throughout. It
+is a limit of the float32 accumulator — the VOF pass did not change — and it
+matters for long windows on steady sheets. The gate measures a 0.3 → 0.9 s
+window, where growth is still close to `√T`.
+
 ---
 
 ## 6 · The fields, all derived from the mean state

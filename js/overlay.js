@@ -111,26 +111,52 @@ const OVERLAY = (() => {
     for (let i = 0; i < nx; i++) { if (use[i] && bd[i] !== 0) ps = i; prevStep[i] = ps; }
     ps = -1;
     for (let i = nx - 1; i >= 0; i--) { if (use[i] && bd[i] !== 0) ps = i; nextStep[i] = ps; }
+    // Where each reach of bed ends: the nearest pair at or after (at or
+    // before) i that is not bed — a cliff, a brink, the domain's end.
+    const gapAfter = new Int32Array(nx), gapBefore = new Int32Array(nx);
+    let gp = nx - 1;                                // use[nx − 1] is always 0
+    for (let i = nx - 1; i >= 0; i--) { if (!use[i]) gp = i; gapAfter[i] = gp; }
+    gp = -1;
+    for (let i = 0; i < nx; i++) { if (!use[i]) gp = i; gapBefore[i] = gp; }
+    // Where there is no step beyond a window's end, snapping IN to the last
+    // step inside it is only honest when the stepless stretch is the
+    // PART-TREAD at the end of a reach — no longer than the tread beside it,
+    // so the next step would have fallen past the reach's end. m1's inlet is
+    // that: 1 in 250, its first step 2–3 m in, a tread of 3 m. A level apron
+    // under a chute is not: metres of no step against the chute's tread of a
+    // few cells. Snapped in there, every apron column within a window of the
+    // toe read the chute's slope exactly — m3 at Low, 0.204 out to
+    // x = 5.25 m and then the tilt's 0.004. These say whether the step at the
+    // end of a run is followed (preceded) by a part-tread, the tread beside
+    // it lying in the same reach.
+    const partAfter = (a) => {
+      const p = a >= 1 ? prevStep[a - 1] : -1;
+      return p >= 0 && gapAfter[p] > a && gapAfter[a + 1] - 1 - a <= a - p;
+    };
+    const partBefore = (b) => {
+      const q = b + 1 < nx ? nextStep[b + 1] : -1;
+      return q >= 0 && gapAfter[b] > q && b - 1 - gapBefore[b] <= q - b;
+    };
     // A tilted-gravity scene draws its bed flat and carries the slope in
     // gravity instead — add it back, it is the dynamic slope the GVF sees.
     const tilt = S.scene.tiltS0 || 0;
     const slope = new Float32Array(nx);
     for (let i = 0; i < nx; i++) {
       const lo0 = Math.max(0, i - win), hi0 = Math.min(nx - 1, i + win);
-      // Out to the step beyond each end; where there is none (the ends of
-      // the domain), IN to the nearest one, so the run still starts and ends
-      // on a step. A one-sided snap counted the inlet's step against half a
-      // window and read 1 in 130 for 1 in 250.
-      let lo = prevStep[lo0] >= 0 ? prevStep[lo0] : nextStep[lo0];
-      let hi = nextStep[hi0] >= 0 ? nextStep[hi0] : prevStep[hi0];
-      // A window the domain's END has clipped, holding one step or none,
-      // reaches on to the next step inward: m1's inlet metre (1 in 250, its
-      // first step 2–3 m in) otherwise read level and labelled the pool H2.
-      // Only at the ends — anywhere else that would hand a level apron the
-      // slope of the chute above it.
+      // Out to the step beyond each end; where there is none and the stretch
+      // is a reach's part-tread (above), IN to the nearest one, so the run
+      // still starts and ends on a step. A one-sided snap counted the inlet's
+      // step against half a window and read 1 in 130 for 1 in 250. Anywhere
+      // else a missing step falls through to the plain-window mean below.
+      let lo = prevStep[lo0], hi = nextStep[hi0], loIn = false, hiIn = false;
+      if (lo < 0 && nextStep[lo0] >= 0 && partBefore(nextStep[lo0])) { lo = nextStep[lo0]; loIn = true; }
+      if (hi < 0 && prevStep[hi0] >= 0 && partAfter(prevStep[hi0])) { hi = prevStep[hi0]; hiIn = true; }
+      // A run snapped in, holding one step or none, reaches on to the next
+      // step of the same reach: m1's inlet metre otherwise read level and
+      // labelled the pool H2.
       if (!(lo >= 0 && hi > lo)) {
-        if (lo0 === 0 && lo >= 0 && lo + 1 < nx && nextStep[lo + 1] > lo) hi = nextStep[lo + 1];
-        else if (hi0 === nx - 1 && hi > 0 && prevStep[hi - 1] >= 0) lo = prevStep[hi - 1];
+        if (loIn && nextStep[lo + 1] > lo) hi = nextStep[lo + 1];
+        else if (hiIn && prevStep[hi - 1] >= 0) lo = prevStep[hi - 1];
       }
       let s;
       if (lo >= 0 && hi > lo) {

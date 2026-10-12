@@ -31,8 +31,8 @@ const state = {
   // look the same for every student who opens it.
   legendPlaced: false,
   // The two grade lines, on their own switch beside the channel overlay. Off
-  // by default: they cost a full-field readback, and most scenes are
-  // free-surface, where the HGL lies on the water line and adds nothing.
+  // by default: most scenes are free-surface, where the HGL lies on the water
+  // line and adds nothing.
   grade: false, gradeBuf: null, gradeTick: 0, gradeAvg: false,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
@@ -709,7 +709,7 @@ const CONTROLS = [
     info: "Critical depth d_c, normal depth d_n and the energy grade line, computed per column from the live depth and unit discharge." },
   { id: "grade", type: "check", label: "Grade lines (EGL / HGL)",
     get: () => state.grade, set: (v) => state.grade = v,
-    info: "The energy grade line H and the hydraulic grade line h = z + p/ρg, drawn for every wet column whether it has a free surface or not. The gap between them is the velocity head V²/2g, to scale. In a free-surface reach the HGL sits on the water surface; in a pressurised conduit there is no surface and the HGL is the only meaningful head — it can run above the crown, which is what B10 is about. Costs one full-field readback, throttled to every third frame." },
+    info: "The energy grade line H and the hydraulic grade line h = z + p/ρg, drawn for every wet column whether it has a free surface or not. The gap between them is the velocity head V²/2g, to scale. In a free-surface reach the HGL sits on the water surface; in a pressurised conduit there is no surface and the HGL is the only meaningful head — it can run above the crown, which is what B10 is about. Refreshed every third frame; under Average it costs a full-field readback." },
   { id: "labels", type: "check", label: "Profile labels",
     get: () => state.labels, set: (v) => state.labels = v,
     info: "Names each reach by its gradually-varied-flow class. The letter is the bed (Mild, Steep, Critical, Horizontal, Adverse); the number is the zone — 1 above both d_n and d_c, 2 between them, 3 below both." },
@@ -2839,13 +2839,18 @@ function emaFlux(prev, now, a) {
  *  numbers — two estimates of the same head that disagree is how you get an
  *  overlay arguing with itself.
  *
- *  Throttled because this is a full-field readPixels: MEASURED on m2 at Medium
- *  (1265 x 75) it costs 6.6 ms against a 12.6 ms frame, so it can never go on
- *  the frame path undivided. Every 3rd frame while the grade lines are up (the
- *  rate that switch already shipped with, ~2.2 ms/frame amortised); every 10th
- *  otherwise, because alpha is a smooth, slowly-varying field and a third of a
- *  second of lag in it is invisible in a steady reach — where it is NOT steady
- *  the velocity head is being smoothed over 1.5 m of reach anyway.
+ *  Throttled because every refresh is a pipeline sync. Live it is an nx×1
+ *  readback off a column pass (SIM.hydraulicGrade) — MEASURED on m2 at Medium
+ *  (1265 × 75), 1.5 ms median against the 4.6 ms of the two full-field
+ *  readPixels it replaced, which every channel scene was paying with nothing
+ *  on screen asking. Under Average it is still a full-field readback (alpha
+ *  needs every cell of every column) — the 6.6 ms against a 12.6 ms frame this
+ *  throttle was first sized for — so it never goes on the frame path
+ *  undivided. Every 3rd frame while the grade lines are up (the rate that
+ *  switch already shipped with); every 10th otherwise, because alpha is a
+ *  smooth, slowly-varying field and a third of a second of lag in it is
+ *  invisible in a steady reach — where it is NOT steady the velocity head is
+ *  being smoothed over 1.5 m of reach anyway.
  *
  *  The window flag is part of the key, not just the throttle: a buffer built
  *  from the live field is the wrong flow state to hand an Average-mode

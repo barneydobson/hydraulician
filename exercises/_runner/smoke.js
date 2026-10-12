@@ -189,8 +189,9 @@ const GPU_MUTANTS = [
 
   { id: "setvalve-no-reset", file: "/js/sim.js",
     why: "a valve toggle changes the solid set with no reset, so frozen cells resume mid-window",
-    find: "    S.p.valveClosed = v;\n    if (S.avg) avgReset();",
-    replace: "    S.p.valveClosed = v;",
+    find: "    S.tcolDirty = true;             // and FS_TCOL reads u_valve: rebuild with it\n" +
+          "    if (S.avg) avgReset();",
+    replace: "    S.tcolDirty = true;             // and FS_TCOL reads u_valve: rebuild with it",
     kills: "avg a valve toggle resets the window",
     measured: "T runs straight through the toggle instead of returning to zero" },
 
@@ -1886,16 +1887,18 @@ SUITES.pack = async (B) => {
         await EX.ready;
         APP.frames(3);
         return { ex: EX.current && EX.current.id, scene: APP.sim.scene.id,
-                 field: APP.state.gaugeField, segs: APP.sim.segs.length };
+                 field: APP.state.gaugeField, segs: APP.sim.segs.length,
+                 fields: CONTROLS.find((c) => c.id === "gaugeField").opts.map((o) => o[0]) };
       })()`);
     } catch (e) {
       ok("PACK " + id + " applies", false, e.message);
       continue;
     }
     ok("PACK " + id + " applies onto its scene",
-      // Every option the "Gauges plot" select offers (js/main.js) — HP-3
-      // plots the level η, and a list missing it failed the pack on main.
-      r.ex === id && !!r.scene && ["h", "H", "d", "eta", "speed"].includes(r.field),
+      // One of the options the "Gauges plot" select offers, read off the
+      // select itself — a copy of the list here went stale when HP-3 started
+      // plotting the level η, and failed the pack on main.
+      r.ex === id && !!r.scene && r.fields.includes(r.field),
       JSON.stringify(r));
   }
 };
@@ -1942,7 +1945,10 @@ SUITES.avg = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=h23`);
   const r = await B.evaluate(`(() => {
     __low();
-    APP.tick(600);                       // settle a little before the window opens
+    // The window opens on the SETTLED flow, past the scene's measured spin-up
+    // — see the growth gate below for why. __settle ticks in fixed chunks, so
+    // where it stops is a substep count, not a wall-clock accident.
+    const spinup = APP.sim.scene.spinup, tOpen = __settle(spinup, 120000);
     APP.SIM.avgStart();
     // APP.tick(n) is EXACTLY n substeps, so T = n*dt is reproducible on every
     // machine. APP.frames() is NOT: the substep governor picks a
@@ -1955,7 +1961,7 @@ SUITES.avg = async (B) => {
     const res2 = APP.SIM.transportResidual(), T2 = APP.SIM.avgT();
     const active = APP.SIM.avgActive();
     APP.SIM.avgStop();
-    return { T, T2, active, dt: APP.SIM.dt(), dx: APP.sim.dx,
+    return { spinup, tOpen, T, T2, active, dt: APP.SIM.dt(), dx: APP.sim.dx,
              max: res.max, mean: res.mean, n: res.n, nSrc: res.nSrc, Fmax: res.Fmax,
              maxSrc: res.maxSrc, Smax: res.Smax,
              max2: res2.max, Fmax2: res2.Fmax,
@@ -1968,6 +1974,8 @@ SUITES.avg = async (B) => {
     ` bound=${b1.toExponential(3)}->${b2.toExponential(3)}` +
     ` margin=${(b1 / r.max).toFixed(1)}x/${(b2 / r.max2).toFixed(1)}x` +
     ` cells=${r.n} src=${r.nSrc}`);
+  ok("avg window opens on the settled flow", r.tOpen >= r.spinup,
+     `__settle reached t = ${r.tOpen.toFixed(2)} s of the ${r.spinup} s spin-up`);
   ok("avg accumulator reports a positive window", r.T > 0 && r.active, JSON.stringify(r));
   ok("avg residual has interior cells to report on", r.n > 100, JSON.stringify(r));
   // F1: the transport balance is an IDENTITY of the scheme, so all that is
@@ -1977,24 +1985,25 @@ SUITES.avg = async (B) => {
      `max ${r.max} / bound ${b1}   max2 ${r.max2} / bound2 ${b2}`);
   // Growth must be SUB-LINEAR in T. Over the 3× window below √T predicts
   // 1.73×; the old factor of 4 was larger than 3, so pure linear growth — the
-  // thing this is here to forbid — passed it. The window is pinned to a fixed
-  // substep count, so the ratio is reproducible: 1.995 on this ANGLE/D3D11
-  // path, identical to four decimal places across five runs, about 1.15x the
-  // √T prediction. 2.6 is 1.30x that measurement and
-  // 1.50x the prediction, with linear growth (3.0) still outside it.
-  //   Each window's maximum is taken in units of the float32 ulp of its OWN
-  // ‖⟨F⟩‖∞. The drift is ½·ulp per step, and the ulp doubles whenever the
-  // largest face mean crosses a power of two — which the window opens too
-  // early to rule out (600 substeps in, the chute is still speeding up).
-  // MEASURED after the stress-free surface (#72): Fmax 1.74 → 2.07 across the
-  // window, the worst cell moving to where it crossed 2.0, a raw ratio of
-  // 3.26 against an ulp-normalised 1.63 — a precision step, not a leak.
-  const ulp = (F) => Math.pow(2, Math.floor(Math.log2(Math.max(F, 1e-30))) - 23);
-  const inUlp1 = r.max / ulp(r.Fmax), inUlp2 = r.max2 / ulp(r.Fmax2);
-  ok("F1 residual grows no faster than sqrt(T)", inUlp2 < inUlp1 * 2.6 + 1e-9,
-     `max ${r.max} -> ${r.max2} (raw ratio ${(r.max2 / r.max).toFixed(3)}, in ulps of ` +
-     `Fmax ${r.Fmax.toFixed(3)} -> ${r.Fmax2.toFixed(3)}: ${(inUlp2 / inUlp1).toFixed(3)})` +
-     ` over T ${r.T} -> ${r.T2}`);
+  // thing this is here to forbid — passed it. 2.6 keeps linear growth (3.0)
+  // outside. The window is pinned to a fixed substep count, so the ratio is
+  // reproducible on a given GPU path: 1.995 on ANGLE/D3D11 before #72,
+  // identical to four decimal places across five runs.
+  //   It opens past h23's spin-up, not 600 substeps in as it used to. There
+  // the chute is still speeding up: after the stress-free surface (#72)
+  // ‖⟨F⟩‖∞ ran 1.74 → 2.07 across the window, the ulp of the worst face
+  // doubled with it, and the ratio read 3.26 — a precision step, not a leak,
+  // but a gate that excused it by normalising each window to its own ulp
+  // also passed linear growth whenever Fmax crossed a power of two. Settled,
+  // ‖⟨F⟩‖∞ holds at 4.17 to three figures and the raw ratio is the gate.
+  // MEASURED (ANGLE/Metal, Low): 2.163 at the open __settle lands on
+  // (t = 20.01 s); across eight settled opens from 20 to 37 s, 1.24–2.51 —
+  // the maximum over cells is heavy-tailed, so the headroom is thin.
+  //   A SHORT-window statement: see docs/averaging.md §5 for the settled
+  // sheet's faster growth past ~3 s.
+  ok("F1 residual grows no faster than sqrt(T)", r.max2 < r.max * 2.6 + 1e-9,
+     `max ${r.max} -> ${r.max2} (ratio ${(r.max2 / r.max).toFixed(3)})` +
+     ` Fmax ${r.Fmax.toFixed(3)} -> ${r.Fmax2.toFixed(3)} over T ${r.T} -> ${r.T2}`);
 
   // F4: the sponge, the Dirichlet bands and every positivity-clamp event live
   // in the ⟨S⟩ ≠ 0 population — counted, never silently excluded — and the §5
@@ -2344,7 +2353,9 @@ SUITES.avg = async (B) => {
     // mean against a 3.04 s CPU one and read it as a Favre error. Where the
     // clock stands here is set by the governor-paced APP.frames() tests
     // above, i.e. by wall-clock speed, so it has to be made true, not assumed.
-    while (S.t < (APP.state.scene.spinup || 0) + 0.25) APP.tick(2000);
+    const tPre = (APP.state.scene.spinup || 0) + 0.25;
+    __settle(tPre, 120000);
+    if (S.t < tPre) return { preroll: S.t, tPre };
     const F = new Float32Array(n * 4);
     const sFu = new Float64Array(n), sF = new Float64Array(n), sU = new Float64Array(n);
     let T = 0, frames = 0;
@@ -2395,37 +2406,44 @@ SUITES.avg = async (B) => {
              sepMin: top.length ? top[top.length - 1].sep : 0,
              best: top[0] || null };
   })()`);
-  console.log(`
+  // __settle gives up on wall clock rather than hanging; say so, rather
+  // than a confusing Favre failure off an unsettled window.
+  if (fr.preroll !== undefined) {
+    ok("Favre/Reynolds probe settled past the spin-up", false,
+       `__settle reached t = ${fr.preroll.toFixed(2)} s of ${fr.tPre.toFixed(2)} s`);
+  } else {
+    console.log(`
     Favre vs Reynolds: ${fr.nCand} cells with 0.3<fbar<0.7 over T=${fr.T.toFixed(4)}s` +
-    ` (${fr.frames} frames); top ${fr.nTop} by separation ${fr.sepMin.toFixed(4)}-${fr.sepMax.toFixed(4)} m/s;` +
-    ` mean |ubar-Favre|=${fr.dFavre.toExponential(3)} vs |ubar-Reynolds|=${fr.dReyn.toExponential(3)};` +
-    ` nearer Favre in ${fr.nearFavre}/${fr.nTop}` +
-    (fr.best ? ` | best cell (${fr.best.i},${fr.best.j}) fbar=${fr.best.fb.toFixed(3)}` +
-      ` Favre=${fr.best.favre.toFixed(4)} Reynolds=${fr.best.reyn.toFixed(4)} ubar=${fr.best.ubar.toFixed(4)}` : ""));
-  // The probe is worthless unless the two references actually separate — a
-  // green assertion on cells where they coincide proves nothing, which is the
-  // failure this test was written to end.
-  // ...and only if both means cover the SAME window: any reset condition
-  // firing mid-probe shortens the GPU one and nothing else would say so.
-  ok("Favre/Reynolds probe found partially filled cells that separate the two",
-     fr.nTop >= 10 && fr.sepMin > 0.02 && Math.abs(fr.gpuT - fr.T) <= 1e-6 * fr.T,
-     JSON.stringify({ ...fr, best: undefined }));
-  // "Nearer Favre than Reynolds" is NOT enough on its own, and the negative
-  // control is what showed it: storing uc instead of f*uc leaves avgField
-  // dividing by fbar anyway, so ubar becomes <u_c>/fbar — at fbar = 0.3 that
-  // is 4.2x the Reynolds mean, further from Reynolds than from Favre, and a
-  // nearness test passes it. The gate is therefore AGREEMENT with the Favre
-  // reference relative to the Favre/Reynolds separation. Measured on this
-  // scene: 1.3e-7 against 6.9e-1, a ratio of 2e-7. The negative control (the
-  // uc store) measured 3.98e-2 against 1.15e0, a ratio of 3.46e-2 — and it
-  // was still "nearer Favre" in 25 cells out of 25, which is precisely why
-  // the nearness clause cannot carry this on its own. The gate at 1e-3 sits
-  // between them with 5000x of clean headroom and 35x of separation from the
-  // bug. The other half of the trap, an avgField that forgets to divide by
-  // fbar, lands nearer Reynolds outright and the nearness clause catches it.
-  ok("avgField's ubar is the FAVRE mean <f u_c>/fbar, not the Reynolds mean <u_c>",
-     fr.dFavre < 1e-3 * fr.dReyn && fr.nearFavre >= 0.9 * fr.nTop,
-     JSON.stringify({ ...fr, best: undefined }));
+      ` (${fr.frames} frames); top ${fr.nTop} by separation ${fr.sepMin.toFixed(4)}-${fr.sepMax.toFixed(4)} m/s;` +
+      ` mean |ubar-Favre|=${fr.dFavre.toExponential(3)} vs |ubar-Reynolds|=${fr.dReyn.toExponential(3)};` +
+      ` nearer Favre in ${fr.nearFavre}/${fr.nTop}` +
+      (fr.best ? ` | best cell (${fr.best.i},${fr.best.j}) fbar=${fr.best.fb.toFixed(3)}` +
+        ` Favre=${fr.best.favre.toFixed(4)} Reynolds=${fr.best.reyn.toFixed(4)} ubar=${fr.best.ubar.toFixed(4)}` : ""));
+    // The probe is worthless unless the two references actually separate — a
+    // green assertion on cells where they coincide proves nothing, which is the
+    // failure this test was written to end.
+    // ...and only if both means cover the SAME window: any reset condition
+    // firing mid-probe shortens the GPU one and nothing else would say so.
+    ok("Favre/Reynolds probe found partially filled cells that separate the two",
+       fr.nTop >= 10 && fr.sepMin > 0.02 && Math.abs(fr.gpuT - fr.T) <= 1e-6 * fr.T,
+       JSON.stringify({ ...fr, best: undefined }));
+    // "Nearer Favre than Reynolds" is NOT enough on its own, and the negative
+    // control is what showed it: storing uc instead of f*uc leaves avgField
+    // dividing by fbar anyway, so ubar becomes <u_c>/fbar — at fbar = 0.3 that
+    // is 4.2x the Reynolds mean, further from Reynolds than from Favre, and a
+    // nearness test passes it. The gate is therefore AGREEMENT with the Favre
+    // reference relative to the Favre/Reynolds separation. Measured on this
+    // scene: 1.3e-7 against 6.9e-1, a ratio of 2e-7. The negative control (the
+    // uc store) measured 3.98e-2 against 1.15e0, a ratio of 3.46e-2 — and it
+    // was still "nearer Favre" in 25 cells out of 25, which is precisely why
+    // the nearness clause cannot carry this on its own. The gate at 1e-3 sits
+    // between them with 5000x of clean headroom and 35x of separation from the
+    // bug. The other half of the trap, an avgField that forgets to divide by
+    // fbar, lands nearer Reynolds outright and the nearness clause catches it.
+    ok("avgField's ubar is the FAVRE mean <f u_c>/fbar, not the Reynolds mean <u_c>",
+       fr.dFavre < 1e-3 * fr.dReyn && fr.nearFavre >= 0.9 * fr.nTop,
+       JSON.stringify({ ...fr, best: undefined }));
+  }
 
   // The column-reading accumulator (Task 7): averages FS_COL's OWN OUTPUT
   // (bed, d, q, top), not the raw field — connectivity stays decided on the

@@ -95,6 +95,9 @@ over a bar chart of the raw fall F.
   solver's own read noise, and half the windows come back with the
   downstream gauge sitting *higher* than the upstream one. Slope-area was
   never the broken part — the reach was.
+- The hover box's `depth d` reads in whole-cell steps (14 mm at Medium): the
+  steady surface sits on a cell face, so **h** is good to one cell. The
+  gauges' `h` comes off the pressure and does not step.
 
 The full verification record — why m1 was abandoned for m3 and m3 in turn for
 `sa1` (a long uniform mild reach, tilt-built so it has no rasterisation

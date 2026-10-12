@@ -201,8 +201,10 @@ void main(){
   // cell to f ≈ 1.09 until the outlet behaved as a weir crest at its own
   // level, ponding the apron 0.25–0.35 m above it. First-order upwind from
   // the interior only: an outgoing face still advects, an incoming one is
-  // left to its pressure gradient.
-  if (i == NXY.x - 1) {
+  // left to its pressure gradient. Under gravity only, like the outflow
+  // clamp further down: every measurement behind this was a tailwater
+  // outlet, and plan view's wake legitimately crosses its open edge both ways.
+  if (i == NXY.x - 1 && u_g != 0.0) {
     float dudx = u0 >= 0.0 ? (u0 - tW.r) / dx : 0.0;
     un = u0 - dt * ( u0 * dudx + wAtU * ud3(tSS.r, tS.r, u0, tN.r, tNN.r, wAtU, dx) );
   }
@@ -796,6 +798,34 @@ void main(){
   o = vec4(zb, zb + d, roof ? 0.0 : 1.0, 0.0);
 }`;
 
+  // --------------------------------------- pass 3c: hydraulic grade line
+  // The piezometric head z + p/ρg at each column's lowest wet cell — the live
+  // half of SIM.hydraulicGrade, which a channel scene keeps all the time
+  // (the overlay's energy line is built on it). One texel per column,
+  // (wet, h, 0, 0), so the refresh is an nx×1 readback and not two of the
+  // whole field. The walk is the CPU one it replaced, cell for cell: the
+  // lowest non-solid cell (a valve does not count) with f ≥ 0.25, and the
+  // pressure belongs to that cell's LOWER face, so z = j·Δx.
+  const FS_HGL = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 o;
+uniform sampler2D u_U, u_F, u_S;
+uniform vec2  u_res;
+uniform float u_dx, u_g;
+
+void main(){
+  int i  = int(gl_FragCoord.x);
+  int NY = int(u_res.y);
+  for (int j = 1; j < NY - 1; j++) {
+    if (texelFetch(u_S, ivec2(i,j), 0).r > 0.75) continue;      // solid
+    if (texelFetch(u_F, ivec2(i,j), 0).r < 0.25) continue;      // not water yet
+    o = vec4(1.0, float(j) * u_dx + texelFetch(u_U, ivec2(i,j), 0).b / u_g, 0.0, 0.0);
+    return;
+  }
+  o = vec4(0.0);                                                // dry column
+}`;
+
   // ------------------------------------------------------------- particles
   const FS_PART = `#version 300 es
 precision highp float;
@@ -1281,6 +1311,6 @@ void main(){
   o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));
 }`;
 
-  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_PART, VS_PART,
+  return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_HGL, FS_PART, VS_PART,
            FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL };
 })();

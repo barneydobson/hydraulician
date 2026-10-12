@@ -100,6 +100,8 @@ the coarse-sampling bias shows up as a systematic offset below the 1:1 line.
   condition, while the bed's resistance is its wall-function drag `C_f`,
   which stays on regardless — two different things a channel does to the
   water touching it.
+- The hover box's `depth d` reads in whole-cell steps (13 mm at Medium): the
+  steady surface sits on a cell face, so `h` is good to one cell and no finer.
 
 The full verification record — why s2 rather than m3's near-uniform apron, the
 rake's access path and its lack of smoothing, the per-station spreads, the

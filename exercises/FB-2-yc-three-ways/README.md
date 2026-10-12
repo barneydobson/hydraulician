@@ -91,6 +91,9 @@ Fr = 1 crossing back to the lip in `d_c` units against the textbook 3–4 `d_c`.
   away. That is curvature defeating the hydrostatic pressure assumption
   `d_c` is built on — visible, repeatable, and the reason `d_brink < d_c` is
   a result rather than solver noise.
+- The gauge's `d` and the hover box's `depth d` read in whole-cell steps
+  (22 mm at Medium): the steady surface sits on a cell face, so each reading
+  is good to one cell and no finer.
 
 The full verification record — the crest-length iteration, the level-margin
 and no-tailwater checks, the measured per-digit table, safe bounds and

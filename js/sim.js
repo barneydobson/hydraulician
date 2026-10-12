@@ -55,6 +55,7 @@ const SIM = (() => {
     prog.vofA = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF_ACC);
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
     prog.tcol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TCOL);
+    prog.hgl  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_HGL);
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
     // The Favre display accumulator (§4.1 of docs/averaging.md) — a separate
     // pass from prog.vofA's transport accumulator, and a separate program
@@ -322,8 +323,10 @@ const SIM = (() => {
    *  hands the wall stress to the wall function and never doubles it.
    *  Exact Euclidean (Felzenszwalb & Huttenlocher's two 1D passes), O(cells),
    *  so it is re-run on every mask change and every valve flip rather than
-   *  cached: a few milliseconds at Ultra. Texel (i, j) is corner (i, j), the
-   *  south-west corner of cell (i, j). */
+   *  cached: a few milliseconds at Ultra. Its scratch is kept on S, sized to
+   *  the grid — it runs on every stroke, undo, slider move and valve flip,
+   *  and a fresh set was ~11 MB of Float64 a time at Ultra. Texel (i, j) is
+   *  corner (i, j), the south-west corner of cell (i, j). */
   function wallDistance() {
     const nx = S.nx, ny = S.ny, m = S.mask;
     // Far beyond any real squared distance (nx² + ny² < 1.4e8) yet small
@@ -335,16 +338,19 @@ const SIM = (() => {
       const v = m[j * nx + i];
       return v >= 192 || (v >= 64 && shut > 0.5);
     };
-    const g = new Float64Array(nx * ny);
+    const n = Math.max(nx, ny);
+    if (!S.wdG || S.wdG.length !== nx * ny || S.wdF.length !== n) {
+      S.wdG = new Float64Array(nx * ny);
+      S.wdF = new Float64Array(n); S.wdD = new Float64Array(n);
+      S.wdZ = new Float64Array(n + 1); S.wdV = new Int32Array(n);
+    }
+    const g = S.wdG, f = S.wdF, d = S.wdD, z = S.wdZ, v = S.wdV;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
         const on = solid(i, j) || solid(i - 1, j) || solid(i, j - 1) || solid(i - 1, j - 1);
         g[j * nx + i] = on ? 0 : INF;
       }
     }
-    const n = Math.max(nx, ny);
-    const f = new Float64Array(n), d = new Float64Array(n), z = new Float64Array(n + 1);
-    const v = new Int32Array(n);
     const pass = (len) => {
       let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
       for (let q = 1; q < len; q++) {
@@ -433,6 +439,7 @@ const SIM = (() => {
     if (S.p.valveClosed === v) return;
     S.p.valveClosed = v;
     wallDistance();                 // a shut valve is a wall to the closure too
+    S.tcolDirty = true;             // and FS_TCOL reads u_valve: rebuild with it
     if (S.avg) avgReset();
   }
 
@@ -460,13 +467,16 @@ const SIM = (() => {
     for (const b of [g.U, g.F, g.P]) if (b && b.dispose) b.dispose();
     if (g.colFbo) gl.deleteFramebuffer(g.colFbo);
     if (g.tcolFbo) gl.deleteFramebuffer(g.tcolFbo);
+    if (g.hglFbo) gl.deleteFramebuffer(g.hglFbo);
     if (g.solid) gl.deleteTexture(g.solid);
     if (g.colTex) gl.deleteTexture(g.colTex);
     if (g.tcolTex) gl.deleteTexture(g.tcolTex);
+    if (g.hglTex) gl.deleteTexture(g.hglTex);
     if (g.wallTex) gl.deleteTexture(g.wallTex);
     g.U = null; g.F = null; g.P = null;
     g.solid = null; g.colTex = null; g.colFbo = null;
     g.tcolTex = null; g.tcolFbo = null; g.wallTex = null;
+    g.hglTex = null; g.hglFbo = null;
     // The trail belongs to the CANVAS, not to the grid, so it survives a
     // rebuild — but what is drawn in it does not: those pixels are the old
     // geometry's particles. Marking it undrawn clears it on the next frame.
@@ -543,6 +553,10 @@ const SIM = (() => {
     S.tcolFbo = GLH.createFBO(gl, S.tcolTex);
     S.wallTex = GLH.createTexture(gl, nx, ny, gl.R32F, gl.RED, FL, null);
     S.nsteps = 0;
+    // The live hydraulic grade line (FS_HGL), one texel per column.
+    S.hglTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
+    S.hglFbo = GLH.createFBO(gl, S.hglTex);
+    S.hglBuf = new Float32Array(nx * 4);
 
     const pn = 128;
     S.pn = pn;
@@ -761,7 +775,10 @@ const SIM = (() => {
    *  C stays inside 0.40–0.54 over that whole range (0.745 on an ANGLE/D3D11
    *  path), which is what makes the law usable as a gate: scale by √(T/Δt) and
    *  the margin stops moving. `Fmax` is returned so a caller can do exactly
-   *  that — see `avgBound` in exercises/_runner/smoke.js.
+   *  that — see `avgBound` in exercises/_runner/smoke.js. Those numbers are
+   *  from before the stress-free surface (#72); its steadier chute sheet
+   *  leaves the random-walk regime on long windows, where the updates fall
+   *  under half an ulp and round away systematically — docs/averaging.md §5.
    *
    *  A one-substep window is a DIFFERENT and smaller regime: there the storage
    *  term dominates, because f is stored in float32 and an update below half an
@@ -1451,9 +1468,15 @@ const SIM = (() => {
    *  would return the surface elevation in every regime and the line would
    *  carry no information a pipe run needs.
    *
-   *  ONE readPixels of the whole velocity/pressure texture -- the same bargain
-   *  fieldStats and boxForce already make. Never call it on the frame path
-   *  without a throttle.
+   *  LIVE, the walk runs on the GPU (FS_HGL) and only nx heads come back — a
+   *  readback the size of columns()'s. It used to be two readPixels of the
+   *  whole field, and a channel scene keeps this line all the time (the
+   *  overlay's energy line is built on it), so with nothing on screen asking
+   *  for it every channel scene paid two full-field syncs every 10th frame.
+   *  UNDER AVERAGING it is still ONE readPixels of the whole mean field — the
+   *  same bargain fieldStats and boxForce make — because `hv` below needs
+   *  every wet cell of every column, not only the lowest. Never call it on the
+   *  frame path without a throttle.
    *
    *  Returns a Float32Array of nx heads; a dry column reads NaN so the overlay
    *  can break the line rather than drawing it through a gap.
@@ -1461,8 +1484,8 @@ const SIM = (() => {
    *  It also fills `out.hv` with each column's TRUE velocity head — the
    *  kinetic energy the flow carries per unit weight of it, RECON.columnEnergy
    *  — so the energy line can be drawn at h + hv rather than at h + V²/2g.
-   *  The two integrals ride this readback because it is already here and
-   *  already walking every column: the whole correction costs a handful of
+   *  The two integrals ride the averaged readback because it is already there
+   *  and already walking every column: the whole correction costs a handful of
    *  flops per cell and not one extra pipeline sync. `hv` is NaN wherever `h`
    *  is, so the two lines break together.
    *
@@ -1484,70 +1507,66 @@ const SIM = (() => {
     const nx = S.nx, ny = S.ny, dx = S.dx;
     const h = out && out.length >= nx ? out : new Float32Array(nx);
     const g = Math.abs(S.p.g) || 9.81;
+    const hv = out && out.hv && out.hv.length >= nx ? out.hv : new Float32Array(nx);
+    h.hv = hv;
+    if (!(avg && S.avg)) {
+      gl.useProgram(prog.hgl);
+      GLH.bindTex(gl, prog.hgl, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+      gl.uniform2f(prog.hgl.u("u_res"), nx, ny);
+      gl.uniform1f(prog.hgl.u("u_dx"), dx);
+      gl.uniform1f(prog.hgl.u("u_g"), g);
+      GLH.bindTarget(gl, S.hglFbo, nx, 1);
+      quad.draw();
+      gl.readPixels(0, 0, nx, 1, gl.RGBA, gl.FLOAT, S.hglBuf);
+      for (let i = 0; i < nx; i++) {
+        h[i] = S.hglBuf[i * 4] > 0.5 ? S.hglBuf[i * 4 + 1] : NaN;
+        hv[i] = NaN;
+      }
+      return h;
+    }
     const buf = S.gradeBuf && S.gradeBuf.length >= nx * ny * 4
       ? S.gradeBuf : (S.gradeBuf = new Float32Array(nx * ny * 4));
-    const on = !!(avg && S.avg);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, on ? S.avg.fld.read.fbo : S.U.read.fbo);
+    // The averaged field stores (f*u, f*w, f, P) — the pressure in the 4th
+    // channel, not the live field's 3rd; reading the wrong one gives a
+    // plausible-looking line made of velocity.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
     gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, buf);
-    // The averaged field stores (f*u, f*w, f, P); the live one (u, w, P, dye).
-    // The pressure sits in a different channel in each, and reading the wrong
-    // one gives a plausible-looking line made of velocity.
-    const pc = on ? 3 : 2;
-    const F = S.fBuf && S.fBuf.length >= nx * ny * 4
-      ? S.fBuf : (S.fBuf = new Float32Array(nx * ny * 4));
-    if (!on) { gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-               gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, F); }
     // Reused column scratch for the energy moments — one allocation, not nx.
     const cf = S.ceF && S.ceF.length >= ny ? S.ceF : (S.ceF = new Float64Array(ny));
     const cu = S.ceU && S.ceU.length >= ny ? S.ceU : (S.ceU = new Float64Array(ny));
     const cw = S.ceW && S.ceW.length >= ny ? S.ceW : (S.ceW = new Float64Array(ny));
-    const hv = out && out.hv && out.hv.length >= nx ? out.hv : new Float32Array(nx);
     for (let i = 0; i < nx; i++) {
       h[i] = NaN; hv[i] = NaN;
       for (let j = 1; j < ny - 1; j++) {
         const k = j * nx + i;
         if (S.mask[k] >= 192) continue;                      // solid
-        const f = on ? buf[k * 4 + 2] : F[k * 4];
-        if (f < 0.25) continue;                              // not water yet
+        if (buf[k * 4 + 2] < 0.25) continue;                 // not water yet
         // j * dx, NOT the cell centre. MEASURED: with (j + 0.5) * dx the
         // whole line sat a uniform 0.00964 m above the free surface on m1
         // at Low, where dx/2 is 0.00966 -- a clean half-cell bias, not
         // weir physics. The stored pressure references the cell's lower
         // face, so that is the elevation it belongs to.
-        h[i] = j * dx + buf[k * 4 + pc] / g;                 // z + p/rho g
+        h[i] = j * dx + buf[k * 4 + 3] / g;                  // z + p/rho g
         break;                                               // lowest wet cell
       }
-      // Dry column, or no mean to take the third moment of: leave hv NaN and
-      // let the caller fall back (see the note above).
-      if (!on || h[i] !== h[i]) continue;
-      // COLLOCATION is the trap, and the same one FS_ACC's comment names: on
-      // the LIVE field u lives on the west face and w on the south face, so
-      // both are averaged to the centre here exactly as FS_COL does it. The
-      // MEAN field was collocated before it was accumulated (FS_ACC) and
-      // stores MOMENTUM, so there the velocity is the Favre mean f*u/f --
-      // divided out here and multiplied back inside columnEnergy so the
-      // integrand is written once, in one place, for both fields.
+      if (h[i] !== h[i]) continue;                           // dry: hv stays NaN
+      // The MEAN field was collocated before it was accumulated (FS_ACC) and
+      // stores MOMENTUM, so the velocity is the Favre mean f*u/f — divided
+      // out here and multiplied back inside columnEnergy so the integrand is
+      // written once, in one place.
       cf.fill(0, 0, ny); cu.fill(0, 0, ny); cw.fill(0, 0, ny);
       for (let j = 1; j < ny - 1; j++) {
         const k = j * nx + i;
         if (S.mask[k] >= 192) continue;
-        const f = on ? buf[k * 4 + 2] : F[k * 4];
+        const f = buf[k * 4 + 2];
         if (f < 0.25) continue;
+        const fi = Math.max(f, 1e-6);
         cf[j] = f;
-        if (on) {
-          const fi = Math.max(f, 1e-6);
-          cu[j] = buf[k * 4] / fi;
-          cw[j] = buf[k * 4 + 1] / fi;
-        } else {
-          const kE = j * nx + Math.min(i + 1, nx - 1);
-          const kN = Math.min(j + 1, ny - 1) * nx + i;
-          cu[j] = 0.5 * (buf[k * 4] + buf[kE * 4]);
-          cw[j] = 0.5 * (buf[k * 4 + 1] + buf[kN * 4 + 1]);
-        }
+        cu[j] = buf[k * 4] / fi;
+        cw[j] = buf[k * 4 + 1] / fi;
       }
       hv[i] = RECON.columnEnergy(cf, cu, cw, dx, g).hv;
     }
-    h.hv = hv;
     return h;
   }
 

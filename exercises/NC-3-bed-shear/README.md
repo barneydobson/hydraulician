@@ -80,6 +80,9 @@ below the class, and each row's measurement window as an error bar.
   x = 11 m and watch `S_f` roughly double into the brink: the same channel
   wants 15 mm gravel mid-reach and twice that near its lip. It also explains
   any Part B number that came back far too big.
+- The hover box's `depth d` reads in whole-cell steps (13 mm at Medium): the
+  steady surface sits on a cell face, so **h** is good to one cell and no
+  finer.
 
 The full verification record — the ten measured class rows, the m2
 station-sensitivity table, the tiltS0 checks, per-row flutter and safe

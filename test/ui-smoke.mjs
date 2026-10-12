@@ -584,7 +584,16 @@ async function main() {
       const tab = await browser.open(INDEX + "?scene=m1");
       const p = await tab.evaluate(`
         const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
-        APP.tick(1200); APP.frames(3);
+        // Settled, at the scene's own measured spin-up — not part-way through
+        // it. m1 starts 0.28 m deep and its inlet holds 0.49 m, so for the
+        // first ~12 s the pool is filling and the surface runs 0.1-0.7 dx off
+        // the head (median, Low); settled it sits within 0.05 dx. Bounded on
+        // wall clock, so a software-rasterised Chrome fails with a reading
+        // here instead of hanging the run.
+        const t0 = Date.now(), spinup = APP.sim.scene.spinup;
+        while (APP.sim.t < spinup && Date.now() - t0 < 120000) APP.tick(400);
+        const settled = APP.sim.t >= spinup, tReached = APP.sim.t;
+        APP.frames(3);
         const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
         const h = APP.SIM.hydraulicGrade(null, false);
         const dx = APP.sim.dx;
@@ -599,6 +608,25 @@ async function main() {
         }
         dev.sort((a, b) => a - b);
         const median = dev[dev.length >> 1];
+        // The live line comes off a GPU column pass (FS_HGL); it must be the
+        // CPU walk it replaced, column for column: lowest non-solid cell with
+        // f >= 0.25, z = j·dx + p/g. Read off the same state, no tick between.
+        const S = APP.sim, nx = S.nx, ny = S.ny, g = Math.abs(S.p.g) || 9.81;
+        const gl = document.querySelector("canvas").getContext("webgl2");
+        const U = new Float32Array(nx * ny * 4), F = new Float32Array(nx * ny * 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo); gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, U);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo); gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, F);
+        let walkOff = 0, walkWorst = 0;
+        for (let i = 0; i < nx; i++) {
+          let ref = NaN;
+          for (let j = 1; j < ny - 1; j++) {
+            const k = j * nx + i;
+            if (S.mask[k] >= 192 || F[k * 4] < 0.25) continue;
+            ref = j * dx + U[k * 4 + 2] / g; break;
+          }
+          if (isFinite(ref) !== isFinite(h[i])) walkOff++;
+          else if (isFinite(ref)) walkWorst = Math.max(walkWorst, Math.abs(ref - h[i]));
+        }
         // and the draw path must actually run and label both lines
         let labels = [];
         const cx = document.createElement("canvas").getContext("2d");
@@ -607,16 +635,22 @@ async function main() {
         OVERLAY.drawGradeLines(cx, APP.view, A, APP.sim, h);
         const before = APP.state.grade;
         document.getElementById("gradeBtn").click();
-        return { n: dev.length, median, dx, ratio: median / dx, labels,
+        return { settled, tReached, spinup, n: dev.length, median, dx, ratio: median / dx, labels,
+                 walkOff, walkWorst,
                  toggled: APP.state.grade !== before,
                  panelHasIt: !!CONTROLS.find((x) => x.id === "grade") };
       `);
       check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("m1 settled to its spin-up inside the budget", p.settled,
+            "reached t = " + p.tReached.toFixed(1) + " s of " + p.spinup + " s in 120 s of wall clock");
       check("the grade line covers the reach", p.n > 200, p.n + " columns");
       check("and lies on the water surface where the column is hydrostatic",
             p.ratio < 0.25,
             "median |HGL - surface| " + p.median.toFixed(5) + " m = " +
             p.ratio.toFixed(3) + " dx");
+      check("the GPU column pass is the CPU walk, column for column",
+            p.walkOff === 0 && p.walkWorst < 1e-5,
+            p.walkOff + " wet/dry mismatches, worst |Δh| " + p.walkWorst.toExponential(2) + " m");
       check("both lines are labelled", p.labels.length === 2, JSON.stringify(p.labels));
       check("the strip button toggles it", p.toggled);
       // The panel must be able to reproduce anything the strip does — the

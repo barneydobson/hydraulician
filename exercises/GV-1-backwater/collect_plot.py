@@ -21,26 +21,24 @@ import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------------------------
 # Scene constants — m1 ("M1 - backwater behind a weir"), read verbatim from
-# js/scenes.js (channel({W:16, H:1.05, bed0:0.35, S0:0.0147, cf:0.125,
-# q:0.25, inletDepth:0.54, weir:{x:13.4, h:0.42, w:0.7}, xEnd:14.6}, ...)).
+# js/scenes.js (channel({W:16, H:1.05, bed0:0.35, S0:0.004, cf:0.25,
+# q:0.25, inletDepth:0.49, weir:{x:13.4, h:0.25, w:0.7}, xEnd:14.6}, ...)).
 # m1 has no slope break (xBreak defaults to xEnd), so bedTop(x) is one
 # straight line over the whole reach a student can stand in.
 G = 9.81
 Q = 0.25          # m^2/s, unit discharge (scene default — no student changes it)
-S0 = 0.0147       # bed slope (1 in 68), scene's S0
+S0 = 0.004        # bed slope (1 in 250), scene's S0
 BED0 = 0.35       # bedTop(x) = BED0 - S0*x
 WEIR_X = 13.4     # weir centreline, m
-WEIR_H = 0.42     # crest height above the local bed
+WEIR_H = 0.25     # crest height above the local bed
 WEIR_W = 0.70     # weir wall thickness -> upstream face at WEIR_X - WEIR_W/2
 
-# Measured "delivered" n (_archive/README-full.md §5 + Director report): two independent
-# ~15-sample median windows at the mid-reach station x = 7 m gave medians
-# 0.0335 and 0.0439 (pooled 18-sample median 0.0346); S_f in a near-flat
-# backwater is a small difference of a smoothed energy line (CLAUDE.md: "in
-# a backwater curve dE/dx is small and differencing it over a short window
-# is mostly noise"), so any SINGLE hover read of n can land anywhere from
-# about 0.009 to 0.069. 0.035 is the pooled, defensible value.
-MEASURED_N = 0.035
+# Measured "delivered" n: the overlay's n at x = 3-9 m off a 15 s Average-mode
+# window after the 40 s settle (Medium), 0.031-0.035 — and 0.031 in uniform
+# flow on the same channel (sa1), which is the steadier number to march with.
+# S_f in a near-flat backwater is a small difference of an energy line, so a
+# single hover read near the inlet or the weir can land well outside that.
+MEASURED_N = 0.031
 
 WEIR_FACE_X = WEIR_X - WEIR_W / 2.0     # 13.05 m — where the solid wall begins
 FAIL_ZONE = 0.5                          # m, per the programme's own payoff text
@@ -121,7 +119,7 @@ def main():
     # --- seed the direct step from the class's OWN best near-weir point,
     # not from a theoretical weir-rating formula. (Dry-run finding: assuming
     # critical depth at the crest, elevation = crest + d_c, predicts a pool
-    # ~130 mm LOWER than the measured 0.891 m -- this weir runs at H/P ~0.76,
+    # ~70 mm LOWER than the measured 0.837 m -- this weir runs at H/P ~1.2,
     # well outside the small-H/P regime where that idealisation is good, and
     # CLAUDE.md itself notes broad-crested weirs pond well above 1.0 d_c.
     # Seeding from a measurement sidesteps a bad weir-coefficient assumption
@@ -187,7 +185,7 @@ def main():
     # ------------------------------------------------------------------ plot
     # Two panels: the top one is ZOOMED on the water surface (millimetres
     # matter there, and that is the actual payoff); the bottom one gives the
-    # true geometry for scale (bed drops 0.17 m over the reach -- on that
+    # true geometry for scale (bed drops 0.05 m over the reach -- on that
     # scale the surface would look perfectly flat and the whole point of
     # the demo would be invisible).
     fig, (ax, axg) = plt.subplots(2, 1, figsize=(9, 6.4), dpi=140,

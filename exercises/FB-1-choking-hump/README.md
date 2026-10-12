@@ -62,9 +62,10 @@ the assignment in class.
 4. Draw the hump — Wall (`1`), brush shrunk with `[` to about 0.04 m, one
    shift-held horizontal stroke ~1 m long centred on **x = 4.5 m**, started
    inside the bed slab (z ≈ 0.45) and dragged up to a first height of ~0.05 m.
-5. Raise it in about seven steps toward `2·Δz_pred` — `Z` to undo, redraw
-   taller, re-settle 15–30 s each time (the fine steps near the top need the
-   longer wait), and **jot `d₁` at every step**.
+5. Raise it in steps toward about `1.3·Δz_pred` — coarse at first, then about
+   2 cm at a time once past `0.8·Δz_pred`. `Z` to undo, redraw taller,
+   re-settle 15–30 s each time (the fine steps near the top need the longer
+   wait), and **jot `d₁` at every step**.
 6. It has choked when the gauge climbs step after step *and* **Field → Froude
    number** goes pale, then orange, on the crest: that height is `Δz_c`. From
    the `d₁` you jotted at the LAST step before it choked, recompute the
@@ -95,11 +96,14 @@ cell-quantisation error bars — and the same `Δz_c` against the re-timed
   pale/orange however much taller the hump goes, while the upstream pool
   keeps climbing. That is the crest taking charge of the depth everywhere
   upstream of it.
-- **Why is everyone's `Δz_c` about 1.9× their committed `Δz_pred`?** Not the
-  sharp edge: a streamlined, ramped, broad-crested hump was built and tested
-  and does *not* close the gap, while re-reading `E₁` at the last pre-choke
-  step collapses it to ~1.0. The pool rises as the hump rises, so `E₁` was
-  never the fixed quantity the derivation assumes it to be.
+- **How close is `Δz_c` to `Δz_pred`?** The dry-run class chokes at
+  1.00–1.18 × its committed `Δz_pred`: within one hump step (22 mm) at the
+  higher discharges, two at the lowest. The pool rises a cell or so as the
+  hump goes up, so `E₁` is not quite the fixed quantity the derivation
+  assumes; re-reading `d₁` at the last pre-choke step moves the prediction
+  the other way, to 0.88–1.00 ×. The two readings bracket the 1:1 line.
+- `d₁` reads in whole-cell steps (0.498 or 0.520 m at Medium): the steady
+  surface sits on a cell face, so the gauge resolves 22 mm and no finer.
 
 The full verification record — the measured baseline and choking-height
 ladder, the crest-Froude evidence, the re-timing refinement, safe bounds and

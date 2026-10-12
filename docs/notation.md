@@ -79,9 +79,17 @@ solver merely extends $h$ into the non-hydrostatic cells it resolves.
   $q_r = L_r^{3/2}$. The scale is never written $\lambda$, which is the
   friction factor.
 - $Re$, $We$ — Reynolds and Weber numbers; $C_d$ — a discharge coefficient.
+- Turbulence — $\kappa = 0.41$ von Kármán's constant; $u_*$ the shear
+  velocity, $\sqrt{\tau_0/\rho}$, which is $\sqrt{g d S_f}$ in uniform flow;
+  $\omega$ the vorticity; $\nu_T$ the Smagorinsky eddy viscosity and $\nu_t$
+  the open-channel mixing-length one, $\nu_t = l^2|\omega|$, with $l$ the
+  mixing length; $C_f$ and $C_s$ the wall-function and Smagorinsky
+  coefficients.
 
-$y$ is used only where it is something else: $y^+$ wall units, and
-chart reference lines like $y = 2x$.
+$y$ is used only where it is something else: distance from the nearest wall
+in the turbulence closure (and $y^+$, the same distance in wall units), and
+chart reference lines like $y = 2x$. Height above the bed is $z - z_b$ and
+depth below the surface $\eta - z$; neither gets a letter.
 
 ## Illustration
 

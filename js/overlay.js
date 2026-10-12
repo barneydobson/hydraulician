@@ -219,12 +219,19 @@ const OVERLAY = (() => {
     // spatial smoothing and the temporal EMA below would filter that mean a
     // second time, which reads on screen as a jump broadened by the filter
     // rather than by the flow. Take the accumulated columns verbatim instead.
-    let dS, qS;
+    let dS, qS, dG;
     if (AVG) {
       dS = new Float32Array(nx); qS = new Float32Array(nx);
       for (let i = 0; i < nx; i++) { dS[i] = col[i * 4 + 1]; qS[i] = col[i * 4 + 2]; }
+      dG = dS;
     } else {
       dS = sm(1); qS = sm(2);
+      // A GAUGE takes the depth here, before the running mean below: its trace
+      // is already a time record, and a running mean counted in frames makes
+      // the record depend on the frame rate. Over a wave it cut the crest and
+      // lagged it ~0.15 s at 60 fps, and cut a short wave's harmonics hardest —
+      // exactly what B6 reads. The ±0.09 m window stays (a gauge is that wide).
+      dG = Float32Array.from(dS);
       // Then average in TIME, per column. Roll waves and surface ripples
       // travel, so they average out; an M3 reach or a jump stands still, so
       // it survives. Doing this spatially instead needs a window wide enough
@@ -238,6 +245,7 @@ const OVERLAY = (() => {
       }
     }
     out.dRaw = []; out.qRaw = [];
+    out.dGauge = dG;
 
     for (let i = 0; i < nx; i++) {
       const bed = col[i * 4], surf = col[i * 4 + 3];

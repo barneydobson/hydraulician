@@ -619,10 +619,12 @@ off.
   d/Δx, and a tank 16 cells deep reads +18% (High: +4.4%) and rings for two
   crests only. The tilt cannot be small — see "Surface waves are damped by
   RESOLUTION" below: at a/d = 0.05 (one cell) the slosh dies in two periods.
-  Two traps in timing it: a gauge's depth is the OVERLAY's (smoothed ±0.09 m
-  in space, so a station within that of a wall reads the wall's empty
-  columns, 0.2–0.3 m shallow), and its 10%-per-frame running mean delays
-  every crest ~0.15 s, so time crest to crest, never from t = 0.
+  One trap in timing it: a gauge's depth is smoothed ±0.09 m in space, so a
+  station within that of a wall reads the wall's empty columns, 0.2–0.3 m
+  shallow. Time crest to crest, never from t = 0. (Until October 2026 the
+  gauge also carried the overlay's 10%-per-frame running mean, which
+  delayed every crest ~0.15 s; it now reads before that mean — see "A
+  gauge's depth is not the hover's" under Measurement gotchas.)
 - **Broad-crested weir C_d against real weirs** (the retired DA-3 weir rig:
   P = 0.696 m, L_c = 1.739 m, q = 0.78 m²/s, so Δh/L_c = 0.40, Δh/P = 1.0).
   C_d = q/(√g Δh^1.5) = 0.431 against 0.49–0.50 for published sharp-cornered
@@ -832,6 +834,17 @@ picture saturated or flat is the symptom of the two having drifted apart.
   `(M₁ − M₂) + (F₁ − F₂)`, both sections carrying their own normal, so the
   upstream one flips when they are read as the two ends of a control volume.
   That is the same number `boxForce` reports for a box drawn between them.
+- **A gauge's depth is not the hover's.** Both start from the column depth
+  smoothed ±0.09 m in space. The hover box and the channel overlay then take
+  a 10%-per-frame running mean of it, to hold the profile class still against
+  ripples; a gauge does not (`analyse().dGauge`). Until October 2026 the
+  gauges read the hover's value, and because that mean is counted in FRAMES
+  it filtered every trace by however fast the machine drew. At 60 fps it
+  lagged each crest ~0.15 s and took 5% off a 3 s wave's height and 17% off
+  its second harmonic, which is the crest/trough asymmetry B6 measures; at
+  T = 1.5 s it took 17% off the height itself. A trace is already a time
+  record, and reading the wobble off it is the student's job. Gauge `h` and
+  `speed` never had the mean; `d` and `η` now match them.
 - **New tools are APPENDED to `TOOLS`, whatever group they belong to.** The
   digit a tool answers to is its index, and every worksheet in the pack refers
   to tools by digit — inserting one renumbers the rest and makes the printed

@@ -85,7 +85,7 @@ keeps its whole history, with ⤓ CSV).
 | B1 | T = 4L/c with your own valve | B1-period-4Lc/ | hammer | (L, T) |
 | B2 | The flexible pipe (c slider) | B2-flexible-pipe/ | hammer | (ΔH₇₀, ΔH₁₄₀) |
 | B3 | Dam break: the moving jump | B3-dambreak/ | dambreak | (bore speed, station pair) + shared neg-wave |
-| B4 | Orbital decay off the trails | B4-orbital-decay/ | wavedeep tracers | (T, surface/bed ratio — or "below noise") |
+| B4 | Orbital decay off the trails | B4-orbital-decay/ | wavedeep tracers, T = 1.2–2.0 s | (T, one loop each of trails 2, 5, 8) |
 | B5 | Iribarren map jigsaw | B5-iribarren/ | both beaches | (cell, ξ, behaviour, surf width) per pair |
 | B6 | Ursell number | B6-ursell/ | waveshallow | (T, U_r, asymmetry) |
 | B7 | Venturi meter rating | B7-venturi-rating/ | venturi | (q, Δh) |

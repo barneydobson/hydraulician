@@ -2,21 +2,19 @@
 """collect_plot.py -- B4 orbital decay: pool a class CSV into the payoff plot.
 
 Usage:
-    python3 collect_plot.py data/simulated-class.csv -o plots/pooled-demo.png
+    python3 collect_plot.py class.csv                 # -> plots/pooled-demo.png
+    python3 collect_plot.py data/simulated-class.csv  # the shipped dry-run class
 
-Required columns: digit, T_s, kh, vratio_submitted_naive (or vratio_dft).
-Extra columns are ignored, so a Blackboard export with a few students missing
-optional fields still plots.
+Required columns: T_s, loop2_mm, loop5_mm, loop8_mm (the height of one loop of
+trails 2, 5 and 8, counted up from the bed). loop1_mm, the bed trail, is
+optional. Extra columns are ignored.
 
-What this draws: the vertical (surface/bed) orbital-amplitude decay ratio
-against kh, alongside the linear-theory curve sinh(k(z+h))/sinh(k(z+h)) built
-from THIS scene's own tracer elevations (bed ~1.5 cells off the floor, surface
-~2 cells below the still surface -- see _archive/README-full.md S1/S5). Theory
-keeps climbing
-exponentially with kh; measured points plateau once the true bed signal drops
-below the station's ambient noise floor -- see _archive/README-full.md S5 for
-why, and why that
-gap is itself the point of the demo, not a defect in it.
+Left: every student's three loops, each divided by their own trail 8, against
+height above the bed, over linear theory sinh(kz)/sinh(k z8) at the class's
+shortest and longest period. Right: trail 8 over trail 2 against kh, with the
+theory curve. Tracer heights are the ones the column is seeded at in the deep
+flume at Medium (main.js seedTracers): 1.65 cm above the bed, then every
+8.80 cm, still depth h = 0.743 m at x = 5.84 m.
 """
 import argparse
 import csv
@@ -35,20 +33,22 @@ TEXT = "#0b0b0b"
 MUTED = "#52514e"
 GRID = "#dedcd4"
 
-H_WAVEDEEP = 0.7385          # measured still-water depth (WV-2), used throughout
-EPS_BED = 0.0165             # tracer height above the true bed, m (near-constant)
-EPS_SURF = 0.0215            # tracer depth below the true still surface, m
+G = 9.81
+H = 0.743                                   # still depth at the tracer column
+Z = [0.0165 + 0.0880 * i for i in range(9)]  # tracer heights above the bed, trails 1..9
 
 
-def theory_curve(kh_vals, h=H_WAVEDEEP, eps_bed=EPS_BED, eps_surf=EPS_SURF):
-    out = []
-    for khv in kh_vals:
-        k = khv / h
-        zbed = -(h - eps_bed)
-        zsurf = -eps_surf
-        v_bed_over_surf = math.sinh(k * (zbed + h)) / math.sinh(k * (zsurf + h))
-        out.append(1.0 / v_bed_over_surf)
-    return np.array(out)
+def k_of(T, h=H):
+    w = 2 * math.pi / T
+    k = w * w / G
+    for _ in range(100):
+        t = math.tanh(k * h)
+        k = max(k - (G * k * t - w * w) / (G * t + G * k * h * (1 - t * t)), k / 2)
+    return k
+
+
+def ratio(k, za, zb):
+    return math.sinh(k * za) / math.sinh(k * zb)
 
 
 def main():
@@ -56,66 +56,64 @@ def main():
     ap.add_argument("csv_path")
     ap.add_argument("-o", "--out", default="plots/pooled-demo.png")
     args = ap.parse_args()
-
     rows = list(csv.DictReader(open(args.csv_path)))
     if not rows:
-        print("no rows in", args.csv_path)
-        sys.exit(1)
+        sys.exit("no rows in " + args.csv_path)
 
-    kh = np.array([float(r["kh"]) for r in rows])
-    v_naive = np.array([float(r["vratio_submitted_naive"]) for r in rows])
-    has_dft = "vratio_dft" in rows[0] and rows[0]["vratio_dft"] != ""
-    v_dft = np.array([float(r["vratio_dft"]) for r in rows]) if has_dft else None
+    T = np.array([float(r["T_s"]) for r in rows])
+    l2 = np.array([float(r["loop2_mm"]) for r in rows])
+    l5 = np.array([float(r["loop5_mm"]) for r in rows])
+    l8 = np.array([float(r["loop8_mm"]) for r in rows])
+    k = np.array([k_of(t) for t in T])
+    kh = k * H
+    r82 = l8 / l2
+    th82 = np.array([ratio(kk, Z[7], Z[1]) for kk in k])
+    print(f"B4 pooled: {len(rows)} students, T {T.min():.2f}-{T.max():.2f} s, kh {kh.min():.2f}-{kh.max():.2f}")
+    print(f"  trail 8 / trail 2: measured {r82.min():.2f}-{r82.max():.2f}, theory {th82.min():.2f}-{th82.max():.2f}")
+    err = 100 * (r82 / th82 - 1)
+    print(f"  error against theory: mean {err.mean():+.1f}%, spread {err.std():.1f}%")
+    for name, l in (("trail 5", l5), ("trail 2", l2)):
+        i = 4 if name == "trail 5" else 1
+        th = np.array([ratio(kk, Z[i], Z[7]) for kk in k])
+        e = 100 * ((l / l8) / th - 1)
+        print(f"  {name} / trail 8 against theory: mean {e.mean():+.1f}%, spread {e.std():.1f}%")
 
-    kh_fine = np.linspace(max(0.5, kh.min() * 0.85), kh.max() * 1.08, 300)
-    theory_fine = theory_curve(kh_fine)
-    theory_pts = theory_curve(kh)
-
-    print(f"B4 pooled: {len(rows)} points, kh {kh.min():.2f}-{kh.max():.2f}")
-    print(f"  naive vratio range: {v_naive.min():.1f} - {v_naive.max():.1f}")
-    if has_dft:
-        print(f"  dft   vratio range: {v_dft.min():.1f} - {v_dft.max():.1f}")
-    print(f"  theory (pure physics) range over same kh: {theory_pts.min():.1f} - {theory_pts.max():.1f}")
-    print("  mean |naive/theory|: %.4f  (points plateau far below theory once bed signal < noise floor)"
-          % float(np.mean(v_naive / theory_pts)))
-
-    fig, ax = plt.subplots(figsize=(9.2, 6.0), dpi=150)
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11.5, 5.2), dpi=150)
     fig.patch.set_facecolor("#fcfcfb")
-    ax.set_facecolor("#fcfcfb")
+    for ax in (a1, a2):
+        ax.set_facecolor("#fcfcfb")
+        ax.grid(True, which="both", color=GRID, linewidth=0.7, alpha=0.8)
+        ax.set_axisbelow(True)
+        for s in ("top", "right"):
+            ax.spines[s].set_visible(False)
+        for s in ("left", "bottom"):
+            ax.spines[s].set_color(GRID)
+        ax.tick_params(colors=MUTED)
 
-    ax.plot(kh_fine, theory_fine, color=BLUE, lw=2, zorder=3,
-            label="linear theory, sinh(k(z+h))  (surface/bed)")
-    if has_dft:
-        ax.scatter(kh, v_dft, s=62, color=ORANGE, edgecolor="#fcfcfb", linewidth=1.2, zorder=5,
-                   label="measured -- paddle-frequency fit (“truth” attempt)")
-    ax.scatter(kh, v_naive, s=62, color=AQUA, edgecolor="#fcfcfb", linewidth=1.2, zorder=4, marker="D",
-               label="measured -- naive trail extent (what a student reads)")
+    zf = np.linspace(0.0, Z[8], 200)
+    for kk, c, lab in ((k.max(), ORANGE, f"theory, T = {T.min():.2f} s (kh = {kh.max():.2f})"),
+                       (k.min(), BLUE, f"theory, T = {T.max():.2f} s (kh = {kh.min():.2f})")):
+        a1.plot([math.sinh(kk * z) / math.sinh(kk * Z[7]) for z in zf], zf / H, color=c, lw=2, label=lab)
+    for i in range(len(rows)):
+        a1.plot([l2[i] / l8[i], l5[i] / l8[i], 1.0], [Z[1] / H, Z[4] / H, Z[7] / H],
+                "o", color=AQUA, ms=5, alpha=0.75, zorder=4)
+    a1.plot([], [], "o", color=AQUA, label="students: loops 2, 5, 8 over loop 8")
+    a1.set_xlabel("vertical loop height / loop height of trail 8", color=TEXT)
+    a1.set_ylabel("height above the bed, z / h", color=TEXT)
+    a1.set_xlim(0, 1.1); a1.set_ylim(0, 1)
+    a1.axhline(1.0, color=MUTED, lw=0.8, ls=":")
+    a1.legend(loc="lower right", frameon=False, fontsize=8.5)
+    a1.set_title("The vertical motion dies towards the bed", color=TEXT, fontsize=11.5)
 
-    for r in rows:
-        ax.annotate(f"d={r['digit']}", (float(r["kh"]), float(r["vratio_submitted_naive"])),
-                    textcoords="offset points", xytext=(6, 6), fontsize=8, color=MUTED)
-
-    ax.set_yscale("log")
-    ax.set_xlabel("kh  (wavenumber × still-water depth)", color=TEXT, fontsize=11)
-    ax.set_ylabel("vertical amplitude ratio, surface / bed  (log scale)", color=TEXT, fontsize=11)
-    ax.set_title("B4 · orbital vertical decay vs kh — wavedeep, x = 5.84 m (scene's own station)",
-                 color=TEXT, fontsize=12.5, pad=14)
-    ax.grid(True, which="both", color=GRID, linewidth=0.7, alpha=0.8)
-    ax.set_axisbelow(True)
-    for spine in ["top", "right"]:
-        ax.spines[spine].set_visible(False)
-    for spine in ["left", "bottom"]:
-        ax.spines[spine].set_color(GRID)
-    ax.tick_params(colors=MUTED)
-    ax.legend(loc="upper left", frameon=False, fontsize=9.5, labelcolor=TEXT)
-
-    ax.text(0.985, 0.03,
-            "Theory keeps climbing with kh; the measurement plateaus around 15-150×\n"
-            "because the true bed signal drops below this station's noise floor\n"
-            "long before kh=8 — the gap IS the finding (see README §5).",
-            transform=ax.transAxes, ha="right", va="bottom", fontsize=8.7, color=MUTED,
-            style="italic")
-
+    khf = np.linspace(kh.min() * 0.9, kh.max() * 1.1, 200)
+    a2.plot(khf, [ratio(x / H, Z[7], Z[1]) for x in khf], color=BLUE, lw=2, label="linear theory, sinh(k z₈)/sinh(k z₂)")
+    a2.scatter(kh, r82, s=48, color=AQUA, edgecolor="#fcfcfb", linewidth=1, zorder=5, label="students")
+    a2.set_xlabel("kh", color=TEXT)
+    a2.set_ylabel("trail 8 / trail 2 (loop heights)", color=TEXT)
+    a2.set_ylim(0, max(r82.max(), th82.max()) * 1.25)
+    a2.legend(loc="upper left", frameon=False, fontsize=8.5)
+    a2.set_title("…faster the shorter the wave", color=TEXT, fontsize=11.5)
+    fig.suptitle("B4 · orbital decay off the trails — deep flume, column at x = 5.84 m", color=TEXT, fontsize=12.5)
     plt.tight_layout()
     plt.savefig(args.out, facecolor=fig.get_facecolor())
     print("wrote", args.out)

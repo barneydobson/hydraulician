@@ -992,6 +992,16 @@ const EXERCISES = [
     task: "Set your period and stroke, slide one gauge along the flat run in 0.2 m steps, note the biggest swing and the smallest, and take K_refl = (a_max − a_min)/(a_max + a_min).",
     settle: 45,
   },
+  // The deep flume's tracer column, read loop by loop. Only periods of 1.2 s
+  // and longer: a shorter wave is gone before x = 3 m (T = 0.75 s at the old
+  // stroke was 0.2 m high at the paddle and 2 mm at x = 2 m), so the column
+  // saw nothing for half the old ladder. The flume also carries a mean
+  // current (forward near the surface, back along the bed, ~0.2 m/s each way
+  // at these strokes) that stretches every trail into a drifting spiral; the
+  // height of ONE loop is unaffected by it, which is why that is the reading.
+  // Trails 2, 5 and 8 rather than the end ones: trail 9 crosses the trough
+  // and is put back on the column every few seconds, and trail 1's 2–3 mm
+  // loop is a flat line to read, not a number.
   {
     id: "B4",
     title: "Orbital decay, measured off the trails",
@@ -1002,14 +1012,23 @@ const EXERCISES = [
     rigParams: { budget: "Medium", waveOn: true },
     viewParams: { tracerOn: true, tracerX: 5.84, tracerN: 9, tracerTrail: 3, vex: 6, particles: false },
     digit: { label: "period", control: "waveT", unit: "s",
-             rule: "your row of the period table (same rows as WV-1)",
-             table: [0.60, 0.75, 0.90, 1.05, 1.20, 1.35, 1.50, 1.60, 1.60, 1.60],
+             rule: "d 0–1: 1.20 · d 2–3: 1.35 · d 4–5: 1.50 · d 6: 1.60 · d 7: 1.80 · d 8–9: 2.00",
+             table: [1.20, 1.20, 1.35, 1.35, 1.50, 1.50, 1.60, 1.80, 2.00, 2.00],
              also: [{ label: "stroke", control: "waveA", unit: "m",
-                      rule: "the amplitude paired with YOUR period",
-                      table: [0.05, 0.08, 0.11, 0.15, 0.19, 0.23, 0.28, 0.30, 0.30, 0.30] }] },
-    ui: { measure: false, view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
-    start: "the deep flume with a column of tracer particles",
-    task: "Set your period and stroke, zoom on the tracer column (it arrives placed, at ×6 vertical exaggeration), then pause and read the VERTICAL extent of the surface trail against the bed trail.",
+                      rule: "0.19 at 1.20 s · 0.23 at 1.35 s · 0.28 at 1.50 s · 0.30 from 1.60 s",
+                      table: [0.19, 0.19, 0.23, 0.23, 0.28, 0.28, 0.30, 0.30, 0.30, 0.30] }] },
+    instruments: [
+      { tool: "measure", where: "straight down across ONE loop of trails 2, 5 and 8, counted up from the bed", why: "the height of a single loop is the vertical orbit; the trail as a whole also carries the mean current's drift" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA", "tracerTrail"] },
+    start: "the deep flume, still depth h = 0.743 m, paddle at the left; a column of nine tracers stands at x = 5.84 m, trail 1 at the bed and trail 9 at the surface",
+    setup: [
+      "Set Period and Amplitude (Controls → Wavemaker) from your digit and press R. The card counts the 40 s settle down.",
+      "Scroll-zoom onto the tracer column at x = 5.84 m (it arrives at ×6 vertical exaggeration). Each tracer leaves a trail of its last 3 s: one loop per wave, sliding sideways with the slow current the flume carries.",
+      "Press space to pause. With Measure (8), drag straight down from the top of ONE loop of trail 8 to its bottom and read the length; do the same on trail 5 and on trail 2. If a trail is shorter than a loop it has just been put back on the column: run on 2 s and pause again.",
+      "Trails 2, 5 and 8 sit 0.105, 0.369 and 0.633 m above the bed. Linear theory: a loop's height is proportional to sinh(kz), z above the bed, with σ² = gk·tanh(kh), σ = 2π/T. Look at trail 1 as well: say what its loop looks like.",
+    ],
+    task: "Submit T and the three loop heights (trails 2, 5 and 8, in mm); the class pools them as loop height over trail 8's against height above the bed.",
     settle: 40,
   },
   {

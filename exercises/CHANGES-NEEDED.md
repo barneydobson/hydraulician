@@ -493,7 +493,9 @@ the text before printing worksheets:
   smoothing-window artifact), plus a spurious "pressurised" tag on free
   jets. Every worksheet station rule should keep reads ≥6 cells from any
   wall/gate/plate face (MO-1's vena station does). Reinforces P1/P6.
-- **[from QS-2, affects any paused read] The gauge chart's history is a
+- **[RESOLVED — gauges now sample only when the clock moves, so a paused
+  trace holds still, and the ⤢ inspector keeps the whole history; kept for
+  the record] [from QS-2, affects any paused read] The gauge chart's history is a
   900-sample ring buffer that the RENDER loop keeps filling while paused** —
   a paused trace is fully overwritten ~8 s after pausing. Read or
   screenshot a trace immediately on pausing, or read live; worksheets that

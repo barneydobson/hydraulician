@@ -34,16 +34,21 @@ captured drawing loads. `↻ Reset to the starting point` on the
 card restores the common setup.
 
 How to run an exercise is described once, above — it is the same for all of
-them, so the briefs do not repeat it. Every brief follows the trimmed
-pattern HP-1 set: short theory, the personalised rule with its lookup table,
-a handful of numbered steps, and instructor pooling with a discussion point
-or two, with the long verification record moved verbatim to `_archive/`
-inside each folder — untracked, local to the maintainer's machine.
+them, so the briefs do not repeat it. The card is the student's whole
+exercise: setup, their own values, the stations, the steps and what to read.
+The folder's README is lecturer notes — theory, worked and measured answers,
+the teaching sequence, pooling and discussion — and never fills a gap in the
+card ([docs/making-exercises.md](../docs/making-exercises.md)). Older briefs
+still carry the student steps HP-1's trimmed pattern put there; they move to
+the card as each exercise is re-checked. The long verification record lives
+in `_archive/` inside each folder — untracked, local to the maintainer's
+machine.
 
 **Standing rules (every worksheet carries them):** everyone on Resolution
 Medium (the picker sets this) · wait out the spin-up · median-of-the-wobble
 reads, never one frame · after changing q, re-check any tailwater ≥ 1.3·d_c ·
-pause-and-read promptly (the chart buffer keeps moving).
+pause to read a trace (a paused trace holds still, and a gauge's ⤢ inspector
+keeps its whole history, with ⤓ CSV).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|

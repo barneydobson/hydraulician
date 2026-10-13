@@ -1564,10 +1564,10 @@ const SCENES = (() => {
       amp: 0.10, period: 4.0, plife: 14, trail: 9,
       tracerX: 2.0, spinup: 30, view: { zoom: 1.9, cx: 2.0, cy: 0.44, vex: 2.2 },
       blurb: "A wave seven metres from crest to crest in 0.35 m of water. The whole depth moves together, the wave travels at √(gh), and it barely damps at all.",
-      tips: ["The trails are flat back-and-forth ellipses, the SAME size top to bottom — that is what 'shallow water' means.",
+      tips: ["The trails are flat back-and-forth ellipses, the SAME length top to bottom — that is what 'shallow water' means. Measured here, each loop is 0.17–0.20 m long at every height, and 2 mm tall at the bed against 5 cm near the surface.",
              "Because every depth moves alike, one depth-averaged velocity describes the flow. That is the assumption every shallow-water model is built on.",
              "Contrast the <b>deep-water</b> flume, where the motion has died out entirely before you reach the bed.",
-             "Long waves barely damp: measured 0.123 m at 2 m and 0.121 m at 7 m in the deeper tank.",
+             "Long waves barely damp: measured, this one is 0.052 m high at x = 1, 2 and 3 m alike, where a 1.5 s wave in the same water loses 58% per wavelength.",
              "This is the tsunami and tidal end of the spectrum. Press <b>0</b> to zoom out."] }),
 
     { id: "plan", name: "Plan view — jet & wake", key: "Gravity off", group: "Jets & waves",

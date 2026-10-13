@@ -723,10 +723,11 @@ itself ~2 cells thick. Consequences:
   `ν_t` took it to one cell — no wave — by x = 3 m).
 - **The stress-free surface DID make the longer deep-flume waves last
   longer** — an earlier version of this note said it did not, from the
-  0.9 s run alone. Re-measured in October 2026 at the strokes B4 and WV-1
-  use (Medium, after 40 s, first-harmonic height): at T = 1.2 s, H at
-  x = 5.84 m is 0.10 m against 0.02 m before #72, and 0.06 m at x = 8 m
-  against 0.01; at T = 1.5 s, 0.19 against 0.12 m and 0.18 against 0.07 m.
+  0.9 s run alone. Re-measured in October 2026 at the strokes B4 uses and
+  WV-1's deep rows used (Medium, after 40 s, first-harmonic height): at
+  T = 1.2 s, H at x = 5.84 m is 0.10 m against 0.02 m before #72, and
+  0.06 m at x = 8 m against 0.01; at T = 1.5 s, 0.19 against 0.12 m and 0.18
+  against 0.07 m.
   It also brought the circulation below.
 - **Plunging breakers are out of reach.** The Iribarren number on the 1 : 3.4
   beach is ξ ≈ 1.3, squarely in the plunging band, so the *conditions* are
@@ -737,14 +738,14 @@ itself ~2 cells thick. Consequences:
 **The deep flume's mean circulation (since #72).** The waves still lose
 height along the flume — at T = 1.5 s from 0.43 m at x = 1 m to 0.18 m at
 x = 8 m — and with a stress-free surface the momentum they give up drives the
-surface water forward and returns it along the bed. Measured at the B4 and
-WV-1 strokes (T = 1.2–2.0 s, 0.19–0.30 m, Medium, the time mean over the
-6 s after a 40 s settle): at x = 5.84 m the mean u is +0.12 to +0.18 m/s
-8 cm below the still surface and −0.12 to −0.32 m/s 9 cm above the bed; at
-x = 3 m, +0.17 to +0.22 and −0.21 to −0.39 m/s. Before #72 the same runs
-gave +0.01 to +0.02 and −0.05 to +0.01 m/s at x = 5.84 m. (The mean level,
-0.08–0.12 m low at the paddle and ~0.01 m high at x = 8 m, is the same on
-both engines.)
+surface water forward and returns it along the bed. Measured at the B4
+strokes and the old WV-1 deep ones (T = 1.2–2.0 s, 0.19–0.30 m, Medium, the
+time mean over the 6 s after a 40 s settle): at x = 5.84 m the mean u is
++0.12 to +0.18 m/s 8 cm below the still surface and −0.12 to −0.32 m/s 9 cm
+above the bed; at x = 3 m, +0.17 to +0.22 and −0.21 to −0.39 m/s. Before #72
+the same runs gave +0.01 to +0.02 and −0.05 to +0.01 m/s at x = 5.84 m. (The
+mean level, 0.08–0.12 m low at the paddle and ~0.01 m high at x = 8 m, is the
+same on both engines.)
 A real flume carries a return current under its waves too, but a weaker
 one: the Stokes transport of a 0.3 m, 1.5 s wave in this depth returns at
 about −0.07 m/s. Two consequences, both measured:
@@ -754,8 +755,9 @@ about −0.07 m/s. Two consequences, both measured:
   phase gradient over 1.5 wavelengths from x = 0.8 m is 15–22% longer; before
   #72, +10% at 1.2 s and +2% at 1.5 s. Steepness is part of it: halving the
   stroke at 1.5 s (0.14 m) halves the excess to +8%, with the current at the
-  bed barely weaker (−0.19 against −0.24 m/s). WV-1's deep rows are
-  affected.
+  bed barely weaker (−0.19 against −0.24 m/s). This is why WV-1 now runs
+  only the shallow flume, timed between two gauges, where every period
+  lands within 5% of linear dispersion.
 - **Orbit tracers drift.** Near the surface forward and near the bed back,
   0.2–0.3 m/s, so a 3 s trail is a spiral and a tracer is put back on its
   column every few seconds. B4 reads the height of one loop, which the drift

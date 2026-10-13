@@ -65,7 +65,7 @@ keeps its whole history, with ⤓ CSV).
 | UN-1 | Celerity and water-hammer reflections | UN-1-celerity/ | hammer + nozzle-width slider | — (lecturer demo) |
 | UN-2 | Flow establishment | UN-2-establishment/ | estab | (level, u_max, t_75) |
 | UN-3 | Surge tank: fit k to the decay | UN-3-surge-tank/ | hammer + standpipe | (k) |
-| WV-1 | Dispersion, one period each | WV-1-dispersion/ | wavedeep + waveshallow | (T, L, flume) |
+| WV-1 | Dispersion, one period each | WV-1-dispersion/ | waveshallow, two depth gauges | (T, Δt, L) |
 | WV-2 | The buried wave gauge | WV-2-buried-gauge/ | wave + wavedeep | (T, ratio or "below noise") |
 | WV-3 | Reflection coefficient | WV-3-reflection/ | wavesurge + wave | (T, K_refl) |
 | MO-1 | Sluice gate C_d and thrust | MO-1-gate-cv/ | RIG-B + gate | (C_d, F_R) |

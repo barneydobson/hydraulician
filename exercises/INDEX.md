@@ -86,7 +86,7 @@ keeps its whole history, with ⤓ CSV).
 | B2 | The flexible pipe (c slider) | B2-flexible-pipe/ | hammer | (ΔH₇₀, ΔH₁₄₀) |
 | B3 | Dam break: the moving jump | B3-dambreak/ | dambreak | (bore speed, station pair) + shared neg-wave |
 | B4 | Orbital decay off the trails | B4-orbital-decay/ | wavedeep tracers | (T, surface/bed ratio — or "below noise") |
-| B5 | Iribarren map jigsaw | B5-iribarren/ | both beaches | (cell, ξ, behaviour, surf width) per pair |
+| B5 | Iribarren map jigsaw | B5-iribarren/ | wave + wavesurge, cells 1–15 | (cell, ξ₀, breaks / surges / dies, surf width) per pair |
 | B6 | Ursell number | B6-ursell/ | waveshallow | (T, U_r, asymmetry) |
 | B7 | Venturi meter rating | B7-venturi-rating/ | venturi | (q, Δh) |
 | B8 | Three orifices, three coefficients | B8-three-orifices/ | jet + drawn lips | (lip type, C_c) |

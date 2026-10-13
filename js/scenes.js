@@ -1495,39 +1495,43 @@ const SCENES = (() => {
     // One flume, three parameter sets — see `flume()` above for why the
     // stroke matters as much as the period.
     // Beach toe at 1.2, right off the paddle, at 1 : 10. Both numbers are
-    // measured, not chosen for looks. These waves lose ~63% of their height
-    // per wavelength to the discretisation, and shoaling on a beach only
-    // amplifies as h^-¼, so on anything gentle the damping wins and the wave
-    // dies BEFORE it can break: at 1 : 20 the ratio H/h sat at 0.35–0.45 the
-    // whole way in and never reached the 0.78 that breaks it. Shortening the
-    // beach (1 : 10 spans 3.5 m, not 7) lets shoaling get ahead — measured
-    // H/h now climbs 0.46 → 0.49 → 0.60 → 0.81 → 1.49 and breaks at x = 4.0.
-    // The surf zone is 0.7 m: small, but real, and five times what the
-    // original 1 : 3.4 beach managed.
+    // measured, not chosen for looks. These waves lose ~60% of their height
+    // per wavelength to the discretisation (58% at 1.5 s on the flat of
+    // `waveshallow`, same depth), and shoaling on a beach only amplifies as
+    // d^-¼, so on anything gentle the damping wins and the wave dies BEFORE it
+    // can break: at 1 : 20 the ratio H/d sat at 0.35–0.45 the whole way in
+    // and never reached the 0.78 that breaks it. Shortening the beach (1 : 10
+    // spans 3.5 m, not 7) lets shoaling get ahead. Re-measured October 2026
+    // (mean wave height over 15 s after the 25 s settle): H/d climbs 0.47 at
+    // the toe → 0.54 at x = 2 → 0.66 at 3 → 0.87 at 3.5, crosses 0.78 at
+    // x ≈ 3.4, where the front stands vertical, and the surf zone runs 1.3 m
+    // to the still shoreline at 4.7 — up from the 0.7 m first measured, which
+    // was already five times what the original 1 : 3.4 beach managed.
     flume({
       id: "wave", name: "Wave flume · shoaling & breaking", key: "Spilling, ξ ≈ 0.4",
       W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 1.2, slope: 0.10,
       amp: 0.18, period: 1.5, particles: 1, spinup: 25,
       view: { zoom: 2.2, cx: 3.2, cy: 0.42, vex: 2.2 },
       blurb: "Waves running onto a 1-in-10 beach. They steepen as the water shallows until the height is comparable with the depth, and then they break.",
-      tips: ["Watch H/h climb up the slope: measured 0.46 at the toe, 0.60, 0.81, then breaking at x ≈ 4.0 m.",
+      tips: ["Watch H/d climb up the slope: measured 0.47 at the toe, 0.54 at x = 2 m, 0.66 at 3 m, then past 0.78 at x ≈ 3.4 m, where the front stands vertical and breaks.",
              "A wave breaks when its height reaches roughly 0.78 of the local depth. That is the whole of the breaking criterion.",
              "Iribarren ξ = tanβ/√(H₀/L₀) ≈ 0.4 — the <b>spilling</b> band, where the crest crumbles down the face.",
-             "A GENTLER beach does not work here, and that is honest: these waves damp ~63% per wavelength, so over a 7 m beach they die before they can break.",
+             "A GENTLER beach does not work here, and that is honest: these waves damp ~60% per wavelength, so over a 7 m beach they die before they can break.",
              "Load the <b>surging</b> flume for the other end of the Iribarren scale."] }),
 
     // The other end of the Iribarren scale: steep beach, long wave. Same
     // water, so the only thing that changed is the slope and the period.
     flume({
-      id: "wavesurge", name: "Wave flume · surging breakers", key: "Steep beach, ξ ≈ 8",
+      id: "wavesurge", name: "Wave flume · surging breakers", key: "Steep beach, ξ ≈ 11",
       W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 8.0, slope: 0.70,
       amp: 0.14, period: 3.0, particles: 1, spinup: 25,
       view: { zoom: 1.9, cx: 9.2, cy: 0.45, vex: 2.0 },
       blurb: "The same water against a steep 1-in-1.4 beach, driven by a long wave. It does not spill: the front surges up the slope as a whole and runs back down.",
-      tips: ["Iribarren ξ ≈ 8, far into the <b>surging</b> band (> 3.3) — no whitewater, just run-up and run-down.",
+      tips: ["Iribarren ξ₀ ≈ 11 (measured: the wave reaches the toe 0.07 m high), far into the <b>surging</b> band (> 3.3) — no step, just run-up and run-down.",
              "The reflected wave runs back out and meets the next one; that is why a steep beach makes a choppy tank.",
-             "Compare with the <b>spilling</b> flume — same depth, same stroke, only the slope and period differ.",
-             "This is why sea walls are built steep to reflect and beaches are gentle to dissipate."] }),
+             "Measured, the wall sends back 0.97 of the wave at this period: put gauges on the flat and the node, at x ≈ 7.1 m, barely moves.",
+             "Compare with the <b>spilling</b> flume: the same depth, but a shorter wave on a slope seven times gentler.",
+             "That is the trade: a steep wall throws the wave back, a gentle beach spends it."] }),
 
     flume({
       id: "wavedeep", name: "Wave flume · deep-water orbits", key: "h/L = 0.34",
@@ -1560,10 +1564,10 @@ const SCENES = (() => {
       amp: 0.10, period: 4.0, plife: 14, trail: 9,
       tracerX: 2.0, spinup: 30, view: { zoom: 1.9, cx: 2.0, cy: 0.44, vex: 2.2 },
       blurb: "A wave seven metres from crest to crest in 0.35 m of water. The whole depth moves together, the wave travels at √(gh), and it barely damps at all.",
-      tips: ["The trails are flat back-and-forth ellipses, the SAME size top to bottom — that is what 'shallow water' means.",
+      tips: ["The trails are flat back-and-forth ellipses, the SAME length top to bottom — that is what 'shallow water' means. Measured here, each loop is 0.17–0.20 m long at every height, and 2 mm tall at the bed against 5 cm near the surface.",
              "Because every depth moves alike, one depth-averaged velocity describes the flow. That is the assumption every shallow-water model is built on.",
              "Contrast the <b>deep-water</b> flume, where the motion has died out entirely before you reach the bed.",
-             "Long waves barely damp: measured 0.123 m at 2 m and 0.121 m at 7 m in the deeper tank.",
+             "Long waves barely damp: measured, this one is 0.052 m high at x = 1, 2 and 3 m alike, where a 1.5 s wave in the same water loses 58% per wavelength.",
              "This is the tsunami and tidal end of the spectrum. Press <b>0</b> to zoom out."] }),
 
     { id: "plan", name: "Plan view — jet & wake", key: "Gravity off", group: "Jets & waves",

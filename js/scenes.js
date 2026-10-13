@@ -1522,15 +1522,16 @@ const SCENES = (() => {
     // The other end of the Iribarren scale: steep beach, long wave. Same
     // water, so the only thing that changed is the slope and the period.
     flume({
-      id: "wavesurge", name: "Wave flume · surging breakers", key: "Steep beach, ξ ≈ 8",
+      id: "wavesurge", name: "Wave flume · surging breakers", key: "Steep beach, ξ ≈ 11",
       W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 8.0, slope: 0.70,
       amp: 0.14, period: 3.0, particles: 1, spinup: 25,
       view: { zoom: 1.9, cx: 9.2, cy: 0.45, vex: 2.0 },
       blurb: "The same water against a steep 1-in-1.4 beach, driven by a long wave. It does not spill: the front surges up the slope as a whole and runs back down.",
-      tips: ["Iribarren ξ ≈ 8, far into the <b>surging</b> band (> 3.3) — no whitewater, just run-up and run-down.",
+      tips: ["Iribarren ξ₀ ≈ 11 (measured: the wave reaches the toe 0.07 m high), far into the <b>surging</b> band (> 3.3) — no step, just run-up and run-down.",
              "The reflected wave runs back out and meets the next one; that is why a steep beach makes a choppy tank.",
-             "Compare with the <b>spilling</b> flume — same depth, same stroke, only the slope and period differ.",
-             "This is why sea walls are built steep to reflect and beaches are gentle to dissipate."] }),
+             "Measured, the wall sends back 0.97 of the wave at this period: put gauges on the flat and the node, at x ≈ 7.1 m, barely moves.",
+             "Compare with the <b>spilling</b> flume: the same depth, but a shorter wave on a slope seven times gentler.",
+             "That is the trade: a steep wall throws the wave back, a gentle beach spends it."] }),
 
     flume({
       id: "wavedeep", name: "Wave flume · deep-water orbits", key: "h/L = 0.34",

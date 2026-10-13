@@ -67,7 +67,7 @@ keeps its whole history, with ⤓ CSV).
 | UN-3 | Surge tank: fit k to the decay | UN-3-surge-tank/ | hammer + standpipe | (k) |
 | WV-1 | Dispersion, one period each | WV-1-dispersion/ | wavedeep + waveshallow | (T, L, flume) |
 | WV-2 | The buried wave gauge | WV-2-buried-gauge/ | wave + wavedeep | (T, ratio or "below noise") |
-| WV-3 | Reflection coefficient | WV-3-reflection/ | wavesurge + wave | (T, K_refl) |
+| WV-3 | Reflection coefficient | WV-3-reflection/ | wavesurge + waveshallow, fitted amplitudes along the flat | (T, a_max, a_min, K) per flume |
 | MO-1 | Sluice gate C_d and thrust | MO-1-gate-cv/ | RIG-B + gate | (C_d, F_R) |
 | MO-2 | Jet on a plate, jet on a vane | MO-2-jet-vane/ | shared jet rig | optional stagnation ratio |
 | FR-1 | The friction law | FR-1-friction-law/ | RIG-A | (level, H₁, H₂, V) |

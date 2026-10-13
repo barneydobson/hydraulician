@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
 """
 collect_plot.py -- pool the WV-3 "reflection coefficient" class CSV and plot
-K_refl = (a_max - a_min)/(a_max + a_min) against wave period T, for both the
-steep "sea wall" flume (wavesurge, ξ ~ 3.6-9) and the 1-in-10 spilling-beach
-contrast (wave, ξ ~ 0.4-0.7), against the textbook reference bands quoted in
-the programme (sea walls 0.7-1.0, beaches 0.05-0.2; W21).
+K = (a_max - a_min)/(a_max + a_min) against the period, the steep sea wall
+(wavesurge, 1 : 1.4) beside the gentle beach (waveshallow, 1 : 20), over
+the reflection of the wall itself: the envelope of every column of the flat.
 
 Usage:
-  python3 collect_plot.py data/simulated-class.csv -o plots/pooled-demo.png
+  python3 collect_plot.py class.csv                 # -> plots/pooled-demo.png
+  python3 collect_plot.py data/simulated-class.csv  # the shipped dry-run class
 
 Expected CSV columns (extra columns ignored):
-  student, digit, scene, series, T_s, Krefl
-  [, amp_m, L_theory_m, c_ms, method, node_spacing_m,
-     node_spacing_theory_m, aMax_m, aMin_m, note]
-
-`series` must be "surging" (wavesurge, the steep 1:1.4 "sea wall") or
-"spilling" (wave, the 1:10 dissipative beach). Rows are otherwise generic --
-extra scenes/series would just plot as their own colour.
+  T_s, K                 (or a_max_m and a_min_m, from which K is taken)
+  [, series]             "wall" (the default) or "beach", the contrast run
 """
 import csv
 import sys
 import argparse
 
-SERIES_STYLE = {
-    "surging":  {"color": "#0d76ad", "marker": "o", "label": "wavesurge -- 1:1.4 \"sea wall\" (surging)"},
-    "spilling": {"color": "#a86a0e", "marker": "s", "label": "wave -- 1:10 beach (spilling)"},
-}
-EXPECT_BANDS = {
-    "surging":  {"lo": 0.7, "hi": 1.0, "color": "#0d76ad", "label": "expected: sea walls 0.7-1.0 (W21)"},
-    "spilling": {"lo": 0.05, "hi": 0.2, "color": "#a86a0e", "label": "expected: beaches 0.05-0.2 (W21)"},
+# The wall's own reflection: the first-harmonic amplitude of every column of
+# the flat over six periods, its largest and smallest within half a
+# wavelength of the wall (README, "Measured answers", envelope K): period -> K.
+WALL_REF = {1.8: 0.59, 2.4: 0.83, 3.0: 0.97, 3.6: 0.89, 4.2: 0.84}
+
+STYLE = {
+    "wall": dict(color="#2a78d6", marker="o", label="sea wall, 1 : 1.4 (wavesurge)"),
+    "beach": dict(color="#eb6834", marker="s", label="gentle beach, 1 : 20 (waveshallow)"),
 }
 
 
@@ -38,15 +34,15 @@ def load_rows(path):
         for r in csv.DictReader(fh):
             try:
                 T = float(r["T_s"])
-                Krefl = float(r["Krefl"])
-            except (KeyError, ValueError, TypeError):
+                if r.get("K") not in (None, ""):
+                    K = float(r["K"])
+                else:
+                    amax, amin = float(r["a_max_m"]), float(r["a_min_m"])
+                    K = (amax - amin) / (amax + amin)
+            except (KeyError, ValueError, TypeError, ZeroDivisionError):
                 continue
-            series = (r.get("series") or r.get("scene") or "").strip().lower()
-            rows.append({
-                "student": r.get("student", ""), "digit": r.get("digit", ""),
-                "scene": r.get("scene", ""), "series": series,
-                "T": T, "Krefl": Krefl, "note": r.get("note", ""),
-            })
+            series = (r.get("series") or "wall").strip().lower()
+            rows.append({"T": T, "K": K, "series": series if series in STYLE else "wall"})
     return rows
 
 
@@ -58,64 +54,48 @@ def main():
 
     rows = load_rows(args.csv)
     if not rows:
-        print("no usable rows in", args.csv)
-        sys.exit(1)
+        sys.exit("no usable rows in " + args.csv)
+    for name in STYLE:
+        rs = [r for r in rows if r["series"] == name]
+        if not rs:
+            continue
+        Ks = [r["K"] for r in rs]
+        line = f"{name:>5}: {len(rs)} rows, K {min(Ks):.2f}-{max(Ks):.2f}, mean {sum(Ks) / len(Ks):.2f}"
+        if name == "wall":
+            d = [r["K"] - WALL_REF[round(r["T"], 1)] for r in rs if round(r["T"], 1) in WALL_REF]
+            if d:
+                line += f"; against the wall's envelope K: mean {sum(d) / len(d):+.2f}, range {min(d):+.2f} to {max(d):+.2f}"
+        print(line)
 
-    by_series = {}
-    for r in rows:
-        by_series.setdefault(r["series"], []).append(r)
-
-    for name, rs in sorted(by_series.items()):
-        Ts = [r["T"] for r in rs]
-        Ks = [r["Krefl"] for r in rs]
-        mean_k = sum(Ks) / len(Ks)
-        band = EXPECT_BANDS.get(name)
-        in_band = ""
-        if band:
-            n_in = sum(1 for k in Ks if band["lo"] <= k <= band["hi"])
-            in_band = f"  {n_in}/{len(Ks)} inside the {band['lo']}-{band['hi']} expected band"
-        print(f"{name:>9}: {len(rs)} points  T {min(Ts):.2f}-{max(Ts):.2f} s  "
-              f"Krefl {min(Ks):.3f}-{max(Ks):.3f}  mean {mean_k:.3f}{in_band}")
-
-    # ---- plot
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(9, 6.2))
-
-    for name, band in EXPECT_BANDS.items():
-        ax.axhspan(band["lo"], band["hi"], color=band["color"], alpha=0.08, zorder=1)
-        ax.text(5.75, (band["lo"] + band["hi"]) / 2, band["label"],
-                ha="right", va="center", fontsize=8.5, color=band["color"])
-
-    for name, rs in sorted(by_series.items()):
-        style = SERIES_STYLE.get(name, {"color": "#888", "marker": "x", "label": name})
-        # jitter repeated (T, Krefl) points slightly in x so overlapping
-        # student submissions (shared digits -> shared period) stay visible
+    fig, ax = plt.subplots(figsize=(9, 6.0))
+    fig.patch.set_facecolor("#fcfcfb"); ax.set_facecolor("#fcfcfb")
+    Ts = sorted(WALL_REF)
+    ax.plot(Ts, [WALL_REF[t] for t in Ts], "-", color="#52514e", lw=1.6, zorder=2,
+            label="the wall's K, envelope of every column")
+    for name, st in STYLE.items():
+        rs = [r for r in rows if r["series"] == name]
+        if not rs:
+            continue
         seen = {}
-        xs, ys = [], []
+        xs = []
         for r in rs:
-            key = (r["T"], round(r["Krefl"], 4))
-            k = seen.get(key, 0)
-            seen[key] = k + 1
-            xs.append(r["T"] + k * 0.025)
-            ys.append(r["Krefl"])
-        ax.scatter(xs, ys, s=70, color=style["color"], marker=style["marker"],
-                   edgecolor="white", linewidths=0.8, zorder=5,
-                   label=f"{style['label']} (n={len(rs)})")
-
-    ax.set_xlabel("piston period T (s)")
-    ax.set_ylabel(r"$K_{refl} = (a_{max} - a_{min}) / (a_{max} + a_{min})$")
-    ax.set_title("WV-3 -- reflection coefficient vs period, class-pooled\n"
-                 "steep sea wall (surging) vs 1:10 beach (spilling)", fontsize=12)
-    ax.set_ylim(-0.02, 1.05)
-    ax.set_xlim(0.8, 4.6)
-    ax.legend(fontsize=8.5, loc="center right")
-    ax.grid(alpha=0.25)
-    ax.axhline(0, color="#999", lw=0.8)
-
-    fig.savefig(args.out, dpi=140, bbox_inches="tight")
+            k = (round(r["T"], 2), round(r["K"], 2))
+            seen[k] = seen.get(k, 0) + 1
+            xs.append(r["T"] + 0.03 * (seen[k] - 1))
+        ax.scatter(xs, [r["K"] for r in rs], s=70, color=st["color"], marker=st["marker"],
+                   edgecolor="white", zorder=5, label=f"{st['label']} (n={len(rs)})")
+    ax.set_xlabel("period T (s)")
+    ax.set_ylabel(r"$K = (a_{max} - a_{min}) / (a_{max} + a_{min})$")
+    ax.set_title("WV-3 · reflection off a steep sea wall and a gentle beach, scanned on the flat", fontsize=12)
+    ax.set_xlim(1.5, 4.5); ax.set_ylim(0, 1)
+    ax.grid(alpha=0.3); ax.legend(fontsize=8.5, loc="upper left", frameon=False)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    fig.savefig(args.out, dpi=140, bbox_inches="tight", facecolor=fig.get_facecolor())
     print("wrote", args.out)
 
 

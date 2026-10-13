@@ -1192,7 +1192,9 @@ async function main() {
         const second = { scene: APP.state.scene.id, field: APP.state.gaugeField,
                          panel: APP.state.ui.panel, controls: APP.state.ui.controls,
                          ex: APP.EX.current && APP.EX.current.id };
-        go("waveshallow");
+        // Neither the card's scene nor its second one: WV-3 has used both
+        // wave and waveshallow for its contrast run.
+        go("wavedeep");
         const other = { field: APP.state.gaugeField, panel: APP.state.ui.panel };
         return { want: { scene: card.secondScene.scene, field: card.viewParams.gaugeField,
                          controls: card.ui.controls }, second, other };

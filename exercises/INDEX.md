@@ -87,7 +87,7 @@ keeps its whole history, with ⤓ CSV).
 | B3 | Dam break: the moving jump | B3-dambreak/ | dambreak | (bore speed, station pair) + shared neg-wave |
 | B4 | Orbital decay off the trails | B4-orbital-decay/ | wavedeep tracers | (T, surface/bed ratio — or "below noise") |
 | B5 | Iribarren map jigsaw | B5-iribarren/ | both beaches | (cell, ξ, behaviour, surf width) per pair |
-| B6 | Ursell number | B6-ursell/ | waveshallow | (T, U_r, asymmetry) |
+| B6 | Ursell number | B6-ursell/ | waveshallow at T = 2.0 s, two depth gauges, own stroke | (stroke, H, L, U_r, asymmetry) |
 | B7 | Venturi meter rating | B7-venturi-rating/ | venturi | (q, Δh) |
 | B8 | Three orifices, three coefficients | B8-three-orifices/ | jet + drawn lips | (lip type, C_c) |
 | B9 | Three reservoirs, one junction | B9-three-reservoirs/ | RIG-C ×3, dynamic | (z_B(0), Q_B, junction head) |

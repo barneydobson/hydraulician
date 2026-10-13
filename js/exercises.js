@@ -1035,6 +1035,12 @@ const EXERCISES = [
     task: "Set your cell's period and amplitude, wait out spin-up plus 15–20 s of transit, then classify what the wave does on the beach - spilling, surging or dies - and count scale-bar lengths of surf.",
     settle: 40,
   },
+  // The Ursell number decides when a wave stops being sinusoidal. Every row
+  // of the old ladder sat at U_r = 130-560, with its gauges at x = 1.0/1.8 m
+  // where the shape has not formed. Now one period and ten strokes run U_r
+  // from 10 to 45, through 26. H and the crest/trough asymmetry (from the
+  // trace's own mean, which sits up to 3.5 mm off the still depth) are read at
+  // 3.5 m, just short of the beach toe; L comes from the lag from 1.5 m.
   {
     id: "B6",
     title: "Ursell number: when Airy stops being enough",
@@ -1042,21 +1048,30 @@ const EXERCISES = [
     folder: "B6-ursell",
     scene: "waveshallow",
     rig: null,
-    rigParams: { budget: "Medium", waveOn: true },
+    // One period for the whole class: the sinusoidal paddle sheds a free
+    // second harmonic that beats against the bound one over 7.8 m at 2.0 s,
+    // so the shape grows steadily out to the 3.5 m gauge. At 3 s and longer
+    // the beat is tens of metres and the shape never forms on this 3.7 m flat
+    // (README, "Why one period").
+    rigParams: { budget: "Medium", waveOn: true, waveT: 2.0 },
     viewParams: { gaugeField: "d", particles: false },
-    digit: { label: "period", control: "waveT", unit: "s",
-             rule: "your row of the period table",
-             table: [3.0, 3.3, 3.6, 3.9, 4.2, 4.5, 4.8, 5.1, 5.5, 6.0],
-             also: [{ label: "stroke", control: "waveA", unit: "m",
-                      rule: "the amplitude paired with YOUR period (it saturates at 0.30 m)",
-                      table: [0.25, 0.265, 0.28, 0.29, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30] }] },
+    digit: { label: "stroke", control: "waveA", unit: "m",
+             rule: "d 0: 0.04 · d 1: 0.06 · d 2: 0.08 · d 3: 0.10 · d 4: 0.12 · d 5: 0.15 · d 6: 0.18 · d 7: 0.20 · d 8: 0.22 · d 9: 0.25",
+             table: [0.04, 0.06, 0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.22, 0.25] },
     instruments: [
-      { tool: "gauge", where: "x = 1.0 m, z = 0.20 m", why: "H crest-to-trough" },
-      { tool: "gauge", where: "x = 1.8 m, z = 0.20 m", why: "the second station — L comes from the lag between the two" },
+      { tool: "gauge", where: "x = 1.5 m, z = 0.40 m", why: "the first station; L comes from the time the wave takes to the second, 2 m on" },
+      { tool: "gauge", where: "x = 3.5 m, z = 0.40 m", why: "H and the crest/trough asymmetry, where the wave's shape has had 3 m to form" },
     ],
-    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
-    start: "a long shallow flume with a paddle and two gauge stations",
-    task: "Set your period and stroke, then read H crest-to-trough and L from the lag between the two gauges over 20–30 s of cycles, and compute U_r = H·L²/h³ with h = 0.348 m. Read the crest/trough ratio — crest above the mean over trough below it — off the same trace.",
+    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA", "gaugeInspect"] },
+    start: "a shallow flume: still depth h = 0.348 m over a bed at z = 0.247 m, paddle at x = 0.30 m running at T = 2.0 s, a 1 : 20 beach from x = 4.0 m; gauges plot the depth d",
+    setup: [
+      "The card has set the period, 2.0 s. Set Amplitude (Controls → Wavemaker) from your digit and press R. The card counts the 42 s settle down.",
+      "Place two Gauges (5) at x = 1.5 m and x = 3.5 m, both at z = 0.40 m (a Depth gauge reads the whole column). Let at least six waves pass, pause, expand one (⤢) and press ⤓ CSV all gauges.",
+      "In a spreadsheet keep exactly six periods (12 s) of t and the 3.5 m gauge's _d_m column; its average is the mean level. In each period the highest d is a crest and the lowest a trough. H = crest − trough; the crest stands a_c = crest − mean above the mean level and the trough a_t = mean − trough below it. Asymmetry = a_c / a_t; take the middle value of the six for each.",
+      "Find a wave crossing d = 0.348 m on the way up at 1.5 m and the next upward crossing at 3.5 m: Δt is the time between them, and L = T × 2.0 m / Δt.",
+      "Ursell number U_r = H·L²/h³ with h = 0.348 m. Linear (Airy) theory needs it small; the usual limit is U_r ≈ 26.",
+    ],
+    task: "Submit your stroke, H, L, U_r and the asymmetry; the class plots asymmetry against U_r, with the U_r ≈ 26 line and second-order Stokes theory for 2.0 s.",
     settle: 42,
   },
 

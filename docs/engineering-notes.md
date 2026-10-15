@@ -619,10 +619,12 @@ off.
   d/Δx, and a tank 16 cells deep reads +18% (High: +4.4%) and rings for two
   crests only. The tilt cannot be small — see "Surface waves are damped by
   RESOLUTION" below: at a/d = 0.05 (one cell) the slosh dies in two periods.
-  Two traps in timing it: a gauge's depth is the OVERLAY's (smoothed ±0.09 m
-  in space, so a station within that of a wall reads the wall's empty
-  columns, 0.2–0.3 m shallow), and its 10%-per-frame running mean delays
-  every crest ~0.15 s, so time crest to crest, never from t = 0.
+  One trap in timing it: a gauge's depth is smoothed ±0.09 m in space, so a
+  station within that of a wall reads the wall's empty columns, 0.2–0.3 m
+  shallow. Time crest to crest, never from t = 0. (Until October 2026 the
+  gauge also carried the overlay's 10%-per-frame running mean, which
+  delayed every crest ~0.15 s; it now reads before that mean — see "A
+  gauge's depth is not the hover's" under Measurement gotchas.)
 - **Broad-crested weir C_d against real weirs** (the retired DA-3 weir rig:
   P = 0.696 m, L_c = 1.739 m, q = 0.78 m²/s, so Δh/L_c = 0.40, Δh/P = 1.0).
   C_d = q/(√g Δh^1.5) = 0.431 against 0.49–0.50 for published sharp-cornered
@@ -716,21 +718,69 @@ itself ~2 cells thick. Consequences:
   to 16×. Reverted.
 - The mixing-length closure acts on vorticity, so it leaves wave motion
   alone. Measured against the old model: the intermediate and shallow flumes
-  and the slosh tank's period and decay unchanged within the reading; the
-  deep flume's train arrives at 0.04–0.07 m in its far half against 0.05–0.07
-  (a strain-based `ν_t` took it to one cell — no wave — by x = 3 m). The
-  stress-free surface itself did not make waves last longer.
+  and the slosh tank's period and decay unchanged within the reading; at the
+  deep flume's own 0.9 s the train is still gone by x = 3 m (a strain-based
+  `ν_t` took it to one cell — no wave — by x = 3 m).
+- **The stress-free surface DID make the longer deep-flume waves last
+  longer** — an earlier version of this note said it did not, from the
+  0.9 s run alone. Re-measured in October 2026 at the strokes B4 uses and
+  WV-1's deep rows used (Medium, after 40 s, first-harmonic height): at
+  T = 1.2 s, H at x = 5.84 m is 0.10 m against 0.02 m before #72, and
+  0.06 m at x = 8 m against 0.01; at T = 1.5 s, 0.19 against 0.12 m and 0.18
+  against 0.07 m.
+  It also brought the circulation below.
 - **Plunging breakers are out of reach.** The Iribarren number on the 1 : 3.4
   beach is ξ ≈ 1.3, squarely in the plunging band, so the *conditions* are
   right — but an overturning tongue is thinner than the interface can hold.
   Measured trapped air under the crest never exceeds 7 mm, i.e. half a cell:
   the breaks are spilling, and no parameter set changes that.
 
+**The deep flume's mean circulation (since #72).** The waves still lose
+height along the flume — at T = 1.5 s from 0.43 m at x = 1 m to 0.18 m at
+x = 8 m — and with a stress-free surface the momentum they give up drives the
+surface water forward and returns it along the bed. Measured at the B4
+strokes and the old WV-1 deep ones (T = 1.2–2.0 s, 0.19–0.30 m, Medium, the
+time mean over the 6 s after a 40 s settle): at x = 5.84 m the mean u is
++0.12 to +0.18 m/s 8 cm below the still surface and −0.12 to −0.32 m/s 9 cm
+above the bed; at x = 3 m, +0.17 to +0.22 and −0.21 to −0.39 m/s. Before #72
+the same runs gave +0.01 to +0.02 and −0.05 to +0.01 m/s at x = 5.84 m. (The
+mean level, 0.08–0.12 m low at the paddle and ~0.01 m high at x = 8 m, is the
+same on both engines.)
+A real flume carries a return current under its waves too, but a weaker
+one: the Stokes transport of a 0.3 m, 1.5 s wave in this depth returns at
+about −0.07 m/s. Two consequences, both measured:
+
+- **The waves ride the current and read long.** Crest to crest near the
+  paddle is 14–17% longer than linear dispersion for T = 1.2–2.0 s, and the
+  phase gradient over 1.5 wavelengths from x = 0.8 m is 15–22% longer; before
+  #72, +10% at 1.2 s and +2% at 1.5 s. Steepness is part of it: halving the
+  stroke at 1.5 s (0.14 m) halves the excess to +8%, with the current at the
+  bed barely weaker (−0.19 against −0.24 m/s). This is why WV-1 now runs
+  only the shallow flume, timed between two gauges, where every period
+  from 0.9 to 3.0 s lands within 5% of linear dispersion (the middle of
+  three waves; one wave alone can be 20% off). Its 4 and 5 s rows went too:
+  a 7–9 m wave on the 3.7 m flat, partly returned by the beach, timed
+  between −3% and +10% in runs whose strokes differed by 0.5%.
+- **Orbit tracers drift.** Near the surface forward and near the bed back,
+  0.2–0.3 m/s, so a 3 s trail is a spiral and a tracer is put back on its
+  column every few seconds. B4 reads the height of one loop, which the drift
+  does not change.
+
+Open: how much of this is physical. The forcing is the waves' decay, and
+most of their decay here is numerical (resolution, above), so the
+circulation is a resolution effect as much as a physical one. Restoring the
+surface bleed would kill it and also put back the mid-depth velocity
+maximum #72 removed from every channel, so it is not the fix.
+
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from
 `cosh k(z+d)/sinh kd`, and the vertical component vanishes at the bed as it
-should. In the deep flume the vertical falls 244× and the horizontal 3.2×.
-When measuring this, fit the Fourier component AT THE PADDLE FREQUENCY — a
+should. In the deep flume, at B4's column (x = 5.84 m, T = 1.2–2.0 s), the
+height of one loop follows sinh(kz) from 1.7 cm above the bed to 2 cm below
+the surface: trail 8 over trail 2 within −5% to +15% of theory from 1.35 s
+up, and 28% low at 1.2 s, where the drift adds a few millimetres of vertical
+wobble to every near-bed trail. Read one loop, not the trail: since #72 the
+trails drift (above). When measuring this, fit the Fourier component AT THE PADDLE FREQUENCY — a
 raw standard deviation picks up the flume's own seiche, which is depth-uniform
 and made deep water look like it had no decay at all.
 
@@ -832,6 +882,17 @@ picture saturated or flat is the symptom of the two having drifted apart.
   `(M₁ − M₂) + (F₁ − F₂)`, both sections carrying their own normal, so the
   upstream one flips when they are read as the two ends of a control volume.
   That is the same number `boxForce` reports for a box drawn between them.
+- **A gauge's depth is not the hover's.** Both start from the column depth
+  smoothed ±0.09 m in space. The hover box and the channel overlay then take
+  a 10%-per-frame running mean of it, to hold the profile class still against
+  ripples; a gauge does not (`analyse().dGauge`). Until October 2026 the
+  gauges read the hover's value, and because that mean is counted in FRAMES
+  it filtered every trace by however fast the machine drew. At 60 fps it
+  lagged each crest ~0.15 s and took 5% off a 3 s wave's height and 17% off
+  its second harmonic, which is the crest/trough asymmetry B6 measures; at
+  T = 1.5 s it took 17% off the height itself. A trace is already a time
+  record, and reading the wobble off it is the student's job. Gauge `h` and
+  `speed` never had the mean; `d` and `η` now match them.
 - **New tools are APPENDED to `TOOLS`, whatever group they belong to.** The
   digit a tool answers to is its index, and every worksheet in the pack refers
   to tools by digit — inserting one renumbers the rest and makes the printed

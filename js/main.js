@@ -2630,8 +2630,12 @@ function sampleGauges(A) {
     // by the friction loss between them; a still column (reservoir, shaft) has
     // |u| ≈ 0, so there H = h = η.
     const g = Math.abs(sim.p.g) || 9.81;
+    // d and η are the gauge's own depth (`dGauge`): the ±0.09 m window but not
+    // the overlay's per-frame running mean, which would filter the trace in
+    // time by however fast this machine draws (overlay.js analyse).
+    const dg = A.dGauge ? A.dGauge[i] : A.d[i];
     const s = { t: sim.t, h: z + pr.phead, H: z + pr.phead + pr.speed * pr.speed / (2 * g),
-                d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
+                d: dg, eta: A.bed[i] + dg, speed: pr.speed };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];

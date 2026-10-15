@@ -48,10 +48,9 @@ restarts the slosh. The tank's inner faces are snapped to the grid.
 Students time the slosh with a Depth gauge at x = 0.5 m, crest to crest:
 T = (t₄ − t₁)/3. Not closer to the wall: a gauge's depth is the overlay's,
 smoothed over ±0.09 m, and at x = 0.35 m that window took in the wall's
-zero-depth columns and read 0.2–0.3 m shallow. Not from the release: the
-same depth has a 10%-per-frame running mean, which delays every crest by
-about 0.15 s. Crest to crest the lag cancels; against t = 0 it would add up
-to 3% to a short tank's period.
+zero-depth columns and read 0.2–0.3 m shallow. Crest to crest, not from
+the release: the release is not a crest of the steady slosh, and timing
+from it adds the start-up to the period.
 
 ## Measured
 

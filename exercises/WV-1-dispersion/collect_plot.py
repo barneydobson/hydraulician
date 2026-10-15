@@ -7,14 +7,15 @@ plot L against T against the three theory curves:
   - full linear dispersion   sigma^2 = g k tanh(k h)      (solved per flume h)
 
 Usage:
-  python3 collect_plot.py data/simulated-class.csv -o plots/pooled-demo.png
+  python3 collect_plot.py class.csv                 # -> plots/pooled-demo.png
+  python3 collect_plot.py data/simulated-class.csv  # the shipped dry-run class
 
 Expected CSV columns (extra columns are ignored):
-  student, digit, scene, flume, h_m, T_s, L_measured_m [, L_theory_tanh_m, err_pct]
+  T_s, L_m (or L_measured_m) [, dt_s, flume, h_m]
 
-`flume` must be "deep" or "shallow" (or `scene` == wavedeep/waveshallow, from
-which flume is inferred). `h_m` is the still-water depth actually run; if
-missing it defaults to 0.74 m (wavedeep) / 0.35 m (waveshallow).
+Every row is the shallow flume (h = 0.348 m) unless it says `flume` = deep
+or `scene` = wavedeep: old class data from when the card used both flumes
+still plot, against the deep flume's own curve.
 """
 import csv
 import math
@@ -22,8 +23,8 @@ import sys
 import argparse
 
 G = 9.81
-H_DEEP = 0.74
-H_SHALLOW = 0.35
+H_DEEP = 0.743
+H_SHALLOW = 0.348
 
 
 def dispersion_L(T, h, g=G):
@@ -65,7 +66,7 @@ def load_rows(path):
             flume = (r.get("flume") or "").strip().lower()
             scene = (r.get("scene") or "").strip().lower()
             if not flume:
-                flume = "deep" if "deep" in scene else ("shallow" if "shallow" in scene else "")
+                flume = "deep" if "deep" in scene else "shallow"
             h = r.get("h_m")
             try:
                 h = float(h)
@@ -119,7 +120,8 @@ def main():
     fig, (ax, axr) = plt.subplots(2, 1, figsize=(8.5, 7.5), sharex=True,
                                   gridspec_kw={"height_ratios": [3, 1.1], "hspace": 0.08})
 
-    Tsmooth = [0.35 + 0.01 * i for i in range(int((6.3 - 0.35) / 0.01) + 1)]
+    Tmax = max([3.5] + [1.15 * r["T"] for r in rows])       # the axis follows the class
+    Tsmooth = [0.35 + 0.01 * i for i in range(int((Tmax - 0.35) / 0.01) + 1)]
 
     # full-tanh curves, each only physically meaningful where h/L keeps the
     # column-of-water assumption reasonable, but drawn over the whole range
@@ -130,13 +132,14 @@ def main():
     Lshallow_asym = [L_shallow_asymp(T, H_SHALLOW) for T in Tsmooth]
 
     ax.plot(Tsmooth, Ldeep_asym, "--", color="#3b82c4", lw=1.4,
-            label=r"deep asymptote $L_0=1.56\,T^2$  (h=0.74 m)")
-    ax.plot(Tsmooth, Ldeep_full, "-", color="#1d5a8a", lw=1.8,
-            label=r"full tanh, h=0.74 m (wavedeep)")
+            label=r"deep-water asymptote $L_0=gT^2/2\pi$")
+    if deep:            # the deep flume is no longer on the card; drawn only for old class data
+        ax.plot(Tsmooth, Ldeep_full, "-", color="#1d5a8a", lw=1.8,
+                label=r"full tanh, h=0.743 m (wavedeep)")
     ax.plot(Tsmooth, Lshallow_asym, "--", color="#c47a3b", lw=1.4,
-            label=r"shallow asymptote $L=T\sqrt{gh}$  (h=0.35 m)")
+            label=r"shallow-water asymptote $L=T\sqrt{gh}$  (h=0.348 m)")
     ax.plot(Tsmooth, Lshallow_full, "-", color="#8a4a1d", lw=1.8,
-            label=r"full tanh, h=0.35 m (waveshallow)")
+            label=r"full relation $\sigma^2=gk\tanh kh$, h=0.348 m (waveshallow)")
 
     if deep:
         ax.scatter([r["T"] for r in deep], [r["L"] for r in deep],
@@ -159,7 +162,7 @@ def main():
                  r"$\sigma^2 = gk\tanh(kh)$", fontsize=12)
     ax.legend(fontsize=8, loc="upper left")
     ax.grid(alpha=0.25)
-    ax.set_ylim(0, max([12] + [r["L"] for r in rows]) * 1.08)
+    ax.set_ylim(0, max([L_shallow_asymp(Tmax, H_SHALLOW)] + [r["L"] for r in rows]) * 1.08)
 
     # ---- residual panel: measured vs the FULL tanh curve at that point's own h
     for r in deep:

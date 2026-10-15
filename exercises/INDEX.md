@@ -34,16 +34,21 @@ captured drawing loads. `↻ Reset to the starting point` on the
 card restores the common setup.
 
 How to run an exercise is described once, above — it is the same for all of
-them, so the briefs do not repeat it. Every brief follows the trimmed
-pattern HP-1 set: short theory, the personalised rule with its lookup table,
-a handful of numbered steps, and instructor pooling with a discussion point
-or two, with the long verification record moved verbatim to `_archive/`
-inside each folder — untracked, local to the maintainer's machine.
+them, so the briefs do not repeat it. The card is the student's whole
+exercise: setup, their own values, the stations, the steps and what to read.
+The folder's README is lecturer notes — theory, worked and measured answers,
+the teaching sequence, pooling and discussion — and never fills a gap in the
+card ([docs/making-exercises.md](../docs/making-exercises.md)). Older briefs
+still carry the student steps HP-1's trimmed pattern put there; they move to
+the card as each exercise is re-checked. The long verification record lives
+in `_archive/` inside each folder — untracked, local to the maintainer's
+machine.
 
 **Standing rules (every worksheet carries them):** everyone on Resolution
 Medium (the picker sets this) · wait out the spin-up · median-of-the-wobble
 reads, never one frame · after changing q, re-check any tailwater ≥ 1.3·d_c ·
-pause-and-read promptly (the chart buffer keeps moving).
+pause to read a trace (a paused trace holds still, and a gauge's ⤢ inspector
+keeps its whole history, with ⤓ CSV).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|
@@ -60,7 +65,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | UN-1 | Celerity and water-hammer reflections | UN-1-celerity/ | hammer + nozzle-width slider | — (lecturer demo) |
 | UN-2 | Flow establishment | UN-2-establishment/ | estab | (level, u_max, t_75) |
 | UN-3 | Surge tank: fit k to the decay | UN-3-surge-tank/ | hammer + standpipe | (k) |
-| WV-1 | Dispersion, one period each | WV-1-dispersion/ | wavedeep + waveshallow | (T, L, flume) |
+| WV-1 | Dispersion, one period each | WV-1-dispersion/ | waveshallow, two depth gauges | (T, Δt, L) |
 | WV-2 | The buried wave gauge | WV-2-buried-gauge/ | wave + wavedeep | (T, ratio or "below noise") |
 | WV-3 | Reflection coefficient | WV-3-reflection/ | wavesurge + wave | (T, K_refl) |
 | MO-1 | Sluice gate C_d and thrust | MO-1-gate-cv/ | RIG-B + gate | (C_d, F_R) |

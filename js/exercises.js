@@ -928,9 +928,13 @@ const EXERCISES = [
   // rows read 14-17% long on the mean circulation the decaying waves drive,
   // short ones break at the paddle or die within a metre, ±15% frame to
   // frame). The shallow flume's first metres hold a clean progressive wave
-  // from 0.9 s to 5 s, kh = 1.8 to 0.24, and a time lag between two Depth
+  // from 0.9 s to 3.0 s, kh = 1.8 to 0.40, and a time lag between two Depth
   // gauges reads its length within a few per cent. Its short waves die
-  // within ~1.5 m, so they are timed nearer the paddle.
+  // within ~1.5 m, so they are timed nearer the paddle; each pair is closer
+  // than a wavelength, so the next up-crossing is the same wave. 4 and 5 s
+  // are out: a 7-9 m wave barely fits the 3.7 m flat, the beach returns part
+  // of it, and runs whose strokes differed by 0.5% timed it 3% short to 10%
+  // long. One wave's lag scatters by up to 20%; the middle of three by ~6%.
   {
     id: "WV-1",
     title: "Dispersion, one period each",
@@ -941,21 +945,21 @@ const EXERCISES = [
     rigParams: { budget: "Medium", waveOn: true },
     viewParams: { gaugeField: "d", particles: false },
     digit: { label: "period", control: "waveT", unit: "s",
-             rule: "d 0: 0.9 · d 1: 1.0 · d 2: 1.2 · d 3: 1.5 · d 4: 2.0 · d 5: 2.5 · d 6: 3.0 · d 7: 4.0 · d 8–9: 5.0",
-             table: [0.9, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 5.0],
+             rule: "d 0: 0.9 · d 1: 1.0 · d 2: 1.2 · d 3: 1.5 · d 4: 1.8 · d 5: 2.0 · d 6: 2.2 · d 7: 2.5 · d 8: 2.8 · d 9: 3.0",
+             table: [0.9, 1.0, 1.2, 1.5, 1.8, 2.0, 2.2, 2.5, 2.8, 3.0],
              also: [{ label: "stroke", control: "waveA", unit: "m",
-                      rule: "0.025 at 0.9 s · 0.030 at 1.0 and 1.2 s · 0.035 at 1.5 s · 0.060 at 2.0 and 2.5 s · 0.10 at 3.0 and 4.0 s · 0.12 at 5.0 s",
-                      table: [0.025, 0.030, 0.030, 0.035, 0.060, 0.060, 0.10, 0.10, 0.12, 0.12] }] },
+                      rule: "0.025 at 0.9 s · 0.030 at 1.0 and 1.2 s · 0.035 at 1.5 s · 0.045 at 1.8 s · 0.060 from 2.0 to 2.5 s · 0.080 at 2.8 s · 0.10 at 3.0 s",
+                      table: [0.025, 0.030, 0.030, 0.035, 0.045, 0.060, 0.060, 0.060, 0.080, 0.10] }] },
     instruments: [
-      { tool: "gauge", where: "x = 1.0 m and x = 3.0 m, z = 0.40 m; for T = 0.9, 1.0 or 1.2 s, x = 0.6 m and 1.0 m", why: "the time a wave takes between them is its speed; a short wave is gone by 2 m" },
+      { tool: "gauge", where: "z = 0.40 m, at x = 1.0 m and x = 3.0 m; for T = 1.2 s at x = 1.0 m and 2.0 m; for T = 0.9 or 1.0 s at x = 0.6 m and 1.0 m", why: "the time a wave takes between them is its speed; a short wave is gone by 2 m, and the pair must be closer than a wavelength" },
     ],
     ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA", "gaugeInspect"] },
     start: "a shallow flume: still depth h = 0.348 m over a bed at z = 0.247 m, paddle at x = 0.30 m, a 1 : 20 beach from x = 4.0 m; gauges plot the depth d",
     setup: [
       "Set Period and Amplitude (Controls → Wavemaker) from your digit and press R. The card counts the 30 s settle down.",
-      "Place two Gauges (5) at z = 0.40 m: at x = 1.0 m and x = 3.0 m, or at x = 0.6 m and x = 1.0 m if your period is 0.9, 1.0 or 1.2 s. Let a few waves pass, pause, and expand both (⤢).",
-      "Pick one wave crossing the still depth d = 0.348 m on the way up on the first chart, and the same wave doing it on the second. Δt is the time between the two crossings.",
-      "The wave's speed is c = Δx/Δt (Δx = 2.0 m, or 0.4 m) and its length L = cT. Linear theory: σ² = gk·tanh(kh), k = 2π/L; deep water L₀ = gT²/2π, shallow water L = T√(gh).",
+      "Place two Gauges (5) at z = 0.40 m: at x = 1.0 m and x = 3.0 m; if your period is 1.2 s, at x = 1.0 m and 2.0 m; if it is 0.9 or 1.0 s, at x = 0.6 m and 1.0 m. Let a few waves pass, pause, and expand both (⤢).",
+      "Pick one wave crossing the still depth d = 0.348 m on the way up on the chart of the gauge nearer the paddle, and the next upward crossing on the other chart. Δt is the time between them. Do the same for the next two waves and keep the middle Δt of the three.",
+      "The wave's speed is c = Δx/Δt (Δx = 2.0, 1.0 or 0.4 m) and its length L = cT. Linear theory: σ² = gk·tanh(kh), k = 2π/L; deep water L₀ = gT²/2π, shallow water L = T√(gh).",
     ],
     task: "Submit T, Δt and L; the class pools L against T on the full relation and both asymptotes.",
     settle: 30,

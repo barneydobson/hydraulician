@@ -120,7 +120,8 @@ def main():
     fig, (ax, axr) = plt.subplots(2, 1, figsize=(8.5, 7.5), sharex=True,
                                   gridspec_kw={"height_ratios": [3, 1.1], "hspace": 0.08})
 
-    Tsmooth = [0.35 + 0.01 * i for i in range(int((6.3 - 0.35) / 0.01) + 1)]
+    Tmax = max([3.5] + [1.15 * r["T"] for r in rows])       # the axis follows the class
+    Tsmooth = [0.35 + 0.01 * i for i in range(int((Tmax - 0.35) / 0.01) + 1)]
 
     # full-tanh curves, each only physically meaningful where h/L keeps the
     # column-of-water assumption reasonable, but drawn over the whole range
@@ -161,7 +162,7 @@ def main():
                  r"$\sigma^2 = gk\tanh(kh)$", fontsize=12)
     ax.legend(fontsize=8, loc="upper left")
     ax.grid(alpha=0.25)
-    ax.set_ylim(0, max([12] + [r["L"] for r in rows]) * 1.08)
+    ax.set_ylim(0, max([L_shallow_asymp(Tmax, H_SHALLOW)] + [r["L"] for r in rows]) * 1.08)
 
     # ---- residual panel: measured vs the FULL tanh curve at that point's own h
     for r in deep:

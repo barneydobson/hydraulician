@@ -757,7 +757,10 @@ about −0.07 m/s. Two consequences, both measured:
   stroke at 1.5 s (0.14 m) halves the excess to +8%, with the current at the
   bed barely weaker (−0.19 against −0.24 m/s). This is why WV-1 now runs
   only the shallow flume, timed between two gauges, where every period
-  lands within 5% of linear dispersion.
+  from 0.9 to 3.0 s lands within 5% of linear dispersion (the middle of
+  three waves; one wave alone can be 20% off). Its 4 and 5 s rows went too:
+  a 7–9 m wave on the 3.7 m flat, partly returned by the beach, timed
+  between −3% and +10% in runs whose strokes differed by 0.5%.
 - **Orbit tracers drift.** Near the surface forward and near the bed back,
   0.2–0.3 m/s, so a 3 s trail is a spiral and a tracer is put back on its
   column every few seconds. B4 reads the height of one loop, which the drift

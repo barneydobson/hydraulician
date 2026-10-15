@@ -4,8 +4,9 @@
 
 A quick in-class exercise, 15 minutes, that draws the dispersion relation
 from a class of single measurements. Each student runs the shallow flume at
-their own period, times one wave between two depth gauges two metres apart
-(0.4 m for the shortest waves), and turns the time into a wavelength. Pooled
+their own period, times three waves between two depth gauges (two metres
+apart for most periods, less for the shortest), keeps the middle time and
+turns it into a wavelength. Pooled
 on one plot of L against T, the short periods sit near the deep-water line
 L₀ = gT²/2π, the long ones approach the shallow-water line L = T√(gh), and
 the ones between sag off both onto the full relation σ² = gk·tanh(kh): the
@@ -27,18 +28,20 @@ It runs on the `waveshallow` scene; the card sets everything up.
 still water h = 0.348 m deep, a piston paddle at x = 0.30 m and a 1 : 20
 beach from x = 4.0 m. Medium gives Δx = 11.2 mm, 31 cells over the depth.
 The card sets Medium, the paddle on, the gauges on Depth and particles off.
-The gauges go at **x = 1.0 and 3.0 m** on the flat, or **0.6 and 1.0 m**
-for the 0.9, 1.0 and 1.2 s rows, whose waves are nearly gone 2 m from the
-paddle; a Depth gauge reads its column's depth whatever height it is placed
-at. A pair 1.0 m apart from x = 1.0 m read the 2.0 and 2.5 s rows 6–8%
-short: next to the paddle the wave field is not yet a clean progressive
-wave, and two metres between the gauges averages that out.
+The gauges go at **x = 1.0 and 3.0 m** on the flat; at **1.0 and 2.0 m**
+for 1.2 s; at **0.6 and 1.0 m** for 0.9 and 1.0 s, whose waves are nearly
+gone 2 m from the paddle. A Depth gauge reads its column's depth whatever
+height it is placed at. Each pair is closer than the wavelength, so the
+farther gauge's next up-crossing belongs to the same wave (two metres would
+not be, at 1.2 s).
 
-One flume covers kh = 1.8 to 0.24: a 0.9 s wave is 5% shorter than L₀ and a
-5 s wave within 1% of T√(gh). The deep-water end itself is out of reach at
-Medium: a 0.7 s wave dies within a wavelength of the paddle (at a stroke of
-0.015 m it is 48 mm high at x = 0.4 m and gone by 1.0 m), and a steeper
-stroke only makes it break there.
+One flume covers kh = 1.8 to 0.40: a 0.9 s wave is 5% shorter than L₀ and a
+3 s wave 3% short of T√(gh). The deep-water end itself is out of reach: a
+0.7 s wave dies within a wavelength of the paddle (at a stroke of 0.015 m it
+is 48 mm high at x = 0.4 m and gone by 1.0 m), and a steeper stroke only makes
+it break there. The long end stops at 3 s. At 4 and 5 s the wave is 7–9 m
+long on a 3.7 m flat, the beach sends part of it back, and runs whose strokes
+differed by half a per cent timed it anywhere from 3% short to 10% long.
 
 The wait is about **30 s**.
 
@@ -60,9 +63,8 @@ flume does not give a clean wavelength at any period:
   crest beside the paddle read −9% to +11%, ±15% from frame to frame, and
   timing between two gauges was worse (±25–60%, except at 0.9 s).
 
-The shallow flume has neither problem: with the gauges two metres apart
-(or 0.4 m for the short waves) the timing lands within 5% of linear theory
-at every period.
+The shallow flume has neither problem: timed as the card says, every period
+lands within about 5% of linear theory.
 
 ## The assignment
 
@@ -70,8 +72,8 @@ at every period.
 
 | d | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **T (s)** | 0.9 | 1.0 | 1.2 | 1.5 | 2.0 | 2.5 | 3.0 | 4.0 | 5.0 | 5.0 |
-| **stroke (m)** | 0.025 | 0.030 | 0.030 | 0.035 | 0.060 | 0.060 | 0.10 | 0.10 | 0.12 | 0.12 |
+| **T (s)** | 0.9 | 1.0 | 1.2 | 1.5 | 1.8 | 2.0 | 2.2 | 2.5 | 2.8 | 3.0 |
+| **stroke (m)** | 0.025 | 0.030 | 0.030 | 0.035 | 0.045 | 0.060 | 0.060 | 0.060 | 0.080 | 0.10 |
 
 Small strokes on purpose: a wave high enough to be nonlinear travels faster
 than linear theory says (B6 measures it), and a short one breaks at the
@@ -81,15 +83,19 @@ paddle. These keep every row's wave a few centimetres high at the gauges.
 
 1. Set Period and Amplitude from the digit and press **R**; wait out the
    settle.
-2. Place two Gauges (`5`) at z = 0.40 m: at x = 1.0 and 3.0 m, or at
-   x = 0.6 and 1.0 m for 0.9, 1.0 and 1.2 s. Let a few waves pass, pause,
-   and expand both (⤢).
+2. Place two Gauges (`5`) at z = 0.40 m: at x = 1.0 and 3.0 m; at 1.0 and
+   2.0 m for 1.2 s; at 0.6 and 1.0 m for 0.9 and 1.0 s. Let a few waves
+   pass, pause, and expand both (⤢).
 3. Find one wave crossing the still depth, d = 0.348 m, on the way up on the
-   nearer gauge's chart, and the same wave doing it on the farther one's. Δt
-   is the time between them; the wave's speed is c = Δx/Δt (2.0 or 0.4 m)
-   and its length L = cT. Every row's Δt is shorter than its period, so
-   "the same wave" is the farther gauge's next up-crossing.
+   nearer gauge's chart, and the next upward crossing on the farther one's.
+   Δt is the time between them. Do the same for the next two waves and keep
+   the middle Δt. The wave's speed is c = Δx/Δt (2.0, 1.0 or 0.4 m) and its
+   length L = cT. Every row's Δt is shorter than its period, so the next
+   up-crossing is the same wave.
 4. Submit T, Δt and L.
+
+Three waves because one is not enough: a single wave's Δt can be up to 20%
+off, the middle of three about 5%.
 
 Timing a crossing of the still level rather than a crest: the crests of the
 longer waves are flat-topped and hard to place in time; the up-crossing is
@@ -109,26 +115,30 @@ formula would give 6.24 m and the shallow-water one 3.70 m.
 
 ## Measured answers
 
-Medium, after the 30 s settle: headless runs recording each column's depth
-24 times a period, smoothed along the flume as a Depth gauge smooths it.
-Δt is the median lag between up-crossings of the still depth over the last
-12 s (15 s for the 5.0 s row), and H the median wave height at each gauge.
+Medium, after the 30 s settle, by `rig.js`: the card's two gauges sampled as
+the frame loop samples them, Δt the middle of the first three waves' lags,
+H the wave height at each gauge. Each row was also run with the stroke 0.5%
+either side: a run on another machine is a different run of the same flow,
+and the "any three" column is how far the middle of three moved over every
+set of three successive waves in all three runs.
 
-| T (s) | stroke (m) | gauges x (m) | kh | H (mm) | Δt (s) | L (m) | L, linear (m) | error | L₀ (m) | T√(gh) (m) |
-|---|---|---|---|---|---|---|---|---|---|---|
-| 0.9 | 0.025 | 0.6 and 1.0 | 1.82 | 52 / 33 | 0.301 | 1.20 | 1.20 | -0.2% | 1.26 | 1.66 |
-| 1.0 | 0.030 | 0.6 and 1.0 | 1.54 | 62 / 45 | 0.277 | 1.45 | 1.42 | +1.6% | 1.56 | 1.85 |
-| 1.2 | 0.030 | 0.6 and 1.0 | 1.18 | 51 / 45 | 0.251 | 1.91 | 1.86 | +2.9% | 2.25 | 2.22 |
-| 1.5 | 0.035 | 1.0 and 3.0 | 0.88 | 45 / 24 | 1.216 | 2.47 | 2.48 | -0.6% | 3.51 | 2.77 |
-| 2.0 | 0.060 | 1.0 and 3.0 | 0.63 | 63 / 46 | 1.177 | 3.40 | 3.48 | -2.3% | 6.25 | 3.70 |
-| 2.5 | 0.060 | 1.0 and 3.0 | 0.49 | 51 / 47 | 1.131 | 4.42 | 4.45 | -0.6% | 9.76 | 4.62 |
-| 3.0 | 0.100 | 1.0 and 3.0 | 0.40 | 78 / 69 | 1.161 | 5.17 | 5.40 | -4.3% | 14.05 | 5.54 |
-| 4.0 | 0.100 | 1.0 and 3.0 | 0.30 | 56 / 63 | 1.107 | 7.23 | 7.28 | -0.8% | 24.98 | 7.39 |
-| 5.0 | 0.120 | 1.0 and 3.0 | 0.24 | 60 / 54 | 1.089 | 9.19 | 9.15 | +0.4% | 39.03 | 9.24 |
+| T (s) | stroke (m) | gauges x (m) | kh | H (mm) | Δt (s) | L (m) | L, linear (m) | error | any three | L₀ (m) | T√(gh) (m) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.9 | 0.025 | 0.6 and 1.0 | 1.82 | 55 / 37 | 0.29 | 1.24 | 1.20 | +3% | −1 to +7% | 1.26 | 1.66 |
+| 1.0 | 0.030 | 0.6 and 1.0 | 1.54 | 64 / 49 | 0.28 | 1.44 | 1.42 | +1% | −2 to +4% | 1.56 | 1.85 |
+| 1.2 | 0.030 | 1.0 and 2.0 | 1.18 | 51 / 34 | 0.62 | 1.95 | 1.86 | +5% | −8 to +5% | 2.25 | 2.22 |
+| 1.5 | 0.035 | 1.0 and 3.0 | 0.88 | 52 / 30 | 1.27 | 2.37 | 2.48 | −5% | −5 to +2% | 3.51 | 2.77 |
+| 1.8 | 0.045 | 1.0 and 3.0 | 0.71 | 61 / 43 | 1.18 | 3.06 | 3.08 | −1% | −2 to +3% | 5.06 | 3.33 |
+| 2.0 | 0.060 | 1.0 and 3.0 | 0.63 | 67 / 57 | 1.16 | 3.45 | 3.48 | −1% | −2 to +2% | 6.25 | 3.70 |
+| 2.2 | 0.060 | 1.0 and 3.0 | 0.57 | 66 / 53 | 1.19 | 3.71 | 3.87 | −4% | −4 to +4% | 7.56 | 4.06 |
+| 2.5 | 0.060 | 1.0 and 3.0 | 0.49 | 63 / 46 | 1.15 | 4.35 | 4.45 | −2% | −5 to −2% | 9.76 | 4.62 |
+| 2.8 | 0.080 | 1.0 and 3.0 | 0.44 | 71 / 53 | 1.13 | 4.95 | 5.02 | −1% | −5 to −1% | 12.24 | 5.17 |
+| 3.0 | 0.100 | 1.0 and 3.0 | 0.40 | 88 / 74 | 1.13 | 5.30 | 5.40 | −2% | −4 to +6% | 14.05 | 5.54 |
 
-Every row lands within 5% of linear dispersion. Neither asymptote holds
-across the class: the full relation is 5% short of L₀ at 0.9 s and 17% short
-at 1.2 s, and still 3% short of T√(gh) at 3.0 s.
+Every row lands within 5% of linear dispersion, and the middle of any three
+waves within 8%. One wave alone scatters more: up to 20% at 1.2 s. Neither
+asymptote holds across the class: the full relation is 5% short of L₀ at
+0.9 s and 17% short at 1.2 s, and still 3% short of T√(gh) at 3.0 s.
 
 ## Pooling the class
 

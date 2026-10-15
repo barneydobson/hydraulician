@@ -9,20 +9,25 @@
  * It does what the card asks, through the same entry points: picks WV-1 (the
  * shallow flume at Medium, gauges on Depth), sets the period and stroke,
  * presses R (SIM.resetWater, t = 0), waits out the 30 s settle, places the
- * two Depth gauges (state.gauges, as the Gauge tool does) at x = 1.0 and
- * 3.0 m, or 0.6 and 1.0 m for the 0.9, 1.0 and 1.2 s rows, and records them once
- * per 1/60 s of simulated time exactly as the frame loop samples them
- * (main.js sampleGauges).
+ * two Depth gauges (state.gauges, as the Gauge tool does) and records them
+ * once per 1/60 s of simulated time exactly as the frame loop samples them
+ * (main.js sampleGauges). The gauges are the card's: x = 0.6 and 1.0 m for
+ * 0.9 and 1.0 s, 1.0 and 2.0 m for 1.2 s, 1.0 and 3.0 m from 1.5 s. The pair
+ * is always closer than a wavelength, so the farther gauge's next up-crossing
+ * belongs to the same wave.
  *
  * Δt is the time from the first gauge's trace crossing the still depth
- * (0.348 m) upward to the second gauge's doing the same, median over the
- * crossings in the record; c = Δx/Δt, L = cT. Theory: σ² = gk·tanh(kh),
- * L = 2π/k; deep water L₀ = gT²/2π, shallow water L = T√(gh).
+ * (0.348 m) upward to the second gauge's doing the same. The card has the
+ * student time three successive waves and keep the middle Δt: `dt` is that,
+ * from the first three waves of the record; `dt_record` is the median over
+ * every wave in it. c = Δx/Δt, L = cT. Theory: σ² = gk·tanh(kh), L = 2π/k;
+ * deep water L₀ = gT²/2π, shallow water L = T√(gh).
  * ==========================================================================*/
 window.WV1 = {
   SETTLE: 30, H0: 0.348,
-  ROWS: [[0.9, 0.025], [1.0, 0.030], [1.2, 0.030], [1.5, 0.035], [2.0, 0.060],
-         [2.5, 0.060], [3.0, 0.100], [4.0, 0.100], [5.0, 0.120]],
+  ROWS: [[0.9, 0.025], [1.0, 0.030], [1.2, 0.030], [1.5, 0.035], [1.8, 0.045],
+         [2.0, 0.060], [2.2, 0.060], [2.5, 0.060], [2.8, 0.080], [3.0, 0.100]],
+  gaugesFor: function (T) { return T <= 1.0 ? [0.6, 1.0] : T <= 1.2 ? [1.0, 2.0] : [1.0, 3.0]; },
 
   yieldNow: function () {
     return new Promise(function (r) { var c = new MessageChannel(); c.port1.onmessage = function () { r(); }; c.port2.postMessage(0); });
@@ -61,7 +66,7 @@ window.WV1 = {
     C("waveOn").set(true); C("waveT").set(T); C("waveA").set(A);
     APP.SIM.resetWater(); clearGaugeHistory();          // R
     await WV1.advance(WV1.SETTLE, null);
-    var xs = T <= 1.2 ? [0.6, 1.0] : [1.0, 3.0];
+    var xs = WV1.gaugesFor(T);
     APP.state.gauges.length = 0;
     xs.forEach(function (x, i) {
       APP.state.gauges.push({ x: x, z: 0.40, hist: [], log: [], id: i + 1, colour: i ? "#ffb37f" : "#7fd4ff" });
@@ -74,9 +79,11 @@ window.WV1 = {
     APP.state.paused = false;
     var ua = WV1.upcrossings(APP.state.gauges[0].log, WV1.H0), ub = WV1.upcrossings(APP.state.gauges[1].log, WV1.H0), lags = [];
     ua.forEach(function (u) { var n = ub.filter(function (v) { return v > u && v < u + T; }); if (n.length) lags.push(n[0] - u); });
-    var dt = WV1.median(lags), L = T * (xs[1] - xs[0]) / dt, Lt = WV1.linL(T, WV1.H0);
+    var dt = WV1.median(lags.slice(0, 3)), dtR = WV1.median(lags), Lt = WV1.linL(T, WV1.H0);
+    var L = T * (xs[1] - xs[0]) / dt, LR = T * (xs[1] - xs[0]) / dtR;
     return { T: T, A: A, gauges: xs, dt: +dt.toFixed(3), L: +L.toFixed(3), L_theory: +Lt.toFixed(3),
-             err_pct: +(100 * (L / Lt - 1)).toFixed(1), L0: +(9.81 * T * T / (2 * Math.PI)).toFixed(2),
+             err_pct: +(100 * (L / Lt - 1)).toFixed(1), dt_record: +dtR.toFixed(3),
+             err_record_pct: +(100 * (LR / Lt - 1)).toFixed(1), L0: +(9.81 * T * T / (2 * Math.PI)).toFixed(2),
              L_shallow: +(T * Math.sqrt(9.81 * WV1.H0)).toFixed(2), crossings: lags.length };
   },
 

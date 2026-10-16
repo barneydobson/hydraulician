@@ -2101,6 +2101,228 @@ const SCENES = (() => {
                "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Dye (D) sends timelines across the stream from the inlet.",
                "Press A: the average of the alternating wake is a steady, symmetric wake bubble."] };
     })(),
+    // ===== Year 1: spillway, pipejet (FF-2, FF-4) =====
+    // Two demo scenes for the Fluid Motion lecture (L4): one flow field each
+    // that the lecturer talks through — speed, steady against unsteady,
+    // streamlines, separation, fluxes, velocity profiles, and turbulence
+    // live against Average.
+
+    // ------------------------------------------- FF-2 · spillway, flip bucket
+    // A reservoir held by the head-driven level control spills over an ogee
+    // crest (the WES shape, x^1.85 = 2 H_d^0.85 · y, for a design head
+    // H_d = 1.5 m), runs down a 1 : 0.75 face into a circular flip bucket
+    // and is thrown into the air; the jet plunges into a deep pool held by a
+    // tailwater on the right edge. No hydraulic jump and no stilling basin:
+    // the pool is simply long — 44 m of domain, ~26 m of pool past the
+    // plunge — so the turbulence has decayed into a slow drift before the
+    // outflow edge, and the tailwater sponge only ever meets that drift.
+    //   The bucket's lip angle is the one Geometry slider: it moves the lip
+    // along the bucket's own arc, so the throw (where the jet lands, how high
+    // it flies) changes while the crest, the face and q do not. MEASURED at
+    // Medium: the jet leaves at roughly half the lip angle (lip 20/30/40/45°
+    // -> ~6/15/21/27°) at 7.3-8.3 m/s and lands 4-5 m past the lip.
+    //   The open-channel mixing length stays ON here (no `kappa`). Measured
+    // with it off (kappa 0) or weak (0.1) the pool's eddies ran the whole
+    // 30 m to the outflow edge and the tailwater sloshed with them (at 0.1
+    // the pool rose to 6 m and drowned the bucket); at the default the pool
+    // fluctuates hard around the plunge and is a calm drift by x = 30 m.
+    // q = 3.46 m²/s over the crest at the 8.7 m level; settled by ~40 s.
+    (() => {
+      const W = 44, H = 10;
+      const ZF = 0.3;                 // reservoir floor and pool floor
+      const XU = 7.0;                 // the dam's upstream face
+      const ZC = 7.2, HD = 1.5;       // crest apex, design head
+      const LEVEL = ZC + HD;          // the reservoir level (a still-water head)
+      const SF = 4 / 3;               // the spillway face, 1 : 0.75
+      const R = 2.0, ZINV = 3.3;      // bucket radius and invert
+      const TW = 3.0;                 // tailwater level: a 2.7 m deep pool
+      const DEF = { lip: 40 };
+      const val = (par, k) => (par && par[k] !== undefined ? par[k] : DEF[k]);
+
+      const geom = (par) => {
+        const th = val(par, "lip") * Math.PI / 180;
+        const ea = 0.28 * HD, eb = 0.165 * HD;              // upstream quarter-ellipse
+        const xc = XU + ea;                                 // crest apex x
+        // WES downstream face to where its slope reaches the chute's SF.
+        const k = 0.5 / Math.pow(HD, 0.85);                 // y = k·x^1.85
+        const xw = Math.pow(SF / (1.85 * k), 1 / 0.85);
+        const zw = ZC - k * Math.pow(xw, 1.85);
+        // The bucket: a circle of radius R, invert at ZINV, tangent to the
+        // chute; on a circle centred C the point at angle α has tangent
+        // direction α + 90°.
+        const a1 = -Math.atan(SF) - Math.PI / 2, a2 = th - Math.PI / 2;
+        const cz = ZINV + R;
+        const zT = cz + R * Math.sin(a1);
+        const xT = xc + xw + (zw - zT) / SF;
+        const cx = xT - R * Math.cos(a1);
+        const xl = cx + R * Math.cos(a2), zl = cz + R * Math.sin(a2);
+        const v = [[XU, -0.5], [xl, -0.5], [xl, zl]];
+        const iBucket = v.length - 1;
+        const arc = GEOM.arcPts(cx, cz, R, a2, a1);          // lip → chute, leftwards
+        for (let n = 1; n < arc.length; n++) v.push(arc[n]);
+        const iFace = v.length - 1;
+        const nW = 40;                                      // WES face, tangent → apex
+        for (let n = nW; n >= 0; n--) {
+          const x = xw * n / nW;
+          v.push([xc + x, ZC - k * Math.pow(x, 1.85)]);
+        }
+        const iUp = v.length - 1;
+        for (let n = 1; n <= 16; n++) {                     // apex → upstream face
+          const s = (n / 16) * Math.PI / 2;
+          v.push([xc - ea * Math.sin(s), ZC - eb + eb * Math.cos(s)]);
+        }
+        const nv = v.length;
+        const dam = GEOM.poly(v,
+          [{ id: "ds", label: "Downstream face (under the lip)", e0: 1, e1: 1 },
+           { id: "bucket", label: "Flip bucket", e0: iBucket, e1: iFace - 1 },
+           { id: "face", label: "Spillway face and crest", e0: iFace, e1: iUp - 1 },
+           { id: "us", label: "Upstream face", e0: iUp, e1: nv - 1 }], "dam");
+        const ground = GEOM.rect(-1, -1, W + 1, ZF, { id: "ground",
+          faces: [{ id: "top", label: "Reservoir and pool floor", e0: 2, e1: 2 }] });
+        return { xc, xw, zw, xT, zT, cx, cz, xl, zl, th, dam, ground, solids: [ground, dam] };
+      };
+      let cache = { key: null, g: null };
+      const geomFor = (par) => {
+        const key = JSON.stringify(par || {});
+        if (cache.key !== key) cache = { key, g: geom(par) };
+        return cache.g;
+      };
+
+      return {
+        id: "spillway", name: "Spillway with a flip bucket", key: "Ski-jump into a plunge pool",
+        group: "Flow fields & turbulence",
+        blurb: "A reservoir spills over an ogee crest, races down the spillway face and is thrown into the air by a flip bucket. The jet plunges into a deep pool: steady above, wildly unsteady below — and its average is steady again.",
+        W, H, c: 30, cf: 0.005, cs: 0.10, bulk: 0.05, nu: 1e-4,
+        mode: 2, hmax: 9, headMax: 10, vmax: 10, particles: 1,
+        view: { vex: 1 },
+        spinup: 40,
+        open: [1, 1, 0, 0],
+        // The sponge holds the reservoir compartment up to 2 m short of
+        // the dam: head-driven, that sponge IS the supply.
+        spongeIn: 5.0, spongeTw: 4.0,
+        inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
+        tailwater: { level: TW, on: 1 },
+        params: [
+          { key: "lip", label: "Bucket lip angle", min: 20, max: 45, step: 1, value: DEF.lip, unit: "°" },
+        ],
+        solids: (W_, H_, P_, par) => geomFor(par).solids,
+        water: (x, z, P, par) => {
+          if (z <= ZF) return 0;
+          const g = geomFor(par);
+          const level = Number.isFinite(P.level) ? P.level : LEVEL;
+          if (x < XU) return still(level, z, P);
+          if (x > g.xl) return still(TW, z, P);
+          return 0;
+        },
+        geom: geomFor,
+        tips: ["Colour is speed: nearly still in the reservoir, accelerating over the crest, fastest in the bucket, slowing in the pool.",
+               "Pause twice: the reservoir, crest and face look the same both times — steady. The pool never does.",
+               "Press <b>A</b> (Average): the pool becomes a calm mean flow with two steady rollers either side of the plunge.",
+               "Two <b>Flux lines</b> — one on the face, one in the pool — read the same q at very different depths and speeds.",
+               "A <b>Rake</b> in the pool jitters live and draws a clean profile once averaged: mean + fluctuation.",
+               "Controls → Geometry tilts the bucket lip: a steeper lip throws higher and further."] };
+    })(),
+
+    // ------------------------------------------- FF-4 · pipe jet into a reservoir
+    // A header (head-driven level control, its whole compartment held)
+    // drives a 0.5 m pipe, 8 m long, that discharges a jet horizontally into
+    // a large tank of still water. Inside the pipe the wall boundary layers
+    // grow from the rounded entrance; past the exit the jet's two free shear
+    // layers roll up, entrain the still water and spread. The pipe axis sits
+    // mid-depth, 5.7 D from the floor and from the lid, and the tank runs
+    // 19.5 m (39 D) past the exit to the outflow edge.
+    //   The tank is FULL (lid on, no free surface) and its right edge is a
+    // submerged tailwater (a piezometric head, as on venturi), so the jet
+    // leaves through the edge instead of turning on a far wall. Two
+    // free-surface versions were measured and dropped:
+    //  * a tailwater on a free surface: this tank carries almost no
+    //    through-flow (~0.1 m/s mean) and the tailwater sponge keeps the
+    //    stress-free surface extension (boundary-conditions.md §3), so an
+    //    inflowing surface current grew at the edge (-1 m/s at 2.6 s, -8 m/s
+    //    by 11 s), filled the tank to the lid and drove the pipe backwards;
+    //  * an overflow weir at the far end: stable, but the jet struck the weir
+    //    face within ~10 s and the 14 m tank filled with one big eddy, so the
+    //    averaged jet was neither straight nor symmetric.
+    //   kappa: 0 switches the open-channel mixing length off. Its l = κy
+    // takes y from the nearest wall, metres from a free shear layer, and
+    // with it on (measured) the jet left the pipe as a smooth laminar blob
+    // with no eddies at all; with it off the Smagorinsky term alone leaves
+    // the shear layers free to roll up.
+    //   nu = 2e-3 m²/s is an eddy viscosity, not water's (Re = VD/ν ≈ 400),
+    // chosen by measurement between two failures: at 1e-4 and 1e-3 the 2-D
+    // jet broke up at the lip into tank-sized eddies that throttled the pipe
+    // (q fell 0.90 → 0.41 m²/s and recovered over ~20 s) and a 90 s Average
+    // was still a blob; at 5e-3 the jet stayed laminar and steady (live =
+    // Average, nothing to show). At 2e-3 the jet leaves as a clean core,
+    // starts to flap ~4 m past the exit and breaks into eddies by ~6 m; the
+    // pipe profile still develops visibly (centreline 2.17 → 2.51 m/s from
+    // x = 3.5 to 10 m) and the averaged jet is a spreading bell.
+    (() => {
+      const W = 30, H = 6;
+      const ZF = 0.3;                         // floor
+      const XH = 2.2, TWALL = 0.3;            // header wall (left face) and thickness
+      const ZA = 3.15, D = 0.5;               // pipe axis (mid-depth) and bore
+      const XE = 10.5;                        // pipe exit
+      const TP = 0.25;                        // pipe wall thickness
+      const LEVEL = 6.6, TW = 6.2;            // header and tank heads (both above the lid)
+      const RB = 0.35;                        // bellmouth radius at the entrance
+      const z0 = ZA - D / 2, z1 = ZA + D / 2, x1 = XH + TWALL;
+      // Two solids. Below: the header wall under the pipe and the pipe's
+      // lower wall; above: the header wall over it and the upper wall. The
+      // entrance corners are rounded (a bellmouth) so the flow enters the
+      // pipe as a near-uniform plug rather than a separated vena contracta,
+      // and the profile development along the pipe is the wall's doing.
+      // Built lazily: geom.js loads after this file, so no GEOM call may run
+      // while the registry is being assembled.
+      let built = null;
+      const build = () => {
+        if (built) return built;
+        const lower = GEOM.poly(
+          [[XH, -0.5], [x1, -0.5], [x1, z0 - TP], [XE, z0 - TP], [XE, z0],
+           ...GEOM.arcPts(XH + RB, z0 - RB, RB, Math.PI / 2, Math.PI)],
+          [{ id: "invert", label: "Pipe invert", e0: 4, e1: 4 },
+           { id: "exitLo", label: "Pipe exit, lower lip", e0: 3, e1: 3 }], "pipeLo");
+        const upper = GEOM.poly(
+          [[XH + RB, z1], [XE, z1], [XE, z1 + TP], [x1, z1 + TP], [x1, H + 1], [XH, H + 1],
+           ...GEOM.arcPts(XH + RB, z1 + RB, RB, Math.PI, 1.5 * Math.PI).slice(0, -1)],
+          [{ id: "soffit", label: "Pipe soffit", e0: 0, e1: 0 },
+           { id: "exitUp", label: "Pipe exit, upper lip", e0: 1, e1: 1 }], "pipeUp");
+        const ground = GEOM.rect(-1, -1, W + 1, ZF, { id: "ground",
+          faces: [{ id: "top", label: "Floor", e0: 2, e1: 2 }] });
+        built = { lower, upper, ground };
+        return built;
+      };
+
+      return {
+        id: "pipejet", name: "Pipe jet into a reservoir", key: "Wall and free shear layers",
+        group: "Flow fields & turbulence",
+        blurb: "A header drives a pipe that discharges a jet into a large, full tank of still water. Boundary layers grow along the pipe walls; past the exit the jet's shear layers roll up into eddies, entrain the still water and spread.",
+        W, H, c: 30, cf: 0.02, cs: 0.10, bulk: 0.05, nu: 2e-3,
+        kappa: 0,
+        mode: 2, hmax: 6, headMax: 6.5, vmax: 3, particles: 1,
+        spinup: 20,
+        open: [1, 1, 0, 0],
+        spongeIn: XH, spongeTw: 2.0,
+        inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
+        tailwater: { level: TW, on: 1 },
+        solids: () => { const g = build(); return [g.ground, g.lower, g.upper]; },
+        water: (x, z, P) => {
+          if (z <= ZF) return 0;
+          const level = Number.isFinite(P.level) ? P.level : LEVEL;
+          if (x < XH) return still(level, z, P);
+          if (x < x1) return z > z0 && z < z1 ? still(level, z, P) : 0;
+          if (x < XE && z > z0 && z < z1) return still(level, z, P);
+          const g = build();
+          if (GEOM.contains(g.lower, x, z) || GEOM.contains(g.upper, x, z)) return 0;
+          return still(TW, z, P);
+        },
+        tips: ["Colour is speed. In the pipe the slow layers by the walls thicken downstream: the boundary layer, with no slip at the wall.",
+               "Past the exit the jet meets still water: two free shear layers, which roll up into eddies and drag the still water in.",
+               "Drop a <b>Rake</b> in the pipe near the entrance and one near the exit: the profile goes from a flat plug towards a rounded one.",
+               "A Rake across the jet jitters live. Press <b>A</b> (Average): a smooth bell-shaped profile that widens and flattens downstream.",
+               "Two <b>Flux lines</b> across the jet: the averaged q GROWS downstream — that is the entrained water.",
+               "The tank is full to its lid and its right edge is an outflow held at a fixed head; Controls → Reservoir level is the header's head: raise it and the jet runs faster."] };
+    })(),
   ];
 
   const byId = {};

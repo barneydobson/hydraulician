@@ -56,6 +56,7 @@ const SIM = (() => {
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
     prog.tcol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TCOL);
     prog.hgl  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_HGL);
+    prog.sflux = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_SFLUX);   // streamlines
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
     // The Favre display accumulator (§4.1 of docs/averaging.md) — a separate
     // pass from prog.vofA's transport accumulator, and a separate program
@@ -1570,6 +1571,72 @@ const SIM = (() => {
     return h;
   }
 
+  /** STREAMLINES: the face fluxes of the whole field, read back WITHOUT a
+   *  pipeline stall. Every other full-field reader here (fieldStats,
+   *  avgField, the averaged hydraulicGrade) calls readPixels into client
+   *  memory, which blocks until the GPU has finished every queued substep.
+   *  This one first packs the fluxes into a half-width texture (FS_SFLUX —
+   *  two cells per texel, a quarter of the bytes of U + F), reads that into a
+   *  pixel-pack buffer and drops a fence; `streamPoll` checks the fence with
+   *  a zero timeout on a later frame and only copies the bytes out once the
+   *  GPU says they are there. One request in flight at a time; the caller
+   *  (main.js refreshStream) sets the rate.
+   *
+   *  Live: from U and F. Average: from the Favre accumulator. The request
+   *  remembers which, and the S it was made against, so a result that lands
+   *  after a rebuild is dropped rather than drawn on the wrong grid. Consumed
+   *  by STREAM.psi (js/stream.js). */
+  let SF = null;
+  function streamRequest(avg) {
+    if (SF && SF.sync) return false;
+    const nx = S.nx, ny = S.ny, w2 = (nx + 1) >> 1, bytes = w2 * ny * 16;
+    if (!SF || SF.forS !== S) {
+      if (SF) { gl.deleteBuffer(SF.pbo); gl.deleteFramebuffer(SF.fbo); gl.deleteTexture(SF.tex); }
+      const tex = GLH.createTexture(gl, w2, ny, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
+      SF = { forS: S, w2, tex, fbo: GLH.createFBO(gl, tex), pbo: gl.createBuffer(),
+             buf: new Float32Array(w2 * ny * 4), sync: null };
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    }
+    const A = !!(avg && S.avg);
+    gl.useProgram(prog.sflux);
+    GLH.bindTex(gl, prog.sflux, [["u_U", A ? S.avg.fld.read.tex : S.U.read.tex],
+                                 ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform2f(prog.sflux.u("u_res"), nx, ny);
+    gl.uniform1f(prog.sflux.u("u_avg"), A ? 1 : 0);
+    gl.uniform1f(prog.sflux.u("u_valve"), S.p.valveClosed);
+    GLH.bindTarget(gl, SF.fbo, SF.w2, ny);
+    quad.draw();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+    gl.readPixels(0, 0, SF.w2, ny, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    SF.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+    SF.avg = A; SF.t = S.t;
+    return true;
+  }
+  /** The finished request, or null while the GPU is still on it. WebGL only
+   *  updates a fence between tasks, so this is at least one frame later. The
+   *  copy-out does not wait for the sim's queued work, but it is one round
+   *  trip to the browser's GPU process (the price of a 1×1 probe); `ms`
+   *  reports it — see engineering-notes, "Streamlines are contours of ψ". */
+  function streamPoll() {
+    if (!SF || !SF.sync) return null;
+    const t0 = performance.now();
+    const st = gl.clientWaitSync(SF.sync, 0, 0);
+    const t1 = performance.now();
+    if (st === gl.TIMEOUT_EXPIRED) return null;
+    gl.deleteSync(SF.sync); SF.sync = null;
+    if (st === gl.WAIT_FAILED || SF.forS !== S) return null;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, SF.buf);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    return { avg: SF.avg, t: SF.t, nx: S.nx, ny: S.ny, dx: S.dx, w2: SF.w2, D: SF.buf,
+             ms: { wait: t1 - t0, copy: performance.now() - t1 } };
+  }
+  function streamPending() { return !!(SF && SF.sync); }
+
   function probe(x, z, avg) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
@@ -2109,7 +2176,7 @@ const SIM = (() => {
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
-           hydraulicGrade,
+           hydraulicGrade, streamRequest, streamPoll, streamPending,
            setValve, setParam, params,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,

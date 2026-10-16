@@ -34,6 +34,13 @@ const state = {
   // by default: most scenes are free-surface, where the HGL lies on the water
   // line and adds nothing.
   grade: false, gradeBuf: null, gradeTick: 0, gradeAvg: false,
+  // Streamlines: contours of the stream function at equal Δψ (js/stream.js),
+  // refreshed a few times a second off an ASYNC readback (collectStream / requestStream).
+  // `slineN` is roughly how many tubes span the flow; `slineDpsi` is the
+  // spacing actually in use, HELD between refreshes so the lines do not
+  // breathe as the range jitters, and re-picked only when it drifts far off.
+  sline: false, slineN: 12, slineBuf: null, slineGrid: null,
+  slineDpsi: 0, slineAt: 0, slineT: -1,
   ruler: true,                // metre ticks on the view edges — a workspace preference
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
@@ -208,6 +215,7 @@ function loadScene(id, keepDrawing) {
   // A scene whose whole subject is the particle motion should not open with
   // the particles switched off and a tip asking you to find the key.
   if (sc.particles !== undefined) state.particles = !!sc.particles;
+  state.slineBuf = null; state.slineDpsi = 0; state.slineT = -1;
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.measure = null; state.measDrag = null;
   state.cv = null; state.cvDrag = null;
@@ -268,6 +276,7 @@ function switchScene(id) {
   state.jumps = true;
   state.particles = false;            // scenes that want them set `sc.particles`
   state.grade = false;                // an exercise that wants them says so in viewParams
+  state.sline = false; state.slineN = 12;   // likewise the streamlines
   state.gaugeField = "h";
   state.tracerN = 9;
   UIMODE.reset();                     // a new scene is a whole interface again
@@ -729,6 +738,13 @@ const CONTROLS = [
     info: "Massless tracers. The clearest way to see wave orbits and jet spreading." },
   { id: "dye", type: "check", label: "Dye",
     get: () => state.dye, set: (v) => state.dye = v },
+  { id: "sline", type: "check", label: "Streamlines",
+    get: () => state.sline, set: (v) => state.sline = v,
+    info: "Contours of the stream function ψ, drawn at equal steps Δψ, so every tube between two neighbouring lines carries the same discharge per unit width — where the lines crowd the water is fast, where they spread it is slow. Walls, the bed and (in steady flow) the free surface are streamlines themselves. Under <b>Average</b> they are the streamlines of the MEAN flow: compare them with the dye and the particles, which follow the unsteady flow, and they agree only where the flow is steady. Refreshed about four times a second; the key at the bottom left quotes Δψ." },
+  { id: "slineN", label: "Streamline density", min: 6, max: 60, step: 1,
+    get: () => state.slineN, set: (v) => { state.slineN = v; state.slineDpsi = 0; },
+    fmt: (v) => "≈ " + v.toFixed(0) + " tubes across the flow",
+    info: "Roughly how many equal-discharge tubes the whole range of ψ is cut into. The step is rounded to 1, 2, 2.5 or 5 × 10ⁿ m²/s so it can be quoted, and then held while the flow develops." },
   { id: "dyeLine", label: "Dye timelines", min: 0, max: 4, step: 0.1,
     get: () => sim.p.dyeLine, set: (v) => sim.p.dyeLine = v,
     fmt: (v) => v === 0 ? "off" : "every " + v.toFixed(1) + " s",
@@ -1129,6 +1145,10 @@ const ICONS = {
              '<circle cx="15" cy="9.5" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/>' +
              '<circle cx="13" cy="15" r="1.3"/>',
   dye:     '<path d="M10 3.5c3 3.6 4.5 5.9 4.5 8a4.5 4.5 0 0 1-9 0c0-2.1 1.5-4.4 4.5-8Z"/>',
+  // Streamlines squeezing past a body: three lines, closer over the bump.
+  sline:   '<path d="M2.5 5c4 0 5 2.5 7.5 2.5S13.5 5 17.5 5"/>' +
+           '<path d="M2.5 10c4 0 5 1.2 7.5 1.2s3.5-1.2 7.5-1.2"/>' +
+           '<path d="M2.5 15.5h4.5a3 2.6 0 0 1 6 0h4.5"/>',
   // Average: a wobbling trace with the mean line drawn flat through it. The
   // glyph is the claim — the line is not the signal, it is what the signal
   // spent the window doing.
@@ -1664,6 +1684,10 @@ const TOOLBAR = [
       hint: "Dye and the dye timelines injected at the inlet",
       on: () => state.dye,
       act: () => { state.dye = !state.dye; syncPanel(); } },
+    { id: "slineBtn", icon: "sline", label: "Streamlines", key: "T",
+      hint: "Streamlines — equal discharge between neighbouring lines; of the mean flow under Average",
+      on: () => state.sline,
+      act: () => { state.sline = !state.sline; syncPanel(); } },
     { id: "chanBtn", icon: "channel", label: "Open-channel overlay", key: "N",
       hint: "Critical depth, normal depth and the energy grade line",
       on: () => state.channel,
@@ -1933,6 +1957,7 @@ const KEYS = (() => {
     ["B", "what the Control volume reads on each edge: Q / momentum / energy"],
     ["P", "particles"],
     ["D", "dye"],
+    ["T", "streamlines"],
     ["N", "open-channel overlay"],
     ["A", "average the flow — the mean field, over one window"],
     ["M", "ruler"],
@@ -2451,6 +2476,7 @@ function frame(now) {
 
 function tickFrame(realDt) {
   computeView();
+  collectStream();               // before this frame's substeps: see requestStream
 
   const t0 = performance.now();
   let simAdvanced = 0;
@@ -2524,6 +2550,7 @@ function tickFrame(realDt) {
   // two flow states in one screenshot.
   const avgCols = state.avg && SIM.avgActive() ? SIM.avgColumns() : null;
   refreshGrade();
+  requestStream();
   // hv is the MEAN flow's velocity head or nothing (SIM.hydraulicGrade), so
   // it only ever reaches analyse alongside the mean columns it belongs to.
   const hv = avgCols && state.gradeBuf ? state.gradeBuf.hv : null;
@@ -2873,6 +2900,51 @@ function refreshGrade() {
   state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, avg);
 }
 
+/** Streamlines, in two halves around the frame's GPU work.
+ *
+ *  `collectStream` runs at the TOP of the frame, before this frame's substeps
+ *  are queued: it polls the async readback (SIM.streamPoll), and when one has
+ *  landed rebuilds psi and its contours (STREAM.psi / STREAM.contours) — one
+ *  pass over the grid for each, skipping every cell no level crosses.
+ *  Polling before the substeps matters: the copy-out is a round trip to the
+ *  GPU process, which is cheap while its queue is empty and waits behind
+ *  every substep once it is not.
+ *
+ *  `requestStream` runs after the substeps and the averaging step, so the
+ *  field it asks for is this frame's, and asks at most every 250 ms of wall
+ *  clock (~4 Hz). Never a stall: SIM.streamRequest packs the fluxes on the
+ *  GPU, reads them into a pixel-pack buffer behind a fence, and returns.
+ *
+ *  Off costs one boolean. Paused, nothing new is requested: the field is not
+ *  changing. A result read in the other window mode (Live vs Average) is
+ *  dropped, and the drawn buffer carries its mode, so a mean picture never
+ *  carries live streamlines or the other way round. */
+function collectStream() {
+  if (!state.sline) { state.slineBuf = null; return; }
+  const avg = measuringAvg();
+  const R = SIM.streamPoll();
+  if (!R || R.avg !== avg) return;
+  const G = STREAM.psi(R, state.slineGrid);
+  state.slineGrid = G;
+  const rg = STREAM.range(G);
+  if (!rg) { state.slineBuf = null; return; }
+  const N = state.slineN, span = rg[1] - rg[0];
+  let d = state.slineDpsi;
+  if (state.slineBuf && state.slineBuf.avg !== avg) d = 0;
+  if (!(d > 0) || span / d < 0.6 * N || span / d > 1.7 * N) d = STREAM.nice(span / N);
+  state.slineDpsi = d;
+  state.slineBuf = { seg: STREAM.contours(G, d), dpsi: d, avg, t: R.t };
+}
+function requestStream() {
+  if (!state.sline) return;
+  const avg = measuringAvg(), now = performance.now();
+  const stale = !state.slineBuf || state.slineBuf.avg !== avg || sim.t !== state.slineT;
+  if (stale && now - state.slineAt > 250 && !SIM.streamPending()) {
+    SIM.streamRequest(avg);
+    state.slineAt = now; state.slineT = sim.t;
+  }
+}
+
 /** What the reservoir is actually DELIVERING.
  *
  *  Neither reservoir number on the panel is a measurement: `inflow.q` is a
@@ -2988,6 +3060,9 @@ function drawOverlay(A) {
     OVERLAY.drawChannel(ctx, view, A, sim);
     if (state.labels) OVERLAY.drawProfileLabels(ctx, view, A, sim);
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
+  }
+  if (state.sline && state.slineBuf && state.slineBuf.avg === measuringAvg()) {
+    OVERLAY.drawStreamlines(ctx, view, state.slineBuf);
   }
   state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
   if (state.tracers) OVERLAY.drawTracers(ctx, view, state.tracers);
@@ -3502,6 +3577,7 @@ function boot() {
     else if (k === "l") LEGEND.toggle();
     else if (k === "b") { state.cvShow = CV_NEXT[state.cvShow] || "Q"; syncPanel(); }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
+    else if (k === "t") { state.sline = !state.sline; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "a") setAverage(!state.avg);
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }

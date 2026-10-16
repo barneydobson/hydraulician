@@ -128,7 +128,7 @@ field and, more importantly, **the line between applied and displayed**:
 | field | applied? | holds |
 |---|---|---|
 | `rigParams` | yes | the plumbing without which the rig is not a rig: `budget` (Resolution) first, then the edges (`openL..openT`), then supplies and levels — *edges before level controls*, because ticking a level opens its own edge |
-| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField`, `speed`, `channel`, `labels`, `jumps`, `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall) |
+| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField`, `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall) |
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
 | `studentParams` | **no** | values the worksheet asks the student to set |
 | `instruments` | **no** | `{tool, where, why}` — where the gauges go; the picker places none and clears any a payload carried |

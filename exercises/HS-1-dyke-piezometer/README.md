@@ -114,15 +114,18 @@ headless probe in `rig.js`:
 |---|---|---|
 | left / culvert / piezometer while shut | 4.00 m | 4.01 / 4.01 / 4.01 m |
 | right while shut | 3.10 m | 3.11 m |
-| upstream face, shut: F_h / F_v | 28.2 / 5.9 kN/m | 28.4 / 5.9 kN/m |
+| upstream face, shut: F_h / F_v | 28.2 / 5.9 kN/m | 28.5 / 6.0 kN/m |
 | downstream face, shut: F_h | 11.0 kN/m | 11.2 kN/m |
-| culvert roof of the upstream block, shut: uplift | 44.7 kN/m | 45.1 kN/m |
+| culvert roof of the upstream block, shut: uplift | 44.7 kN/m | 45.3 kN/m |
 | common level after V | 3.82 m | 3.82 m |
-| either face after V: F_h | 24.2 kN/m | 24.1 / 24.2 kN/m |
-| upstream face after V: F_v | 4.7 kN/m | 4.6 kN/m |
+| either face after V: F_h | 24.2 kN/m | 24.2 / 24.2 kN/m |
+| upstream face after V: F_v | 4.7 kN/m | 4.7 kN/m |
 | water mass before → after V (Σf over the domain) | conserved | 3.800 → 3.800, to four figures |
 
-The basin speeds are under 1 cm/s about 45 s after V and under 5 mm/s by 55 s; there is no boot
+Re-measured in October 2026, after the polygon-geometry and stress-free
+surface changes and with the Pressure force tool's surface check deepened for
+sloped faces (see PF-2): every number above still holds; the face forces
+moved by at most 0.2 kN/m. The basin speeds are under 1 cm/s about 45 s after V and under 5 mm/s by 55 s; there is no boot
 transient to wait out, so the card's countdown is zero.
 
 The mass row is the Control volume's enclosed-mass integral over the whole

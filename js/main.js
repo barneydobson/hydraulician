@@ -2998,6 +2998,12 @@ function drawOverlay(A) {
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
   }
   state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
+  // Wind over the water (FF-1): only a scene declaring a "tau" param has one.
+  const tau = SIM.windTau();
+  if (tau) {
+    const td = (SIM.params().decl || []).find((d) => d.key === "tau");
+    OVERLAY.drawWind(ctx, view, A, sim, tau, td ? Math.max(Math.abs(td.min), Math.abs(td.max)) : Math.abs(tau));
+  }
   if (state.tracers) OVERLAY.drawTracers(ctx, view, state.tracers);
   const meas = state.measDrag || state.measure;
   if (meas) OVERLAY.drawMeasure(ctx, view, meas);

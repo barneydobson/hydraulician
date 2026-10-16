@@ -1148,4 +1148,38 @@ const EXERCISES = [
     task: "Read the three levels and the two face forces while the valve is shut, then press V: watch the culvert run and the small basin fill, and read them again once the water is still — one level, equal forces.",
     settle: 0,
   },
+
+  // ===== Year 1: FF-1 =====
+  // A lecturer demo on the `lake` scene: a closed tank of still water with a
+  // wind shear stress τ on its free surface, the scene's one param (geom0).
+  // Boots at rest (settle 0): the first reading IS the still tank. No
+  // measuring tools — the hover probe and the field legend are the
+  // instruments (MEASURE off, so there is nothing to place).
+  {
+    id: "FF-1",
+    title: "Wind over a lake",
+    topic: "Flow fields, shear and turbulence",
+    folder: "FF-1-wind-lake",
+    scene: "lake",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", particles: true },
+    digitNote: "lecturer demo: no personalised parameter",
+    ui: {
+      measure: false,
+      view: ["legendBtn", "partBtn"],
+      fields: ["water", "speed", "phead"],
+      panel: "focused",
+      controls: ["geom0"],
+    },
+    setup: [
+      "At rest: hover the water and read u = 0 and p/ρg = the depth below the surface. Switch the field to Pressure head: flat horizontal bands — pressure only.",
+      "Set the Wind stress τ slider to a small positive value: the water starts to flow and keeps flowing while the wind blows.",
+      "Watch the surface rise against the right-hand wall and the particles near the bed run back to the left. Switch to Speed to see where the water moves fastest.",
+      "Reverse τ: everything reverses. Set τ = 0: the motion dies away and the bands go flat again.",
+    ],
+    start: "a closed tank of still water, 6 m long and 0.30 m deep, with no wind",
+    task: "Read u and p at rest, then blow on the surface with τ: any shear, however small, makes the water flow — set-up at the downwind wall, return flow along the bed.",
+    settle: 0,
+  },
 ];

@@ -123,6 +123,7 @@ uniform vec4  u_wave;    // amplitude (m), omega (rad/s), on, piston column
 uniform sampler2D u_Wd;  // wall distance (m) at each cell's SW corner, CPU-built
 uniform sampler2D u_Tc;  // nx×1 open-channel columns: bed z, surface z, on, 0
 uniform float u_kappa;   // mixing-length constant (0 = closure off)
+uniform float u_tau;     // wind stress on the free surface, KINEMATIC: τ/ρ (m²/s²), +x
 
 // --- the depth-scale closure: Prandtl's mixing length, κy damped towards the
 //     free surface, l = κ·y·√((η − z)/d), y the distance to the nearest WALL
@@ -287,6 +288,24 @@ void main(){
   float pC = press(fC, dvC);
   un -= dt * (pC - press(fW, dvW)) / dx;
   wn -= dt * (pC - press(fS, dvS)) / dx;
+
+  // --- wind shear stress on the free surface (FF-1). A tangential stress τ
+  //     on the surface is a force τ per unit area acting on the top layer, so
+  //     the u-face that holds the interface is accelerated by τ/(ρΔz). The
+  //     interface is wherever the face's water fraction drops going up: the
+  //     weight max(f_here − f_above, 0) is a discrete −∂f/∂z, which sums to
+  //     exactly 1 up any column with water below air, so the whole column
+  //     receives τ however the surface sits in its cells — split between a
+  //     part-full top cell and the full one under it. Purely additive, after
+  //     gravity and ∇p (nothing interposed), and before the void handling, so
+  //     the dry u-faces above still take the water's u (the stress-free
+  //     extension) — the wind drives the water, not the void. Branch on the
+  //     uniform: τ = 0 leaves every other scene bit-for-bit unchanged.
+  if (u_tau != 0.0) {
+    float fUp = max(TF(ivec2(i, j+1)).r, TF(ivec2(i-1, j+1)).r);
+    float wTop = clamp(min(fFu, 1.0) - min(fUp, 1.0), 0.0, 1.0);
+    un += dt * u_tau * wTop / dx;
+  }
 
   // --- void handling. Hard-zeroing the velocity in empty cells makes the air
   //     behave like a rigid medium, and the fake shear layer shreds any free

@@ -516,6 +516,11 @@ const SIM = (() => {
       source: Object.assign({}, scene.source),
       dyeLine: scene.dyeLine, dyeDecay: 0.02,
       valveClosed: scene.valveOpen ? 0 : 1,
+      // Optional per-scene von Kármán constant for the mixing-length closure;
+      // undefined keeps KAPPA. A free jet in a deep tank sets 0: the closure's
+      // l = κy takes y from the nearest WALL, metres away from a free shear
+      // layer, and its ν_t smeared the jet into a laminar blob (pipejet).
+      kappa: scene.kappa,
     };
     if (prev) {
       p.open = prev.open.slice();

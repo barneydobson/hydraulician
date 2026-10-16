@@ -1148,4 +1148,74 @@ const EXERCISES = [
     task: "Read the three levels and the two face forces while the valve is shut, then press V: watch the culvert run and the small basin fill, and read them again once the water is still — one level, equal forces.",
     settle: 0,
   },
+  // ===== Year 1: FF-2, FF-4 =====
+  // Two lecturer demos for the Fluid Motion lecture (L4), each one flow field
+  // talked through for several concepts at once: the velocity field, steady
+  // against unsteady, streamlines (particles over the Average), separation,
+  // fluxes, velocity profiles and turbulence as mean + fluctuation. Nothing
+  // to draw and nothing personal; students replay them afterwards. Numbers
+  // in the `why`s are measured at Medium (the READMEs have the tables).
+  {
+    id: "FF-2",
+    title: "Spillway with a ski-jump",
+    topic: "Flow fields, shear and turbulence",
+    folder: "FF-2-spillway",
+    scene: "spillway",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", particles: true, gaugeField: "speed" },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "flux", where: "Flux lines, two sections: one over the crest (a vertical at x ≈ 7.4 m, from the crest up through the surface), one full-depth across the pool at x ≈ 30 m", why: "q = 3.46 m²/s over the crest; live the pool section wanders ±10–20% about it, averaged (T = 40 s) it reads 3.36–3.41, within 3%" },
+      { tool: "rake", where: "Rakes in the pool at x ≈ 20 m and x ≈ 25 m", why: "a wall jet hugging the pool floor after the plunge (fastest ~2.5 m/s near the bed); at x = 20 m the live profile swings by ~1 m/s, the averaged one is a smooth curve" },
+      { tool: "gauge", where: "a Gauge in the pool at x ≈ 20 m, z ≈ 1.0 m (on Speed)", why: "its trace is the fluctuation: a mean plus wild excursions" },
+    ],
+    ui: {
+      view: ["legendBtn", "partBtn", "dyeBtn", "avgBtn"],
+      fields: ["water", "speed", "vort", "phead"],
+      controls: ["speed", "geom0", "inLevel", "dye", "dyeLine"],
+    },
+    start: "a reservoir spilling over an ogee crest, down the face and off a flip bucket; the jet plunges into a long, deep pool held by a tailwater at the right edge",
+    setup: [
+      "Colour is Speed. Read it from left to right: nearly still in the reservoir, accelerating over the crest, fastest on the face and in the bucket, slowing in the pool.",
+      "Press Space twice a few seconds apart: the reservoir, crest and face look the same both times (steady); the pool around the plunge does not (unsteady).",
+      "Place a Flux line over the crest and one full-depth across the pool at x ≈ 30 m, two Rakes in the pool at x ≈ 20 and 25 m, and a Gauge at x ≈ 20 m, z ≈ 1 m.",
+      "Press A (Average) and wait until the legend's T passes 30 s: the pool becomes a steady mean flow with a roller either side of the plunge, the rakes stop jittering, and the two fluxes agree.",
+      "Optional: Controls → Bucket lip angle changes the throw; Dye with Dye timelines on marks the reservoir water and shows it smeared through the pool (Dye stands down while Average is on).",
+    ],
+    task: "Compare q over the crest and in the pool, live and averaged, and the pool rake live against averaged: turbulence is mean + fluctuation, and the mean is steady.",
+    settle: 40,
+  },
+  {
+    id: "FF-4",
+    title: "A pipe jet into a still reservoir",
+    topic: "Flow fields, shear and turbulence",
+    folder: "FF-4-pipe-jet",
+    scene: "pipejet",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", particles: true, gaugeField: "speed" },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "rake", where: "Rakes, first in the pipe near the entrance (x ≈ 3.5 m) and near the exit (x ≈ 10 m)", why: "the wall boundary layers thicken along the pipe: centreline 2.17 → 2.51 m/s, the profile goes from a flat-topped plug to a rounded one" },
+      { tool: "rake", where: "then Rakes across the jet at x ≈ 12 m and x ≈ 14 m", why: "live the x = 14 m profile jumps about; averaged (T = 60 s) both are bells, 1.43 m/s peak at 12 m and a wider, flatter 0.74 m/s at 14 m" },
+      { tool: "flux", where: "Flux lines, two short sections across the jet only: z = 2.4–3.9 m at x = 12 m and z = 2.15–4.15 m at x = 14 m", why: "averaged q 0.76 m²/s in the pipe, 0.92 at 12 m, 1.03 at 14 m: the still water the jet has entrained" },
+      { tool: "gauge", where: "a Gauge on the jet axis at x ≈ 15 m, z ≈ 3.15 m (on Speed)", why: "where the jet flaps: a trace of eddies passing" },
+    ],
+    ui: {
+      view: ["legendBtn", "partBtn", "dyeBtn", "avgBtn"],
+      fields: ["water", "speed", "vort"],
+      controls: ["speed", "inLevel", "dye", "dyeLine"],
+    },
+    start: "a header driving an 8 m pipe of 0.5 m bore that discharges a jet into a large tank of still water, full to its lid, with an outflow at the far edge",
+    setup: [
+      "Colour is Speed. In the pipe, look at the slow layers along both walls and how they thicken downstream: no slip at the wall, a boundary layer growing.",
+      "Past the exit the jet keeps its core for a few metres, then starts to flap and breaks into eddies. Switch the field to Vorticity: two thin sheets of opposite sign leave the pipe lips, the free shear layers, and roll up.",
+      "Place Rakes in the pipe at x ≈ 3.5 and 10 m and compare them; then place two more across the jet at x ≈ 12 and 14 m (each new Rake replaces the oldest).",
+      "Press A (Average) and wait until T passes 30 s: the jet becomes a smooth spreading plume and the rakes across it bell-shaped curves, wider and lower downstream.",
+      "Place two short Flux lines across the jet only (z = 2.4–3.9 m at x = 12 m, z = 2.15–4.15 m at x = 14 m): the averaged q through the jet grows downstream as it entrains the still water.",
+    ],
+    task: "Compare the wall boundary layer in the pipe with the free shear layers of the jet, live and averaged: one scene, both kinds of boundary layer, and turbulence as mean + fluctuation.",
+    settle: 20,
+  },
 ];

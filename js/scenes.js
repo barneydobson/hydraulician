@@ -1995,6 +1995,38 @@ const SCENES = (() => {
                "F_v is the weight of the water standing on the wall. Under an overhang it is the weight of the water that ISN'T there above it, and it points up.",
                "Switch <b>Submerged block</b> on and click the block: the pressure all round it adds up to one upward force, its displaced weight."] };
     })(),
+    // ===== Year 1: lake =====
+    // FF-1 · Wind over a lake. A closed rectangular tank of still water, 6 m
+    // long and 0.30 m deep, with a wind shear stress τ on its free surface
+    // (the scene's one param, key "tau", which the vel pass reads — SIM.windTau).
+    // At τ = 0 it is hydrostatic: u = 0, p = ρg·d, flat pressure-head bands.
+    // Any τ ≠ 0 drives a surface drift downwind, sets the surface up against
+    // the downwind wall and sends a return flow back along the bed. The range
+    // is far beyond a real lake's (a gale is ~0.5 N/m²) so the set-up is
+    // whole cells high in a 6 m tank: τ·L/(ρg·d) ≈ 4 cm at τ = 20 N/m².
+    // nu = 2e-3 is an eddy viscosity, as on the dyke: a scene whose point is
+    // rest has to be able to come back to rest once τ returns to zero.
+    { id: "lake", name: "Wind over a lake", key: "Wind stress",
+      group: "Year 1 · Flow fields",
+      blurb: "A closed tank of still water. Blow on its surface with the wind-stress slider: the water flows however small τ is, piles up against the downwind wall and returns along the bed.",
+      W: 6.0, H: 0.80, c: 12, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
+      hmax: 0.45, headMax: 0.32, vmax: 0.25,
+      particles: 1, spinup: 0,
+      open: [0, 0, 0, 0],
+      params: [
+        { key: "tau", label: "Wind stress τ", min: -20, max: 20, step: 0.5, value: 0,
+          unit: "N/m²", fmt: (v) => (v > 0 ? "+" : "") + v.toFixed(1) + " N/m²" +
+            (v > 0 ? "  → blowing right" : v < 0 ? "  ← blowing left" : "  calm") },
+      ],
+      solids: () => [
+        GEOM.rect(-0.5, -0.5, 6.5, 0.10, { id: "ground",
+          faces: [{ id: "top", label: "Lake bed", e0: 2, e1: 2 }] }),
+      ],
+      water: (x, z, P) => (z <= 0.10 ? 0 : still(0.40, z, P)),
+      tips: ["At rest: hover the water — u = 0 and p/ρg is just the depth below the surface. Pressure head shows flat bands: pressure only.",
+             "Move the <b>Wind stress τ</b> slider: the surface water is dragged downwind at once, however small τ is.",
+             "Watch the surface pile up against the downwind wall (set-up), and the particles near the bed run back upwind.",
+             "Reverse τ and the whole circulation reverses. Set τ = 0 and the motion dies away."] },
   ];
 
   const byId = {};

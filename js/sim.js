@@ -1141,6 +1141,16 @@ const SIM = (() => {
     quad.draw();
   }
 
+  /** The wind shear stress on the free surface, τ in N/m² (positive blows
+   *  +x). A scene opts in by declaring a param with key "tau" (one slider,
+   *  carried by rigs like any other param); every other scene reads 0, and
+   *  the vel pass then skips the term altogether. */
+  function windTau() {
+    const decl = (S.scene.params || []).some((d) => d.key === "tau");
+    const v = decl ? S.params.tau : 0;
+    return Number.isFinite(v) ? v : 0;
+  }
+
   function step(nsub) {
     const p = S.p, h = dt();
     for (let n = 0; n < nsub; n++) {
@@ -1153,6 +1163,7 @@ const SIM = (() => {
       simUniforms(prog.vel, h);
       gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
       gl.uniform1f(prog.vel.u("u_nu"), p.nu);
+      gl.uniform1f(prog.vel.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
       gl.uniform1f(prog.vel.u("u_cs"), p.cs);
       gl.uniform1f(prog.vel.u("u_cf"), p.cf);
       gl.uniform1f(prog.vel.u("u_slip"), p.slip);
@@ -2177,7 +2188,7 @@ const SIM = (() => {
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
            hydraulicGrade, streamRequest, streamPoll, streamPending,
-           setValve, setParam, params,
+           setValve, setParam, params, windTau,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

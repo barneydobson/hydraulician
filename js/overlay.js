@@ -928,6 +928,48 @@ const OVERLAY = (() => {
     return rects;
   }
 
+  /** Wind over the water (FF-1): a row of arrows above the free surface,
+   *  pointing the way τ blows, longer the stronger it is (|τ|/τmax of the
+   *  scene's slider range), with τ printed beside the first one. Nothing at
+   *  τ = 0. The row sits a fixed fraction of the way from the highest water
+   *  surface to the top of the domain, over the wet columns only. */
+  function drawWind(ctx, V, A, sim, tau, tauMax) {
+    if (!tau || !(tauMax > 0)) return;
+    const nx = sim.nx, dx = sim.dx;
+    let i0 = -1, i1 = -1, zs = 0;
+    for (let i = 0; i < nx; i++) {
+      if (!A || !A.ok[i] || !(A.d[i] > 2 * dx)) continue;
+      if (i0 < 0) i0 = i;
+      i1 = i;
+      zs = Math.max(zs, A.bed[i] + A.d[i]);
+    }
+    if (i0 < 0) { i0 = 1; i1 = nx - 2; zs = 0.5 * sim.H; }
+    const zr = zs + 0.45 * (sim.H - zs);
+    const xa = (i0 + 0.5) * dx, xb = (i1 + 0.5) * dx, span = xb - xa;
+    const n = 5, pitch = V.w * (span / sim.W) / n;                // px between arrows
+    const frac = Math.min(1, Math.abs(tau) / tauMax);
+    const len = Math.max(10, 0.85 * pitch * frac), dir = Math.sign(tau);
+    const y = V.Y(zr), head = Math.min(10, 0.4 * len + 4);
+    ctx.save();
+    ctx.strokeStyle = "rgba(235,245,255,0.9)"; ctx.fillStyle = "rgba(235,245,255,0.9)";
+    ctx.lineWidth = 1.5 + 2.5 * frac; ctx.lineCap = "round";
+    for (let k = 0; k < n; k++) {
+      const xc = V.X(xa + (k + 0.5) * span / n);
+      const xt = xc - dir * len / 2, xh = xc + dir * len / 2;
+      ctx.beginPath(); ctx.moveTo(xt, y); ctx.lineTo(xh - dir * head * 0.6, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(xh, y);
+      ctx.lineTo(xh - dir * head, y - head * 0.55);
+      ctx.lineTo(xh - dir * head, y + head * 0.55);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.font = "12px ui-monospace, SFMono-Regular, monospace";
+    ctx.textBaseline = "bottom"; ctx.textAlign = "center";
+    ctx.fillText("wind  τ = " + tau.toFixed(Math.abs(tau) < 1 ? 2 : 1) + " N/m²",
+                 V.X(0.5 * (xa + xb)), y - 10);
+    ctx.restore();
+  }
+
   /** Frame, axes and scale bar — anchored to the VISIBLE part of the domain
    *  so they stay on screen when the view is zoomed in. */
   function drawFrame(ctx, V, sim) {
@@ -1584,7 +1626,7 @@ const OVERLAY = (() => {
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
-           drawGradeLines, drawStreamlines,
+           drawGradeLines, drawStreamlines, drawWind,
            ROW_IDS, DEFAULT_ROWS,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
            drawMeasure, drawCV, drawFlux, drawForce, drawForceHover, measureText, chip, fmt };

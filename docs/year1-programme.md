@@ -49,6 +49,31 @@ Principles:
 | L7–L8 | taught by a colleague; rough ideas at the end |
 | Year 2 preview | WV-4 Breaking waves on a beach |
 
+The course menu (`js/menu.js`, fork-local) lists exactly these, in this order.
+
+## First drafts: status and points for the lecturer (2026-10-16)
+
+All fourteen are built as first drafts: scene, card, brief (`exercises/<ID>-…/README.md`)
+and headless `rig.js`, with the numbers in each brief measured, not assumed. New shared
+capability: a **wind shear stress** on the free surface (FF-1) and a **streamline display**
+(VIEW → Streamlines, key T; contours of ψ, of the mean flow under Average). What each
+draft does not yet do well, as measured:
+
+| ID | Works | Needs a decision or more work |
+|---|---|---|
+| FF-1 | Set-up ≈ 4.9 cm at τ = 20 N/m², return flow, exact mirror for −τ, decays at τ = 0 | τ range is ~40× a real gale (scaled for visibility); set-up invisible below ~5 N/m²; last mm of seiche decays slowly; τ sits under the "Geometry" panel heading |
+| UP-1 | New `pipeline` scene (reservoir → straight pipe → valve → overflowing tank): Δt = 16/c, ΔH ≈ c·v₀/g, T ≈ 4L/c | Tank level is only 0.2 m below the reservoir (needed to keep the bore unthrottled); above c ≈ 90 m/s the down-surge reaches zero pressure; corner gauge cards hidden in favour of inspector windows |
+| HS-1 | Re-verified on current main: all brief numbers hold | — |
+| PF-2 | F_h = ½ρgd² within 1.5% for overhang, vertical, 30°, 60°, staircase; F_v = weight of water above / "water that isn't there" | Optional submerged block reads 5% high; force chip now labels F_h / F_v on every face, with ½ρgd² on this card |
+| FF-2 | Spillway, flip bucket, plunge pool; bucket lip angle slider; Average gives clean rollers | Throw is short (jet leaves at about half the lip angle, lands 4–5 m out) |
+| FF-3 | Ellipse → square at fixed frontal width: steady wake → Kármán street (St ≈ 0.16); Average gives a symmetric bubble | Shedding onset (s ≈ 0.3) is slow to grow — jump from ellipse to s ≥ 0.6 in the lecture; dye fades before the wake; Re ≈ 180 (laminar street) |
+| FF-4 | Pipe profile develops; jet flaps then breaks up ~4–6 m out; averaged bells; entrainment visible in the flux | Had to be a lidded full tank (free-surface versions failed, documented); eddy viscosity, Re ≈ 400; far-field average still lumpy at 60 s |
+| FF-5 / VC-1 / MM-2 | Contraction rig: Q equal in both pipes; ΣQ ≈ 0.2%; R from the CV matches the formula; taper vs step differ by ≈ the extra loss; vena contracta Cc ≈ 0.68 | Slider restarts the water (25 s warm-up); vena contracta is thin at Medium (best on Vorticity); straight-pipe friction is a tiny number; outlet jet runs along the right reservoir's surface; dye does not reach the pipe |
+| VC-2 | dh/dt = Q/S to 2%; settled level matches C_d ≈ 0.65; CV now shows dV/dt and closes to < 1% | Inflow slider drives the spout through a workaround in the scene's `solids()` |
+| MM-1 | Plan view (gravity ≈ 0): F_x and F_z within ~7% of ρqU(1−cos θ), ρqU sin θ from 90° to 150°; F_x nearly doubles at 175° | 90° is a hooded plate (one-sided), not the textbook split; some spray after slider moves |
+| HJ-2 | Ported from the OneDrive copy; gate force two ways (29.3 vs ½ρg(d₀−a)² = 29.8 kN/m); non-hydrostatic pressure at the gate; weir drowns the gate | After #72 the jet keeps its momentum: the free jump exists only for crest ≈ 0.44–0.48 m, with hysteresis; default crest moved to 0.48 |
+| WV-4 | Spilling (tanβ 0.06) and surging (tanβ 0.7) clear | Plunging does not curl over: the front goes vertical and collapses (also at High) |
+
 ---
 
 ## Shared scene: the contraction rig

@@ -2083,13 +2083,16 @@ const SIM = (() => {
         mdot += f * wn;
       }
     }
-    let m = 0;                                       // enclosed water, for the z-budget
+    let m = 0, vol = 0;                              // enclosed water, for the z-budget
     for (let j = jB; j < jT; j++) {
-      for (let i = iL; i < iR; i++) if (!sol(i, j)) m += F[k(i, j)];
+      for (let i = iL; i < iR; i++) if (!sol(i, j)) { m += F[k(i, j)]; vol += Math.min(F[k(i, j)], 1); }
     }
     m *= RHO * S.dx * S.dx;
+    // `vol` counts a full cell once, as the faces' Q does (min(f, 1)), so its
+    // rate of change balances Q: Σf would add the EOS compression of every
+    // column a rising level loads (gh/c², ~3% in a 2 m tank) to the storage.
     return { fx: -RHO * dFx * S.dx, fz: -RHO * dFz * S.dx - gAbs * m,
-             mdot: RHO * mdot * S.dx, mass: m, iL, iR, jB, jT };
+             mdot: RHO * mdot * S.dx, mass: m, vol: vol * S.dx * S.dx, iL, iR, jB, jT };
   }
 
   const get = () => S;

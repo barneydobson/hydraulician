@@ -1074,6 +1074,22 @@ const OVERLAY = (() => {
     top:   (v) => (v < 0 ? "▼" : "▲"),
   };
 
+  /** dV/dt of the water inside the box, m²/s: the least-squares slope of the
+   *  enclosed volume over the last 2 s of sim time. null until there are
+   *  enough samples to fit a line through. */
+  function storageRate(hist) {
+    if (!hist || hist.length < 6) return null;
+    const tEnd = hist[hist.length - 1].t;
+    let n = 0, st = 0, sv = 0, stt = 0, stv = 0;
+    for (const q of hist) {
+      if (tEnd - q.t > 2 || !Number.isFinite(q.vol)) continue;
+      n++; st += q.t; sv += q.vol; stt += q.t * q.t; stv += q.t * q.vol;
+    }
+    const den = n * stt - st * st;
+    if (n < 6 || !(den > 1e-12)) return null;
+    return (n * stv - st * sv) / den;
+  }
+
   function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
     const F = cv.flux;
     const q = CV_Q[show] || CV_Q.Q;
@@ -1115,10 +1131,19 @@ const OVERLAY = (() => {
       return { inn, out };
     };
     const Q = gross((e) => e.Q), E = gross((e) => e.E);
+    // Continuity is in − out = dV/dt, not in = out: a box round a tank that
+    // is filling has a net flux and that is the point (VC-2). The storage
+    // rate is the slope of the enclosed water over the last ~2 s of the
+    // history, so the closure printed is the unsteady one and reads 0 for a
+    // steady box exactly as the old "should be 0" did.
+    const dVdt = storageRate(cv.hist);
+    const net = Q.out - Q.inn;
     const lines = [
-      "water    in " + Q.inn.toFixed(3) + "   out " + Q.out.toFixed(3) +
-        "   net " + (Q.out - Q.inn).toFixed(3) + " m²/s" +
-        (Q.inn > 1e-9 ? "  (" + (100 * Math.abs(Q.out - Q.inn) / Q.inn).toFixed(1) + "%, should be 0)" : ""),
+      "water  in " + Q.inn.toFixed(3) + "  out " + Q.out.toFixed(3) +
+        "  net " + net.toFixed(3) +
+        (dVdt === null ? " m²/s"
+          : "  dV/dt " + (dVdt >= 0 ? "+" : "") + dVdt.toFixed(3) + " m²/s" +
+            (Q.inn > 1e-9 ? "  (net + dV/dt: " + (100 * Math.abs(net + dVdt) / Q.inn).toFixed(1) + "%, should be 0)" : "")),
       "force    on what is inside:  →  " + fN(fx) + " ±" + fN(sd) + " N/m    ↑ " + fN(fz) + " N/m",
       "energy   in " + fmtBig(E.inn, "W/m") + "   out " + fmtBig(E.out, "W/m") +
         "   lost " + fmtBig(E.inn - E.out, "W/m"),

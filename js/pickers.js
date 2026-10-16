@@ -595,7 +595,8 @@ const EX = (() => {
   const isOpen = () => !!(el && el.classList.contains("open"));
 
   /** The course menu, if this deployment ships one (js/menu.js, optional):
-   *  `const EXERCISE_MENU = { title, sections: [{ title, ids: [...] }] }`.
+   *  `const EXERCISE_MENU = { title, sections: [{ title, ids: [...] }], briefLink }`
+   *  (`briefLink: false` hides the card's link to the brief).
    *  It only chooses what the MENU lists and in what order — every exercise
    *  in the register still boots from `?ex=`, and `?menu=all` (or the link at
    *  the foot of the menu) lists the whole register by topic as before. Ids
@@ -942,6 +943,10 @@ const EX = (() => {
       a.href = brief;
       a.textContent = "Lecturer notes";
       a.title = brief;
+      // A course whose students read the card can drop the link to the brief
+      // (`briefLink: false` in js/menu.js); without a course menu it stays.
+      a.style.display = (typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU &&
+                         EXERCISE_MENU.briefLink === false) ? "none" : "";
       tick();
     }
     /** The "Yours" block: the printed rule, and beside it the control the

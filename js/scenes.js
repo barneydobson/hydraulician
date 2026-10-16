@@ -1580,6 +1580,81 @@ const SCENES = (() => {
              "Colour is vorticity: the two shear layers roll up into a Kármán street.",
              "Draw a splitter plate behind the body and the street stops shedding.",
              "Turn particles on to watch the jet entrain the surrounding water."] },
+
+    // ===== Year 1: body (FF-3) =====
+
+    /** FF-3's scene: `plan` (gravity off, looking down) with the duct opened
+     *  to the whole left edge, so the body sits in a uniform stream rather
+     *  than in a jet whose own shear layers would shed regardless, and the
+     *  body's shape on ONE slider.
+     *
+     *  The body is a superellipse |x/a|ⁿ + |z/b|ⁿ = 1. The slider s ∈ [0, 1]
+     *  takes n from 2 (an ellipse) to 12 (a square with softened corners)
+     *  geometrically, n = 2·6^s, and the aspect a/b from 3 (slender, aligned
+     *  with the flow) to 1, a/b = 3^(1−s). HOLD says which size is held:
+     *  "width" keeps the frontal width 2b fixed (shape alone changes);
+     *  "area" keeps the plan area fixed (the body also gets wider as it gets
+     *  bluffer). Both were tried at Medium (README, "For the instructor"):
+     *  width hold sheds from s ≈ 0.3, area hold from s ≈ 0.6; width is kept
+     *  because Re_D = U·2b/ν then stays 180 along the whole slider and the
+     *  onset is down to shape alone. `shape(s, "area")` still builds the
+     *  other family for anyone who wants to compare.
+     *
+     *  ν = 2e-3 is an eddy viscosity chosen to put the onset mid-slider: at
+     *  `plan`'s 2e-5 even the 3 : 1 ellipse sheds (Re_D ~ 10⁴), at 1e-3 it
+     *  is still weakly unstable, at 3e-3 the square sheds only slowly.
+     *  Walls are free-slip as in `plan` (slip 1); measured with no-slip
+     *  the ellipse is marginally unstable at this ν, so the streamlined end
+     *  would not read as clearly steady. */
+    (() => {
+      const XC = 1.9, ZC = 1.7;                // body centre
+      const B_W = 0.20;                        // half frontal width, "width" hold
+      const AREA = 0.16;                       // plan area, "area" hold (= 0.4 m square)
+      const HOLD = "width";
+      const NPTS = 192;
+      const shape = (s, hold) => {
+        s = Math.min(1, Math.max(0, s));
+        const n = 2 * Math.pow(6, s), r = Math.pow(3, 1 - s);
+        const unit = [];
+        for (let k = 0; k < NPTS; k++) {
+          const t = (2 * Math.PI * k) / NPTS, c = Math.cos(t), sn = Math.sin(t);
+          unit.push([r * Math.sign(c) * Math.pow(Math.abs(c), 2 / n),
+                     Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n)]);
+        }
+        let A = 0;                               // shoelace, for the area hold
+        for (let k = 0; k < NPTS; k++) {
+          const p = unit[k], q = unit[(k + 1) % NPTS];
+          A += p[0] * q[1] - q[0] * p[1];
+        }
+        A = Math.abs(A) / 2;
+        const sc = hold === "area" ? Math.sqrt(AREA / A) : B_W;
+        return { n, r, b: sc, a: r * sc,
+                 verts: unit.map((p) => [XC + sc * p[0], ZC + sc * p[1]]) };
+      };
+      return {
+        id: "body", name: "Plan view — flow past a body", key: "Streamlined → bluff",
+        group: "Jets & waves",
+        blurb: "Looking down on a uniform stream past one body whose shape you morph with a slider, from a slender ellipse lined up with the flow to a square. Streamlined: a thin steady wake. Bluff: the flow separates and the wake sheds vortices.",
+        W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 2e-3, slip: 1, bulk: 0.03,
+        mode: 4, ca: 0, vmax: 1.6, vortMax: 12, dyeLine: 1.0,
+        // Left edge open and NOT walled: the inflow prescribes the stream over
+        // the whole of it (see `plan` for why the edge itself must be open).
+        open: [1, 1, 0, 0],
+        inflow: { level: 99, v: 0.9, on: 1 },
+        params: [{ key: "shape", label: "Body shape (streamlined → bluff)",
+                   min: 0, max: 1, step: 0.01, value: 0, unit: "" }],
+        solids: (W, H, P, par) => {
+          const s = par && par.shape !== undefined ? par.shape : 0;
+          return [GEOM.poly(shape(s, HOLD).verts,
+                            [{ id: "body", label: "Body", e0: 0, e1: NPTS - 1 }], "body")];
+        },
+        shape,
+        water: () => 1,
+        tips: ["Slide the shape from streamlined to bluff and watch the wake: steady and thin, then wider, then alternating.",
+               "Colour is vorticity: the two shear layers leave the body where the flow separates, and roll up into a Kármán street.",
+               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Dye (D) sends timelines across the stream from the inlet.",
+               "Press A: the average of the alternating wake is a steady, symmetric wake bubble."] };
+    })(),
   ];
 
   const byId = {};

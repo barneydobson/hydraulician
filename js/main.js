@@ -347,7 +347,7 @@ const FIELDS = [
     mean: "A true average of the pressure.",
     blurb: "The pressure alone. In still water it is simply the depth below the surface, so it climbs down every column and is not comparable between cells at different heights." },
   { mode: 4, id: "vort", name: "Vorticity", sym: "ω", unit: "1/s",
-    ramp: "divg", mid: 0, def: () => [-40, 40],
+    ramp: "divg", mid: 0, def: () => { const v = sceneNow().vortMax || 40; return [-v, v]; },
     mean: "The spin OF the mean flow — it matches the averaged spin only where the fill holds steady.",
     blurb: "∂w/∂x − ∂u/∂z: the local spin. Shear layers, the roller of a jump and the separation off a step each show as sheets of one sign." },
   { mode: 3, id: "froude", name: "Froude number", sym: "Fr", unit: "",

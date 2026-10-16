@@ -2734,7 +2734,7 @@ function sampleCV() {
                     : { fx: r.fx, fz: r.fz };
     cv.flux = emaFlux(cv.flux, b, a);
   }
-  cv.hist.push({ t: sim.t, fx: r.fx });
+  cv.hist.push({ t: sim.t, fx: r.fx, vol: r.vol });   // vol: the storage term dV/dt
   while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
   cv.last = r;
 }

@@ -1763,6 +1763,153 @@ const SCENES = (() => {
                "A Flux line in each pipe reads the same Q; a Control volume round the contraction gives the force on it."],
       }];
     })(),
+    // ===== Year 1: fillleak, vane =====
+    //
+    // VC-2 · a tank filled from the top by the spout and emptied through a
+    // valved orifice near its floor. Kept deliberately bare: one tank of
+    // plan area S = 2.00 m per metre width (inside faces x = 0.40 → 2.40),
+    // floor top at z = 0.50, an orifice 0.08 m tall (z 0.55 → 0.63) through
+    // the right wall, shut by a scene valve (V). The jet leaves into open air
+    // and falls out through the open right and bottom edges, so nothing the
+    // outlet sheds can come back into the tank.
+    //
+    // The inflow slider is the SPOUT: a scene param cannot write sim.p by
+    // itself, but solids() is handed the live sim.p (rasterise passes it) and
+    // every param change goes through rasterise, so solids() sets the spout's
+    // downward speed from the slider there. The spout is 2r = 0.16 m wide and
+    // the speed asked of it is Q_nom / (2r·K), where K is the measured ratio of
+    // what the disc actually delivers to 2r·|v| (see QIN_K).
+    (() => {
+      const S0 = 0.40, S1 = 2.40, ZF = 0.50;          // tank inside faces, floor top
+      const O0 = 0.55, O1 = 0.63, ZW = 3.00;          // orifice, wall top
+      const R = 0.08;                                 // spout radius
+      const QIN_K = 1.0;                              // delivered Q / (2r|v|), measured
+      const spoutV = (q) => -q / (2 * R * QIN_K);
+      return {
+        id: "fillleak", name: "Tank that fills and leaks", key: "S dh/dt = Q_in − Q_out",
+        group: "Jets & waves",
+        blurb: "A tank fed from the top and drained through a valved hole near the floor. Shut, the level climbs at Q/S; open, the outflow grows with depth until it matches the inflow and the level stops.",
+        W: 4.0, H: 3.6, c: 26, cf: 0.004, cs: 0.10, nu: 1e-3,
+        mode: 0, hmax: 2.6, headMax: 2.6, vmax: 5,
+        valveOpen: 0, particles: 0, spinup: 0,
+        open: [0, 1, 1, 0],
+        params: [
+          { key: "q_in", label: "Inflow Q", min: 0.10, max: 0.30, step: 0.01,
+            value: 0.25, unit: "m²/s",
+            fmt: (v) => v.toFixed(2) + " m²/s  (per metre width)" },
+        ],
+        source: { on: 1, x: 1.40, z: 3.30, r: R, vx: 0, vz: spoutV(0.25) },
+        solids: (W, H, P, par = {}) => {
+          const q = par.q_in === undefined ? 0.25 : par.q_in;
+          if (P && P.source) P.source.vz = spoutV(q);
+          return [
+            // Ground, floor, left wall and the right wall below the orifice:
+            // one CCW polygon, solid down past z = 0 and out past x = 0.
+            GEOM.poly([[-0.5, -0.5], [S1 + 0.10, -0.5], [S1 + 0.10, O0], [S1, O0],
+                       [S1, ZF], [S0, ZF], [S0, ZW], [-0.5, ZW]],
+              [{ id: "floor", label: "Tank floor", e0: 4, e1: 4 },
+               { id: "left", label: "Left wall", e0: 5, e1: 5 }], "tank"),
+            GEOM.rect(S1, O1, S1 + 0.10, ZW, { id: "rightWall",
+              faces: [{ id: "inner", label: "Right wall (inside)", e0: 3, e1: 3 }] }),
+          ];
+        },
+        valves: () => [[S1 + 0.05, O0 - 0.02, S1 + 0.05, O1 + 0.02, 0.08]],
+        water: (x, z, P) => (x > S0 && x < S1 && z > ZF ? still(0.70, z, P) : 0),
+        tips: ["The valve starts SHUT: the level climbs in a straight line at Q/S, S = 2.00 m.",
+               "Press <b>V</b>: the outflow grows with depth (Torricelli) and the level creeps up to where out = in.",
+               "Move <b>Inflow Q</b> and the level finds a new balance — higher Q, higher level.",
+               "Drag a Control volume (9) round the whole tank: in, out and net. Net is the rate the tank stores water; it is NOT zero while the level moves."] };
+    })(),
+
+    // MM-1 · a jet turned through an angle θ by one vane, θ on a slider from
+    // 90° (a flat plate with a hood: the jet strikes it square-on and is sent
+    // down) to 175° (a cup that sends it nearly straight back).
+    //
+    // GRAVITY IS (ALMOST) OFF, and that is the design choice. The textbook
+    // vane is a horizontal jet in a horizontal plane, so the picture is a
+    // PLAN view: gravity acts into the screen. In the vertical plane the jet
+    // sags, the turned sheet speeds up or slows as it falls or climbs through
+    // the vane, a sheet turned upward rains back onto the jet (MO-2's +20%),
+    // and the box's F_z carries the weight of every drop inside it — so the
+    // vertical component, half of what this demo is for, would read gravity
+    // as much as momentum. Unlike `plan` the plane is NOT full of water: the
+    // jet is free, in air at p = 0, as the textbook assumes. That needs the
+    // free-surface EOS, which the shaders switch off at g exactly 0 (the
+    // two-sided plan-view EOS pulls an interface together), so g is
+    // 1e-3 m/s²: the free-surface path stays on and the jet sags 0.1 mm over
+    // its flight.
+    (() => {
+      const XS = 0.50, ZJ = 1.60, RJ = 0.09;          // spout centre and radius
+      const XP = 1.60;                                // the plate's water face
+      const ZT = ZJ + 0.12;                           // hood (ceiling) underside
+      const RF = 0.12;                                // hood-to-plate fillet radius
+      // The plate runs well below the jet: cut it short and the sheet leaves it
+      // before it has been turned (measured: a plate ending 0.15 m under the
+      // axis turned the jet only ~55°, and the box read half of ρqU).
+      const ZB = ZJ - 0.40;                           // plate meets the lip
+      const RL = 0.25;                                // lip radius
+      const LT = 0.20;                                // straight run-out past the lip
+      const TH = 0.06;                                // vane thickness
+      const XH = XP - 0.45;                           // upstream end of the hood
+      const deg = Math.PI / 180;
+      /** The vane's WATER face, as a polyline from the hood's upstream end
+       *  round to the lip's tip, for a total turn θ (degrees). */
+      function face(theta) {
+        const phi = Math.max(0, Math.min(theta - 90, 90)) * deg;
+        const pts = [[XH, ZT]];
+        // hood → plate fillet (clockwise, 90° → 0°)
+        GEOM.arcPts(XP - RF, ZT - RF, RF, 90 * deg, 0, 8).forEach((p) => pts.push(p));
+        pts.push([XP, ZB]);
+        // lip (clockwise from 0 to −φ)
+        if (phi > 1e-3) GEOM.arcPts(XP - RL, ZB, RL, 0, -phi).slice(1).forEach((p) => pts.push(p));
+        // …and a straight run-out along the exit direction (cos θ, −sin θ).
+        // Without it a 0.18 m sheet leaves a short arc before it has taken
+        // the arc's angle: measured at θ = 120° it left at ~107° and the box
+        // read 0.80 of ρqU(1 − cos θ).
+        const e = pts[pts.length - 1], th = theta * deg;
+        pts.push([e[0] + LT * Math.cos(th), e[1] - LT * Math.sin(th)]);
+        return pts;
+      }
+      /** Thicken the water face outward (away from the water, i.e. to the
+       *  right of travel for this clockwise curve) into a CCW polygon. */
+      function vane(theta) {
+        const f = face(theta), n = f.length, off = [];
+        for (let k = 0; k < n; k++) {
+          const a = f[Math.max(0, k - 1)], b = f[Math.min(n - 1, k + 1)];
+          const tx = b[0] - a[0], tz = b[1] - a[1], L = Math.hypot(tx, tz) || 1;
+          // The water face runs clockwise round the water, so the water is
+          // on its right and the solid on its LEFT: offset along the left normal.
+          off.push([f[k][0] - TH * tz / L, f[k][1] + TH * tx / L]);
+        }
+        // Out along the water face with the solid on the left, back along the
+        // offset: counter-clockwise, and the wet face is edges 0 … n−2.
+        const ring = f.concat(off.reverse());
+        return GEOM.poly(ring, [{ id: "face", label: "Vane (wet face)", e0: 0, e1: n - 2 }], "vane");
+      }
+      return {
+        id: "vane", name: "Jet on a vane, plan view", key: "F = ρqU(1 − cos θ), ρqU sin θ",
+        group: "Jets & waves",
+        blurb: "A free jet seen from above, turned by one vane through an angle you set: from a flat plate (90°) to a cup that sends it back (175°). Box it with a Control volume and read both force components.",
+        W: 3.0, H: 2.4, g: 1e-3, c: 26, cf: 0.004, cs: 0.10, nu: 1e-5,
+        mode: 2, hmax: 1, headMax: 1, vmax: 5,
+        particles: 0, spinup: 0,
+        // OUTFALL on all four edges (ghosts held empty, so the edge is a
+        // brink): with no gravity to drain it, spray that reached a plain
+        // zero-gradient edge sat against it and spread along it as a pond.
+        open: [2, 2, 2, 2],
+        params: [
+          { key: "theta", label: "Turning angle θ", min: 90, max: 175, step: 1,
+            value: 90, unit: "°",
+            fmt: (v) => v.toFixed(0) + "°  (90° flat plate → 175° cup)" },
+        ],
+        source: { on: 1, x: XS, z: ZJ, r: RJ, vx: 4.5, vz: 0 },
+        solids: (W, H, P, par = {}) => [vane(par.theta === undefined ? 90 : par.theta)],
+        water: () => 0,
+        tips: ["Gravity is out of the plane: this is the jet seen from ABOVE, so it flies straight and the turned sheet keeps its speed.",
+               "Drag a Control volume (9) round the vane, clear of the spout: it reads F→ and F↑ on what is inside — the vane.",
+               "Slide θ from 90° to 175°: F→ climbs from ρqU towards 2ρqU while F↑ = ρqU sin θ falls from ρqU to almost nothing.",
+               "Field → Momentum flux: red is still heading the way the jet was fired, blue has been sent back."] };
+    })(),
   ];
 
   const byId = {};

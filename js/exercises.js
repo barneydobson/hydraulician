@@ -1283,4 +1283,54 @@ const EXERCISES = [
     task: "R is set by the end sections: taper and step give nearly the same force, the difference being the extra loss; on a straight pipe the pressure drop is all friction.",
     settle: 25,
   },
+  // ===== Year 1: VC-2, MM-1 =====
+  // Two lecturer demos on scenes written for them (`fillleak`, `vane`). Each
+  // has ONE slider, the scene's own param, on Controls → Geometry (geom0).
+  {
+    id: "VC-2",
+    title: "The tank that fills and leaks",
+    topic: "Volume conservation",
+    folder: "VC-2-fill-and-leak",
+    scene: "fillleak",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", particles: false, gaugeField: "eta" },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "gauge", where: "x = 1.0 m, z = 0.6 m — low in the tank, clear of the falling inflow", why: "on Level η the gauge reads the free surface itself, and its chart is the h(t) curve: a straight line while the valve is shut, a curve bending over to a plateau once it is open" },
+      { tool: "cv", where: "Control volume (9): drag (0.30, 0.40) → (2.70, 3.12) — round the whole tank, under the spout and across the outlet jet", why: "in through the top face, out through the right face, and the stored rate dV/dt — net + dV/dt = 0 at every instant" },
+    ],
+    ui: { view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0"] },
+    start: "a tank 2.00 m wide (S = 2.00 m² per metre) fed from a spout at Inflow Q, with a 0.08 m outlet near the floor shut by a valve",
+    setup: [
+      "Gauge (5) at (1.0, 0.6) — it reads the level η. Control volume (9) from (0.30, 0.40) to (2.70, 3.12).",
+      "The Control volume counts OUTWARD as positive: net = out − in. The slides count inflow positive: S dh/dt = Q_in − Q_out. So net = −S dh/dt.",
+      "Valve shut: predict dh/dt = Q/S. Valve open: predict the level where Q_out = Q_in.",
+    ],
+    task: "With the valve shut, read dh/dt off the gauge and compare it with Q/S, and read in, out, net and dV/dt off the box. Press V and watch the level bend over and settle; read the settled level and check net ≈ 0. Change Inflow Q and watch it settle at a new level.",
+    settle: 0,
+  },
+  {
+    id: "MM-1",
+    title: "A jet turned through an angle",
+    topic: "Momentum conservation",
+    folder: "MM-1-jet-vane-angle",
+    scene: "vane",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", particles: false },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "cv", where: "Control volume (9): drag (0.95, 0.65) → (1.90, 1.95) — round the whole vane, clear of the spout", why: "F→ and F↑ on what is inside the box — the vane — from the momentum and pressure on its four faces" },
+    ],
+    ui: { view: ["legendBtn"], fields: ["water", "speed", "mom"], controls: ["speed", "geom0"] },
+    start: "a free jet (plan view: gravity is out of the screen) striking a vane whose turning angle θ is on the slider",
+    setup: [
+      "Control volume (9) from (0.95, 0.65) to (1.90, 1.95). Let it settle ~5 s after every change.",
+      "At θ = 90° read q off the box's left face (≈ 0.79 m²/s) and hover the jet for U (≈ 4.5 m/s). Predict F_x = ρqU(1 − cos θ) and F_z = ρqU sin θ.",
+      "At large θ the returning sheet leaves through the same left face the jet enters by, so that face's Q nets to almost zero — the momentum does not.",
+    ],
+    task: "Set θ = 90°, 120°, 135°, 150° and 175° with the Turning angle slider; at each read F→ and F↑ off the box and compare with your predictions. Field → Momentum flux shows the jet being sent back.",
+    settle: 5,
+  },
 ];

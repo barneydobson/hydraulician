@@ -1580,6 +1580,111 @@ const SCENES = (() => {
              "Colour is vorticity: the two shear layers roll up into a Kármán street.",
              "Draw a splitter plate behind the body and the street stops shedding.",
              "Turn particles on to watch the jet entrain the surrounding water."] },
+
+    // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
+    // The shared contraction rig: two reservoirs held at fixed levels, a
+    // 0.80 m pipe that contracts into a 0.40 m pipe discharging into the
+    // right reservoir. ONE slider, the contraction length L: at L = 4 m the
+    // wide pipe tapers the whole way from x = 3 to x = 7; shorter L keeps the
+    // wide bore constant for longer and converges over a shorter, steeper
+    // taper, always ending at the fixed narrow pipe at x = 7.0; L = 0 is the
+    // abrupt step. The contraction is symmetric about the pipe axis
+    // (z = 1.20), so both corners separate alike.
+    //
+    // Pressurised duct flow between two head-driven level controls, the
+    // venturi pattern: the left sponge holds the WHOLE left compartment
+    // (a narrow sponge cannot supply the pipe and the reservoir draws down),
+    // the right one the whole right compartment (or the pipe jet blows
+    // through the tailwater and the bore never feels its pressure). The
+    // pipe sits deep — its crown 1.1 m under the tailwater — so the lowest
+    // pressure in the rig, at the vena contracta past the step, stays well
+    // above zero gauge (the EOS clips there and would void).
+    //
+    // Above the pipe is a sealed EMPTY pocket between the two reservoir
+    // walls: the pipe is a casing with air over it, not a buried tunnel.
+    ...(() => {
+      const XL = 1.6, XS = 5.6, XR = 9.0;           // pipe entry, contraction end, pipe exit
+      const ZC = 1.00, A1 = 0.50, A2 = 0.25;        // axis, wide and narrow half-bores
+      const ZF = 0.20, ZTOP = 1.75, TW = 0.20;      // reservoir floors, casing top, wall thickness
+      const L1 = 2.80, L2 = 2.40;                   // reservoir levels
+      const RB = 0.30, NB = 8;                      // bellmouth radius, chords per lip
+      const LMAX = 3.0;                             // longest taper: x = 2.6 → 5.6
+      const Q0 = 0.95;                              // measured steady Q, m²/s (taper)
+      const Lof = (par) => (par && par.taperL !== undefined ? par.taperL : LMAX);
+      // Half-bore at x: wide, then a straight taper of length L, then narrow.
+      const half = (x, L) => {
+        if (x >= XS) return A2;
+        if (L <= 1e-6 || x <= XS - L) return A1;
+        return A1 + (A2 - A1) * (x - (XS - L)) / L;
+      };
+      return [{
+        id: "contraction", name: "Contraction rig", key: "Taper ↔ step",
+        group: "Pressure & transients",
+        blurb: "Two reservoirs joined by a wide pipe that contracts into a narrow one. One slider takes the contraction from a long gentle taper to an abrupt step.",
+        W: 11.5, H: 2.9, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
+        mode: 2, hmax: 3.0, headMax: 2.6, vmax: 4, particles: 1, plife: 6,
+        spinup: 25,                               // measured: from a fresh start Q overshoots ~30% at 8 s and is back within a few per cent of steady by 25 s, at either end of the slider
+        open: [1, 1, 0, 0],
+        spongeIn: 1.4, spongeTw: 2.3,
+        inflow: { level: L1, q: 0, on: 1, free: 1 },
+        tailwater: { level: L2, on: 1 },
+        params: [
+          { key: "taperL", label: "Contraction length L", min: 0, max: LMAX, step: 0.05, value: LMAX, unit: "m", resetWater: true },
+        ],
+        // The pipe entry is a rounded bellmouth (radius RB, NB chords per
+        // lip): a square-edged entry separates and leaves slow layers along
+        // the first metre of the wide pipe, right where a control-volume
+        // face has to stand.
+        solids: (W, H, P, par) => {
+          const L = Lof(par), xt = XS - L;
+          const lo = GEOM.arcPts(XL + RB, ZC - A1 - RB, RB, Math.PI / 2, Math.PI, NB);
+          const ground = GEOM.poly([
+            [-0.5, -0.5], [W + 0.5, -0.5], [W + 0.5, ZF], [XR, ZF], [XR, ZC - A2],
+            [XS, ZC - A2], [xt, ZC - A1], ...lo, [XL, ZF], [-0.5, ZF]], [
+            { id: "rfloor", label: "Right reservoir floor", e0: 2, e1: 2 },
+            { id: "rwall", label: "Right reservoir wall, below the pipe", e0: 3, e1: 3 },
+            { id: "invert2", label: "Narrow pipe invert", e0: 4, e1: 4 },
+            { id: "contr", label: "Contraction, lower face", e0: 5, e1: 5 },
+            { id: "invert1", label: "Wide pipe invert", e0: 6, e1: 6 },
+            { id: "lwall", label: "Bellmouth and left reservoir wall, below the pipe", e0: 7, e1: 7 + NB },
+            { id: "lfloor", label: "Left reservoir floor", e0: 8 + NB, e1: 8 + NB },
+          ], "ground");
+          const up = GEOM.arcPts(XL + RB, ZC + A1 + RB, RB, Math.PI, 1.5 * Math.PI, NB);
+          const casing = GEOM.poly([
+            ...up, [xt, ZC + A1], [XS, ZC + A2], [XR, ZC + A2], [XR, H + 0.5],
+            [XR - TW, H + 0.5], [XR - TW, ZTOP], [XL + TW, ZTOP], [XL + TW, H + 0.5], [XL, H + 0.5]], [
+            { id: "soffit1", label: "Wide pipe soffit", e0: NB, e1: NB },
+            { id: "contr", label: "Contraction, upper face", e0: NB + 1, e1: NB + 1 },
+            { id: "soffit2", label: "Narrow pipe soffit", e0: NB + 2, e1: NB + 2 },
+            { id: "rwall", label: "Right reservoir wall, above the pipe", e0: NB + 3, e1: NB + 3 },
+            { id: "lwall", label: "Left reservoir wall and bellmouth, above the pipe", e0: NB + 9, e1: NB - 1 },
+          ], "casing");
+          return [ground, casing];
+        },
+        // Start the pipe near its steady discharge (Q0, measured) rather
+        // than from rest: the column otherwise takes ~15 s to come up to
+        // speed, a rigid-column establishment that is not this demo's point.
+        flow: (x, z, P, par) => {
+          if (x < XL + RB || x > XR) return null;
+          const hf = half(x, Lof(par));
+          return Math.abs(z - ZC) < hf ? [Q0 / (2 * hf), 0] : null;
+        },
+        // Hydrostatic in each reservoir; in the pipe a head falling linearly
+        // from one level to the other — a charged pipe, at rest.
+        water: (x, z, P, par) => {
+          if (z < ZF) return 0;
+          if (x < XL) return still(L1, z, P);
+          if (x > XR) return still(L2, z, P);
+          const hf = half(x, Lof(par));
+          if (Math.abs(z - ZC) > hf) return 0;
+          return still(L1 - (L1 - L2) * (x - XL) / (XR - XL), z, P);
+        },
+        tips: ["Drag <b>Contraction length L</b> in Controls → Geometry: 3 m is a gentle taper, 0 an abrupt step.",
+               "Particles speed up through the contraction: in steady flow every particle still accelerates.",
+               "Past the step the flow cannot turn the corner: it separates, and the jet necks down to a vena contracta.",
+               "A Flux line in each pipe reads the same Q; a Control volume round the contraction gives the force on it."],
+      }];
+    })(),
   ];
 
   const byId = {};

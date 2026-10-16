@@ -1186,4 +1186,101 @@ const EXERCISES = [
     task: "Compare Δt with 16/c, ΔH with Joukowsky c·v₀/g (g = 9.81 m/s²) and the period with 4L/c (L = 47 m). Halve c: the delay doubles and the surge halves.",
     settle: 20,
   },
+  // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
+  // Three questions asked of ONE scene, `contraction`: a 1.00 m pipe that
+  // contracts into a 0.50 m pipe between two reservoirs held by head-driven
+  // level controls. Geometry slider geom0 = contraction length L (3 m taper
+  // → 0 m abrupt step); a change restarts the water (resetWater) and the
+  // scene's measured spin-up runs flat out again, so every L is read steady.
+  // Lecturer demos: no digit, nothing pooled.
+  {
+    id: "FF-5",
+    title: "The contraction rig: streamlines",
+    topic: "Flow fields, shear and turbulence",
+    folder: "FF-5-contraction-streamlines",
+    scene: "contraction",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", particles: true },
+    digitNote: "lecturer demo: no personalised parameter",
+    ui: {
+      measure: false,
+      view: ["legendBtn", "partBtn", "avgBtn"],
+      fields: ["water", "speed", "vort"],
+      panel: "focused",
+      controls: ["geom0"],
+    },
+    start: "two reservoirs joined by a 1.00 m pipe that contracts into a 0.50 m pipe; Contraction length L = 3 m, a gentle taper",
+    setup: [
+      "Watch the particles on Speed: smooth paths that converge and speed up through the taper.",
+      "Switch the field to Vorticity: thin sheets along the walls, nothing leaving them in the taper.",
+      "Drag Contraction length L (Controls → Geometry) to 0 m — an abrupt step. The run restarts and spins up again.",
+      "Look at the step on Vorticity and Speed: sheets leave both corners, slow eddies sit in them, and the jet necks down just past the edge (the vena contracta) before it fills the pipe.",
+      "Press A (Average) for the mean picture: the particles then follow the mean flow's streamlines.",
+    ],
+    task: "Compare the taper (L = 3 m) with the step (L = 0): smooth converging streamlines against separation in the corners and a vena contracta past the edge.",
+    settle: 25,
+  },
+  {
+    id: "VC-1",
+    title: "The contraction rig, steady",
+    topic: "Volume conservation",
+    folder: "VC-1-contraction-steady",
+    scene: "contraction",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", particles: true },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "flux", where: "Flux line (8): drag UP across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "Q₁ in the wide pipe" },
+      { tool: "flux", where: "Flux line (8): drag UP across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
+      { tool: "cv", where: "Control volume (9): drag (2.3, 0.3) → (7.0, 1.65) — round the contraction, top and bottom inside the pipe walls", why: "Σ Q = 0: in on the left face, out on the right, nothing through the walls" },
+    ],
+    ui: {
+      view: ["legendBtn", "partBtn", "avgBtn"],
+      fields: ["water", "speed"],
+      panel: "focused",
+      controls: ["geom0", "cvShow", "fluxList"],
+    },
+    start: "two reservoirs joined by a 1.00 m pipe that contracts into a 0.50 m pipe, running steadily; Contraction length L = 3 m",
+    setup: [
+      "Lagrangian: follow one particle through the contraction — it speeds up although nothing on screen changes in time.",
+      "Eulerian: place the two Flux lines and read Q in each pipe.",
+      "Place the Control volume round the contraction and read Q on each face and Σ Q under the box.",
+      "Drag Contraction length L to 0 m (an abrupt step): the run restarts; after it settles read the three again.",
+    ],
+    task: "Q₁ = Q₂ and Σ Q ≈ 0 for any contraction; the step changes the streamlines and lowers Q only a few per cent.",
+    settle: 25,
+  },
+  {
+    id: "MM-2",
+    title: "The contraction rig, forces",
+    topic: "Momentum conservation",
+    folder: "MM-2-contraction-forces",
+    scene: "contraction",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", particles: false },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "flux", where: "Flux line (8): drag UP across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "section 1: Q, momentum flux M₁ = ρQU₁ and pressure force F₁ = p₁A₁" },
+      { tool: "flux", where: "Flux line (8): drag UP across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "section 2; the card under the pair prints the force on what is between them" },
+      { tool: "cv", where: "Control volume (9): drag (2.3, 0.3) → (7.0, 1.65), then press B until the faces read momentum + pressure; later move it to (7.0, 0.3) → (8.6, 1.65)", why: "F→ on the box is R, the force of the water on the contraction (plus the wall shear inside the box)" },
+    ],
+    ui: {
+      view: ["legendBtn", "avgBtn"],
+      fields: ["speed", "phead"],
+      panel: "focused",
+      controls: ["geom0", "cvShow", "fluxList"],
+    },
+    start: "two reservoirs joined by a 1.00 m pipe that contracts into a 0.50 m pipe, running steadily; Contraction length L = 3 m",
+    setup: [
+      "Place the two Flux lines (sections 1 and 2) and the Control volume between them. Each section prints Q, M (momentum flux) and F (pressure force); the pair prints the force on what is between them.",
+      "Check R = p₁A₁ − p₂A₂ − ρQ(U₂ − U₁) per metre width (A₁ = 1.00 m, A₂ = 0.50 m, U = Q/A) against the box's F→.",
+      "Drag Contraction length L to 0 m (abrupt step), let it settle and read R again.",
+      "Then put the box on the straight 0.50 m pipe instead, (7.0, 0.3) → (8.6, 1.65): momentum in = momentum out, so the pressure drop across it is the wall friction.",
+    ],
+    task: "R is set by the end sections: taper and step give nearly the same force, the difference being the extra loss; on a straight pipe the pressure drop is all friction.",
+    settle: 25,
+  },
 ];

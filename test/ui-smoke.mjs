@@ -147,7 +147,9 @@ async function main() {
       const p = await tab.evaluate(PROBE);
       check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("start screen is up", p.startOpen);
-      eq("the whole pack is listed", p.startItems, await tab.evaluate("return APP.EX.all().length;"));
+      // What the start screen lists is the exercise menu: the course menu when
+      // this deployment ships one (js/menu.js), otherwise the whole register.
+      eq("the menu's exercises are listed", p.startItems, await tab.evaluate("return APP.EX.listed().length;"));
       check("the pack does not overflow sideways", !p.startSideways);
       check("every strip button has an icon", p.emptyIcons === 0, p.emptyIcons + " empty");
       check("every strip button is labelled", p.unlabelled === 0, p.unlabelled + " bare");
@@ -188,7 +190,7 @@ async function main() {
       // Filtering the pack, and the side door out of it.
       const filtered = await tab.evaluate(`
         const f = document.getElementById("startfilter");
-        f.value = "belanger"; f.dispatchEvent(new Event("input"));
+        f.value = APP.EX.listed()[0].id; f.dispatchEvent(new Event("input"));
         return document.querySelectorAll("#startlist .si").length;
       `);
       check("the filter narrows the pack", filtered >= 1 && filtered < p.startItems,
@@ -646,8 +648,8 @@ async function main() {
       check("the grade line covers the reach", p.n > 200, p.n + " columns");
       check("and lies on the water surface where the column is hydrostatic",
             p.ratio < 0.25,
-            "median |HGL - surface| " + p.median.toFixed(5) + " m = " +
-            p.ratio.toFixed(3) + " dx");
+            "median |HGL - surface| " + (p.n ? p.median.toFixed(5) : "n/a") + " m = " +
+            (p.n ? p.ratio.toFixed(3) : "n/a") + " dx");
       check("the GPU column pass is the CPU walk, column for column",
             p.walkOff === 0 && p.walkWorst < 1e-5,
             p.walkOff + " wet/dry mismatches, worst |Δh| " + p.walkWorst.toExponential(2) + " m");

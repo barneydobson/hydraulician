@@ -917,3 +917,11 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #startfoot a { color: inherit; text-decoration: none; }
 #startfoot a:hover { color: #7fd4ff; text-decoration: underline; }
 
+
+/* The foot of the exercise menu: course menu <-> whole register. */
+.gmenu .smscope {
+  display: block; width: 100%; margin-top: 6px; padding: 8px 9px; text-align: left;
+  background: none; border: 0; border-top: 1px solid rgba(255,255,255,.08);
+  color: inherit; font-size: 11.5px; opacity: .6; cursor: pointer;
+}
+.gmenu .smscope:hover { opacity: 1; }

@@ -14,6 +14,15 @@ by `û`, so over a mean picture they draw the mean flow's paths — for a steady
 mean, its streamlines. Dye is the one live tracer with no accumulator, so it
 stands down while a window is open and returns with Live.
 
+**Streamlines** (VIEW → *Streamlines*, the `T` key) are drawn from the same
+accumulator: under an open window they are contours of the stream function
+of the mean volume flux `⟨f u⟩ = f̄ û` — the streamlines **of the mean flow**,
+labelled so on the canvas. That is the comparison the toggle exists for: in
+an unsteady flow (a wake, a jet) the dye and the live particles follow paths
+that the mean streamlines do not, and the two pictures agree only where the
+flow is steady. How they are computed is in
+[engineering-notes.md](engineering-notes.md#streamlines-are-contours-of-ψ-read-back-without-a-stall).
+
 Two principles fix everything below:
 
 1. **The mean satisfies the solver's own discrete conservation law**, not a

@@ -26,6 +26,7 @@ shallow water); this one resolves the depth.
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
 | `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
 | `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards, digit rules, the settings a pick applies) |
+| `js/stream.js` | `STREAM` — streamlines as contours of the stream function ψ, built on the CPU from a fenced face-flux readback; of the mean flow under Average |
 | `js/gauge-inspector.js` | `GINSP` — a draggable window per gauge: identity, live values, the full history chart, CSV export |
 | `js/rig.js` | `RIG` — rig save / load / share, the wire format and its version gate |
 | `js/exercises.js` | the exercise register the picker reads (machine-readable source of the pack) |

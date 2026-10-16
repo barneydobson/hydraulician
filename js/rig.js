@@ -115,7 +115,7 @@ const RIG = (() => {
             // A view flag like the three above it: what a shared rig was
             // being LOOKED at with, which is part of the rig for a demo
             // whose whole subject is where the HGL runs.
-            grade: b01(state.grade),
+            grade: b01(state.grade), sline: b01(state.sline),
             dye: b01(state.dye) },
     };
     // additive, optional — a scene with no `params` declaration writes none,
@@ -214,7 +214,7 @@ const RIG = (() => {
     if (U.field) state.gaugeField = U.field;
     if (U.cvShow && CV_NEXT[U.cvShow]) state.cvShow = U.cvShow;
     if (U.speed !== undefined) state.speed = +U.speed;
-    ["channel", "labels", "jumps", "particles", "dye", "grade"].forEach((k) => {
+    ["channel", "labels", "jumps", "particles", "dye", "grade", "sline"].forEach((k) => {
       if (U[k] !== undefined) state[k] = !!(+U[k]);
     });
 

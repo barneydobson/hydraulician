@@ -123,6 +123,7 @@ uniform vec4  u_wave;    // amplitude (m), omega (rad/s), on, piston column
 uniform sampler2D u_Wd;  // wall distance (m) at each cell's SW corner, CPU-built
 uniform sampler2D u_Tc;  // nx×1 open-channel columns: bed z, surface z, on, 0
 uniform float u_kappa;   // mixing-length constant (0 = closure off)
+uniform float u_tau;     // wind stress on the free surface, KINEMATIC: τ/ρ (m²/s²), +x
 
 // --- the depth-scale closure: Prandtl's mixing length, κy damped towards the
 //     free surface, l = κ·y·√((η − z)/d), y the distance to the nearest WALL
@@ -287,6 +288,24 @@ void main(){
   float pC = press(fC, dvC);
   un -= dt * (pC - press(fW, dvW)) / dx;
   wn -= dt * (pC - press(fS, dvS)) / dx;
+
+  // --- wind shear stress on the free surface (FF-1). A tangential stress τ
+  //     on the surface is a force τ per unit area acting on the top layer, so
+  //     the u-face that holds the interface is accelerated by τ/(ρΔz). The
+  //     interface is wherever the face's water fraction drops going up: the
+  //     weight max(f_here − f_above, 0) is a discrete −∂f/∂z, which sums to
+  //     exactly 1 up any column with water below air, so the whole column
+  //     receives τ however the surface sits in its cells — split between a
+  //     part-full top cell and the full one under it. Purely additive, after
+  //     gravity and ∇p (nothing interposed), and before the void handling, so
+  //     the dry u-faces above still take the water's u (the stress-free
+  //     extension) — the wind drives the water, not the void. Branch on the
+  //     uniform: τ = 0 leaves every other scene bit-for-bit unchanged.
+  if (u_tau != 0.0) {
+    float fUp = max(TF(ivec2(i, j+1)).r, TF(ivec2(i-1, j+1)).r);
+    float wTop = clamp(min(fFu, 1.0) - min(fUp, 1.0), 0.0, 1.0);
+    un += dt * u_tau * wTop / dx;
+  }
 
   // --- void handling. Hard-zeroing the velocity in empty cells makes the air
   //     behave like a rigid medium, and the fake shear layer shreds any free
@@ -1311,6 +1330,59 @@ void main(){
   o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));
 }`;
 
+  // ------------------------------------------------------------ streamlines
+  /** The volume fluxes the stream function is integrated from (js/stream.js),
+   *  packed TWO cells per texel so the async readback is a quarter of the
+   *  live U + F it replaces. Texel (p, j) covers cells a = (2p, j), b = a + 1:
+   *
+   *    row j >= 1:  (qx_a, qx_b, wet_a + 2 wet_b, 0)
+   *    row j == 0:  (qx_a, qx_b, qz_a, qz_b)   — the floor's flux instead of
+   *                 wetness; the bottom ring row is never drawn.
+   *
+   *  qx is the flux through a cell's LEFT face, qz through its BOTTOM face,
+   *  per unit width: (f u) with the fill capped at 1 (pressurised water is
+   *  still one volume of water), zero on any face touching a solid. Live, u
+   *  already lives on that face and f is the two-cell mean; under Average
+   *  (u_avg) u_U is the Favre accumulator (<f u_c>, <f w_c>, fbar, Pbar),
+   *  whose centred mean fluxes are averaged onto the face. */
+  const FS_SFLUX = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 o;
+uniform sampler2D u_U, u_F, u_S;
+uniform vec2  u_res;
+uniform float u_avg, u_valve;
+
+bool inside(ivec2 c){ return c.x >= 0 && c.x < int(u_res.x); }
+bool solid(ivec2 c){
+  float s = texelFetch(u_S, c, 0).r;
+  return s > 0.75 || (s > 0.25 && u_valve > 0.5);
+}
+float fillAt(ivec2 c){ return u_avg > 0.5 ? texelFetch(u_U, c, 0).b : texelFetch(u_F, c, 0).r; }
+vec2 meanQ(ivec2 c){ vec4 A = texelFetch(u_U, c, 0); return A.rg / max(A.b, 1.0); }
+float qx(ivec2 c){
+  if (!inside(c) || solid(c)) return 0.0;
+  ivec2 l = c - ivec2(1, 0);
+  bool hasL = c.x > 0;
+  if (hasL && solid(l)) return 0.0;
+  if (u_avg > 0.5) return hasL ? 0.5 * (meanQ(c).x + meanQ(l).x) : meanQ(c).x;
+  float f = hasL ? 0.5 * (fillAt(c) + fillAt(l)) : fillAt(c);
+  return texelFetch(u_U, c, 0).r * clamp(f, 0.0, 1.0);
+}
+float qz(ivec2 c){
+  if (!inside(c) || solid(c)) return 0.0;
+  if (u_avg > 0.5) return meanQ(c).y;
+  return texelFetch(u_U, c, 0).g * clamp(fillAt(c), 0.0, 1.0);
+}
+float wet(ivec2 c){ return inside(c) && !solid(c) && fillAt(c) >= 0.5 ? 1.0 : 0.0; }
+
+void main(){
+  ivec2 a = ivec2(2 * int(gl_FragCoord.x), int(gl_FragCoord.y));
+  ivec2 b = a + ivec2(1, 0);
+  o = a.y == 0 ? vec4(qx(a), qx(b), qz(a), qz(b))
+               : vec4(qx(a), qx(b), wet(a) + 2.0 * wet(b), 0.0);
+}`;
+
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_HGL, FS_PART, VS_PART,
-           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL };
+           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL, FS_SFLUX };
 })();

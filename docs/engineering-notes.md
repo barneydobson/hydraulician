@@ -787,6 +787,54 @@ picture saturated or flat is the symptom of the two having drifted apart.
   of the domain — so the frame, the scale bar, the legend and the label
   clamps stay on screen zoomed in.
 
+### Streamlines are contours of ψ, read back without a stall
+
+VIEW → *Streamlines* draws contours of the stream function at equal steps
+Δψ, so neighbouring lines bound tubes of equal discharge per unit width and
+their spacing goes as 1/speed. Contours rather than integrated seed lines,
+because ψ makes every hard case automatic: a wall carries no flux, so every
+solid (bed, soffit, bluff body) is a level of ψ; the flux is fill-weighted,
+so the void carries none and a steady free surface is a streamline;
+recirculation is a closed contour; a pressurised pipe needs nothing special.
+Seeded RK lines bunch by accident of where they started, stop at stagnation
+points and need a stopping rule at every boundary.
+
+- **The pieces.** `FS_SFLUX` (shaders.js) packs the face fluxes `q = f u`
+  (fill capped at 1; zero on any face touching a solid or a closed valve)
+  two cells per texel; `SIM.streamRequest` reads that into a pixel-pack
+  buffer behind a fence; `SIM.streamPoll` copies it out once the fence has
+  signalled; `STREAM.psi` (js/stream.js) integrates ψ along the floor
+  (−q_z dx, non-zero only where the floor is open, as under `jet`'s falling
+  jet) then up every node column (+q_x dx); `STREAM.contours` marches the
+  wet cells (f ≥ 0.5) at ψ = (k + ½)Δψ. Under Average the flux is the Favre
+  accumulator's own `⟨f u_c⟩` averaged onto faces.
+- **Exact for a discretely solenoidal field** (checked: ψ rebuilt from the
+  face fluxes of an analytic ψ to 3e-8). Where the field is not — the slot
+  EOS's small dilatation, a surface moving within the instant — the error is
+  a column-to-column mismatch in ψ *above* that cell, which is mostly void
+  and never drawn. Integrating from the floor is right because every scene's
+  floor is solid (or, in plan view, a wall).
+- **Δψ is held.** It is a round 1/2/2.5/5 × 10ⁿ near (range / `slineN`) and is
+  re-picked only when the ψ range drifts outside 0.6–1.7 × `slineN` steps,
+  on a Live/Average switch or a density change — otherwise the lines breathe
+  as the range jitters, the same reason the colour range is held.
+- **Gotcha: a WebGL fence only updates between tasks.** A headless script
+  that runs `APP.frames(n)` in one `evaluate` never sees a streamline
+  result; yield (await a timeout) between frames. The refresh is ~4 Hz of
+  wall clock and requests nothing while paused.
+- **Cost, measured** on m2 (1265 × 75) and plan (409 × 232), once per
+  refresh (~4 Hz), never per frame: request (pack pass + PBO read + fence)
+  0.1–2 ms; ψ 2–8 ms; contours 3–15 ms; drawing ~1 ms per frame. The
+  copy-out (`getBufferSubData` after the fence has signalled) does not wait
+  for the GPU to finish the sim, but it is still one synchronous round trip
+  to Chrome's GPU process — `SIM.streamPoll()` returns `ms.wait/copy` so it
+  can be watched. Measured with eight agents sharing one GPU it was
+  5–100 ms, the SAME as a 1 × 1 `SIM.probe` readPixels on that machine
+  (40–180 ms) and well under a synchronous full-field `fieldStats`
+  (300–800 ms) — i.e. it costs what one round trip costs, not what the
+  queued substeps cost. On an uncontended machine expect a millisecond or
+  two; re-measure there before quoting a number. Off, it costs one boolean.
+
 ## Measurement gotchas
 
 - **The Control volume is a momentum budget, not a dial.** The control-volume

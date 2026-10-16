@@ -29,6 +29,7 @@ const OVERLAY = (() => {
 
   const C = {
     dc: "#ffb648", dn: "#5fd08a", egl: "#cfe3f5", hgl: "#ff9de2", surf: "#7fd4ff",
+    sline: "rgba(245,250,255,0.9)", slineHalo: "rgba(8,14,22,0.55)",
     dim: "rgba(223,232,242,0.55)", grid: "rgba(223,232,242,0.13)",
   };
 
@@ -657,6 +658,31 @@ const OVERLAY = (() => {
     });
   }
 
+  /** Streamlines: contour segments of ψ (STREAM.contours), in metres, plus a
+   *  one-line key quoting the discharge each tube carries. `L` is
+   *  {seg, dpsi, avg} as main.js refreshStream keeps it. */
+  function drawStreamlines(ctx, V, L) {
+    if (!L || !L.seg) return;
+    const s = L.seg;
+    ctx.save();
+    ctx.beginPath();
+    for (let k = 0; k < s.length; k += 4) {
+      ctx.moveTo(V.X(s[k]), V.Y(s[k + 1]));
+      ctx.lineTo(V.X(s[k + 2]), V.Y(s[k + 3]));
+    }
+    // A dark halo under a light core, so the lines read over every ramp —
+    // the pale middle of vorticity as much as the dark end of speed.
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = C.slineHalo; ctx.lineWidth = 2.6; ctx.stroke();
+    ctx.strokeStyle = C.sline; ctx.lineWidth = 1.1; ctx.stroke();
+    ctx.restore();
+    const B = V.vis || V;
+    chip(ctx, B.x + 10, B.y + B.h - 34,
+         "streamlines" + (L.avg ? " of the MEAN flow" : "") +
+         " · Δψ = " + (+L.dpsi.toPrecision(2)) + " m²/s between lines",
+         C.sline);
+  }
+
   function drawCursorReadout(ctx, V, A, sim, mx, mz, probe, show) {
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(mx / sim.dx)));
     const d = A.d[i], dc = A.dc[i], dn = A.dn[i], S0 = A.S0[i];
@@ -902,6 +928,48 @@ const OVERLAY = (() => {
     return rects;
   }
 
+  /** Wind over the water (FF-1): a row of arrows above the free surface,
+   *  pointing the way τ blows, longer the stronger it is (|τ|/τmax of the
+   *  scene's slider range), with τ printed beside the first one. Nothing at
+   *  τ = 0. The row sits a fixed fraction of the way from the highest water
+   *  surface to the top of the domain, over the wet columns only. */
+  function drawWind(ctx, V, A, sim, tau, tauMax) {
+    if (!tau || !(tauMax > 0)) return;
+    const nx = sim.nx, dx = sim.dx;
+    let i0 = -1, i1 = -1, zs = 0;
+    for (let i = 0; i < nx; i++) {
+      if (!A || !A.ok[i] || !(A.d[i] > 2 * dx)) continue;
+      if (i0 < 0) i0 = i;
+      i1 = i;
+      zs = Math.max(zs, A.bed[i] + A.d[i]);
+    }
+    if (i0 < 0) { i0 = 1; i1 = nx - 2; zs = 0.5 * sim.H; }
+    const zr = zs + 0.45 * (sim.H - zs);
+    const xa = (i0 + 0.5) * dx, xb = (i1 + 0.5) * dx, span = xb - xa;
+    const n = 5, pitch = V.w * (span / sim.W) / n;                // px between arrows
+    const frac = Math.min(1, Math.abs(tau) / tauMax);
+    const len = Math.max(10, 0.85 * pitch * frac), dir = Math.sign(tau);
+    const y = V.Y(zr), head = Math.min(10, 0.4 * len + 4);
+    ctx.save();
+    ctx.strokeStyle = "rgba(235,245,255,0.9)"; ctx.fillStyle = "rgba(235,245,255,0.9)";
+    ctx.lineWidth = 1.5 + 2.5 * frac; ctx.lineCap = "round";
+    for (let k = 0; k < n; k++) {
+      const xc = V.X(xa + (k + 0.5) * span / n);
+      const xt = xc - dir * len / 2, xh = xc + dir * len / 2;
+      ctx.beginPath(); ctx.moveTo(xt, y); ctx.lineTo(xh - dir * head * 0.6, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(xh, y);
+      ctx.lineTo(xh - dir * head, y - head * 0.55);
+      ctx.lineTo(xh - dir * head, y + head * 0.55);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.font = "12px ui-monospace, SFMono-Regular, monospace";
+    ctx.textBaseline = "bottom"; ctx.textAlign = "center";
+    ctx.fillText("wind  τ = " + tau.toFixed(Math.abs(tau) < 1 ? 2 : 1) + " N/m²",
+                 V.X(0.5 * (xa + xb)), y - 10);
+    ctx.restore();
+  }
+
   /** Frame, axes and scale bar — anchored to the VISIBLE part of the domain
    *  so they stay on screen when the view is zoomed in. */
   function drawFrame(ctx, V, sim) {
@@ -1074,6 +1142,22 @@ const OVERLAY = (() => {
     top:   (v) => (v < 0 ? "▼" : "▲"),
   };
 
+  /** dV/dt of the water inside the box, m²/s: the least-squares slope of the
+   *  enclosed volume over the last 2 s of sim time. null until there are
+   *  enough samples to fit a line through. */
+  function storageRate(hist) {
+    if (!hist || hist.length < 6) return null;
+    const tEnd = hist[hist.length - 1].t;
+    let n = 0, st = 0, sv = 0, stt = 0, stv = 0;
+    for (const q of hist) {
+      if (tEnd - q.t > 2 || !Number.isFinite(q.vol)) continue;
+      n++; st += q.t; sv += q.vol; stt += q.t * q.t; stv += q.t * q.vol;
+    }
+    const den = n * stt - st * st;
+    if (n < 6 || !(den > 1e-12)) return null;
+    return (n * stv - st * sv) / den;
+  }
+
   function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
     const F = cv.flux;
     const q = CV_Q[show] || CV_Q.Q;
@@ -1115,10 +1199,19 @@ const OVERLAY = (() => {
       return { inn, out };
     };
     const Q = gross((e) => e.Q), E = gross((e) => e.E);
+    // Continuity is in − out = dV/dt, not in = out: a box round a tank that
+    // is filling has a net flux and that is the point (VC-2). The storage
+    // rate is the slope of the enclosed water over the last ~2 s of the
+    // history, so the closure printed is the unsteady one and reads 0 for a
+    // steady box exactly as the old "should be 0" did.
+    const dVdt = storageRate(cv.hist);
+    const net = Q.out - Q.inn;
     const lines = [
-      "water    in " + Q.inn.toFixed(3) + "   out " + Q.out.toFixed(3) +
-        "   net " + (Q.out - Q.inn).toFixed(3) + " m²/s" +
-        (Q.inn > 1e-9 ? "  (" + (100 * Math.abs(Q.out - Q.inn) / Q.inn).toFixed(1) + "%, should be 0)" : ""),
+      "water  in " + Q.inn.toFixed(3) + "  out " + Q.out.toFixed(3) +
+        "  net " + net.toFixed(3) +
+        (dVdt === null ? " m²/s"
+          : "  dV/dt " + (dVdt >= 0 ? "+" : "") + dVdt.toFixed(3) + " m²/s" +
+            (Q.inn > 1e-9 ? "  (net + dV/dt: " + (100 * Math.abs(net + dVdt) / Q.inn).toFixed(1) + "%, should be 0)" : "")),
       "force    on what is inside:  →  " + fN(fx) + " ±" + fN(sd) + " N/m    ↑ " + fN(fz) + " N/m",
       "energy   in " + fmtBig(E.inn, "W/m") + "   out " + fmtBig(E.out, "W/m") +
         "   lost " + fmtBig(E.inn - E.out, "W/m"),
@@ -1386,7 +1479,18 @@ const OVERLAY = (() => {
         const fKN = (v) => Math.abs(v) >= 1000
           ? (v / 1000).toFixed(1) + " kN/m" : v.toFixed(0) + " N/m";
         chip(ctx, cx + 8, cy - 18, "F = " + fKN(D.F), col);
-        chip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m"), col);
+        const refs = (sim.scene && sim.scene.forceRef) || [];
+        const ref = refs.indexOf(D.solidId + ":" + D.faceId) >= 0 ? faceDepth(sim, D, g) : null;
+        if (!ref) chip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m", ["F_h ", "F_v "]), col);
+        else {
+          // A face the scene lists in `forceRef` (PF-2's wall) gets
+          // the components on their own rows and ½ρg·d² beside F_h, d being
+          // the wetted height of THIS face.
+          const half = 0.5 * 1000 * g * ref * ref;
+          chip(ctx, cx + 8, cy, "F_h " + (D.Fx >= 0 ? "→ " : "← ") + fKN(Math.abs(D.Fx)) +
+               "   ½ρgd² = " + fKN(half) + "  (d = " + ref.toFixed(2) + " m)", col);
+          chip(ctx, cx + 8, cy + 18, "F_v " + (D.Fz >= 0 ? "↑ " : "↓ ") + fKN(Math.abs(D.Fz)), col);
+        }
       }
     }
     ctx.restore();
@@ -1417,19 +1521,43 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** The wetted height d of the face a Pressure force reading `D` was taken
+   *  on: the free surface η (z + p/g at the lowest wet sample, evaluated at
+   *  the point SIM.faceForce actually read — 0.75 Δx out along the normal)
+   *  minus the lowest vertex of the face. Null when the face is dry or its
+   *  solid is gone. Only drawn for the faces a scene lists in `forceRef`
+   *  ("solid:face"). */
+  function faceDepth(sim, D, g) {
+    const so = (sim.solids || []).find((s) => s.id === D.solidId);
+    if (!so) return null;
+    let zf = Infinity;
+    GEOM.faceEdges(so, D.faceId).forEach((e) => {
+      zf = Math.min(zf, so.verts[e][1], so.verts[(e + 1) % so.verts.length][1]);
+    });
+    let low = null;
+    for (const s of D.samples) {
+      if (s.f > 0.5 && s.p > 0 && (!low || s.z < low.z)) low = s;
+    }
+    if (!low || !Number.isFinite(zf)) return null;
+    const eta = low.z + low.nz * 0.75 * sim.dx + low.p / g;
+    return eta > zf ? eta - zf : null;
+  }
+
   /** A vector as two signed components with their directions spelled out, so
    *  nothing on this tool is read off a bare sign. */
-  function vec(vx, vz, unit) {
+  function vec(vx, vz, unit, labels) {
     // ONE scale for the pair, and the unit written once at the end. Scaling
     // each component on its own produced "1.51 k  0.0 N/m", where the k had
-    // come adrift from the unit it belonged to.
+    // come adrift from the unit it belonged to. `labels` ([x, z] prefixes,
+    // e.g. ["F_h ", "F_v "]) names the two components.
     const big = Math.max(Math.abs(vx), Math.abs(vz)) >= 1000;
     const d = (v) => {
       const a = Math.abs(v) / (big ? 1000 : 1);
       return big || a < 100 ? a.toFixed(a >= 10 ? 1 : 2) : a.toFixed(0);
     };
-    return (vx >= 0 ? "→ " : "← ") + d(vx) +
-           "   " + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
+    const L = labels || ["", ""];
+    return L[0] + (vx >= 0 ? "→ " : "← ") + d(vx) +
+           "   " + L[1] + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
            " " + (big ? "k" : "") + unit;
   }
 
@@ -1498,7 +1626,7 @@ const OVERLAY = (() => {
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
-           drawGradeLines,
+           drawGradeLines, drawStreamlines, drawWind,
            ROW_IDS, DEFAULT_ROWS,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
            drawMeasure, drawCV, drawFlux, drawForce, drawForceHover, measureText, chip, fmt };

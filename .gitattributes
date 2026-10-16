@@ -1,2 +1,4 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# The course menu is per deployment and never travels upstream: on a merge
+# from upstream, keep ours. Needs once per clone:
+#   git config merge.ours.driver true
+js/menu.js merge=ours

@@ -56,6 +56,7 @@ const SIM = (() => {
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
     prog.tcol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TCOL);
     prog.hgl  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_HGL);
+    prog.sflux = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_SFLUX);   // streamlines
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
     // The Favre display accumulator (§4.1 of docs/averaging.md) — a separate
     // pass from prog.vofA's transport accumulator, and a separate program
@@ -516,6 +517,11 @@ const SIM = (() => {
       source: Object.assign({}, scene.source),
       dyeLine: scene.dyeLine, dyeDecay: 0.02,
       valveClosed: scene.valveOpen ? 0 : 1,
+      // Optional per-scene von Kármán constant for the mixing-length closure;
+      // undefined keeps KAPPA. A free jet in a deep tank sets 0: the closure's
+      // l = κy takes y from the nearest WALL, metres away from a free shear
+      // layer, and its ν_t smeared the jet into a laminar blob (pipejet).
+      kappa: scene.kappa,
     };
     if (prev) {
       p.open = prev.open.slice();
@@ -1140,6 +1146,16 @@ const SIM = (() => {
     quad.draw();
   }
 
+  /** The wind shear stress on the free surface, τ in N/m² (positive blows
+   *  +x). A scene opts in by declaring a param with key "tau" (one slider,
+   *  carried by rigs like any other param); every other scene reads 0, and
+   *  the vel pass then skips the term altogether. */
+  function windTau() {
+    const decl = (S.scene.params || []).some((d) => d.key === "tau");
+    const v = decl ? S.params.tau : 0;
+    return Number.isFinite(v) ? v : 0;
+  }
+
   function step(nsub) {
     const p = S.p, h = dt();
     for (let n = 0; n < nsub; n++) {
@@ -1152,6 +1168,7 @@ const SIM = (() => {
       simUniforms(prog.vel, h);
       gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
       gl.uniform1f(prog.vel.u("u_nu"), p.nu);
+      gl.uniform1f(prog.vel.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
       gl.uniform1f(prog.vel.u("u_cs"), p.cs);
       gl.uniform1f(prog.vel.u("u_cf"), p.cf);
       gl.uniform1f(prog.vel.u("u_slip"), p.slip);
@@ -1570,6 +1587,72 @@ const SIM = (() => {
     return h;
   }
 
+  /** STREAMLINES: the face fluxes of the whole field, read back WITHOUT a
+   *  pipeline stall. Every other full-field reader here (fieldStats,
+   *  avgField, the averaged hydraulicGrade) calls readPixels into client
+   *  memory, which blocks until the GPU has finished every queued substep.
+   *  This one first packs the fluxes into a half-width texture (FS_SFLUX —
+   *  two cells per texel, a quarter of the bytes of U + F), reads that into a
+   *  pixel-pack buffer and drops a fence; `streamPoll` checks the fence with
+   *  a zero timeout on a later frame and only copies the bytes out once the
+   *  GPU says they are there. One request in flight at a time; the caller
+   *  (main.js refreshStream) sets the rate.
+   *
+   *  Live: from U and F. Average: from the Favre accumulator. The request
+   *  remembers which, and the S it was made against, so a result that lands
+   *  after a rebuild is dropped rather than drawn on the wrong grid. Consumed
+   *  by STREAM.psi (js/stream.js). */
+  let SF = null;
+  function streamRequest(avg) {
+    if (SF && SF.sync) return false;
+    const nx = S.nx, ny = S.ny, w2 = (nx + 1) >> 1, bytes = w2 * ny * 16;
+    if (!SF || SF.forS !== S) {
+      if (SF) { gl.deleteBuffer(SF.pbo); gl.deleteFramebuffer(SF.fbo); gl.deleteTexture(SF.tex); }
+      const tex = GLH.createTexture(gl, w2, ny, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
+      SF = { forS: S, w2, tex, fbo: GLH.createFBO(gl, tex), pbo: gl.createBuffer(),
+             buf: new Float32Array(w2 * ny * 4), sync: null };
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    }
+    const A = !!(avg && S.avg);
+    gl.useProgram(prog.sflux);
+    GLH.bindTex(gl, prog.sflux, [["u_U", A ? S.avg.fld.read.tex : S.U.read.tex],
+                                 ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform2f(prog.sflux.u("u_res"), nx, ny);
+    gl.uniform1f(prog.sflux.u("u_avg"), A ? 1 : 0);
+    gl.uniform1f(prog.sflux.u("u_valve"), S.p.valveClosed);
+    GLH.bindTarget(gl, SF.fbo, SF.w2, ny);
+    quad.draw();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+    gl.readPixels(0, 0, SF.w2, ny, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    SF.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+    SF.avg = A; SF.t = S.t;
+    return true;
+  }
+  /** The finished request, or null while the GPU is still on it. WebGL only
+   *  updates a fence between tasks, so this is at least one frame later. The
+   *  copy-out does not wait for the sim's queued work, but it is one round
+   *  trip to the browser's GPU process (the price of a 1×1 probe); `ms`
+   *  reports it — see engineering-notes, "Streamlines are contours of ψ". */
+  function streamPoll() {
+    if (!SF || !SF.sync) return null;
+    const t0 = performance.now();
+    const st = gl.clientWaitSync(SF.sync, 0, 0);
+    const t1 = performance.now();
+    if (st === gl.TIMEOUT_EXPIRED) return null;
+    gl.deleteSync(SF.sync); SF.sync = null;
+    if (st === gl.WAIT_FAILED || SF.forS !== S) return null;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, SF.buf);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    return { avg: SF.avg, t: SF.t, nx: S.nx, ny: S.ny, dx: S.dx, w2: SF.w2, D: SF.buf,
+             ms: { wait: t1 - t0, copy: performance.now() - t1 } };
+  }
+  function streamPending() { return !!(SF && SF.sync); }
+
   function probe(x, z, avg) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
@@ -1946,9 +2029,18 @@ const SIM = (() => {
       // wrapper says the solid is. If that texel is not solid, the wrapper
       // is describing a surface the mask does not have (an erased hole) or
       // no longer has (an open valve) — zero the sample.
-      const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * 0.5 * S.dx) / S.dx)));
-      const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * 0.5 * S.dx) / S.dx)));
-      if (!sol(ix, jx)) { q.p = 0; q.f = 0; }
+      // A sloped face rasterises as a cell staircase, so half a cell in
+      // can still be a water cell between two stair-steps: on PF-2's 30°
+      // wall that zeroed 6 samples in 154 and read F_h 4% low. So the check
+      // looks 0.5, 1.0 and 1.5 Δx in and the surface exists if ANY is solid
+      // — still far short of an erase stroke or an open valve's thickness.
+      let inside = false;
+      for (const dd of [0.5, 1.0, 1.5]) {
+        const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * dd * S.dx) / S.dx)));
+        const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * dd * S.dx) / S.dx)));
+        if (sol(ix, jx)) { inside = true; break; }
+      }
+      if (!inside) { q.p = 0; q.f = 0; }
     }
     const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
     const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);
@@ -2083,13 +2175,16 @@ const SIM = (() => {
         mdot += f * wn;
       }
     }
-    let m = 0;                                       // enclosed water, for the z-budget
+    let m = 0, vol = 0;                              // enclosed water, for the z-budget
     for (let j = jB; j < jT; j++) {
-      for (let i = iL; i < iR; i++) if (!sol(i, j)) m += F[k(i, j)];
+      for (let i = iL; i < iR; i++) if (!sol(i, j)) { m += F[k(i, j)]; vol += Math.min(F[k(i, j)], 1); }
     }
     m *= RHO * S.dx * S.dx;
+    // `vol` counts a full cell once, as the faces' Q does (min(f, 1)), so its
+    // rate of change balances Q: Σf would add the EOS compression of every
+    // column a rising level loads (gh/c², ~3% in a 2 m tank) to the storage.
     return { fx: -RHO * dFx * S.dx, fz: -RHO * dFz * S.dx - gAbs * m,
-             mdot: RHO * mdot * S.dx, mass: m, iL, iR, jB, jT };
+             mdot: RHO * mdot * S.dx, mass: m, vol: vol * S.dx * S.dx, iL, iR, jB, jT };
   }
 
   const get = () => S;
@@ -2097,8 +2192,8 @@ const SIM = (() => {
            step, columns, advanceParticles, render, probe, rake, patch, patchVel,
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
-           hydraulicGrade,
-           setValve, setParam, params,
+           hydraulicGrade, streamRequest, streamPoll, streamPending,
+           setValve, setParam, params, windTau,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

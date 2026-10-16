@@ -87,6 +87,19 @@ pause-and-read promptly (the chart buffer keeps moving).
 | B8 | Three orifices, three coefficients | B8-three-orifices/ | jet + drawn lips | (lip type, C_c) |
 | B9 | Three reservoirs, one junction | B9-three-reservoirs/ | RIG-C ×3, dynamic | (z_B(0), Q_B, junction head) |
 | B10 | Lift the crest until the pipe gives up | B10-crest-vs-hgl/ | RIG-A + raised crest | (level, z_sep, HGL at the crest) |
+| FF-1 | Wind over a lake | FF-1-wind-lake/ | lake, wind stress τ slider | — (lecturer demo) |
+| UP-1 | Pressure travels at the speed of sound (water hammer) | UP-1-water-hammer/ | pipeline | — (lecturer demo) |
+| PF-2 | The wall's shape doesn't matter | PF-2-wall-shape/ | wall-shape, wall shape slider | — (lecturer demo) |
+| FF-2 | Spillway with a ski-jump | FF-2-spillway/ | spillway, bucket lip angle slider | — (lecturer demo) |
+| FF-3 | Flow past a body | FF-3-flow-past-body/ | body, body shape slider | — (lecturer demo) |
+| FF-4 | A pipe jet into a still reservoir | FF-4-pipe-jet/ | pipejet | — (lecturer demo) |
+| FF-5 | Contraction rig: streamlines | FF-5-contraction-streamlines/ | contraction, contraction length slider | — (lecturer demo) |
+| VC-1 | Contraction rig, steady | VC-1-contraction-steady/ | contraction | — (lecturer demo) |
+| VC-2 | The tank that fills and leaks | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (lecturer demo) |
+| MM-1 | A jet turned through an angle | MM-1-jet-vane-angle/ | vane, turning angle slider | — (lecturer demo) |
+| MM-2 | Contraction rig, forces | MM-2-contraction-forces/ | contraction | — (lecturer demo) |
+| HJ-2 | Sluice gate with the movable weir | HJ-2-gate-jump/ | gatejump, weir crest slider | — (lecturer demo) |
+| WV-4 | Breaking waves on a beach | WV-4-breakers/ | beach, beach slope slider | — (lecturer demo) |
 
 Rigs: RIG-A (pressurised duct) card = FR-1/rig.js · RIG-B (flat channel) card
 = WE-1/rig.js. The historical RIG-C tank family is implemented independently

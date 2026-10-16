@@ -100,8 +100,8 @@ window.HS1 = {
   },
 };
 /* Measured, Medium:  shut  left 4.01 culvert 4.01 piezo 4.01 right 3.11
- *                          upstream Fx 28.4 Fz -5.9 (28.2 / 5.9)  downstream Fx -11.2 (11.0)
- *                          roof uplift, upstream block 45.1 (44.7)           kN/m
+ *                          upstream Fx 28.5 Fz -6.0 (28.2 / 5.9)  downstream Fx -11.2 (11.0)
+ *                          roof uplift, upstream block 45.3 (44.7)           kN/m
  *                    still all four 3.82 (3.82 predicted)
- *                          upstream Fx 24.1 Fz -4.6  downstream Fx -24.2 (24.2 / 4.7)
+ *                          upstream Fx 24.2 Fz -4.7  downstream Fx -24.2 (24.2 / 4.7)
  *                    basin RMS speed < 0.01 m/s from ~45 s; mass 3.800 -> 3.800        */

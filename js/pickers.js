@@ -594,11 +594,41 @@ const EX = (() => {
   const menu = () => (el || (el = document.getElementById("exmenu")));
   const isOpen = () => !!(el && el.classList.contains("open"));
 
-  function grouped() {
-    const order = [], by = new Map(), f = foldText(filter.trim());
+  /** The course menu, if this deployment ships one (js/menu.js, optional):
+   *  `const EXERCISE_MENU = { title, sections: [{ title, ids: [...] }] }`.
+   *  It only chooses what the MENU lists and in what order — every exercise
+   *  in the register still boots from `?ex=`, and `?menu=all` (or the link at
+   *  the foot of the menu) lists the whole register by topic as before. Ids
+   *  the register does not have are skipped, so a menu can name an exercise
+   *  before it lands. */
+  let showAll = /[?&]menu=all\b/.test(location.search);
+  function course() {
+    if (showAll || typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU ||
+        !Array.isArray(EXERCISE_MENU.sections)) return null;
+    return EXERCISE_MENU;
+  }
+  function listed() {
+    const c = course();
+    if (!c) return all();
+    const out = [];
+    c.sections.forEach((s) => (s.ids || []).forEach((id) => {
+      const e = byId(id); if (e && out.indexOf(e) < 0) out.push(e);
+    }));
+    return out;
+  }
+
+  function grouped(text) {
+    const order = [], by = new Map(),
+          f = foldText((text === undefined ? filter : text).trim());
+    const hit = (e) => !f || foldText(e.id + " " + e.title + " " + (e.topic || "") + " " +
+                                      e.scene + " " + (e.start || "")).includes(f);
+    const c = course();
+    if (c) {
+      return c.sections.map((s) => [s.title || "",
+        (s.ids || []).map(byId).filter((e) => e && hit(e))]).filter(([, l]) => l.length);
+    }
     all().forEach((e) => {
-      if (f && !foldText(e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
-                         (e.start || "")).includes(f)) return;
+      if (!hit(e)) return;
       const g = e.topic || "Other";
       if (!by.has(g)) { by.set(g, []); order.push(g); }
       by.get(g).push(e);
@@ -606,14 +636,27 @@ const EX = (() => {
     return order.map((g) => [g, by.get(g)]);
   }
 
+  /** The foot of the menu: switch between the course and the whole register. */
+  function scopeLink() {
+    if (typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU) return null;
+    const a = document.createElement("button");
+    a.type = "button"; a.className = "smscope";
+    a.textContent = showAll
+      ? "← back to " + (EXERCISE_MENU.title || "the course menu")
+      : "show all " + all().length + " exercises in the register →";
+    a.onclick = (ev) => { ev.stopPropagation(); showAll = !showAll; hi = -1; render(); place(); };
+    return a;
+  }
+
   function render() {
     const m = menu();
     m.textContent = "";
     const head = document.createElement("div");
     head.className = "smh";
-    const hb = document.createElement("b"); hb.textContent = "Exercises";
+    const hb = document.createElement("b");
+    hb.textContent = course() ? (course().title || "Exercises") : "Exercises";
     const hi2 = document.createElement("i");
-    hi2.textContent = all().length ? all().length + " · Esc closes" : "none loaded";
+    hi2.textContent = all().length ? listed().length + " · Esc closes" : "none loaded";
     head.appendChild(hb); head.appendChild(hi2);
     m.appendChild(head);
 
@@ -639,6 +682,7 @@ const EX = (() => {
       const n = document.createElement("div");
       n.className = "smnone"; n.textContent = "nothing matches “" + filter + "”.";
       m.appendChild(n);
+      const s0 = scopeLink(); if (s0) m.appendChild(s0);
       return;
     }
     groups.forEach(([g, list]) => {
@@ -671,6 +715,7 @@ const EX = (() => {
         if (pending === e.id) m.appendChild(warning(e));
       });
     });
+    const s1 = scopeLink(); if (s1) m.appendChild(s1);
   }
 
   /** The scene menu's warning, in the same words and the same amber block —
@@ -957,7 +1002,7 @@ const EX = (() => {
       if (!c || !c.set) return null;
       const wrap = document.createElement("div");
       wrap.className = "exrowf";
-      let el;
+      let el, out = null;
       if (c.type === "check") {
         el = document.createElement("input");
         el.type = "checkbox";
@@ -969,6 +1014,19 @@ const EX = (() => {
           o.value = v; o.textContent = txt; el.appendChild(o);
         });
         el.onchange = () => { c.set(el.value); syncPanel(); };
+      } else if (c.par) {
+        // A Geometry row is a dimension of the scene — a weir crest, a gate
+        // opening, a beach slope — and is played with rather than typed: a
+        // slider, with the value printed beside it. Range and step are the
+        // param's own, read off the control (syncPanel copies them there).
+        el = document.createElement("input");
+        el.type = "range";
+        el.min = c.min; el.max = c.max; el.step = c.step;
+        el.oninput = () => {
+          const v = +el.value;
+          if (isFinite(v)) { c.set(v); syncPanel(); }
+          if (out) out.textContent = round4(v) + " " + unitOf(c);
+        };
       } else {
         el = document.createElement("input");
         el.type = "number";
@@ -988,12 +1046,12 @@ const EX = (() => {
       el.setAttribute("aria-label", ctlLabel(id));
       wrap.appendChild(el);
       if (c.type !== "check" && c.type !== "select") {
-        const u = document.createElement("span");
-        u.className = "exunit";
-        u.textContent = unitOf(c);
-        wrap.appendChild(u);
+        out = document.createElement("span");
+        out.className = "exunit";
+        out.textContent = unitOf(c);
+        wrap.appendChild(out);
       }
-      fields.push({ id, el, type: c.type });
+      fields.push({ id, el, type: c.par ? "range" : c.type, out });
       return wrap;
     }
 
@@ -1011,13 +1069,20 @@ const EX = (() => {
      *  typed, and "0.4" on the way to "0.45" is a legitimate half-typed value. */
     function syncValues() {
       if (!box || !cur) return;
-      fields.forEach(({ id, el, type }) => {
+      fields.forEach(({ id, el, type, out }) => {
         if (!el.isConnected || el === document.activeElement) return;
         const c = CONTROLS.find((x) => x.id === id);
         if (!c || !c.get) return;
         const v = c.get();
         if (type === "check") el.checked = !!v;
         else if (type === "select") el.value = v;
+        else if (type === "range") {
+          // The slider follows the panel's row, and so do its bounds — a
+          // Geometry row's param can change with the scene.
+          el.min = c.min; el.max = c.max; el.step = c.step;
+          if (!(Math.abs(+el.value - v) < 1e-9)) el.value = v;
+          if (out) out.textContent = round4(v) + " " + unitOf(c);
+        }
         else {
           const shown = el.value === "" ? NaN : +el.value;
           if (!(Math.abs(shown - v) < 1e-9)) el.value = round4(v);
@@ -1137,7 +1202,8 @@ const EX = (() => {
   }
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
-           pick, reset, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
+           pick, reset, clear, setDigit, all, byId, listed, course,
+           groupsFor: grouped, rules, ruleValue, digitSummary,
            studentControls,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,

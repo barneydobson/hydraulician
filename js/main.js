@@ -2105,26 +2105,18 @@ const START = (() => {
     });
   }
 
-  /** The pack, grouped by the register's own `topic` in register order — the
-   *  same grouping the exercise menu uses, so the two never disagree. */
-  function grouped() {
-    const order = [], by = new Map(), f = foldText(filter.trim());
-    EX.all().forEach((e) => {
-      if (f && !foldText(e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
-                         (e.start || "")).includes(f)) return;
-      const g = e.topic || "Other";
-      if (!by.has(g)) { by.set(g, []); order.push(g); }
-      by.get(g).push(e);
-    });
-    return order.map((g) => [g, by.get(g)]);
-  }
+  /** The pack as the exercise menu groups it — the course menu when this
+   *  deployment ships one (js/menu.js), otherwise the register by `topic` —
+   *  so the two never disagree. */
+  function grouped() { return EX.groupsFor(filter); }
 
   function renderList() {
     const host = document.getElementById("startlist");
     host.textContent = "";
     const n = EX.all().length;
     document.getElementById("startcount").textContent =
-      n ? n + " verified demos" : "pack not loaded";
+      n ? (EX.course() ? EX.listed().length + (EX.listed().length === 1 ? " exercise" : " exercises")
+             : n + " verified demos") : "pack not loaded";
     if (!n) {
       const d = document.createElement("div");
       d.className = "none";

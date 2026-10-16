@@ -594,11 +594,41 @@ const EX = (() => {
   const menu = () => (el || (el = document.getElementById("exmenu")));
   const isOpen = () => !!(el && el.classList.contains("open"));
 
-  function grouped() {
-    const order = [], by = new Map(), f = foldText(filter.trim());
+  /** The course menu, if this deployment ships one (js/menu.js, optional):
+   *  `const EXERCISE_MENU = { title, sections: [{ title, ids: [...] }] }`.
+   *  It only chooses what the MENU lists and in what order — every exercise
+   *  in the register still boots from `?ex=`, and `?menu=all` (or the link at
+   *  the foot of the menu) lists the whole register by topic as before. Ids
+   *  the register does not have are skipped, so a menu can name an exercise
+   *  before it lands. */
+  let showAll = /[?&]menu=all\b/.test(location.search);
+  function course() {
+    if (showAll || typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU ||
+        !Array.isArray(EXERCISE_MENU.sections)) return null;
+    return EXERCISE_MENU;
+  }
+  function listed() {
+    const c = course();
+    if (!c) return all();
+    const out = [];
+    c.sections.forEach((s) => (s.ids || []).forEach((id) => {
+      const e = byId(id); if (e && out.indexOf(e) < 0) out.push(e);
+    }));
+    return out;
+  }
+
+  function grouped(text) {
+    const order = [], by = new Map(),
+          f = foldText((text === undefined ? filter : text).trim());
+    const hit = (e) => !f || foldText(e.id + " " + e.title + " " + (e.topic || "") + " " +
+                                      e.scene + " " + (e.start || "")).includes(f);
+    const c = course();
+    if (c) {
+      return c.sections.map((s) => [s.title || "",
+        (s.ids || []).map(byId).filter((e) => e && hit(e))]).filter(([, l]) => l.length);
+    }
     all().forEach((e) => {
-      if (f && !foldText(e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
-                         (e.start || "")).includes(f)) return;
+      if (!hit(e)) return;
       const g = e.topic || "Other";
       if (!by.has(g)) { by.set(g, []); order.push(g); }
       by.get(g).push(e);
@@ -606,14 +636,27 @@ const EX = (() => {
     return order.map((g) => [g, by.get(g)]);
   }
 
+  /** The foot of the menu: switch between the course and the whole register. */
+  function scopeLink() {
+    if (typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU) return null;
+    const a = document.createElement("button");
+    a.type = "button"; a.className = "smscope";
+    a.textContent = showAll
+      ? "← back to " + (EXERCISE_MENU.title || "the course menu")
+      : "show all " + all().length + " exercises in the register →";
+    a.onclick = (ev) => { ev.stopPropagation(); showAll = !showAll; hi = -1; render(); place(); };
+    return a;
+  }
+
   function render() {
     const m = menu();
     m.textContent = "";
     const head = document.createElement("div");
     head.className = "smh";
-    const hb = document.createElement("b"); hb.textContent = "Exercises";
+    const hb = document.createElement("b");
+    hb.textContent = course() ? (course().title || "Exercises") : "Exercises";
     const hi2 = document.createElement("i");
-    hi2.textContent = all().length ? all().length + " · Esc closes" : "none loaded";
+    hi2.textContent = all().length ? listed().length + " · Esc closes" : "none loaded";
     head.appendChild(hb); head.appendChild(hi2);
     m.appendChild(head);
 
@@ -639,6 +682,7 @@ const EX = (() => {
       const n = document.createElement("div");
       n.className = "smnone"; n.textContent = "nothing matches “" + filter + "”.";
       m.appendChild(n);
+      const s0 = scopeLink(); if (s0) m.appendChild(s0);
       return;
     }
     groups.forEach(([g, list]) => {
@@ -671,6 +715,7 @@ const EX = (() => {
         if (pending === e.id) m.appendChild(warning(e));
       });
     });
+    const s1 = scopeLink(); if (s1) m.appendChild(s1);
   }
 
   /** The scene menu's warning, in the same words and the same amber block —
@@ -1137,7 +1182,8 @@ const EX = (() => {
   }
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
-           pick, reset, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
+           pick, reset, clear, setDigit, all, byId, listed, course,
+           groupsFor: grouped, rules, ruleValue, digitSummary,
            studentControls,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,

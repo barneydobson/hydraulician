@@ -67,7 +67,32 @@ Measured on Resolution Medium (844 × 113 cells, Δx = 7.1 mm) with the
 headless probe in `rig.js`; u at mid-tank (x = 3 m), the set-up is the
 piezometric level η = z + p/ρg read just above the bed at x = 0.2 and 5.8 m.
 
-MEASURED_TABLE
+| reading | expected | measured |
+|---|---|---|
+| at rest, 10 s: largest speed in the tank | 0 | 0.2–0.5 mm/s |
+| at rest: η at either end | 0.40 m | 0.399 m both, set-up 0.0 mm |
+| τ = +1 N/m², 5–15 s: surface u / near-bed u | flows, however small | +0.02 to +0.03 / −0.003 to −0.006 m/s |
+| τ = +1 N/m²: set-up | τL/(ρgd) = 2 mm | ±3–5 mm slosh about zero: under one cell, not visible |
+| τ = +10 N/m², 10 s after switching on: set-up | 2.0–3.1 cm | 2.3–2.9 cm |
+| τ = +20 N/m², 5 s after switching on | | surface +0.19, mid −0.10, bed −0.11 m/s; set-up 6.2 cm (overshoot) |
+| τ = +20 N/m², 15–40 s (steady, ± seiche) | 4.1–6.1 cm | set-up 4.2–5.3 cm, settling at 4.9 cm; surface +0.23 to +0.28, near bed −0.07 to −0.09 m/s |
+| τ = −20 N/m², 20–40 s after reversing | mirror image | set-up −4.6 to −5.4 cm (left wall high); surface −0.22 to −0.27, near bed +0.08 m/s |
+| τ = 0 after −20, 10 / 20 / 40 / 60 s later: largest speed | decays | 4.8 / 2.2 / 1.0–1.2 / 1.2 cm/s |
+| τ = 0, 30–60 s later: u at mid-tank | 0 | under 2 mm/s; a slow seiche of a few mm remains at the ends |
+
+**Response time.** The surface layer moves within the first second, and the
+two-layer circulation (drift on top, return along the bed) is fully formed
+within 5 s; the set-up overshoots and rings as a seiche (period
+2L/√(gd) ≈ 7 s) for 10–15 s before it settles. After τ returns to zero the
+circulation is under 1 cm/s within about 30–40 s; a residual seiche of a few
+millimetres at the end walls takes minutes to die. That is the honest limit
+of "the motion dies away": it does, but the last millimetres are slow.
+
+**Small τ.** At 1 N/m² the water visibly drifts (particles, Speed field) but
+the set-up is a fifth of a cell and does not show; the set-up needs
+τ ≳ 5 N/m² to be several cells high. The slider runs ±20 N/m² in steps of
+0.5. ±20 was stable over 80 s of driving in both directions, with peak
+speeds about 0.35 m/s.
 
 ### How the stress is applied
 

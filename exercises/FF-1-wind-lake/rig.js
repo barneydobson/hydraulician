@@ -67,4 +67,11 @@ window.FF1 = {
 
   small: function (tau) { return FF1.hold(tau === undefined ? 1 : tau, 20, 5); },
 };
-/* Measured, Medium (844 x 113, dx = 7.1 mm): see the README's instructor table. */
+/* Measured, Medium (844 x 113, dx = 7.1 mm), u at x = 3 m:
+ *   rest            speedMax < 0.5 mm/s, setup 0.0 mm
+ *   tau +20, 5 s    uSurf +0.19 uMid -0.10 uBed -0.11  setup 6.2 cm (overshoot)
+ *   tau +20, 40 s   uSurf +0.24 uBed -0.08              setup 4.9 cm
+ *   tau -20, 40 s   uSurf -0.24 uBed +0.08              setup -4.9 cm
+ *   tau 0, 60 s     uMid < 2 mm/s, speedMax 1.2 cm/s (residual seiche)
+ *   tau +1, 15 s    uSurf +0.03 uBed -0.003             setup within +-5 mm slosh
+ * Full table in the README's instructor section. */

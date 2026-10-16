@@ -1946,9 +1946,18 @@ const SIM = (() => {
       // wrapper says the solid is. If that texel is not solid, the wrapper
       // is describing a surface the mask does not have (an erased hole) or
       // no longer has (an open valve) — zero the sample.
-      const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * 0.5 * S.dx) / S.dx)));
-      const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * 0.5 * S.dx) / S.dx)));
-      if (!sol(ix, jx)) { q.p = 0; q.f = 0; }
+      // A sloped face rasterises as a cell staircase, so half a cell in
+      // can still be a water cell between two stair-steps: on PF-2's 30°
+      // wall that zeroed 6 samples in 154 and read F_h 4% low. So the check
+      // looks 0.5, 1.0 and 1.5 Δx in and the surface exists if ANY is solid
+      // — still far short of an erase stroke or an open valve's thickness.
+      let inside = false;
+      for (const dd of [0.5, 1.0, 1.5]) {
+        const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * dd * S.dx) / S.dx)));
+        const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * dd * S.dx) / S.dx)));
+        if (sol(ix, jx)) { inside = true; break; }
+      }
+      if (!inside) { q.p = 0; q.f = 0; }
     }
     const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
     const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);

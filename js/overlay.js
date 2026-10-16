@@ -1411,7 +1411,18 @@ const OVERLAY = (() => {
         const fKN = (v) => Math.abs(v) >= 1000
           ? (v / 1000).toFixed(1) + " kN/m" : v.toFixed(0) + " N/m";
         chip(ctx, cx + 8, cy - 18, "F = " + fKN(D.F), col);
-        chip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m"), col);
+        const refs = (sim.scene && sim.scene.forceRef) || [];
+        const ref = refs.indexOf(D.solidId + ":" + D.faceId) >= 0 ? faceDepth(sim, D, g) : null;
+        if (!ref) chip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m", ["F_h ", "F_v "]), col);
+        else {
+          // A face the scene lists in `forceRef` (PF-2's wall) gets
+          // the components on their own rows and ½ρg·d² beside F_h, d being
+          // the wetted height of THIS face.
+          const half = 0.5 * 1000 * g * ref * ref;
+          chip(ctx, cx + 8, cy, "F_h " + (D.Fx >= 0 ? "→ " : "← ") + fKN(Math.abs(D.Fx)) +
+               "   ½ρgd² = " + fKN(half) + "  (d = " + ref.toFixed(2) + " m)", col);
+          chip(ctx, cx + 8, cy + 18, "F_v " + (D.Fz >= 0 ? "↑ " : "↓ ") + fKN(Math.abs(D.Fz)), col);
+        }
       }
     }
     ctx.restore();
@@ -1442,19 +1453,43 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** The wetted height d of the face a Pressure force reading `D` was taken
+   *  on: the free surface η (z + p/g at the lowest wet sample, evaluated at
+   *  the point SIM.faceForce actually read — 0.75 Δx out along the normal)
+   *  minus the lowest vertex of the face. Null when the face is dry or its
+   *  solid is gone. Only drawn for the faces a scene lists in `forceRef`
+   *  ("solid:face"). */
+  function faceDepth(sim, D, g) {
+    const so = (sim.solids || []).find((s) => s.id === D.solidId);
+    if (!so) return null;
+    let zf = Infinity;
+    GEOM.faceEdges(so, D.faceId).forEach((e) => {
+      zf = Math.min(zf, so.verts[e][1], so.verts[(e + 1) % so.verts.length][1]);
+    });
+    let low = null;
+    for (const s of D.samples) {
+      if (s.f > 0.5 && s.p > 0 && (!low || s.z < low.z)) low = s;
+    }
+    if (!low || !Number.isFinite(zf)) return null;
+    const eta = low.z + low.nz * 0.75 * sim.dx + low.p / g;
+    return eta > zf ? eta - zf : null;
+  }
+
   /** A vector as two signed components with their directions spelled out, so
    *  nothing on this tool is read off a bare sign. */
-  function vec(vx, vz, unit) {
+  function vec(vx, vz, unit, labels) {
     // ONE scale for the pair, and the unit written once at the end. Scaling
     // each component on its own produced "1.51 k  0.0 N/m", where the k had
-    // come adrift from the unit it belonged to.
+    // come adrift from the unit it belonged to. `labels` ([x, z] prefixes,
+    // e.g. ["F_h ", "F_v "]) names the two components.
     const big = Math.max(Math.abs(vx), Math.abs(vz)) >= 1000;
     const d = (v) => {
       const a = Math.abs(v) / (big ? 1000 : 1);
       return big || a < 100 ? a.toFixed(a >= 10 ? 1 : 2) : a.toFixed(0);
     };
-    return (vx >= 0 ? "→ " : "← ") + d(vx) +
-           "   " + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
+    const L = labels || ["", ""];
+    return L[0] + (vx >= 0 ? "→ " : "← ") + d(vx) +
+           "   " + L[1] + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
            " " + (big ? "k" : "") + unit;
   }
 

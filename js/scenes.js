@@ -1910,6 +1910,91 @@ const SCENES = (() => {
                "Slide θ from 90° to 175°: F→ climbs from ρqU towards 2ρqU while F↑ = ρqU sin θ falls from ρqU to almost nothing.",
                "Field → Momentum flux: red is still heading the way the jet was fired, blue has been sent back."] };
     })(),
+    // ===== Year 1: wall-shape =====
+    // PF-2: a still tank whose right-hand wall changes shape under ONE slider,
+    // with the water depth over the wall's foot held at d = 1.60 m. The point
+    // is the projection rule: the Pressure force tool reads F_h = ½ρg·d² on
+    // every shape, while F_v is the weight of the water standing on the wall
+    // (or, under an overhang, of the "water that isn't there" above it,
+    // pointing up). The scene lists the wall in `forceRef`, which makes
+    // drawForce print the ½ρg·d² reference beside F_h.
+    //
+    // The slider s ∈ [0, 1]: s ≤ 0.75 is a straight face whose angle from the
+    // vertical runs linearly from −30° (overhang) through 0° (s = 0.25) and
+    // 30° (s = 0.5) to 60° (s = 0.75); past 0.75 the 60° face blends vertex by
+    // vertex into a four-step staircase whose outer corners lie on that 60°
+    // line. The face always has the same nine vertices (collinear on a straight
+    // face), each moving monotonically up and to the right, so every
+    // intermediate polygon is simple and stays joined to the bed: the wall and
+    // the ground are ONE polygon, so there is no seam for water to leak
+    // through. The face runs 0.20 m above the water to a flat crest, so the
+    // top step is dry and the free surface never meets a corner.
+    //
+    // nu is an eddy viscosity for the same reason as `dyke`: the point is
+    // still water, and every slider move restarts it from the hydrostatic fill.
+    (() => {
+      const ZB = 0.30, D = 1.60, ETA = ZB + D, ZF = ETA + 0.20;   // bed, depth, surface, face top
+      const XF = 2.00, NSTEP = 4, W = 5.6;                        // foot of the wall, steps, domain
+      const deg = (s) => (s <= 0.75 ? -30 + 120 * s : 60);
+      // The nine face vertices, foot first.
+      const face = (s) => {
+        const th = deg(s) * Math.PI / 180, hf = ZF - ZB, run = hf * Math.tan(th);
+        const beta = s <= 0.75 ? 0 : (s - 0.75) / 0.25;
+        const r = hf / NSTEP, t = run / NSTEP, pts = [];
+        for (let k = 0; k <= 2 * NSTEP; k++) {
+          const P = [XF + run * k / (2 * NSTEP), ZB + hf * k / (2 * NSTEP)];   // on the line
+          const m = Math.ceil(k / 2), q = Math.floor(k / 2);                   // stairs: rise, then tread
+          const Q = [XF + q * t, ZB + m * r];
+          pts.push([P[0] + beta * (Q[0] - P[0]), P[1] + beta * (Q[1] - P[1])]);
+        }
+        return pts;
+      };
+      const shape = (s) => (s === undefined ? 0.25 : s);
+      return {
+        id: "wall-shape", name: "Wall shape and the pressure force", key: "F_h = ½ρgd², whatever the shape",
+        group: "Hydrostatics",
+        blurb: "Still water, 1.60 m deep, against a wall whose shape you set: overhanging, vertical, sloped at 30° or 60°, or stepped. Click the wall with the Pressure force tool and compare F_h and F_v as the shape changes.",
+        W, H: 2.4, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
+        hmax: 2.0, headMax: 1.8, vmax: 1,
+        open: [0, 0, 0, 0], particles: 0, spinup: 0,
+        forceRef: ["tank:wall"],               // drawForce prints ½ρg·d² beside F_h on this face
+        params: [
+          { key: "shape", label: "Wall shape", min: 0, max: 1, step: 0.01, value: 0.25, unit: "",
+            resetWater: true,
+            fmt: (v) => {
+              if (v > 0.75) return v >= 0.995 ? "staircase (4 steps, 60° overall)"
+                : "60° slope → steps " + Math.round(400 * (v - 0.75)) + "%";
+              const th = deg(v);
+              return Math.abs(th) < 0.5 ? "vertical" : th < 0
+                ? "overhang " + (-th).toFixed(0) + "° from vertical"
+                : "sloped " + th.toFixed(0) + "° from vertical";
+            } },
+          { key: "block", label: "Submerged block", min: 0, max: 1, step: 1, value: 0, unit: "",
+            resetWater: true, fmt: (v) => (v > 0.5 ? "on: 0.50 × 0.50 m, held still" : "off") },
+        ],
+        solids: (W_, H_, P_, par = {}) => {
+          const f = face(shape(par.shape));
+          const verts = [[-0.5, -0.5], [W + 0.5, -0.5], [W + 0.5, ZF]];
+          for (let k = f.length - 1; k >= 0; k--) verts.push(f[k]);   // crest end down to the foot
+          verts.push([-0.5, ZB]);
+          // CCW edges: 0 underside, 1 right, 2 crest, 3..10 the face (top
+          // down), 11 the bed, 12 left.
+          const out = [GEOM.poly(verts, [
+            { id: "wall", label: "Right-hand wall", e0: 3, e1: 2 + 2 * NSTEP },
+            { id: "bed", label: "Tank floor", e0: 3 + 2 * NSTEP, e1: 3 + 2 * NSTEP },
+            { id: "crest", label: "Crest", e0: 2, e1: 2 },
+          ], "tank")];
+          if (par.block > 0.5) out.push(GEOM.rect(0.20, 0.80, 0.70, 1.30, { id: "block",
+            faces: [{ id: "all", label: "Submerged block (all four sides)", e0: 0, e1: 3 }] }));
+          return out;
+        },
+        water: (x, z, P) => (z > ZB && z < ETA ? still(ETA, z, P) : 0),
+        tips: ["Pick the <b>Pressure force</b> tool and click the right-hand wall. The chip prints F, then F_h with ½ρg·d² beside it, then F_v.",
+               "Set <b>Wall shape</b> in Controls: overhang → vertical → 30° → 60° → steps. Each change restarts the still water; the depth at the wall stays 1.60 m.",
+               "F_h never changes: only the wall's vertical projection, d, matters.",
+               "F_v is the weight of the water standing on the wall. Under an overhang it is the weight of the water that ISN'T there above it, and it points up.",
+               "Switch <b>Submerged block</b> on and click the block: the pressure all round it adds up to one upward force, its displaced weight."] };
+    })(),
   ];
 
   const byId = {};

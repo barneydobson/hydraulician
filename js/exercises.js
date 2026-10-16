@@ -1333,4 +1333,31 @@ const EXERCISES = [
     task: "Set θ = 90°, 120°, 135°, 150° and 175° with the Turning angle slider; at each read F→ and F↑ off the box and compare with your predictions. Field → Momentum flux shows the jet being sent back.",
     settle: 5,
   },
+  // ===== Year 1: PF-2 =====
+  // A lecturer demo the class replays: the `wall-shape` scene, one slider
+  // morphing the wall. Every slider move restarts still, hydrostatic water
+  // (resetWater), so there is nothing to wait out: `settle: 0`. The scene's
+  // `forceRef` puts ½ρg·d² beside F_h on the wall's chip.
+  {
+    id: "PF-2",
+    title: "The wall's shape doesn't matter",
+    topic: "Pressure, force and where it acts",
+    folder: "PF-2-wall-shape",
+    scene: "wall-shape",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", particles: false },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "force", where: "the right-hand wall of the tank (and the submerged block, when it is on)", why: "F_h with ½ρg·d² beside it, and F_v — the weight of the water standing on the wall, or of the water that isn't there above an overhang" },
+    ],
+    ui: { view: ["legendBtn"], fields: ["water", "phead"], panel: "focused", controls: ["geom0", "geom1"] },
+    start: "still water 1.60 m deep against a right-hand wall whose shape is set by one slider; per metre width",
+    setup: ["Pick the Pressure force tool and click the right-hand wall. The chip at the centre of pressure prints F, then F_h with ½ρg·d² beside it, then F_v.",
+            "Controls → Geometry → Wall shape: 0 overhang 30°, 0.25 vertical, 0.50 sloped 30°, 0.75 sloped 60°, 1 a staircase. Each change restarts the still water; the depth at the wall stays d = 1.60 m.",
+            "At each of the five settings read F_h and F_v. Work out the weight of the water standing on the wall, ρg × (area between the wall and the surface), and compare it with F_v.",
+            "Optional: switch Submerged block on and click the block. Its four sides add up to one upward force; compare it with ρg × 0.25 m²."],
+    task: "Show that F_h stays at ½ρg·d² = 12.6 kN/m whatever the wall's shape, and that F_v is the weight of the water above the wall — pointing up under the overhang, where the water above is water that isn't there.",
+    settle: 0,
+  },
 ];

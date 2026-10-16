@@ -1148,4 +1148,42 @@ const EXERCISES = [
     task: "Read the three levels and the two face forces while the valve is shut, then press V: watch the culvert run and the small basin fill, and read them again once the water is still — one level, equal forces.",
     settle: 0,
   },
+
+  // ===== Year 1: UP-1 =====
+  // L2 Fundamentals: the speed of sound in a pipe. A lecturer demo on the
+  // `pipeline` scene (reservoir → straight pipe → valve → overflowing tank),
+  // written for this item because hammer's nozzle outlet muddied the
+  // picture. No rig, no digit; the Slot celerity row is the experiment.
+  // Speed ×0.1 so a 16 m gauge spacing (0.23 s at c = 70) is seen, not
+  // inferred.
+  {
+    id: "UP-1",
+    title: "Pressure travels at the speed of sound (water hammer)",
+    topic: "Unsteady pipe flow",
+    folder: "UP-1-water-hammer",
+    scene: "pipeline",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "1", particles: true, gaugeField: "h", speed: 0.1 },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "gauge", where: "on the pipe axis, z = 3 m, at x = 14, 30 and 46 m (16 m apart; the valve is at x = 52 m)", why: "three stations 16 m apart: the arrival delay 16/c is 0.23 s at c = 70 and 0.46 s at c = 35; the 46 m gauge sits near the valve and carries the full Joukowsky plateau for 2L/c" },
+    ],
+    // The corner gauge cards are withheld: three of them stack over the
+    // downstream end of the pipe and hide the valve and the 46 m gauge. The
+    // inspector windows are the time series instead, and can be parked in
+    // the empty space above the pipe.
+    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead"],
+      controls: ["cel", "gaugeInspect"], readouts: { gauges: false } },
+    start: "a reservoir at a constant 16 m level feeding a 47 m straight pipe (2 m bore, axis z = 3 m) that discharges through an open valve into a small overflowing tank; the flow is steady",
+    setup: [
+      "Place three Gauges (5) on the pipe axis at x = 14, 30 and 46 m. Open each one's history from Controls → Gauge inspector and park the three windows in the empty space above the pipe.",
+      "Before the slam read the pipe velocity v₀ (the |u| tab) and the head h at the 46 m gauge.",
+      "Press V to slam the valve. Watch the gauges respond one after another: the pressure wave runs up the pipe at the slot celerity c, reflects at the reservoir as a low-pressure wave and returns.",
+      "Pause (space) and read in the inspector: the arrival times at the three gauges (Δt for 16 m), the head rise ΔH at the 46 m gauge, and the period of the square wave.",
+      "Press V to reopen, set Slot celerity c to 35 m/s, press R and wait about 20 s for the flow to settle; slam again.",
+    ],
+    task: "Compare Δt with 16/c, ΔH with Joukowsky c·v₀/g (g = 9.81 m/s²) and the period with 4L/c (L = 47 m). Halve c: the delay doubles and the surge halves.",
+    settle: 20,
+  },
 ];

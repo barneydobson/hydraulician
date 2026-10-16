@@ -7,6 +7,7 @@
 // Ids the register does not have yet are skipped, not errors.
 const EXERCISE_MENU = {
   title: "CIVE40008 · Year 1",
+  briefLink: false,          // students read the card; no "Lecturer notes" link
   sections: [
     { title: "L2 · Fundamentals",       ids: ["FF-1", "UP-1"] },
     { title: "L3 · Statics",            ids: ["HS-1", "PF-2"] },

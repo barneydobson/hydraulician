@@ -1311,6 +1311,59 @@ void main(){
   o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));
 }`;
 
+  // ------------------------------------------------------------ streamlines
+  /** The volume fluxes the stream function is integrated from (js/stream.js),
+   *  packed TWO cells per texel so the async readback is a quarter of the
+   *  live U + F it replaces. Texel (p, j) covers cells a = (2p, j), b = a + 1:
+   *
+   *    row j >= 1:  (qx_a, qx_b, wet_a + 2 wet_b, 0)
+   *    row j == 0:  (qx_a, qx_b, qz_a, qz_b)   — the floor's flux instead of
+   *                 wetness; the bottom ring row is never drawn.
+   *
+   *  qx is the flux through a cell's LEFT face, qz through its BOTTOM face,
+   *  per unit width: (f u) with the fill capped at 1 (pressurised water is
+   *  still one volume of water), zero on any face touching a solid. Live, u
+   *  already lives on that face and f is the two-cell mean; under Average
+   *  (u_avg) u_U is the Favre accumulator (<f u_c>, <f w_c>, fbar, Pbar),
+   *  whose centred mean fluxes are averaged onto the face. */
+  const FS_SFLUX = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 o;
+uniform sampler2D u_U, u_F, u_S;
+uniform vec2  u_res;
+uniform float u_avg, u_valve;
+
+bool inside(ivec2 c){ return c.x >= 0 && c.x < int(u_res.x); }
+bool solid(ivec2 c){
+  float s = texelFetch(u_S, c, 0).r;
+  return s > 0.75 || (s > 0.25 && u_valve > 0.5);
+}
+float fillAt(ivec2 c){ return u_avg > 0.5 ? texelFetch(u_U, c, 0).b : texelFetch(u_F, c, 0).r; }
+vec2 meanQ(ivec2 c){ vec4 A = texelFetch(u_U, c, 0); return A.rg / max(A.b, 1.0); }
+float qx(ivec2 c){
+  if (!inside(c) || solid(c)) return 0.0;
+  ivec2 l = c - ivec2(1, 0);
+  bool hasL = c.x > 0;
+  if (hasL && solid(l)) return 0.0;
+  if (u_avg > 0.5) return hasL ? 0.5 * (meanQ(c).x + meanQ(l).x) : meanQ(c).x;
+  float f = hasL ? 0.5 * (fillAt(c) + fillAt(l)) : fillAt(c);
+  return texelFetch(u_U, c, 0).r * clamp(f, 0.0, 1.0);
+}
+float qz(ivec2 c){
+  if (!inside(c) || solid(c)) return 0.0;
+  if (u_avg > 0.5) return meanQ(c).y;
+  return texelFetch(u_U, c, 0).g * clamp(fillAt(c), 0.0, 1.0);
+}
+float wet(ivec2 c){ return inside(c) && !solid(c) && fillAt(c) >= 0.5 ? 1.0 : 0.0; }
+
+void main(){
+  ivec2 a = ivec2(2 * int(gl_FragCoord.x), int(gl_FragCoord.y));
+  ivec2 b = a + ivec2(1, 0);
+  o = a.y == 0 ? vec4(qx(a), qx(b), qz(a), qz(b))
+               : vec4(qx(a), qx(b), wet(a) + 2.0 * wet(b), 0.0);
+}`;
+
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_HGL, FS_PART, VS_PART,
-           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL };
+           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL, FS_SFLUX };
 })();

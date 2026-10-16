@@ -29,6 +29,7 @@ const OVERLAY = (() => {
 
   const C = {
     dc: "#ffb648", dn: "#5fd08a", egl: "#cfe3f5", hgl: "#ff9de2", surf: "#7fd4ff",
+    sline: "rgba(245,250,255,0.9)", slineHalo: "rgba(8,14,22,0.55)",
     dim: "rgba(223,232,242,0.55)", grid: "rgba(223,232,242,0.13)",
   };
 
@@ -655,6 +656,31 @@ const OVERLAY = (() => {
       ctx.textBaseline = "middle";
       ctx.fillText(t, B.x + 46, ly + k * 15 + 1);
     });
+  }
+
+  /** Streamlines: contour segments of ψ (STREAM.contours), in metres, plus a
+   *  one-line key quoting the discharge each tube carries. `L` is
+   *  {seg, dpsi, avg} as main.js refreshStream keeps it. */
+  function drawStreamlines(ctx, V, L) {
+    if (!L || !L.seg) return;
+    const s = L.seg;
+    ctx.save();
+    ctx.beginPath();
+    for (let k = 0; k < s.length; k += 4) {
+      ctx.moveTo(V.X(s[k]), V.Y(s[k + 1]));
+      ctx.lineTo(V.X(s[k + 2]), V.Y(s[k + 3]));
+    }
+    // A dark halo under a light core, so the lines read over every ramp —
+    // the pale middle of vorticity as much as the dark end of speed.
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = C.slineHalo; ctx.lineWidth = 2.6; ctx.stroke();
+    ctx.strokeStyle = C.sline; ctx.lineWidth = 1.1; ctx.stroke();
+    ctx.restore();
+    const B = V.vis || V;
+    chip(ctx, B.x + 10, B.y + B.h - 34,
+         "streamlines" + (L.avg ? " of the MEAN flow" : "") +
+         " · Δψ = " + (+L.dpsi.toPrecision(2)) + " m²/s between lines",
+         C.sline);
   }
 
   function drawCursorReadout(ctx, V, A, sim, mx, mz, probe, show) {
@@ -1498,7 +1524,7 @@ const OVERLAY = (() => {
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
            drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
-           drawGradeLines,
+           drawGradeLines, drawStreamlines,
            ROW_IDS, DEFAULT_ROWS,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
            drawMeasure, drawCV, drawFlux, drawForce, drawForceHover, measureText, chip, fmt };

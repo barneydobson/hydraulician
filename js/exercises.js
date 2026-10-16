@@ -1393,4 +1393,36 @@ const EXERCISES = [
     task: "Read u and p at rest, then blow on the surface with τ: any shear, however small, makes the water flow — set-up at the downwind wall, return flow along the bed.",
     settle: 0,
   },
+  // ===== Year 1: FF-3 =====
+  // A lecturer demo on the `body` scene: plan view, a uniform stream past one
+  // body whose shape is the single Geometry slider (0 = slender ellipse,
+  // 1 = square, frontal width held at 0.40 m). The card boots on the ellipse
+  // with its steady wake; the lecturer drags the slider through the onset of
+  // shedding (measured near 0.4) and then presses A. No digit: watched, not
+  // pooled. `settle` is the time the boot transient takes to wash past the
+  // body and leave the steady streamlined wake.
+  {
+    id: "FF-3",
+    title: "Flow past a body",
+    topic: "Flow fields, shear and turbulence",
+    folder: "FF-3-flow-past-body",
+    scene: "body",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "4", particles: false, dye: false, gaugeField: "speed" },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "gauge", where: "in the wake, about 0.6 m behind the body and 0.2 m off the centreline", why: "the speed trace is flat behind a streamlined body and a steady oscillation, one cycle per shed pair, behind a bluff one — the period is read off it" },
+    ],
+    ui: { measure: ["gauge"], view: ["legendBtn", "partBtn", "dyeBtn", "avgBtn"],
+          fields: ["water", "speed", "vort"], panel: "focused", controls: ["speed", "geom0"] },
+    start: "looking down on a uniform 0.9 m/s stream past a slender ellipse lined up with the flow, 0.40 m wide; colour is vorticity",
+    setup: ["Watch the wake behind the ellipse: two thin shear layers (red and blue) that run off downstream side by side, and nothing moves.",
+            "Drag Controls → Geometry → Body shape slowly towards 1 (a square of the same width). Give each step 20–30 s; shedding grows slowly near its onset.",
+            "Note where along the slider the wake starts to swing from side to side. Put a Gauge (5) in the wake and read the period of the oscillation off its Speed trace.",
+            "Turn on Dye (D) and Particles (P): compare the dye timelines and the particle tracks in the steady wake and in the shedding one.",
+            "With the square shedding, press A (Average): watch the alternating street become one steady, symmetric wake bubble."],
+    task: "Find the slider position where the wake starts to shed, read the shedding period, and compare the live wake of the square with its average.",
+    settle: 10,
+  },
 ];

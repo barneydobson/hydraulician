@@ -1580,6 +1580,153 @@ const SCENES = (() => {
              "Colour is vorticity: the two shear layers roll up into a Kármán street.",
              "Draw a splitter plate behind the body and the street stops shedding.",
              "Turn particles on to watch the jet entrain the surrounding water."] },
+
+    // ===== Year 1: HJ-2, WV-4 =====
+    // ------------------------------------------------ THE FLUME LAB, SCALED UP
+    // HJ-2's scene, ported from the lecturer's unversioned 10 Sep copy
+    // (2026_hydraulician-gate-jump). The first-year teaching flume (Lab 2,
+    // "The hydraulic jump"): a sluice gate 43 mm open under a 0.275 m pool
+    // passes 5.85 l/s down a 0.104 m wide flume — q = 0.056 m²/s, d_c =
+    // 0.070 m — and a weir on an operating handle at the far end holds a jump
+    // about 0.7 m downstream of the gate. Here the same flume at roughly seven
+    // to ten times its size: a 0.30 m opening under a 2.85 m pool passing
+    // q = 1.2 m²/s (d_c = 0.53 m), a flap weir hinged 7 m past the gate, the
+    // bed flat throughout. The weir crest (the Geometry slider `weir_h`,
+    // geom1 after the gate's geom0) is the lab's operating handle: raise it
+    // and the jump walks back and the gate drowns.
+    //
+    // channel() builds the bed, the gate and its `gate_a` param; the flap
+    // weir is added here rather than in channel() so the port stays one
+    // block. Its param and polygon are appended to what channel() returns.
+    //
+    // Three decisions measured on the 10 Sep code (the README records them;
+    // re-measured on the stress-free surface, see the README's instructor
+    // section for what still holds):
+    //  · The downstream control is a WEIR with a free overfall behind it, not
+    //    a tailwater level: with the level pinned on the right edge the
+    //    roller ended on the gate at every setting tried.
+    //  · The flume is 14 m, not the 24 m a ×10 lab would be: over a 17 m
+    //    reach the backwater alone drowned the gate at every crest.
+    //  · a = 0.30 rather than the lab's 0.43 ×10: the wider opening's sheet
+    //    was overrun within 2 m at every crest. Crest 0.05 flooded the flume
+    //    (the two-cell weir stopped being one), hence the 0.10 floor.
+    //
+    // RE-MEASURED after the stress-free surface (#72), Medium: the jet no
+    // longer carries a slow layer, so it keeps its momentum (Fr₁ ≈ 4.5 at
+    // d₁ ≈ 0.20 m, conjugate ≈ 1.2 m) and the old 0.20 crest held no jump at
+    // all — the sheet ran supercritical up the flap and over it. The jump now
+    // lives in a narrow, hysteretic band: from boot at 0.48 it stands at the
+    // gate's foot; 0.46 puts it on the apron (x ≈ 6–8), 0.44 at x ≈ 9, and
+    // 0.42 sweeps it over the weir; from the swept state it does not return
+    // until ~0.60, where it runs straight to the gate and drowns it. Hence
+    // the 0.48 default, and a reach that starts 1.20 m deep from x = 7 m so
+    // the jump is established at boot rather than swept out on the way in.
+    (function () {
+      const s = channel({
+        W: 14, H: 3.8, bed0: 0.30, S0: 0, cf: 0.008, cs: 0.06, q: 1.2,
+        inletDepth: 2.85, gate: { x: 4.0, a: 0.30 }, xEnd: 12.5,
+        mode: 2, hmax: 3.2, vmax: 8, spinup: 60,
+        extra: {
+          headMax: 3.2,
+          water: (x, z, P) => {
+            // Pool, a DRY apron, and the reach the weir holds. The apron
+            // starts dry because a jet shot into standing water starts
+            // submerged and the roller is slow to leave the gate; over a dry
+            // bed the sheet is free from the first second.
+            const bed = 0.30;
+            if (z <= bed || x >= 12.5) return 0;
+            const lev = x < 4.0 ? bed + 2.85 : x < 7.0 ? 0 : bed + 1.20;
+            return lev ? still(lev, z, P) : 0;
+          },
+        },
+      });
+      // The flume's flap weir: a plate hinged at its upstream foot (x = 11.0),
+      // leaning downstream, the operating handle turning it about the hinge
+      // so that its tip — the crest — stands at bed + h. The plate is 1.3 m
+      // long and 0.10 m thick, rooted 0.15 m into the bed; the angle is solved
+      // from  L sinθ + t cosθ = h + 0.15  (the tip's upper corner is the
+      // crest). Faces: the water side (upstream), the tip, and the underside
+      // the nappe falls past.
+      const WX = 11.0, BED = 0.30, LP = 1.3, TP = 0.10, ROOT = 0.15;
+      const flap = (h) => {
+        let th = Math.asin(Math.min(0.98, (h + ROOT) / LP));
+        for (let k = 0; k < 6; k++) th = Math.asin(Math.max(0.02, Math.min(0.98, (h + ROOT - TP * Math.cos(th)) / LP)));
+        const cx = Math.cos(th), sx = Math.sin(th), z0 = BED - ROOT;
+        return GEOM.poly(
+          [[WX, z0], [WX + LP * cx, z0 + LP * sx], [WX + LP * cx - TP * sx, z0 + LP * sx + TP * cx], [WX - TP * sx, z0 + TP * cx]],
+          [{ id: "us", label: "Upstream face (water side)", e0: 2, e1: 2 },
+           { id: "crest", label: "Tip", e0: 1, e1: 1 },
+           { id: "ds", label: "Underside", e0: 0, e1: 0 }], "weir");
+      };
+      const gateSolids = s.solids;
+      s.params = s.params.concat([{ key: "weir_h", label: "Weir crest height", min: 0.10, max: 1.0,
+                                    step: 0.01, value: 0.48, unit: "m" }]);
+      s.solids = (W_, H_, P_, par) => gateSolids(W_, H_, P_, par)
+        .concat([flap(par && par.weir_h !== undefined ? par.weir_h : 0.48)]);
+      return Object.assign(s, {
+        id: "gatejump", name: "Sluice gate → hydraulic jump", key: "The flume lab, scaled up",
+        blurb: "The teaching flume at several times its size: a deep pool behind a sluice gate, a fast sheet under it, and a hydraulic jump back to the depth a weir holds at the far end — subcritical, supercritical, subcritical, in one view.",
+        tips: ["Pressure head (P): hydrostatic in the pool, clearly not under the gate, where the streamlines curve and the water accelerates.",
+               "The pool is subcritical, the sheet under the gate supercritical: the Froude field switches colour at the gate.",
+               "The weir crest (Controls → Geometry) holds the jump: at 0.46 m it stands on the apron, at 0.42 m it is swept over the weir, and it only comes back near 0.60 m — straight up to the gate, which drowns.",
+               "The grade lines show the head loss in the jump as a drop in the EGL — (d₂−d₁)³/(4d₁d₂).",
+               "Click the gate with the Pressure force tool: hydrostatic near the surface, falling to zero at the lip."] });
+    })(),
+
+    // ------------------------------------------------ WV-4 · BREAKERS ON A BEACH
+    // One flume, one wave, one slider: the beach slope tanβ. The piston at
+    // the left makes the same wave every time over a flat bed of constant
+    // depth; the slider tilts the beach, and the Iribarren number
+    // ξ = tanβ/√(H₀/L₀) moves through spilling (ξ < 0.5), plunging
+    // (0.5–3.3) and surging (> 3.3) with nothing else changed.
+    //
+    // Where the beach goes. A gentle beach is long and a steep one short, and
+    // these waves lose height to the discretisation the further they run
+    // (engineering notes, "Surface waves are damped by RESOLUTION"), so the
+    // beach is placed to keep the flat run short at both ends of the slider:
+    // the toe sits at x = 1.2 m (just off the paddle) until the beach is steep
+    // enough for its still-water shoreline to come inside x = 6 m, and from
+    // there the shoreline stays at 6 m and the toe walks right. Above the
+    // shoreline the beach runs on to the right edge, so run-up always has
+    // somewhere to go. Changing the slope is a new experiment (resetWater).
+    (function () {
+      const W = 12, H = 1.2, BED = 0.20, LEV = 0.60, D = LEV - BED;
+      const TOE0 = 1.2, SHORE = 6.0;
+      const toeOf = (s) => Math.max(TOE0, SHORE - D / s);
+      const slopeOf = (par) => (par && par.beach_s !== undefined ? par.beach_s : 0.06);
+      return {
+        id: "beach", name: "Wave flume · breakers on a beach", key: "Iribarren, one slider",
+        group: "Jets & waves",
+        blurb: "Waves from a piston over deep, level water run onto a beach whose slope is one slider. Gentle: the crest crumbles and spills all the way in. Steep: the front surges up the slope and runs back without breaking.",
+        W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+        mode: 0, hmax: 0.9, vmax: 1.6,
+        open: [0, 0, 0, 0],
+        wave: { amp: 0.18, period: 2.0, on: 1, x: 0.30 },
+        particles: 1, plife: 6,
+        spinup: 0,
+        params: [{ key: "beach_s", label: "Beach slope tanβ", min: 0.04, max: 0.70, step: 0.01,
+                   value: 0.06, unit: "", resetWater: true,
+                   fmt: (v) => v.toFixed(2) + "  (1 : " + (1 / v).toFixed(1) + ")" }],
+        solids: (W_, H_, P_, par) => {
+          const s = slopeOf(par), xt = toeOf(s), zTop = H_ + 0.5;
+          // One CCW polygon: the flat bed, the toe, and the beach rising to
+          // the right edge (or leaving through the top first on a steep one).
+          const xr = W_ + 0.5, zr = BED + s * (xr - xt);
+          const top = zr <= zTop ? [[xr, zr]] : [[xr, zTop], [xt + (zTop - BED) / s, zTop]];
+          return [GEOM.poly([[-0.5, -0.5], [xr, -0.5]].concat(top, [[xt, BED], [-0.5, BED]]),
+            [{ id: "beach", label: "Beach face", e0: 2 + top.length - 1, e1: 2 + top.length - 1 },
+             { id: "bed", label: "Flume bed", e0: 3 + top.length - 1, e1: 3 + top.length - 1 }], "beach")];
+        },
+        water: (x, z, P, par) => {
+          const s = slopeOf(par), xt = toeOf(s);
+          return z > BED && z < LEV && x < xt + (z - BED) / s ? still(LEV, z, P) : 0;
+        },
+        tips: ["One slider: the beach slope. The wave is the same every time — the piston's stroke and period do not change.",
+               "Iribarren ξ = tanβ/√(H₀/L₀): spilling below about 0.5, plunging 0.5–3.3, surging above 3.3.",
+               "Gentle beach: the wave shoals, steepens, and its crest crumbles down the front — spilling, a long surf zone.",
+               "Steep beach: the front never steepens enough to break; it surges up the slope and slides back, and much of the wave reflects.",
+               "A real plunging breaker throws a tongue of water that traps an air tube. That tongue is thinner than this solver's interface — see the card."] };
+    })(),
   ];
 
   const byId = {};

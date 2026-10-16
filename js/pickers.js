@@ -957,7 +957,7 @@ const EX = (() => {
       if (!c || !c.set) return null;
       const wrap = document.createElement("div");
       wrap.className = "exrowf";
-      let el;
+      let el, out = null;
       if (c.type === "check") {
         el = document.createElement("input");
         el.type = "checkbox";
@@ -969,6 +969,19 @@ const EX = (() => {
           o.value = v; o.textContent = txt; el.appendChild(o);
         });
         el.onchange = () => { c.set(el.value); syncPanel(); };
+      } else if (c.par) {
+        // A Geometry row is a dimension of the scene — a weir crest, a gate
+        // opening, a beach slope — and is played with rather than typed: a
+        // slider, with the value printed beside it. Range and step are the
+        // param's own, read off the control (syncPanel copies them there).
+        el = document.createElement("input");
+        el.type = "range";
+        el.min = c.min; el.max = c.max; el.step = c.step;
+        el.oninput = () => {
+          const v = +el.value;
+          if (isFinite(v)) { c.set(v); syncPanel(); }
+          if (out) out.textContent = round4(v) + " " + unitOf(c);
+        };
       } else {
         el = document.createElement("input");
         el.type = "number";
@@ -988,12 +1001,12 @@ const EX = (() => {
       el.setAttribute("aria-label", ctlLabel(id));
       wrap.appendChild(el);
       if (c.type !== "check" && c.type !== "select") {
-        const u = document.createElement("span");
-        u.className = "exunit";
-        u.textContent = unitOf(c);
-        wrap.appendChild(u);
+        out = document.createElement("span");
+        out.className = "exunit";
+        out.textContent = unitOf(c);
+        wrap.appendChild(out);
       }
-      fields.push({ id, el, type: c.type });
+      fields.push({ id, el, type: c.par ? "range" : c.type, out });
       return wrap;
     }
 
@@ -1011,13 +1024,20 @@ const EX = (() => {
      *  typed, and "0.4" on the way to "0.45" is a legitimate half-typed value. */
     function syncValues() {
       if (!box || !cur) return;
-      fields.forEach(({ id, el, type }) => {
+      fields.forEach(({ id, el, type, out }) => {
         if (!el.isConnected || el === document.activeElement) return;
         const c = CONTROLS.find((x) => x.id === id);
         if (!c || !c.get) return;
         const v = c.get();
         if (type === "check") el.checked = !!v;
         else if (type === "select") el.value = v;
+        else if (type === "range") {
+          // The slider follows the panel's row, and so do its bounds — a
+          // Geometry row's param can change with the scene.
+          el.min = c.min; el.max = c.max; el.step = c.step;
+          if (!(Math.abs(+el.value - v) < 1e-9)) el.value = v;
+          if (out) out.textContent = round4(v) + " " + unitOf(c);
+        }
         else {
           const shown = el.value === "" ? NaN : +el.value;
           if (!(Math.abs(shown - v) < 1e-9)) el.value = round4(v);

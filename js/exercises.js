@@ -1148,4 +1148,83 @@ const EXERCISES = [
     task: "Read the three levels and the two face forces while the valve is shut, then press V: watch the culvert run and the small basin fill, and read them again once the water is still — one level, equal forces.",
     settle: 0,
   },
+
+  // ===== Year 1: HJ-2, WV-4 =====
+  // HJ-2: the flume lab (Lab 2, "The hydraulic jump") scaled up, ported from
+  // the lecturer's 10 Sep copy and re-homed under momentum (L6), where it
+  // shows non-hydrostatic pressure under the gate and the gate force read two
+  // ways. A lecturer demo: nothing is personalised, and the one control the
+  // class owns is the weir crest — the flume's operating handle — which is a
+  // Geometry slider, so the card names it and draws it as a slider. The weir,
+  // not a tailwater level, is the downstream control for a measured reason
+  // recorded in the scene.
+  {
+    id: "HJ-2",
+    title: "Sluice gate with the movable weir",
+    topic: "Momentum conservation",
+    folder: "HJ-2-gate-jump",
+    scene: "gatejump",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "1", channel: false, grade: true, jumps: false, labels: false, gaugeField: "d" },
+    digitNote: "lecturer demo: no personalised parameter — the weir crest is the handle",
+    studentParams: [
+      { control: "geom1", unit: "m",
+        rule: "the flap weir's tip, 0.48 m above the bed as the card opens (jump at the gate's foot); 0.46 moves it out onto the apron, 0.42 sweeps it over the weir, and from 0.60 the gate is drowned" },
+    ],
+    instruments: [
+      { tool: "force", where: "the gate's Upstream face — pick the Pressure force tool on the strip and click the plate", why: "the pressure diagram: hydrostatic near the surface, falling to zero at the lip" },
+      { tool: "cv", where: "Control volume (9): drag (2.50, 0.10) → (6.00, 3.70) — pool to the sheet, bottom face inside the bed, top clear of the pool", why: "F→ on the gate from the momentum theorem, to set against the Pressure force tool's diagram" },
+      { tool: "gauge", where: "x = 2.5 m, z ≈ 0.6 m — the pool", why: "d₀ behind the gate, for ½ρg(d₀ − a)² and C_d" },
+      { tool: "gauge", where: "x = 10 m, z ≈ 0.6 m — the reach past the jump", why: "d₂; watch it climb as the weir rises" },
+      { tool: "flux", where: "a vertical section through the sheet at x ≈ 6 m", why: "q, and the depth and velocity that carry it" },
+    ],
+    ui: { view: ["legendBtn", "gradeBtn", "avgBtn"],
+          fields: ["phead", "water", "speed", "ehead", "froude"], panel: "focused" },
+    setup: [
+      "Wait out the settle. Live, the jump breathes: press A (Average) before reading anything downstream of the gate.",
+      "Pressure head (the colour on screen): it grows with depth in the pool as ρgd, but under the gate, where the streamlines curve and the water accelerates, it falls short of the depth below the surface — pressure is hydrostatic only where streamlines are straight.",
+      "Click the gate's upstream face with the Pressure force tool and read F→. Compare ½ρg(d₀ − a)² with d₀ from the pool gauge and a = 0.30 m.",
+      "Drag the Control volume round the gate and read its F→: the momentum theorem's answer for the same force.",
+      "Step the Weir crest height slider down in small steps, waiting ~40 s each: 0.46 puts a free jump out on the apron, 0.44 pushes it to the far end, 0.42 sweeps it over the weir and the sheet runs the whole flume. It does not come back until about 0.60, and then the jump runs straight up to the gate and drowns it — the pool climbs and the gate force rises (0.80, 1.00).",
+    ],
+    start: "a 2.85 m pool behind a sluice gate open 0.30 m, a fast sheet under it, a hydraulic jump, and a flap weir holding the reach at the far end",
+    task: "Read the pressure head under the gate against the depth, the gate force two ways (Pressure force tool and Control volume) against ½ρg(d₀ − a)², then raise the weir crest until the gate drowns and read them again.",
+    settle: 60,
+  },
+
+  // WV-4: a Year 2 preview, the spectacular extra. One slider (the beach
+  // slope, geom0) moves the Iribarren number through the breaker types with
+  // the wave held fixed. The solver spills and surges honestly; a true
+  // plunging tongue is thinner than its interface (engineering notes), so the
+  // middle band is described as what it is on screen.
+  {
+    id: "WV-4",
+    title: "Breaking waves on a beach",
+    topic: "Waves",
+    folder: "WV-4-breakers",
+    scene: "beach",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { mode: "0", particles: true },
+    digitNote: "lecturer demo: no personalised parameter — the beach slope is the handle",
+    studentParams: [
+      { control: "geom0", unit: "",
+        rule: "tanβ; 0.06 (1 : 17) as the card opens. Moving it restarts the flume" },
+    ],
+    instruments: [
+      { tool: "gauge", where: "x ≈ 1 m, in the deep level part", why: "the wave arriving at the beach: H ≈ 0.16–0.19 m, T = 2.0 s" },
+    ],
+    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "speed", "vort"], panel: "focused",
+          controls: ["speed", "geom0"] },
+    setup: [
+      "The piston makes the same wave every time: T = 2.0 s, H₀ ≈ 0.16 m over 0.40 m of water, so L₀ = gT²/2π ≈ 6.2 m and ξ = tanβ/√(H₀/L₀) ≈ 6·tanβ.",
+      "Gentle, tanβ = 0.06 (ξ ≈ 0.4, spilling): the wave steepens slowly and its crest crumbles into a bore that runs a long way up the beach, losing height all the way.",
+      "Middle, tanβ ≈ 0.15–0.3 (ξ ≈ 1–2, the plunging band): the front goes vertical and collapses close to the shoreline over a short surf zone. A real plunger throws a tongue over an air pocket; that tongue is thinner than this model's interface, so here it collapses rather than curls.",
+      "Steep, tanβ ≥ 0.55 (ξ > 3.3, surging): the front never breaks; the water surges up the slope and slides back down, and much of the wave reflects back into the flume.",
+    ],
+    start: "a wave flume with a piston at the left, 0.40 m of level water, and a beach whose slope is the one slider",
+    task: "Watch a few waves arrive at the gentle beach, then step the slope up (0.06 → 0.15 → 0.3 → 0.7), waiting about 15 s after each change, and name the breaker each time: spilling, plunging (collapsing here) or surging.",
+    settle: 15,
+  },
 ];

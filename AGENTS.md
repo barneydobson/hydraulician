@@ -270,6 +270,18 @@ that is silently not there. Hidden tools keep their digit: worksheets say
 
 ## Gotchas worth knowing on day one
 
+- **Tablets are a first-class target** (a lecturer runs exercises on an
+  iPad). The neutral tool is **Read** (`state.tool === null`): a press with
+  it never draws — a tap pins the readout card, a drag pans when zoomed —
+  and every exercise arrives with it in hand; only the sandbox door arms
+  Wall. A finger's press is held ~90 ms (`TOUCH_HOLD_MS`) so a pinch never
+  places, pins or dyes anything. On a coarse pointer the strip wraps onto a
+  second row rather than shrinking below 40 px or scrolling (`fitBar`,
+  `--barb`, `state.barTop`), and an upright tablet under 900 px gets the
+  bottom sheet, not an overlaid side panel. `ui-smoke.mjs` drives a real
+  emulated iPad (touch events, dpr 2); details in
+  [docs/making-exercises.md](docs/making-exercises.md) → *Reading the water
+  by touch*.
 - A dev browser may serve stale JS from `http.server`; force with
   `fetch(url, {cache:"reload"})` then `location.reload()`.
 - Resolution changes Δx, not the physics: the domain is a fixed physical

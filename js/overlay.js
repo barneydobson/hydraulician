@@ -709,6 +709,20 @@ const OVERLAY = (() => {
          C.sline);
   }
 
+  /** Where a pinned readout reads: a ring and a dot, so the card is visibly
+   *  ABOUT a point rather than floating free once the finger has gone. */
+  function drawPinMark(ctx, V, mx, mz) {
+    const x = V.X(mx), y = V.Y(mz);
+    ctx.save();
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.stroke();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = "#ffd98a";
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.stroke();
+    ctx.fillStyle = "#ffd98a";
+    ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
   function drawCursorReadout(ctx, V, A, sim, mx, mz, probe, show) {
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(mx / sim.dx)));
     const d = A.d[i], dc = A.dc[i], dn = A.dn[i], S0 = A.S0[i];
@@ -1008,8 +1022,10 @@ const OVERLAY = (() => {
     for (let k = gauges.length - 1; k >= 0; k--) {
       const gg = gauges[k], x = V.pxW - pad - W;
       rects.push({ k, x, y, w: W, h: H });
-      const hist = gg.hist;
       const Q = pick(gg), label = Q.label, unit = Q.unit, val = Q.get;
+      // `series`: what to plot — the scrolling window, or the whole run from
+      // t = 0 (main.js gaugeSeries); the card's look is the same either way.
+      const hist = Q.series || gg.hist;
       ctx.save();
       ctx.fillStyle = "rgba(12,17,26,0.80)";
       ctx.strokeStyle = "rgba(255,255,255,0.10)";
@@ -1035,6 +1051,17 @@ const OVERLAY = (() => {
         ctx.font = "700 11px ui-monospace, monospace";
         ctx.fillText(String(k + 1) + "  " + label + " " + fmt(val(hist[hist.length - 1]), 3) + " " + unit,
           x + 10, y + 14);
+        // The whole run says so, with its time axis at the foot: "t = 0" at
+        // the left edge and the clock at the right, so a student reads the
+        // approach to steady state against time rather than a bare curve.
+        if (Q.whole) {
+          ctx.font = "9.5px ui-monospace, monospace";
+          ctx.fillStyle = C.dim;
+          ctx.fillText("t = " + Math.round(t0) + " s", x + 10, y + H - 4);
+          ctx.textAlign = "right";
+          ctx.fillText(Math.round(t1) + " s", x + W - 52, y + H - 4);
+          ctx.textAlign = "left";
+        }
       }
       ctx.restore();
       y -= H + 8;
@@ -1762,7 +1789,7 @@ const OVERLAY = (() => {
   }
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
-           drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
+           drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawPinMark, drawRake,
            drawGradeLines, drawStreamlines, drawWind, drawRakeScale,
            ROW_IDS, DEFAULT_ROWS, setPrint, PRINT,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,

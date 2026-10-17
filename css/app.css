@@ -21,7 +21,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    toast) centres on `100vw - var(--dock)` for the same reason. */
 /* --dock is what the side panel takes; --dockb is what the same panel takes
    as a bottom sheet on a phone. One of the two is always zero. */
-:root { --dock: 0px; --dockb: 0px; --sheet-h: min(58vh, 520px); }
+:root { --dock: 0px; --dockb: 0px; --barb: 0px; --gcw: 0px; --sheet-h: min(58vh, 520px); }
 
 /* Sized, not just inset: a <canvas> has an intrinsic 300 × 150, and a fixed
    box with `width: auto` keeps it rather than stretching to the four edges. */
@@ -237,7 +237,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    theirs and stops following the panel. Same bargain as the vertical
    exaggeration -- fitted until somebody sets it by hand. */
 #legend {
-  position: fixed; z-index: 12; right: calc(var(--dock) + 12px); top: 84px;
+  position: fixed; z-index: 12; right: calc(var(--dock) + 12px); top: max(84px, calc(var(--barb) + 11px));
   width: 236px;
   display: none; padding: 9px 11px 8px; gap: 5px; flex-direction: column;
   font: 11.5px system-ui, sans-serif;
@@ -362,15 +362,18 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #hint {
   position: fixed; bottom: calc(var(--dockb) + 18px);
   z-index: 10; padding: 9px 34px 9px 18px;
-  left: calc((100vw - var(--dock)) / 2); transform: translateX(-50%);
+  /* --gcw is the width the gauges' corner cards take out of the bottom right
+     (main.js sets it while any are drawn): the tips line centres on what is
+     left, so it never sits on top of a gauge's chart. */
+  left: calc((100vw - var(--dock) - var(--gcw)) / 2); transform: translateX(-50%);
   font-size: 13px; opacity: .92; pointer-events: none; text-align: center;
-  max-width: min(640px, 70vw);
+  max-width: min(640px, 70vw, calc(100vw - var(--dock) - var(--gcw) - 24px));
 }
 #hint b { color: #7fd4ff; }
 #hint .minbtn { pointer-events: auto; }
 
 #toast {
-  position: fixed; top: 76px; z-index: 11; padding: 12px 20px; text-align: center;
+  position: fixed; top: max(76px, calc(var(--barb) + 3px)); z-index: 11; padding: 12px 20px; text-align: center;
   left: calc((100vw - var(--dock)) / 2); transform: translateX(-50%) translateY(-8px);
   opacity: 0; transition: opacity .35s, transform .35s;
   pointer-events: none; max-width: min(560px, 80vw);
@@ -631,6 +634,9 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   padding: 4px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #exmenu.compact .smi b { font-size: 12.5px; }
+/* No hover on this screen (pickers.js): the aim is printed under the title,
+   so the item wraps rather than ellipsizing. */
+#exmenu.compact.inline .smi { white-space: normal; padding: 8px 9px 9px; }
 #exmenu.compact .smg { padding: 7px 9px 2px; }
 .exdesc {
   position: fixed; z-index: 31; display: none; pointer-events: none;
@@ -763,12 +769,31 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   #bar.tight .tbtn { width: 42px; height: 42px; }
   #bar.tighter .tbtn { width: 40px; height: 40px; }
   #bar.tightest .tbtn { width: 38px; height: 38px; }
+  /* Out of room on a touch screen: the groups WRAP rather than shrink below
+     40 px or scroll out of sight (fitBar). The bar grows a row, and the
+     legend, the toast and the panel follow its bottom edge (--barb). */
+  #bar.wraps { height: auto; min-height: 58px; padding-top: 5px; padding-bottom: 5px; }
+  #bar.wraps #groups { flex: 1 1 auto; flex-wrap: wrap; row-gap: 5px; overflow: visible; }
+  #bar.wraps .tbtn { width: 42px; height: 42px; }
+  #bar.notitle #title { display: none; }
+  /* The gauge cards' small DOM controls keep their look (every worksheet
+     screenshot has one) but get a finger-sized hit area. */
+  .gcardBtn, .gcardX { overflow: visible; }
+  .gcardX::after { content: ""; position: absolute; inset: -11px; }
+  .gcardBtn::after { content: ""; position: absolute; inset: -9px -11px -3px -11px; }
+  .gcardSel { height: 28px; }
+  /* A slider is dragged with a fingertip: a taller track to land on. */
+  #dock input[type=range], #panel input[type=range] { height: 32px; }
+  #panel { top: max(78px, calc(var(--barb) + 8px)); max-height: calc(100vh - max(78px, calc(var(--barb) + 8px)) - 20px); }
+  /* The canvas is a surface to touch, not text: no callout, no selection
+     loupe and no grey flash on a long press. */
+  #view, #over, #bar { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  button, .tbtn, [role="button"] { -webkit-tap-highlight-color: transparent; }
   /* A 44 px target and a caption do not both fit a strip this tall, and the
      target is the one that cannot be given up. */
   .tcap { display: none; }
   .tsep { display: block; }
   #bar { height: 58px; }
-  #panel { top: 78px; }
   /* Shortcuts are for machines with keys. */
   #keysBtn { display: none; }
   .dock-x { font-size: 20px; padding: 6px 10px; }
@@ -973,6 +998,8 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   font: 700 10.5px ui-monospace, monospace; color: #7fd4ff; letter-spacing: .04em;
 }
 #startlist .si .t { font-size: 12px; }
+/* The aim, printed only where there is no hover to show it as a tooltip. */
+#startlist .si .aim { display: block; margin: 2px 0 0 38px; font-size: 11px; line-height: 1.35; opacity: .55; }
 #startlist .none { padding: 10px 8px; font-size: 12px; opacity: .5; }
 
 .startcard {

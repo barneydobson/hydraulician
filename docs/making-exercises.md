@@ -138,7 +138,7 @@ An entry in a course's `exercises.js`, appended to `EXERCISES` (declared in
 | field | applied? | holds |
 |---|---|---|
 | `rigParams` | yes | the plumbing without which the rig is not a rig: `budget` (Resolution) first, then the edges (`openL..openT`), then supplies and levels — *edges before level controls*, because ticking a level opens its own edge |
-| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' number boxes, default on) and `hoverCard` (the cursor's hover card, default on — FF-1 opens with it off), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
+| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `gaugeSpan` (`"window"`, the default, or `"all"`: the corner charts span the whole run from t = 0 — VC-2), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' number boxes, default on) and `hoverCard` (the hover card that follows a mouse, default on — FF-1 opens with it off; it does not govern the tap-to-read card, see *Reading the water by touch*), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
 | `gauges` | yes | `[{x, z, field}]`, at most four: gauges the card arrives with ALREADY PLACED, each on its own quantity. The exception to "the picker places no instruments", for a card whose subject is a time series from t = 0 (VC-2's level curve). The card lists them under *Already set* |
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
 | `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule`. For a slider give a short `label` ("Speed of sound in water, c", "Wall shape", "Inflow Q") and **no** `rule`: a sentence under every slider made the Year 1 cards mostly slider, so what it does and its starting value go in `setup` |
@@ -238,6 +238,32 @@ once and the quantity new gauges start on, which is what old worksheets
 ("set Gauges plot to Depth") and rigs mean by it. A gauge's own choice is
 **not** in the rig wire format (no version bump): a rig carries the one
 `ui.field`, applied to all its gauges.
+
+Controls → **Gauge charts** (`viewParams.gaugeSpan`) sets how much of the run
+the corner charts span: `"window"` (the default) is the scrolling recent
+window; `"all"` spans t = 0 → now, the time axis compressing as the run
+grows, with `t = 0 s … N s` printed at the chart's foot — for a card whose
+point is the APPROACH to a steady state (VC-2: the level rising from its
+starting depth; the overshoot after the valve is shut and opened). The whole
+run is kept thinned for drawing (≤ 1200 points, halved as it fills), so t = 0
+never scrolls off; the inspector (which opens fitted to all it holds) and
+the CSV keep every sample. **R** restarts it with the clock.
+
+**Reading the water by touch.** The neutral tool is **Read** (the first
+MEASURE button, no digit, never hidden while any tool is offered): nothing
+in hand. A tap — or a mouse click — with it pins the hover card's rows at
+that point, live, with a ring marking where; it stays until the next tap
+elsewhere moves it, and a tap on the ring, on dry ground or a solid, or
+outside the domain takes it away. A drag with it pans when zoomed in and
+never draws. Every exercise arrives with Read in hand, even one that offers
+BUILD — drawing starts when a student picks Wall, Erase, Valve or Pour (a
+mouse right-drag still pours); only the sandbox door (New sandbox, start
+screen, `?scene=sandbox`) arms Wall. The pinned card follows the card's
+`readouts.rows` and is withheld by `readouts.cursor: false`, but NOT by the
+Hover readout switch (`hoverCard`): that switch governs the card that
+FOLLOWS a mouse on a desktop, and a tablet has no other way to read the
+flow. So FF-1's "turn on Hover readout" is a desktop instruction; on an iPad
+a tap reads the same rows with the switch off.
 
 **Rakes.** A rake reads the water around the point CLICKED: down to the
 first solid, up to the first solid or the end of the water. In open water
@@ -375,14 +401,16 @@ tab of the exercise already on the bench switches tabs in place.
 
 The menu is **compact** (one line per item, id and title; the entry's `aim`,
 or for entries without one the `start · ?scene · settles in N s` line, in a
-small floating box beside the item on hover or arrow-key highlight) and
+small floating box beside the item on hover or arrow-key highlight; on a
+screen that cannot hover — a tablet — it is printed under the title instead) and
 **collapsible** (section headings only; one opens at a time; the current
 exercise's section opens by itself; a filter opens every section with a
 match). Its height is capped to the viewport. A course may switch these off
 (`compact: false`, `collapsible: false`), offer a link to the whole register
 (`showAllLink: true`) or show the card's link to the brief (`briefLink:
 true`); by default neither link shows. The start screen's list shows id and
-title, with the `aim` as a hover tooltip.
+title, with the `aim` as a hover tooltip (printed under the title on a
+touch screen).
 
 The **Scenes** button and the `S` key are offered only while no exercise is
 on screen (start screen, sandbox, a `?scene=` boot) or after ⋯ (show

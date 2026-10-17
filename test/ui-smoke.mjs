@@ -1805,6 +1805,128 @@ async function main() {
       } finally { await phone.close(); }
     }
 
+    // ----------------------------------------------------------------- tablets
+    // An iPad, emulated: a mobile viewport at devicePixelRatio 2 with touch
+    // input, driven by real touch events (Input.dispatchTouchEvent). The
+    // lecturer touched an exercise to read it and it drew a block: the default
+    // tool was Wall even where the card hides BUILD.
+    console.log("\na tablet reads the water by touch and never draws by accident");
+    {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      async function tablet(url, w, h) {
+        const tab = await browser.open(url);
+        await tab.send("Emulation.setDeviceMetricsOverride",
+                       { width: w, height: h, deviceScaleFactor: 2, mobile: true });
+        await tab.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+        await tab.send("Page.reload", { ignoreCache: true });
+        await sleep(300);
+        for (let i = 0; ; i++) {
+          let ok = false;
+          try { ok = await tab.evaluate("return !!window.APP && !!document.querySelector('#groups .tbtn');"); }
+          catch (_) { /* still navigating */ }
+          if (ok) break;
+          if (i > 200) throw new Error("tablet tab did not boot: " + url);
+          await sleep(150);
+        }
+        await tab.evaluate("return APP.EX.ready ? APP.EX.ready.then(() => true) : true;");
+        await tab.evaluate("APP.frames(5); return true;");
+        return tab;
+      }
+      const touch = (tab, type, pts) => tab.send("Input.dispatchTouchEvent",
+        { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+      async function tap(tab, x, y) {
+        await touch(tab, "touchStart", [[x, y]]);
+        await sleep(40);
+        await touch(tab, "touchEnd", []);
+        await sleep(200);                 // past the touch hold (TOUCH_HOLD_MS)
+      }
+      // A point in the water, in CSS pixels: scan a column for a full cell.
+      const WET = `
+        const W = APP.sim.W, H = APP.sim.H;
+        for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) for (let k = 1; k < 40; k++) {
+          const x = W * fx, z = H * k / 40, p = APP.probe(x, z);
+          if (p && p.f > 0.9 && p.f < 1.05) {
+            const cv = document.getElementById("view"), r = cv.getBoundingClientRect();
+            const px = [r.left + APP.view.X(x), r.top + APP.view.Y(z)];
+            if (document.elementFromPoint(px[0], px[1]) === cv) return px;
+          }
+        }
+        return null;`;
+
+      const tab = await tablet(INDEX + "?ex=FF-1", 768, 1024);
+      const before = await tab.evaluate(`return { tool: APP.state.tool,
+        segs: (APP.sim.segs || []).length, build: !!document.getElementById("undoBtn") };`);
+      eq("an exercise opens with nothing in hand", before.tool, null);
+      check("FF-1 offers no BUILD (the case that drew)", !before.build);
+      const at = await tab.evaluate(WET);
+      check("found the water on screen", !!at);
+      await tap(tab, at[0], at[1]);
+      await tab.evaluate("APP.frames(4); return true;");
+      const after = await tab.evaluate(`return { segs: (APP.sim.segs || []).length,
+        pin: APP.state.pin, ptr: APP.state.ptr };`);
+      eq("a touch tap creates no geometry", after.segs, before.segs);
+      eq("the tap was a touch", after.ptr, "touch");
+      check("a tap pins the readout where it landed", !!after.pin);
+      // A second tap on the pin takes it away; so does a tap on dry ground.
+      await tap(tab, at[0], at[1]);
+      const gone = await tab.evaluate("return APP.state.pin;");
+      eq("a tap on the pin clears it", gone, null);
+      await tap(tab, at[0], at[1]);
+      // Dry ground: air over the water, at a point the canvas itself is under
+      // (not the strip or the legend, which float over the top of the view).
+      const dry = await tab.evaluate(`
+        const cv = document.getElementById("view"), r = cv.getBoundingClientRect();
+        for (const fx of [0.3, 0.5, 0.15, 0.7]) for (let k = 39; k > 0; k--) {
+          const x = APP.sim.W * fx, z = APP.sim.H * k / 40, p = APP.probe(x, z);
+          const px = [r.left + APP.view.X(x), r.top + APP.view.Y(z)];
+          if (p && p.f < 0.01 && document.elementFromPoint(px[0], px[1]) === cv) return px;
+        }
+        return null;`);
+      check("found dry ground on screen", !!dry);
+      await tap(tab, dry[0], dry[1]);
+      eq("a tap on dry ground clears it", await tab.evaluate("return APP.state.pin;"), null);
+      // The card fits a portrait iPad: a bottom sheet inside the viewport,
+      // the strip's every button a finger's width and on screen.
+      const fit = await tab.evaluate(`
+        const d = document.getElementById("dock"), r = d.getBoundingClientRect();
+        const body = d.querySelector(".dock-body");
+        const btns = [...document.querySelectorAll("#groups .tbtn")].map((b) => b.getBoundingClientRect());
+        return { sheet: d.classList.contains("sheet"), open: d.classList.contains("open"),
+                 inside: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5,
+                 scrolls: getComputedStyle(body).overflowY,
+                 small: btns.filter((b) => b.width > 0 && (b.width < 40 || b.height < 40)).length,
+                 off: btns.filter((b) => b.left < 0 || b.right > innerWidth || b.top < 0).length,
+                 pageW: document.documentElement.scrollWidth, iw: innerWidth };`);
+      check("the card is open as a bottom sheet at 768 × 1024", fit.open && fit.sheet);
+      check("and sits inside the viewport", fit.inside);
+      eq("its body scrolls", fit.scrolls, "auto");
+      eq("every strip button is at least 40 px", fit.small, 0);
+      eq("and on screen", fit.off, 0);
+      eq("nothing overflows sideways", fit.pageW, fit.iw);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      await tab.close();
+
+      // A pinch is not a tool action: with the Gauge tool in hand, two
+      // fingers zoom and place nothing.
+      const t2 = await tablet(INDEX + "?ex=VC-2", 1024, 768);
+      const g0 = await t2.evaluate(`APP.state.tool = "gauge"; return { n: APP.state.gauges.length, z: APP.state.zoom };`);
+      const c = await t2.evaluate(WET);
+      await touch(t2, "touchStart", [[c[0] - 30, c[1]]]);
+      await sleep(15);
+      await touch(t2, "touchStart", [[c[0] - 30, c[1]], [c[0] + 30, c[1]]]);
+      for (let k = 1; k <= 6; k++) {
+        await touch(t2, "touchMove", [[c[0] - 30 - 12 * k, c[1]], [c[0] + 30 + 12 * k, c[1]]]);
+        await sleep(20);
+      }
+      await touch(t2, "touchEnd", []);
+      await sleep(200);
+      const g1 = await t2.evaluate("return { n: APP.state.gauges.length, z: APP.state.zoom };");
+      eq("a pinch places no gauge", g1.n, g0.n);
+      check("and zooms", g1.z > g0.z * 1.2, "zoom " + g0.z + " → " + g1.z);
+      check("no uncaught errors", t2.errors.length === 0, t2.errors[0]);
+      await t2.close();
+    }
+
     // ------------------------------------------------------- embedded in an LMS
     console.log("\nan embedded exercise keeps the water");
     {

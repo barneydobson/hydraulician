@@ -36,7 +36,12 @@ const CONFIG = {
 
 const state = {
   scene: null, budget: CONFIG.defaultBudget,
-  tool: "wall", brush: 0.055,
+  // The pointer tool in hand. NULL is the neutral "Read" tool: a press never
+  // draws, it pins the readout card where it lands (state.pin). Only the
+  // sandbox door arms Wall (newSandbox, a `?scene=sandbox` boot): everywhere
+  // else building waits until Wall, Erase, Valve or Pour is CHOSEN — a
+  // lecturer on an iPad touched an exercise to read it and found blocks.
+  tool: null, brush: 0.055,
   mode: 0, range: {}, particles: false, dyeSeeds: false, channel: true, labels: true, jumps: true,
   ui: null,                   // the resolved UI profile; UIMODE.full() when absent
   // The legend sits top right, immediately left of the Controls panel, until
@@ -95,10 +100,18 @@ const state = {
   // accumulators and reset the overlay's EMAs in BOTH directions.
   avg: false,
   gauges: [], rakes: [], gaugeField: "h", tracers: null, tracerN: 9,
+  gaugeSpan: "window",        // the corner charts: "window" (scrolling) or "all" (t = 0 → now)
   gaugeT: -1,                 // sim time of the last gauge sample — see sampleGauges
   gaugeSeq: 0,                // ever-increasing gauge id, for inspector identity
   deliv: null,                // measured inlet discharge / level, for the panel
   cursor: [0, 0], inside: false, hover: null,
+  // The pinned readout: the touch screen's hover. A tap (or a click) with no
+  // tool in hand puts the readout card at {x, z} and leaves it there until
+  // the next tap elsewhere, or a tap on dry ground / outside the domain.
+  // `ptr` is the pointer type of the last canvas event — the floating hover
+  // card follows a mouse or pen, never a finger (it would sit under it).
+  pin: null, pinProbe: null, pinTick: 0, ptr: "mouse", pending: null, press: null,
+  barTop: 0,                  // px a wrapped touch strip takes off the top of the view (fitBar)
   drag: null, pour: null, dyeInj: null,
   zoom: 1, vex: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false, vexDrag: null,
   // The exaggeration is fitted to the window until somebody sets it by hand —
@@ -127,10 +140,12 @@ let canvas, over, octx, view, sim;
  *  honest because they follow the same rect. */
 function baseRect() {
   const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
+  // A wrapped (two-row) touch strip claims the top of the canvas — fitBar.
+  const top = Math.min(state.barTop || 0, ch * 0.4);
   const ar = sim.W / (sim.H * state.vex);
   let w = cw, h = cw / ar;
-  if (h > ch) { h = ch; w = ch * ar; }
-  return { cw, ch, w, h, bx: (cw - w) / 2, by: (ch - h) / 2 };
+  if (h > ch - top) { h = ch - top; w = h * ar; }
+  return { cw, ch, w, h, bx: (cw - w) / 2, by: top + (ch - top - h) / 2 };
 }
 
 function computeView() {
@@ -195,7 +210,8 @@ function zoomAt(px, py, factor) {
 const VEX_FILL = 0.62, VEX_MAX = 8;
 function autoVex() {
   if (!canvas || !sim || !(sim.W > 0) || !(sim.H > 0)) return 1;
-  const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
+  const cw = canvas.clientWidth || 900;
+  const ch0 = canvas.clientHeight || 600, ch = ch0 - Math.min(state.barTop || 0, ch0 * 0.4);
   // From baseRect: a width-limited rect is `cw · H · vex / W` tall.
   const v = VEX_FILL * ch * sim.W / (cw * sim.H);
   return Math.max(1, Math.min(VEX_MAX, v));
@@ -250,6 +266,7 @@ function loadScene(id, keepDrawing) {
   state.force = null;
   state.forceHover = null;
   state.forceScale = null;
+  state.pin = null; state.pinProbe = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -320,6 +337,7 @@ function switchScene(id) {
   state.grade = false;                // an exercise that wants them says so in viewParams
   state.sline = false; state.slineN = 12;   // likewise the streamlines
   state.gaugeField = "h";
+  state.gaugeSpan = "window";         // an exercise that wants the whole run says gaugeSpan: "all"
   state.instReadouts = true;          // an exercise that wants them off says so in viewParams
   state.hoverCard = true;
   state.tracerN = 9;
@@ -580,7 +598,7 @@ const CONTROLS = [
       }
     },
     fmt: () => EX.statusLine(),
-    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. The card prints the RULE for your own parameter (d is your student number's last digit — your lecturer explains it); working it out and setting it is yours, because the picker never moves a slider or drops a gauge. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
+    info: "The verified teaching demos, one folder per course in <code>courses/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. The card prints the RULE for your own parameter (d is your student number's last digit — your lecturer explains it); working it out and setting it is yours, because the picker never moves a slider or drops a gauge. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
 
   { h: "Flow" },
   { id: "speed", label: "Speed", min: 0.02, max: 10, step: 0.01, log: true,
@@ -927,6 +945,15 @@ const CONTROLS = [
     optsNow: () => UIMODE.gaugeFields().map((q) => [q.id, q.name]),
     get: () => gaugeFieldOf(null), set: (v) => setAllGaugeFields(v),
     info: "What every gauge plots, and what a new gauge starts on. Each gauge can then be switched on its own: the small selector beside its card, or the tabs in its inspector window. Every quantity is recorded all the time whatever is plotted, and the CSV carries all of them." },
+  // How much of the run the corner cards plot. "window" (the default) is the
+  // scrolling recent window the cards always showed; "all" spans t = 0 → now,
+  // compressing the time axis as the run grows, so an approach to steady state
+  // (VC-2's level rising from its starting depth, the overshoot after a valve
+  // is shut and opened) stays on the chart from its first sample.
+  { id: "gaugeSpan", type: "select", label: "Gauge charts",
+    opts: [["window", "recent (scrolling)"], ["all", "whole run, from t = 0"]],
+    get: () => state.gaugeSpan, set: (v) => { state.gaugeSpan = v === "all" ? "all" : "window"; },
+    info: "What each gauge's corner chart spans. Recent: the last few hundred samples, scrolling. Whole run: from t = 0 to now, the time axis compressing as the run grows (thinned for drawing — the inspector and the CSV keep every sample). R restarts it with the clock." },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
     // opens), plus a CSV of everything recorded.
@@ -1332,6 +1359,9 @@ const ICONS = {
   particles: '<circle cx="5" cy="7" r="1.3"/><circle cx="11" cy="5.5" r="1.3"/>' +
              '<circle cx="15" cy="9.5" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/>' +
              '<circle cx="13" cy="15" r="1.3"/>',
+  // The neutral tool: nothing in hand, a press reads the water there.
+  read:    '<circle cx="10" cy="10" r="2" fill="currentColor" stroke="none"/>' +
+           '<circle cx="10" cy="10" r="5.6" opacity=".6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2"/>',
   dye:     '<path d="M10 3.5c3 3.6 4.5 5.9 4.5 8a4.5 4.5 0 0 1-9 0c0-2.1 1.5-4.4 4.5-8Z"/>',
   // Streamlines squeezing past a body: three lines, closer over the bump.
   sline:   '<path d="M2.5 5c4 0 5 2.5 7.5 2.5S13.5 5 17.5 5"/>' +
@@ -1388,12 +1418,20 @@ const TIP = (() => {
     t.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
     t.style.top = (r.bottom + 8) + "px";
   }
-  function hide() { if (el) el.classList.remove("show"); }
+  let flashT = 0;
+  function hide() { clearTimeout(flashT); if (el) el.classList.remove("show"); }
+  /** The touch screen's tooltip: shown by the tap that pressed the button,
+   *  gone by itself after a moment (no key — a tablet has none). */
+  function flash(anchor, label, hint) {
+    show(anchor, label, hint, "");
+    clearTimeout(flashT);
+    flashT = setTimeout(() => { if (el) el.classList.remove("show"); }, 1800);
+  }
   /** Whether this machine has a pointer that can hover at all. */
   function hoverable() {
     return !(window.matchMedia && matchMedia("(hover: none)").matches);
   }
-  return { show, hide, hoverable };
+  return { show, hide, flash, hoverable };
 })();
 
 /** The colour key — and the field picker, because they are the same question.
@@ -1722,6 +1760,16 @@ const UIMODE = (() => {
     return list.indexOf(it.tool) >= 0 || list.indexOf(it.id) >= 0;
   }
 
+  /** Does the strip offer this tool under the live profile? */
+  function offers(tool) {
+    return allows(familyOf(tool), { tool, id: tool });
+  }
+  /** Is ANY pointer tool offered? Only then does the strip carry the Read
+   *  button that puts the tool down again. */
+  function anyTool() {
+    return TOOLS.some((t) => offers(t[0]));
+  }
+
   /** Whether anything at all is hidden — what puts ⋯ on the strip. */
   function narrowed() {
     const u = state.ui;
@@ -1735,6 +1783,11 @@ const UIMODE = (() => {
 
   function apply(profile) {
     state.ui = Object.assign(full(), profile || {});
+    // The tool in hand must be one the strip offers. Before this the default
+    // Wall stayed armed under a card that hides BUILD, so the first touch on
+    // an iPad drew a block the student had no button to take back. A tool the
+    // profile hides goes down, and the hand is empty: the Read tool.
+    if (state.tool && !offers(state.tool)) state.tool = null;
     if (state.ui.legend === false) LEGEND.close(); else LEGEND.open();
     // A profile that hides the live field would leave the legend naming
     // something its own picker cannot reach, so the field moves to the first
@@ -1817,8 +1870,8 @@ const UIMODE = (() => {
     return u.hide.indexOf(concept) >= 0;
   }
 
-  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows, rows,
-           gaugeFields, hides };
+  return { full, fromExercise, apply, lift, reset, allows, offers, anyTool, narrowed,
+           fields, shows, rows, gaugeFields, hides };
 })();
 
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
@@ -1899,6 +1952,9 @@ function newSandbox() {
   }
   newArmed = 0;
   EX.clear();
+  // The one door that is a choice to BUILD: Wall goes into the hand. Every
+  // other way in leaves the neutral Read tool there (see state.tool).
+  state.tool = "wall";
   switchScene("sandbox");     // announces itself — `loadScene` toasts the blurb
 }
 
@@ -1945,8 +2001,18 @@ const TOOLBAR = [
        { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
+  // MEASURE opens with READ: the empty hand. A press with it never draws or
+  // places anything — it pins the readout card where it lands, which is the
+  // touch screen's hover. It is not in TOOLS (no digit to renumber) and no
+  // profile can hide it: it is offered wherever any pointer tool is, because
+  // it is the way to put that tool down.
   { cap: "MEASURE", family: "measure",
-    items: toolItems("gauge", "rake", "tracer", "dye", "measure", "cv", "flux", "force") },
+    items: [{ id: "inspectBtn", icon: "read", label: "Read", key: "",
+              always: true,
+              hint: "Nothing in hand: tap or click the water to pin its numbers there — a press never draws. Tap dry ground to clear",
+              on: () => !state.tool,
+              act: () => { state.tool = null; state.forceHover = null; syncToolbar(); syncPanel(); } }]
+      .concat(toolItems("gauge", "rake", "tracer", "dye", "measure", "cv", "flux", "force")) },
   // VIEW: how the water is DRAWN. The three toggles were reachable only from
   // the P / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
@@ -2104,6 +2170,9 @@ function aboutHref() {
     : "docs/view.html?doc=numerics.md";
 }
 
+/** Strip buttons whose press opens a menu, a screen or a page. */
+const OPENERS = /^(homeBtn|sceneBtn|exBtn|panelBtn|fsBtn|popBtn|keysBtn|aboutBtn)$/;
+
 function buildToolbar() {
   const host = document.getElementById("groups");
   host.textContent = "";
@@ -2117,7 +2186,8 @@ function buildToolbar() {
     // narrowing is the thing a lecturer chose, then the capability check,
     // which is fixed at boot and so is never re-read by `syncToolbar`.
     const items = group.items.filter((it) =>
-      UIMODE.allows(group.family, it) && (!it.when || it.when()));
+      (it.always ? UIMODE.anyTool() : UIMODE.allows(group.family, it)) &&
+      (!it.when || it.when()));
     if (!items.length) return;
     if (host.children.length) {
       const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
@@ -2143,7 +2213,16 @@ function buildToolbar() {
       b.appendChild(iconEl(typeof it.icon === "function" ? it.icon() : it.icon));
       const tip = () => TIP.show(b, typeof it.label === "function" ? it.label() : it.label,
                                  it.hint, it.key);
-      b.onclick = () => { b.blur(); TIP.hide(); it.act(b); syncToolbar(); };
+      b.onpointerdown = (e) => { b._touch = e.pointerType === "touch"; };
+      b.onclick = () => {
+        b.blur(); TIP.hide(); it.act(b); syncToolbar();
+        // A finger has no hover, so a glyph on its own would never be named.
+        // The tap that presses it shows its card briefly instead — long
+        // enough to read the name, gone before it sits on the water.
+        // Not for a button that opens something: what it opens names itself,
+        // and a card on top of a menu would cover its first rows.
+        if (b._touch && b.isConnected && !OPENERS.test(b.id)) TIP.flash(b, typeof it.label === "function" ? it.label() : it.label, it.hint);
+      };
       // Only a pointer that can hover gets the card. On a touch screen there
       // is no hover to leave, so it would appear on the tap that presses the
       // button and then sit there over the water until something else was
@@ -2206,10 +2285,29 @@ function fitBar() {
   // would otherwise shrink itself for nothing. Two pixels of slack is already
   // too much — it leaves the last button clipped along its edge.
   const over = () => g.scrollWidth > g.clientWidth + 1;
-  bar.classList.remove("tight", "tighter", "tightest");
+  bar.classList.remove("tight", "tighter", "tightest", "wraps", "notitle");
+  bar.classList.remove("scrolls");
   if (over()) bar.classList.add("tight");
   if (over()) bar.classList.add("tighter");
-  if (over()) bar.classList.add("tightest");
+  // A FINGER needs its 40 px more than the strip needs one row: on a touch
+  // screen the last rungs (26 px glyphs, then a sideways scroll nobody finds)
+  // would leave half of an iPad's strip out of sight or out of reach, so the
+  // groups wrap onto a second row instead, and whatever hangs under the strip
+  // moves down with it (--barb).
+  // Before a second row, the title chip goes — the brief beside the water
+  // already names the exercise — if that alone makes one row enough.
+  const coarse = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  if (coarse && over()) {
+    bar.classList.add("notitle");
+    if (over()) { bar.classList.remove("notitle"); bar.classList.add("wraps"); }
+  } else if (over()) bar.classList.add("tightest");
+  const barb = bar.classList.contains("wraps") ? Math.round(bar.getBoundingClientRect().bottom) : 0;
+  document.documentElement.style.setProperty("--barb", barb + "px");
+  // A two-row strip is tall enough to hide the top of the flume, so the
+  // fitted view starts under it (baseRect); one row sits in the letterbox
+  // band as it always has.
+  const top = barb ? barb + 4 : 0;
+  if (top !== state.barTop) { state.barTop = top; if (sim) applyAutoVex(); }
   // Still too many for the room: the groups scroll, and the last one visible
   // is faded so that it looks like it continues rather than like it ends.
   bar.classList.toggle("scrolls", over());
@@ -2346,7 +2444,14 @@ const DOCK = (() => {
   const foot = () => el().querySelector(".dock-foot");
 
   function narrow() { return innerWidth < MINW; }
-  function phone() { return innerWidth < PHONE; }
+  // A tablet held upright (768 × 1024, 820 × 1180) is under MINW too, and an
+  // overlaid 348 px panel hid the right half of the flume AND of the strip
+  // (whose buttons ran on behind it). Upright there is height to spare and
+  // never width, so it gets the bottom sheet as a phone does: the water keeps
+  // the full width, the strip its full length.
+  function phone() {
+    return innerWidth < PHONE || (innerWidth < MINW && innerHeight > innerWidth * 1.1);
+  }
   /** Must agree with `--sheet-h` in the stylesheet. */
   function sheetH() { return Math.round(Math.min(0.58 * innerHeight, 520)); }
   function sync() {
@@ -2481,6 +2586,11 @@ const START = (() => {
         const t = document.createElement("span"); t.className = "t"; t.textContent = e.title;
         b.appendChild(i); b.appendChild(t);
         if (e.aim) b.title = e.aim;   // the exercise's `aim`, on hover
+        // …which a touch screen never shows: print it under the title there.
+        if (e.aim && !TIP.hoverable()) {
+          const a = document.createElement("span"); a.className = "aim"; a.textContent = e.aim;
+          b.appendChild(a);
+        }
         b.onclick = () => { close(); EX.pick(e.ref || e.id); };   // e.ref: a tab ("CR-1#forces")
         box.appendChild(b);
       });
@@ -2552,44 +2662,86 @@ function stopDye() {
   if (sim && sim.p) sim.p.dyeInj = null;
 }
 
+/** A FINGER's press is held back this long before it becomes a tool action.
+ *  A pinch starts with one finger and the second follows a few tens of
+ *  milliseconds later; acting on the first at once placed a gauge, pinned a
+ *  readout or let a blot of dye go at the start of every zoom. A press that
+ *  moves further than TOUCH_SLOP_PX first is committed at once (from where it
+ *  landed, so a stroke still starts under the finger); a mouse or pen press
+ *  is never held back. */
+const TOUCH_HOLD_MS = 90, TOUCH_SLOP_PX = 6;
+/** How far a press may wander and still count as a TAP (the Read tool). */
+const TAP_PX = 10;
+
+function cancelPending() {
+  if (state.pending) { clearTimeout(state.pending.timer); state.pending = null; }
+}
+function commitPending(ev) {
+  if (!ev || state.pending !== ev) return;
+  clearTimeout(ev.timer);
+  state.pending = null;
+  beginPress(ev);
+}
+
 function onDown(e) {
   try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* synthetic events */ }
-  pointers.set(e.pointerId, pointerPx(e));
-  const [x, z] = pointerPos(e);
+  state.ptr = e.pointerType || "mouse";
+  const px = pointerPx(e);
+  pointers.set(e.pointerId, px);
+  const [x, z] = view.toDomain(px[0], px[1]);
   state.cursor = [x, z];
-  if (pointers.size === 2) {         // second finger: abandon tools, pinch
+  if (pointers.size >= 2) {          // second finger: abandon tools, pinch
+    cancelPending();
+    if (pointers.size > 2) return;
     state.drag = null; state.spoutDrag = false; state.measDrag = null;
-    state.cvDrag = null; state.fluxDrag = null;
+    state.cvDrag = null; state.fluxDrag = null; state.press = null;
+    state.vexDrag = null; state.panDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
     stopDye();
     const ps = [...pointers.values()];
-    state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
+    state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]),
+                    mid: [(ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2] };
     return;
   }
-  if (e.button === 1) {              // middle-drag pans
-    e.preventDefault();
-    const px = pointerPx(e);
-    state.panDrag = { px, c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
+  if (e.button === 1) e.preventDefault();
+  const ev = { pointerId: e.pointerId, button: e.button, px, x, z,
+               // "" is a synthetic event (the tests); it behaves as a mouse.
+               mouse: !e.pointerType || e.pointerType === "mouse" };
+  if (e.pointerType === "touch") {
+    state.pending = ev;
+    ev.timer = setTimeout(() => commitPending(ev), TOUCH_HOLD_MS);
+    return;
+  }
+  beginPress(ev);
+}
+
+/** What a press DOES — everything after the pinch bookkeeping. `ev` is the
+ *  press as it landed: {button, px, x, z, mouse}. */
+function beginPress(ev) {
+  const x = ev.x, z = ev.z;
+  if (ev.button === 1) {             // middle-drag pans
+    state.panDrag = { px: ev.px, c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
     return;
   }
   // Drag in the empty letterbox band above or below the domain to stretch it
   // vertically. That band is dead space — nothing to draw on — so grabbing it
   // is unambiguous, and it is the natural place to reach for when a long flat
-  // flume is squashed into a strip.
+  // flume is squashed into a strip. A TAP there is a tap on empty space: it
+  // clears a pinned readout and claims nothing (onUp).
   {
-    const B = baseRect(), py = pointerPx(e)[1];
+    const B = baseRect(), py = ev.px[1];
     if (state.zoom < 1.001 && (py < B.by - 2 || py > B.by + B.h + 2)) {
-      state.vexDrag = { py, vex: state.vex, mid: B.by + B.h / 2 };
-      state.vexAuto = false;          // dragging the band claims the number
+      state.vexDrag = { py, vex: state.vex, mid: B.by + B.h / 2, moved: false };
       return;
     }
   }
-  // Pouring: a right-drag anywhere, or the Pour tool. The tool exists because
-  // a touch screen has no second button and no Shift — the old
+  // Pouring: a right-drag with a MOUSE, or the Pour tool. The tool exists
+  // because a touch screen has no second button and no Shift — the old
   // `pointerType === "touch" && e.shiftKey` was unreachable on every device it
   // named, which made half of "draw an edge, pour water" impossible on a
-  // phone. Right-drag still works regardless of the tool in your hand.
-  if (e.button === 2 || state.tool === "pour") {
+  // phone. Right-drag still works regardless of the tool in your hand; a pen's
+  // barrel button also reports button 2 and must not pour.
+  if ((ev.button === 2 && ev.mouse) || state.tool === "pour") {
     state.pour = { x, z, r: state.brush * 4, vx: 0, vz: sim.p.g > 0.5 ? -2.0 : 0, lx: x, lz: z };
     sim.p.pour = state.pour;
     return;
@@ -2641,7 +2793,7 @@ function onDown(e) {
     // the grab radius wrong under vex for sloped or horizontal faces — the
     // same anisotropy nearSegment's per-axis scaling exists to handle. Pick
     // in screen space instead, GRAB_PX applied directly as a screen radius.
-    const hit = faceAtPx(sim.solids || [], x, z, GRAB_PX);
+    const hit = faceAtPx(sim.solids || [], x, z, grabPx());
     if (!hit) { state.force = null; return; }
     if (state.force && state.force.solidId === hit.solid.id) {
       // Same solid again: cycle to its next named face.
@@ -2654,23 +2806,67 @@ function onDown(e) {
     state.force.scale = forceScale();
     return;
   }
-  state.drag = { x0: x, z0: z, x1: x, z1: z };
+  // Only a drawing tool draws. Anything else in hand — above all NO tool, the
+  // Read tool — makes the press a reading: a tap pins the readout card there
+  // (onUp → tapRead), and a drag pans the view when it is zoomed in.
+  if (state.tool === "wall" || state.tool === "erase" || state.tool === "valve") {
+    state.drag = { x0: x, z0: z, x1: x, z1: z };
+    return;
+  }
+  state.press = { px: ev.px, x, z, moved: false,
+                  c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
+}
+
+/** A tap with the Read tool: pin the readout card where it landed — the touch
+ *  screen's hover. A tap on the pin itself, on dry ground or a solid, or
+ *  outside the domain takes it away. A card that withholds the cursor readout
+ *  (`readouts.cursor: false`) withholds this too; the Hover readout switch
+ *  does NOT — it governs the card that FOLLOWS a mouse, and reading the water
+ *  by touching it is the one way a tablet has to read it at all. */
+function tapRead(x, z) {
+  if (!UIMODE.shows("cursor")) { state.pin = null; return; }
+  if (state.pin && pxApart(state.pin.x, state.pin.z, x, z) < grabPx() + 8) {
+    state.pin = null; return;
+  }
+  const inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
+  const p = inside ? SIM.probe(x, z, measuringAvg()) : null;
+  if (!p || !(p.f > 0.02)) { state.pin = null; return; }
+  state.pin = { x, z }; state.pinProbe = p; state.pinTick = 3;
 }
 
 function onMove(e) {
+  state.ptr = e.pointerType || "mouse";
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, pointerPx(e));
+  // A held-back finger (TOUCH_HOLD_MS) that starts to travel is a stroke, not
+  // the start of a pinch: commit it from where it landed, then carry on.
+  const pend = state.pending;
+  if (pend && pend.pointerId === e.pointerId) {
+    const px = pointerPx(e);
+    if (Math.hypot(px[0] - pend.px[0], px[1] - pend.px[1]) < TOUCH_SLOP_PX) return;
+    commitPending(pend);
+  }
   if (state.pinch && pointers.size === 2) {
+    // Two fingers zoom about their midpoint AND carry the view with it, so a
+    // pinch can pan as well — the one-finger drag is the tool's.
     const ps = [...pointers.values()];
     const d = Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]);
-    if (d > 8 && state.pinch.d > 8) {
-      zoomAt((ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2, d / state.pinch.d);
+    const mid = [(ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2];
+    if (d > 8 && state.pinch.d > 8) zoomAt(mid[0], mid[1], d / state.pinch.d);
+    if (state.zoom > 1.001 && state.pinch.mid) {
+      const c = state.panC || [sim.W / 2, sim.H / 2];
+      state.panC = [c[0] - (mid[0] - state.pinch.mid[0]) * sim.W / view.w,
+                    c[1] + (mid[1] - state.pinch.mid[1]) * sim.H / view.h];
+      computeView();
     }
-    state.pinch.d = d;
+    state.pinch.d = d; state.pinch.mid = mid;
     return;
   }
   if (state.vexDrag) {
     // Pull away from the middle to stretch, toward it to squash.
     const d = state.vexDrag, py = pointerPx(e)[1];
+    if (!d.moved && Math.abs(py - d.py) < TAP_PX) return;
+    d.moved = true;
+    state.vexAuto = false;            // dragging the band claims the number
     const r0 = Math.max(Math.abs(d.py - d.mid), 8);
     const r1 = Math.max(Math.abs(py - d.mid), 8);
     state.vex = Math.max(1, Math.min(12, d.vex * (r1 / r0)));
@@ -2680,6 +2876,18 @@ function onMove(e) {
   const [x, z] = pointerPos(e);
   state.cursor = [x, z];
   state.inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
+  // The Read tool's press: still a tap until it travels; then, zoomed in, a
+  // one-finger (or left-button) drag pans the view. Never draws.
+  if (state.press) {
+    const p = state.press, px = pointerPx(e);
+    if (!p.moved && Math.hypot(px[0] - p.px[0], px[1] - p.px[1]) >= TAP_PX) p.moved = true;
+    if (p.moved && state.zoom > 1.001) {
+      state.panC = [p.c[0] - (px[0] - p.px[0]) * sim.W / view.w,
+                    p.c[1] + (px[1] - p.px[1]) * sim.H / view.h];
+      computeView();
+    }
+    return;
+  }
   // The Force tool's own hover pick: pure CPU (faceAtPx, screen-space),
   // recomputed on every move so the surface under the cursor lights up
   // BEFORE a click selects it — no SIM.faceForce call, so no GPU readback.
@@ -2742,10 +2950,26 @@ function onMove(e) {
 
 function onUp(e) {
   pointers.delete(e.pointerId);
+  // A cancelled touch (the browser took the gesture) does nothing at all; a
+  // finger lifted before its hold ran out was a tap, and acts now.
+  if (e.type === "pointercancel") { cancelPending(); state.press = null; }
+  else if (state.pending && state.pending.pointerId === e.pointerId) commitPending(state.pending);
   if (pointers.size < 2) state.pinch = null;
   state.panDrag = null;
   state.spoutDrag = false;
-  if (state.vexDrag) { state.vexDrag = null; syncPanel(); return; }
+  if (state.press) {
+    const p = state.press;
+    state.press = null;
+    if (!p.moved) tapRead(p.x, p.z);
+    return;
+  }
+  if (state.vexDrag) {
+    const moved = state.vexDrag.moved;
+    state.vexDrag = null;
+    if (!moved) state.pin = null;     // a tap on the empty band: empty space
+    else syncPanel();
+    return;
+  }
   if (state.pour) { state.pour = null; sim.p.pour = null; }
   stopDye();
   if (state.measDrag) {
@@ -2932,7 +3156,9 @@ function tickFrame(realDt) {
   // soon as there is enough water to hang it in.
   if (!state.tracers && state.scene.tracerX && sim.t > 0.5) seedTracers(state.scene.tracerX);
 
-  const cur = state.inside ? state.cursor : [-99, -99];
+  // The brush ring is a TOOL's footprint: none with the Read tool in hand, and
+  // none under a finger, which hides it anyway.
+  const cur = state.inside && state.tool && state.ptr !== "touch" ? state.cursor : [-99, -99];
   const rg = rangeFor(fieldFor(state.mode).id);
   SIM.render(view, {
     mode: state.mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1],
@@ -3150,18 +3376,44 @@ function sampleGauges(A) {
                 u: pr.u, w: pr.w, p: 1000 * pr.p, phead: pr.phead };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
+    // The WHOLE run, thinned: what the corner card plots under Gauge charts
+    // = whole run (viewParams gaugeSpan: "all"). Every sample until it holds
+    // WHOLE_MAX, then every other one is dropped and the spacing doubles, so
+    // t = 0 stays on the chart however long the run goes, in bounded memory.
+    // The log above stays the full-resolution record (inspector, CSV).
+    if (!gg.whole) { gg.whole = []; gg.wdt = 0; }
+    const Wh = gg.whole;
+    if (!Wh.length || s.t - Wh[Wh.length - 1].t >= gg.wdt) {
+      Wh.push(s);
+      if (Wh.length > WHOLE_MAX) {
+        gg.whole = Wh.filter((_, n) => n % 2 === 0);
+        gg.wdt = 2 * (s.t - gg.whole[0].t) / gg.whole.length;
+      }
+    }
     if (!gg.log) gg.log = [];
     gg.log.push(s);
     if (gg.log.length > CONFIG.logMax) gg.log.splice(0, gg.log.length - CONFIG.logMax);
     gg.last = pr;
   });
 }
+/** Samples a gauge's whole-run series holds before it is thinned by half. */
+const WHOLE_MAX = 1200;
+/** What a corner card plots: the scrolling window, or the whole run with the
+ *  newest sample on its end (the thinned series may lag it by one spacing). */
+function gaugeSeries(gg) {
+  if (state.gaugeSpan !== "all" || !gg.whole || !gg.whole.length) return gg.hist;
+  const last = gg.hist[gg.hist.length - 1];
+  return last && last !== gg.whole[gg.whole.length - 1] ? gg.whole.concat([last]) : gg.whole;
+}
 
 /** R (reset water) restarts the clock, so the traces cannot be continued —
  *  both stores are emptied and the inspectors go blank. Loading a scene drops
  *  the gauges entirely. Said out loud in the inspector's caption. */
 function clearGaugeHistory() {
-  state.gauges.forEach((g) => { g.hist.length = 0; if (g.log) g.log.length = 0; });
+  state.gauges.forEach((g) => {
+    g.hist.length = 0; if (g.log) g.log.length = 0;
+    g.whole = null; g.wdt = 0;
+  });
   state.gaugeT = -1;
 }
 /** True while measurements should come from the averaging window: Average is
@@ -3187,7 +3439,7 @@ function sampleRakes() {
  *  than inlined because a click and a drag are different gestures on this
  *  tool: removal happens on the way DOWN, placement on the way up. */
 function removeFluxAt(x, z) {
-  const hit = state.flux.findIndex((L) => nearSegment(L, x, z) < GRAB_PX);
+  const hit = state.flux.findIndex((L) => nearSegment(L, x, z) < grabPx());
   if (hit < 0) return false;
   state.flux.splice(hit, 1);
   syncPanel();
@@ -3622,12 +3874,35 @@ function drawOverlay(A) {
   const cards = UIMODE.shows("gauges") && state.instReadouts
     ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, (gg) => {
         const q = gaugeQty(gaugeFieldOf(gg));
-        return { label: q.sym, unit: q.unit, get: (s) => s[q.id] * q.k };
+        return { label: q.sym, unit: q.unit, get: (s) => s[q.id] * q.k,
+                 series: gaugeSeries(gg), whole: state.gaugeSpan === "all" };
       })
     : [];
   GINSP.tick(cards);
+  // The tips line centres on the width the corner cards leave (#hint, --gcw):
+  // on an iPad it used to sit right on top of VC-2's pre-placed gauge chart.
+  // The width counts the selector and ⤢ that hang off the card's left edge.
+  const gcw = cards.length ? Math.round(cards[0].w + 76) : 0;
+  if (gcw !== state.gcw) {
+    state.gcw = gcw;
+    document.documentElement.style.setProperty("--gcw", gcw + "px");
+  }
   if (state.grade) OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
-  if (state.inside && !state.drag && UIMODE.shows("cursor") && state.hoverCard) {
+  // The pinned readout (a tap with the Read tool): the same card and the same
+  // rows as the hover readout, held at the point that was touched and kept
+  // live. It answers to the card's `readouts.cursor`, not to the Hover
+  // readout switch — see tapRead.
+  const pin = state.pin;
+  if (pin && UIMODE.shows("cursor")) {
+    if (--state.pinTick <= 0) { state.pinTick = 3; state.pinProbe = SIM.probe(pin.x, pin.z, measuringAvg()); }
+    OVERLAY.drawPinMark(ctx, view, pin.x, pin.z);
+    OVERLAY.drawCursorReadout(ctx, view, A, sim, pin.x, pin.z, state.pinProbe, UIMODE.rows());
+  }
+  // The hover card follows a mouse or a pen — never a finger, which would sit
+  // on top of it — and stands down over the pin, which already says it.
+  if (state.inside && !state.drag && UIMODE.shows("cursor") && state.hoverCard &&
+      state.ptr !== "touch" &&
+      !(pin && pxApart(pin.x, pin.z, state.cursor[0], state.cursor[1]) < 24)) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
     if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1], measuringAvg()); }
@@ -3646,6 +3921,10 @@ function pxApart(x0, z0, x1, z1) {
   return Math.hypot(dx, dz);
 }
 const GRAB_PX = 16;      // a finger is 44 px; this is for a pointed-at marker
+/** The hit radius for the pointer that is pressing: a fingertip covers a
+ *  dozen pixels on its own and lands a few off where its owner aimed, so a
+ *  touch gets the 44 px target the guidelines ask for (a 22 px radius). */
+function grabPx() { return state.ptr === "touch" ? 22 : GRAB_PX; }
 
 /** Screen distance from a point to a drawn section, in pixels. */
 function nearSegment(L, x, z) {
@@ -3687,7 +3966,7 @@ function faceAtPx(solids, x, z, tolPx) {
  *  The tape, the Control volume and the orbit tracers all already clear on a click,
  *  so this is the convention the rest of the toolbox was using. */
 function placeGauge(x, z) {
-  const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < GRAB_PX);
+  const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < grabPx());
   if (hit >= 0) { removeGauge(state.gauges[hit]); return; }
   if (state.gauges.length >= 4) state.gauges.shift();
   state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
@@ -3722,7 +4001,7 @@ function clearAllGauges() {
  *  rake from a rig or a script without one spans the column's bed → surface.
  *  Removal compares the station only. */
 function placeRake(x, z) {
-  const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < GRAB_PX);
+  const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < grabPx());
   if (hit >= 0) { state.rakes.splice(hit, 1); syncPanel(); return; }
   if (state.rakes.length >= 2) state.rakes.shift();
   state.rakes.push({ x, z: Number.isFinite(z) ? z : undefined, buf: null });
@@ -4072,6 +4351,9 @@ function boot() {
   buildPanel();
   const q = new URLSearchParams(location.search);
   loadScene(q.get("scene") || "sandbox", false);
+  // `?scene=sandbox` is the sandbox door by address: building is what it is
+  // for, so Wall is in hand. Any other boot opens on the neutral Read tool.
+  if (q.get("scene") === "sandbox" && !q.get("ex")) state.tool = "wall";
   // Read the rig code BEFORE the exercise rewrites the address bar — setting
   // one up drops the hash exactly as a scene switch does.
   const rigCode = RIG.hashCode();

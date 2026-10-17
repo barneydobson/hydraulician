@@ -25,7 +25,7 @@ shallow water); this one resolves the depth.
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
 | `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
-| `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards, digit rules, the settings a pick applies) |
+| `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards — the short layout, inline strip icons, tabs —, digit rules, the settings a pick applies) |
 | `js/stream.js` | `STREAM` — streamlines as contours of the stream function ψ, built on the CPU from a fenced face-flux readback; of the mean flow under Average |
 | `js/gauge-inspector.js` | `GINSP` — a draggable window per gauge: identity, live values, the full history chart, CSV export |
 | `js/rig.js` | `RIG` — rig save / load / share, the wire format and its version gate |
@@ -112,7 +112,7 @@ to look fine for a minute and explode in an exercise.
   changes. An exercise may narrow the interface (`UIMODE`), but never lock
   it: the `⋯` on the strip and at the head of the panel puts everything back
   in one click, which is what keeps that acceptance test true.
-- **A field is described once.** The seven colourings live in `FIELDS` in
+- **A field is described once.** The nine colourings live in `FIELDS` in
   `main.js` — mode integer, name, symbol, unit, ramp and default range — and
   the legend, the Controls select and the `G` key all read it. The ramp
   colours themselves are `Shaders.RAMPS`, interpolated into the display

@@ -93,12 +93,10 @@ pause-and-read promptly (the chart buffer keeps moving).
 | FF-2 | The velocity field, and turbulence (spillway) | FF-2-spillway/ | spillway, bucket lip angle slider | — (students play; class demo) |
 | FF-3 | Steady and unsteady flow (flow past a body) | FF-3-flow-past-body/ | body, body shape slider | — (students play; class demo) |
 | FF-4 | Boundary layers: at a wall, in a jet (pipe jet) | FF-4-pipe-jet/ | pipejet | — (students play; class demo) |
-| FF-5 | Streamlines and separation (contraction rig) | FF-5-contraction-streamlines/ | contraction, contraction length slider | — (students play; class demo) |
-| VC-1 | Continuity: Q in equals Q out (contraction rig) | VC-1-contraction-steady/ | contraction | — (students play; class demo) |
+| CR-1 | The contraction rig: tabs Streamlines (L4, was FF-5), Continuity (L5, was VC-1), Forces (L6, was MM-2) | CR-1-contraction-rig/ | contraction, contraction length slider | — (students play; class demo) |
 | VC-2 | Storage = in − out (tank that fills and leaks) | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (students play; class demo) |
 | MM-1 | The force of a jet on an inclined plate | MM-1-jet-inclined-plate/ | vane, plate angle slider | — (students play; class demo) |
-| MM-2 | Momentum: the force on a contraction (contraction rig) | MM-2-contraction-forces/ | contraction | — (students play; class demo) |
-| HJ-2 | Pressure and force on a sluice gate | HJ-2-gate-jump/ | gatejump, weir crest slider | — (students play; class demo) |
+| HJ-2 | Momentum balance: sluice gate and hydraulic jump | HJ-2-gate-jump/ | gatejump, weir crest slider | — (students play; class demo) |
 | WV-4 | How waves break on beaches | WV-4-breakers/ | beach (wall paddle), beach slope slider on the card | — (student-run preview) |
 
 Rigs: RIG-A (pressurised duct) card = FR-1/rig.js · RIG-B (flat channel) card

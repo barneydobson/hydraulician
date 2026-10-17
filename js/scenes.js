@@ -1938,6 +1938,10 @@ const SCENES = (() => {
         blurb: "A free jet seen from above strikes a flat plate set at an angle θ to it. The jet splits into two unequal sheets along the plate; box the plate with a Control volume and read the force, which is at right angles to the plate.",
         W: 3.4, H: 2.4, g: 1e-3, c: 26, cf: 0, cs: 0.10, nu: 1e-5, slip: 1, kappa: 0,
         mode: 2, hmax: 1, headMax: 1, vmax: 5,
+        // Pressure (kPa): zero in the still air around the jet, up to the
+        // stagnation pressure ½ρU² ≈ 9.9 kPa where the 4.45 m/s jet meets the
+        // plate (measured 9.2-9.9 at the 99th percentile).
+        pRange: [0, 10],
         particles: 0, spinup: 0,
         open: [2, 2, 2, 2],
         residueDrain: { rate: 2, speed: 1.0 },

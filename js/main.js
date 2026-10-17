@@ -354,7 +354,7 @@ function syncURL(id) {
 // ==========================================================================
 //  The fields the water can be painted with.
 // ==========================================================================
-/** The seven colourings, as data.
+/** The colourings, as data.
  *
  *  A field used to be described in three disconnected places — a `u_mode`
  *  integer in the GLSL, an `opts` pair in the panel spec, and prose in an
@@ -398,6 +398,14 @@ const FIELDS = [
     ramp: "turbo", def: () => [0, sceneNow().headMax || 3],
     mean: "A true average of the pressure.",
     blurb: "The pressure alone. In still water it is simply the depth below the surface, so it climbs down every column and is not comparable between cells at different heights." },
+  // The pressure itself, p = ρP in kPa (the solver carries the kinematic
+  // P = p/ρ). Unlike the heads it does not divide by g, so it means the same
+  // thing in a plan view (gravity ≈ 0), where a head is p/0.001. Next to
+  // Pressure head because it is the same picture times ρg wherever g is real.
+  { mode: 8, id: "p", name: "Pressure", sym: "p", unit: "kPa",
+    ramp: "turbo", def: () => pressureRange(), floating: true,
+    mean: "A true average of the pressure.",
+    blurb: "The pressure above atmospheric, in kPa. In still water it grows with depth, p = ρg × depth; in moving water it is highest where the flow is stopped against something and lowest where it is fastest." },
   { mode: 4, id: "vort", name: "Vorticity", sym: "ω", unit: "1/s",
     ramp: "divg", mid: 0, def: () => { const v = sceneNow().vortMax || 40; return [-v, v]; },
     mean: "The spin OF the mean flow — it matches the averaged spin only where the fill holds steady.",
@@ -420,6 +428,31 @@ const FIELDS = [
 function sceneNow() { return state.scene || {}; }
 /** The scene's own maximum for the Water view's depth hue. */
 function hmaxScene() { const s = sceneNow(); return s.hmax || (s.g ? 2.0 : 1); }
+/** The Pressure field's default range, in kPa. A scene may state its own
+ *  (`pRange: [lo, hi]`); otherwise under gravity it is the hydrostatic scale
+ *  ρgH over the scene's pressure-head maximum, and in a plan view (|g| < 0.5,
+ *  where hydrostatics is absent) the live field's own spread, fitted ONCE when
+ *  the range is first asked for and held from then on like any other range.
+ *  A plan view's pressure has no hydrostatic zero: a closed or level-fed
+ *  domain carries an arbitrary reference (`body` sits near 37 kPa and creeps
+ *  ~0.1 kPa a minute) under differences of ±½ρU² (~0.2 kPa there), so no
+ *  fixed number would show them. Before there is water to fit, ±½ρ·vmax².
+ *  ρ = 1000 kg/m³, so p in kPa is numerically ρ·P/1000. */
+function pressureRange() {
+  const s = sceneNow();
+  if (Array.isArray(s.pRange)) return s.pRange.slice();
+  const g = s.g === undefined ? 9.81 : Math.abs(s.g);
+  if (g < 0.5) {
+    const st = (sim && SIM.fieldStats) ? SIM.fieldStats(8, !!state.avg) : null;
+    if (st && isFinite(st.lo) && isFinite(st.hi) && st.hi > st.lo) {
+      const pad = 0.1 * (st.hi - st.lo);
+      return [+(st.lo - pad).toFixed(3), +(st.hi + pad).toFixed(3)];
+    }
+    const v = s.vmax || 4, q = 0.5 * v * v;
+    return [-q, q];
+  }
+  return [0, +(g * (s.headMax || 3)).toFixed(1)];
+}
 /** The momentum-flux scale, as the display pass has always computed it. */
 function momScene() { return 0.5 * Math.pow(sceneNow().vmax || 4, 2); }
 
@@ -1434,6 +1467,10 @@ const LEGEND = (() => {
       // the midpoint of whatever the reading happened to be.
       const m = Math.max(f.mid - s.lo, s.hi - f.mid, 1e-6);
       state.range[f.id] = [f.mid - m, f.mid + m];
+    } else if (f.floating && sim && Math.abs(sim.p.g) < 0.5) {
+      // No zero worth anchoring to (a plan view's pressure sits on an
+      // arbitrary reference): fit the spread itself.
+      state.range[f.id] = [s.lo, Math.max(s.hi, s.lo + 1e-3)];
     } else {
       state.range[f.id] = [Math.min(0, s.lo), Math.max(s.hi, s.lo + 1e-3)];
     }
@@ -2384,12 +2421,12 @@ const START = (() => {
       box.appendChild(hd);
       list.forEach((e) => {
         const b = document.createElement("button");
-        b.type = "button"; b.className = "si"; b.dataset.id = e.id;
+        b.type = "button"; b.className = "si"; b.dataset.id = e.ref || e.id;
         const i = document.createElement("span"); i.className = "eid"; i.textContent = e.id;
         const t = document.createElement("span"); t.className = "t"; t.textContent = e.title;
         b.appendChild(i); b.appendChild(t);
         if (e.aim) b.title = e.aim;   // the exercise's `aim`, on hover
-        b.onclick = () => { close(); EX.pick(e.id); };
+        b.onclick = () => { close(); EX.pick(e.ref || e.id); };   // e.ref: a tab ("CR-1#forces")
         box.appendChild(b);
       });
       const k = h[0] <= h[1] ? 0 : 1;
@@ -3945,7 +3982,9 @@ function boot() {
   // included, so it runs INSTEAD of `?scene=` (which has already loaded, and
   // is what you are left on if the id is unknown to this build).
   const exId = q.get("ex");
-  if (exId && !EX.pick(exId)) showToast("Unknown exercise", "\"" + exId +
+  // `&tab=<key>` opens a tabbed card on that tab (CR-1's "forces"); an old
+  // id that became a tab (`?ex=MM-2`) is resolved by EX itself.
+  if (exId && !EX.pick(exId, q.get("tab") ? { tab: q.get("tab") } : undefined)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
   // Embedded, the brief lives on the page around the frame; the card starts
   // folded to its tab so the water keeps the width (spec §1.1).

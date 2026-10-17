@@ -22,6 +22,13 @@ facts that are derivable from the register and leaves the prose to people:
      BUILD is not hidden from a card whose task, start or setup tells the
      student to draw, cut, erase or otherwise build something
   7. no orphans in either direction
+  9. TABS (one entry, several questions — CR-1): every tab has a unique key
+     and a label, an alias collides with no id, and checks 6 and 8 run on
+     each tab's VIEW (the entry with the tab merged over it, as EX.view does
+     in js/pickers.js), reported as "CR-1#forces"
+ 10. the short card layout: `steps` holds at most five, and the inline
+     markup in steps / background / setup — {tool:id}, {btn:id}, {key:K} —
+     names a tool or strip button that exists
   8. a digit rule (or studentParams entry) on a Geometry row -- `geomN` --
      names a param its scene actually declares at index N. The panel binds
      those rows BY INDEX, so a reordered `params` list moves a student's
@@ -177,7 +184,50 @@ def cards():
 # (CS-1, QS-2) is missed by leaving digitNote out.
 def draws_text(e):
     setup = e.get("setup") or []
-    return " ".join([e.get("task") or "", e.get("start") or "", " ".join(setup)])
+    steps = e.get("steps") or []
+    return " ".join([e.get("task") or "", e.get("start") or "", " ".join(setup),
+                     " ".join(steps)])
+
+
+def paras(v):
+    """`background` is a string or a list of them."""
+    if v is None:
+        return []
+    return v if isinstance(v, list) else [v]
+
+
+# The card's inline markup (EX.rich in js/pickers.js): {tool:id} {btn:id} {key:K}.
+MARK = re.compile(r"\{(tool|btn|key):([^}\s]+)\}")
+TAB_OWN = ("key", "label", "alias")
+
+
+def tab_view(e, t):
+    """The entry as one tab sees it -- the same merge as EX.view in
+    js/pickers.js: the tab's fields over the entry's, `viewParams` and `ui`
+    merged shallowly, and the tab's ref ("CR-1#forces") as its name."""
+    v = dict(e)
+    for k, val in t.items():
+        if k not in TAB_OWN:
+            v[k] = val
+    v["viewParams"] = dict(e.get("viewParams") or {}, **(t.get("viewParams") or {}))
+    v["ui"] = dict(e.get("ui") or {}, **(t.get("ui") or {}))
+    v["_ref"] = "%s#%s" % (e.get("id"), t.get("key"))
+    v.pop("tabs", None)
+    return v
+
+
+def views(ex):
+    """Every card a student can be shown: each entry, or each of its tabs."""
+    out = []
+    for e in ex:
+        tabs = e.get("tabs")
+        if isinstance(tabs, list) and tabs:
+            out.extend(tab_view(e, t) for t in tabs if isinstance(t, dict))
+        else:
+            v = dict(e)
+            v["_ref"] = e.get("id")
+            out.append(v)
+    return out
 
 
 # Widened from the original {draw, draws, redraw, redraws, erase, sketch}:
@@ -353,7 +403,7 @@ def main():
     #    its own task asks for, or name something that does not exist.
     TOOL_IDS = {"wall", "erase", "valve", "spout", "gauge", "rake", "tracer",
                 "measure", "cv", "pour", "flux", "force"}
-    FIELD_IDS = {"water", "speed", "ehead", "head", "phead", "vort", "froude", "mom"}
+    FIELD_IDS = {"water", "speed", "ehead", "head", "phead", "p", "vort", "froude", "mom"}
     PANEL = {"full", "focused", "shut"}
     # gauges/cursor/status switch a whole panel; `rows` narrows the hover
     # card to named lines and is validated against ROW_IDS below.
@@ -370,8 +420,60 @@ def main():
     # BUILD to the tools it draws with has to name Undo to keep it.
     VIEW_IDS = TOOL_IDS | view_button_ids()
     BUILD_TOOLS = {"wall", "erase", "valve", "spout", "pour"}
+    # 9. tabs: the structure first; the per-card checks below then run on
+    #    every tab's view.
+    all_ids = {e.get("id") for e in ex}
+    aliases = set()
     for e in ex:
-        i, ui = e.get("id"), e.get("ui")
+        tabs = e.get("tabs")
+        if tabs is None:
+            continue
+        checked += 1
+        i = e.get("id")
+        if not isinstance(tabs, list) or not tabs:
+            fail.append("%-5s tabs must be a non-empty list" % i)
+            continue
+        keys = [t.get("key") for t in tabs if isinstance(t, dict)]
+        if len(keys) != len(tabs) or not all(isinstance(k, str) and k for k in keys):
+            fail.append("%-5s every tab needs a string `key`" % i)
+        if len(set(keys)) != len(keys):
+            fail.append("%-5s tab keys repeat: %s" % (i, keys))
+        for t in tabs:
+            if not isinstance(t, dict) or not t.get("label"):
+                fail.append("%-5s tab %r has no label" % (i, t.get("key") if isinstance(t, dict) else t))
+            a = isinstance(t, dict) and t.get("alias")
+            if a:
+                if a in all_ids or a in aliases:
+                    fail.append("%-5s tab alias %r collides with another id or alias" % (i, a))
+                aliases.add(a)
+    if aliases & index_ids:
+        fail.append("      INDEX.md has rows for tab aliases (they are not cards): %s"
+                    % ", ".join(sorted(aliases & index_ids)))
+
+    # 10. the short layout, and the inline markup it uses.
+    btn_ids = view_button_ids() | set(re.findall(r'\{\s*id:\s*"([A-Za-z]+Btn)"',
+                                       open(os.path.join(ROOT, "js", "main.js"), encoding="utf-8").read()))
+    for v in views(ex):
+        i = v["_ref"]
+        steps = v.get("steps")
+        if steps is not None:
+            checked += 1
+            if not isinstance(steps, list) or not steps:
+                fail.append("%-5s steps must be a non-empty list" % i)
+            elif len(steps) > 5:
+                fail.append("%-5s has %d steps; the short layout holds at most 5 -- move the rest "
+                            "into `background`" % (i, len(steps)))
+        texts = (v.get("steps") or []) + paras(v.get("background")) + (v.get("setup") or [])
+        for txt in texts:
+            for kind, ident in MARK.findall(str(txt)):
+                checked += 1
+                if kind == "tool" and ident not in TOOL_IDS:
+                    fail.append("%-5s {tool:%s} names no tool" % (i, ident))
+                if kind == "btn" and ident not in btn_ids:
+                    fail.append("%-5s {btn:%s} names no strip button" % (i, ident))
+
+    for e in views(ex):
+        i, ui = e.get("_ref"), e.get("ui")
         if ui:
             checked += 1
             for fam in ("build", "measure", "view"):
@@ -489,7 +591,7 @@ def main():
     #    declares N params or fewer is a slider that is not there; one on a
     #    scene that declares more may be the wrong one -- both silent in the
     #    browser, both loud here.
-    geom_rules = [(e, r) for e in ex
+    geom_rules = [(e, r) for e in views(ex)
                   for r in ([e.get("digit")] if e.get("digit") else []) +
                            (e.get("digit") or {}).get("also", []) +
                            (e.get("studentParams") or [])
@@ -502,10 +604,10 @@ def main():
             decl = params_by_scene.get(e.get("scene"), [])
             if n >= len(decl):
                 fail.append("%-5s %s is on Geometry row %d but scene %r declares only %d param%s"
-                            % (e.get("id"), r["control"], n, e.get("scene"), len(decl),
+                            % (e.get("_ref"), r["control"], n, e.get("scene"), len(decl),
                                "" if len(decl) == 1 else "s"))
             elif verbose:
-                print("  %-5s %s -> %s (%s)" % (e.get("id"), r["control"], decl[n]["key"], decl[n]["label"]))
+                print("  %-5s %s -> %s (%s)" % (e.get("_ref"), r["control"], decl[n]["key"], decl[n]["label"]))
 
     # 7. orphans
     for i in sorted(index_ids - {e.get("id") for e in ex}):

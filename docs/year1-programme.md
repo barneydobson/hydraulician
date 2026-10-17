@@ -35,7 +35,8 @@ Principles:
 - **Sliders over presets.** One continuous slider morphs the scene (wall
   shape, contraction sharpness, body shape, vane angle).
 - **Shared scenes.** The contraction rig is one scene asked different
-  questions in different topics (VC-1, MM-2, and later energy).
+  questions in different topics — ONE exercise, CR-1, with a tab per
+  question (Streamlines L4, Continuity L5, Forces L6; later energy).
 
 ## Year 1 course order
 
@@ -43,13 +44,35 @@ Principles:
 |---|---|
 | L2 Fundamentals | FF-1 Wind over a lake · UP-1 Water hammer |
 | L3 Statics | HS-1 Dyke and piezometer · PF-2 Wall shape |
-| L4 Fluid motion | FF-2 Spillway · FF-3 Flow past a body · FF-4 Pipe jet into a reservoir · (FF-5 contraction rig, idea) |
-| L5 Mass conservation | VC-1 Contraction rig, steady · VC-2 Fill and leak |
-| L6 Momentum | MM-1 Jet on an inclined plate · MM-2 Contraction rig, forces · HJ-2 Sluice gate |
+| L4 Fluid motion | FF-2 Spillway · FF-3 Flow past a body · FF-4 Pipe jet into a reservoir · CR-1 Contraction rig, tab Streamlines |
+| L5 Mass conservation | CR-1 Contraction rig, tab Continuity · VC-2 Fill and leak |
+| L6 Momentum | MM-1 Jet on an inclined plate · CR-1 Contraction rig, tab Forces · HJ-2 Momentum balance: sluice gate and hydraulic jump |
 | L7–L8 | taught by a colleague; rough ideas at the end |
 | Year 2 preview | WV-4 How waves break on beaches |
 
-The course menu (`js/menu.js`, fork-local) lists exactly these, in this order.
+The course menu (`js/menu.js`, fork-local) lists exactly these, in this order;
+the contraction rig appears three times, as `"CR-1#streamlines"`,
+`"CR-1#continuity"` and `"CR-1#forces"`, each opening the card on its tab.
+(Until Oct 2026 the three tabs were three exercises, FF-5, VC-1 and MM-2;
+those ids still open the matching tab.)
+
+## The cards (Oct 2026)
+
+The lecturer found the first cards verbose: they ran off the page. Every Year
+1 card now uses the **short layout** (docs/making-exercises.md): the sliders
+on top with short labels; at most five numbered steps, one line each — the
+action and what to notice; a closed **Background** fold for definitions,
+formulas and remarks; no Start / Do paragraphs. The tools and strip buttons a
+step asks for are drawn inline with their own icons ("Pick [icon] Pressure
+force and click the gate"); the valve is just "press V".
+
+**Pressure.** A plain **Pressure** colouring (p, kPa) was added. Up to L6
+the cards show Pressure, not pressure head — FF-1, UP-1 (Δp ≈ ρcΔv in kPa),
+PF-2, FF-3 and MM-1 (plan views, where pressure head means nothing but the
+pressure does), FF-4 and CR-1's Forces tab. The exception is **HS-1**, which
+offers Pressure head and Piezometric head: the lecturer teaches piezometric
+head in Statics with the piezometer, and one colour across connected still
+water is what it shows.
 
 ## First drafts: status and points for the lecturer (2026-10-16)
 
@@ -68,10 +91,10 @@ draft does not yet do well, as measured:
 | FF-2 | Spillway, flip bucket, plunge pool; bucket lip angle slider; Average gives clean rollers | Throw is short (jet leaves at about half the lip angle, lands 4–5 m out) |
 | FF-3 | Ellipse → square at fixed frontal width: steady wake → Kármán street (St ≈ 0.16); Average gives a symmetric bubble | Shedding onset (s ≈ 0.3) is slow to grow — jump from ellipse to s ≥ 0.6 in the lecture; dye fades before the wake; Re ≈ 180 (laminar street) |
 | FF-4 | Pipe profile develops; jet flaps then breaks up ~4–6 m out; averaged bells; entrainment visible in the flux | Now a free-surface reservoir spilling over an end wall at x = 24 m (the lidded tank is history) (free-surface versions failed, documented); eddy viscosity, Re ≈ 400; far-field average still lumpy at 60 s |
-| FF-5 / VC-1 / MM-2 | Contraction rig: Q equal in both pipes; ΣQ ≈ 0.2%; R from the CV matches the formula; taper vs step differ by ≈ the extra loss; vena contracta Cc ≈ 0.68 | Slider restarts the water (25 s warm-up); vena contracta is thin at Medium (best on Vorticity); straight-pipe friction is a tiny number; outlet jet runs along the right reservoir's surface; dye does not reach the pipe |
+| CR-1 (was FF-5 / VC-1 / MM-2) | One exercise, three tabs. Contraction rig: Q equal in both pipes; ΣQ ≈ 0.2%; R from the CV matches the formula; taper vs step differ by ≈ the extra loss; vena contracta Cc ≈ 0.68 | Slider restarts the water (25 s warm-up); vena contracta is thin at Medium (best on Vorticity); straight-pipe friction is a tiny number; outlet jet runs along the right reservoir's surface; dye does not reach the pipe |
 | VC-2 | dh/dt = Q/S to 2%; settled level matches C_d ≈ 0.65; CV now shows dV/dt and closes to < 1% | Inflow slider drives the spout through a workaround in the scene's `solids()` |
 | MM-1 | Plan view (gravity ≈ 0), inclined flat plate 90°→20°, free-slip: CV F_n within 1–6% of ρqU sin θ (a few % high), along-plate force ≤ 6% of F_n; sheets q₁, q₂ within 0.01–0.04 m²/s of q(1 ± cos θ)/2 | Small sheet under two cells below 30°; start-up spray wobbles the box; CV chip still prints an energy line |
-| HJ-2 | Reworked to the lecturer's sequence: only the pool full at t = 0, weir flat (crest 0); gate force two ways (28.1 diagram, 30.2 box vs ½ρg(d₀−a)² = 28.7 kN/m); non-hydrostatic pressure at the gate; raising the weir forms a jump, then drowns the gate | A jump forms from the sheet only at crest ≥ 0.5 m (0.55 reliably); once formed, 0.45 washes it out, 0.46 holds it where it is, ≥ 0.6 drowns the gate |
+| HJ-2 | Retitled *Momentum balance: sluice gate and hydraulic jump* (Oct 2026): CV round the gate 30.2 kN/m against ½ρg(d₁² − d₂²) − ρq(U₂ − U₁) = 28.3 and the Pressure force tool 28.1; CV round the held jump: in 8.41, out 8.58 kN/m, F→ ≈ 0. Reworked to the lecturer's sequence: only the pool full at t = 0, weir flat (crest 0); gate force two ways (28.1 diagram, 30.2 box vs ½ρg(d₀−a)² = 28.7 kN/m); non-hydrostatic pressure at the gate; raising the weir forms a jump, then drowns the gate | A jump forms from the sheet only at crest ≥ 0.5 m (0.55 reliably); once formed, 0.45 washes it out, 0.46 holds it where it is, ≥ 0.6 drowns the gate |
 | WV-4 | Spilling (tanβ 0.06) and surging (tanβ 0.7) clear | Plunging does not curl over: the front goes vertical and collapses (also at High) |
 
 ---
@@ -82,9 +105,10 @@ Two reservoirs, both filled to the top, joined by a wide pipe that contracts
 into a narrower second pipe discharging into the right reservoir. One slider
 sets the contraction: from a long gentle taper over the whole wide pipe to a
 wide pipe of constant width that converges faster and faster to the fixed
-narrow pipe, ending as an abrupt step. Used by FF-5 (streamlines), VC-1
-(continuity), MM-2 (forces) and, later, energy (contraction against
-expansion).
+narrow pipe, ending as an abrupt step. One exercise, **CR-1**, with a tab
+per question: Streamlines (L4, was FF-5), Continuity (L5, was VC-1), Forces
+(L6, was MM-2) and, later, energy (contraction against expansion). Switching
+tabs swaps the card's steps and interface and leaves the flow running.
 
 ---
 
@@ -98,8 +122,9 @@ expansion).
 - **Slides:** 18–23, 31, 35–36, 46–49 (one level in a connected body; the
   piezometer; F_h = ½ρgd²; a sloped face; the valve equalises the levels).
 - **Scene:** existing, `?ex=HS-1`. Keep as it is; re-verify on current main.
-- **Interface:** as shipped (Gauge, Pressure force; Water, Pressure head,
-  Piezometric head; Particles; panel shut).
+- **Interface:** Pressure force; Water, Pressure head, Piezometric head (not
+  the plain Pressure: piezometric head is taught here with the piezometer);
+  Particles; panel shut.
 - **New instrument:** Gauge, the valve, and Pressure force.
 
 #### PF-2 · The wall's shape doesn't matter — Play
@@ -114,7 +139,7 @@ expansion).
   F_h stays at ½ρgd² every time. F_v changes and equals the weight of
   water above the wall; for the overhang it points up.
 - **Interface:** no build · tools: Pressure force · fields: Water, Pressure
-  head · panel: focused, one row (wall shape).
+  (kPa) · panel: focused, one row (wall shape).
 - **New instrument:** a geometry slider on the card.
 - **Readout:** the tool already prints the components, as a second chip
   under the resultant: `F = 15.7 kN/m` then `→ 12.3  ↓ 9.8 kN/m`. For this
@@ -136,7 +161,7 @@ New topic. It absorbs the review's "Shear layers and velocity profiles".
 - **Scene:** a rectangular tank of still water with a free surface, standing
   in for a lake.
 - **Student does:** at rest, hover the water and read u = 0 and p = ρg·d.
-  The Pressure head field shows flat horizontal bands: pressure only. Then
+  The Pressure field shows flat horizontal bands: pressure only. Then
   move the wind slider: a shear stress τ on the free surface, positive
   (blowing right) or negative (blowing left). Arrows above the surface
   show the wind's direction and strength. The water starts to move and
@@ -146,7 +171,7 @@ New topic. It absorbs the review's "Shear layers and velocity profiles".
   dies away.
 - **Point:** any shear makes a fluid flow; at rest there is pressure only.
 - **Interface:** no build tools, no measuring tools (the hover probe only) ·
-  fields: Water, Speed, Pressure head · strip: Play/Pause, Reset water,
+  fields: Water, Speed, Pressure (kPa) · strip: Play/Pause, Reset water,
   Field & legend, Particles · panel: focused, one row (wind stress τ,
   symmetric about zero).
 - **New instrument:** the hover probe and the field legend.
@@ -233,14 +258,13 @@ New topic. It absorbs the review's "Shear layers and velocity profiles".
 - **To check:** the reservoir is large enough that the jet does not
   recirculate back onto itself or feel the far wall within the demo time.
 
-#### FF-5 · The contraction rig: streamlines — idea to develop
+#### CR-1, tab Streamlines (was FF-5) · The contraction rig: streamlines
 
 - **Tier:** Year 1 core · **Rung:** L1 · **Used in:** L4
 - **Scene:** the shared contraction rig.
 - **For L4:** streamlines. Gradual taper: smooth, converging streamlines.
   Abrupt step: separation in the corners and a vena contracta past the edge.
-- **Status:** the rig is agreed for VC-1 (L5) and MM-2 (L6); its use in L4
-  is an idea to develop alongside the scenes above.
+- **Status:** built as the first tab of CR-1 (Oct 2026).
 
 Not shown in a scene (L4):
 
@@ -251,7 +275,7 @@ Not shown in a scene (L4):
 
 ### Volume conservation — VC
 
-#### VC-1 · The contraction rig, steady — Demo / Play
+#### CR-1, tab Continuity (was VC-1) · The contraction rig, steady — Demo / Play
 
 - **Tier:** Year 1 core · **Rung:** L1 · **Used in:** L5
 - **Slides:** 3–9 (Lagrangian/Eulerian; the control volume; Q₁ = Q₂).
@@ -302,7 +326,7 @@ Not shown in a scene (L4):
 
 ---
 
-#### MM-2 · The contraction rig, forces — Demo / Play
+#### CR-1, tab Forces (was MM-2) · The contraction rig, forces — Demo / Play
 
 - **Tier:** Year 1 core · **Rung:** L2 · **Used in:** L6
 - **Slides:** 3–6, 12–18.
@@ -318,11 +342,18 @@ Not shown in a scene (L4):
     in = out, so the whole pressure drop is wall friction (τ_w, slides
     16–18).
 
-#### HJ-2 · Pressure and force on a sluice gate (ported from the OneDrive copy) — Demo
+#### HJ-2 · Momentum balance: sluice gate and hydraulic jump (ported from the OneDrive copy) — Demo
 
 - **Tier:** Year 1 core · **Rung:** L2 · **Used in:** L6
 - **Slides:** 10–11 (pressure is hydrostatic only where streamlines are
-  straight).
+  straight; the momentum balance on a gate).
+- **Aim (agreed Oct 2026):** a momentum balance. A control volume round the
+  gate gives the force on it from the momentum flux and the hydrostatic
+  pressure on the faces, ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), which the Pressure
+  force tool reads slightly lower because the pressure at the lip is not
+  hydrostatic; a control volume round the jump has nothing solid inside, so
+  momentum flux + pressure force in = out — the water jumps so the books
+  balance (no Bélanger).
 - **Scene:** `gatejump`, to be ported from
   `OneDrive/…/2026_hydraulician-gate-jump` (built on 10 Sep code, never
   committed). Re-verify after #72.
@@ -350,9 +381,9 @@ Taught by a colleague. See the rough ideas at the end.
 - **Lecturer does:** three gauges along the pipe. Slam the valve. The
   gauges respond one after the other. Lower c and repeat: the delay grows.
   The Gauge inspector shows the time series.
-- **Interface:** no build · tools: Gauge · fields: Water, Pressure head ·
-  strip: Play/Pause, Reset water, Valves, Field & legend · panel: focused,
-  one row (Slot celerity c) · Gauge inspector on.
+- **Interface:** no build · tools: Gauge · fields: Pressure (kPa; Δp ≈ ρcΔv),
+  Water, Speed · strip: Play/Pause, Reset water, Valves, Field & legend ·
+  panel: focused, one row (Slot celerity c) · Gauge inspector on.
 - **New instrument:** time series (the Gauge inspector).
 - **Existing:** UN-1, B1, B2.
 - **To redesign:** the `hammer` outlet is awkward and odd. Work out a
@@ -478,8 +509,9 @@ Not discussed. Kept as a starting point only.
 6. **FF-3** Body-shape slider in `plan` (ellipse → square); try equal area
    against equal frontal width; check the averaged wake is symmetric.
 7. **FF-4** Pipe jet into a large still reservoir.
-8. **Contraction rig** (FF-5, VC-1, MM-2): two full reservoirs, wide pipe
-   into narrow pipe, contraction-sharpness slider.
+8. **Contraction rig** (CR-1, tabs Streamlines / Continuity / Forces; was
+   FF-5, VC-1, MM-2): two full reservoirs, wide pipe into narrow pipe,
+   contraction-sharpness slider.
 9. **VC-2** The fill-and-leak tank with an inflow slider.
 10. **MM-1** A jet on an inclined flat plate with a plate-angle slider; the
     CV force with both components shown clearly, and the unequal split.

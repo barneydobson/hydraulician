@@ -1065,7 +1065,7 @@ uniform float u_dx, u_g, u_c2, u_valve, u_time;
 uniform float u_tilt;         // scene tiltS0: elevation is z − S₀x when set
 uniform int   u_mode;         // 0 water 1 pressure head 2 speed 3 Froude
                               // 4 vorticity 5 momentum flux
-                              // 6 piezometric head 7 energy head
+                              // 6 piezometric head 7 energy head 8 pressure
 uniform float u_vmax;         // speed scale: the particles and the Water sheen
 uniform float u_lo, u_hi;     // the CURRENT field's colour range, in its units
 uniform float u_dyeOn;
@@ -1279,6 +1279,11 @@ void main(){
     float g2 = max(abs(u_g), 1e-3);
     float He = pm.y - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
     water = turbo(nrm(He));
+  } else if (u_mode == 8) {
+    // Pressure p in kPa: ρ·P with ρ = 1000 kg/m³ and P (U.b) the kinematic
+    // pressure in m²/s², so kPa = P numerically. No division by g, so it
+    // reads the same in a plan view (g ≈ 0), where the heads cannot.
+    water = turbo(nrm(U.b));
   } else {
     // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
     // display pass runs once per FRAME, not once per substep — it is the two

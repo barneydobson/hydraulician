@@ -30,11 +30,13 @@ Shutting a valve stops the water next to it at once; the water further up
 does not yet know. The front between moving and stopped water runs upstream
 at c, and behind it the momentum of the water has become pressure:
 
-    Δp = ρ·c·Δv,   or as a pressure head   Δp/ρg = c·Δv/g
+    Δp = ρ·c·Δv            (in kPa: c·Δv with ρ = 1000 kg/m³ and c, Δv in m/s)
 
-**Pressure head** is the pressure divided by ρg — the pressure expressed as a
-height of water. It is the pressure up to a constant factor, so wherever it is
-higher, the pressure is higher. It is the colour on screen.
+The colour on screen is the **Pressure** p, in kPa above atmospheric
+(lecturer, Oct 2026: up to L6 the cards show the plain pressure, not the
+pressure head). At the default c = 30 m/s and v₀ ≈ 2.25 m/s,
+Δp = 1000 × 30 × 2.25 ≈ 67 kPa; measured 70 kPa (the 7.16 m of water in the
+table below × ρg).
 
 For a sudden, complete shut Δv = v₀, the steady pipe velocity. Two gauges a
 distance Δx apart see the front Δt = Δx/c apart. At the reservoir the front
@@ -68,7 +70,7 @@ the tank no longer matters.
 ## What to do
 
 1. The card opens on a steady flow (the countdown waits out **25 s**). The
-   colour is Pressure head (see Theory).
+   colour is the Pressure p in kPa (see Theory); its key runs 0–196 kPa.
 2. Place Gauges (`5`) on the pipe's centre line, **z = 2.5 m**, at
    **x = 14, 30 and 46 m** — 16 m apart. Open their windows from Controls →
    **Gauge inspector** and drag the three windows above the pipe. They plot
@@ -78,7 +80,7 @@ the tank no longer matters.
    then at 14 m. Pause (space) and read the three times in the windows: the
    delay over 16 m should be 16/c.
 4. Hover the cursor on the pipe either side of the front and read the
-   pressure head: it jumps by about c·v₀/g. Let it run: the wave reflects at
+   pressure: it jumps by about ρcv₀ (≈ 67 kPa). Let it run: the wave reflects at
    the reservoir as low pressure and the cycle repeats with period 4L/c.
 5. Press **V** to reopen, set **c = 20 m/s** on the card, press **R** and wait
    for the countdown. Shut it again: the delay grows about 1.5 times and the
@@ -120,6 +122,7 @@ centre line (z = 2.5 m); "crown" is 1 m higher, the top of the bore.
 | 16/c | 0.533 s | 0.800 | 0.533 | 0.533 | 0.457 |
 | jump in p/ρg at 46 m | 7.16 m | 4.90 | 8.85 | 3.70 | 8.35 |
 | c·v₀/g, bore / gauge v₀ | 6.87 / 7.27 m | 4.20 / 4.43 | 8.36 / 8.32 | 3.35 / 3.32 | 8.23 / 8.25 |
+| the same in kPa, as the card reads it: jump in p / ρcv₀ (bore v₀) | 70.2 / 67.5 kPa | 48.1 / 41.2 | 86.8 / 81.9 | 36.3 / 33.0 | 81.9 / 80.9 |
 | lowest p/ρg at the crown (after reflection) | **2.3 m** | 4.7 | **0.75** | 5.5 | **0.54** |
 | period | 6.25 s | 8.88 | 6.27 | 6.24 | 5.43 |
 | 4L/c, L = 46.75 m | 6.23 s | 9.35 | 6.23 | 6.23 | 5.34 |
@@ -199,14 +202,15 @@ synchronous read; not done here because it changes when a sample lands.
 
 ### Interface
 
-No build tools; MEASURE is the Gauge only; fields Pressure head, Water and
+No build tools; MEASURE is the Gauge only; fields Pressure (kPa), Water and
 Speed. Two card sliders: the speed of sound c (the panel's Slot celerity,
 limited on the card to 20–35 m/s) and the overflow crest (Geometry, 10.2–11.6
-m). The gauges plot speed; the hover readout is cut to position, velocity and
-pressure head. The corner gauge cards are withheld: stacked in the
-bottom-right corner they cover the valve and the 46 m gauge. The inspector
-windows still list h (piezometric head) and H (total head) beside the speed —
-that list is shared by every exercise and is not trimmed per card.
+m). The gauges plot speed (their tabs offer the pressure p and u — no head of
+any kind); the hover readout is cut to position, velocity and pressure in
+kPa. The corner gauge cards are withheld: stacked in the bottom-right corner
+they cover the valve and the 46 m gauge. The card is the short layout: five
+steps, with the definition of Δp = ρcv₀, c's real value and the crest slider
+in its Background fold.
 
 ### Discussion points
 
@@ -216,12 +220,12 @@ that list is shared by every exercise and is not trimmed per card.
 - **The jump does not depend on the pipe length,** only on c and v₀. The
   length sets how long it lasts (2L/c at the valve), which is why a valve
   closed in less than 2L/c counts as instantaneous.
-- **Real numbers.** At c = 1200 m/s, stopping 2 m/s gives a pressure head
-  jump of about 245 m — twenty-four atmospheres from shutting a tap quickly
-  on a long main.
+- **Real numbers.** At c = 1200 m/s, stopping 2 m/s gives a jump of
+  ρcv = 2400 kPa — twenty-four atmospheres from shutting a tap quickly on a
+  long main.
 - **Why the low-pressure half matters.** After the reflection the pressure at
   the valve falls about as far below its steady value as it first rose above
-  it. Raise c until c·v₀/g approaches the ~9 m of water over the pipe's crown
+  it. Raise c until ρcv₀ approaches the ~90 kPa (9 m of water) over the pipe's crown
   and the low-pressure wave reaches zero pressure: the column separates.
 
 `rig.js` is the console spot-check: `UP1.demo()` places the gauges, restarts

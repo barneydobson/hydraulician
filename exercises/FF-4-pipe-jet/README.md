@@ -58,7 +58,7 @@ slider: nothing about the pipe needs morphing to make the two points.
 2. **The edges of the jet.** On Speed, the jet's two edges — where fast
    water meets still water — leave the lips sharp, start to flap a metre or
    two past the exit and roll up into eddies by x ≈ 14–15 m; the eddies
-   reach the free surface and dimple it. (Pressure head is the card's other
+   reach the free surface and dimple it. (Pressure, in kPa, is the card's other
    colouring: under the free surface it mostly grows with depth.)
 3. **Live against Average.** Place two more rakes across the jet at x ≈ 12 and
    14 m (each new rake replaces the oldest). Switch the colour bar from Live

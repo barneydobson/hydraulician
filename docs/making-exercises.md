@@ -12,7 +12,8 @@ the task from the card alone, without opening the README or being referred
 to it. HS-1's on-screen description is the model: state the starting setup,
 where to measure, the action to take and the readings to compare afterwards.
 For a calculation exercise, also put the necessary data, student-number
-rule and formula on the card. Keep that concise; use `setup` for ordered
+rule and formula on the card. Keep that concise — the short layout (`steps`
+and a `background` fold, below) is the current form; or use `setup` for ordered
 steps rather than making `task` one long paragraph. An optional lecturer
 notes link is not a substitute for any student instruction.
 
@@ -133,7 +134,9 @@ field and, more importantly, **the line between applied and displayed**:
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
 | `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule`. For a slider give a short `label` ("Speed of sound in water, c", "Wall shape", "Inflow Q") and **no** `rule`: a sentence under every slider made the Year 1 cards mostly slider, so what it does and its starting value go in `setup` |
 | `instruments` | **no** | `{tool, where, why}` — where the gauges go; the picker places none and clears any a payload carried |
-| `setup`, `start`, `task`, `note` | printed | the staged steps, one line on the bench, one or two on what to do and read |
+| `steps`, `background` | printed | **the short layout** (below): at most five one-line numbered steps, and a closed Background fold for definitions, formulas and remarks |
+| `setup`, `start`, `task`, `note` | printed | the older layout: the staged steps, one line on the bench, one or two on what to do and read. A card with `steps` prints neither `start` nor `task` |
+| `tabs` | — | one scene asked several questions: a list of tabs, each with its own steps and interface (below) |
 | `aim` | printed in the menu | optional: one or two plain sentences on what the scene is and what the student does in it; the exercise menu prints it under the title instead of the `start · ?scene · settle` line, the start screen shows it on hover, the card does not |
 | `settle` | yes | sim-seconds the picker runs flat out before the card counts down; `0` is meaningful |
 | `rigWhy`, `instruments[].why` | neither | maintenance prose: why a constant is what it is |
@@ -169,13 +172,15 @@ top:
   checks (`instReadouts`, `hoverCard`) and so `viewParams` keys. A card that
   lists VIEW should name them where it has instruments or a hover card.
 - `ui.fields`: the `FIELDS` ids the legend offers (`water speed ehead head
-  phead vort froude mom`); if the live field is not among them, the first one
-  is applied.
+  phead p vort froude mom`); if the live field is not among them, the first one
+  is applied. `p` is the plain **Pressure** (kPa) — see *The Pressure field*
+  below.
 - `ui.panel`: `"full"`, `"focused"` or `"shut"`. `ui.controls` is a list of
   individual `CONTROLS` row ids when even a focused section contains more than
   the exercise needs; the section headings are retained automatically.
   `ui.legend: false` closes the legend. `ui.readouts`:
-  `{gauges, cursor, status}` booleans and `rows: [...]`, validated against
+  `{gauges, cursor, status}` booleans and `rows: [...]` (the pressure in kPa
+  is the row `p`, off by default; pressure head is `phead`), validated against
   `OVERLAY`'s row register. The hover card's TITLE — the open-channel
   profile class, "H2 profile" — is the row `profile`: a card with a `rows`
   list that does not name it never shows it (it used to appear whatever the
@@ -242,10 +247,100 @@ tool — `ui: { build: true }` or a build tool in `instruments` — or the tool
 is silently absent. A profile is never a cage: the `⋯` on the strip restores
 everything.
 
-HS-1: `ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead"],
-panel: "shut", readouts: { rows: ["pos", "eta", "uw", "phead"] } }` — the
-Pressure force tool from `instruments`, the field key and the particle
-toggle, and a hover card limited to what an L3 student has met.
+HS-1: `ui: { view: ["legendBtn", "partBtn", "readBtn", "hoverBtn"],
+fields: ["water", "phead", "head"], panel: "shut", hide: ["energy",
+"critical"], readouts: { rows: ["pos", "eta", "uw", "phead", "h"] } }` — the
+Pressure force tool from `instruments`, the field key, the particle toggle
+and the two readout switches, and a hover card limited to what an L3 student
+has met (pressure head and piezometric head are taught in Statics).
+
+### The short card layout: `steps`, `background` and inline icons
+
+The Year 1 lecturer's verdict on the first cards was that they were verbose
+and ran off the page. A card that carries `steps` is drawn in the short
+layout:
+
+1. the sliders on top (`studentParams`, short labels, no `rule`);
+2. the tab bar, if the entry has tabs;
+3. `steps`: **at most five**, one line each — the action and what to notice
+   (`check_pack.py` fails a card with more);
+4. `background`: a string or a list of paragraphs in a **Background** fold at
+   the foot, closed whenever a card or tab is shown, open with one click — a
+   definition (pressure head…), a formula, the data, a remark;
+5. the collapsed *Already set* receipt.
+
+There is no Start / Do paragraph (they repeated the steps) and no
+Instruments line (the stations are in the steps). The dock body scrolls
+inside itself, so a long Background never pushes the card off the page. A
+card without `steps` (the upstream pack) is drawn as before from `setup`,
+`start` and `task`.
+
+**Inline icons.** A step or a Background paragraph names the strip items a
+student must press, and the card draws that item's own icon and label in
+line, read from the same `TOOLBAR` / `ICONS` spec the strip is built from, so
+the two cannot drift:
+
+| markup | draws |
+|---|---|
+| `{tool:force}` | a tool by its `TOOLS` id → [icon] **Pressure force** |
+| `{btn:legendBtn}` | a strip button by its id → [icon] **Field & legend** |
+| `{key:V}` | a key cap — **V** (the valve is just "press {key:V}") |
+
+`"Pick {tool:force} and click the gate"` renders as "Pick [icon] Pressure
+force and click the gate". An unknown id prints in amber on the card and
+fails `check_pack.py`. `EX.plain(text)` spells the markup out in words.
+
+### Tabs: one scene, several questions
+
+The contraction rig is one scene asked about streamlines in L4, continuity
+in L5 and forces in L6, so it is ONE entry, CR-1, with three tabs:
+
+```js
+{ id: "CR-1", title: "The contraction rig", scene: "contraction",
+  rigParams: { budget: "Medium" }, settle: 25, studentParams: [...],
+  ui: { panel: "focused", hide: ["energy", "critical"] },
+  tabs: [
+    { key: "streamlines", label: "Streamlines", alias: "FF-5", topic: "…",
+      title: "…", aim: "…", viewParams: {...}, ui: {...}, steps: [...], background: [...] },
+    { key: "continuity", label: "Continuity", alias: "VC-1", instruments: [...], … },
+    { key: "forces", label: "Forces", alias: "MM-2", … } ] }
+```
+
+A tab's own fields replace the entry's (`viewParams` and `ui` are merged over
+the entry's, shallowly) — `title`, `aim`, `topic`, `steps`, `background`,
+`instruments`, `studentParams`, `note`, `ui`, `viewParams`. The scene, the rig,
+`rigParams` and `settle` are the entry's alone: **switching tabs does not
+reload the scene or restart the flow**. It swaps the steps and the interface
+profile (fields, strip buttons, tools, gauges, `hide`, …) and applies the
+tab's view; placed instruments, the clock and the student's slider values
+carry on. The card shows a tab bar under its title.
+
+Addressing: `?ex=CR-1&tab=forces` opens a tab directly (the address bar
+follows the tab), `"CR-1#forces"` is the same in a course menu or
+`APP.pickExercise`, and a tab's `alias` — the id the question had before it
+became a tab — still works as `?ex=MM-2`. A tab without `title` is called
+"<entry title> · <label>" in menus; one with `topic` is listed under that
+topic in the register view. `check_pack.py` checks the tab keys and labels,
+that an alias collides with no id, and runs every per-card check on each
+tab's merged view (reported as `CR-1#forces`).
+
+### The Pressure field
+
+`FIELDS` has a plain **Pressure** colouring: id `p`, mode 8, p in kPa above
+atmospheric. The solver carries the kinematic pressure P = p/ρ, so
+p = ρP (kPa = P numerically, ρ = 1000 kg/m³). Unlike every head it does not
+divide by g, so it means the same in a plan view (gravity ≈ 0), where pressure
+head is p/0.001. Its default range is the hydrostatic scale ρg·`headMax`
+under gravity, a scene's own `pRange: [lo, hi]` (kPa) where it gives one
+(`vane`: 0–10), and otherwise in a plan view the live field's spread, fitted
+the first time Pressure is shown and then held — a plan view's pressure sits
+on an arbitrary, slowly creeping reference (`body`: ~37 kPa), so no fixed
+number would show its ±0.2 kPa. The hover card's row id is `p`
+("pressure p … kPa"); the gauge quantity `p` already existed.
+
+Up to L6 the Year 1 cards show **Pressure**, not pressure head (lecturer,
+Oct 2026) — except HS-1, which offers Pressure head and Piezometric head,
+because the piezometer's one level is what piezometric head shows.
 
 ### The menu: `aim`, the course menu and `compact`
 
@@ -256,6 +351,10 @@ unless a deployment ships `js/menu.js` with a course menu:
 const EXERCISE_MENU = { title: "…", compact: true,
                         sections: [{ title: "L2 · Fundamentals", ids: ["FF-1", "UP-1"] }] };
 ```
+
+A menu id may name a **tab**: `"CR-1#forces"` lists that tab under its
+lecture (its own `title` and `aim`) and opens the card on it; choosing another
+tab of the exercise already on the bench switches tabs in place.
 
 Under each title the menu prints the entry's `aim` when it has one, and
 otherwise the `start · ?scene · settles in N s` line. `compact: true` turns
@@ -344,7 +443,10 @@ ladder disagrees with the rule; the `ui` profile names a tool, button, field,
 panel or readout row that does not exist, a gauge quantity outside
 `GAUGE_QTY` (or a `viewParams.gaugeField` it does not offer), a `hide`
 concept other than `energy` / `critical`, or a `fieldText` key that is not a
-field; a card's `gauges` entry is malformed; a drawing task hides BUILD; or a
+field; a card's `gauges` entry is malformed; a drawing task hides BUILD; a
+card has more than five `steps`, or its inline markup names a tool or button
+that does not exist; a tab has no key or label, repeats a key, or its alias
+collides with an id (every check above runs on each tab's merged view); or a
 folder or INDEX row has no card. `check_notation.py` then greps the brief for
 retired names (the y-family, old gauge keys). Both are instant and run in CI.
 

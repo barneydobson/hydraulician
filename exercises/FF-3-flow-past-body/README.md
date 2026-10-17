@@ -80,12 +80,19 @@ does not restart the water. Each change also restarts an Average window.
    now follow the mean flow's streamlines. Switch back to Live to return to
    the live street.
 
-The card offers Speed only (Oct 2026). Pressure head was an optional sixth
-step, but in this plan view it carries a large, slowly drifting constant
-(about 2–4 m) and shows nothing a student can read without Fit, so the
-field, its hover row and its gauge quantity were withdrawn. A lecturer who
-wants it — the stagnation pressure at the front of the body — has it under
-`⋯ Show everything` → Field → Pressure head, then Fit on the legend.
+The card offers Speed and **Pressure** (lecturer, 2026-10-17). Pressure head
+was withdrawn earlier (Oct 2026): in this plan view it divides by g = 0 (the
+app falls back to 9.81) and carries a large, slowly drifting constant. The
+plain Pressure (p, kPa) does not divide by g, but its level is still
+arbitrary in a plan view: measured at Medium it sits near **37.1–37.4 kPa**
+and creeps up by about 0.1 kPa a minute (37.14–37.37 at t = 11 s,
+37.38–37.61 at t = 200 s, 1st–99th percentile), with ±0.12 kPa of real
+differences on top — stagnation at the nose, low pressure along the sides
+and in the shed eddies (½ρU² = 0.4 kPa at 0.9 m/s). So the field's range is
+not a fixed number here: it is **fitted once, the first time Pressure is
+shown**, and held (`pressureRange` in js/main.js); press Fit on the legend
+after a long run to re-centre it. The card's Background says only the
+differences matter. The hover card and the gauges read p in kPa.
 
 ## For the instructor
 

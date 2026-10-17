@@ -22,9 +22,10 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 ## Theory
 
 **At rest.** With u = 0 the momentum equation leaves only the vertical
-balance ∂p/∂z = −ρg, so p = ρg·(η − z) = ρg·d and the pressure head p/ρg is
-the depth below the surface: flat horizontal bands on the Pressure head
-field. A shear stress needs a velocity gradient, and there is none.
+balance ∂p/∂z = −ρg, so p = ρg·(η − z) = ρg·d: the pressure grows with the
+depth below the surface, 2.9 kPa at the bed 0.30 m down — flat horizontal
+bands on the Pressure field (p, kPa; the card shows the plain pressure, not
+the pressure head, lecturer 2026-10-17). A shear stress needs a velocity gradient, and there is none.
 
 **The wind.** A stress τ (N/m²) on the surface is a force τ per square metre
 on the top layer of water. Nothing at rest can balance it, so the water
@@ -50,15 +51,13 @@ carries back. That is the return flow near the bed.
 The card carries these steps; the Wind stress τ slider is on the card.
 
 1. **At rest.** Hover the water anywhere: the velocity is zero, and the
-   pressure head p/ρg is the depth below the surface (0.30 m at the bed).
-   Pressure head is the pressure divided by ρg — the pressure expressed as a
-   height of water; wherever it is higher, the pressure is higher. Choose
-   Pressure head in Field & legend: flat horizontal bands. Pressure only.
+   pressure p = ρg × depth (2.9 kPa at the bed). Choose Pressure in Field &
+   legend: flat horizontal bands. Pressure only.
 2. **Turn on the wind.** Set τ to a small positive value (the arrows above
    the water point right). The water starts to move at once and keeps moving.
    Particles in the top layer run right; those near the bed run back left.
 3. **Watch the water pile up.** The surface rises against the right wall and
-   falls at the left; on Pressure head the bands tilt. Choose Speed to see the
+   falls at the left; on Pressure the bands tilt. Choose Speed to see the
    fast surface layer and the slower return flow.
 4. **Reverse τ.** Everything reverses: the water piles up at the left wall,
    the return flow runs to the right.

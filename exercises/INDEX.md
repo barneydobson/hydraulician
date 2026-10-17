@@ -52,7 +52,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |
 | HP-2 | Cups vs plates | HP-2-pelton/ | shared jet rig | — (lecturer demo) |
 | HP-3 | Hydropower and unsteady flow | HP-3-surge-tower/ | hydro (fixed tutorial scheme) | (V₀, h_f, V_jet, P, η₀, k, η_max) |
-| HS-1 | Dyke, culvert and piezometer | HS-1-dyke-piezometer/ | dyke | — (lecturer demo) |
+| HS-1 | Dike with a piezometer | HS-1-dyke-piezometer/ | dyke | — (students play; class demo) |
 | NC-2 | Gauging a vertical: 0.6 d against 0.2 d + 0.8 d | NC-2-gauging-methods/ | gauging, reservoir level 0.68 m then 1.33 m, own station | (x, d, u₀.₂, u₀.₆, u₀.₈, V) per run |
 | NC-3 | Bed shear and riprap | NC-3-bed-shear/ | s2 sweep + m2 anchor | (τ₀, D_min) |
 | QS-1 | Predict the drain | QS-1-drain-predict/ | jet | (t_pred, t_meas) |
@@ -87,17 +87,17 @@ pause-and-read promptly (the chart buffer keeps moving).
 | B8 | Three orifices, three coefficients | B8-three-orifices/ | jet + drawn lips | (lip type, C_c) |
 | B9 | Three reservoirs, one junction | B9-three-reservoirs/ | RIG-C ×3, dynamic | (z_B(0), Q_B, junction head) |
 | B10 | Lift the crest until the pipe gives up | B10-crest-vs-hgl/ | RIG-A + raised crest | (level, z_sep, HGL at the crest) |
-| FF-1 | Wind over a lake | FF-1-wind-lake/ | lake, wind stress τ slider | — (lecturer demo) |
+| FF-1 | A fluid deforms under any shear (wind over a lake) | FF-1-wind-lake/ | lake, wind stress τ slider | — (students play; class demo) |
 | UP-1 | Pressure travels at the speed of sound (water hammer) | UP-1-water-hammer/ | pipeline | — (lecturer demo) |
-| PF-2 | The wall's shape doesn't matter | PF-2-wall-shape/ | wall-shape, wall shape slider | — (lecturer demo) |
-| FF-2 | Spillway with a ski-jump | FF-2-spillway/ | spillway, bucket lip angle slider | — (lecturer demo) |
-| FF-3 | Flow past a body | FF-3-flow-past-body/ | body, body shape slider | — (lecturer demo) |
-| FF-4 | A pipe jet into a still reservoir | FF-4-pipe-jet/ | pipejet | — (lecturer demo) |
-| FF-5 | Contraction rig: streamlines | FF-5-contraction-streamlines/ | contraction, contraction length slider | — (lecturer demo) |
-| VC-1 | Contraction rig, steady | VC-1-contraction-steady/ | contraction | — (lecturer demo) |
-| VC-2 | The tank that fills and leaks | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (lecturer demo) |
+| PF-2 | Pressure force: only the depth matters (wall shape) | PF-2-wall-shape/ | wall-shape, wall shape slider | — (students play; class demo) |
+| FF-2 | The velocity field, and turbulence (spillway) | FF-2-spillway/ | spillway, bucket lip angle slider | — (students play; class demo) |
+| FF-3 | Steady and unsteady flow (flow past a body) | FF-3-flow-past-body/ | body, body shape slider | — (students play; class demo) |
+| FF-4 | Boundary layers: at a wall, in a jet (pipe jet) | FF-4-pipe-jet/ | pipejet | — (students play; class demo) |
+| FF-5 | Streamlines and separation (contraction rig) | FF-5-contraction-streamlines/ | contraction, contraction length slider | — (students play; class demo) |
+| VC-1 | Continuity: Q in equals Q out (contraction rig) | VC-1-contraction-steady/ | contraction | — (students play; class demo) |
+| VC-2 | Storage = in − out (tank that fills and leaks) | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (students play; class demo) |
 | MM-1 | A jet turned through an angle | MM-1-jet-vane-angle/ | vane, turning angle slider | — (lecturer demo) |
-| MM-2 | Contraction rig, forces | MM-2-contraction-forces/ | contraction | — (lecturer demo) |
+| MM-2 | Momentum: the force on a contraction (contraction rig) | MM-2-contraction-forces/ | contraction | — (students play; class demo) |
 | HJ-2 | Sluice gate with the movable weir | HJ-2-gate-jump/ | gatejump, weir crest slider | — (lecturer demo) |
 | WV-4 | Breaking waves on a beach | WV-4-breakers/ | beach, beach slope slider | — (lecturer demo) |
 

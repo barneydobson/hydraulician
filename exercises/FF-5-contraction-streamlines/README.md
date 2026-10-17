@@ -1,4 +1,4 @@
-# FF-5 · The contraction rig: streamlines
+# FF-5 · Streamlines and separation
 
 Two reservoirs held at fixed levels are joined by a 1.00 m pipe that
 contracts into a 0.50 m pipe discharging into the right-hand reservoir. One
@@ -52,17 +52,21 @@ and the scene's spin-up then runs flat out again, so each L is seen steady.
    particle tracks converge smoothly through the taper and lengthen as the
    water accelerates; the colour goes from blue in the wide pipe to green in
    the narrow one.
-2. Switch to **Vorticity**: the only vorticity is in the thin boundary
-   layers on the walls; nothing leaves the wall in the taper.
-3. Drag **Contraction length L** (Controls → Geometry) to **0 m**. The run
-   restarts and spins up.
-4. On **Vorticity**, two shear layers now leave the two corners of the step
-   and reattach a little way down the narrow pipe; on **Speed** the corner
-   regions are dark (slow eddies) and the core just past the edge is faster
-   than further down the pipe — the vena contracta.
-5. Press **A** (Average): the particles then ride the mean flow and draw its
-   streamlines; the corner eddies stand out as regions the through-flow
-   never enters.
+2. Turn on **Streamlines** on the strip: they converge smoothly through
+   the taper and follow the walls.
+3. Slide **Contraction length L** on the card to **0 m**. The run restarts
+   and spins up.
+4. On **Speed** the corner regions are dark (slow eddies) and the core just
+   past the edge is faster than further down the pipe — the vena contracta;
+   the streamlines leave the corners and bend round the eddies.
+5. Switch the colour bar from Live to **Average**: the particles then ride
+   the mean flow and the streamlines are those of the mean flow; the corner
+   eddies stand out as regions the through-flow never enters.
+
+(The first draft also used the Vorticity colouring here, which shows the
+separated layers leaving the corners most clearly. Vorticity is not taught
+in Year 1, so the card offers Water and Speed only; `⋯ Show everything`
+brings Vorticity back for a lecturer who wants it.)
 
 ## For the instructor
 

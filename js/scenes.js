@@ -1110,13 +1110,14 @@ const SCENES = (() => {
     // horizontal one. The culvert is tall enough to be a channel in its own
     // right rather than a pipe.
     //
-    // Levels: 4.00 m left, 3.10 m right, both well above the culvert roof at
-    // 1.60 m, so the culvert stays drowned throughout. The right basin is
+    // Levels: 3.50 m left, 2.60 m right, both well above the culvert roof at
+    // 1.10 m, so the culvert stays drowned throughout. The right basin is
     // narrow so it fills in seconds when the valve opens; the common level
     // follows from the volume the left body loses (its plan area shrinks as
-    // it drops down the slope) — 3.82 m here, measured and closed-form.
-    // The ground top sits at 1.0 m, not near the floor, so the pressure
-    // diagram the Force tool hangs under the culvert roof has room to draw.
+    // it drops down the slope) — 3.32 m here, measured and closed-form.
+    // The ground top sits at 0.50 m (the lecturer's trim, Oct 2026: it was
+    // 1.00 m and the frame ran under the controls); everything above it kept
+    // its own dimensions and moved down 0.50 m with it.
     //
     // nu is an EDDY viscosity, not water's. At the stock 1e-5 the jet that
     // fills the small basin leaves a trapped eddy that never dies: 0.2 m/s
@@ -1125,16 +1126,16 @@ const SCENES = (() => {
     // stand still. Raising C_s to 0.4 or C_f to 0.05 barely moved it; 1e-3
     // took the basins to 4 mm/s by 60 s, 2e-3 to under 5 mm/s by 45 s with
     // the fill itself unchanged (culvert RMS 0.33 m/s at 12 s either way).
-    { id: "dyke", name: "Dyke with a piezometer", key: "Hydrostatics",
+    { id: "dyke", name: "Dike with a piezometer", key: "Hydrostatics",
       group: "Hydrostatics",
-      blurb: "Two reservoirs at different levels either side of a dyke, joined by a shut culvert with a piezometer tapped into its roof. Read the three levels and the face forces, then press V and watch them find one level.",
-      W: 6.0, H: 5.1, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
+      blurb: "Two reservoirs at different levels either side of a dike, joined by a culvert under it with a shut valve and a piezometer tube in its roof. Read the levels and the face forces, then press V and watch the water find one level.",
+      W: 6.0, H: 4.6, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
       hmax: 4.2, headMax: 3.3, vmax: 4,
       valveOpen: 0, particles: 1,
       open: [0, 0, 0, 0],
       solids: () => {
-        const zg = 1.00, zr = 1.60, zc = 4.30;            // ground top, culvert roof, crest
-        const xt = 2.40, zt = 2.40, xs = 3.30;            // toe, top of the toe, slope meets crest
+        const zg = 0.50, zr = 1.10, zc = 3.80;            // ground top, culvert roof, crest
+        const xt = 2.40, zt = 1.90, xs = 3.30;            // toe, top of the toe, slope meets crest
         const s0 = 4.30, s1 = 4.50, x1 = 5.20;            // piezometer slot, downstream face
         return [
           GEOM.rect(-0.5, -0.5, 6.5, zg, { id: "ground",
@@ -1153,15 +1154,15 @@ const SCENES = (() => {
                     { id: "crest", label: "Crest", e0: 2, e1: 2 }] }),
         ];
       },
-      valves: () => [[5.00, 1.00, 5.00, 1.60, 0.08]],   // across the culvert, downstream of the tap
-      water: (x, z, P) => (z <= 1.00 ? 0
-                           : x < 5.00 ? still(4.00, z, P)   // left basin, culvert, piezometer
-                           : still(3.10, z, P)),            // right basin
-      tips: ["Three water surfaces, one level: the left basin, the culvert and the piezometer are the same connected body.",
-             "Hover the dyke's faces with the <b>Pressure force</b> tool — the sloped upstream face carries ½ρg·d² sideways AND the weight of the water standing on the slope downward; the vertical downstream face only the first.",
-             "Press <b>V</b> to open the culvert. The narrow right basin fills in seconds; the common level is where the volume the left body loses equals what the right one gains.",
-             "Once still again — about 45 s — both faces carry the same horizontal force: the dyke feels no net thrust.",
-             "Switch the field to Piezometric head — still water is one colour everywhere, however deep."] },
+      valves: () => [[5.00, 0.50, 5.00, 1.10, 0.08]],   // across the culvert, downstream of the tap
+      water: (x, z, P) => (z <= 0.50 ? 0
+                           : x < 5.00 ? still(3.50, z, P)   // left basin, culvert, piezometer
+                           : still(2.60, z, P)),            // right basin
+      tips: ["Three water surfaces, one level: the left reservoir, the culvert and the piezometer tube are one connected body of still water.",
+             "Pick the <b>Pressure force</b> tool and click a face of the dike: the pressure grows with depth, and the sideways force is ½ρg·d².",
+             "The sloped upstream face also carries the weight of the water standing on it, pushing down; the vertical downstream face does not.",
+             "Press <b>V</b> to open the valve. The small right reservoir fills; once the water is still, every surface stands at one level.",
+             "When all is still again — about 45 s — both faces carry the same sideways force: the dike feels no net push."] },
 
     // -------------------------------------------- pressure and transients
     // A real pipeline, not a lab flume: the static head has to exceed the
@@ -1757,9 +1758,9 @@ const SCENES = (() => {
           if (Math.abs(z - ZC) > hf) return 0;
           return still(L1 - (L1 - L2) * (x - XL) / (XR - XL), z, P);
         },
-        tips: ["Drag <b>Contraction length L</b> in Controls → Geometry: 3 m is a gentle taper, 0 an abrupt step.",
+        tips: ["Slide <b>Contraction length L</b> on the card: 3 m is a gentle taper, 0 an abrupt step.",
                "Particles speed up through the contraction: in steady flow every particle still accelerates.",
-               "Past the step the flow cannot turn the corner: it separates, and the jet necks down to a vena contracta.",
+               "Past the step the flow cannot turn the corner: it separates, and the jet narrows to a vena contracta.",
                "A Flux line in each pipe reads the same Q; a Control volume round the contraction gives the force on it."],
       }];
     })(),
@@ -1788,10 +1789,10 @@ const SCENES = (() => {
       return {
         id: "fillleak", name: "Tank that fills and leaks", key: "S dh/dt = Q_in − Q_out",
         group: "Jets & waves",
-        blurb: "A tank fed from the top and drained through a valved hole near the floor. Shut, the level climbs at Q/S; open, the outflow grows with depth until it matches the inflow and the level stops.",
+        blurb: "A tank fed from the top and drained through a hole near the floor. The outflow grows with the depth of water over the hole, so the level settles where outflow equals inflow; shut the valve (V) and the level climbs at Q/S.",
         W: 4.0, H: 3.6, c: 26, cf: 0.004, cs: 0.10, nu: 1e-3,
         mode: 0, hmax: 2.6, headMax: 2.6, vmax: 5,
-        valveOpen: 0, particles: 0, spinup: 0,
+        valveOpen: 1, particles: 0, spinup: 0,      // VC-2 opens with the outlet OPEN (lecturer, Oct 2026)
         open: [0, 1, 1, 0],
         params: [
           { key: "q_in", label: "Inflow Q", min: 0.10, max: 0.30, step: 0.01,
@@ -1815,9 +1816,9 @@ const SCENES = (() => {
         },
         valves: () => [[S1 + 0.05, O0 - 0.02, S1 + 0.05, O1 + 0.02, 0.08]],
         water: (x, z, P) => (x > S0 && x < S1 && z > ZF ? still(0.70, z, P) : 0),
-        tips: ["The valve starts SHUT: the level climbs in a straight line at Q/S, S = 2.00 m.",
-               "Press <b>V</b>: the outflow grows with depth (Torricelli) and the level creeps up to where out = in.",
-               "Move <b>Inflow Q</b> and the level finds a new balance — higher Q, higher level.",
+        tips: ["The outlet starts OPEN: the outflow grows with the depth over it, and the level creeps up to where out = in.",
+               "Press <b>V</b> to shut the valve: with nothing going out, the level climbs in a straight line at Q/S, S = 2.00 m.",
+               "Slide <b>Inflow Q</b> on the card and the level finds a new balance — higher Q, higher level.",
                "Drag a Control volume (9) round the whole tank: in, out and net. Net is the rate the tank stores water; it is NOT zero while the level moves."] };
     })(),
 
@@ -1990,7 +1991,7 @@ const SCENES = (() => {
         },
         water: (x, z, P) => (z > ZB && z < ETA ? still(ETA, z, P) : 0),
         tips: ["Pick the <b>Pressure force</b> tool and click the right-hand wall. The chip prints F, then F_h with ½ρg·d² beside it, then F_v.",
-               "Set <b>Wall shape</b> in Controls: overhang → vertical → 30° → 60° → steps. Each change restarts the still water; the depth at the wall stays 1.60 m.",
+               "Slide <b>Wall shape</b> on the card: overhang → vertical → 30° → 60° → steps. Each change restarts the still water; the depth at the wall stays 1.60 m.",
                "F_h never changes: only the wall's vertical projection, d, matters.",
                "F_v is the weight of the water standing on the wall. Under an overhang it is the weight of the water that ISN'T there above it, and it points up.",
                "Switch <b>Submerged block</b> on and click the block: the pressure all round it adds up to one upward force, its displaced weight."] };
@@ -2023,9 +2024,9 @@ const SCENES = (() => {
           faces: [{ id: "top", label: "Lake bed", e0: 2, e1: 2 }] }),
       ],
       water: (x, z, P) => (z <= 0.10 ? 0 : still(0.40, z, P)),
-      tips: ["At rest: hover the water — u = 0 and p/ρg is just the depth below the surface. Pressure head shows flat bands: pressure only.",
+      tips: ["At rest: hover the water — the velocity is zero and the pressure head p/ρg is just the depth below the surface. Pressure head shows flat bands: pressure only.",
              "Move the <b>Wind stress τ</b> slider: the surface water is dragged downwind at once, however small τ is.",
-             "Watch the surface pile up against the downwind wall (set-up), and the particles near the bed run back upwind.",
+             "Watch the surface pile up against the downwind wall, and the particles near the bed run back upwind.",
              "Reverse τ and the whole circulation reverses. Set τ = 0 and the motion dies away."] },
     // ===== Year 1: body (FF-3) =====
 
@@ -2080,9 +2081,9 @@ const SCENES = (() => {
       return {
         id: "body", name: "Plan view — flow past a body", key: "Streamlined → bluff",
         group: "Jets & waves",
-        blurb: "Looking down on a uniform stream past one body whose shape you morph with a slider, from a slender ellipse lined up with the flow to a square. Streamlined: a thin steady wake. Bluff: the flow separates and the wake sheds vortices.",
+        blurb: "Looking down on a uniform stream past one body whose shape you morph with a slider, from a slender ellipse lined up with the flow to a square. Streamlined: a thin steady wake. Bluff: the flow separates and the wake swings from side to side, shedding eddies.",
         W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 2e-3, slip: 1, bulk: 0.03,
-        mode: 4, ca: 0, vmax: 1.6, vortMax: 12, dyeLine: 1.0,
+        mode: 2, ca: 0, vmax: 1.6, vortMax: 12, headMax: 3.2, dyeLine: 1.0,
         // Left edge open and NOT walled: the inflow prescribes the stream over
         // the whole of it (see `plan` for why the edge itself must be open).
         open: [1, 1, 0, 0],
@@ -2097,9 +2098,9 @@ const SCENES = (() => {
         shape,
         water: () => 1,
         tips: ["Slide the shape from streamlined to bluff and watch the wake: steady and thin, then wider, then alternating.",
-               "Colour is vorticity: the two shear layers leave the body where the flow separates, and roll up into a Kármán street.",
-               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Dye (D) sends timelines across the stream from the inlet.",
-               "Press A: the average of the alternating wake is a steady, symmetric wake bubble."] };
+               "Colour is speed: behind a bluff body the flow separates from the surface, and the slow wake swings from side to side as eddies are shed.",
+               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Dye (D) sends lines of dye across the stream from the inlet.",
+               "Switch the colour bar from Live to Average: the average of the alternating wake is a steady, symmetric wake bubble."] };
     })(),
     // ===== Year 1: spillway, pipejet (FF-2, FF-4) =====
     // Two demo scenes for the Fluid Motion lecture (L4): one flow field each
@@ -2113,9 +2114,16 @@ const SCENES = (() => {
     // H_d = 1.5 m), runs down a 1 : 0.75 face into a circular flip bucket
     // and is thrown into the air; the jet plunges into a deep pool held by a
     // tailwater on the right edge. No hydraulic jump and no stilling basin:
-    // the pool is simply long — 44 m of domain, ~26 m of pool past the
-    // plunge — so the turbulence has decayed into a slow drift before the
-    // outflow edge, and the tailwater sponge only ever meets that drift.
+    // the pool is simply long enough. It was 44 m of domain (~26 m of pool
+    // past the plunge, a calm drift at the outflow edge); in Oct 2026 the
+    // lecturer asked for the pool to be halved so the fitted view shows more
+    // of the spillway: W = 29 m, ~11 m of pool past the plunge. MEASURED at
+    // Medium (525 × 181, Δx 55 mm) over 105 s live + 40 s averaged: the
+    // turbulence now reaches the outflow edge (its section reads 3.0–4.6
+    // m²/s live) but the edge never flows back (min u > 0.45 m/s over the
+    // column), the tailwater holds at 2.97–3.03 m, and averaged the edge
+    // reads 3.51 and a pool section at x = 22 m 3.33 against 3.52 over the
+    // crest.
     //   The bucket's lip angle is the one Geometry slider: it moves the lip
     // along the bucket's own arc, so the throw (where the jet lands, how high
     // it flies) changes while the crest, the face and q do not. MEASURED at
@@ -2126,9 +2134,11 @@ const SCENES = (() => {
     // 30 m to the outflow edge and the tailwater sloshed with them (at 0.1
     // the pool rose to 6 m and drowned the bucket); at the default the pool
     // fluctuates hard around the plunge and is a calm drift by x = 30 m.
-    // q = 3.46 m²/s over the crest at the 8.7 m level; settled by ~40 s.
+    // (Those kappa measurements were on the 44 m pool.) q = 3.52 m²/s over
+    // the crest at the 8.7 m level on the 29 m domain (3.46 on the coarser
+    // 44 m grid); settled by ~40 s.
     (() => {
-      const W = 44, H = 10;
+      const W = 29, H = 10;
       const ZF = 0.3;                 // reservoir floor and pool floor
       const XU = 7.0;                 // the dam's upstream face
       const ZC = 7.2, HD = 1.5;       // crest apex, design head
@@ -2191,7 +2201,7 @@ const SCENES = (() => {
       return {
         id: "spillway", name: "Spillway with a flip bucket", key: "Ski-jump into a plunge pool",
         group: "Flow fields & turbulence",
-        blurb: "A reservoir spills over an ogee crest, races down the spillway face and is thrown into the air by a flip bucket. The jet plunges into a deep pool: steady above, wildly unsteady below — and its average is steady again.",
+        blurb: "A reservoir spills over a curved crest, races down the spillway face and is thrown into the air by a flip bucket. The jet plunges into a deep pool: steady above, wildly unsteady below — and its average is steady again.",
         W, H, c: 30, cf: 0.005, cs: 0.10, bulk: 0.05, nu: 1e-4,
         mode: 2, hmax: 9, headMax: 10, vmax: 10, particles: 1,
         view: { vex: 1 },
@@ -2217,10 +2227,10 @@ const SCENES = (() => {
         geom: geomFor,
         tips: ["Colour is speed: nearly still in the reservoir, accelerating over the crest, fastest in the bucket, slowing in the pool.",
                "Pause twice: the reservoir, crest and face look the same both times — steady. The pool never does.",
-               "Press <b>A</b> (Average): the pool becomes a calm mean flow with two steady rollers either side of the plunge.",
+               "Switch the colour bar from Live to <b>Average</b>: the pool becomes a calm mean flow with a steady eddy either side of the plunge.",
                "Two <b>Flux lines</b> — one on the face, one in the pool — read the same q at very different depths and speeds.",
                "A <b>Rake</b> in the pool jitters live and draws a clean profile once averaged: mean + fluctuation.",
-               "Controls → Geometry tilts the bucket lip: a steeper lip throws higher and further."] };
+               "The <b>Bucket lip angle</b> slider tilts the lip: a steeper lip throws higher and further."] };
     })(),
 
     // ------------------------------------------- FF-4 · pipe jet into a reservoir
@@ -2294,9 +2304,9 @@ const SCENES = (() => {
       };
 
       return {
-        id: "pipejet", name: "Pipe jet into a reservoir", key: "Wall and free shear layers",
+        id: "pipejet", name: "Pipe jet into a reservoir", key: "Boundary layers: wall and jet",
         group: "Flow fields & turbulence",
-        blurb: "A header drives a pipe that discharges a jet into a large, full tank of still water. Boundary layers grow along the pipe walls; past the exit the jet's shear layers roll up into eddies, entrain the still water and spread.",
+        blurb: "A header drives a pipe that discharges a jet into a large, full tank of still water. Boundary layers grow along the pipe walls; past the exit the edges of the jet roll up into eddies, drag the still water along and spread.",
         W, H, c: 30, cf: 0.02, cs: 0.10, bulk: 0.05, nu: 2e-3,
         kappa: 0,
         mode: 2, hmax: 6, headMax: 6.5, vmax: 3, particles: 1,
@@ -2317,11 +2327,11 @@ const SCENES = (() => {
           return still(TW, z, P);
         },
         tips: ["Colour is speed. In the pipe the slow layers by the walls thicken downstream: the boundary layer, with no slip at the wall.",
-               "Past the exit the jet meets still water: two free shear layers, which roll up into eddies and drag the still water in.",
+               "Past the exit the jet meets still water: its edges roll up into eddies and drag the still water in.",
                "Drop a <b>Rake</b> in the pipe near the entrance and one near the exit: the profile goes from a flat plug towards a rounded one.",
-               "A Rake across the jet jitters live. Press <b>A</b> (Average): a smooth bell-shaped profile that widens and flattens downstream.",
+               "A Rake across the jet jitters live. Switch the colour bar from Live to <b>Average</b>: a smooth bell-shaped profile that widens and flattens downstream.",
                "Two <b>Flux lines</b> across the jet: the averaged q GROWS downstream — that is the entrained water.",
-               "The tank is full to its lid and its right edge is an outflow held at a fixed head; Controls → Reservoir level is the header's head: raise it and the jet runs faster."] };
+               "The tank is full to its lid and its right edge is an outflow held at a fixed level; <b>Reservoir level</b> on the card drives the pipe: raise it and the jet runs faster."] };
     })(),
     // ===== Year 1: HJ-2, WV-4 =====
     // ------------------------------------------------ THE FLUME LAB, SCALED UP

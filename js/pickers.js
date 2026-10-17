@@ -602,6 +602,50 @@ const EX = (() => {
    *  the register does not have are skipped, so a menu can name an exercise
    *  before it lands. */
   let showAll = /[?&]menu=all\b/.test(location.search);
+  /** COMPACT MENU, a deployment switch: `compact: true` in EXERCISE_MENU.
+   *  Each item is then one line, id and title; its description (the `aim`,
+   *  or the start · ?scene · settle line for an entry without one) moves to
+   *  a small floating box beside the item, shown on hover and for the
+   *  keyboard-highlighted item. Off by default, so a deployment with no
+   *  js/menu.js, or one that does not set the flag, sees the menu as before.
+   *  The flag holds in both scopes (the course and "show all"). */
+  function compact() {
+    return typeof EXERCISE_MENU !== "undefined" && !!EXERCISE_MENU &&
+           EXERCISE_MENU.compact === true;
+  }
+  function describe(e) {
+    return e.aim ? e.aim : (e.start ? e.start + "  ·  " : "") +
+      "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
+  }
+  let descEl = null;
+  function descBox() {
+    if (!descEl) {
+      descEl = document.createElement("div");
+      descEl.className = "glass exdesc";
+      descEl.setAttribute("role", "tooltip");
+      document.body.appendChild(descEl);
+    }
+    return descEl;
+  }
+  /** The floating description beside item `b`: to the right of the menu if
+   *  there is room, otherwise to its left, and always inside the viewport. */
+  function showDesc(b) {
+    if (!compact() || !b || !b.dataset.desc) { hideDesc(); return; }
+    const d = descBox();
+    d.textContent = b.dataset.desc;
+    d.classList.add("open");
+    const mr = menu().getBoundingClientRect(), br = b.getBoundingClientRect();
+    const w = d.offsetWidth, h = d.offsetHeight, gap = 8;
+    let x = mr.right + gap, y = br.top;
+    if (x + w > innerWidth - 8) x = mr.left - gap - w;          // no room right: go left
+    if (x < 8) {                                                // no room either side: under the item
+      x = Math.max(8, Math.min(innerWidth - w - 8, br.left + 24));
+      y = br.bottom + 4;
+    }
+    y = Math.max(8, Math.min(innerHeight - h - 8, y));
+    d.style.left = x + "px"; d.style.top = y + "px";
+  }
+  function hideDesc() { if (descEl) descEl.classList.remove("open"); }
   function course() {
     if (showAll || typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU ||
         !Array.isArray(EXERCISE_MENU.sections)) return null;
@@ -621,7 +665,7 @@ const EX = (() => {
     const order = [], by = new Map(),
           f = foldText((text === undefined ? filter : text).trim());
     const hit = (e) => !f || foldText(e.id + " " + e.title + " " + (e.topic || "") + " " +
-                                      e.scene + " " + (e.start || "")).includes(f);
+                                      e.scene + " " + (e.start || "") + " " + (e.aim || "")).includes(f);
     const c = course();
     if (c) {
       return c.sections.map((s) => [s.title || "",
@@ -651,6 +695,8 @@ const EX = (() => {
   function render() {
     const m = menu();
     m.textContent = "";
+    hideDesc();
+    m.classList.toggle("compact", compact());
     const head = document.createElement("div");
     head.className = "smh";
     const hb = document.createElement("b");
@@ -706,10 +752,22 @@ const EX = (() => {
         }
         const idc = document.createElement("span"); idc.className = "eid"; idc.textContent = e.id;
         const nm = document.createElement("b"); nm.textContent = e.title;
-        const bl = document.createElement("p");
-        bl.textContent = (e.start ? e.start + "  ·  " : "") +
-          "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
-        b.appendChild(idc); b.appendChild(nm); b.appendChild(bl);
+        b.appendChild(idc); b.appendChild(nm);
+        // An entry with an `aim` is introduced by it — what the exercise is
+        // for, in the student's words; the rest keep the bench line. In the
+        // compact menu it moves to the floating box beside the item.
+        if (compact()) {
+          b.dataset.desc = describe(e);
+          b.removeAttribute("title");
+          b.onpointerenter = () => showDesc(b);
+          b.onpointerleave = () => hideDesc();
+          b.onfocus = () => showDesc(b);
+          b.onblur = () => hideDesc();
+        } else {
+          const bl = document.createElement("p");
+          bl.textContent = describe(e);
+          b.appendChild(bl);
+        }
         b.onclick = () => choose(e.id);
         m.appendChild(b);
         if (pending === e.id) m.appendChild(warning(e));
@@ -759,6 +817,10 @@ const EX = (() => {
     const m = menu();
     const a = anchor && anchor.isConnected ? anchor : document.getElementById("exBtn");
     const r = a.getBoundingClientRect();
+    // Compact: hang below the anchor and scroll inside rather than ride up
+    // over the strip — unless that leaves less than 240 px.
+    const room = innerHeight - (r.bottom + 8) - 8;
+    m.style.maxHeight = compact() && room >= 240 ? room + "px" : "";
     const w = m.offsetWidth, h = m.offsetHeight;
     m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
     m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
@@ -779,6 +841,7 @@ const EX = (() => {
   }
   function close() {
     if (el) el.classList.remove("open");
+    hideDesc();
     pending = null; hi = -1;
     const btn = document.getElementById("exBtn");
     if (btn) btn.classList.remove("active");
@@ -799,6 +862,7 @@ const EX = (() => {
       hi = hi < 0 ? (e.key === "ArrowDown" ? 0 : list.length - 1) : (hi + d) % list.length;
       list.forEach((b, i) => b.classList.toggle("hi", i === hi));
       if (list[hi].scrollIntoView) list[hi].scrollIntoView({ block: "nearest" });
+      showDesc(list[hi]);
       return;
     }
     if (e.key === "Enter") {
@@ -967,7 +1031,11 @@ const EX = (() => {
 
       const h = document.createElement("div");
       h.className = "exhead";
-      h.textContent = "Yours — d is the last digit of your student number";
+      // A card whose only rows are `studentParams` sliders has no digit, so
+      // the student-number line would be a riddle there.
+      h.textContent = rules(cur).length
+        ? "Yours — d is the last digit of your student number"
+        : "Try it yourself";
       host.appendChild(h);
 
       rows.forEach((row) => {

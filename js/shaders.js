@@ -1175,7 +1175,10 @@ void main(){
     water = mix(shallow, deep, nrm(sub));
     water += vec3(0.10, 0.14, 0.16) * clamp(length(U.rg) / max(u_vmax, 0.01), 0.0, 1.0);
   } else if (u_mode == 1) {
-    float head = U.b / max(abs(u_g), 1e-3);   // pressure head p/ρg: submergence below the surface (m)
+    // pressure head p/ρg: submergence below the surface (m). In plan view
+    // (g = 0) it is divided by 9.81, as SIM.probe does, so the colour and the
+    // hover card agree instead of the colour reading p/0.001.
+    float head = U.b / (u_g == 0.0 ? 9.81 : abs(u_g));
     water = turbo(nrm(head));
   } else if (u_mode == 2) {
     water = turbo(nrm(length(U.rg)));

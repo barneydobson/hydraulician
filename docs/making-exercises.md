@@ -130,9 +130,10 @@ field and, more importantly, **the line between applied and displayed**:
 | `rigParams` | yes | the plumbing without which the rig is not a rig: `budget` (Resolution) first, then the edges (`openL..openT`), then supplies and levels — *edges before level controls*, because ticking a level opens its own edge |
 | `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField`, `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall) |
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
-| `studentParams` | **no** | values the worksheet asks the student to set |
+| `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule` |
 | `instruments` | **no** | `{tool, where, why}` — where the gauges go; the picker places none and clears any a payload carried |
 | `setup`, `start`, `task`, `note` | printed | the staged steps, one line on the bench, one or two on what to do and read |
+| `aim` | printed in the menu | optional: one or two plain sentences on what the scene is and what the student does in it; the exercise menu prints it under the title instead of the `start · ?scene · settle` line, the start screen shows it on hover, the card does not |
 | `settle` | yes | sim-seconds the picker runs flat out before the card counts down; `0` is meaningful |
 | `rigWhy`, `instruments[].why` | neither | maintenance prose: why a constant is what it is |
 | `ui` | yes | the interface profile, below |
@@ -143,8 +144,8 @@ the README's H1 text. Tool ids for `instruments`: `wall erase valve spout
 pour` (build) and `gauge rake tracer measure cv flux force` (measure).
 
 HS-1's card applies nothing but `budget: "Medium"` and the view (`mode: "0"`,
-`particles: true`, `gaugeField: "h"`), and says `digitNote: "lecturer demo:
-no personalised parameter"`.
+`particles: true`), and carries no `digitNote`: it has no personalised
+parameter, and the line is simply left out.
 
 ### The `ui` profile
 
@@ -179,9 +180,32 @@ tool — `ui: { build: true }` or a build tool in `instruments` — or the tool
 is silently absent. A profile is never a cage: the `⋯` on the strip restores
 everything.
 
-HS-1: `ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead",
-"head"], panel: "shut" }` — gauges and force from `instruments`, the field
-key and the particle toggle, nothing else on screen.
+HS-1: `ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead"],
+panel: "shut", readouts: { rows: ["pos", "eta", "uw", "phead"] } }` — the
+Pressure force tool from `instruments`, the field key and the particle
+toggle, and a hover card limited to what an L3 student has met.
+
+### The menu: `aim`, the course menu and `compact`
+
+The exercise menu (Exercises / `E`) lists the whole register by `topic`,
+unless a deployment ships `js/menu.js` with a course menu:
+
+```js
+const EXERCISE_MENU = { title: "…", compact: true,
+                        sections: [{ title: "L2 · Fundamentals", ids: ["FF-1", "UP-1"] }] };
+```
+
+Under each title the menu prints the entry's `aim` when it has one, and
+otherwise the `start · ?scene · settles in N s` line. `compact: true` turns
+the menu into one line per item (id and title); the same description then
+appears in a small floating box beside the item on hover, and for the item
+highlighted with the arrow keys. The menu's height is capped to the viewport
+and scrolls inside. Without the flag (or without `js/menu.js`) the menu is
+unchanged. The start screen's list shows id and title only, with the `aim`
+as a hover tooltip.
+
+A card whose only "Yours" rows are `studentParams` (no digit rule) heads
+them "Try it yourself" rather than with the student-number line.
 
 ## 4. The rig payload, when there is one
 

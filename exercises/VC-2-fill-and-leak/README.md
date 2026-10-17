@@ -1,16 +1,17 @@
-# VC-2 · The tank that fills and leaks
+# VC-2 · Storage = in − out
 
 A tank is fed from the top by a spout and drained through a hole near its
-floor, behind a valve. With the valve shut the level climbs in a straight
-line, `dh/dt = Q/S`. Open it and the outflow grows with the depth over the
-hole, so the level climbs more and more slowly and stops where outflow equals
-inflow; change the inflow and it finds a new level. A Control volume round
-the tank reports what goes in, what comes out, and the rate the tank is
-storing water: the net flux is not zero while the level moves, and it is
-once it has stopped.
+floor. The outlet is open when the card opens: the outflow grows with the
+depth of water over the hole, so the level climbs more and more slowly and
+stops where outflow equals inflow. The students predict that level from the
+mass balance, Q_in = Q_out, with the outflow law given to them, compare it
+with what the tank does, and find the outlet's coefficient C. Pressing V
+shuts the valve and shows the other half of storage = in − out: with nothing
+going out the level climbs in a straight line, dh/dt = Q/S.
 
-This is a **lecturer demo** (L5, volume conservation): no personalised
-parameter, nothing to pool. Students replay it.
+A small calculation exercise students play with on their own (L5, volume
+conservation); the lecturer can also show it in class. No personalised
+parameter, nothing to pool.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **VC-2**, or use the direct link
@@ -23,18 +24,21 @@ Per metre width, for a tank of plan width S:
 
     dV/dt = S dh/dt = Q_in − Q_out
 
-Valve shut, Q_out = 0, so the level rises linearly at `Q_in/S`.
+The level stops changing where Q_out = Q_in. The outlet is a hole of height
+a = 0.08 m with its centre at z_o = 0.59 m, and the water leaves it at a
+speed of about √(2gh), h being the height of the surface above the centre of
+the hole. That speed comes from Bernoulli (lecture 7), so the card **gives**
+it rather than deriving it:
 
-Valve open, the hole is an orifice of height a with its centre at z_o:
+    Q_out = C · a · √(2gh)          C ≤ 1: the jet narrows just past the edge
 
-    Q_out = C_d a √(2g(η − z_o))
+and setting Q_out = Q_in gives the settled height
 
-which grows with the level η. The level stops where Q_out = Q_in:
+    h = (Q_in / (C·a))² / 2g        level η = z_o + h
 
-    η∞ = z_o + (Q_in / C_d a)² / 2g
-
-and approaches it roughly exponentially, with a time scale
-`τ ≈ 2S(η∞ − z_o)/Q_in` (linearise the orifice law about η∞).
+With C = 1 (the ideal) the prediction is too low; the C that makes it match
+is the outlet's effective discharge coefficient. Valve shut, Q_out = 0 and
+the level rises linearly at Q_in/S.
 
 **Sign convention.** The Control volume counts what LEAVES as positive on
 every face (net = out − in), so for the tank `net = −dV/dt`. The slides count
@@ -46,32 +50,61 @@ before reading the box.
 | item | where |
 |---|---|
 | tank | inside faces x = 0.40 → 2.40 m, so **S = 2.00 m** (per metre width); floor top z = 0.50 m; walls to z = 3.00 m |
-| outlet | through the right wall, z = 0.55 → 0.63 m (a = 0.08 m, centre z_o = 0.59 m), behind a scene valve — **shut** at boot |
-| inflow | the spout at (1.40, 3.30), 0.16 m wide, firing straight down; **Inflow Q** (Controls → Geometry) sets its speed so it delivers Q |
+| outlet | through the right wall, z = 0.55 → 0.63 m (a = 0.08 m, centre z_o = 0.59 m), behind a scene valve — **open** at boot |
+| inflow | the spout at (1.40, 3.30), 0.16 m wide, firing straight down; **Inflow Q** (the slider on the card) sets its speed so it delivers Q |
 | outflow | a free jet into open air; it leaves through the open right and bottom edges and cannot come back |
 | start | still water at η = 0.70 m, Q = 0.25 m²/s (slider 0.10 → 0.30) |
 
 ## What to do
 
-1. Place a **Gauge** (`5`) at **(1.0, 0.6)** — the card sets Gauges plot to
-   *Level η*, so it reads the free surface itself (the column's top), not a
-   pressure that the falling inflow keeps shaking. Drag a **Control volume**
-   (`9`) from **(0.30, 0.40)** to **(2.70, 3.12)**: round the whole tank,
-   below the spout, across the outlet jet.
-2. **Valve shut.** The level climbs in a straight line. Read the slope off
-   the gauge chart (or two readings a few seconds apart): **≈ 0.125 m/s**,
-   Q/S = 0.25/2.00. The box: in ≈ 0.25 through the top face, out 0, net
-   −0.25, dV/dt +0.25 — "net + dV/dt" ≈ 0.
-3. **Press V** after a few seconds (before the level passes ~1.5 m). The
-   jet leaps out of the hole; the level keeps rising, more and more slowly,
-   and stops at **≈ 1.70 m** after about **40–50 s**. Out climbs to meet in;
-   net and dV/dt both go to zero.
-4. **Change Inflow Q** to 0.15. The level falls (out > in, dV/dt < 0) and
-   settles at **≈ 1.03 m** in about 40 s.
-5. Ask the class to predict each settled level from the orifice law before
-   it arrives, with C_d ≈ 0.65.
+The card carries these steps.
+
+1. **Predict with C = 1.** For Q = 0.25 m²/s: h = (0.25/0.08)²/19.62 =
+   0.50 m, so a level of 1.09 m.
+2. **Read the level.** A Gauge (the Gauge tool on the strip) at
+   **(1.0, 0.6)** — the card sets Gauges plot to *Level η*, so it reads the
+   free surface itself. Wait until it stops rising (about a minute): it
+   settles near **1.73 m**, well above the C = 1 prediction.
+3. **Find C.** h = 1.73 − 0.59 = 1.14 m, so C = Q/(a√(2gh)) ≈ **0.66**.
+4. **Check it.** Slide Inflow Q to 0.15: with C = 0.66 the prediction is
+   1.00 m; the tank settles at **1.04 m**.
+5. **Optional: the valve.** Press V to shut it: the level climbs in a
+   straight line at **≈ 0.125 m/s** (Q/S = 0.25/2.00 at Q = 0.25). A Control
+   volume from **(0.30, 0.40)** to **(2.70, 3.12)** reads in, out, net and
+   dV/dt — "net + dV/dt" ≈ 0 at every instant. Press V again to reopen.
 
 ## For the instructor
+
+**The calculation, as the card sets it (Oct 2026).** The outlet now starts
+open and the students predict the settled level from Q_in = Q_out with the
+outflow law given (√(2gh) is lecture 7). Measured headless at Medium
+(325 × 293, Δx = 12.3 mm), outlet open from boot, level = the surface found
+at x = 0.7 and 2.1 m, averaged over 10 s once settled:
+
+| Q (m²/s) | C = 1 predicts η | tank settles at η | h = η − 0.59 | C that matches |
+|---|---|---|---|---|
+| 0.25 | 1.09 m | **1.73 m** (1.726) | 1.14 m | **0.66** |
+| 0.15 | 0.77 m | **1.04 m** (1.036) | 0.45 m | **0.63** |
+
+So the effective coefficient of this outlet is **C ≈ 0.63–0.66** (the first
+draft measured 0.64–0.67 by the same route). With C = 0.66 from the first
+inflow, the 0.15 prediction is 1.00 m against 1.04 m measured: the check the
+card asks for lands within 4 cm. The jet contracting just past the sharp
+edge is most of it (C_c ≈ 0.6–0.65 for a sharp-edged slot). From the boot
+level of 0.70 m the tank needs about 80 s at Q = 0.25 to reach its level
+within 1 cm (≈ 1.63 at 40 s, 1.69 at 60 s, 1.72 at 80 s).
+
+### In the lecture
+
+- Before anything settles, have the class do the C = 1 prediction (1.09 m)
+  and commit to it; the tank then goes well past it.
+- The step from "it settles where in = out" to "how high" needs the outflow
+  law; say plainly that √(2gh) is a promise for lecture 7.
+- Press V to shut the valve for the linear rise, dh/dt = Q/S, and the
+  Control volume's in / out / net / dV/dt — the original L5 demonstration.
+
+### Earlier measurements (valve shut at boot, then opened)
+
 
 Measured headless on Resolution Medium (325 × 293 cells, Δx = 12.3 mm) with
 `rig.js`. The level is the MEAN surface, floor + (water in the tank)/S, which

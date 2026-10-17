@@ -598,6 +598,21 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   text-transform: uppercase; opacity: .6; margin-top: 3px;
 }
 .gmenu .smnone { padding: 10px 9px; font-size: 12px; opacity: .5; }
+/* Compact exercise menu (EXERCISE_MENU.compact): one line per item, the
+   description in a floating box beside it. The menu never runs off the page:
+   place() clamps it and this caps its height, the list scrolls inside. */
+#exmenu.compact { width: 360px; max-height: calc(100vh - 16px); }
+#exmenu.compact .smi {
+  padding: 4px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#exmenu.compact .smi b { font-size: 12.5px; }
+#exmenu.compact .smg { padding: 7px 9px 2px; }
+.exdesc {
+  position: fixed; z-index: 31; display: none; pointer-events: none;
+  width: 280px; max-width: calc(100vw - 16px); padding: 8px 11px;
+  font-size: 12px; line-height: 1.4;
+}
+.exdesc.open { display: block; }
 
 /* ------------------------------------------------------- keyboard sheet */
 #keysmenu { width: 336px; }

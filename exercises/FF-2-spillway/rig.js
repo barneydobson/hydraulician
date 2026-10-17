@@ -19,9 +19,9 @@
 window.FF2 = {
   SECTIONS: {
     crest: [7.42, 7.25, 7.42, 9.9],     // a vertical through the crest apex, up through the surface
-    pool25: [25, 0.35, 25, 6],          // full-depth pool sections
-    pool30: [30, 0.35, 30, 6],
-    pool38: [38, 0.35, 38, 6],          // 6 m short of the outflow edge
+    pool22: [22, 0.35, 22, 6],          // full-depth pool sections (the pool ends at x = 29 m since Oct 2026)
+    pool25: [25, 0.35, 25, 6],
+    pool28: [28.4, 0.35, 28.4, 6],      // 0.6 m short of the outflow edge
   },
 
   q: function (avg) {

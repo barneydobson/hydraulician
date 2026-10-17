@@ -1,4 +1,4 @@
-# FF-4 · A pipe jet into a still reservoir
+# FF-4 · Boundary layers: at a wall, in a jet
 
 A header drives water through a straight pipe that discharges a jet into a
 large tank of still water. One scene, both kinds of boundary layer: inside
@@ -7,8 +7,7 @@ meets still water and two free shear layers form, roll up into eddies,
 entrain the still water and spread. Live the jet flaps; averaged it is a
 smooth spreading jet with a bell-shaped profile.
 
-This is a **lecturer demo**: no personalised parameter, nothing to pool;
-students replay it afterwards.
+An exercise students play with on their own; the lecturer can also show it in class. No personalised parameter, nothing to pool.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **FF-4**, or use the direct link
@@ -42,10 +41,10 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 | outflow | the right edge, 19.5 m (39 D) past the exit, held at a head of **6.20 m** (a submerged tailwater, sponge 2 m) |
 
 The driving head is 0.40 m; the pipe carries **q ≈ 0.76–0.80 m²/s** (mean
-velocity ~1.6 m/s, centreline 2.2–2.5 m/s). Controls → *Reservoir level* is
-the header head and is the one slider offered: raise it and the jet runs
-faster. There is no Geometry slider: nothing about the pipe needs morphing
-to make the two points.
+velocity ~1.6 m/s, centreline 2.2–2.5 m/s). *Reservoir level* is
+the header head and is the one value offered on the card: raise it and the jet runs
+faster; it is on the card. There is no Geometry slider: nothing about the
+pipe needs morphing to make the two points.
 
 **Why the tank is full (no free surface).** Two free-surface versions were
 built and measured first. With a tailwater on a free surface, this tank —
@@ -63,12 +62,13 @@ instead of turning on a far wall.
 1. **The wall boundary layer.** Rakes at x ≈ 3.5 m and x ≈ 10 m, inside the
    pipe. Same q, different shape: the profile near the exit is rounder and
    faster on the axis.
-2. **The free shear layers.** Field → Vorticity: two thin sheets of
-   opposite sign leave the lips. Watch them roll up a few metres past the
-   exit.
+2. **The edges of the jet.** On Speed, the jet's two edges — where fast
+   water meets still water — leave the lips sharp and roll up into eddies a
+   few metres past the exit. (Pressure head is the card's other colouring:
+   in this full tank it mostly grows with depth.)
 3. **Live against Average.** Place two more rakes across the jet at x ≈ 12 and
-   14 m (each new rake replaces the oldest). Press **A** and wait until T
-   passes 30 s: two bells, the downstream one wider and lower.
+   14 m (each new rake replaces the oldest). Switch the colour bar from Live
+   to **Average** and wait until T passes 30 s: two bells, the downstream one wider and lower.
 4. **Entrainment.** Two short Flux lines across the jet only — z = 2.4–3.9 m
    at x = 12 m, z = 2.15–4.15 m at x = 14 m. Averaged, q through the jet
    grows downstream.

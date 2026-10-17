@@ -735,8 +735,8 @@ const OVERLAY = (() => {
     if (wet) {
       rows.push(["depth d", fmt(d, 3) + " m", "d"]);
       if (!press) rows.push(["level η", fmt(A.bed[i] + d, 3) + " m above datum", "eta"]);
-      rows.push(["q", fmt(A.q[i], 3) + " m²/s", "q"]);
-      rows.push(["V", fmt(A.V[i], 2) + " m/s", "V"]);
+      rows.push(["q, whole depth", fmt(A.q[i], 3) + " m²/s", "q"]);
+      rows.push(["V = q/d, depth mean", fmt(A.V[i], 2) + " m/s", "V"]);
     }
     if (wet && !press) {
       rows.push(["Fr", fmt(A.Fr[i], 2) + (PRINT.critical
@@ -751,7 +751,7 @@ const OVERLAY = (() => {
         (isFinite(A.n[i]) ? "   n = " + fmt(A.n[i], 3) : ""), "Sf"]);
     }
     if (probe) {
-      rows.push(["u, w", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s", "uw"]);
+      rows.push(["u, w at cursor", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s", "uw"]);
       // probe.p is the kinematic pressure P = p/ρ; with ρ = 1000 kg/m³ its
       // value in m²/s² is p in kPa.
       rows.push(["pressure p", fmt(probe.p, 2) + " kPa", "p"]);

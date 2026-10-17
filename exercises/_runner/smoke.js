@@ -764,6 +764,39 @@ SUITES.geom = async (B) => {
   ok("UI a Force selection does not survive an edit that could have renumbered it",
     renumber.droppedForce === null && renumber.droppedHover === null,
     `force: ${JSON.stringify(renumber.droppedForce)}, hover: ${JSON.stringify(renumber.droppedHover)}`);
+
+  // SIM.onGeometry fires from EVERY rasterise(), including setParam's (which
+  // calls the module-local rasterise, out of reach of any outside wrapper) and
+  // the unsubscribe it returns really detaches.
+  await B.goto(`http://localhost:${PORT}/?scene=hydro`);
+  const hook = await B.evaluate(`(() => {
+    const out = {};
+    APP.state.force = { solidId: "wall0", faceId: "side1", data: null, t0: 0 };
+    APP.state.forceHover = { solidId: "wall0", faceId: "side1" };
+    APP.sim._ynK = 5;
+    const cur = APP.SIM.params().values.gap;
+    const other = cur === 0.5 ? 0.4 : 0.5;
+    APP.SIM.setParam("gap", other);
+    out.force = APP.state.force; out.hover = APP.state.forceHover;
+    out.ynK = APP.sim._ynK;
+    let n = 0, seen = null;
+    const off = APP.SIM.onGeometry((S) => { n++; seen = S; });
+    APP.SIM.setParam("gap", cur);
+    APP.SIM.setValve(APP.sim.p.valveClosed ? 0 : 1);
+    out.calls = n; out.sameGrid = seen === APP.sim;
+    off();
+    APP.SIM.setParam("gap", other);
+    out.afterOff = n;
+    return out;
+  })()`);
+  ok("geom setParam drops the Force selection",
+    hook.force === null && hook.hover === null,
+    `force: ${JSON.stringify(hook.force)}, hover: ${JSON.stringify(hook.hover)}`);
+  ok("geom setParam resets the overlay's running estimates",
+    Number.isNaN(hook.ynK), `_ynK: ${hook.ynK}`);
+  ok("geom SIM.onGeometry fires for setParam and a valve flip, with the live grid, and unsubscribes",
+    hook.calls === 2 && hook.sameGrid && hook.afterOff === 2,
+    JSON.stringify(hook));
 };
 
 

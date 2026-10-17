@@ -4324,15 +4324,16 @@ function boot() {
   // problem, but a drawn one always can — dropping the selection on every
   // edit (the same choke point averaging already resets through) is the
   // one answer that is right regardless of which id moved.
-  ["rasterise", "addSeg", "undoSeg", "clearSegs"].forEach((k) => {
-    const f = SIM[k];
-    SIM[k] = (...a) => {
-      const r = f(...a);
-      OVERLAY.resetEstimates(sim);
-      state.force = null;
-      state.forceHover = null;
-      return r;
-    };
+  // One listener on SIM.onGeometry, fired at the end of every rasterise()
+  // (draw, undo, clear, a Geometry param, the boundary toggles, build) and of
+  // a valve flip — so no path can skip it, which the old outside wrapper of
+  // SIM.rasterise/addSeg/undoSeg/clearSegs could not promise (setParam called
+  // the module-local rasterise). It receives the grid it fired for: during
+  // build() that is the NEW grid, before `sim` has been reassigned.
+  SIM.onGeometry((S) => {
+    OVERLAY.resetEstimates(S);
+    state.force = null;
+    state.forceHover = null;
   });
 
   // The strip first: PICKER, EX and KEYS all light their own opener by id, so

@@ -337,6 +337,28 @@ const SIM = (() => {
     // this, so it can neither double-start nor fight build()'s own wasAvg
     // restore.
     if (S.avg) avgReset();
+    emitGeometry();
+  }
+
+  /** Geometry listeners — see onGeometry. */
+  const geomListeners = [];
+  function emitGeometry() {
+    // Iterate a copy so a listener may unsubscribe itself. Exceptions are
+    // deliberately NOT caught: a broken listener must be loud.
+    geomListeners.slice().forEach((fn) => fn(S));
+  }
+  /** Register fn(S), called at the end of every rasterise() — so through
+   *  addSeg, undoSeg, clearSegs, setParam, the boundary toggles and build() —
+   *  and at the end of setValve when the flag actually changes. S is the live
+   *  grid at the moment of the call (during build() that is the NEW one, before
+   *  the caller has stored it), so a listener must use the argument, not a
+   *  grid it cached. Returns an unsubscribe function. */
+  function onGeometry(fn) {
+    geomListeners.push(fn);
+    return () => {
+      const k = geomListeners.indexOf(fn);
+      if (k >= 0) geomListeners.splice(k, 1);
+    };
   }
 
   /** Distance from every cell corner to the nearest solid, in metres — the
@@ -464,6 +486,7 @@ const SIM = (() => {
     wallDistance();                 // a shut valve is a wall to the closure too
     S.tcolDirty = true;             // and FS_TCOL reads u_valve: rebuild with it
     if (S.avg) avgReset();
+    emitGeometry();
   }
 
   // ------------------------------------------------------------ allocation
@@ -2549,7 +2572,7 @@ const SIM = (() => {
   }
 
   const get = () => S;
-  return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
+  return { init, build, rasterise, onGeometry, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, probeMany, rake, patch, patchVel,
            fieldStats, particlePos, particleTrail, dyeInjRadius,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,

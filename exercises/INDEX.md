@@ -99,7 +99,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | MM-1 | The force of a jet on an inclined plate | MM-1-jet-inclined-plate/ | vane, plate angle slider | — (students play; class demo) |
 | MM-2 | Momentum: the force on a contraction (contraction rig) | MM-2-contraction-forces/ | contraction | — (students play; class demo) |
 | HJ-2 | Sluice gate with the movable weir | HJ-2-gate-jump/ | gatejump, weir crest slider | — (lecturer demo) |
-| WV-4 | Breaking waves on a beach | WV-4-breakers/ | beach, beach slope slider | — (lecturer demo) |
+| WV-4 | How waves break on beaches | WV-4-breakers/ | beach (wall paddle), beach slope slider on the card | — (student-run preview) |
 
 Rigs: RIG-A (pressurised duct) card = FR-1/rig.js · RIG-B (flat channel) card
 = WE-1/rig.js. The historical RIG-C tank family is implemented independently

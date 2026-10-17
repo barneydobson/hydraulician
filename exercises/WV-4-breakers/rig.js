@@ -1,10 +1,10 @@
 /* WV-4 "Breaking waves on a beach" — paste into the dev console.
  *
- *   ?ex=WV-4 (or ?scene=beach), Resolution: Medium (975 x 98, dx = 12 mm).
+ *   ?ex=WV-4 (or ?scene=beach), Resolution: Low (671 x 67, dx = 13 mm).
  *
  * Nothing to draw: the beach is the scene's polygon and its slope is the
  * Geometry slider `beach_s` (geom0). This is the lecturer's spot-check — it
- * sets a slope (which restarts the flume from still water), runs the piston
+ * sets a slope (which restarts the flume from still water), runs the paddle
  * for t seconds, then reads the surface range over two periods along the
  * flume through the same column reduction the gauges use:
  *   APP.SIM.setParam("beach_s", s)  = the Beach slope slider (resetWater)
@@ -18,7 +18,7 @@
  * slope per call.
  */
 window.WV4 = {
-  T: 2.0, H0: 0.16,                       // the piston's period; H measured in the level part
+  T: 2.0, H0: 0.17,                       // the paddle's period; H measured in the level part
   L0: function () { return 9.81 * WV4.T * WV4.T / (2 * Math.PI); },
   xi: function (s) { return s / Math.sqrt(WV4.H0 / WV4.L0()); },
 
@@ -26,7 +26,7 @@ window.WV4 = {
     APP.SIM.setParam("beach_s", s); syncPanel();
     const sim = APP.sim, dt = APP.SIM.dt();
     APP.tick(Math.round((t || 12) / dt));
-    const xs = []; for (let x = 0.6; x < 11.9; x += 0.4) xs.push(+x.toFixed(1));
+    const xs = []; for (let x = 0.6; x < sim.W - 0.1; x += 0.4) xs.push(+x.toFixed(1));
     const lo = xs.map(() => 1e9), hi = xs.map(() => -1e9);
     const steps = Math.max(1, Math.round(0.05 / dt));
     for (let k = 0; k < Math.ceil(2 * WV4.T / 0.05); k++) {

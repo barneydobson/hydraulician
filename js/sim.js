@@ -1156,6 +1156,17 @@ const SIM = (() => {
     return Number.isFinite(v) ? v : 0;
   }
 
+  /** Is the piston a paddle AT THE LEFT WALL? Only when it sits in column 1,
+   *  the left edge is a plain open edge (its zero-gradient ghost is what
+   *  feeds the paddle face) and the scene declares the still depth `wave.d`
+   *  the volume flux is scaled by (shaders.js, FS_VEL). Off for every scene
+   *  but WV-4's `beach`; the overlay asks the same question to draw it. */
+  function wallPaddle() {
+    const p = S.p;
+    return p.wave.on > 0.5 && p.wave.d > 0 && p.open[0] === 1 && p.inflow.on < 0.5
+      && Math.round(p.wave.x / S.dx) <= 1;
+  }
+
   function step(nsub) {
     const p = S.p, h = dt();
     for (let n = 0; n < nsub; n++) {
@@ -1175,6 +1186,7 @@ const SIM = (() => {
       gl.uniform1f(prog.vel.u("u_bulk"), p.bulk);
       gl.uniform4f(prog.vel.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
         p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
+      gl.uniform1f(prog.vel.u("u_waveD"), wallPaddle() ? p.wave.d : 0);
       GLH.bindTarget(gl, S.U.write.fbo, S.nx, S.ny);
       quad.draw();
       S.U.swap();
@@ -2193,7 +2205,7 @@ const SIM = (() => {
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
            hydraulicGrade, streamRequest, streamPoll, streamPending,
-           setValve, setParam, params, windTau,
+           setValve, setParam, params, windTau, wallPaddle,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

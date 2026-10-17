@@ -1633,38 +1633,40 @@ const EXERCISES = [
     settle: 60,
   },
 
-  // WV-4: a Year 2 preview, the spectacular extra. One slider (the beach
-  // slope, geom0) moves the Iribarren number through the breaker types with
-  // the wave held fixed. The solver spills and surges honestly; a true
-  // plunging tongue is thinner than its interface (engineering notes), so the
-  // middle band is described as what it is on screen.
+  // WV-4: a Year 2 preview, the show-piece. One slider (the beach slope,
+  // geom0, on the card through studentParams) moves the Iribarren number
+  // through the breaker types with the wave held fixed. Student-facing, so
+  // no digit and no lecturer wording; the solver spills and surges honestly,
+  // and a true plunging tongue is thinner than its interface (engineering
+  // notes), so the card calls the middle band what it is on screen — the
+  // front stands up and collapses — and the README says why. Low, not
+  // Medium: the box was cropped to what the waves use, so Low is the old
+  // Medium's Δx with half the cells (README, "Speed").
   {
     id: "WV-4",
-    title: "Breaking waves on a beach",
+    title: "How waves break on beaches",
+    aim: "See the same wave spill on a gentle beach, collapse on a steeper one and surge up a steep one.",
     topic: "Waves",
     folder: "WV-4-breakers",
     scene: "beach",
     rig: null,
-    rigParams: { budget: "Medium", waveOn: true },
+    rigParams: { budget: "Low", waveOn: true },
     viewParams: { mode: "0", particles: true },
-    digitNote: "lecturer demo: no personalised parameter — the beach slope is the handle",
     studentParams: [
       { control: "geom0", unit: "",
-        rule: "tanβ; 0.06 (1 : 17) as the card opens. Moving it restarts the flume" },
+        rule: "tanβ, how steep the beach is: 0.06 (1 in 17) to start with. Each change starts the flume again from still water" },
     ],
-    instruments: [
-      { tool: "gauge", where: "x ≈ 1 m, in the deep level part", why: "the wave arriving at the beach: H ≈ 0.16–0.19 m, T = 2.0 s" },
-    ],
-    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "speed", "vort"], panel: "focused",
-          controls: ["speed", "geom0"] },
+    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "speed"], measure: false,
+          panel: "shut", controls: ["speed", "geom0"] },
     setup: [
-      "The piston makes the same wave every time: T = 2.0 s, H₀ ≈ 0.16 m over 0.40 m of water, so L₀ = gT²/2π ≈ 6.2 m and ξ = tanβ/√(H₀/L₀) ≈ 6·tanβ.",
-      "Gentle, tanβ = 0.06 (ξ ≈ 0.4, spilling): the wave steepens slowly and its crest crumbles into a bore that runs a long way up the beach, losing height all the way.",
-      "Middle, tanβ ≈ 0.15–0.3 (ξ ≈ 1–2, the plunging band): the front goes vertical and collapses close to the shoreline over a short surf zone. A real plunger throws a tongue over an air pocket; that tongue is thinner than this model's interface, so here it collapses rather than curls.",
-      "Steep, tanβ ≥ 0.55 (ξ > 3.3, surging): the front never breaks; the water surges up the slope and slides back down, and much of the wave reflects back into the flume.",
+      "The paddle at the left end pushes the water to and fro every 2 s and sends the same wave down the flume each time. The beach on the right is the only thing you change.",
+      "Gentle beach, 0.06: as the water gets shallower the wave grows steeper, then its crest crumbles and tumbles down its own front. The broken wave carries on as a bore and shrinks all the way up a long surf zone. This is a SPILLING breaker.",
+      "Set the beach slope to 0.15 and wait about 10 s: the wave runs almost to the shore unchanged, then its front stands up nearly vertical and collapses onto the beach in one go, over a much shorter surf zone. Try 0.3 as well. This is the PLUNGING range (here the front collapses rather than curling over).",
+      "Set 0.7, a steep beach: nothing breaks. The water SURGES up the slope as a sheet, stops, and slides back down, and much of the wave reflects back towards the paddle.",
+      "Pick Speed on the colour key: the breaking front shows up as the fastest water. The surf similarity number ξ = tanβ/√(H₀/L₀), with this wave's height H₀ and deep-water length L₀ = gT²/2π, sorts the three: spilling below about 0.5, surging above about 3.3. Here ξ ≈ 6·tanβ.",
     ],
-    start: "a wave flume with a piston at the left, 0.40 m of level water, and a beach whose slope is the one slider",
-    task: "Watch a few waves arrive at the gentle beach, then step the slope up (0.06 → 0.15 → 0.3 → 0.7), waiting about 15 s after each change, and name the breaker each time: spilling, plunging (collapsing here) or surging.",
-    settle: 15,
+    start: "a wave flume: a paddle at the left end, 0.40 m of still water, and a beach whose slope is the slider on this card",
+    task: "Watch a few waves break on the gentle beach, then set the slope to 0.15, 0.3 and 0.7 in turn, waiting about 10 s after each, and say how the way the wave breaks changes. Which beach would you build to soak up wave energy, and which shape throws it back?",
+    settle: 10,
   },
 ];

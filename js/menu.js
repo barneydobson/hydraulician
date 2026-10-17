@@ -16,9 +16,9 @@ const EXERCISE_MENU = {
   sections: [
     { title: "Fundamentals",          ids: ["FF-1", "UP-1"] },
     { title: "Statics",               ids: ["HS-1", "PF-2"] },
-    { title: "Fluid dynamics",        ids: ["FF-2", "FF-3", "FF-4", "FF-5",
-                                            "VC-1", "VC-2",
-                                            "MM-1", "MM-2", "HJ-2"] },
+    { title: "Fluid dynamics",        ids: ["FF-2", "FF-3", "FF-4",
+                                            "CR-1#streamlines", "CR-1#continuity", "VC-2",
+                                            "MM-1", "CR-1#forces", "HJ-2"] },
     { title: "Energy conservation",   ids: [] },
     { title: "Pipes",                 ids: [] },
     { title: "Free-surface flows",    ids: [] },

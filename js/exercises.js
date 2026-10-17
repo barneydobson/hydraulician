@@ -1399,10 +1399,11 @@ const EXERCISES = [
     aim: "Draw a control volume round a flat plate struck by a jet and find the force on it: it is at right angles to the plate, ρqU sin θ. Turning the plate also splits the jet unequally.",
     studentParams: [
       { control: "geom0", unit: "°",
-        rule: "the angle between the jet and the plate: 90° (square to the jet) as the card opens; try 90, 75, 60, 45 and 30" },
+        rule: "90° = square to the jet" },
     ],
     instruments: [
       { tool: "cv", where: "Control volume: drag (0.70, 0.30) → (2.50, 2.10) — round the whole plate at every angle, clear of the spout", why: "F→ and F↑ on what is inside the box (the plate), from the momentum and pressure on its four faces; at 90° the left face reads the jet's q alone" },
+      { tool: "force", where: "the plate's wet face — the side the jet strikes", why: "the pressure diagram on the plate and its resultant F, at right angles to the plate: on a smooth plate the whole force is pressure, so F matches the box's F_n" },
       { tool: "flux", where: "one across each sheet, about 0.1 m past each end of the plate, at right angles to it", why: "q₁ and q₂, the two sheets' discharges, against q(1 ± cos θ)/2" },
     ],
     ui: { view: ["legendBtn"], fields: ["speed", "mom"], controls: ["speed", "geom0"],
@@ -1412,7 +1413,8 @@ const EXERCISES = [
       "Pick Control volume on the strip and drag a box from (0.70, 0.30) to (2.50, 2.10), round the whole plate. After every change wait about 5 s for the readings to settle.",
       "At θ = 90° the box's left face prints the discharge coming in, q ≈ 1.04 m²/s per metre; hover the jet and read u for its speed, U ≈ 4.45 m/s. So ρqU ≈ 4.6 kN/m. q and U stay the same when you turn the plate.",
       "Read the force on what is inside the box: → is F_x (along the jet), ↑ is F_z (across it). At 90° expect F_x = ρqU and F_z = 0.",
-      "Set θ = 75°, 60°, 45° and 30°. At each, read F_x and F_z and work out the force normal to the plate, F_n = F_x sin θ + F_z cos θ. Compare with ρqU sin θ, i.e. F_x = ρqU sin²θ and F_z = ρqU sin θ cos θ. They agree to within about 5%. Check the force along the plate, F_x cos θ − F_z sin θ, is close to zero.",
+      "Pick Pressure force on the strip and click the plate's wet face, the side the jet strikes. The arrows are the pressure on the plate, largest where the jet hits; the label prints their resultant F, drawn at right angles to the plate, and its components (F_h is → and F_v is ↑ in this view from above). At 90° compare F with the box's →.",
+      "Set θ = 75°, 60°, 45° and 30° with Plate angle θ on this card. At each, read F_x and F_z off the box and work out the force normal to the plate, F_n = F_x sin θ + F_z cos θ. Compare it with the Pressure force F on the plate and with ρqU sin θ, i.e. F_x = ρqU sin²θ and F_z = ρqU sin θ cos θ. The box's F_n and the Pressure force F agree to within a few per cent, and both sit within about 5–10% of ρqU sin θ, a little above it. Check the force along the plate, F_x cos θ − F_z sin θ, is close to zero: a smooth plate can only push at right angles to itself, so all of its force is pressure.",
       "Pick Flux line on the strip and drag one across each sheet, just past each end of the plate, at right angles to it — across the whole sheet but clear of the incoming jet. Their Q are q₁ (the sheet carried on along the plate) and q₂ (the sheet sent back): compare with q(1 + cos θ)/2 and q(1 − cos θ)/2.",
     ],
     task: "Show that the force on the plate is at right angles to it and equal to ρqU sin θ, and that the jet splits unequally, q₁ = q(1 + cos θ)/2 and q₂ = q(1 − cos θ)/2, because a smooth plate cannot push the water along itself.",

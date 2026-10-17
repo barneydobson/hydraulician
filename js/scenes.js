@@ -1904,6 +1904,17 @@ const SCENES = (() => {
     // sheet run parallel to the plate before it leaves the end. Every edge is
     // an OUTFALL (ghosts held empty): with no gravity to drain it, spray at a
     // plain open edge ponded against it.
+    //
+    // RESIDUE DRAIN. The plane starts EMPTY (water: 0) and only the spout
+    // brings water in, but the first impact and every slider move throw
+    // filaments and droplets that, with no gravity, drift for ever: after
+    // 20 s of jet 36% of the wet cells were such relics away from the jet and
+    // sheets, 37–42% in the 15 s after a move to 60°. `residueDrain` (FS_VOF,
+    // plan view only) lets slow water (< 1 m/s) with no pressurised water
+    // within two cells fall out of the plane at 2/s; measured at Medium the same counts are
+    // 5% and 3%, and F_n at 60° 4.14–4.16 kN/m against 4.18 without it
+    // (raw σ ≈ 0.14). The jet and sheets are fast and the stagnation point is
+    // pressurised, so neither is touched.
     (() => {
       const XS = 0.40, ZJ = 1.20, RJ = 0.12, UJ = 4.5;  // spout centre, radius, speed
       const XC = 1.60;                                // impact point on the wet face
@@ -1929,6 +1940,7 @@ const SCENES = (() => {
         mode: 2, hmax: 1, headMax: 1, vmax: 5,
         particles: 0, spinup: 0,
         open: [2, 2, 2, 2],
+        residueDrain: { rate: 2, speed: 1.0 },
         params: [
           { key: "theta", label: "Plate angle θ", min: 20, max: 90, step: 1,
             value: 90, unit: "°",
@@ -1939,7 +1951,8 @@ const SCENES = (() => {
         water: () => 0,
         tips: ["This is the jet seen from ABOVE: it flies straight, and the sheets keep their speed along the plate.",
                "Drag a Control volume (9) round the plate, clear of the spout: it reads the force on what is inside — the plate.",
-               "Turn the plate with <b>Plate angle θ</b>: the force stays at right angles to the plate, ρqU sin θ, and the jet splits unequally, q(1 ± cos θ)/2."] };
+               "Turn the plate with <b>Plate angle θ</b>: the force stays at right angles to the plate, ρqU sin θ, and the jet splits unequally, q(1 ± cos θ)/2.",
+               "Click the plate's wet face with the <b>Pressure force</b> tool: the pressure diagram's resultant is the same force the box reads — on a smooth plate it is all pressure."] };
     })(),
     // ===== Year 1: wall-shape =====
     // PF-2: a still tank whose right-hand wall changes shape under ONE slider,

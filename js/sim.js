@@ -529,6 +529,11 @@ const SIM = (() => {
       // Optional: the tailwater's exchange face passes outflow only, like a
       // plain open edge (FS_VEL). 0 / undefined is off — contraction only.
       twOutflowOnly: scene.twOutflowOnly ? 1 : 0,
+      // Optional residue drain, PLAN VIEW ONLY (FS_VOF): slow, thin water with
+      // no pressurised water near it leaves the plane at `rate` 1/s, as if it
+      // fell through the floor. { rate, speed } or undefined = off — every
+      // scene but vane. Gated on |g| < 0.1 in step() as well.
+      residueDrain: scene.residueDrain ? Object.assign({}, scene.residueDrain) : null,
     };
     if (prev) {
       p.open = prev.open.slice();
@@ -1222,6 +1227,8 @@ const SIM = (() => {
       gl.uniform1f(pv.u("u_ca"), p.ca);
       gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
       gl.uniform2f(pv.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
+      const rd = p.residueDrain && Math.abs(p.g) < 0.1 ? p.residueDrain : null;
+      gl.uniform2f(pv.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
       if (useAcc) {
         // T BEFORE this substep — the running-mean weight is h/(T+h).
         gl.uniform1f(pv.u("u_Tacc"), S.avg.t);

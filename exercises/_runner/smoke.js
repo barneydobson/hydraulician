@@ -1339,12 +1339,13 @@ SUITES.physics = async (B) => {
   // looking for a conservation bug that was not there.
   //
   // If this is the assertion that fails, the physics below is untested, not
-  // wrong. The usual cause is the rasteriser: with `$SOFTWARE=1` (or a host
-  // whose ANGLE backend falls back to SwiftShader) the run is software-
-  // rendered, while the default GPU-backed `--use-angle=d3d11` reaches t = 30
-  // on this same scene in about 7 s of wall clock. Measured on a Windows laptop, m1 at Low, 828 x 64: ANGLE gets
-  // to t = 30 in 6.5 s; SwiftShader reaches roughly t = 9.5 in the full 150 s
-  // budget, about 50x slower. Raise the budget, or give this harness the GPU.
+  // wrong. The usual cause is the rasteriser: under `$SOFTWARE=1`, or on a
+  // host whose ANGLE backend falls back to a software rasteriser, the run is
+  // far too slow, while the default GPU-backed ANGLE backend reaches t = 30 on
+  // this scene in about 7 s of wall clock. Measured on a Windows laptop, m1 at
+  // Low, 828 x 64: ANGLE gets to t = 30 in 6.5 s; SwiftShader reaches roughly
+  // t = 9.5 in the full 150 s budget, about 50x slower. Raise the budget, or
+  // give this harness the GPU.
   ok("PHYSICS m1 settled to the time its readings are taken at", flow.t >= 39.5,
     `reached t = ${flow.t.toFixed(1)} s of 40 — the wall-clock budget in ` +
     `__settle ran out first, so every reading below is of an unsettled reach`);
@@ -2192,23 +2193,27 @@ SUITES.avg = async (B) => {
     APP.SIM.avgStart(); APP.frames(180);
     const A = APP.SIM.avgField();
     const S = APP.sim, nx = S.nx, ny = S.ny;
-    let wet = 0, fmax = 0;
+    let wet = 0, finite = true, fmax = 0;
     for (let k = 0; k < nx*ny; k++) {
+      if (!Number.isFinite(A.fbar[k]) || !Number.isFinite(A.ubar[k])) { finite = false; break; }
       if (A.fbar[k] > 0.5) wet++;
       if (A.fbar[k] > fmax) fmax = A.fbar[k];
     }
     APP.SIM.avgStop();
-    return { keys: Object.keys(A).sort(), wet, fmax, n: nx*ny };
+    return { keys: Object.keys(A).sort(), wet, finite, fmax, n: nx*ny };
   })()`);
   ok("avgField returns the four mean-state arrays",
      g2.keys.join(",") === "fbar,pbar,ubar,wbar", g2.keys.join(","));
+  // NaN-blind neighbours (wet/fmax: NaN comparisons are false) make this the
+  // one check that sees a NaN blow-up in the mean arrays.
+  ok("avgField is finite everywhere", g2.finite);
   ok("avgField finds the water", g2.wet > 0.05 * g2.n, `wet ${g2.wet}/${g2.n}`);
   ok("mean fill is a fill (slot storage excepted)", g2.fmax < 1.5, `fmax ${g2.fmax}`);
 
   // The collocation trap the shader was built around (Task 6 brief): u lives
   // on the west face, so a shader that weighted f by the face value alone —
   // instead of centring first — would put a directional bias into every
-  // mean. avgField()'s wet/fmax checks above do not exercise this at
+  // mean. avgField()'s wet/finite/fmax checks above do not exercise this at
   // all (they only touch the f/P channels), so this is a dedicated check
   // that ubar sits on the CENTRED velocity, not the west face.
   //
@@ -2406,18 +2411,20 @@ SUITES.avg = async (B) => {
     APP.SIM.avgStart(); APP.frames(300);
     const { C, sigma } = APP.SIM.avgColumns();
     const S = APP.sim, nx = S.nx;
-    let bedOK = 0;
+    let dOK = 0, bedOK = 0;
     for (let i = 0; i < nx; i++) {
+      if (C[i*4+1] >= 0 && Number.isFinite(C[i*4+1])) dOK++;
       if (Math.abs(C[i*4] - bed0[i*4]) < S.dx * 2) bedOK++;   // bed is static
     }
     APP.SIM.avgStop();
-    return { nx, len: C.length, bedOK };
+    return { nx, len: C.length, dOK, bedOK };
   })()`);
   ok("avgColumns is laid out like SIM.columns", cc.len === cc.nx * 4);
+  ok("mean depth is finite and non-negative in every column", cc.dOK === cc.nx);
   ok("the bed does not move within a window", cc.bedOK === cc.nx);
 
   // The checks above only prove the array LENGTH matches SIM.columns()
-  // and that the bed holds still -- they do not prove which
+  // and that depth is finite/non-negative and the bed holds still -- they do not prove which
   // channel is which, and Task 8 depends on that order being EXACT. This
   // compares the accumulated mean depth against the live instantaneous depth,
   // averaged over every reliably-wet column: close to 1 in a settled reach

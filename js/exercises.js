@@ -1322,9 +1322,10 @@ const EXERCISES = [
     settle: 25,
   },
   // ===== Year 1: VC-2, MM-1 =====
-  // Two scenes written for these exercises (`fillleak`, `vane`). Each has ONE
-  // slider, the scene's own param (geom0), drawn on the card through
-  // `studentParams` and also on Controls → Geometry.
+  // Two exercises on scenes written for them (`fillleak`, `vane`). Each has
+  // ONE slider, the scene's own param, on Controls → Geometry (geom0); MM-1
+  // also puts it on the card (studentParams), since turning the plate is the
+  // student's job.
   {
     id: "VC-2",
     title: "Storage = in − out",
@@ -1363,25 +1364,33 @@ const EXERCISES = [
   },
   {
     id: "MM-1",
-    title: "A jet turned through an angle",
+    title: "The force of a jet on an inclined plate",
     topic: "Momentum conservation",
-    folder: "MM-1-jet-vane-angle",
+    folder: "MM-1-jet-inclined-plate",
     scene: "vane",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2", particles: false },
-    digitNote: "lecturer demo: no personalised parameter",
+    aim: "Draw a control volume round a flat plate struck by a jet and find the force on it: it is at right angles to the plate, ρqU sin θ. Turning the plate also splits the jet unequally.",
+    studentParams: [
+      { control: "geom0", unit: "°",
+        rule: "the angle between the jet and the plate: 90° (square to the jet) as the card opens; try 90, 75, 60, 45 and 30" },
+    ],
     instruments: [
-      { tool: "cv", where: "Control volume (9): drag (0.95, 0.65) → (1.90, 1.95) — round the whole vane, clear of the spout", why: "F→ and F↑ on what is inside the box — the vane — from the momentum and pressure on its four faces" },
+      { tool: "cv", where: "Control volume: drag (0.70, 0.30) → (2.50, 2.10) — round the whole plate at every angle, clear of the spout", why: "F→ and F↑ on what is inside the box (the plate), from the momentum and pressure on its four faces; at 90° the left face reads the jet's q alone" },
+      { tool: "flux", where: "one across each sheet, about 0.1 m past each end of the plate, at right angles to it", why: "q₁ and q₂, the two sheets' discharges, against q(1 ± cos θ)/2" },
     ],
-    ui: { view: ["legendBtn"], fields: ["water", "speed", "mom"], controls: ["speed", "geom0"] },
-    start: "a free jet (plan view: gravity is out of the screen) striking a vane whose turning angle θ is on the slider",
+    ui: { view: ["legendBtn"], fields: ["speed", "mom"], controls: ["speed", "geom0"],
+          readouts: { rows: ["pos", "uw"] } },
+    start: "a free jet seen from above (gravity acts into the screen) striking a flat plate; the angle θ between the jet and the plate is the slider on this card",
     setup: [
-      "Control volume (9) from (0.95, 0.65) to (1.90, 1.95). Let it settle ~5 s after every change.",
-      "At θ = 90° read q off the box's left face (≈ 0.79 m²/s) and hover the jet for U (≈ 4.5 m/s). Predict F_x = ρqU(1 − cos θ) and F_z = ρqU sin θ.",
-      "At large θ the returning sheet leaves through the same left face the jet enters by, so that face's Q nets to almost zero — the momentum does not.",
+      "Pick Control volume on the strip and drag a box from (0.70, 0.30) to (2.50, 2.10), round the whole plate. After every change wait about 5 s for the readings to settle.",
+      "At θ = 90° the box's left face prints the discharge coming in, q ≈ 1.04 m²/s per metre; hover the jet and read u for its speed, U ≈ 4.45 m/s. So ρqU ≈ 4.6 kN/m. q and U stay the same when you turn the plate.",
+      "Read the force on what is inside the box: → is F_x (along the jet), ↑ is F_z (across it). At 90° expect F_x = ρqU and F_z = 0.",
+      "Set θ = 75°, 60°, 45° and 30°. At each, read F_x and F_z and work out the force normal to the plate, F_n = F_x sin θ + F_z cos θ. Compare with ρqU sin θ, i.e. F_x = ρqU sin²θ and F_z = ρqU sin θ cos θ. They agree to within about 5%. Check the force along the plate, F_x cos θ − F_z sin θ, is close to zero.",
+      "Pick Flux line on the strip and drag one across each sheet, just past each end of the plate, at right angles to it — across the whole sheet but clear of the incoming jet. Their Q are q₁ (the sheet carried on along the plate) and q₂ (the sheet sent back): compare with q(1 + cos θ)/2 and q(1 − cos θ)/2.",
     ],
-    task: "Set θ = 90°, 120°, 135°, 150° and 175° with the Turning angle slider; at each read F→ and F↑ off the box and compare with your predictions. Field → Momentum flux shows the jet being sent back.",
+    task: "Show that the force on the plate is at right angles to it and equal to ρqU sin θ, and that the jet splits unequally, q₁ = q(1 + cos θ)/2 and q₂ = q(1 − cos θ)/2, because a smooth plate cannot push the water along itself.",
     settle: 5,
   },
   // ===== Year 1: PF-2 =====

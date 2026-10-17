@@ -2350,35 +2350,41 @@ const SCENES = (() => {
     //  · The flume is 14 m, not the 24 m a ×10 lab would be: over a 17 m
     //    reach the backwater alone drowned the gate at every crest.
     //  · a = 0.30 rather than the lab's 0.43 ×10: the wider opening's sheet
-    //    was overrun within 2 m at every crest. Crest 0.05 flooded the flume
-    //    (the two-cell weir stopped being one), hence the 0.10 floor.
+    //    was overrun within 2 m at every crest. (On that code crest 0.05
+    //    flooded the flume and the slider stopped at 0.10; on the current
+    //    code crest 0 is a flat bed and the sheet leaves cleanly — measured.)
     //
-    // RE-MEASURED after the stress-free surface (#72), Medium: the jet no
-    // longer carries a slow layer, so it keeps its momentum (Fr₁ ≈ 4.5 at
-    // d₁ ≈ 0.20 m, conjugate ≈ 1.2 m) and the old 0.20 crest held no jump at
-    // all — the sheet ran supercritical up the flap and over it. The jump now
-    // lives in a narrow, hysteretic band: from boot at 0.48 it stands at the
-    // gate's foot; 0.46 puts it on the apron (x ≈ 6–8), 0.44 at x ≈ 9, and
-    // 0.42 sweeps it over the weir; from the swept state it does not return
-    // until ~0.60, where it runs straight to the gate and drowns it. Hence
-    // the 0.48 default, and a reach that starts 1.20 m deep from x = 7 m so
-    // the jump is established at boot rather than swept out on the way in.
+    // RE-MEASURED after the stress-free surface (#72), Medium: the jet keeps
+    // its momentum (d₁ ≈ 0.20 m, 6.4 m/s, Fr₁ ≈ 4.5, conjugate ≈ 1.2 m), so a
+    // supercritical sheet over this flap is hard to turn back.
+    //
+    // THE LECTURER'S SEQUENCE (HJ-2): water only in the pool at t = 0, the
+    // apron and reach dry, the flap flat (crest 0, the slider's floor). The
+    // released water runs under the gate as a sheet and off the end; the pool
+    // settles at d₀ = 2.72 m by t ≈ 26 s. Then the class raises the crest.
+    // Measured from that state (README, instructor section): up to 0.40 the
+    // sheet runs up the flap and over it, no jump; at 0.50 a jump forms at the
+    // flap within 10–60 s and creeps upstream (x ≈ 7.5 m about a minute
+    // later, the gate's foot after ~3 min); 0.60 and above drive it to the
+    // gate in ~30 s and drown it. Once a jump exists, 0.46 holds it where
+    // it is (x ≈ 5.6 m for 300 s), 0.47 lets it creep upstream (~1 m a
+    // minute and a half) and 0.45 washes it back over the flap. The flap stays a plate at crest 0 (its tip flush with the bed),
+    // so the slider's floor is a flat bed, not a missing weir.
     (function () {
       const s = channel({
         W: 14, H: 3.8, bed0: 0.30, S0: 0, cf: 0.008, cs: 0.06, q: 1.2,
         inletDepth: 2.85, gate: { x: 4.0, a: 0.30 }, xEnd: 12.5,
-        mode: 2, hmax: 3.2, vmax: 8, spinup: 60,
+        mode: 2, hmax: 3.2, vmax: 8, spinup: 30,   // measured: the pool settles at d₀ = 2.72 m by t ≈ 26 s
         extra: {
           headMax: 3.2,
           water: (x, z, P) => {
-            // Pool, a DRY apron, and the reach the weir holds. The apron
-            // starts dry because a jet shot into standing water starts
-            // submerged and the roller is slow to leave the gate; over a dry
-            // bed the sheet is free from the first second.
+            // Water ONLY in the pool: the flume below the gate starts dry
+            // (the lecturer's sequence). Over a dry bed the sheet is free from
+            // the first second; a jet shot into standing water starts
+            // submerged and the roller is slow to leave the gate.
             const bed = 0.30;
             if (z <= bed || x >= 12.5) return 0;
-            const lev = x < 4.0 ? bed + 2.85 : x < 7.0 ? 0 : bed + 1.20;
-            return lev ? still(lev, z, P) : 0;
+            return x < 4.0 ? still(bed + 2.85, z, P) : 0;
           },
         },
       });
@@ -2401,18 +2407,17 @@ const SCENES = (() => {
            { id: "ds", label: "Underside", e0: 0, e1: 0 }], "weir");
       };
       const gateSolids = s.solids;
-      s.params = s.params.concat([{ key: "weir_h", label: "Weir crest height", min: 0.10, max: 1.0,
-                                    step: 0.01, value: 0.48, unit: "m" }]);
+      s.params = s.params.concat([{ key: "weir_h", label: "Weir crest height", min: 0, max: 1.0,
+                                    step: 0.01, value: 0, unit: "m" }]);
       s.solids = (W_, H_, P_, par) => gateSolids(W_, H_, P_, par)
-        .concat([flap(par && par.weir_h !== undefined ? par.weir_h : 0.48)]);
+        .concat([flap(par && par.weir_h !== undefined ? par.weir_h : 0)]);
       return Object.assign(s, {
         id: "gatejump", name: "Sluice gate → hydraulic jump", key: "The flume lab, scaled up",
-        blurb: "The teaching flume at several times its size: a deep pool behind a sluice gate, a fast sheet under it, and a hydraulic jump back to the depth a weir holds at the far end — subcritical, supercritical, subcritical, in one view.",
-        tips: ["Pressure head (P): hydrostatic in the pool, clearly not under the gate, where the streamlines curve and the water accelerates.",
-               "The pool is subcritical, the sheet under the gate supercritical: the Froude field switches colour at the gate.",
-               "The weir crest (Controls → Geometry) holds the jump: at 0.46 m it stands on the apron, at 0.42 m it is swept over the weir, and it only comes back near 0.60 m — straight up to the gate, which drowns.",
-               "The grade lines show the head loss in the jump as a drop in the EGL — (d₂−d₁)³/(4d₁d₂).",
-               "Click the gate with the Pressure force tool: hydrostatic near the surface, falling to zero at the lip."] });
+        blurb: "The teaching flume at several times its size: a deep reservoir behind a sluice gate, released into an empty flume. The water shoots under the gate as a fast thin sheet; raise the weir at the far end and the sheet jumps up to a slow deep flow, which can be driven back until it drowns the gate.",
+        tips: ["Click the gate with the Pressure force tool: the pressure grows with depth near the surface as in still water, and falls to zero at the lip, where the water curves under the gate and speeds up.",
+               "Froude number: above 1 the flow is fast and shallow (red), below 1 slow and deep (blue). The sheet under the gate is red.",
+               "Weir crest height (Controls → Geometry): at 0.5 m a jump forms at the weir and creeps up the flume; at 0.6 m or more it runs up to the gate and drowns it.",
+               "A drowned gate: the water below it covers the lip, the reservoir rises and the force on the gate grows."] });
     })(),
 
     // ------------------------------------------------ WV-4 · BREAKERS ON A BEACH

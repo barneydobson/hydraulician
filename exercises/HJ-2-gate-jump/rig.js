@@ -1,4 +1,4 @@
-/* HJ-2 "Sluice gate with the movable weir" (the flume lab at full scale) — paste
+/* HJ-2 "Pressure and force on a sluice gate" (the flume lab at full scale) — paste
  * into the dev console.
  *
  *   ?ex=HJ-2 (or ?scene=gatejump), Resolution: Medium (592 x 161, dx = 0.0236 m).
@@ -19,7 +19,7 @@
  *   HJ2.jump()           -> d₁, d₂, Fr₁, Bélanger's d₂ and ΔE, from the box
  *   HJ2.gate()           -> F on the gate: diagram (face) and C_d
  *   HJ2.weir(h, t)       -> set the crest to h, run t s, print table + jump
- *   HJ2.demo()           -> settle, then everything above at the shipped crest (0.48 m)
+ *   HJ2.demo()           -> settle, then everything above at the shipped crest (0 m: the free sheet)
  *   HJ2.phead()          -> p/ρg against the hydrostatic value, pool vs just upstream of the gate
  */
 window.HJ2 = {
@@ -96,7 +96,7 @@ window.HJ2 = {
   },
 
   demo: function () {
-    APP.tick(Math.round(Math.max(0, 60 - APP.sim.t) / APP.SIM.dt()));
+    APP.tick(Math.round(Math.max(0, 30 - APP.sim.t) / APP.SIM.dt()));
     HJ2.table(); HJ2.jump(); HJ2.phead(); return HJ2.gate();
   },
 };

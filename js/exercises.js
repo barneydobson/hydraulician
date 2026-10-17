@@ -71,6 +71,8 @@
  *            geometry or a station on screen — there is no control to set.
  *   setup    the ordered sequence a snapshot cannot hold ("fill it, THEN shut
  *            the valve"). Steps for the student to follow, never automated.
+ *   aim      optional: ONE line on what the exercise is for; the exercise
+ *            menu shows it in place of `start`.
  *   start    ONE short line on what is on the bench when the card opens —
  *            "a chute onto a level apron, with a tailwater control".
  *   task     ONE or two short lines on what to do, INCLUDING what to read off
@@ -1498,47 +1500,53 @@ const EXERCISES = [
   // ===== Year 1: HJ-2, WV-4 =====
   // HJ-2: the flume lab (Lab 2, "The hydraulic jump") scaled up, ported from
   // the lecturer's 10 Sep copy and re-homed under momentum (L6), where it
-  // shows non-hydrostatic pressure under the gate and the gate force read two
-  // ways. A lecturer demo: nothing is personalised, and the one control the
-  // class owns is the weir crest — the flume's operating handle — which is a
-  // Geometry slider, so the card names it and draws it as a slider. The weir,
-  // not a tailwater level, is the downstream control for a measured reason
-  // recorded in the scene.
+  // shows that the pressure on and under a sluice gate is not hydrostatic and
+  // reads the gate force two ways. The lecturer's sequence: water only in the
+  // reservoir at t = 0, the weir flat (crest 0) so the released water shoots
+  // under the gate as a fast sheet and off the end; then the class raises the
+  // weir — the slider on the card — until a jump forms at the weir, walks up
+  // the flume and finally drowns the gate. Vocabulary is L6's (docs: the
+  // VOCAB rule): no heads, no grade lines, no jump box; Froude is kept on the
+  // lecturer's own decision, in plain words. The jump itself is described,
+  // not analysed — it is not Year 1 theory. The crest → jump map behind the
+  // setup steps is measured (README, instructor section).
   {
     id: "HJ-2",
-    title: "Sluice gate with the movable weir",
+    title: "Pressure and force on a sluice gate",
+    aim: "The pressure on a sluice gate is not hydrostatic near its lip; read the force on the gate two ways, then raise a weir until the downstream water drowns the gate.",
     topic: "Momentum conservation",
     folder: "HJ-2-gate-jump",
     scene: "gatejump",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "1", channel: false, grade: true, jumps: false, labels: false, gaugeField: "d" },
-    digitNote: "lecturer demo: no personalised parameter — the weir crest is the handle",
+    viewParams: { mode: "0", particles: true, channel: false, grade: false, jumps: false, labels: false, gaugeField: "d" },
     studentParams: [
       { control: "geom1", unit: "m",
-        rule: "the flap weir's tip, 0.48 m above the bed as the card opens (jump at the gate's foot); 0.46 moves it out onto the apron, 0.42 sweeps it over the weir, and from 0.60 the gate is drowned" },
+        rule: "0 m (flat) as the card opens. A push to 0.55 m makes a jump at the weir; 0.46 m then holds it where it is; 0.5 m lets it creep to the gate; 0.6 m or more drowns the gate" },
     ],
     instruments: [
-      { tool: "force", where: "the gate's Upstream face — pick the Pressure force tool on the strip and click the plate", why: "the pressure diagram: hydrostatic near the surface, falling to zero at the lip" },
-      { tool: "cv", where: "Control volume (9): drag (2.50, 0.10) → (6.00, 3.70) — pool to the sheet, bottom face inside the bed, top clear of the pool", why: "F→ on the gate from the momentum theorem, to set against the Pressure force tool's diagram" },
-      { tool: "gauge", where: "x = 2.5 m, z ≈ 0.6 m — the pool", why: "d₀ behind the gate, for ½ρg(d₀ − a)² and C_d" },
-      { tool: "gauge", where: "x = 10 m, z ≈ 0.6 m — the reach past the jump", why: "d₂; watch it climb as the weir rises" },
-      { tool: "flux", where: "a vertical section through the sheet at x ≈ 6 m", why: "q, and the depth and velocity that carry it" },
+      { tool: "force", where: "the gate's Upstream face: pick the Pressure force tool and click the plate", why: "the pressure diagram: growing with depth near the surface, falling to zero at the lip" },
+      { tool: "gauge", where: "Gauge (5) in the reservoir at x = 2.5 m, z ≈ 0.6 m (it reads the depth d₀)", why: "d₀ behind the gate, for ½ρg(d₀ − a)²; it climbs when the gate drowns" },
+      { tool: "cv", where: "Control volume (9): drag (2.50, 0.10) → (6.00, 3.70): reservoir to sheet, round the gate", why: "F→ on the gate from the momentum equation, to set against the pressure diagram" },
+      { tool: "flux", where: "Flux line (8): drag UP through the sheet at x = 6 m, from the bed to z ≈ 1.5 m", why: "q, the discharge per metre width" },
     ],
-    ui: { view: ["legendBtn", "gradeBtn", "avgBtn"],
-          fields: ["phead", "water", "speed", "ehead", "froude"], panel: "focused" },
+    ui: { view: ["legendBtn", "partBtn"],
+          fields: ["water", "speed", "froude"], panel: "focused",
+          controls: ["speed", "geom1"],
+          readouts: { rows: ["pos", "d", "eta", "q", "V", "Fr"] } },
     setup: [
-      "Wait out the settle. Live, the jump breathes: press A (Average) before reading anything downstream of the gate.",
-      "Pressure head (the colour on screen): it grows with depth in the pool as ρgd, but under the gate, where the streamlines curve and the water accelerates, it falls short of the depth below the surface — pressure is hydrostatic only where streamlines are straight.",
-      "Click the gate's upstream face with the Pressure force tool and read F→. Compare ½ρg(d₀ − a)² with d₀ from the pool gauge and a = 0.30 m.",
-      "Drag the Control volume round the gate and read its F→: the momentum theorem's answer for the same force.",
-      "Step the Weir crest height slider down in small steps, waiting ~40 s each: 0.46 puts a free jump out on the apron, 0.44 pushes it to the far end, 0.42 sweeps it over the weir and the sheet runs the whole flume. It does not come back until about 0.60, and then the jump runs straight up to the gate and drowns it — the pool climbs and the gate force rises (0.80, 1.00).",
+      "Wait out the countdown. The water was all behind the gate at the start; now it shoots out under the gate as a fast, thin sheet (about 0.2 m deep, 6 m/s) and runs off the end of the flume. Switch the colour to Speed to see it.",
+      "Place the Gauge in the reservoir, then click the gate's upstream face with the Pressure force tool. Near the surface the pressure on the plate grows with depth as in still water (ρgz); towards the lip it falls away to zero, because the water there is curving round under the gate and speeding up. Pressure is hydrostatic only where the streamlines are straight. Read F→ and compare it with ½ρg(d₀ − a)², with d₀ from the gauge and a = 0.30 m.",
+      "Drag the Control volume round the gate and read its F→: the momentum equation's answer for the same force, without assuming anything about the pressure on the plate. Drag the Flux line through the sheet and read q.",
+      "Froude number (the legend's field list): above 1 the flow is fast and shallow (red), below 1 slow and deep (blue). The sheet is red all the way down.",
+      "Raise Weir crest height step by step to 0.4 m: nothing much changes, the fast sheet just runs up the weir and over it. It does not want to go back, so give it a push: 0.55 m. Within about 15 s the water piles up at the weir and the fast thin sheet suddenly jumps up to a slow, deep flow: a hydraulic jump. It starts to creep up the flume.",
+      "When the jump is about halfway between the gate and the weir (x ≈ 7–8 m, some 30 s after the push), bring the crest back to 0.46 m: the jump stays about where it is, churning. At 0.45 m it is washed back over the weir and needs another push; at 0.47 m it creeps slowly on towards the gate.",
+      "Now raise the crest again: at 0.5 m the jump creeps up to the foot of the gate within a few minutes; at 0.6 m or more it runs up to the gate in about half a minute and drowns it. The water below the gate covers the lip, the reservoir rises and the force on the gate grows. Read d₀ and F→ (both tools) again.",
     ],
-    start: "a 2.85 m pool behind a sluice gate open 0.30 m, a fast sheet under it, a hydraulic jump, and a flap weir holding the reach at the far end",
-    task: "Read the pressure head under the gate against the depth, the gate force two ways (Pressure force tool and Control volume) against ½ρg(d₀ − a)², then raise the weir crest until the gate drowns and read them again.",
-    settle: 60,
+    start: "a deep reservoir behind a sluice gate open 0.30 m, released into an empty flume; the weir at the far end lies flat (crest 0 m)",
+    task: "Read the force on the gate with the Pressure force tool and with the Control volume and compare both with ½ρg(d₀ − a)²; then raise the weir until a jump forms, follow it up to the gate, and read the force again once the gate is drowned.",
+    settle: 30,
   },
-
   // WV-4: a Year 2 preview, the spectacular extra. One slider (the beach
   // slope, geom0) moves the Iribarren number through the breaker types with
   // the wave held fixed. The solver spills and surges honestly; a true

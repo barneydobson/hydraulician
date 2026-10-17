@@ -71,7 +71,7 @@ draft does not yet do well, as measured:
 | FF-5 / VC-1 / MM-2 | Contraction rig: Q equal in both pipes; ΣQ ≈ 0.2%; R from the CV matches the formula; taper vs step differ by ≈ the extra loss; vena contracta Cc ≈ 0.68 | Slider restarts the water (25 s warm-up); vena contracta is thin at Medium (best on Vorticity); straight-pipe friction is a tiny number; outlet jet runs along the right reservoir's surface; dye does not reach the pipe |
 | VC-2 | dh/dt = Q/S to 2%; settled level matches C_d ≈ 0.65; CV now shows dV/dt and closes to < 1% | Inflow slider drives the spout through a workaround in the scene's `solids()` |
 | MM-1 | Plan view (gravity ≈ 0): F_x and F_z within ~7% of ρqU(1−cos θ), ρqU sin θ from 90° to 150°; F_x nearly doubles at 175° | 90° is a hooded plate (one-sided), not the textbook split; some spray after slider moves |
-| HJ-2 | Ported from the OneDrive copy; gate force two ways (29.3 vs ½ρg(d₀−a)² = 29.8 kN/m); non-hydrostatic pressure at the gate; weir drowns the gate | After #72 the jet keeps its momentum: the free jump exists only for crest ≈ 0.44–0.48 m, with hysteresis; default crest moved to 0.48 |
+| HJ-2 | Reworked to the lecturer's sequence: only the pool full at t = 0, weir flat (crest 0); gate force two ways (28.1 diagram, 30.2 box vs ½ρg(d₀−a)² = 28.7 kN/m); non-hydrostatic pressure at the gate; raising the weir forms a jump, then drowns the gate | A jump forms from the sheet only at crest ≥ 0.5 m (0.55 reliably); once formed, 0.45 washes it out, 0.46 holds it where it is, ≥ 0.6 drowns the gate |
 | WV-4 | Spilling (tanβ 0.06) and surging (tanβ 0.7) clear | Plunging does not curl over: the front goes vertical and collapses (also at High) |
 
 ---
@@ -317,7 +317,7 @@ Not shown in a scene (L4):
     in = out, so the whole pressure drop is wall friction (τ_w, slides
     16–18).
 
-#### HJ-2 · Sluice gate with the movable weir (ported from the OneDrive copy) — Demo
+#### HJ-2 · Pressure and force on a sluice gate (ported from the OneDrive copy) — Demo
 
 - **Tier:** Year 1 core · **Rung:** L2 · **Used in:** L6
 - **Slides:** 10–11 (pressure is hydrostatic only where streamlines are
@@ -326,8 +326,8 @@ Not shown in a scene (L4):
   `OneDrive/…/2026_hydraulician-gate-jump` (built on 10 Sep code, never
   committed). Re-verify after #72.
 - **What it shows:**
-  - The Pressure head colouring: hydrostatic away from the gate, clearly
-    not under it.
+  - The Pressure force tool's diagram on the gate: hydrostatic near the
+    surface, falling to zero at the lip where the streamlines curve.
   - The gate force from the Pressure force tool against the force from a
     control-volume box round the gate.
   - The weir slider pushes the downstream level up until the gate drowns.

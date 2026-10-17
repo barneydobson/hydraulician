@@ -708,7 +708,10 @@ const EX = (() => {
         const idc = document.createElement("span"); idc.className = "eid"; idc.textContent = e.id;
         const nm = document.createElement("b"); nm.textContent = e.title;
         const bl = document.createElement("p");
-        bl.textContent = (e.start ? e.start + "  ·  " : "") +
+        // `aim` (optional): one line on what the exercise is FOR, which the
+        // menu prefers to the bench description in `start`.
+        const lead = e.aim || e.start;
+        bl.textContent = (lead ? lead + "  ·  " : "") +
           "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
         b.appendChild(idc); b.appendChild(nm); b.appendChild(bl);
         b.onclick = () => choose(e.id);

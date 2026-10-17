@@ -15,10 +15,15 @@
 // exercises.js — the grouping the menu draws with no course — so a card added
 // to exercises.js needs a line here as well (check_pack.py checks every id
 // listed here exists; it does not check that every card is listed).
+//
+// `briefLink: true` keeps each card's "Lecturer notes" link to its brief, as
+// the cards had before the course menus (the switch defaults to off, for
+// student-facing courses); these cards are lecturer demos and point at it.
 COURSES.add({
   id: "original",
   title: "Hydraulics teaching pack",
   hosts: ["barneydobson.github.io"],
+  briefLink: true,
   sections: [
     { title: "Uniform flow",          ids: ["UF-1"] },
     { title: "Gradually varied flow", ids: ["GV-1", "GV-2"] },

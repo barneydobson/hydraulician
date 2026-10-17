@@ -1263,8 +1263,10 @@ const EX = (() => {
       const h = document.createElement("div");
       h.className = "exhead";
       // A card whose only rows are `studentParams` sliders has no digit, so
-      // the student-number line would be a riddle there.
-      h.textContent = rules(cur).length
+      // the student-number line would be a riddle there — unless it carries
+      // a `digitNote`, which is the digit rule in words (B2's drawn gap,
+      // B9's poured level) and needs d defined above it.
+      h.textContent = (rules(cur).length || cur.digitNote)
         ? "Yours — d is the last digit of your student number"
         : "Try it yourself";
       host.appendChild(h);

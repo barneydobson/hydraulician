@@ -78,6 +78,17 @@ water on both sides. The other wave flumes (`wave`, `wavesurge`, `wavedeep`,
 `waveshallow`) still use that piston; the wall paddle is opt-in per scene
 (`wave.x = 0`, left edge open, `wave.d` = still depth).
 
+**Piston, not flap (tried, Oct 2026).** WV-5 added a hinged-flap mode to the
+same wall paddle. Here, at kd = 0.68, the flap needs nearly twice the
+stroke for the same wave (Biésel: H/S = 0.35 against the piston's 0.68;
+±0.27 m at the surface of 0.40 m of water), and with it the flume is the
+same flume: H along it within about 0.01 m of the piston's at tanβ = 0.06,
+0.15 and 0.7 (0.18 m at x = 1 m in both; in the surf zone the two trade
+places by up to 0.012 m), the same spilling, collapsing and surging
+fronts in screenshots side by side, and no less near-paddle disturbance.
+Intermediate-depth water moves nearly uniformly over the depth, which is
+what a piston does, so the card keeps it.
+
 Measured headless at the card's resolution (Low, 671 × 67, Δx = 13 mm), the
 wave height H as the crest-to-trough range of the surface over two periods,
 after 12 s from still water:

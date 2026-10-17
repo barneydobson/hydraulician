@@ -680,6 +680,9 @@ const SIM = (() => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, vel);
     }
     S.t = 0;
+    // A wave train belongs to the run it was fired in: the clock restarts,
+    // so does the paddle (the scene's own t0, if it fires one by itself).
+    if (S.p.wave) S.p.wave.t0 = S.scene.wave ? S.scene.wave.t0 : undefined;
     // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex, whose
     // storage the loop above just RESPECIFIED — the same hazard rescaleFill
     // sidesteps with texSubImage2D. Rebuild rather than gamble on those
@@ -1211,6 +1214,107 @@ const SIM = (() => {
       && Math.round(p.wave.x / S.dx) <= 1;
   }
 
+  // ------------------------------------------------------- the wavemaker
+  // Two opt-in additions to the `wave` group, both off unless a scene (or the
+  // Controls panel) asks — every other scene's paddle is the old expression,
+  // bit for bit (FS_VEL takes the u_waveU branch only when one is on):
+  //
+  //   wave.flap = 1        a FLAP hinged `wave.hinge` metres below the bed
+  //                        (0 = on the bed) instead of a piston: the velocity
+  //                        through the paddle grows linearly from the hinge,
+  //                        u(z) = U·(z − z_h)/(z₀ − z_h), U the velocity at the
+  //                        still-water level z₀ = bed + wave.d. `amp` is the
+  //                        stroke amplitude AT z₀. Needs wave.d.
+  //   wave.train = N       an ENVELOPE: one train of N periods, a cosine ramp
+  //                        of `wave.ramp` periods (default 1.5) up and down,
+  //                        fired by fireTrain() (the strip's Wave train
+  //                        button, the V key); the paddle stands still before
+  //                        and after. 0 / undefined = run continuously.
+  //
+  // The paddle's displacement is X(τ) = a·E(τ)·sin ωτ and the velocity
+  // imposed is its exact derivative a·(E·ω·cos ωτ + E′·sin ωτ), so a train
+  // ends with the paddle back where it started and puts in no net volume.
+
+  /** The train envelope E(τ) and its derivative over a train of `n` periods
+   *  of period T with `r`-period cosine ramps. 0 outside [0, nT]. */
+  function envelope(tau, n, r, T) {
+    const D = n * T, R = Math.min(r * T, D / 2);
+    if (!(tau > 0) || tau >= D) return [0, 0];
+    if (R <= 0) return [1, 0];
+    const k = Math.PI / R;
+    if (tau < R) return [0.5 * (1 - Math.cos(k * tau)), 0.5 * k * Math.sin(k * tau)];
+    if (tau > D - R) {
+      const s = D - tau;
+      return [0.5 * (1 - Math.cos(k * s)), -0.5 * k * Math.sin(k * s)];
+    }
+    return [1, 0];
+  }
+
+  /** The paddle at time t: U, the velocity it imposes (at the still-water
+   *  level, for a flap), X its displacement, E the envelope (1 when running
+   *  continuously). The overlay draws X; the vel pass gets U. */
+  function paddle(t) {
+    const w = S.p.wave, T = Math.max(w.period, 0.05), om = 2 * Math.PI / T;
+    if (t === undefined) t = S.t;
+    if (!(w.train > 0)) {
+      return { U: w.amp * om * Math.cos(om * t), X: w.amp * Math.sin(om * t), E: 1, running: true };
+    }
+    if (!Number.isFinite(w.t0)) return { U: 0, X: 0, E: 0, running: false };
+    const tau = t - w.t0, [E, dE] = envelope(tau, w.train, w.ramp === undefined ? 1.5 : w.ramp, T);
+    const s = Math.sin(om * tau), c = Math.cos(om * tau);
+    return { U: w.amp * (E * om * c + dE * s), X: w.amp * E * s, E,
+             running: tau >= 0 && tau < w.train * T };
+  }
+
+  /** Linear wavemaker theory (Biésel 1951; Dean & Dalrymple ch. 6), no GL:
+   *  the height H of the progressive wave a paddle of stroke S = 2a makes in
+   *  still water of depth h, for a piston or a flap hinged l below the bed.
+   *  With the paddle's displacement profile f(z), 1 at the still-water level,
+   *      H/S = 4k·sinh kh ∫ f(z) cosh k(h+z) dz / (sinh 2kh + 2kh),
+   *  which is 2(cosh 2kh − 1)/(sinh 2kh + 2kh) for the piston and, for the
+   *  flap, puts [(kh sinh kh − cosh kh + 1)/k² + l·sinh kh/k]/(h + l) in the
+   *  integral. Returns {k, L, kh, H_S, cp, cg}; k from ω² = gk tanh kh.
+   *  On the grid the measured H falls short of it (WV-5's README). */
+  function wavemakerHS(T, h, flap, l) {
+    const g = 9.81, om = 2 * Math.PI / T;
+    let k = Math.max(om * om / g, om / Math.sqrt(g * h));
+    for (let n = 0; n < 40; n++) {
+      const th = Math.tanh(k * h);
+      k -= (g * k * th - om * om) / (g * th + g * k * h * (1 - th * th));
+    }
+    const kh = k * h, sh = Math.sinh(kh), den = Math.sinh(2 * kh) + 2 * kh;
+    const I = flap ? ((kh * sh - Math.cosh(kh) + 1) / (k * k) + (l || 0) * sh / k) / (h + (l || 0))
+                   : sh / k;
+    const cp = om / k;
+    return { k, L: 2 * Math.PI / k, kh, H_S: 4 * k * sh * I / den,
+             cp, cg: 0.5 * cp * (1 + 2 * kh / Math.sinh(2 * kh)) };
+  }
+
+  /** Fire one wave train (wave.train > 0). Refused while one is still being
+   *  made — restarting mid-stroke would jerk the paddle. Returns true when a
+   *  train starts. */
+  function fireTrain() {
+    const w = S.p.wave;
+    if (!(w.train > 0) || !(w.on > 0.5)) return false;
+    if (paddle().running) return false;
+    w.t0 = S.t;
+    return true;
+  }
+
+  /** Is the paddle a flap? (wave.flap, with the still depth it needs.) */
+  function flapOn() {
+    const w = S.p.wave;
+    return w.flap > 0.5 && w.d > 0;
+  }
+
+  /** The bed under the paddle's column, from the mask (the first non-solid
+   *  cell up from the bottom) — the flap's hinge is measured from it. */
+  function paddleBed() {
+    const i = Math.max(1, Math.round(S.p.wave.x / S.dx));
+    for (let j = 0; j < S.ny; j++) if (S.mask[j * S.nx + i] < 192) return j * S.dx;
+    return 0;
+  }
+
   function step(nsub) {
     const p = S.p, h = dt();
     for (let n = 0; n < nsub; n++) {
@@ -1234,6 +1338,15 @@ const SIM = (() => {
       gl.uniform4f(prog.vel.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
         p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
       gl.uniform1f(prog.vel.u("u_waveD"), wallPaddle() ? p.wave.d : 0);
+      // The flap and the train envelope (both opt-in): the CPU hands the
+      // paddle's velocity for this substep, and the flap's hinge and
+      // still-water level. y = 0 keeps the old expression in the shader.
+      const flap = flapOn(), shaped = flap || p.wave.train > 0;
+      gl.uniform2f(prog.vel.u("u_waveU"), shaped ? paddle(S.t).U : 0, shaped ? 1 : 0);
+      if (flap) {
+        const zb = paddleBed();
+        gl.uniform2f(prog.vel.u("u_flap"), zb - Math.max(0, p.wave.hinge || 0), zb + p.wave.d);
+      } else gl.uniform2f(prog.vel.u("u_flap"), 0, 0);
       GLH.bindTarget(gl, S.U.write.fbo, S.nx, S.ny);
       quad.draw();
       S.U.swap();
@@ -2413,6 +2526,7 @@ const SIM = (() => {
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
            hydraulicGrade, streamRequest, streamPoll, streamPending,
            setValve, setParam, params, windTau, wallPaddle,
+           paddle, fireTrain, flapOn, paddleBed, envelope, wavemakerHS,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

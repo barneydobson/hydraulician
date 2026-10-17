@@ -738,6 +738,43 @@ flume's water in 16 s) would go in — and with the volume flux the water
 holds to 0.2% over 16 s (measured at tanβ 0.06–0.7). Per unit stroke the wall paddle makes the
 taller wave (no pocket to fill): 0.14 m there matches the piston's 0.18 m.
 
+**The flap and the train envelope** (WV-5) are two opt-in keys on the same
+`wave` group, both off unless a scene or the Wavemaker panel asks; with
+neither, FS_VEL takes the old expression bit for bit. `wave.flap = 1` (with
+`wave.d`) makes the paddle a flap hinged `wave.hinge` below the bed: the
+imposed velocity grows linearly from the hinge, u(z) = U·(z − z_h)/(z₀ − z_h),
+and at the wall its volume flux is the flap's swept rate, held over the live
+depth as the piston's is. `wave.train = N` makes it fire one train of N
+periods with `wave.ramp`-period cosine ramps (default 1.5) on `SIM.fireTrain()`
+— the strip's Wave train button and V where there is no valve — and stand
+still otherwise; the velocity is the exact derivative of the displacement
+a·E(τ)·sin ωτ, so a train ends with the paddle where it started. The CPU
+computes U per substep (`SIM.paddle`) and hands it in as `u_waveU`. Neither
+key is in the rig wire format (v2): a saved rig carries the scene's own.
+`SIM.wavemakerHS` is Biésel's linear transfer function H/S for either.
+Measured: Biésel's flap/piston ratio holds on the grid to the percent
+(equal H from strokes in its ratio, 1.50 at kh = 2.55 and 1.93 at
+kh = 0.68), but the absolute H falls short of it — 0.6–0.75 of linear theory
+half a wavelength out in deep water — because the grid damps the near field.
+Deep water: the flap is cleaner where it should be, near the paddle (bed
+velocity range at x = 0.6 m 0.21 against the piston's 0.29 m/s; surface
+residue at x = 1 m after a train 6 against 21 mm), and identical a
+wavelength out. On WV-4's beach (kh = 0.68) the two are indistinguishable
+in breaker shape at tanβ 0.06, 0.15 and 0.7, H along the flume agrees to
+about 0.01 m, and
+the flap needs nearly twice the stroke (±0.27 m on 0.40 m of water), so WV-4
+keeps the piston.
+
+**Deep-water waves are the worst case of the resolution damping.** A wave
+of L = 1 m on a 13.7 mm grid (73 cells per wavelength, H ≈ 4 cells) was
+gone within one wavelength of the paddle; at L/Δx = 106, 145 and 204 it
+lasted about 2, 2.5 and 3.5 wavelengths, and a wave dies quickly once H is
+under ~4 cells. The mixing length takes part (with `kappa: 0` the wave goes
+further, but the whole flume fills with grid-scale surface noise within
+10 s — not a usable fix); `c`, `ca`, `bulk` and `cf` do not. WV-5 is sized
+around it: L ≈ 2 m on 10.4 mm (190 cells), H ≈ 0.14 m (13 cells), and the
+group still fades from 0.14 m at 1 m to 0.04 m at 8 m.
+
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from
 `cosh k(z+d)/sinh kd`, and the vertical component vanishes at the bed as it

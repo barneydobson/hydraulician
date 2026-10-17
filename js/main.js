@@ -762,6 +762,16 @@ const CONTROLS = [
   { id: "waveX", place: "piston", label: "Piston position", min: 0, max: 1, step: 0.01, rel: "W",
     get: () => sim.p.wave.x, set: (v) => sim.p.wave.x = v,
     fmt: (v) => v.toFixed(2) + " m from the left" },
+  // The flap and the train are the two opt-in halves of SIM.paddle; neither
+  // is in the rig wire format (v2), so a saved rig carries the scene's own.
+  { id: "waveFlap", place: "piston", type: "check", label: "Hinged flap",
+    get: () => sim.p.wave.flap > 0.5, set: (v) => sim.p.wave.flap = v ? 1 : 0,
+    info: "A paddle hinged at the bed instead of a piston: it moves the water most at the surface and not at all at the hinge, which is how a deep-water wave moves. Needs a scene that declares its still depth (the wall paddles)." },
+  { id: "waveN", place: "piston", label: "Wave train", min: 0, max: 20, step: 1,
+    get: () => sim.p.wave.train || 0, set: (v) => { sim.p.wave.train = Math.round(v); sim.p.wave.t0 = undefined; },
+    fmt: (v) => (v < 0.5 ? "off — the paddle runs continuously"
+                          : Math.round(v) + " periods per train · press V or the strip's Wave train"),
+    info: "A train of waves instead of an endless wave: the paddle ramps up over a period and a half, holds, ramps down and stops. Fire one with the strip's Wave train button or V." },
 
   { h: "Orbit tracers" },
   { id: "tracerOn", type: "check", label: "Show orbit tracers",
@@ -1283,6 +1293,9 @@ const ICONS = {
   pause:   '<rect x="5.2" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>' +
            '<rect x="11.6" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>',
   play:    '<path d="M6.5 4.2 15.5 10l-9 5.8Z" fill="currentColor" stroke="none"/>',
+  // A wave train: three crests under a hump-shaped envelope.
+  train:   '<path d="M2.5 12c1.6 0 2-1.2 3-1.2s1.6 2.6 3 2.6 1.8-6.4 3-6.4 1.6 6.4 3 6.4 1.8-2.6 3-2.6"/>' +
+           '<path d="M2.5 16.5h15" opacity=".55"/>',
   reset:   '<path d="M4.5 10a5.5 5.5 0 1 1 1.7 4"/><path d="M4.5 15v-5h5"/>',
   undo:    '<path d="M7 5.5 3.5 9 7 12.5"/><path d="M3.5 9h8A4.5 4.5 0 0 1 16 13.5v1"/>',
   pour:    '<path d="M4.5 4.5h7l-1 4.5h-5z"/><path d="M11.5 6.2c1.6 0 2.2 1 2.2 2s-.8 1.9-2.2 1.9"/>' +
@@ -1819,6 +1832,22 @@ function scenesOffered() {
   return !ex || !!(state.ui && state.ui.lifted);
 }
 
+/** Is there a wave train to fire? (wave.train > 0 on a running paddle.) The
+ *  strip's Wave train button shows only then, and V fires it where there is
+ *  no valve to work. */
+function trainOffered() {
+  return !!sim && !!sim.p && sim.p.wave.on > 0.5 && sim.p.wave.train > 0;
+}
+function fireTrain() {
+  if (SIM.fireTrain()) {
+    const w = sim.p.wave;
+    showToast("Wave train", w.train + " waves of period " + w.period.toFixed(2) + " s. Follow one crest, then follow the group.");
+  } else if (trainOffered()) {
+    showToast("Still making the last train", "Wait for the paddle to stop, then press again.");
+  }
+  syncToolbar();
+}
+
 /** Is there a valve on the bench — one the scene declares, or a drawn one
  *  (segment kind 128)? The strip shows the Valves button only then. */
 function hasValves() {
@@ -1830,10 +1859,13 @@ function hasValves() {
   catch (_) { return true; }               // a scene that cannot say keeps its button
 }
 /** Rebuild the strip when the answer changes — cheap to ask, rare to change. */
-let valvesShown = null;
+let valvesShown = null, trainLit = false;
 function syncValveBtn() {
-  const v = hasValves();
+  const v = hasValves() + ":" + trainOffered();
   if (v !== valvesShown) { valvesShown = v; buildToolbar(); }
+  // The Wave train button is lit while the paddle is making one.
+  const run = trainOffered() && SIM.paddle().running;
+  if (run !== trainLit) { trainLit = run; syncToolbar(); }
 }
 
 /** A blank flume, from wherever you are. This is the sandbox's "new document":
@@ -1971,6 +2003,13 @@ const TOOLBAR = [
       // valve puts the button up and erasing the last takes it away.
       when: () => hasValves(),
       on: () => !!sim && sim.p.valveClosed < 0.5, act: () => toggleValve() },
+    // Only where the paddle makes trains (wave.train > 0, WV-5): one press,
+    // one train. Shares V with the valves — V fires the train where there is
+    // no valve to work.
+    { id: "trainBtn", icon: "train", label: "Wave train", key: "V",
+      hint: "Fire one wave train: the paddle ramps up, holds and stops",
+      when: () => trainOffered() && !hasValves(),
+      on: () => !!sim && SIM.paddle().running && sim.p.wave.train > 0, act: () => fireTrain() },
   ] },
   // Chrome, not a family: captioning it would put it in the same taxonomy as
   // the four above, which is exactly what it is not.
@@ -3722,19 +3761,36 @@ function drawMarkers(ctx) {
     // 10 px off the wall, so it reads as the thing a wave flume has. The view
     // starts at x = 0, so the back half of the stroke is drawn squashed
     // against the wall (4 px) rather than off-screen.
+    // The displacement and velocity are SIM.paddle's — the same numbers the
+    // solver imposes, train envelope included. A flap (SIM.flapOn) is drawn
+    // as a plate hinged at its hinge: the face leans, moving the full stroke
+    // at the still-water level and nothing at the hinge.
     const f = flashOf("piston");
     const om = 2 * Math.PI / Math.max(p.wave.period, 0.05);
+    const pd = SIM.paddle();
     const pxm = V.w / sim.W;
-    const face = V.X(0) + Math.max(4, 10 + p.wave.amp * Math.sin(om * sim.t) * pxm);
     const yTop = V.Y(sim.H * 0.95), yBot = V.Y(0);
+    const flap = SIM.flapOn();
+    const zh = flap ? SIM.paddleBed() - Math.max(0, p.wave.hinge || 0) : 0;
+    const z0 = flap ? SIM.paddleBed() + p.wave.d : 1;
+    const faceAt = (z) => V.X(0) + Math.max(4, 10 + pd.X * (flap ? (z - zh) / (z0 - zh) : 1) * pxm);
+    const face = faceAt(sim.H * 0.95), faceBot = faceAt(flap ? zh : 0);
     ctx.save();
     ctx.fillStyle = "#c98a2e"; ctx.globalAlpha = 0.92;
-    ctx.fillRect(V.X(0) - 2, yTop, face - V.X(0) + 2, yBot - yTop);
+    ctx.beginPath();
+    ctx.moveTo(V.X(0) - 2, yTop); ctx.lineTo(face, yTop);
+    if (flap) { ctx.lineTo(faceBot, V.Y(zh)); ctx.lineTo(faceBot, yBot); }
+    else ctx.lineTo(face, yBot);
+    ctx.lineTo(V.X(0) - 2, yBot); ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.strokeStyle = "#ffcf7a"; ctx.lineWidth = 2 + 2 * f;
-    ctx.beginPath(); ctx.moveTo(face, yTop); ctx.lineTo(face, yBot); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(face, yTop);
+    if (flap) {
+      ctx.lineTo(faceBot, V.Y(zh)); ctx.stroke();
+      ctx.beginPath(); ctx.arc(faceBot, V.Y(zh), 3.5, 0, 2 * Math.PI); ctx.stroke();   // the hinge
+    } else { ctx.lineTo(face, yBot); ctx.stroke(); }
     // the push/pull arrow: its length is the paddle's speed now
-    const u = Math.cos(om * sim.t), ym = yTop + 34, L = 24 * u;
+    const u = pd.U / Math.max(p.wave.amp * om, 1e-6), ym = yTop + 34, L = 24 * u;
     if (Math.abs(L) > 3) {
       const tip = face + 6 + Math.max(0, L), tail = face + 6 + Math.max(0, -L);
       const [a, b] = L > 0 ? [tail, tip] : [tip, tail];
@@ -3744,7 +3800,7 @@ function drawMarkers(ctx) {
       ctx.moveTo(b, ym); ctx.lineTo(b + s * 5, ym + 4);
       ctx.stroke();
     }
-    OVERLAY.chip(ctx, face + 6, yTop + 12, "wave paddle", "#ffb648");
+    OVERLAY.chip(ctx, face + 6, yTop + 12, flap ? "hinged flap" : "wave paddle", "#ffb648");
     ctx.restore();
   } else if (p.wave.on > 0.5) {
     const x = V.X(p.wave.x), f = flashOf("piston");
@@ -4076,7 +4132,7 @@ function boot() {
     else if (k === "h") START.open();
     else if (k === "s") { if (scenesOffered()) PICKER.open(document.getElementById("sceneBtn")); }
     else if (k === "e") EX.open(document.getElementById("exBtn"));
-    else if (k === "v") toggleValve();
+    else if (k === "v") { if (trainOffered() && !hasValves()) fireTrain(); else toggleValve(); }
     else if (k === "z") SIM.undoSeg();
     else if (k === "c") SIM.clearSegs();
     else if (k === "r") { SIM.resetWater(); clearGaugeHistory(); }

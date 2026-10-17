@@ -2077,9 +2077,12 @@ const SCENES = (() => {
      *  onset is down to shape alone. `shape(s, "area")` still builds the
      *  other family for anyone who wants to compare.
      *
-     *  ν = 2e-3 is an eddy viscosity chosen to put the onset mid-slider: at
-     *  `plan`'s 2e-5 even the 3 : 1 ellipse sheds (Re_D ~ 10⁴), at 1e-3 it
-     *  is still weakly unstable, at 3e-3 the square sheds only slowly.
+     *  ν = 1e-3 (lecturer's call, 2026-10-17: halved from 2e-3, at which the
+     *  square's street was too weak to see). MEASURED at Medium after 40 s,
+     *  rms cross-stream w 1.1 m behind the body: ellipse 0.05 m/s (steady
+     *  along the body, a gentle wiggle far downstream), s = 0.5 0.38, square
+     *  0.59 (a strong street; 0.35 at 2e-3). At `plan`'s 2e-5 even the 3 : 1
+     *  ellipse sheds hard (Re_D ~ 10⁴); at 3e-3 the square sheds only slowly.
      *  Walls are free-slip as in `plan` (slip 1); measured with no-slip
      *  the ellipse is marginally unstable at this ν, so the streamlined end
      *  would not read as clearly steady. */
@@ -2112,7 +2115,7 @@ const SCENES = (() => {
         id: "body", name: "Plan view — flow past a body", key: "Streamlined → bluff",
         group: "Jets & waves",
         blurb: "Looking down on a uniform stream past one body whose shape you morph with a slider, from a slender ellipse lined up with the flow to a square. Streamlined: a thin steady wake. Bluff: the flow separates and the wake swings from side to side, shedding eddies.",
-        W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 2e-3, slip: 1, bulk: 0.03,
+        W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 1e-3, slip: 1, bulk: 0.03,
         mode: 2, ca: 0, vmax: 1.6, vortMax: 12, headMax: 3.2, dyeLine: 1.0,
         // Left edge open and NOT walled: the inflow prescribes the stream over
         // the whole of it (see `plan` for why the edge itself must be open).

@@ -48,7 +48,7 @@ The scene alone is `?scene=body`.
 | slider `Body shape`, s = 0 → 1 | n = 2·6^s (2 → 12), aspect a/b = 3^(1−s) (3 → 1), frontal width 2b = 0.40 m held |
 | s = 0 | ellipse 1.20 m long, 0.40 m wide |
 | s = 1 | square, 0.40 m, slightly rounded corners (n = 12) |
-| viscosity | ν = 2·10⁻³ m²/s (an eddy viscosity): Re = U·2b/ν ≈ 180 at every slider position |
+| viscosity | ν = 1·10⁻³ m²/s (an eddy viscosity): Re = U·2b/ν ≈ 360 at every slider position |
 | dye | timelines injected across the whole inlet every 1.0 s |
 
 Changing the slider re-rasterises the body and keeps the flow running; it
@@ -157,7 +157,7 @@ behind the tail.
   At `plan`'s 2·10⁻⁵ the ellipse sheds too (RMS w 0.55 m/s); at 10⁻³ the
   ellipse is weakly unstable; at 3·10⁻³ the square sheds only slowly
   (still growing at 30 s). The Reynolds number of the demo is therefore
-  ~180, a laminar-street Reynolds number, not a river's.
+  ~360, a laminar-street Reynolds number, not a river's.
 - The walls are free-slip (as in `plan`): the separation off the square is
   pressure-driven at its corners. With no-slip walls at the same ν the
   ellipse was marginally unstable (RMS w 0.009 m/s and growing at 40 s), so
@@ -177,3 +177,10 @@ behind the tail.
 
 `rig.js` is the console spot-check: `FF3.wake(s, T)` reproduces a row of
 the width table, `FF3.mean(T)` the symmetry table.
+
+**Viscosity halved (2026-10-17).** At ν = 2·10⁻³ the square's street was
+too weak to see in class, so ν is now 1·10⁻³ (Re ≈ 360). Measured at Medium
+after 40 s, rms cross-stream velocity 1.1 m behind the body: ellipse
+0.05 m/s (steady along the body, a gentle wiggle far downstream), halfway
+0.38 m/s, square 0.59 m/s (a strong vortex street). The onset numbers in the
+sections above were measured at 2·10⁻³ and now sit earlier on the slider.

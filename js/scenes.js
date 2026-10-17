@@ -2337,7 +2337,7 @@ const SCENES = (() => {
     // the axis). 2e-3 is the lowest value at which the class still sees a
     // clean core, its roll-up and break-up, and a converged average.
     (() => {
-      const W = 27, H = 7;
+      const W = 27, H = 9;   // 9 m: a lid 1 m above the 8 m top of the card's level slider
       const ZF = 0.3;                         // floor
       const XH = 2.2, TWALL = 0.3;            // header wall (left face) and thickness
       const ZA = 3.15, D = 0.5;               // pipe axis and bore

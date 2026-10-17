@@ -1589,8 +1589,8 @@ const EXERCISES = [
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
-      { control: "inLevel", unit: "m",
-        rule: "the level that drives the pipe (6.60 m as the card opens): raise it and the jet runs faster." },
+      { control: "inLevel", unit: "m", label: "Reservoir level", slider: { min: 6.3, max: 8.0, step: 0.05 },
+        rule: "drives the jet: higher, faster" },
     ],
     instruments: [
       { tool: "rake", where: "Rakes, first in the pipe near the entrance (x ≈ 3.5 m) and near the exit (x ≈ 10 m)", why: "the wall boundary layers thicken along the pipe: centreline 2.17 → 2.47 m/s, the profile goes from a flat-topped plug to a rounded one" },

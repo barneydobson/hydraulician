@@ -3,7 +3,7 @@
 The flume lab at full scale: the first-year teaching flume, several times its
 size. A deep pool stands behind a sluice gate open 0.30 m, and at t = 0 that
 is the only water there is — the flume below the gate is empty and the flap
-weir at its far end lies flat. Released, the water shoots out under the gate
+weir at its far end stands at 0.5 m. Released, the water shoots out under the gate
 as a fast, thin sheet and runs off the end. The weir crest is the lab's
 operating handle: raised, it makes the sheet jump up to a slow, deep flow,
 moves that jump along the apron, and finally drowns the gate.
@@ -72,7 +72,7 @@ over the bed.
 | bed | flat, top face z = 0.30 m, from the inlet to x = 12.5 m |
 | pool | x = 0 → 4.0 m, starts 2.85 m deep and settles at 2.72 m, fed through the reservoir boundary at q ≈ 1.3 m²/s; the only water at t = 0 |
 | gate | x = 4.0 m, opening a = 0.30 m |
-| weir | the flume's flap: a 1.3 m plate hinged on its upstream foot at x = 11.0 m and leaning downstream; its tip is the crest (**Weir crest height** — the slider on the card, 0 → 1.00 m). At 0 m it lies flat, flush with the bed |
+| weir | the flume's flap: a 1.3 m plate hinged on its upstream foot at x = 11.0 m and leaning downstream; its tip is the crest (**Weir crest height** — the slider on the card, 0 → 0.60 m, starting at 0.50 m). At 0 m it lies flat, flush with the bed |
 | overfall | the bed ends at 12.5 m and the water leaves through the open floor |
 
 Roughly the lab flume at ×7–10: the lab's 43 mm gate under a 0.275 m pool
@@ -92,9 +92,10 @@ passes 5.85 l/s down a 0.104 m flume (q = 0.056 m²/s) with the jump about
    d₂ ≈ 0.20 m gives about **28.3 kN/m**; the Pressure force tool on the
    gate's upstream face reads **28.1 kN/m** — its diagram falls to zero at
    the lip, where the pressure is not hydrostatic.
-4. **The jump.** Raise **Weir crest height** to 0.55 m: within about 15 s the
-   sheet jumps up to a slow, deep flow, which creeps up the flume. When it is
-   halfway (x ≈ 7–8 m, some 30 s after the push) set 0.46 m: it stays there.
+4. **The jump.** The weir starts at 0.5 m: by about 20 s the sheet jumps up
+   near the weir (x ≈ 7.5 m) to a slow, deep flow, which then creeps up to the
+   gate's foot (by about 40 s). Set 0.46 m while it is partway to hold it;
+   0.6 m (the top of the slider) drowns the gate.
 5. **The box round the jump.** Drag the Control volume from about 0.5 m
    before the jump's toe to 2 m past it, bed to z ≈ 2.6 m: in on the left
    (mostly momentum flux) ≈ out on the right (mostly pressure force), about
@@ -276,3 +277,10 @@ feeds the pool.
 `rig.js` is the console spot-check — it prints the depth stations, q, the
 gate force both ways and p/ρg against the hydrostatic value from the same
 entry points the strip uses, and `HJ2.weir(h)` walks the crest.
+
+**Weir default 0.5 m, slider 0–0.6 m (2026-10-17).** At the lecturer's
+request the weir starts at 0.5 m and the slider stops at 0.6 m (drowned-ish),
+for finer control in the useful range. Measured at Medium from t = 0: the
+jump forms near the weir (x ≈ 7.5 m) by t ≈ 20 s and reaches the gate's foot
+by t ≈ 40 s. The crest-0 numbers above (sheet, gate force) were measured with
+the weir flat; set the slider to 0 to reproduce them.

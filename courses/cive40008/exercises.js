@@ -509,8 +509,9 @@ COURSES.exercises("cive40008", [
   // jump has nothing solid inside, so momentum flux + pressure force in =
   // out — the water jumps so the books balance (no Bélanger: not Year 1).
   // The lecturer's sequence is kept: water only in the reservoir at t = 0,
-  // the weir flat (crest 0); a push to 0.55 m forms the jump, 0.46 m holds
-  // it, ≥ 0.6 m drowns the gate. Vocabulary is L6's: no heads, no grade
+  // the weir at 0.5 m (lecturer, 2026-10-17; slider 0–0.6 m for finer
+  // control): the jump forms near the weir by ~20 s and creeps to the gate's
+  // foot by ~40 s; 0.46 m holds it partway; 0.6 m drowns the gate. Vocabulary is L6's: no heads, no grade
   // lines, no jump box; Froude is kept on the lecturer's own decision, in
   // plain words. The crest → jump map and the balance numbers are measured
   // (README, instructor section).
@@ -548,7 +549,7 @@ COURSES.exercises("cive40008", [
       "The water shoots under the gate as a fast, thin sheet. Read the pool depth d₁ with a {tool:gauge} at x = 2.5 m, and q with a {tool:flux} up through the sheet at x = 6 m.",
       "Drag a {tool:cv} round the gate, (2.50, 0.10) → (6.00, 3.70), and press {key:B} until its faces read momentum + pressure: F→ is the force on the gate.",
       "Work out ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), d₂ the sheet's depth; compare it, and F→, with {tool:force} on the gate's upstream face.",
-      "Raise Weir crest height to 0.55 m: within about 15 s the sheet jumps up to a slow, deep flow. When the jump is halfway (x ≈ 7–8 m) set 0.46 m to hold it.",
+      "The weir starts at 0.5 m: by about 20 s the sheet jumps up to a slow, deep flow near the weir, then the jump creeps towards the gate. Set Weir crest height to 0.46 m to hold it partway; 0.6 m drowns the gate.",
       "Drag the box round the jump: momentum flux + pressure force in on the left = out on the right, and F→ ≈ 0 — the water jumps so the books balance.",
     ],
     background: [
@@ -556,7 +557,7 @@ COURSES.exercises("cive40008", [
       "Round the gate the faces are hydrostatic: ½ρgd² each. So the force on the gate is F = ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), with U = q/d, d₁ the pool's depth and d₂ the sheet's (about 0.20 m). Depths are above the bed, which is at z = 0.30 m; the gate is open a = 0.30 m.",
       "On the gate itself the pressure is hydrostatic near the surface but falls to zero at the lip, where the water curves round under the gate and speeds up: pressure is hydrostatic only where the streamlines are straight. That is why the Pressure force tool reads a little less than the balance. The box reads a few per cent more: its upstream face is not exactly hydrostatic either, and it also carries the bed's friction inside it.",
       "Round the jump there is nothing solid inside the box (only the bed's friction), so what goes in must come out: the fast thin sheet and the slow deep flow carry the same momentum flux + pressure force.",
-      "Above 0.6 m the jump runs up to the gate and drowns it: the pool rises and the force on the gate grows. At 0.45 m a held jump is washed back over the weir; at 0.4 m or less the sheet just runs over the weir. Water is the default colouring; Speed and Froude number are in {btn:legendBtn}.",
+      "At 0.6 m (the top of the slider) the jump runs up to the gate and drowns it: the pool rises and the force on the gate grows. At 0.45 m a held jump is washed back over the weir; at 0.4 m or less the sheet just runs over the weir. Water is the default colouring; Speed and Froude number are in {btn:legendBtn}.",
     ],
     settle: 30,
   },

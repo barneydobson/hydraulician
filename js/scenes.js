@@ -2523,10 +2523,10 @@ const SCENES = (() => {
            { id: "ds", label: "Underside", e0: 0, e1: 0 }], "weir");
       };
       const gateSolids = s.solids;
-      s.params = s.params.concat([{ key: "weir_h", label: "Weir crest height", min: 0, max: 1.0,
-                                    step: 0.01, value: 0, unit: "m" }]);
+      s.params = s.params.concat([{ key: "weir_h", label: "Weir crest height", min: 0, max: 0.6,
+                                    step: 0.01, value: 0.5, unit: "m" }]);
       s.solids = (W_, H_, P_, par) => gateSolids(W_, H_, P_, par)
-        .concat([flap(par && par.weir_h !== undefined ? par.weir_h : 0)]);
+        .concat([flap(par && par.weir_h !== undefined ? par.weir_h : 0.5)]);
       return Object.assign(s, {
         id: "gatejump", name: "Sluice gate → hydraulic jump", key: "The flume lab, scaled up",
         blurb: "The teaching flume at several times its size: a deep reservoir behind a sluice gate, released into an empty flume. The water shoots under the gate as a fast thin sheet; raise the weir at the far end and the sheet jumps up to a slow deep flow, which can be driven back until it drowns the gate.",

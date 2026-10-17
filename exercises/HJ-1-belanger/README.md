@@ -8,9 +8,9 @@ take the same jump onto a 1-in-4 bed, where their points fall below
 the curve: the horizontal-bed assumption failing in public, discovered rather
 than announced.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **HJ-1**, or use the direct link
-[`?ex=HJ-1`](https://barneydobson.github.io/hydraulician/?ex=HJ-1).
+[`?ex=HJ-1`](../../?ex=HJ-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

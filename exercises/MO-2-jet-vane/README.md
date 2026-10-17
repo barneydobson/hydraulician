@@ -9,9 +9,9 @@ the turning angle the sim has just shown you; a control-volume **Control volume*
 then reads the force the rig actually delivers, so the board number has
 something to be checked against.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **MO-2**, or use the direct link
-[`?ex=MO-2`](https://barneydobson.github.io/hydraulician/?ex=MO-2).
+[`?ex=MO-2`](../../?ex=MO-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

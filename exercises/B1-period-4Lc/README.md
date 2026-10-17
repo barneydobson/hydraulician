@@ -6,9 +6,9 @@ gauge. Pooled, (L, T) — acoustic length against period — lies on a straight
 line whose slope is 4/c: the class measures the pipe's celerity a second
 way, from timing alone, with no pressure reading at all.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B1**, or use the direct link
-[`?ex=B1`](https://barneydobson.github.io/hydraulician/?ex=B1).
+[`?ex=B1`](../../?ex=B1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

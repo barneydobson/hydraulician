@@ -6,9 +6,9 @@ celerity (70 m/s), once at double that (140 m/s). Joukowsky says
 ratio as the two celerities — exactly 2.0. No physical rig can change a
 pipe's elastic modulus between two readings; this one does it with a slider.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B2**, or use the direct link
-[`?ex=B2`](https://barneydobson.github.io/hydraulician/?ex=B2).
+[`?ex=B2`](../../?ex=B2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

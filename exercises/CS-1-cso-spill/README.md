@@ -10,9 +10,9 @@ different throttle, ramps their own storm, and logs the discharge at which the
 crest first spills. Pooled, that is the design chart that sets a CSO at
 n × DWF.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **CS-1**, or use the direct link
-[`?ex=CS-1`](https://barneydobson.github.io/hydraulician/?ex=CS-1).
+[`?ex=CS-1`](../../?ex=CS-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

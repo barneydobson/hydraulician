@@ -8,9 +8,9 @@ level into the middle tank, open the valve and read the answer off a gauge.
 Pooled, the class answers the question the textbook only poses — at what level
 does B stop supplying the junction and start taking from it?
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B9**, or use the direct link
-[`?ex=B9`](https://barneydobson.github.io/hydraulician/?ex=B9).
+[`?ex=B9`](../../?ex=B9).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

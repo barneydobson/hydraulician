@@ -7,9 +7,9 @@ axis, the class's own points reproduce the textbook spilling and surging
 bands either side of a hole in the middle: nothing anyone runs, on either
 beach, ever plunges.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B5**, or use the direct link
-[`?ex=B5`](https://barneydobson.github.io/hydraulician/?ex=B5).
+[`?ex=B5`](../../?ex=B5).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

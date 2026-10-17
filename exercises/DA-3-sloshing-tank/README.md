@@ -20,9 +20,9 @@ K = T√(g/d) = φ(B/d), and the app checks the claim.
 Every equation on the sheet is a native Word equation (OMML), so the sheet
 can be edited in Word.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **DA-3**, or use the direct link
-[`?ex=DA-3`](https://barneydobson.github.io/hydraulician/?ex=DA-3).
+[`?ex=DA-3`](../../?ex=DA-3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 The student handout is [`tutorial-sheet-questions.docx`](tutorial-sheet-questions.docx);
 the tutor copy, [`tutorial-sheet.docx`](tutorial-sheet.docx), adds the

@@ -30,9 +30,9 @@ heads, no grade lines, no jump box. (Ported from the 10 Sep build of the lab
 demo; titled "Pressure and force on a sluice gate" until the lecturer agreed
 the momentum-balance aim, Oct 2026.)
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **HJ-2**, or use the direct link
-[`?ex=HJ-2`](https://barneydobson.github.io/hydraulician/?ex=HJ-2).
+[`?ex=HJ-2`](../../../../?ex=HJ-2).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory

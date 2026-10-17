@@ -7,9 +7,9 @@ exponent, extracted from a channel whose roughness nobody typed in. `C_f` was
 set once, in the scene file; the `n` the class reads back out is a measured
 property of the solver's delivered resistance, not an input.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **UF-1**, or use the direct link
-[`?ex=UF-1`](https://barneydobson.github.io/hydraulician/?ex=UF-1).
+[`?ex=UF-1`](../../?ex=UF-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

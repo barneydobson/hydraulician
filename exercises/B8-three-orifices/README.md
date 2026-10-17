@@ -8,9 +8,9 @@ the three, measures C_c off the jet, and the pooled class splits into
 clusters. The Borda value is **provable from ten lines of momentum**, with no
 empirical coefficient anywhere in the derivation.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B8**, or use the direct link
-[`?ex=B8`](https://barneydobson.github.io/hydraulician/?ex=B8).
+[`?ex=B8`](../../?ex=B8).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

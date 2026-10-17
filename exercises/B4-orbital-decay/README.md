@@ -8,9 +8,9 @@ flume is about 200× — while the horizontal motion never fully vanishes,
 because a particle sitting on the floor can still slide sideways but cannot
 sink into it.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B4**, or use the direct link
-[`?ex=B4`](https://barneydobson.github.io/hydraulician/?ex=B4).
+[`?ex=B4`](../../?ex=B4).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

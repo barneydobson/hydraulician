@@ -7,7 +7,7 @@ submission layer it already is, and the app stays the instrument.
 ## The tag
 
 ```html
-<iframe src="https://barneydobson.github.io/hydraulician/?ex=<ID>&embed=1"
+<iframe src="https://<your-site>/hydraulician/?ex=<ID>&embed=1"
         width="100%" height="640" allow="fullscreen"
         title="hydraulician · <ID>" style="border:0"></iframe>
 ```

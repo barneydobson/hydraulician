@@ -13,9 +13,9 @@ A small calculation exercise students play with on their own (L5, volume
 conservation); the lecturer can also show it in class. No personalised
 parameter, nothing to pool.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **VC-2**, or use the direct link
-[`?ex=VC-2`](https://barneydobson.github.io/hydraulician/?ex=VC-2).
+[`?ex=VC-2`](../../../../?ex=VC-2).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory

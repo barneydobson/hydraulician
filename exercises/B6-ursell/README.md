@@ -5,9 +5,9 @@ and still-water depth, and computes the Ursell number. The
 crest stands up into a peak, the trough spreads out flat, and the longer the
 personalised period, the more pronounced that lopsidedness gets.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B6**, or use the direct link
-[`?ex=B6`](https://barneydobson.github.io/hydraulician/?ex=B6).
+[`?ex=B6`](../../?ex=B6).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

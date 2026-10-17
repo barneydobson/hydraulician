@@ -16,9 +16,9 @@ For the Fundamentals lecture (compressibility and the speed of sound). Two
 sliders on the card — the speed of sound c and the overflow crest — are the
 things to play with; there is no personalised parameter and nothing to pool.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **UP-1**, or use the direct link
-[`?ex=UP-1`](https://barneydobson.github.io/hydraulician/?ex=UP-1).
+[`?ex=UP-1`](../../../../?ex=UP-1).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory

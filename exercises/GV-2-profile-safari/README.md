@@ -9,9 +9,9 @@ disguised as a collecting game. A2 and the whole C family are deliberately
 rare: nobody is expected to clear the board, and the pooled "who found what"
 chart is the payoff, not any one student's score.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **GV-2**, or use the direct link
-[`?ex=GV-2`](https://barneydobson.github.io/hydraulician/?ex=GV-2).
+[`?ex=GV-2`](../../?ex=GV-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

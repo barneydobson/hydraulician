@@ -5,9 +5,9 @@ throws the water out of a nozzle. A big nozzle passes lots of water slowly; a
 small nozzle throws a fast, thin jet. Somewhere in between the jet carries the
 most power — and the class finds where, one nozzle each.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **HP-1**, or use the direct link
-[`?ex=HP-1`](https://barneydobson.github.io/hydraulician/?ex=HP-1).
+[`?ex=HP-1`](../../?ex=HP-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

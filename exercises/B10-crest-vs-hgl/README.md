@@ -8,9 +8,9 @@ soffit, and the discharge stalls. That height is not a property of the pipe
 or of the pump — it is the elevation of the **hydraulic grade line** at the
 crest, which the class has already measured with two gauges either side.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B10**, or use the direct link
-[`?ex=B10`](https://barneydobson.github.io/hydraulician/?ex=B10).
+[`?ex=B10`](../../?ex=B10).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

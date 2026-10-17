@@ -7,9 +7,9 @@ manufacturer-style pump curve on paper, the class finds the intersection
 graphically, and one student imposes that exact `Q` live: the flange gauge
 should land on the head the graph predicted.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **PU-1**, or use the direct link
-[`?ex=PU-1`](https://barneydobson.github.io/hydraulician/?ex=PU-1).
+[`?ex=PU-1`](../../?ex=PU-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

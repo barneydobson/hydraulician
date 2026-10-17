@@ -8,9 +8,9 @@ straight line. Locate it, size its loss coefficient from the kink, submit both
 numbers. Every pair hides a different fault, so every pair's answer is
 different — exactly how a utility finds a half-shut valve in a buried main.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **LL-2**, or use the direct link
-[`?ex=LL-2`](https://barneydobson.github.io/hydraulician/?ex=LL-2).
+[`?ex=LL-2`](../../?ex=LL-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

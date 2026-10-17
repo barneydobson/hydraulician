@@ -14,9 +14,9 @@ Students submit **Lr_water, Vr_water, Lr_honey, Vr_honey**, and the class
 pools them into one plot against L_r: water on the Froude line, honey
 falling away from it as the model shrinks.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **DA-1**, or use the direct link
-[`?ex=DA-1`](https://barneydobson.github.io/hydraulician/?ex=DA-1).
+[`?ex=DA-1`](../../?ex=DA-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 It runs on the `fluid-tanks` scene; the card sets everything up.
 

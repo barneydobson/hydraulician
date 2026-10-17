@@ -17,9 +17,9 @@ for each run; the class pools them into one plot of each rule's error against
 the station's distance from the inlet, and every student's points laid on the
 log law the rules are built on.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **NC-2**, or use the direct link
-[`?ex=NC-2`](https://barneydobson.github.io/hydraulician/?ex=NC-2).
+[`?ex=NC-2`](../../?ex=NC-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 It runs on the `gauging` scene; the card sets everything up.
 

@@ -8,9 +8,9 @@ sits, visibly, in the vorticity display. Pooled, the class's (measured h_L,
 Borda–Carnot prediction) points sit on the 1:1 line — a loss coefficient
 predicted from geometry alone, and confirmed one head at a time.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **LL-1**, or use the direct link
-[`?ex=LL-1`](https://barneydobson.github.io/hydraulician/?ex=LL-1).
+[`?ex=LL-1`](../../?ex=LL-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

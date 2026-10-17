@@ -11,9 +11,9 @@ A Year 2 preview (tier: Preview), written for students to run themselves:
 no personalised parameter and nothing to submit. The card is the whole
 exercise; these notes are for the lecturer.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **WV-4**, or use the direct link
-[`?ex=WV-4`](https://barneydobson.github.io/hydraulician/?ex=WV-4).
+[`?ex=WV-4`](../../../../?ex=WV-4).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory

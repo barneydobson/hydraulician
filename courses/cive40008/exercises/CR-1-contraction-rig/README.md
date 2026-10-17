@@ -15,11 +15,11 @@ interface (fields, strip buttons, tools) and leaves the flow running:
 | **Continuity** | L5 Mass conservation | Lagrangian and Eulerian; Q₁ = Q₂ and Σ Q = 0 round a control volume, for any shape | VC-1 |
 | **Forces** | L6 Momentum | the force on the contraction from a momentum balance, R = p₁A₁ − p₂A₂ − ρQ(U₂ − U₁); a straight pipe's friction | MM-2 |
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **CR-1**, or link straight to a tab:
-[`?ex=CR-1&tab=streamlines`](https://barneydobson.github.io/hydraulician/?ex=CR-1&tab=streamlines),
-[`&tab=continuity`](https://barneydobson.github.io/hydraulician/?ex=CR-1&tab=continuity),
-[`&tab=forces`](https://barneydobson.github.io/hydraulician/?ex=CR-1&tab=forces).
+[`?ex=CR-1&tab=streamlines`](../../../../?ex=CR-1&tab=streamlines),
+[`&tab=continuity`](../../../../?ex=CR-1&tab=continuity),
+[`&tab=forces`](../../../../?ex=CR-1&tab=forces).
 The old links `?ex=FF-5`, `?ex=VC-1` and `?ex=MM-2` still work and open the
 matching tab. A course menu lists a tab as `"CR-1#forces"`.
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).

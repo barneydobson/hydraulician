@@ -14,9 +14,9 @@ small, makes it flow, and it keeps flowing for as long as the shear acts.
 An exercise students play with on their own; the lecturer can also show it in class. (L2, slides 3 and 10–12.) There is no
 personalised parameter and nothing to pool.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **FF-1**, or use the direct link
-[`?ex=FF-1`](https://barneydobson.github.io/hydraulician/?ex=FF-1).
+[`?ex=FF-1`](../../../../?ex=FF-1).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory

@@ -10,9 +10,9 @@ and a control-volume thrust. Pooled, the C_d's land in a tight cluster around
 A **Control volume** then measures the thrust on the same control volume, so both
 formula-sheet estimates can be compared with the force the flow delivers.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **MO-1**, or use the direct link
-[`?ex=MO-1`](https://barneydobson.github.io/hydraulician/?ex=MO-1).
+[`?ex=MO-1`](../../?ex=MO-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

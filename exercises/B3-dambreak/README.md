@@ -8,9 +8,9 @@ balance, but watched from the fixed lab frame with a stopwatch, which is
 exactly what a control-volume analysis normally asks you to imagine rather
 than see.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B3**, or use the direct link
-[`?ex=B3`](https://barneydobson.github.io/hydraulician/?ex=B3).
+[`?ex=B3`](../../?ex=B3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

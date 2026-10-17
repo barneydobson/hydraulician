@@ -7,9 +7,9 @@ shallow-water line, and the ones in between sag off both — the class has drawn
 the full dispersion relation without anyone solving a transcendental equation
 by hand.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **WV-1**, or use the direct link
-[`?ex=WV-1`](https://barneydobson.github.io/hydraulician/?ex=WV-1).
+[`?ex=WV-1`](../../?ex=WV-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

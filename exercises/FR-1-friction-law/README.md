@@ -11,9 +11,9 @@ out near 2.8, not 2, and λ is not a constant but climbs across the class. That
 is the honest half of the hour: you calibrate a network because the resistance
 of a real conduit is a property of *that conduit*, not of a formula.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **FR-1**, or use the direct link
-[`?ex=FR-1`](https://barneydobson.github.io/hydraulician/?ex=FR-1).
+[`?ex=FR-1`](../../?ex=FR-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

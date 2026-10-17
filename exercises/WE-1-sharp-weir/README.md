@@ -8,9 +8,9 @@ axes they lie on a straight line whose slope the class measures and whose
 intercept is a discharge coefficient. Nobody calibrated a weir; twenty laptops
 did it between them.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **WE-1**, or use the direct link
-[`?ex=WE-1`](https://barneydobson.github.io/hydraulician/?ex=WE-1).
+[`?ex=WE-1`](../../?ex=WE-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

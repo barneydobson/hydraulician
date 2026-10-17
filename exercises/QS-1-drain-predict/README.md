@@ -9,9 +9,9 @@ h₂. Then they switch the spout off, watch the number on the gauge fall, and
 time it for real. The result is a scatter of (predicted, measured) pairs
 against the 1:1 line.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **QS-1**, or use the direct link
-[`?ex=QS-1`](https://barneydobson.github.io/hydraulician/?ex=QS-1).
+[`?ex=QS-1`](../../?ex=QS-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

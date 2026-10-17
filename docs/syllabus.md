@@ -35,7 +35,7 @@ is, and where it acts. Everything assumes this distribution can be read on sight
 
 | exercise | type | what it does |
 |---|---|---|
-| **HS-1** · Dike with a piezometer ([open it](https://barneydobson.github.io/hydraulician/?ex=HS-1) · [brief](../exercises/HS-1-dyke-piezometer/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A dike between two reservoirs at different levels, with a piezometer tapped into the culvert through it. Read the levels and the face forces with the valve shut, then open it and watch one level and equal forces arrive. |
+| **HS-1** · Dike with a piezometer ([open it](../?ex=HS-1) · [brief](../exercises/HS-1-dyke-piezometer/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A dike between two reservoirs at different levels, with a piezometer tapped into the culvert through it. Read the levels and the face forces with the valve shut, then open it and watch one level and equal forces arrive. |
 
 ## 2. Volume conservation
 
@@ -51,7 +51,7 @@ returns later inside the hydraulic jump.
 
 | exercise | type | what it does |
 |---|---|---|
-| **HP-2** · Why turbine buckets are cups, not plates ([open it](https://barneydobson.github.io/hydraulician/?ex=HP-2) · [brief](../exercises/HP-2-pelton/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A jet deflected by a flat plate, a deep-V and a six-stroke Pelton cup. Read the force off the control volume for each and see why the cup delivers nearly twice the plate — and why the flooded V does not. |
+| **HP-2** · Why turbine buckets are cups, not plates ([open it](../?ex=HP-2) · [brief](../exercises/HP-2-pelton/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A jet deflected by a flat plate, a deep-V and a six-stroke Pelton cup. Read the force off the control volume for each and see why the cup delivers nearly twice the plate — and why the flooded V does not. |
 
 ## 4. Energy conservation
 
@@ -60,7 +60,7 @@ measured, and how a contraction differs from an expansion.
 
 | exercise | type | what it does |
 |---|---|---|
-| **QS-2** · Two tanks and two parallel ducts ([open it](https://barneydobson.github.io/hydraulician/?ex=QS-2) · [brief](../exercises/QS-2-twin-tanks/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Two reservoirs joined by parallel ducts. Predict the level changes at 120 s from a storage balance, run it, and compare — per-student tank widths, so the class pools a spread of answers. |
+| **QS-2** · Two tanks and two parallel ducts ([open it](../?ex=QS-2) · [brief](../exercises/QS-2-twin-tanks/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Two reservoirs joined by parallel ducts. Predict the level changes at 120 s from a storage balance, run it, and compare — per-student tank widths, so the class pools a spread of answers. |
 
 ## 5. Shear layers and velocity profiles
 
@@ -70,7 +70,7 @@ measure by how much.
 
 | exercise | type | what it does |
 |---|---|---|
-| **NC-2** · Gauging a vertical: the 0.6-depth and two-point methods ([open it](https://barneydobson.github.io/hydraulician/?ex=NC-2) · [brief](../exercises/NC-2-gauging-methods/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Gauge one vertical of a long reach twice, shallow and deep: read the velocity at 0.2, 0.6 and 0.8 of the depth and judge the one-point and two-point rules against the rake's full depth-average. Pool the class by distance from the inlet: where the fastest water is still below the surface, only the two-point rule holds. |
+| **NC-2** · Gauging a vertical: the 0.6-depth and two-point methods ([open it](../?ex=NC-2) · [brief](../exercises/NC-2-gauging-methods/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Gauge one vertical of a long reach twice, shallow and deep: read the velocity at 0.2, 0.6 and 0.8 of the depth and judge the one-point and two-point rules against the rake's full depth-average. Pool the class by distance from the inlet: where the fastest water is still below the surface, only the two-point rule holds. |
 
 ## 6. Pipe flow
 
@@ -112,9 +112,9 @@ limits become part of the subject.
 
 | exercise | type | what it does |
 |---|---|---|
-| **UN-1** · Celerity and water-hammer reflections ([open it](https://barneydobson.github.io/hydraulician/?ex=UN-1) · [brief](../exercises/UN-1-celerity/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | Set the nozzle width, slam the valve, measure celerity from three gauge arrival times, compare the head rise with Joukowsky ΔH = ΔV·c/g, and use particles to follow the alternating high- and low-pressure reflections. |
-| **UN-2** · Flow establishment: the asymptotic start ([open it](https://barneydobson.github.io/hydraulician/?ex=UN-2) · [brief](../exercises/UN-2-establishment/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Open a valve on a still, full pipe and measure how its velocity approaches the plateau. Pool the class's reservoir levels, u_max and t_75 to recover the rigid-column establishment law. |
-| **HP-3** · Hydropower and unsteady flow: test the tutorial predictions ([open it](https://barneydobson.github.io/hydraulician/?ex=HP-3) · [brief](../exercises/HP-3-surge-tower/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> | Calculate the fixed scheme's velocity, losses, power, steady shaft level and first surge crest, then use a velocity rake, two level gauges and an instantaneous shutdown to fill the measured column beside the predictions. |
+| **UN-1** · Celerity and water-hammer reflections ([open it](../?ex=UN-1) · [brief](../exercises/UN-1-celerity/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | Set the nozzle width, slam the valve, measure celerity from three gauge arrival times, compare the head rise with Joukowsky ΔH = ΔV·c/g, and use particles to follow the alternating high- and low-pressure reflections. |
+| **UN-2** · Flow establishment: the asymptotic start ([open it](../?ex=UN-2) · [brief](../exercises/UN-2-establishment/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Open a valve on a still, full pipe and measure how its velocity approaches the plateau. Pool the class's reservoir levels, u_max and t_75 to recover the rigid-column establishment law. |
+| **HP-3** · Hydropower and unsteady flow: test the tutorial predictions ([open it](../?ex=HP-3) · [brief](../exercises/HP-3-surge-tower/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> | Calculate the fixed scheme's velocity, losses, power, steady shaft level and first surge crest, then use a velocity rake, two level gauges and an instantaneous shutdown to fill the measured column beside the predictions. |
 
 ## 11. Similitude and the limits of a model
 
@@ -123,8 +123,8 @@ scaling. The capstone, on purpose: it presumes everything above it.
 
 | exercise | type | what it does |
 |---|---|---|
-| **DA-1** · Empty a tank of honey ([open it](https://barneydobson.github.io/hydraulician/?ex=DA-1) · [brief](../exercises/DA-1-empty-a-tank-of-honey/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Drain a tank and a scale copy at your own L_r, once in water and once in honey, and measure the velocity ratio V_r. Pool the class: water follows Froude's √L_r; honey falls away from it as the model shrinks, because the model's Reynolds number has fallen into the range where viscosity matters. |
-| **DA-3** · Sloshing in a tank ([open it](https://barneydobson.github.io/hydraulician/?ex=DA-3) · [brief](../exercises/DA-3-sloshing-tank/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> | Use dimensional analysis to design a set of runs: 125 planned runs for the sloshing period of a tank collapse to one curve, K = T√(g/d) against B/d. In the app, five runs, one per value of B/d, draw that design chart against linear theory and its shallow and deep limits. |
+| **DA-1** · Empty a tank of honey ([open it](../?ex=DA-1) · [brief](../exercises/DA-1-empty-a-tank-of-honey/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#2da44e;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">quick</span> | Drain a tank and a scale copy at your own L_r, once in water and once in honey, and measure the velocity ratio V_r. Pool the class: water follows Froude's √L_r; honey falls away from it as the model shrinks, because the model's Reynolds number has fallen into the range where viscosity matters. |
+| **DA-3** · Sloshing in a tank ([open it](../?ex=DA-3) · [brief](../exercises/DA-3-sloshing-tank/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#8250df;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">tutorial</span> | Use dimensional analysis to design a set of runs: 125 planned runs for the sloshing period of a tank collapse to one curve, K = T√(g/d) against B/d. In the app, five runs, one per value of B/d, draw that design chart against linear theory and its shallow and deep limits. |
 
 ---
 

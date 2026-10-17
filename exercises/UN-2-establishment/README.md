@@ -7,9 +7,9 @@ student runs their own reservoir level, reads the plateau speed and the time
 to reach 75% of it, and the pooled class points trace a straight line through
 the origin whose slope is ln 7, a number nobody typed in anywhere.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **UN-2**, or use the direct link
-[`?ex=UN-2`](https://barneydobson.github.io/hydraulician/?ex=UN-2).
+[`?ex=UN-2`](../../?ex=UN-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

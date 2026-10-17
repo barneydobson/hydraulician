@@ -6,9 +6,9 @@ wave's celerity from its travel time between three gauges, and follows the
 successive high- and low-pressure reflections with gauges, velocity rakes and
 particles.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **UN-1**, or use the direct link
-[`?ex=UN-1`](https://barneydobson.github.io/hydraulician/?ex=UN-1).
+[`?ex=UN-1`](../../?ex=UN-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

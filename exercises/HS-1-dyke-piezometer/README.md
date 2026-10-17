@@ -22,9 +22,9 @@ pool. It is a good first scene before any of the flow exercises, because the
 Pressure force tool's diagram and the field colourings are read here against
 numbers the class can do on paper.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **HS-1**, or use the direct link
-[`?ex=HS-1`](https://barneydobson.github.io/hydraulician/?ex=HS-1).
+[`?ex=HS-1`](../../?ex=HS-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

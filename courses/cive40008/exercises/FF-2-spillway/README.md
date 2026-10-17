@@ -10,9 +10,9 @@ and turbulence as a mean plus a fluctuation.
 An exercise students play with on their own; the lecturer can also show it in
 class. No personalised parameter, nothing to pool.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **FF-2**, or use the direct link
-[`?ex=FF-2`](https://barneydobson.github.io/hydraulician/?ex=FF-2).
+[`?ex=FF-2`](../../../../?ex=FF-2).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory, in one paragraph per slide

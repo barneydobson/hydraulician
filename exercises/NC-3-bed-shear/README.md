@@ -9,9 +9,9 @@ Second, the same reading once on a mild channel at its own fixed discharge,
 which gives everyone a shared second point almost for free. Nobody types in a grain size, and the change of bed slope alone
 moves the answer by a factor of about 20 — gravel to boulders.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **NC-3**, or use the direct link
-[`?ex=NC-3`](https://barneydobson.github.io/hydraulician/?ex=NC-3).
+[`?ex=NC-3`](../../?ex=NC-3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

@@ -323,6 +323,15 @@ function mathjax() {
 /* file:// blocks this as a cross-origin read, and there is nothing a page can
    do about that — so say which two ways DO work rather than showing a broken
    screen. */
+/* The repository this page is served from, so the "source" links work on any
+   fork's Pages site: <owner>.github.io/<repo>/… -> github.com/<owner>/<repo>.
+   Elsewhere (localhost, file://) there is no repository to name: null. */
+function repoUrl() {
+  var m = /^([^.]+)\.github\.io$/i.exec(location.hostname);
+  var seg = location.pathname.split("/").filter(Boolean)[0];
+  return m && seg ? "https://github.com/" + m[1] + "/" + seg : null;
+}
+
 function cannotRead(why) {
   document.getElementById("doc").innerHTML =
     '<div class="note"><b>This page needs a server to read ' + DOC + "</b>" +
@@ -331,8 +340,8 @@ function cannotRead(why) {
     "<code>docs/" + DOC + "</code>.</p>" +
     "<p>Either serve the folder — <code>python3 -m http.server 8124</code>, then " +
     'open <code>localhost:8124/docs/view.html?doc=' + DOC + "</code> — or read it " +
-    'on <a href="https://github.com/barneydobson/hydraulician/blob/main/docs/' +
-    DOC + '">GitHub</a>, which renders the same file.</p>' +
+    (repoUrl() ? 'on <a href="' + repoUrl() + '/blob/main/docs/' + DOC + '">GitHub</a>, which renders the same file.'
+               : "in the repository on GitHub, which renders the same file.") + "</p>" +
     '<p style="opacity:.7">(' + why + ")</p></div>";
 }
 
@@ -346,8 +355,8 @@ fetch(DOC, { cache: "no-cache" })
     var t = document.querySelector("#doc h1");
     if (t) document.title = t.textContent + " — Hydraulician";
     document.getElementById("foot").innerHTML =
-      "docs/" + DOC + ' · <a href="https://github.com/barneydobson/hydraulician/blob/main/docs/' +
-      DOC + '">source on GitHub</a>';
+      "docs/" + DOC + (repoUrl() ? ' · <a href="' + repoUrl() + '/blob/main/docs/' +
+      DOC + '">source on GitHub</a>' : "");
     mathjax();
     // A deep link (#section) has to be re-applied: the anchor did not exist
     // when the browser first went looking for it.

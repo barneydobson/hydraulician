@@ -7,9 +7,9 @@ their predictions. This is no longer a student-number shaft-width sweep: leave
 the geometry at the sheet values, let the 60 s settle finish, and compare like
 with like.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **HP-3**, or use the direct link
-[`?ex=HP-3`](https://barneydobson.github.io/hydraulician/?ex=HP-3).
+[`?ex=HP-3`](../../?ex=HP-3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 The student handout is
 [`tutorial-sheet-questions.docx`](tutorial-sheet-questions.docx). The tutor copy,

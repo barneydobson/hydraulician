@@ -5,7 +5,7 @@
 **Interactive 2D hydraulics in the vertical plane, in your browser** — draw a
 channel with the mouse and watch free-surface Navier–Stokes run through it.
 
-**Try it:** <https://barneydobson.github.io/hydraulician/> — runs in the
+**Try it:** open this repository's GitHub Pages site (`https://<owner>.github.io/hydraulician/`, or [`index.html`](index.html) locally) — runs in the
 browser, nothing to install (live once the repository is public).
 
 **Contents** — [Summary](#summary) · [Syllabus](#syllabus) ·
@@ -34,7 +34,7 @@ is done on paper, then checked against the solver. The exercises that have
 been checked are arranged on a teaching syllabus, ordered from hydrostatics
 through the conservation laws to unsteady pipe flow and similitude:
 
-**→ <https://barneydobson.github.io/hydraulician/docs/syllabus.html>**
+**→ [docs/syllabus.md](docs/syllabus.md)** (rendered at `docs/syllabus.html` on the Pages site)
 ([docs/syllabus.md](docs/syllabus.md))
 
 The full pack — including exercises not yet checked — is in the app (press
@@ -122,7 +122,7 @@ t = 120 s and checked for steadiness, flutter and discharge continuity.
 Clone, serve, open — there is nothing to build:
 
 ```bash
-git clone https://github.com/barneydobson/hydraulician
+git clone <this repository's URL>
 cd hydraulician
 python3 -m http.server 8124     # then http://localhost:8124
 ```
@@ -204,7 +204,7 @@ GitHub Pages on every push to `main`. The app itself has no build step —
 `index.html` and `js/` are copied through verbatim — but the workflow runs
 Jekyll (`_config.yml`) so every markdown brief renders as a web page: an
 exercise README is readable at its folder's URL, e.g.
-[`…/exercises/HP-1-penstock-power/`](https://barneydobson.github.io/hydraulician/exercises/HP-1-penstock-power/).
+[`…/exercises/HP-1-penstock-power/`](exercises/HP-1-penstock-power/).
 Underscore-prefixed folders (`exercises/_runner`, `_code-changes`, the
 per-exercise `_archive`) stay repo-only. The workflow turns Pages on by
 itself the first time it can run, so making the repository public is the only

@@ -9,9 +9,9 @@ they make a force at right angles to the plate, F_n = ρqU sin θ, and the jet
 splits unequally, q₁ = q(1 + cos θ)/2 carried on along the plate and
 q₂ = q(1 − cos θ)/2 sent back up it. L6, momentum in 2D (slides 20–21).
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **MM-1**, or use the direct link
-[`?ex=MM-1`](https://barneydobson.github.io/hydraulician/?ex=MM-1).
+[`?ex=MM-1`](../../../../?ex=MM-1).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory

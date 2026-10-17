@@ -12,9 +12,9 @@ what stopping it does, which is why an impulse turbine has buckets and not
 paddles. It is **not** a demonstration of the Pelton bucket's shape — see
 "What this rig does not show".
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **HP-2**, or use the direct link
-[`?ex=HP-2`](https://barneydobson.github.io/hydraulician/?ex=HP-2).
+[`?ex=HP-2`](../../?ex=HP-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

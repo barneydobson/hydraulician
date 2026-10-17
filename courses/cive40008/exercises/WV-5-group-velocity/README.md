@@ -12,9 +12,9 @@ CIVE40008 menu), written for students to run themselves: no personalised
 parameter, nothing to submit. The card is the whole exercise; these notes
 are for the lecturer.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../../../)
 and pick **WV-5**, or use the direct link
-[`?ex=WV-5`](https://barneydobson.github.io/hydraulician/?ex=WV-5).
+[`?ex=WV-5`](../../../../?ex=WV-5).
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory

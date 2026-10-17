@@ -7,9 +7,9 @@ minutes. The exercise is to download the gauge trace, integrate the surge
 ODE beside it in a spreadsheet, and adjust the friction coefficient **k**
 until the model matches the measurement.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **UN-3**, or use the direct link
-[`?ex=UN-3`](https://barneydobson.github.io/hydraulician/?ex=UN-3).
+[`?ex=UN-3`](../../?ex=UN-3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

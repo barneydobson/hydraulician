@@ -8,9 +8,9 @@ sampled ten points off the meter equation the solver itself obeys. The gap
 between that line and the frictionless prediction is the loss the "ideal"
 venturi formula always has to fudge with a coefficient.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **B7**, or use the direct link
-[`?ex=B7`](https://barneydobson.github.io/hydraulician/?ex=B7).
+[`?ex=B7`](../../?ex=B7).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

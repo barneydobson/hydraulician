@@ -9,9 +9,9 @@ second run on the gentle 1:10 beach, same water and same paddle, gives a low
 one by exactly the same method: the class has measured, not been told, why
 revetments are built gentle when reflection is the enemy.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **WV-3**, or use the direct link
-[`?ex=WV-3`](https://barneydobson.github.io/hydraulician/?ex=WV-3).
+[`?ex=WV-3`](../../?ex=WV-3).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

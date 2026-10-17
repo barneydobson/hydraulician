@@ -10,9 +10,9 @@ upstream pool steps up while the crest snaps supercritical. Raising a physical
 sill in 22 mm steps and re-settling a flume after each one is an afternoon, not
 a slot.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **FB-1**, or use the direct link
-[`?ex=FB-1`](https://barneydobson.github.io/hydraulician/?ex=FB-1).
+[`?ex=FB-1`](../../?ex=FB-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

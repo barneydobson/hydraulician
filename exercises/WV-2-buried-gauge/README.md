@@ -7,9 +7,9 @@ curve, `1/cosh(kh)`, whatever the wave. Personalising the period spreads the
 pooled class along the whole of it, from a bed gauge that barely notices the
 depth to one that is genuinely buried.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **WV-2**, or use the direct link
-[`?ex=WV-2`](https://barneydobson.github.io/hydraulician/?ex=WV-2).
+[`?ex=WV-2`](../../?ex=WV-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

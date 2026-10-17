@@ -9,9 +9,9 @@ few millimetres of it — under one grid cell — everywhere except the last
 half-metre against the weir face, where the 1D hydrostatic assumption
 visibly, honestly, gives up.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **GV-1**, or use the direct link
-[`?ex=GV-1`](https://barneydobson.github.io/hydraulician/?ex=GV-1).
+[`?ex=GV-1`](../../?ex=GV-1).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

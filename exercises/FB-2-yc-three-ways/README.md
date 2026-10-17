@@ -8,9 +8,9 @@ and the crest ends at a free overfall. Critical depth stops being something you
 plug `q` into and becomes three numbers a laptop measured, all traceable to the
 same discharge — and the three do not agree, which is the lesson.
 
-**Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
+**Open it:** press **E** in the [app](../../)
 and pick **FB-2**, or use the direct link
-[`?ex=FB-2`](https://barneydobson.github.io/hydraulician/?ex=FB-2).
+[`?ex=FB-2`](../../?ex=FB-2).
 How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
 
 ## Theory

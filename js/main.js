@@ -2634,8 +2634,13 @@ function sampleGauges(A) {
   if (!(sim.t > state.gaugeT)) return;
   state.gaugeT = sim.t;
   const av = measuringAvg();
-  state.gauges.forEach((gg) => {
-    const pr = SIM.probe(gg.x, gg.z, av);
+  // One batched read for all the gauges: each readPixels is a synchronous GPU
+  // round trip of a few ms whatever its size, and one per gauge per texture
+  // was most of the frame with three gauges up (SIM.probeMany). No sample
+  // uses the fill f, so its texture is not read: one read per grid row.
+  const prs = SIM.probeMany(state.gauges.map((gg) => [gg.x, gg.z]), av, true);
+  state.gauges.forEach((gg, gk) => {
+    const pr = prs[gk];
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(gg.x / sim.dx)));
     // Piezometric head h = z + p/ρg. For a scene whose bed is real geometry
     // z is just the gauge's own z, but a tilted-gravity scene (m2) draws a FLAT
@@ -3693,7 +3698,7 @@ function toggleValve() {
   syncToolbar();
   showToast(sim.p.valveClosed > 0.5 ? "Valve closed" : "Valve open",
     sim.p.valveClosed > 0.5
-      ? "Watch the gauge: the surge should be ΔH = c·Δv/g."
+      ? "Watch the gauges: a pressure wave runs up the pipe at c, and the pressure head jumps by c·Δv/g."
       : "Flow re-established.");
 }
 

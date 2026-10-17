@@ -38,10 +38,12 @@
  *   studentParams  DISPLAYED, NEVER APPLIED. Values the worksheet asks the
  *                  student to set, that no digit rule covers — a staged step
  *                  (B9's two level controls), an assigned cell (B5). Each is
- *                  {control, value?, unit?, rule?}. This is also how a
- *                  scene's own slider (a Geometry row, geomN) gets onto the
- *                  card: the card draws it as a slider beside its `rule`,
- *                  under "Try it yourself" when the entry has no digit.
+ *                  {control, value?, unit?, rule?, slider?, label?}. The card
+ *                  draws the control as a field to set; a Geometry row is a
+ *                  slider, and `slider: {min, max, step}` makes any other
+ *                  numeric row one too, over the range worth playing in
+ *                  (UP-1's c). `label` renames the row on the card only.
+ *                  Slider rows sit under "Try it yourself" when the entry has no digit.
  *   digit          DISPLAYED, NEVER APPLIED (with one exception, below). The
  *                  personalised parameter: `base` + `step`·d, or a per-digit
  *                  `table` where the measured rule is not linear, `mod: N` for
@@ -1169,41 +1171,62 @@ const EXERCISES = [
   },
 
   // ===== Year 1: UP-1 =====
-  // L2 Fundamentals: the speed of sound in a pipe. A lecturer demo on the
-  // `pipeline` scene (reservoir → straight pipe → valve → overflowing tank),
-  // written for this item because hammer's nozzle outlet muddied the
-  // picture. No rig, no digit; the Slot celerity row is the experiment.
-  // Speed ×0.1 so a 16 m gauge spacing (0.23 s at c = 70) is seen, not
-  // inferred.
+  // L2 Fundamentals: the speed of sound in a pipe, on the `pipeline` scene
+  // (reservoir → straight pipe → valve → overflowing tank), written for this
+  // item because hammer's nozzle outlet muddied the picture. No digit; the
+  // two card sliders are the experiment: c (the slot celerity, called the
+  // speed of sound on the card) and the tank's overflow crest, which sets the
+  // pipe speed v₀. c = 30 by default: with v₀ ≈ 2.25 m/s the jump c·v₀/g ≈ 7 m
+  // stays under the ~9 m of water over the pipe's crown, so the return wave
+  // does not empty it (measured in the brief: 2.3 m left at the default, 0.75
+  // m at the lowest crest). The card slider stops at 35 (0.5 m left at the
+  // default crest; at the lowest crest it separates) and at 20 below, where
+  // the slot's compression already makes the wave ~9% faster than c. Speed
+  // ×0.25 (was ×0.1, which made the run crawl once the settle ended) so the
+  // wave crosses the 47 m pipe in ~6 s of wall clock. L2 vocabulary: no head
+  // other than the Pressure head field, which the first step explains.
   {
     id: "UP-1",
-    title: "Pressure travels at the speed of sound (water hammer)",
+    title: "Pressure travels at the speed of sound",
+    aim: "Shut a valve at the end of a long pipe and watch the pressure jump run back up it at the speed of sound, reflect and return.",
     topic: "Unsteady pipe flow",
     folder: "UP-1-water-hammer",
     scene: "pipeline",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "1", particles: true, gaugeField: "h", speed: 0.1 },
-    digitNote: "lecturer demo: no personalised parameter",
+    viewParams: { mode: "1", particles: true, gaugeField: "speed", speed: 0.25 },
+    studentParams: [
+      { control: "cel", label: "Speed of sound c", unit: "m/s", slider: { min: 20, max: 35, step: 1 },
+        rule: "the speed of sound in the pipe, 30 m/s as the card opens. A real water main is nearer 1200 m/s; here it is slow so you can watch the wave." },
+      { control: "geom0", unit: "m",
+        rule: "the overflow crest in the tank on the right, 10.6 m as the card opens. Lower it and the water in the pipe runs faster. Changing it restarts the water." },
+    ],
     instruments: [
-      { tool: "gauge", where: "on the pipe axis, z = 3 m, at x = 14, 30 and 46 m (16 m apart; the valve is at x = 52 m)", why: "three stations 16 m apart: the arrival delay 16/c is 0.23 s at c = 70 and 0.46 s at c = 35; the 46 m gauge sits near the valve and carries the full Joukowsky plateau for 2L/c" },
+      { tool: "gauge", where: "on the pipe's centre line, z = 2.5 m, at x = 14, 30 and 46 m (16 m apart; the valve is at x = 52 m)", why: "three stations 16 m apart: the arrival delay 16/c is 0.53 s at c = 30 and 0.80 s at c = 20; the 46 m gauge sits near the valve and sees the full jump for 2L/c" },
     ],
     // The corner gauge cards are withheld: three of them stack over the
     // downstream end of the pipe and hide the valve and the 46 m gauge. The
     // inspector windows are the time series instead, and can be parked in
-    // the empty space above the pipe.
-    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead"],
-      controls: ["cel", "gaugeInspect"], readouts: { gauges: false } },
-    start: "a reservoir at a constant 16 m level feeding a 47 m straight pipe (2 m bore, axis z = 3 m) that discharges through an open valve into a small overflowing tank; the flow is steady",
+    // the empty space above the pipe. The gauges plot speed (L2 knows it;
+    // piezometric head is L7), and the hover readout is cut to position,
+    // velocity and pressure head.
+    ui: { view: ["legendBtn", "partBtn"], fields: ["phead", "water", "speed"],
+      controls: ["cel", "geom0", "speed", "gaugeInspect"],
+      readouts: { gauges: false, rows: ["pos", "uw", "phead"] } },
+    start: "a reservoir feeding a long straight pipe (2 m wide, 47 m long) that ends in an open valve and a small tank; the water flows steadily to the right",
     setup: [
-      "Place three Gauges (5) on the pipe axis at x = 14, 30 and 46 m. Open each one's history from Controls → Gauge inspector and park the three windows in the empty space above the pipe.",
-      "Before the slam read the pipe velocity v₀ (the |u| tab) and the head h at the 46 m gauge.",
-      "Press V to slam the valve. Watch the gauges respond one after another: the pressure wave runs up the pipe at the slot celerity c, reflects at the reservoir as a low-pressure wave and returns.",
-      "Pause (space) and read in the inspector: the arrival times at the three gauges (Δt for 16 m), the head rise ΔH at the 46 m gauge, and the period of the square wave.",
-      "Press V to reopen, set Slot celerity c to 35 m/s, press R and wait about 20 s for the flow to settle; slam again.",
+      "The colour is Pressure head: the pressure divided by ρg, which is the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher.",
+      "Place three Gauges (5) on the pipe's centre line, z = 2.5 m, at x = 14, 30 and 46 m.",
+      "Open the three gauge windows from Controls → Gauge inspector and drag them into the empty space above the pipe. They plot the speed: read the pipe speed v₀.",
+      "Press V (or Shift+V) to shut the valve suddenly. Watch the colour: a band of high pressure starts at the valve and runs up the pipe.",
+      "Watch the gauge windows: the speed drops to zero at 46 m first, then at 30 m, then at 14 m — the moment the wave reaches each one.",
+      "Pause (space). Hover each trace to read when its speed dropped. The time between two gauges 16 m apart is 16/c.",
+      "Hover the cursor on the pipe either side of the wave front and read the pressure head: it jumps by about c·v₀/g (g = 9.81 m/s²).",
+      "Run again: the wave bounces off the reservoir and comes back as low pressure, and keeps running up and down the pipe.",
+      "Press V to open the valve, set the speed of sound c on the card to 20 m/s, press R and wait for the countdown, then press V again.",
     ],
-    task: "Compare Δt with 16/c, ΔH with Joukowsky c·v₀/g (g = 9.81 m/s²) and the period with 4L/c (L = 47 m). Halve c: the delay doubles and the surge halves.",
-    settle: 20,
+    task: "Check that the wave takes 16/c to travel between gauges and that the pressure head jumps by about c·v₀/g. Lower c from 30 to 20: the wave takes about 1.5 times as long and the jump is smaller. Lower the overflow crest: the water runs faster and the jump grows.",
+    settle: 25,
   },
   // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
   // Three questions asked of ONE scene, `contraction`: a 1.00 m pipe that

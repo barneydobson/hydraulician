@@ -1687,6 +1687,56 @@ const SIM = (() => {
              solid: S.mask[j * S.nx + i] };
   }
 
+  /** `probe` for several points at once, returning the same objects in the
+   *  same order. Points are grouped by grid row and each row's x-span is read
+   *  with ONE readPixels per texture, instead of one per point per texture.
+   *
+   *  Why: a readPixels is a synchronous round trip to Chrome's GPU process and
+   *  costs a fixed few milliseconds whatever its size (measured 4.7 ms per
+   *  1×1 read under ANGLE/D3D11). Three gauges probed one by one were six of
+   *  them, ~45 ms a frame (UP-1). Three gauges on one row are now one or two
+   *  reads. Values are bit-identical to `probe`. `noFill` skips the fill
+   *  texture's read (the gauges never use f): `f` is then null, and a row
+   *  costs ONE read. */
+  function probeMany(pts, avg, noFill) {
+    const g = Math.abs(S.p.g) || 9.81;
+    const cell = pts.map(([x, z]) => [
+      Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx))),
+      Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)))]);
+    const rows = new Map();
+    cell.forEach(([i, j], k) => {
+      const r = rows.get(j);
+      if (r) { r.i0 = Math.min(r.i0, i); r.i1 = Math.max(r.i1, i); r.k.push(k); }
+      else rows.set(j, { i0: i, i1: i, k: [k] });
+    });
+    const out = new Array(pts.length);
+    const useAvg = !!(avg && S.avg);
+    rows.forEach((r, j) => {
+      const n = r.i1 - r.i0 + 1;
+      const A = new Float32Array(4 * n);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, useAvg ? S.avg.fld.read.fbo : S.U.read.fbo);
+      gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, A);
+      let B = null;
+      if (!useAvg && !noFill) {
+        B = new Float32Array(4 * n);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+        gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, B);
+      }
+      r.k.forEach((k) => {
+        const i = cell[k][0], o = 4 * (i - r.i0), solid = S.mask[j * S.nx + i];
+        if (useAvg) {
+          const f = A[o + 2], d = Math.max(f, 1e-6);
+          const u = A[o] / d, w = A[o + 1] / d, p = A[o + 3];
+          out[k] = { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+        } else {
+          const u = A[o], w = A[o + 1], p = A[o + 2];
+          out[k] = { i, j, f: B ? B[o] : null, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+        }
+      });
+    });
+    return out;
+  }
+
   /** The 1st and 99th percentile of a display field over WET cells, for the
    *  legend's Fit button. One readPixels of each state texture — the same
    *  bargain `rescaleFill` and `boxForce` already make, and it happens on a
@@ -2201,7 +2251,7 @@ const SIM = (() => {
 
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
-           step, columns, advanceParticles, render, probe, rake, patch, patchVel,
+           step, columns, advanceParticles, render, probe, probeMany, rake, patch, patchVel,
            fieldStats, particlePos,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
            hydraulicGrade, streamRequest, streamPoll, streamPending,

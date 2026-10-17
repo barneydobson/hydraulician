@@ -436,7 +436,9 @@ const EX = (() => {
     (ex.studentParams || []).forEach((p) => {
       if (!p.control || seen.has(p.control)) return;
       seen.add(p.control);
-      rows.push({ label: ctlLabel(p.control), unit: p.unit,
+      // `label` renames the row on the card only — UP-1 calls the panel's
+      // "Slot celerity c" the speed of sound, in the lecture's own words.
+      rows.push({ label: p.label || ctlLabel(p.control), unit: p.unit,
                   text: p.rule || (p.value !== undefined
                           ? "set it to " + ctlText(p.control, p.value) : ""),
                   control: usable(p.control) ? p.control : null,
@@ -1076,6 +1078,12 @@ const EX = (() => {
       const wrap = document.createElement("div");
       wrap.className = "exrowf";
       let el, out = null;
+      // A studentParams entry may ask for a slider on a plain numeric row (not
+      // a Geometry one) and give it the range worth playing in: UP-1's Slot
+      // celerity c runs 8–400 m/s on a log scale in the panel, but only
+      // 20–35 m/s keeps its pressure wave honest and above zero pressure.
+      const sp = (cur.studentParams || []).find((x) => x.control === id);
+      const own = sp && sp.slider && c.type !== "check" && c.type !== "select" ? sp.slider : null;
       if (c.type === "check") {
         el = document.createElement("input");
         el.type = "checkbox";
@@ -1087,14 +1095,15 @@ const EX = (() => {
           o.value = v; o.textContent = txt; el.appendChild(o);
         });
         el.onchange = () => { c.set(el.value); syncPanel(); };
-      } else if (c.par) {
+      } else if (own || c.par) {
         // A Geometry row is a dimension of the scene — a weir crest, a gate
         // opening, a beach slope — and is played with rather than typed: a
         // slider, with the value printed beside it. Range and step are the
         // param's own, read off the control (syncPanel copies them there).
         el = document.createElement("input");
         el.type = "range";
-        el.min = c.min; el.max = c.max; el.step = c.step;
+        const B = own || c;
+        el.min = B.min; el.max = B.max; el.step = B.step;
         el.oninput = () => {
           const v = +el.value;
           if (isFinite(v)) { c.set(v); syncPanel(); }
@@ -1124,7 +1133,7 @@ const EX = (() => {
         out.textContent = unitOf(c);
         wrap.appendChild(out);
       }
-      fields.push({ id, el, type: c.par ? "range" : c.type, out });
+      fields.push({ id, el, type: own || c.par ? "range" : c.type, out, own });
       return wrap;
     }
 
@@ -1142,7 +1151,7 @@ const EX = (() => {
      *  typed, and "0.4" on the way to "0.45" is a legitimate half-typed value. */
     function syncValues() {
       if (!box || !cur) return;
-      fields.forEach(({ id, el, type, out }) => {
+      fields.forEach(({ id, el, type, out, own }) => {
         if (!el.isConnected || el === document.activeElement) return;
         const c = CONTROLS.find((x) => x.id === id);
         if (!c || !c.get) return;
@@ -1152,7 +1161,8 @@ const EX = (() => {
         else if (type === "range") {
           // The slider follows the panel's row, and so do its bounds — a
           // Geometry row's param can change with the scene.
-          el.min = c.min; el.max = c.max; el.step = c.step;
+          const B = own || c;
+          el.min = B.min; el.max = B.max; el.step = B.step;
           if (!(Math.abs(+el.value - v) < 1e-9)) el.value = v;
           if (out) out.textContent = round4(v) + " " + unitOf(c);
         }

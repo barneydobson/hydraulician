@@ -62,7 +62,7 @@ draft does not yet do well, as measured:
 | ID | Works | Needs a decision or more work |
 |---|---|---|
 | FF-1 | Set-up ≈ 4.9 cm at τ = 20 N/m², return flow, exact mirror for −τ, decays at τ = 0 | τ range is ~40× a real gale (scaled for visibility); set-up invisible below ~5 N/m²; last mm of seiche decays slowly; τ sits under the "Geometry" panel heading |
-| UP-1 | New `pipeline` scene (reservoir → straight pipe → valve → overflowing tank): Δt = 16/c, ΔH ≈ c·v₀/g, T ≈ 4L/c | Tank level is only 0.2 m below the reservoir (needed to keep the bore unthrottled); above c ≈ 90 m/s the down-surge reaches zero pressure; corner gauge cards hidden in favour of inspector windows |
+| UP-1 | New `pipeline` scene (reservoir → straight pipe → valve → overflowing tank), 14.5 m tall; card sliders c (20–35 m/s, default 30) and overflow crest (10.2–11.6 m, v₀ 2.7–1.1 m/s): Δt ≈ 16/c, ΔH ≈ c·v₀/g, T ≈ 4L/c | At c = 35 with the lowest crest the return wave reaches zero pressure; below c = 20 the slot's compression makes the wave visibly faster than c; corner gauge cards hidden in favour of inspector windows; Speed ×0.25 |
 | HS-1 | Re-verified on current main: all brief numbers hold | — |
 | PF-2 | F_h = ½ρgd² within 1.5% for overhang, vertical, 30°, 60°, staircase; F_v = weight of water above / "water that isn't there" | Optional submerged block reads 5% high; force chip now labels F_h / F_v on every face, with ½ρgd² on this card |
 | FF-2 | Spillway, flip bucket, plunge pool; bucket lip angle slider; Average gives clean rollers | Throw is short (jet leaves at about half the lip angle, lands 4–5 m out) |

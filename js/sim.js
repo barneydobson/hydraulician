@@ -1804,6 +1804,7 @@ const SIM = (() => {
         const x = (i + 0.5) * S.dx, z = (j + 0.5) * S.dx;
         let q = null;
         if (mode === 0 || mode === 1) q = P / g;
+        else if (mode === 8) q = P;          // p in kPa = ρP/1000, ρ = 1000
         else if (mode === 6) q = z - tilt * x + P / g;
         else if (mode === 7) q = z - tilt * x + P / g + (u * u + w * w) / (2 * g);
         else if (mode === 2) q = Math.hypot(u, w);

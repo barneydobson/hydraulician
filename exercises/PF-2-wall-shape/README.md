@@ -60,7 +60,11 @@ does not.
 | submerged block (optional) | x = 0.20 to 0.70 m, z = 0.80 to 1.30 m, held still |
 
 The wall and the bed are one polygon, so no shape can leak. Each slider move
-restarts the water at rest and hydrostatic, so it is still at once.
+restarts the water at rest and hydrostatic, so it is still at once. The card
+offers the Water and **Pressure** colourings (p in kPa, 0 to ρg·1.8 m = 17.7
+kPa; the hover card reads p too): the pressure depends on depth only, which is
+the exercise in one picture (up to L6 the cards show the plain pressure, not
+the pressure head — lecturer, Oct 2026).
 
 ## What to do
 

@@ -614,8 +614,11 @@ const OVERLAY = (() => {
    *  without a list is unchanged.
    */
   const ROW_IDS = ["profile", "pos", "d", "eta", "q", "V", "Fr", "dc", "dn", "S0", "Sf",
-                   "uw", "phead", "h", "f"];
-  const DEFAULT_ROWS = ROW_IDS.filter((r) => r !== "f");
+                   "uw", "p", "phead", "h", "f"];
+  // `p` (the pressure in kPa) is opt-in like `f`: the default card already
+  // carries the pressure as p/ρg, and a Year 1 card that shows the Pressure
+  // colouring names `p` instead of `phead`.
+  const DEFAULT_ROWS = ROW_IDS.filter((r) => r !== "f" && r !== "p");
 
   /** `show` is the set of row ids the caller wants, or null for the default.
    *  Every row below carries a stable id as its third element, so an exercise
@@ -749,6 +752,9 @@ const OVERLAY = (() => {
     }
     if (probe) {
       rows.push(["u, w", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s", "uw"]);
+      // probe.p is the kinematic pressure P = p/ρ; with ρ = 1000 kg/m³ its
+      // value in m²/s² is p in kPa.
+      rows.push(["pressure p", fmt(probe.p, 2) + " kPa", "p"]);
       rows.push(["pressure head p/ρg", fmt(probe.phead, 3) + " m", "phead"]);
       // h = z + p/ρg. Shown in BOTH regimes: in hydrostatic open-channel flow
       // it equals the level η above, but inside a pressurised conduit there is

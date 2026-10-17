@@ -1,4 +1,4 @@
-/* HJ-2 "Pressure and force on a sluice gate" (the flume lab at full scale) — paste
+/* HJ-2 "Momentum balance: sluice gate and hydraulic jump" (the flume lab at full scale) — paste
  * into the dev console.
  *
  *   ?ex=HJ-2 (or ?scene=gatejump), Resolution: Medium (592 x 161, dx = 0.0236 m).

@@ -79,7 +79,11 @@ sheets on their way out of the plane, not relics. F_n at 60° was
 own wobble. At this g
 the head fields (Pressure head and the others) are meaningless — p/ρg with
 g = 10⁻³ is a thousand times the pressure in metres — so the card does not
-offer them, nor Water (a depth colouring), nor gauges.
+offer them, nor Water (a depth colouring), nor gauges. The plain **Pressure**
+(p, kPa) does not divide by g and is offered (lecturer, 2026-10-17): zero in
+the still air round the jet, rising to the stagnation pressure ½ρU² ≈ 9.9 kPa
+where the jet meets the plate (measured 9.2–9.9 kPa at the 99th percentile);
+the scene fixes its key at 0–10 kPa (`pRange`).
 
 **No friction along the plate.** The scene runs free-slip walls (`slip: 1`)
 with the wall-friction function off (`cf: 0`) and the open-channel mixing
@@ -114,8 +118,10 @@ tangential force, which is what makes the split.
 
 Pressure head is not offered (see above), so the card needs no pressure-head
 sentence. The **Speed** field shows the stagnation point on the plate (blue)
-moving off the jet's axis toward the sent-back sheet as θ falls; **Momentum
-flux** is the second field offered.
+moving off the jet's axis toward the sent-back sheet as θ falls; **Pressure**
+is the second field offered (it replaced Momentum flux, Oct 2026), and shows
+the same stagnation point as its peak — the pressure the Pressure force tool
+integrates over the face.
 
 ## For the instructor
 

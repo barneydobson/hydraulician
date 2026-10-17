@@ -41,6 +41,13 @@ whole reason a piezometer measures pressure: its column is a free surface you
 can see. (Pressure head is the pressure divided by ρg — the pressure expressed
 as a height of water; wherever it is higher, the pressure is higher.)
 
+**Piezometric head** h = z + p/ρg is the level a piezometer connected at that
+point would stand at. In one connected body of still water it is the same
+number everywhere (it is η), which is the whole statement of this exercise in
+one colour. The lecturer teaches it in Statics (L3) with the piezometer, so
+the card offers both **Pressure head** and **Piezometric head** — and not the
+plain Pressure colouring the other early cards use (lecturer, 2026-10-17).
+
 **Force on a face**, per metre width, for a face wetted from its foot z_f up
 to the surface η, with d = η − z_f:
 
@@ -81,7 +88,8 @@ class can be asked which answer to expect before the valve moves.
 Particles are on when the card opens: they sit still until the valve moves.
 The only instrument is the **Pressure force** tool; levels are read off the
 scale at the left, or by hovering the water (the hover card prints the level
-η and the pressure head).
+η, the pressure head and the piezometric head h). The fields are Water,
+Pressure head and Piezometric head.
 
 ## What to do
 
@@ -92,8 +100,11 @@ The card carries these steps; this is the same sequence with the numbers.
    **2.60 m**. Ask the class why the water in the piezometer, standing on a
    culvert under the dike, reaches the same level as the reservoir on the
    far left.
-2. **Pressure head.** Choose Pressure head in Field & legend and hover: it
-   is the depth below the surface, everywhere in the connected body.
+2. **Piezometric head, then pressure head.** Choose Piezometric head in
+   Field & legend: one colour through the left reservoir, the culvert and the
+   tube — they are one body at one level (the right reservoir is another
+   colour). Then Pressure head, and hover: it is the depth below the surface,
+   everywhere in the connected body.
 3. **Read the forces.** Pick the Pressure force tool on the strip and click
    the dike's sloped upstream face. The diagram is drawn on the face and the
    label at the centre of pressure prints the resultant and its components:

@@ -376,7 +376,9 @@ const RIG = (() => {
    *  at boot (docs/embedding.md): folded card, ctrl + wheel, the pop-out. */
   function embedCode() {
     const id = (window.APP && APP.EX && APP.EX.current)
-      ? "ex=" + APP.EX.current.id : "scene=" + state.scene.id;
+      ? "ex=" + APP.EX.current.id +
+        (APP.EX.current.tabKey ? "&tab=" + APP.EX.current.tabKey : "")   // a tabbed card's tab
+      : "scene=" + state.scene.id;
     const src0 = location.origin + location.pathname + "?" + id + "&embed=1";
     // A rig-bearing link is `#rig=<code>` — link() builds the whole URL, so
     // only its fragment is kept; a bare exercise or scene needs no fragment

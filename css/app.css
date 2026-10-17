@@ -685,7 +685,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .dock-x:hover { opacity: 1; background: rgba(255,255,255,0.12); }
 .dock-body {
-  flex: 1 1 auto; overflow: auto; padding: 14px 16px;
+  flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px 16px;
   display: flex; flex-direction: column; gap: 11px; font-size: 12px;
 }
 .dock-body::-webkit-scrollbar { width: 6px; }
@@ -832,6 +832,48 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   display: flex; flex-direction: column; gap: 3px; user-select: text;
 }
 #dock .exsteps li { opacity: .88; }
+/* A strip button named in a step ({tool:force}, {btn:legendBtn}): its own
+   icon and label, in line, looking like the button and not like a link. */
+#dock .exico {
+  display: inline-flex; align-items: center; gap: 3px; vertical-align: -2px;
+  padding: 0 5px 0 3px; margin: 0 1px; border-radius: 5px; white-space: nowrap;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+  line-height: 17px;
+}
+#dock .exico svg { flex: 0 0 auto; color: #7fd4ff; }
+#dock .exico b { font-weight: 600; opacity: 1; }
+#dock .exico.bad { color: #ffb648; }
+#dock .exkey {
+  display: inline-block; min-width: 15px; padding: 0 4px; text-align: center;
+  font: 700 10.5px ui-monospace, monospace; line-height: 16px;
+  border: 1px solid rgba(255,255,255,0.28); border-bottom-width: 2px; border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+}
+/* Tabs: one scene, several questions (CR-1). Switching keeps the bench. */
+#dock .extabs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: -4px; }
+#dock .extab {
+  appearance: none; cursor: pointer; color: inherit; font: 600 11.5px system-ui, sans-serif;
+  padding: 4px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04); opacity: .7;
+}
+#dock .extab:hover { opacity: 1; background: rgba(77,195,255,0.14); }
+#dock .extab.on {
+  opacity: 1; background: rgba(77,195,255,0.22); border-color: rgba(77,195,255,0.55);
+}
+/* Background: the definitions, formulas and remarks, closed by default. */
+#dock .exbg { font-size: 12px; line-height: 1.45; user-select: text; }
+#dock .exbg > summary {
+  cursor: pointer; list-style: none; font-weight: 700; opacity: .7; padding: 2px 0;
+}
+#dock .exbg > summary::-webkit-details-marker { display: none; }
+#dock .exbg > summary::before { content: "▸ "; }
+#dock .exbg[open] > summary::before { content: "▾ "; }
+#dock .exbg > summary:hover { opacity: 1; }
+#dock .exbgl {
+  display: flex; flex-direction: column; gap: 6px; margin-top: 4px;
+  padding: 7px 10px; border-radius: 8px; background: rgba(255,255,255,0.05);
+}
+#dock .exbgl p { margin: 0; opacity: .88; }
 #dock .exset { font-size: 11px; user-select: text; }
 #dock .exset > summary {
   cursor: pointer; opacity: .62; list-style: none;

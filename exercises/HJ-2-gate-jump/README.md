@@ -1,4 +1,4 @@
-# HJ-2 · Pressure and force on a sluice gate
+# HJ-2 · Momentum balance: sluice gate and hydraulic jump
 
 The flume lab at full scale: the first-year teaching flume, several times its
 size. A deep pool stands behind a sluice gate open 0.30 m, and at t = 0 that
@@ -6,25 +6,29 @@ is the only water there is — the flume below the gate is empty and the flap
 weir at its far end lies flat. Released, the water shoots out under the gate
 as a fast, thin sheet and runs off the end. The weir crest is the lab's
 operating handle: raised, it makes the sheet jump up to a slow, deep flow,
-moves that jump along the apron, and finally drowns the gate so that the pool
-climbs and the sheet is gone.
+moves that jump along the apron, and finally drowns the gate.
 
-In the momentum lecture (L6, slides 10–11) it is the demo for **pressure is
-hydrostatic only where streamlines are straight**: the Pressure force tool on
-the gate draws the pressure diagram, which grows as ρgz near the surface and
-falls to zero at the lip, where the water curves and accelerates under the
-gate; and the force on the gate is read two ways, off the pressure diagram
-and off a control volume round the gate, against the "gate as a wall"
-estimate ½ρg(d₀ − a)².
+In the momentum lecture (L6, slide 11) it is a **momentum balance**, done
+twice with the Control volume:
 
-The card offers what the class has met by L6: the Water, Speed and Froude
-number colourings (Froude in plain words — above 1 fast and shallow, below 1
-slow and deep; kept on the lecturer's decision), the Pressure force tool, a
-Control volume, a Flux line for q and a Gauge reading depth. No heads, no
-grade lines, no jump box: the hydraulic jump is described, not analysed — it
-is not Year 1 theory. (Ported from the 10 Sep build of the lab demo, which
-first carried the title "Sluice gate and hydraulic jump: the flume lab at full
-scale", and later "Sluice gate with the movable weir".)
+- **Round the gate.** Momentum flux in and out plus the hydrostatic pressure
+  forces on the two faces give the force on the gate,
+  F = ½ρg(d₁² − d₂²) − ρq(U₂ − U₁). The Pressure force tool reads the same
+  force off the plate itself, slightly lower: the pressure right at the gate
+  is not hydrostatic — it falls to zero at the lip, where the streamlines
+  curve under the gate (slide 10).
+- **Round the jump.** Nothing solid is inside the box (only the bed's
+  friction), so momentum flux + pressure force in = out: the fast thin sheet
+  and the slow deep flow carry the same total. The water jumps so the books
+  balance. No Bélanger theory — it is not Year 1.
+
+The card offers what the class has met by L6: the Water (default), Speed and
+Froude number colourings (Froude in plain words — above 1 fast and shallow,
+below 1 slow and deep; kept on the lecturer's decision), the Control volume,
+the Pressure force tool, a Flux line for q and a Gauge reading depth. No
+heads, no grade lines, no jump box. (Ported from the 10 Sep build of the lab
+demo; titled "Pressure and force on a sluice gate" until the lecturer agreed
+the momentum-balance aim, Oct 2026.)
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **HJ-2**, or use the direct link
@@ -33,26 +37,33 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 
 ## Theory
 
-Under the gate, energy is conserved from the pool to the vena contracta and
-the discharge follows from the pool depth d₀ and the opening a:
+Steady momentum balance in x on a control volume, per metre width:
 
-    q = C_d · a · √(2·g·d₀)             C_d ≈ 0.55–0.6 for a sharp-edged vertical gate
+    Σ (momentum flux out) − Σ (momentum flux in) = Σ (pressure forces on the faces) − F_solid
 
-On the gate, the pressure is hydrostatic from the surface down most of the
-plate and falls to zero at the lip, where the water is already moving;
-integrated it is close to ½ρg·(d₀ − a)², the "gate as a wall" estimate. The
-momentum theorem on a box from the pool to the vena contracta gives the same
-force without assuming anything about the pressure on the plate:
+with F_solid the force of the water on whatever solid is inside the box.
 
-    F_gate = ½ρg·d₀² − ½ρg·d₁² − ρq·(V₁ − V₀)
+**Round the gate**, from the pool (depth d₁, U₁ = q/d₁) to the sheet just
+past the lip (depth d₂, U₂ = q/d₂), both faces hydrostatic:
 
-For the instructor only (not on the card, not Year 1 theory): across the
-jump, momentum is conserved and energy is not,
-d₂/d₁ = ½·(√(1 + 8·Fr₁²) − 1). With d₁ ≈ 0.20 m and Fr₁ ≈ 4.5 the conjugate
-depth is about 1.2 m, and the weir has to hold that.
+    F_gate = ½ρg·d₁² − ½ρg·d₂² − ρq·(U₂ − U₁)
 
-The bed's top face is at **z = 0.30 m** above the datum; depths below are
-depths over the bed.
+On the plate the pressure is hydrostatic from the surface down most of the
+way and falls to zero at the lip, where the water is already moving; the
+"gate as a wall" estimate ½ρg(d₁ − a)² is close to the integral.
+
+**Round the jump**, nothing solid inside (bar the bed's shear):
+
+    ρq·U₁ + ½ρg·d₁² = ρq·U₂ + ½ρg·d₂²          (d₁, d₂ either side of the jump)
+
+For the instructor only (not on the card): this with continuity is
+Bélanger's d₂/d₁ = ½·(√(1 + 8·Fr₁²) − 1); with d₁ ≈ 0.20 m and Fr₁ ≈ 4.5
+the conjugate depth is about 1.2 m, and the weir has to hold that. Energy is
+not conserved across the jump.
+
+On the card d₁ is the upstream depth and d₂ the downstream one in each box
+(slide 11's labels). The bed's top face is at **z = 0.30 m**; depths are
+over the bed.
 
 ## The bench
 
@@ -71,30 +82,28 @@ passes 5.85 l/s down a 0.104 m flume (q = 0.056 m²/s) with the jump about
 ## What to do
 
 1. Let it settle — about **30 s**; the card counts it down. The water rushes
-   under the gate and down the empty flume as a sheet about 0.2 m deep at
-   6 m/s, and pours off the end; the pool has settled by then.
-2. **The pressure on the gate.** Drop a Gauge (`5`) in the pool at x = 2.5 m:
-   it reads d₀ ≈ 2.72 m. Pick the Pressure force tool on the strip and click
-   the gate's upstream face: the pressure diagram grows with depth near the
-   surface and falls away to zero at the lip. Its resultant is about
-   **28 kN/m**; compare ½ρg·(d₀ − a)² = 28.7 kN/m. Streamlines curve under
-   the gate, so the pressure there is not hydrostatic.
-3. **The same force by momentum.** Drag a Control volume (`9`) from
-   (2.50, 0.10) to (6.00, 3.70) and read F→: about 30 kN/m.
-4. **The discharge.** Drag a Flux line (`8`) up through the sheet at x = 6 m:
-   q ≈ 1.30 m²/s.
-5. **The handle.** Raise **Weir crest height** on the card. Up to 0.4 m the
-   sheet just runs up the flap and over it — it does not want to go back.
-   Give it a push to 0.55 m: within about 15 s the water piles up at the weir
-   and the fast thin sheet suddenly jumps up to a slow, deep flow, which then
-   creeps up the flume. When it is about halfway (x ≈ 7–8 m, some 30 s after
-   the push) bring the crest back to 0.46 m: the jump stays about where it
-   is. Raise it again: at 0.5 m
-   it creeps to the foot of the gate within a few minutes; at 0.6 m and
-   above it reaches the gate in about half a minute and drowns it — the pool
-   climbs, the reservoir marker on the left edge is left behind, and the gate
-   force grows (≈ 33.5 kN/m at 0.7 m). Ask the class which of the depths on
-   the gate's two faces changed.
+   under the gate as a sheet about 0.2 m deep at 6.4 m/s. Drop a Gauge in
+   the pool at x = 2.5 m (d₁ ≈ 2.72 m) and drag a Flux line up through the
+   sheet at x = 6 m (q ≈ 1.30 m²/s).
+2. **The box round the gate.** Drag a Control volume from (2.50, 0.10) to
+   (6.00, 3.70) and press **B** until its faces read momentum + pressure. F→
+   is the force on the gate: about **30 kN/m**.
+3. **The formula and the plate.** ½ρg(d₁² − d₂²) − ρq(U₂ − U₁) with
+   d₂ ≈ 0.20 m gives about **28.3 kN/m**; the Pressure force tool on the
+   gate's upstream face reads **28.1 kN/m** — its diagram falls to zero at
+   the lip, where the pressure is not hydrostatic.
+4. **The jump.** Raise **Weir crest height** to 0.55 m: within about 15 s the
+   sheet jumps up to a slow, deep flow, which creeps up the flume. When it is
+   halfway (x ≈ 7–8 m, some 30 s after the push) set 0.46 m: it stays there.
+5. **The box round the jump.** Drag the Control volume from about 0.5 m
+   before the jump's toe to 2 m past it, bed to z ≈ 2.6 m: in on the left
+   (mostly momentum flux) ≈ out on the right (mostly pressure force), about
+   **8.4–8.6 kN/m** each, and F→ ≈ 0.
+
+Then raise the crest again: at 0.6 m and above the jump reaches the gate in
+about half a minute and drowns it — the pool climbs, the reservoir marker on
+the left edge is left behind, and the gate force grows (≈ 33.5 kN/m at
+0.7 m). Ask the class which of the depths on the gate's two faces changed.
 
 ## For the instructor
 
@@ -117,10 +126,58 @@ surface code (#72), means of 1 s samples.
 | p/ρg in the opening (x = 4.0 m), 0.05 / 0.15 m above the bed | 1.42 / 1.04 m |
 | p/ρg in the pool at x = 2.5 m, same heights | 2.68 / 2.56 / 2.46 m — hydrostatic to 1 cm |
 
-The box reads 5% above the diagram because it also carries the bed's shear
-over 3.5 m and the momentum of the pool's approach flow; the diagram reads 2%
-under ½ρg·(d₀ − a)² because the pressure has already started to fall near
-the lip.
+(d₀ in these older tables is the pool depth, d₁ on the card.) The diagram
+reads 2% under ½ρg·(d₀ − a)² because the pressure has already started to fall
+near the lip.
+
+**The momentum balance, measured (Oct 2026).** Same build and driver, means
+of 40 samples 0.5 s apart; `M.box` in the measuring script is `APP.boxFlux`,
+the Control volume's own budget.
+
+Round the gate, crest 0 (t = 30–50 s), box (2.50, 0.10) → (6.00, 3.70):
+
+| reading | value |
+|---|---|
+| d₁, pool at x = 2.5 m | 2.718 m |
+| d₂, the sheet at its thinnest (x ≈ 4.45 m) / at the box's right face (x = 6 m) | 0.202 m / 0.214 m |
+| q, Flux line at x = 6 m | 1.300 m²/s |
+| ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), d₂ = 0.202 m | **28.3 kN/m** (36.0 hydrostatic − 7.75 momentum) |
+| the same with d₂ = 0.214 m (the box's own face) | 28.7 kN/m |
+| Pressure force tool, gate upstream face | **28.1 kN/m** |
+| Control volume F→ | **30.2 kN/m** (± 0.07) |
+| box faces: in, momentum flux / pressure force | 1.09 / 37.51 kN/m |
+| box faces: out, momentum flux / pressure force | 8.17 / 0.25 kN/m |
+
+The plate's diagram reads 0.7% under the formula: the pressure on the plate
+falls short of hydrostatic towards the lip (the p/ρg rows in the table above).
+The box reads 6.8% over it. Most of that is its upstream face: 37.5 kN/m of
+pressure force against ½ρgd₁² = 36.2 kN/m from the gauge depth (+1.3 kN/m);
+the rest is the momentum fluxes (in 1.09 against ρq²/d₁ = 0.62 — the pool's
+approach flow is not uniform; out 8.17 against ρq²/d₂ = 7.90 at x = 6 m —
+the sheet's profile is not flat) and the bed's friction under the sheet,
+which is inside the box. Students see the box's two faces print exactly these
+in/out terms, so the comparison is honest: the formula is the textbook's
+idealisation of the same box.
+
+Round the jump: from crest 0 pushed to 0.55 m at t = 30 s, the jump formed at
+the weir at t ≈ 46 s, reached x = 7.75 m at t ≈ 65 s, and held at 0.46 m its
+toe wandered between x = 7.0 and 7.9 m for the 30 s measured (t = 65–95 s).
+Box (6.9, 0.10) → (9.9, 2.6), t = 95–115 s:
+
+| reading | in (left face, x = 6.9 m) | out (right face, x = 9.9 m) |
+|---|---|---|
+| depth | 0.33 m (the toe's roller reaches it at times) | 1.11 m |
+| Q | 1.309 m²/s | 1.304 m²/s |
+| momentum flux | 7.18 kN/m | 2.26 kN/m |
+| pressure force | 1.23 kN/m | 6.31 kN/m |
+| **momentum flux + pressure force** | **8.41 kN/m** (± 0.54) | **8.58 kN/m** (± 0.87) |
+
+F→ on the box = −0.16 kN/m (± 1.0 frame to frame): zero within the
+fluctuation of the roller, i.e. under 2% of what crosses each face. The
+momentum flux falls by 4.9 kN/m across the jump and the pressure force rises
+by 5.1 kN/m to make up for it — the books balance, which is the whole point
+of the box. Read the median of a few frames: the roller makes single frames
+swing by ±1 kN/m.
 
 **The gate drowned, crest 0.7 m** (after 80 s, then 20 s of means): d₀ =
 2.93 m, depth just past the lip 0.96 m, q = 1.17–1.21 m²/s; diagram F→ =

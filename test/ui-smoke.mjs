@@ -174,14 +174,16 @@ async function main() {
                  blurbless: F.filter((f) => !f.blurb || f.blurb.length < 20).length,
                  opts: [...document.getElementById("c_mode").options].map((o) => o.value) };
       `);
-      eq("the registry has every field", reg.n, 8);
-      check("every mode 0-7 is described once",
-            [...reg.modes].sort((a, b) => a - b).join(",") === "0,1,2,3,4,5,6,7", reg.modes.join(","));
+      eq("the registry has every field", reg.n, 9);
+      check("every mode 0-8 is described once",
+            [...reg.modes].sort((a, b) => a - b).join(",") === "0,1,2,3,4,5,6,7,8", reg.modes.join(","));
       // The ORDER is a decision, not an accident: Water first because it is
       // the default, then speed, then the three heads in the order they nest
-      // (H contains h contains p/rho.g), then the two derived numbers.
+      // (H contains h contains p/rho.g), the plain Pressure (p = rho.g times
+      // the pressure head where g is real) beside the last of them, then the
+      // derived numbers.
       eq("the picker lists them in the agreed order", reg.ids.join(","),
-         "water,speed,ehead,head,phead,vort,froude,mom");
+         "water,speed,ehead,head,phead,p,vort,froude,mom");
       check("every field is fully described", reg.bare === 0, reg.bare + " incomplete");
       check("every field carries a blurb", reg.blurbless === 0, reg.blurbless + " unexplained");
       // The panel select is BUILT from the registry, so it cannot fall behind it.
@@ -800,13 +802,64 @@ async function main() {
       check("Hover readout switches on its own", r.hov.inst === true && r.hov.hover === false,
             JSON.stringify(r.hov));
       check("a Year 1 card withholds the energy terms", r.hj.energyHidden);
-      eq("the strip names the exercise, not its scene", r.hj.title, "Pressure and force on a sluice gate");
+      eq("the strip names the exercise, not its scene", r.hj.title, "Momentum balance: sluice gate and hydraulic jump");
       await tab.close();
       const ff1 = await browser.open(INDEX + "?ex=FF-1",
         { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
       const h = await ff1.evaluate("return APP.EX.ready.then(() => APP.state.hoverCard);");
       eq("FF-1 opens with the hover card off", h, false);
       await ff1.close();
+    }
+    // ------------------------------------- tabs, the short layout, inline icons
+    console.log("\na tabbed card swaps its steps and interface, not the bench; steps draw the strip's own icons");
+    {
+      // ?ex=MM-2 is an ALIAS: the id the Forces question had before the
+      // contraction rig became one exercise with three tabs.
+      const tab = await browser.open(INDEX + "?ex=MM-2",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const r = await tab.evaluate(`
+        return APP.EX.ready.then(() => {
+          const c0 = APP.EX.current.ref, url0 = location.search, mode0 = APP.state.mode;
+          APP.tick(60);
+          const t0 = APP.sim.t;
+          document.querySelector('#dock .extab[data-tab="streamlines"]').click();
+          const ico = [...document.querySelectorAll('#dock .exsteps .exico')];
+          return { c0, url0, mode0, c1: APP.EX.current.ref, url1: location.search,
+            t0, t1: APP.sim.t, scene: APP.sim.scene.id,
+            fields: APP.UIMODE.fields().map((f) => f.id).join(","),
+            measure: APP.state.ui.measure,
+            tabs: [...document.querySelectorAll('#dock .extab')]
+              .map((b) => b.textContent + (b.classList.contains("on") ? "*" : "")).join(","),
+            steps: document.querySelectorAll('#dock .exsteps li').length,
+            icons: ico.map((e) => e.textContent).join("|"),
+            svgs: ico.filter((e) => e.querySelector("svg")).length,
+            bad: document.querySelectorAll('#dock .exico.bad').length,
+            bgShown: getComputedStyle(document.querySelector('#dock .exbg')).display !== "none",
+            bgOpen: document.querySelector('#dock .exbg').open,
+            start: getComputedStyle(document.querySelector('#dock .exstart')).display,
+            task: getComputedStyle(document.querySelector('#dock .extask')).display };
+        });
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("an old id opens its tab", r.c0, "CR-1#forces");
+      check("and the address bar names the entry and the tab",
+            /ex=CR-1/.test(r.url0) && /tab=forces/.test(r.url0), r.url0);
+      eq("the Forces tab opens on Pressure", r.mode0, 8);
+      eq("a tab click switches the card", r.c1, "CR-1#streamlines");
+      check("without reloading the scene or restarting the flow",
+            r.scene === "contraction" && r.t1 >= r.t0 && r.t0 > 0, JSON.stringify([r.t0, r.t1]));
+      check("the address bar follows the tab", /tab=streamlines/.test(r.url1), r.url1);
+      eq("the tab's own fields", r.fields, "water,speed");
+      eq("the tab's own tools", r.measure, false);
+      eq("the tab bar marks the open tab", r.tabs, "Streamlines*,Continuity,Forces");
+      eq("five steps", r.steps, 5);
+      eq("the steps name strip buttons by their own labels", r.icons, "Particles|Streamlines");
+      eq("each with the strip's own icon", r.svgs, 2);
+      eq("no unknown markup", r.bad, 0);
+      check("Background is there, and closed", r.bgShown && !r.bgOpen, JSON.stringify(r));
+      check("the short layout drops Start and Do", r.start === "none" && r.task === "none",
+            r.start + " " + r.task);
+      await tab.close();
     }
     console.log("\na gauge can be removed one by one or all at once; the strip shows only what the bench can use");
     {

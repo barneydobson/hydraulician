@@ -1,0 +1,1077 @@
+"use strict";
+// The original teaching pack (course `original`): forty cards — the verified
+// demos built from demo-programme.html (beside this file), and HS-1. They were
+// the whole shared register, js/exercises.js, until they moved here; the
+// lecturer means to retire them in time, so they live as one course folder
+// that can be deleted in one go.
+//
+// The card schema is the shared register's — read the header of
+// js/exercises.js before adding a value. COURSES.exercises (js/courses.js)
+// stamps every card here with `course: "original"` and
+// `home: "courses/original/exercises"`, so `folder` names a folder under
+// courses/original/exercises/ and the card's brief link, check_pack.py and
+// courses/original/INDEX.md all look there. Ids are global: none of these may
+// repeat an id (or tab alias) of another course.
+//
+// Every number here is the SHIPPED value from the demo's own README —
+// remeasured constants, not the ones the original programme sheet promised.
+// Several rules changed during verification (HJ-1's q floor moved from 0.30 to
+// 0.42 because 0.30 drowned; B10's level rule was trimmed to `d mod 6`;
+// HP-1's whole rig became a drawn throttle) and it is the amended rule, cross
+// -checked against courses/original/CHANGES-NEEDED.md §2b, that appears below.
+//
+// Drawn rigs (`rig:` keys) are in js/exercises-rigs.js, which stays shared.
+// The menu (course.js) groups these by `topic`, in first-appearance order —
+// so the order of the cards below is the order of the menu's sections.
+COURSES.exercises("original", [
+
+  // ------------------------------------------------------- open channel
+  {
+    id: "UF-1",
+    title: "Normal depth scales as q^(3/5)",
+    topic: "Uniform flow",
+    folder: "UF-1-normal-depth",
+    scene: "s2",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { channel: true, jumps: false },
+    digit: { label: "q", control: "inQ", base: 0.80, step: 0.04, unit: "m²/s",
+             rule: "q = 0.80 + 0.04·d" },
+    ui: {
+      measure: false,
+      view: ["legendBtn", "chanBtn"],
+      controls: ["speed", "inQ"],
+      readouts: { rows: ["pos", "d", "q", "dn"] },
+    },
+    start: "a steep chute running uniform flow, with your own inflow to set",
+    task: "Set your q, then hover mid-chute at x ≈ 3.5 m and read the MEASURED d_n off the hover box.",
+    settle: 15,
+  },
+  {
+    id: "GV-1",
+    title: "The class digitises the backwater curve",
+    topic: "Gradually varied flow",
+    folder: "GV-1-backwater",
+    scene: "m1",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { channel: true, labels: true, jumps: false },
+    digitNote: "your station: x = 1 + d metres",
+    ui: {
+      measure: false,
+      view: ["legendBtn", "chanBtn"],
+      controls: ["speed"],
+      readouts: { rows: ["pos", "d", "eta"] },
+    },
+    start: "the settled backwater pool behind a weir — nothing to set",
+    task: "Hover at your own station and read the surface elevation straight off the hover box (the \"surface … above datum\" row).",
+    settle: 30,
+  },
+  {
+    id: "GV-2",
+    title: "Profile safari",
+    topic: "Gradually varied flow",
+    folder: "GV-2-profile-safari",
+    scene: "sandbox",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { channel: true, labels: true, jumps: true },
+    digitNote: "no digit: every rig is drawn by hand, and two identical screenshots count once",
+    // Drawn by the student, so the BUILD family stays: without this the
+    // derived profile hides the tools the task asks for.
+    ui: {
+      build: ["wall", "erase", "undoBtn", "clearBtn"],
+      measure: ["measure"],
+      view: ["legendBtn", "chanBtn"],
+      controls: ["speed", "inflowOn", "inLevel", "inQ", "inFree", "twOn", "twLevel", "openL", "openR", "openB", "labels", "jumps"],
+    },
+    start: "an empty sandbox — you draw every rig yourself",
+    task: "In pairs, draw beds, gates, weirs and tailwaters and collect as many distinct GVF chips as you can, screenshotting chip plus geometry each time.",
+    settle: 0,
+  },
+  {
+    id: "HJ-1",
+    title: "Bélanger from a room full of flumes",
+    topic: "Hydraulic jump",
+    folder: "HJ-1-belanger",
+    scene: "h23",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { jumps: true, channel: true, labels: false },
+    digit: { label: "q", control: "inQ", base: 0.42, step: 0.03, unit: "m²/s",
+             rule: "q = 0.42 + 0.03·d",
+             also: [{ label: "tailwater", control: "twLevel", unit: "m",
+                      // 1.75·d_c above the apron (0.15 m), every digit: the
+                      // conjugate of the sheet landing on the apron. MEASURED
+                      // across the ladder (Medium): the jump stands on the
+                      // apron with d₂ −2% to +5% of Bélanger; at 1.6·d_c it is
+                      // against the outlet, at 1.9·d_c on the chute toe.
+                      rule: "0.15 + 1.75 · d_c — check it yourself against the d_c the q slider prints",
+                      table: [0.609, 0.630, 0.650, 0.671, 0.693,
+                              0.712, 0.731, 0.750, 0.769, 0.789] }] },
+    secondScene: { scene: "s1", when: "optional coda - switch to s1 (Scenes menu) for the same jump on a 1-in-4 bed, tailwater 1.15 / 1.25 / 1.35 m, and expect d₂ under Bélanger." },
+    ui: { measure: false, view: ["legendBtn"], controls: ["speed", "inQ", "twLevel"] },
+    start: "a chute onto a level apron, with a tailwater control",
+    task: "Set your q and its paired tailwater, let the jump settle on the apron, then read Fr₁ and d₂/d₁ off the jump box over ~10 s.",
+    settle: 20,
+  },
+
+  // ---------------------------------------------------- natural channels
+  // A current-meter gauging, done twice on the `gauging` reach: once with the
+  // reservoir level giving a vertical shallower than 0.75 m, where field
+  // practice takes one point at 0.6 d, and once deeper, where it takes 0.2 d
+  // and 0.8 d. The student reads all three points both times, on gauges set
+  // to Speed, and judges each rule against the rake's full integral, in
+  // Average mode, because a current meter's count is a time mean. The
+  // station is the student's own choice; the README shows what a station
+  // near the inlet or the lip does to the answer.
+  {
+    id: "NC-2",
+    title: "Gauging a vertical: the 0.6-depth and two-point methods",
+    topic: "Natural channels",
+    folder: "NC-2-gauging-methods",
+    scene: "gauging",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", gaugeField: "speed", channel: false, particles: false },
+    digitNote: "no digit: choose your own station, clear of the inlet and the lip",
+    studentParams: [
+      { control: "inLevel", value: 0.68, unit: "m", rule: "shallow run (d ≈ 0.4 m all along the reach)" },
+      { control: "inLevel", value: 1.33, unit: "m", rule: "deep run (d ≈ 0.8–1.0 m, shallower near the lip)" },
+    ],
+    instruments: [
+      { tool: "gauge", where: "three at your station x: at z = η − 0.2 d, η − 0.6 d and η − 0.8 d", why: "on Speed, each reads the point velocity a current meter would at that depth" },
+      { tool: "rake", where: "at the same x, through the whole depth", why: "the rake's V is the full depth-integral both rules are judged against" },
+    ],
+    ui: {
+      view: ["legendBtn", "avgBtn"],
+      fields: ["speed"],
+      controls: ["speed", "inLevel"],
+      readouts: { rows: ["pos", "d", "eta", "uw"] },
+    },
+    start: "a 35 m channel at 1 in 400 fed by a reservoir and ending in a free overfall; the reservoir level sets the flow",
+    setup: [
+      "Shallow run: set Controls → Reservoir level to 0.68 m and press R; the card counts the settle down. Choose a station x well clear of the inlet and the lip.",
+      "Hover at x and read the depth d and the level η off the box. Place three Gauges (5) at x, at z = η − 0.2 d, η − 0.6 d and η − 0.8 d (the box's x, z row shows where the cursor is), and a Rake (6) at the same x.",
+      "Press A (Average) and wait until the legend's T passes 15 s. Read u₀.₂, u₀.₆ and u₀.₈ off the three gauge cards and V off the rake's chip. One-point rule V₁ = u₀.₆; two-point rule V₂ = ½(u₀.₂ + u₀.₈); each rule's error is 100·(V_rule/V − 1) %.",
+      "Deep run: set the level to 1.33 m and press R. After the settle, read d and η again at the same x, click each gauge with the Gauge tool to clear it, place three at the new depths, and repeat.",
+    ],
+    task: "Submit x, d, u₀.₂, u₀.₆, u₀.₈ and V for both runs. Field practice uses one point below 0.75 m and two above it: which rule lands closer to V on each run, by how much, and where does the rake put the fastest water?",
+    settle: 40,
+  },
+  {
+    id: "NC-3",
+    title: "Bed shear and the riprap size",
+    topic: "Natural channels",
+    folder: "NC-3-bed-shear",
+    scene: "s2",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { channel: false },
+    digit: { label: "q", control: "inQ", base: 0.80, step: 0.04, unit: "m²/s",
+             rule: "q = 0.80 + 0.04·d" },
+    secondScene: { scene: "m2", when: "Part B - open m2 (Scenes menu), touch nothing, wait out the 30 s spin-up and compare at x ≈ 7 m." },
+    ui: {
+      measure: false,
+      view: ["legendBtn"],
+      controls: ["speed", "inQ"],
+      readouts: { rows: ["pos", "d", "Sf"] },
+    },
+    start: "the steep flume, with your own inflow to set",
+    task: "Hover at x ≈ 3.5 m and read h and S_f, then τ₀ = ρg·h·S_f and D_min = τ₀/[0.056(ρₛ−ρ)g].",
+    settle: 15,
+  },
+
+  // -------------------------------------------------- specific energy etc.
+  {
+    id: "FB-1",
+    title: "The hump that chokes",
+    topic: "Specific energy",
+    folder: "FB-1-choking-hump",
+    scene: "sandbox",
+    rig: "FB-1",
+    // The reach is doubly controlled: reservoir AND tailwater both at 1.00 m,
+    // the same for everyone (the digitNote says so). Without both the hump has
+    // nothing to choke against.
+    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
+                 inflowOn: true, inFree: false, inLevel: 1.00,
+                 twOn: true, twLevel: 1.00, spoutOn: false, waveOn: false },
+    rigWhy: { inLevel: "the reach is doubly controlled: the hump has nothing to choke against without both ends held.",
+              twLevel: "the other half of that pair." },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
+    digit: { label: "q", control: "inQ", unit: "m²/s",
+             rule: "q = 0.15 + 0.05·d (d = 0…8; if your last digit is 9 use d = 8)",
+             table: [0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.55] },
+    instruments: [
+      { tool: "gauge", where: "x = 2.5 m, z = 0.75 m", why: "the upstream depth d₁ the prediction is built on" },
+    ],
+    ui: { build: ["wall", "undoBtn"], view: ["legendBtn"], controls: ["speed", "inQ"] },
+    start: "a level reach held at both ends, and a hump to grow at x = 4.5 m",
+    task: "Read d₁ at the gauge and commit a prediction Δz = E₁ − 1.5·d_c. Then grow a 1 m flat-topped hump at x = 4.5 m in steps (about 2 cm at a time near the end), jotting d₁ at each and re-settling, until the crest chokes — the d₁ from the LAST pre-choke step redoes the prediction as Δz_pred*.",
+    settle: 60,
+  },
+  {
+    id: "FB-2",
+    title: "Critical depth three ways",
+    topic: "Specific energy",
+    folder: "FB-2-yc-three-ways",
+    scene: "sandbox",
+    rig: "FB-2",
+    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
+                 inflowOn: true, inFree: false, twOn: false, spoutOn: false, waveOn: false },
+    viewParams: { mode: "3", channel: false, labels: false, jumps: false, gaugeField: "d" },
+    digit: { label: "q", control: "inQ", unit: "m²/s",
+             rule: "q = 0.15 + 0.05·d (d = 0…8; 9 → use 8)",
+             table: [0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.55],
+             also: [{ label: "reservoir", control: "inLevel", unit: "m",
+                      rule: "level = 0.935 + 1.65·d_c + 0.03 — the pairing the pool needs at your q",
+                      table: [1.182, 1.228, 1.271, 1.310, 1.348,
+                              1.383, 1.417, 1.450, 1.482, 1.482] }] },
+    instruments: [
+      { tool: "gauge", where: "x = 6.85 m, z ≈ 1.13 m", why: "on the broad crest — reads d_crest" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
+    start: "a reservoir feeding a broad crest that spills over a brink",
+    task: "Set your q and its paired level, then read d_c off the q slider, d_crest at the gauge on the crest and d_brink at the last wet column on the lip, and order the three.",
+    settle: 55,
+  },
+  {
+    id: "WE-1",
+    title: "Rating a sharp-crested weir, one point each",
+    topic: "Weirs & controls",
+    folder: "WE-1-sharp-weir",
+    scene: "sandbox",
+    rig: "WE-1",
+    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
+                 inflowOn: true, inFree: false, twOn: false, spoutOn: false, waveOn: false },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
+    digit: { label: "q", control: "inQ", base: 0.10, step: 0.05, unit: "m²/s",
+             rule: "q = 0.10 + 0.05·d",
+             also: [{ label: "reservoir", control: "inLevel", unit: "m",
+                      rule: "the level paired with YOUR q — load-bearing, not a convenience (±0.1 m moves C_d by ~25%)",
+                      table: [1.152, 1.195, 1.233, 1.261, 1.304,
+                              1.326, 1.362, 1.389, 1.412, 1.434] }] },
+    instruments: [
+      { tool: "gauge", where: "x = 4.5 m, z ≈ 0.75 m", why: "the approach pool — H = h − 0.50" },
+      { tool: "cv", where: "Control volume (9), optional: drag about (2.0, 0.3) → (6.7, 1.6) — bottom inside the bed, right face short of where the nappe lands", why: "F→ is the thrust the pool puts on the plate, against ρgP(h − P/2)" },
+      { tool: "force", where: "the plate itself — pick the Pressure force tool and click it", why: "the same thrust, read straight off the pressure diagram cut off at the crest — no box to place at all" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inQ", "inLevel"] },
+    start: "an approach pool behind a sharp-crested weir",
+    task: "Set your q with its paired level, settle, then read the gauge card DEPTH h and take the head over the crest as H = h − 0.50. Optional: a Control volume round the plate, or the Pressure force tool clicked on the plate itself, both read F→ a few percent above ρgP(h − P/2).",
+    settle: 60,
+  },
+
+  // ------------------------------------------------------------ momentum
+  {
+    id: "MO-1",
+    title: "Sluice gate: thrust and C_d from the control volume",
+    topic: "Momentum",
+    folder: "MO-1-gate-cv",
+    scene: "sandbox",
+    rig: "MO-1",
+    // q = 0.330 is the same for every student (the digitNote says so) and the
+    // gate has nothing to meter without it; the LEVEL is the personalised
+    // fixed point for that q, so it is the student's to set.
+    rigParams: { budget: "Medium", openL: "1", openR: "1", openB: "1", openT: "0",
+                 inflowOn: true, inFree: false, inQ: 0.33,
+                 twOn: false, spoutOn: false, waveOn: false },
+    rigWhy: { inQ: "the same q for the whole class — your gate opening and its level are the personalisation." },
+    viewParams: { mode: "0", channel: false, labels: false, jumps: false, gaugeField: "d" },
+    digit: { label: "reservoir", control: "inLevel", unit: "m",
+             rule: "the fixed point for q = 0.330 at YOUR gate opening",
+             table: [1.7565, 1.7565, 1.4181, 1.4181, 1.4181,
+                     1.2103, 1.2103, 1.2103, 1.0791, 1.0791] },
+    digitNote: "your gate opening is DRAWN: a = 5 + round(3d/9) cells, gate bottom z = 0.609 / 0.630 / 0.652 / 0.674 m",
+    instruments: [
+      { tool: "gauge", where: "x = 3.5 m, z ≈ 0.65 m", why: "the upstream pool — reads d₀" },
+      { tool: "cv", where: "Control volume (9): drag (3.50, 0.30) → (5.63, 3.20) — gauge station to vena station, bottom face inside the bed", why: "measures the thrust F_R predicts, on the same control volume and without its two assumptions" },
+      { tool: "force", where: "the gate face itself — pick the Pressure force tool on the strip and click it", why: "the pressure diagram and F→ straight off the gate, a third reading beside F_R and the box" },
+    ],
+    ui: {
+      build: ["wall", "erase", "undoBtn"],
+      view: ["legendBtn"],
+      controls: ["speed", "inLevel"],
+    },
+    start: "a pool behind a drawn sluice gate — its opening is yours to adjust",
+    task: "Redraw the gate opening to your own row, set your reservoir level, then read d₀ at the gauge and d₁ by hovering the vena at x = 5.630 m, work out C_d and the gate thrust, measure that thrust with the Control volume, and click the gate itself with the Pressure force tool for the diagram it is drawn from.",
+    settle: 70,
+  },
+  {
+    id: "MO-2",
+    title: "Jet on a plate, jet on a vane",
+    topic: "Momentum",
+    folder: "MO-2-jet-vane",
+    scene: "sandbox",
+    rig: "MO-2",
+    // The jet IS the rig, and nothing here is personalised — everyone reads the
+    // same one — so the spout is part of the common starting point.
+    rigParams: { budget: "Medium", openL: "0", openR: "0", openB: "1", openT: "0",
+                 spoutOn: true, spoutR: 0.09, spoutVx: 4.5, spoutVy: 0 },
+    viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "h" },
+    digitNote: "no personalised parameter: everyone reads the same rig",
+    instruments: [
+      { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20) — it encloses all four shapes and clears the spout", why: "F→ is the force each turn actually delivers, to set against ρqv(1−cosθ)" },
+      { tool: "gauge", where: "in the free jet, ~0.25 m clear of the plate (README uses 0.95, 2.50)", why: "the approach head" },
+      { tool: "gauge", where: "on the stagnation point, ~0.03 m off the plate face (README uses 1.32, 2.46)", why: "the stagnation head — the ratio is the answer" },
+      { tool: "force", where: "the flat plate only — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, on the ONE drawn wall the plate is. The ramp's face is oblique enough that the same click reads a third under the box (measured), and the corner and deep-V are two and three strokes the tool cannot sum — so the Control volume is what the series is actually read on" },
+    ],
+    ui: { build: ["wall", "erase", "undoBtn"], view: ["legendBtn"], controls: ["speed"] },
+    start: "a horizontal jet from a spout striking a flat plate",
+    task: "Redraw the deflector four ways - flat plate, 45° ramp, 90° corner, deep-V (apex 1.90, 2.40) - settling 3–5 s each, watch the force follow the turn angle on Field > Momentum flux, and read F→ off the Control volume for each. On the flat plate only, the Pressure force tool clicked on the plate reads the same number with no box. The deep-V under-delivers because it floods.",
+    settle: 5,
+  },
+
+  // ------------------------------------------------------- pipes & losses
+  {
+    id: "FR-1",
+    title: "The friction law without the Moody chart",
+    topic: "Pipe flow & losses",
+    folder: "FR-1-friction-law",
+    scene: "sandbox",
+    rig: "FR-1",
+    // The 2.50 m tailwater is the one addition RIG-A needs to be a working
+    // rig at all (README §5: without it the pipe empties and the run dies).
+    rigParams: { budget: "Medium", spoutOn: false, openB: "0", openR: "1",
+                 inflowOn: true, inFree: true, inLevel: 2.50,
+                 twOn: true, twLevel: 2.50, cs: 0.40 },
+    rigWhy: { inLevel: "the bench idles with no driving head — level = tailwater, so the duct sits charged and still. Supplying the head is your first move.",
+              twLevel: "without a tailwater near 2.5 m the pipe empties and the run dies." },
+    viewParams: { mode: "1", channel: false, labels: false, jumps: false },
+    digit: { label: "reservoir level", control: "inLevel", base: 3.30, step: 0.13, unit: "m",
+             rule: "level = 3.30 + 0.13·d" },
+    instruments: [
+      { tool: "gauge", where: "x = 4.0 m, z = 2.20 m", why: "H₁, mid-height in the bore and clear of the entry region" },
+      { tool: "gauge", where: "x = 8.5 m, z = 2.20 m", why: "H₂ — L = 4.5 m, not 6 (README §5)" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inLevel"] },
+    start: "a pressurised duct fed from a reservoir",
+    task: "Raise the reservoir to your own level, place the two gauges for h_f = H₁ − H₂ and hover mid-pipe for the bore-mean V.",
+    settle: 22,
+  },
+  {
+    id: "LL-1",
+    title: "Borda–Carnot at a sudden expansion",
+    topic: "Pipe flow & losses",
+    folder: "LL-1-borda-carnot",
+    scene: "sandbox",
+    rig: "LL-1",
+    rigParams: { budget: "Medium", spoutOn: false, openB: "0", openR: "1",
+                 inflowOn: true, inFree: true, inLevel: 2.95,
+                 twOn: true, twLevel: 2.95, cs: 0.40 },
+    rigWhy: { inLevel: "the bench idles with no driving head — level = tailwater, so the duct sits charged and still.",
+              twLevel: "holds the wide leg full, so the expansion has a pressure to recover into." },
+    viewParams: { mode: "1", channel: false, labels: false, jumps: false },
+    digit: { label: "reservoir level", control: "inLevel", base: 3.45, step: 0.035, unit: "m",
+             rule: "level = 3.45 + 0.035·d" },
+    instruments: [
+      { tool: "gauge", where: "x = 3.4 m, z = 2.20 m", why: "H₁, in the 0.40 m bore upstream of the step" },
+      { tool: "gauge", where: "x = 7.6 m, z = 2.10 m", why: "H₂ — LOW in the wide pipe; a centreline tap sign-flips the recovery" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inLevel"] },
+    start: "a pressurised duct that steps 0.40 to 0.80 m at x = 3.80 m",
+    task: "Set your reservoir level, hover either side of the step for V₁ and V₂ and read H₁ and H₂ off the gauges, then compare h_L with Borda–Carnot's (V₁−V₂)²/2g.",
+    settle: 20,
+  },
+  {
+    id: "LL-2",
+    title: "Find the throttle",
+    topic: "Pipe flow & losses",
+    folder: "LL-2-find-throttle",
+    scene: "sandbox",
+    rig: "LL-2",
+    // 3.90 m is the one shared level for every pair — the personalisation is
+    // partner A's hidden stroke, not a slider.
+    rigParams: { budget: "Medium", spoutOn: false, openB: "0", openR: "1",
+                 inflowOn: true, inFree: true, inLevel: 3.90,
+                 twOn: true, twLevel: 2.50, cs: 0.40 },
+    rigWhy: { inLevel: "one shared level for every pair — the personalisation is A's hidden stroke, not a slider.",
+              twLevel: "without it the pipe empties." },
+    viewParams: { mode: "1", channel: false, labels: false, jumps: false },
+    digitNote: "personalised by partner A's hidden stroke, not a digit: 2–3 cells tall, somewhere between x = 4.6 and 7.0 m",
+    instruments: [
+      { tool: "gauge", where: "four gauges walked along the covered run, EVERY one at z = 2.35", why: "near the soffit — the HGL kink is what you are hunting" },
+    ],
+    ui: { build: ["wall", "erase", "undoBtn"], view: ["legendBtn"], controls: ["speed"] },
+    start: "a covered pressurised pipe, the same head for every pair",
+    task: "In pairs: A draws a hidden 2–3 cell obstruction in the covered run, B walks four gauges along it in three 20 s rounds to bracket the HGL kink and size k_L.",
+    settle: 20,
+  },
+  {
+    id: "PU-1",
+    title: "System curve measured, operating point kept honest",
+    topic: "Pumps & systems",
+    folder: "PU-1-system-curve",
+    scene: "sandbox",
+    rig: "PU-1",
+    // The spout is deliberately NOT ticked on: the rig loads in its
+    // pre-priming state and the sequence below is the experiment.
+    rigParams: { budget: "Medium", openL: "0", openR: "0", openB: "1", openT: "0",
+                 spoutOn: false, spoutR: 0.15, spoutVy: 0 },
+    rigWhy: { spoutOn: "off, as step 1 says: the sandbox's own spout would otherwise rain into the sump before you are ready." },
+    viewParams: { mode: "1", channel: false, labels: false, jumps: false },
+    studentParams: [
+      { control: "spoutOn", value: true, rule: "step 2 — tick it to rain into the sump, then move it into the bore as the pump" },
+    ],
+    digit: { label: "spout velocity", control: "spoutVx", base: 1.5, step: 0.09, unit: "m/s",
+             rule: "vx = 1.50 + 0.09·d — set it only AFTER the shared 2.2 m/s priming step" },
+    setup: ["The rig loads with the spout OFF.",
+            "Tick Top-left spout and rain into the sump for ~7 s.",
+            "Move the spout to (2.0, 0.60) and set its velocity to 2.2 m/s; leave it ~55 s until the tank spills. This shared step is not optional.",
+            "Now set your own spout velocity and let it re-settle."],
+    instruments: [
+      { tool: "gauge", where: "x = 3.0 m, z = 0.60 m", why: "the flange, 1.0 m downstream of the pump" },
+      { tool: "gauge", where: "x = 0.9 m, z = 1.0 m", why: "the sump's open water — H is gauge 1 minus gauge 2" },
+    ],
+    // Step 3 MOVES the spout, and the panel cannot: spoutOn/R/Vx/Vy are all
+    // there, but the spout's POSITION is set only by dragging with the Spout
+    // tool. The two gauges above would otherwise derive a measure-only profile
+    // and take the one tool the sequence depends on off the strip.
+    ui: { build: ["spout"], view: ["legendBtn"], controls: ["speed", "spoutOn", "spoutVx"] },
+    start: "a sump, a drawn rising main and a delivery tank, spout off",
+    task: "Prime the rising main as below, then set your own spout velocity and read Q by hovering the low-run bore and H as gauge 1 minus gauge 2.",
+    settle: 10,
+  },
+  {
+    id: "B10",
+    title: "Lift the crest until the pipe gives up",
+    topic: "Pipe flow & losses",
+    folder: "B10-crest-vs-hgl",
+    scene: "sandbox",
+    rig: "B10",
+    rigParams: { budget: "Medium", spoutOn: false, openB: "0", openR: "1",
+                 inflowOn: true, inFree: true, inLevel: 2.50,
+                 twOn: true, twLevel: 2.50, cs: 0.40 },
+    rigWhy: { inLevel: "the bench idles with no driving head — level = tailwater, so the duct sits charged and still.",
+              twLevel: "without it the pipe empties." },
+    viewParams: { mode: "1", channel: false, labels: false, jumps: false },
+    digit: { label: "reservoir level", control: "inLevel", base: 3.30, step: 0.13, mod: 6, unit: "m",
+             rule: "level = 3.30 + 0.13·(d mod 6)" },
+    instruments: [
+      { tool: "gauge", where: "x = 3.7 m, z = 2.20 m", why: "upstream of the hump station" },
+      { tool: "gauge", where: "x = 8.0 m, z = 2.20 m", why: "downstream — interpolate the HGL at the crest between the two" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inLevel"] },
+    start: "a flat pressurised duct with a crest you can lift mid-length",
+    task: "Set your reservoir level, interpolate the HGL at the hump station from the two gauges, then walk the crest soffit up until the crown head drops below 0.02 m - that height is z_sep.",
+    settle: 12,
+  },
+
+  // ---------------------------------------------------------- hydropower
+  {
+    id: "HP-1",
+    title: "Maximum power transmission — the class finds h_f = H/3",
+    topic: "Hydropower",
+    folder: "HP-1-penstock-power",
+    scene: "hammer",
+    rig: "HP-1",
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", particles: false },
+    digitNote: "your nozzle gap is DRAWN: gap = 0.42 / 0.70 / 0.84 / 0.97 / 1.10 m by d mod 5",
+    ui: {
+      build: ["wall", "erase", "undoBtn"],
+      measure: false,
+      view: ["legendBtn"],
+      controls: ["speed", "ruler"],
+    },
+    start: "a 49 m penstock from a high reservoir, throttled at x = 8 m, with a 0.84 m nozzle at x = 56.5 m",
+    task: "Erase the nozzle plate at x = 56.5 m and redraw it at YOUR gap (two pieces about z = 3.5, ruler on), press R and wait out the 50 s, then hover mid-pipe for q and read the jet core speed in the Speed view at x ≈ 57 m.",
+    note: "The green bar at x = 55 m is the scene's valve — it belongs to the water-hammer demos, not to this rig. Leave it open; if the pipe suddenly stops flowing you have pressed V and slammed it (press V again).",
+    settle: 50,
+  },
+  {
+    id: "HP-2",
+    title: "Why turbine buckets are cups, not plates",
+    topic: "Hydropower",
+    folder: "HP-2-pelton",
+    scene: "sandbox",
+    rig: "HP-2",
+    rigParams: { budget: "Medium", openL: "0", openR: "0", openB: "1", openT: "0",
+                 spoutOn: true, spoutR: 0.09, spoutVx: 4.5, spoutVy: 0 },
+    viewParams: { mode: "2", channel: false, labels: false, jumps: false, gaugeField: "h" },
+    digitNote: "lecturer demo: no personalised parameter",
+    instruments: [
+      { tool: "cv", where: "Control volume (9): drag (0.85, 1.55) → (2.05, 3.20), around the deflector and clear of the spout", why: "reads the momentum-theorem force on whatever it encloses — the number the demo is about" },
+      { tool: "gauge", where: "optionally in the free jet and on the stagnation point (MO-2's two stations)", why: "head, if you want the ratio as well as the force" },
+      { tool: "force", where: "the flat plate only — pick the Pressure force tool and click it", why: "F→ off the pressure diagram directly, on the ONE drawn wall the plate is; the 6-stroke cup and the deep-V's three strokes are why the Control volume stays how the rest of the demo is read" },
+    ],
+    ui: { build: true },
+    start: "the jet-on-a-plate rig, as a lecturer demonstration",
+    task: "Read F→ off the Control volume — or, on the flat plate only, click the deflector with the Pressure force tool for the same number with no box: about 4 kN/m. Redraw as the 6-stroke cup (README table) and the box reads about 7 — close to the factor of two; the cup is six drawn walls, so only the box sums it. The textbook deep-V reads only about 5 because it floods.",
+    settle: 5,
+  },
+
+  {
+    id: "HP-3",
+    title: "Hydropower and unsteady flow: test the tutorial predictions",
+    topic: "Hydropower",
+    folder: "HP-3-surge-tower",
+    scene: "hydro",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "2", gaugeField: "eta" },
+    instruments: [
+      { tool: "rake", where: "through the headrace at x ≈ 27 m; read the rake's depth-averaged V as V₀", why: "the worksheet needs the conduit mean velocity q/D, not a point velocity from one cell" },
+      { tool: "gauge", where: "in the reservoir strip by the wall, x ≈ 6.6 m, z ≈ 20 m", why: "the reservoir level used as the datum for η₀" },
+      { tool: "gauge", where: "in the surge shaft, x ≈ 50 m, z ≈ 18 m — expand its card (⤢) for the trace", why: "the shaft level on η before shutdown and the crest rise on d afterwards" },
+    ],
+    ui: { build: false,
+      measure: ["rake", "gauge", "cv"],
+      view: ["legendBtn"],
+      fields: ["speed"],
+      controls: ["gaugeField", "cvShow"],
+      readouts: { rows: ["pos", "eta", "V", "uw"] },
+    },
+    start: "the fixed tutorial scheme: a 24.9 m reservoir, 42.4 m headrace, 3.0 m surge shaft and 0.48 m nozzle, running steadily",
+    task: "Complete the sheet's measured column: V₀, headrace h_f, V_jet, P, η₀, k and η_max. Use the rake for depth-averaged V₀ and hover the horizontal jet for V_jet; read the two gauges on Level η, then switch them to Depth d, press V and read the first crest.",
+    setup: [
+      "Before the session calculate the predicted column from q₀ = 7.6 m²/s, L = 42.4 m, D_h = 3.05 m, D_s = 3.0 m, D_p = 2.4 m and λ = 0.03.",
+      "After the settle, use η₀ = η_shaft − η_reservoir, h_f = −η₀ − V₀²/(2g), k = −η₀/V₀² and P = ½ρq₀V_jet².",
+      "For the shutdown use rise = d_max − d₀ and η_max = rise + η₀. Press R and let the 60 s settle finish before any repeat.",
+    ],
+    note: "The green bar at x = 63.5 m is the turbine valve; V closes it instantaneously. Leave the fixed sheet geometry alone — the hidden Geometry controls and the maximum-power flow sweep are not part of this comparison.",
+    settle: 60,
+  },
+
+  // ------------------------------------------------------- unsteady flow
+  {
+    id: "UN-1",
+    title: "Celerity and water-hammer reflections",
+    topic: "Water hammer",
+    folder: "UN-1-celerity",
+    scene: "hammer",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { speed: 0.02, gaugeField: "h" },
+    instruments: [
+      { tool: "gauge", where: "on the pipe axis (z = 3.5 m) at x = 10 m, 30 m and 50 m", why: "the 20 m spacing makes the wave celerity readable from successive arrival times and shows the reflected high- and low-pressure fronts" },
+      { tool: "rake", where: "x = 20 m and 40 m", why: "the two velocity sections measure ΔV and show the change in flow as each incident and reflected front passes" },
+    ],
+    ui: { build: false,
+      view: ["legendBtn", "partBtn"],
+      controls: ["speed", "cel", "geom0"],
+    },
+    start: "a 60 m pipe from a reservoir to a valve, running steadily",
+    task: "Set the nozzle width, place gauges at x = 10, 30 and 50 m and rakes at x = 20 and 40 m, then press V. Measure c and ΔV, calculate ΔH = ΔV·c/g, and use the particles to follow the high- and low-pressure reflections.",
+    settle: 15,
+  },
+  {
+    id: "UN-2",
+    title: "Flow establishment: the asymptotic start",
+    topic: "Water hammer",
+    folder: "UN-2-establishment",
+    scene: "estab",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { gaugeField: "speed" },
+    digit: { label: "reservoir level", control: "inLevel", base: 3.4, step: 0.1, unit: "m",
+             rule: "level = 3.4 + 0.1·d" },
+    instruments: [
+      { tool: "gauge", where: "mid-pipe, x = 14 m, z = 2.4 m — expand its card (⤢) to read the trace", why: "the speed trace u_max and t_75 are read on" },
+    ],
+    ui: { view: ["legendBtn", "avgBtn"],
+      controls: ["speed", "inLevel"],
+    },
+    start: "a reservoir feeding a 23 m pipe, full and still behind a shut valve",
+    task: "Set your level, press R, let it settle; open the valve (V) and read the settled band as u_max and the first crossing of 0.75·u_max as t_75, timed from where the trace leaves zero. Read the reservoir level off its marker while the pipe flows.",
+    settle: 30,
+  },
+  {
+    id: "UN-3",
+    title: "Surge tank: fit k to the decay",
+    topic: "Water hammer",
+    folder: "UN-3-surge-tank",
+    scene: "hammer",
+    rig: "UN-3",
+    // Wave damping 0.03 is the rig's own; the d channel and ×2 speed are how
+    // the mass oscillation is readable at all. inLevel here is the d = 5 rung
+    // of the digit ladder — the student sets their own.
+    rigParams: { budget: "Medium", inLevel: 12.0, bulk: 0.03, cel: 70 },
+    rigWhy: { inLevel: "the scene default of 25 m fails containment; the ladder runs 10.0–13.6 m.",
+              bulk: "the shipped value: 0.30 throttles the nozzle by 33% and corrupts the decay.",
+              view: "d, because the h channel's ±6 m Joukowsky wave buries the 3 m mass oscillation." },
+    viewParams: { gaugeField: "d", speed: 2, particles: false },
+    digit: { label: "reservoir level", control: "inLevel", base: 10.0, step: 0.4,
+             unit: "m", rule: "level = 10.0 + 0.4·d" },
+    digitNote: "your reservoir level is a SLIDER, not a drawing — level = 10.0 + 0.4·d metres",
+    instruments: [
+      { tool: "gauge", where: "in the standpipe shaft, x ≈ 53 m, z ≈ 6 m", why: "the mass oscillation — the whole decay downloads from this gauge (Controls → Gauges → ⤓ CSV)" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inLevel", "gaugeInspect"] },
+    start: "the penstock with nozzle, tee and standpipe already built — only the reservoir level is yours",
+    task: "Set your level, gauge the shaft, slam the valve and let it swing five times. Download the gauge CSV (Controls → Gauges → ⤓ CSV), integrate the surge ODE beside it in Excel — the equations are in the README — and adjust k until the model matches the trace. Submit k.",
+    settle: 100,
+  },
+  {
+    id: "B1",
+    title: "T = 4L/c with your own valve",
+    topic: "Water hammer",
+    folder: "B1-period-4Lc",
+    scene: "hammer",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { gaugeField: "h", speed: 0.3, particles: false },
+    digitNote: "your valve station is DRAWN: x_d = 12 + 4·d m, so L = x_d − 6 and your gauge goes at x_d − 3",
+    instruments: [
+      { tool: "gauge", where: "x = x_d − 3 (three metres upstream of YOUR OWN valve), z ≈ 3.5 m", why: "read near the reservoir instead and the sponge smears the trace" },
+    ],
+    ui: { build: ["valve", "undoBtn"], view: ["legendBtn"], controls: ["speed"] },
+    start: "the 60 m pipe — you add a valve at your own station and leave the shipped one alone",
+    task: "Draw your own valve, check it seals, gauge 3 m upstream of it, then slam it and pause on four consecutive peaks: T is the median of the three gaps.",
+    settle: 13,
+  },
+  {
+    id: "B2",
+    title: "The flexible pipe, via the c slider",
+    topic: "Water hammer",
+    folder: "B2-flexible-pipe",
+    scene: "hammer",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { speed: 0.2, gaugeField: "h", particles: false },
+    studentParams: [
+      { control: "cel", unit: "m/s", rule: "leg 1 at the scene's own c = 70, then set c = 140 for leg 2 — the celerity is the experiment, not a personalisation" },
+    ],
+    digitNote: "your nozzle gap is DRAWN: gap = 0.14 × (1 + (d mod 6)) m, exactly as UN-1. The celerity is not personalised",
+    instruments: [
+      { tool: "gauge", where: "x = 30 m, z = 3.5 m", why: "mid-pipe — the same station for both legs" },
+    ],
+    secondScene: { scene: null, when: "the second leg is the same scene, not another one - scale the post-slam wait and the read window by 70/c." },
+    ui: { view: ["legendBtn"], controls: ["speed", "cel", "geom0"] },
+    start: "the 60 m pipe at the shipped celerity c = 70 m/s",
+    task: "Slam at c = 70 for ΔH₇₀, then reopen, set Slot celerity c = 140, press R, re-settle, re-read v₀ and slam again for ΔH₁₄₀. The ratio of the two surges is the pipe material.",
+    settle: 13,
+  },
+  {
+    id: "B3",
+    title: "Dam break: the moving jump",
+    topic: "Unsteady flow",
+    folder: "B3-dambreak",
+    scene: "dambreak",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { speed: 0.15 },
+    digitNote: "your bore stations: x₁ = 3.0 + 0.5·d m and x₂ = x₁ + 1.5 m; the negative wave is read at x = 1.0 m by everyone",
+    ui: { measure: ["gauge"], view: ["legendBtn"], controls: ["speed"] },
+    start: "a full reservoir behind a dam, a shallow STILL tailrace downstream — wet on purpose, the bore needs it",
+    task: "Pull the dam and time the surface at x = 1.0 m dropping clearly below its still-water mark, then reset and time the bore front between your own x₁ and x₂.",
+    settle: 0,
+  },
+
+  // -------------------------------------------------------- quasi-steady
+  {
+    id: "QS-1",
+    title: "Predict the drain, then run it",
+    topic: "Quasi-steady flow",
+    folder: "QS-1-drain-predict",
+    scene: "jet",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { speed: 0.15, gaugeField: "h" },
+    digitNote: "your start level by digit: 1.98, 2.09, 2.20, 2.31, 2.62, 2.73, 2.84, 2.95, 3.04, 3.11 m. Stop at 1.80 m; depth h = level − 1.36 m",
+    instruments: [
+      { tool: "gauge", where: "x = 1.0 m, z = 1.0 m", why: "low enough to stay submerged all the way down to η₂; on Head it reads the surface elevation directly" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "spoutOn"] },
+    start: "a tall tank draining through an orifice, in slow motion",
+    task: "Predict the drain time on paper first, from t = (2A/(C_d·a·√2g))(√h₁ − √h₂) with A = 1.90 m, a = 0.12 m, C_d = 0.61 × 0.97. Then gauge low in the tank, switch the spout off and time the real fall on the status-bar clock.",
+    settle: 55,
+  },
+  {
+    id: "QS-2",
+    title: "Two tanks and two parallel ducts",
+    topic: "Quasi-steady flow",
+    folder: "QS-2-twin-tanks",
+    scene: "two-tank",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { gaugeField: "h", mode: "1", grade: true, channel: false, particles: false, speed: 1 },
+    digit: { label: "Left reservoir width B₁", control: "geom0", base: 6.75, step: 0.25, unit: "m",
+      rule: "B₁ = 6.75 + 0.25·d",
+      also: [{ label: "Right reservoir width B₂", control: "geom1", base: 3.75, step: 0.25, unit: "m",
+        rule: "B₂ = 3.75 + 0.25·d" }] },
+    instruments: [
+      { tool: "gauge", where: "Head gauges at (5, 0.35) and (26.5, 0.35) m", why: "the two water levels; subtract to get the driving head difference" },
+      { tool: "flux", where: "optional Flux lines at x = 17 m, drawn upwards across each duct", why: "the two parallel discharges add; both branches see the same head difference" },
+    ],
+    // Nothing is drawn — the widths are sliders — so BUILD goes with the
+    // derivation, and the panel keeps only the two widths and the speed.
+    ui: { view: ["legendBtn", "gradeBtn"],
+      controls: ["speed", "geom0", "geom1"],
+    },
+    start: "two reservoirs at 3.00 and 1.20 m, joined by two full, identical 15 m × 0.10 m ducts; all quantities are per metre width",
+    setup: ["Set both widths from your digit using the fields above or Controls → Geometry. Changing a width restarts the water and clock; keep Medium resolution.",
+      "Predict the difference at 120 s: Δ = [√1.8 − 2.16(1/B₁ + 1/B₂)]². The total discharge law is q = 0.036√Δ m²/s.",
+      "Predicted left fall = B₂(1.8−Δ)/(B₁+B₂); right rise = B₁(1.8−Δ)/(B₁+B₂)."],
+    task: "Place two Head gauges (5), press R and watch the left reservoir fall as the right rises. Pause at 120 s on the simulation clock; record both changes, compare with your predictions to within 0.05 m, and explain why the narrower reservoir changes level faster.",
+    settle: 0,
+  },
+
+  // ------------------------------------------------------------- metering
+  {
+    id: "B7",
+    title: "Venturi meter rating",
+    topic: "Metering",
+    folder: "B7-venturi-rating",
+    scene: "venturi",
+    rig: null,
+    // The 1.55 m tailwater is what makes the duct flow full under head-driven
+    // inflow; the reservoir level is the personalised parameter.
+    rigParams: { budget: "Medium", twLevel: 1.55 },
+    rigWhy: { twLevel: "makes the duct run full under head-driven inflow." },
+    viewParams: { mode: "1", channel: false },
+    digit: { label: "reservoir level", control: "inLevel", base: 1.70, step: 0.06, unit: "m",
+             rule: "level = 1.70 + 0.06·d" },
+    instruments: [
+      { tool: "gauge", where: "x = 2.4 m, z = 0.85 m", why: "the barrel" },
+      { tool: "gauge", where: "x = 5.0 m, z = 0.85 m", why: "the throat — SAME height, or Δh is not a pressure difference" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inLevel"] },
+    start: "a venturi duct running full from a reservoir",
+    task: "Set your reservoir level, put both gauges at the SAME height - barrel and throat - for the pressure difference, and hover the barrel for q.",
+    settle: 15,
+  },
+  {
+    id: "B8",
+    title: "Three orifices, three coefficients",
+    topic: "Orifices & jets",
+    folder: "B8-three-orifices",
+    scene: "jet",
+    rig: "B8-sharp",
+    rigTable: ["B8-sharp", "B8-bellmouth", "B8-borda", "B8-sharp", "B8-bellmouth",
+               "B8-borda", "B8-sharp", "B8-bellmouth", "B8-borda", "B8-sharp"],
+    rigParams: { budget: "Medium" },
+    digitNote: "your lip: d mod 3 gives 0 sharp edge (draw nothing), 1 bellmouth, 2 Borda re-entrant",
+    ui: { measure: ["measure"], view: ["legendBtn"], controls: ["speed"] },
+    start: "a tank draining through a sharp-edged orifice",
+    task: "Your digit loads its lip already drawn — check it against your row, then zoom into the wall exit and read C_c as the narrowest jet core divided by the opening height (station x = 2.41 m, or 2.44 m for the Borda tube).",
+    settle: 55,
+  },
+  {
+    id: "B9",
+    title: "Three reservoirs, one junction",
+    topic: "Pipe networks",
+    folder: "B9-three-reservoirs",
+    scene: "sandbox",
+    rig: "B9",
+    // The rig loads pre-commissioning: valve shut, BOTH level controls off.
+    // Turning them on is step 2 of the student's own sequence.
+    rigParams: { budget: "Medium", spoutOn: false, cs: 0.40,
+                 openL: "1", openR: "1", openB: "0", openT: "0", inQ: 0 },
+    viewParams: { gaugeField: "h", mode: "0" },
+    studentParams: [
+      { control: "inflowOn", value: true, rule: "step 2 — reservoir A" },
+      { control: "inLevel", value: 3.20, unit: "m", rule: "A's head, the same for everyone" },
+      { control: "twOn", value: true, rule: "step 2 — reservoir C" },
+      { control: "twLevel", value: 0.60, unit: "m", rule: "C's head, the same for everyone" },
+    ],
+    digitNote: "your middle tank's start level: z_B = 1.30 + 0.16·d m, POURED by right-drag, so read what it settles to",
+    setup: ["The rig loads with the valve SHUT and both level controls off.",
+            "Tick Upstream reservoir (3.20 m) and Tailwater control (0.60 m) to hold A and C.",
+            "Right-drag to pour tank B up to your own level, then wait 10 s and read what it settles to.",
+            "Press V — all three branches release together — and read the junction gauge 3 s later."],
+    instruments: [
+      { tool: "gauge", where: "x ≈ 0.75 m, z ≈ 0.20 m", why: "reservoir A" },
+      { tool: "gauge", where: "x ≈ 2.78 m, just ABOVE z = 1.0", why: "tank B — lower than that is inside the shut valve's solid and reads a false dry" },
+      { tool: "gauge", where: "x ≈ 5.05 m, z ≈ 0.20 m", why: "reservoir C" },
+      { tool: "gauge", where: "x ≈ 2.78 m, z ≈ 0.50 m", why: "the junction head, 3 s after the release" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "inflowOn", "inLevel", "twOn", "twLevel"] },
+    start: "three tanks on one junction, valve shut and both controls off",
+    task: "Follow the steps to hold A and C and pour B to your own level, then press V and read B's direction and the junction head 3 s later.",
+    settle: 20,
+  },
+  {
+    id: "CS-1",
+    title: "Setting the overflow: when does your chamber spill?",
+    topic: "Urban drainage",
+    folder: "CS-1-cso-spill",
+    scene: "sandbox",
+    rig: "CS-1",
+    // The arrangement IS the rig: storm inlet on, chamber outfall open, no
+    // reservoir and no tailwater. 0.50 m/s is the dry-weather flow the ramp
+    // starts from, not a personalised value.
+    rigParams: { budget: "Medium", inflowOn: false, twOn: false,
+                 openL: "0", openR: "1", openB: "1", openT: "0",
+                 spoutOn: true, spoutR: 0.10, spoutVx: 0.50, spoutVy: 0 },
+    rigWhy: { spoutVx: "the dry-weather flow the 45 s pre-charge runs at — the storm ramp up from it is yours." },
+    // The spout's own dye source (the default seed at a running spout) marks
+    // the storm water: one of the few fixed sources still switched on.
+    viewParams: { gaugeField: "d", dyeSeeds: true, dyeDecay: 0 },
+    digitNote: "your throttle is DRAWN: r = d mod 4 gives 2 / 4 / 6 / 8 cells erased straight down x = 4 m",
+    setup: ["Press Z once — the rig ships with a 6-cell throttle already cut, and undo restores the whole floor so every rung starts equal (an erase stroke can widen a hole, never narrow it).",
+            "Cut your own throttle: press [ twenty times to shrink the erase brush, then ] once / 3 / 5 / 6 times for r = 0 / 1 / 2 / 3, and erase down the x = 4 m line.",
+            "Settle 45 s at dry-weather flow (spout velocity 0.50 m/s) — the chamber must be pre-charged or the first flush is invisible.",
+            "Ramp the spout in 0.25 m/s steps held 10 s to bracket the spill, then 0.08 m/s steps held 20 s to pin it.",
+            "First spill is the chamber gauge one cell over the crest with a continuous sheet; then hover the sewer at x ≈ 2 m for q."],
+    instruments: [
+      { tool: "gauge", where: "x ≈ 4.25 m, z ≈ 1.62 m", why: "the chamber at crest level — first spill is this gauge ≥ crest + 1 cell" },
+    ],
+    // The task says "cut your own throttle" and the setup spends two steps on
+    // the erase brush, so BUILD stays. The single gauge above would otherwise
+    // derive a measure-only profile and the Erase tool would not be there.
+    ui: {
+      build: ["erase", "undoBtn"],
+      view: ["legendBtn"],
+      controls: ["speed", "spoutVx"],
+    },
+    start: "a sewer feeding a CSO chamber with a spill crest",
+    task: "Cut your own throttle, pre-charge at dry-weather flow, then ramp the storm inflow until the chamber first spills over the crest, and read q off the hover over the sewer.",
+    settle: 20,
+  },
+
+  // --------------------------------------------------------------- waves
+  {
+    id: "WV-1",
+    title: "Dispersion, one period each",
+    topic: "Waves",
+    folder: "WV-1-dispersion",
+    scene: "wavedeep",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { particles: false },
+    digit: { label: "period", control: "waveT", unit: "s",
+             rule: "your row of the period table (it plateaus at 1.60 s from d = 7)",
+             table: [0.60, 0.75, 0.90, 1.05, 1.20, 1.35, 1.50, 1.60, 1.60, 1.60],
+             also: [{ label: "stroke", control: "waveA", unit: "m",
+                      rule: "the amplitude paired with YOUR period — a short wave with a long stroke just breaks at the paddle",
+                      table: [0.05, 0.08, 0.11, 0.15, 0.19, 0.23, 0.28, 0.30, 0.30, 0.30] }] },
+    secondScene: { scene: "waveshallow", when: "second half - switch to waveshallow (Scenes menu) and repeat on the shallow rows, T = 3.0 to 6.0 s." },
+    ui: { measure: ["measure"], view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
+    start: "a deep wave flume with a paddle at the left end",
+    task: "Set your period and stroke, zoom onto the paddle, then pause and read one crest-to-crest wavelength off the scale bar.",
+    settle: 40,
+  },
+  {
+    id: "WV-2",
+    title: "The buried wave gauge",
+    topic: "Waves",
+    folder: "WV-2-buried-gauge",
+    scene: "wave",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { gaugeField: "h", particles: false },
+    digit: { label: "period", control: "waveT", unit: "s",
+             rule: "your row of the period table",
+             table: [1.10, 1.10, 1.20, 1.30, 1.40, 1.50, 1.65, 1.85, 2.10, 2.10],
+             also: [{ label: "stroke", control: "waveA", unit: "m",
+                      rule: "the amplitude paired with YOUR period",
+                      table: [0.055, 0.055, 0.055, 0.060, 0.060, 0.060, 0.060, 0.065, 0.070, 0.070] }] },
+    instruments: [
+      { tool: "gauge", where: "near the paddle, LOW — about a tenth of the depth above the floor", why: "the bed gauge" },
+      { tool: "gauge", where: "the same vertical, about three-quarters of the way up", why: "the surface gauge — leave a visible band of water above it or it flat-lines at a trough" },
+    ],
+    secondScene: { scene: "wavedeep", when: "even digits only - repeat on wavedeep (Scenes menu) with the same two gauges at x ≈ 1.2 m, where a bed trace of pure noise IS the answer." },
+    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
+    start: "a wave flume with a beach, paddle at the left end",
+    task: "Set your period and stroke, put two gauges on one vertical near the paddle - one low, one three-quarters up - then read each trace's peak-to-peak swing and divide bed by surface.",
+    settle: 20,
+  },
+  {
+    id: "WV-3",
+    title: "Reflection coefficient of a steep sea wall",
+    topic: "Waves",
+    folder: "WV-3-reflection",
+    scene: "wavesurge",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { gaugeField: "d", particles: false },
+    digit: { label: "period", control: "waveT", unit: "s",
+             rule: "your row of the period table (digits pair up: 0,1 → 1.80 s and so on)",
+             table: [1.80, 1.80, 2.40, 2.40, 3.00, 3.00, 3.60, 3.60, 4.20, 4.20],
+             also: [{ label: "stroke", control: "waveA", unit: "m",
+                      rule: "the amplitude paired with YOUR period",
+                      table: [0.080, 0.080, 0.110, 0.110, 0.140, 0.140, 0.170, 0.170, 0.200, 0.200] }] },
+    instruments: [
+      { tool: "gauge", where: "ONE gauge, moved along the flat run from x = 1.3 to 7.5 m in 0.2 m steps", why: "you are hunting the antinode and the node — the swing at each stop is the measurement" },
+    ],
+    secondScene: { scene: "wave", when: "contrast run - repeat on wave (Scenes menu) with your d mod 3 row from the brief, submitted as series = spilling; its flat run is x = 0.65-1.15 m, stepped by 0.1 m." },
+    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
+    start: "a steep sea wall at the end of a wave flume",
+    task: "Set your period and stroke, slide one gauge along the flat run in 0.2 m steps, note the biggest swing and the smallest, and take K_refl = (a_max − a_min)/(a_max + a_min).",
+    settle: 45,
+  },
+  {
+    id: "B4",
+    title: "Orbital decay, measured off the trails",
+    topic: "Waves",
+    folder: "B4-orbital-decay",
+    scene: "wavedeep",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { tracerOn: true, tracerX: 5.84, tracerN: 9, tracerTrail: 3, vex: 6, particles: false },
+    digit: { label: "period", control: "waveT", unit: "s",
+             rule: "your row of the period table (same rows as WV-1)",
+             table: [0.60, 0.75, 0.90, 1.05, 1.20, 1.35, 1.50, 1.60, 1.60, 1.60],
+             also: [{ label: "stroke", control: "waveA", unit: "m",
+                      rule: "the amplitude paired with YOUR period",
+                      table: [0.05, 0.08, 0.11, 0.15, 0.19, 0.23, 0.28, 0.30, 0.30, 0.30] }] },
+    ui: { measure: false, view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
+    start: "the deep flume with a column of tracer particles",
+    task: "Set your period and stroke, zoom on the tracer column (it arrives placed, at ×6 vertical exaggeration), then pause and read the VERTICAL extent of the surface trail against the bed trail.",
+    settle: 40,
+  },
+  {
+    id: "B5",
+    title: "Iribarren map jigsaw",
+    topic: "Waves",
+    folder: "B5-iribarren",
+    scene: "wave",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    studentParams: [
+      { control: "waveT", unit: "s", rule: "your CELL's period — from the table below, not from a digit" },
+      { control: "waveA", unit: "m", rule: "your cell's amplitude; a wavesurge cell also needs ?scene=wavesurge" },
+    ],
+    digitNote: "assigned by CELL, not by digit - your row gives a scene, a period and an amplitude. wave: (0.70,0.035) (0.90,0.045) (1.10,0.055) (1.50,0.060) (2.10,0.070) (3.00,0.055) (4.00,0.045) (5.00,0.035) (6.00,0.030); wavesurge: (0.80,0.060) (1.40,0.130) (1.40,0.173) (1.80,0.080) (3.00,0.140) (4.20,0.199)",
+    secondScene: { scene: "wavesurge", when: "half the cells live on the other beach - if your row is a wavesurge one, switch scene before setting the period." },
+    ui: {
+      measure: ["measure"],
+      view: ["legendBtn", "partBtn"],
+      controls: ["speed", "waveT", "waveA"],
+    },
+    start: "a wave flume with a beach; your cell decides which flume",
+    task: "Set your cell's period and amplitude, wait out spin-up plus 15–20 s of transit, then classify what the wave does on the beach - spilling, surging or dies - and count scale-bar lengths of surf.",
+    settle: 40,
+  },
+  {
+    id: "B6",
+    title: "Ursell number: when Airy stops being enough",
+    topic: "Waves",
+    folder: "B6-ursell",
+    scene: "waveshallow",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { gaugeField: "d", particles: false },
+    digit: { label: "period", control: "waveT", unit: "s",
+             rule: "your row of the period table",
+             table: [3.0, 3.3, 3.6, 3.9, 4.2, 4.5, 4.8, 5.1, 5.5, 6.0],
+             also: [{ label: "stroke", control: "waveA", unit: "m",
+                      rule: "the amplitude paired with YOUR period (it saturates at 0.30 m)",
+                      table: [0.25, 0.265, 0.28, 0.29, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30] }] },
+    instruments: [
+      { tool: "gauge", where: "x = 1.0 m, z = 0.20 m", why: "H crest-to-trough" },
+      { tool: "gauge", where: "x = 1.8 m, z = 0.20 m", why: "the second station — L comes from the lag between the two" },
+    ],
+    ui: { view: ["legendBtn"], controls: ["speed", "waveT", "waveA"] },
+    start: "a long shallow flume with a paddle and two gauge stations",
+    task: "Set your period and stroke, then read H crest-to-trough and L from the lag between the two gauges over 20–30 s of cycles, and compute U_r = H·L²/h³ with h = 0.348 m. Read the crest/trough ratio — crest above the mean over trough below it — off the same trace.",
+    settle: 42,
+  },
+
+  // ------------------------------------------------------ dimensional analysis
+  {
+    id: "DA-1",
+    title: "Empty a tank of honey",
+    topic: "Similitude",
+    folder: "DA-1-empty-a-tank-of-honey",
+    scene: "fluid-tanks",
+    rig: null,
+    // A quick exercise: each student drains the same pair of tanks at their
+    // own L_r, once in water and once in honey, and submits V_r for each.
+    // Pooled, water follows Froude's √L_r and honey falls away from it as the
+    // model shrinks. Very high is the resolution the README's numbers were
+    // measured at (the scene comment says why).
+    rigParams: { budget: "Very high" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digit: { label: "Length ratio L_r", control: "geom0", base: 0.25, step: 0.05, rule: "L_r = 0.25 + 0.05·d" },
+    instruments: [
+      { tool: "gauge", where: "prototype: x = 1.6 m, 1.4 m in from the tank's outer left edge at x = 0.2 m (any height below the water)", why: "prototype depth d" },
+      { tool: "gauge", where: "model: the same station scaled by L_r from the model's outer left edge at x = 5.2 m, i.e. x = 5.2 + 1.4 L_r m", why: "model depth d" },
+    ],
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1"] },
+    start: "a 4 m prototype tank and a scale copy of it at length ratio L_r, both full of water, slots shut; per metre width",
+    setup: ["Set Length ratio L_r from your digit (the field above, or Controls → Geometry). Both tanks refill.",
+            "Place both Depth gauges (5): prototype at x = 1.6 m, model at x = 5.2 + 1.4 L_r m. Press V to open both slots together and let the tanks empty.",
+            "Expand each gauge (⤢) and hover its trace. T_p is the time the prototype takes to fall from d = 2.50 m to 1.00 m; T_m is the model's time from 2.50 L_r to 1.00 L_r.",
+            "Work out the time ratio T_r = T_m / T_p and the velocity ratio V_r = L_r / T_r. Froude scaling predicts V_r = √L_r.",
+            "Set Controls → Geometry → Fluid to honey (both tanks refill) and repeat at the same L_r. The honey drains more slowly: allow about 15 s."],
+    task: "Measure V_r in water and in honey, then submit Lr_water, Vr_water, Lr_honey and Vr_honey. The class pools them into one plot against L_r.",
+    settle: 0,
+  },
+
+
+  {
+    id: "DA-3",
+    title: "Sloshing in a tank",
+    topic: "Similitude",
+    folder: "DA-3-sloshing-tank",
+    scene: "slosh-tank",
+    rig: null,
+    // The tutorial sheet's in-app part: dimensional analysis says the period
+    // depends on B/d alone (a/d small), so one run per B/d draws the whole
+    // design chart K = T√(g/d) = φ(B/d). Nothing personal — every student
+    // runs the same five tanks. The scene releases the tilt at t = 0, so
+    // there is nothing to settle.
+    rigParams: { budget: "Medium" },
+    viewParams: { mode: "0", gaugeField: "d", particles: false },
+    digitNote: "tutorial sheet: every student runs the same five tanks",
+    instruments: [
+      { tool: "gauge", where: "near the left wall: x = 0.5 m, low in the water", why: "the depth d there rises and falls once per period. Not right against the wall: a gauge's depth is smoothed over ±0.09 m and would take in the wall's own columns" },
+    ],
+    ui: { measure: ["gauge", "measure"], view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0", "geom1", "geom2"] },
+    start: "a closed tank, length B = 4 m, depth d = 1.0 m, its surface tilted by a = 0.2 d and released at t = 0; per metre width",
+    setup: ["Place a Depth gauge (5) near the left wall: x = 0.5 m, low in the water.",
+            "Set Tank length B, Water depth d and Initial tilt a/d in Controls → Geometry. Each change restarts the slosh from t = 0; R also restarts it.",
+            "Expand the gauge (⤢) and hover its trace. Read the times t₁ and t₄ of the first and fourth crests after the release; the period is T = (t₄ − t₁) / 3.",
+            "The sheet's five models, one per value of B/d, all at a/d = 0.2 (B, d in m): A 1, 1.0; B 2, 1.0; C 4, 1.0; D 8, 1.0; E 8, 0.5.",
+            "For each, K = T√(g/d): the period with the tank's size divided out, so any two tanks can be compared."],
+    task: "Time the five tanks, work out K = T√(g/d) for each and plot K against B/d on the sheet's chart: the design chart, from five models instead of 125.",
+    settle: 0,
+  },
+
+  // ===================================================== Year 1 (CIVE40008)
+  // HS-1 is a CIVE40008 card that lives in this pack (it went upstream
+  // first, into the register this file used to be); CIVE40008's course.js
+  // lists it by id, which reaches it wherever it is registered. The course's
+  // other Year 1 cards are its own, in courses/cive40008/exercises.js. Like
+  // them, HS-1 uses the SHORT card layout
+  // (`steps` and a `background` fold, with inline strip icons). Vocabulary
+  // follows the lecture it is used in: it shows Pressure head and Piezometric
+  // head, not the plain Pressure colouring of the cards up to L6, because the
+  // piezometer's one level is exactly what piezometric head shows (taught in
+  // Statics, L3); like every card before L7 it carries hide: ["energy",
+  // "critical"].
+
+  // ------------------------------------------------------- hydrostatics
+  // An exercise students play with (L3 Statics) on the `dyke` scene: no rig
+  // payload, because the scene's own polygons ARE the rig, and no digit,
+  // because the point is watched, not pooled. `settle: 0` is deliberate —
+  // the water boots at rest and there is nothing to wait out; the wait that
+  // matters is the ~45 s after V, which the card says to watch, not to time.
+  {
+    id: "HS-1",
+    title: "Dike with a piezometer",
+    aim: "Two reservoirs either side of a dike, joined by a culvert with a piezometer tube — see connected still water stand at one level, and read the pressure force on the dike.",
+    topic: "Hydrostatics",
+    folder: "HS-1-dyke-piezometer",
+    scene: "dyke",
+    rig: null,
+    rigParams: { budget: "Medium" },
+    viewParams: { hoverCard: false, mode: "0", particles: true },
+    // L3 Statics. The Pressure force tool is the one instrument (lecturer,
+    // Oct 2026: no gauges); levels are read off the scale or the hover card.
+    instruments: [
+      { tool: "force", where: "the sloped upstream face of the dike; the same block again for its culvert roof; then the downstream face of the block past the piezometer", why: "½ρg·d² sideways on each face (28.2 and 11.0 kN/m shut), plus the weight of the water on the slope downward on the upstream one, and the push up on the roof; after V both faces read 24.2 kN/m sideways" },
+    ],
+    // Pressure head AND piezometric head, not the plain Pressure (lecturer,
+    // 2026-10-17): the piezometer standing at one level across connected
+    // still water is what the piezometric-head colouring shows in one colour.
+    ui: { view: ["legendBtn", "partBtn", "readBtn", "hoverBtn"], fields: ["water", "phead", "head"], panel: "shut",
+          hide: ["energy", "critical"],
+          readouts: { rows: ["pos", "eta", "uw", "phead", "h"] } },
+    steps: [
+      "The valve is shut. The left reservoir, the culvert and the piezometer tube are one body of still water: all three stand at 3.50 m.",
+      "In {btn:legendBtn} pick Piezometric head: one colour through all that connected water. Then Pressure head: it grows with depth.",
+      "Pick {tool:force} and click the dike's sloped upstream face: compare the sideways force with ½ρgd², d = 3.50 − 1.10 = 2.40 m.",
+      "Click the same block again for the culvert roof (pushed up), then the downstream face of the block past the tube (d = 1.50 m).",
+      "Press {key:V}: water flows through the culvert. When all is still (about 45 s) everything stands at one level and the two sideways forces are equal.",
+    ],
+    background: [
+      "In still water the pressure grows with depth: p = ρg × (depth below the surface), whatever the shape of the container. ρ = 1000 kg/m³, g = 9.81 m/s².",
+      "Pressure head p/ρg is the pressure divided by ρg — the pressure as a height of water. In still water it is the depth below the surface.",
+      "Piezometric head h = z + p/ρg is the height plus the pressure head: the level a piezometer tube connected at that point would stand at. In connected still water it is the same everywhere, so it shows as one colour.",
+    ],
+    settle: 0,
+  },
+]);

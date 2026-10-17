@@ -2,10 +2,13 @@
 r"""check_pack.py — assert the teaching pack agrees with itself.
 
 Zero dependencies; exits non-zero on any failure, so it can gate a commit.
-The same exercise is described in several files ON PURPOSE — js/exercises.js
-is the register, the rest are prose with different jobs; CLAUDE.md's "pack is
-described in four places" note has the reasoning. This asserts the handful of
-facts that are derivable from the register and leaves the prose to people:
+The same exercise is described in several files ON PURPOSE — the register
+(js/exercises.js declares it, empty; every courses/<id>/exercises.js appends
+its cards) is the machine-readable source, the rest are prose with different
+jobs; AGENTS.md's "pack is described in four places" note has the reasoning.
+This asserts the handful of facts that are derivable from the register and
+leaves the prose to people (a card's folder and INDEX are its course's:
+courses/<id>/exercises/<folder>/ and courses/<id>/INDEX.md):
 
   1. every card's folder exists, and has a README
   2. the README's H1 id and title match the card
@@ -35,6 +38,12 @@ facts that are derivable from the register and leaves the prose to people:
      slider without a word from the browser; js/scenes.js is parsed the same
      way js/exercises.js is (with js/geom.js in front of it) and the label
      the rule lands on is printed with -v
+ 11. courses: every course.js / exercises.js is loaded by index.html, ids
+     are unique across every course, a course file registers cards only under
+     its own id, `hosts` are well-formed and claimed once, every id a menu
+     lists exists, and every card a course owns is in its own menu (with no
+     course the menu was the whole register, so nothing could go missing;
+     a course menu is a hand-written list, so this is the guard)
 
 HOW THIS PARSES js/exercises.js
 --------------------------------
@@ -405,10 +414,11 @@ def main():
         print("could not parse any exercise from js/exercises.js")
         return 1
 
-    # Where each card lives. A shared card: its folder under exercises/, its
-    # row in exercises/INDEX.md. A course's own card (COURSES.exercises
-    # stamped `course` and `home`): its folder under courses/<id>/exercises/,
-    # its row in courses/<id>/INDEX.md. The guarantees are the same for both.
+    # Where each card lives. A course's card (COURSES.exercises stamped
+    # `course` and `home`): its folder under courses/<id>/exercises/, its row
+    # in courses/<id>/INDEX.md. Every card is a course's now; a card pushed
+    # straight into js/exercises.js (no `home`) would still be held to
+    # exercises/<folder>/ and exercises/INDEX.md. The guarantees are the same.
     def home_of(e):
         return e.get("home") or "exercises"
 
@@ -800,6 +810,23 @@ def main():
         for cid in sorted({e.get("course") for e in ex if e.get("course")} - seen):
             fail.append("course %s owns cards (courses/%s/exercises.js) but has no "
                         "course.js registering it" % (cid, cid))
+        # Every card a course owns is in its own menu. A card left out boots
+        # from ?ex= but is in no menu on the course's site -- silent.
+        alias_of = {t.get("alias"): e.get("id") for e in ex
+                    for t in (e.get("tabs") or []) if t.get("alias")}
+        for c in reg.get("courses") or []:
+            cid = c.get("id")
+            listed = set()
+            for sec in c.get("sections") or []:
+                for ref in sec.get("ids") or []:
+                    base = ref.partition("#")[0]
+                    listed.add(alias_of.get(base, base))
+            for e in ex:
+                if e.get("course") == cid:
+                    checked += 1
+                    if e.get("id") not in listed:
+                        fail.append("%-5s courses/%s/exercises.js owns it but courses/%s/course.js "
+                                    "lists it in no section" % (e.get("id"), cid, cid))
 
     if unverified:
         print("note: no digit ladder found in the recognised table form, so "

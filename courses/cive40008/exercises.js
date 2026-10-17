@@ -546,25 +546,50 @@ COURSES.exercises("cive40008", [
     // keeps its energy wording (the lecturer wants the box's energy rows here:
     // across the jump momentum balances and energy is lost), and the gauges offer depth,
     // level, speed and u.
+    // Two tabs, one scene (the flow carries on when the tab changes):
+    // Momentum (CIVE40008 L6, energy hidden) and Energy (L7, the colleague's
+    // part: grade lines, energy head, the box's energy rows, the jump's loss).
     ui: { view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
           fields: ["water", "speed", "froude"], panel: "focused",
           controls: ["speed", "geom1"],
-          gaugeFields: ["d", "eta", "speed", "u"], hide: ["critical"],
+          gaugeFields: ["d", "eta", "speed", "u"],
           fieldText: { froude: "Fr = u/√(gd), from the speed and the depth. Above 1: fast and shallow (red); below 1: slow and deep (blue)." },
           readouts: { rows: ["pos", "d", "eta", "q", "V", "Fr"] } },
-    steps: [
-      "The water shoots under the gate as a fast, thin sheet. Read the pool depth d₁ with a {tool:gauge} at x = 2.5 m, and q with a {tool:flux} up through the sheet at x = 6 m.",
-      "Drag a {tool:cv} round the gate, (2.50, 0.10) → (6.00, 3.70), and press {key:B} until its faces read momentum + pressure: F→ is the force on the gate.",
-      "Work out ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), d₂ the sheet's depth; compare it, and F→, with {tool:force} on the gate's upstream face.",
-      "The weir starts at 0.5 m: by about 20 s the sheet jumps up to a slow, deep flow near the weir, then the jump creeps towards the gate. Set Weir crest height to 0.46 m to hold it partway; 0.6 m drowns the gate.",
-      "Drag the box round the jump: momentum flux + pressure force in = out, F→ ≈ 0 — the water jumps so the books balance. Press {key:B} on to energy: in > out — the jump loses energy.",
-    ],
-    background: [
-      "Momentum balance on a control volume, per metre width: (momentum flux out − momentum flux in) = the pressure forces on its faces + the force from anything solid inside. The box prints the momentum flux and the pressure force on each face.",
-      "Round the gate the faces are hydrostatic: ½ρgd² each. So the force on the gate is F = ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), with U = q/d, d₁ the pool's depth and d₂ the sheet's (about 0.20 m). Depths are above the bed, which is at z = 0.30 m; the gate is open a = 0.30 m.",
-      "On the gate itself the pressure is hydrostatic near the surface but falls to zero at the lip, where the water curves round under the gate and speeds up: pressure is hydrostatic only where the streamlines are straight. That is why the Pressure force tool reads a little less than the balance. The box reads a few per cent more: its upstream face is not exactly hydrostatic either, and it also carries the bed's friction inside it.",
-      "Round the jump there is nothing solid inside the box (only the bed's friction), so what goes in must come out: the fast thin sheet and the slow deep flow carry the same momentum flux + pressure force.",
-      "At 0.6 m (the top of the slider) the jump runs up to the gate and drowns it: the pool rises and the force on the gate grows. At 0.45 m a held jump is washed back over the weir; at 0.4 m or less the sheet just runs over the weir. Water is the default colouring; Speed and Froude number are in {btn:legendBtn}.",
+    tabs: [
+      { key: "momentum", label: "Momentum",
+        ui: { hide: ["energy", "critical"] },
+        steps: [
+          "The water shoots under the gate as a fast, thin sheet. Read the pool depth d₁ with a {tool:gauge} at x = 2.5 m, and q with a {tool:flux} up through the sheet at x = 6 m.",
+          "Drag a {tool:cv} round the gate, (2.50, 0.10) → (6.00, 3.70), and press {key:B} until its faces read momentum + pressure: F→ is the force on the gate.",
+          "Work out ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), d₂ the sheet's depth; compare it, and F→, with {tool:force} on the gate's upstream face.",
+          "The weir starts at 0.5 m: by about 20 s the sheet jumps up to a slow, deep flow near the weir, then the jump creeps towards the gate. Set Weir crest height to 0.46 m to hold it partway; 0.6 m drowns the gate.",
+          "Drag the box round the jump: momentum flux + pressure force in = out, F→ ≈ 0 — the water jumps so the books balance.",
+        ],
+        background: [
+          "Momentum balance on a control volume, per metre width: (momentum flux out − momentum flux in) = the pressure forces on its faces + the force from anything solid inside. The box prints the momentum flux and the pressure force on each face.",
+          "Round the gate the faces are hydrostatic: ½ρgd² each. So the force on the gate is F = ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), with U = q/d, d₁ the pool's depth and d₂ the sheet's (about 0.20 m). Depths are above the bed, which is at z = 0.30 m; the gate is open a = 0.30 m.",
+          "On the gate itself the pressure is hydrostatic near the surface but falls to zero at the lip, where the water curves round under the gate and speeds up: pressure is hydrostatic only where the streamlines are straight. That is why the Pressure force tool reads a little less than the balance. The box reads a few per cent more: its upstream face is not exactly hydrostatic either, and it also carries the bed's friction inside it.",
+          "Round the jump there is nothing solid inside the box (only the bed's friction), so what goes in must come out: the fast thin sheet and the slow deep flow carry the same momentum flux + pressure force.",
+          "At 0.6 m (the top of the slider) the jump runs up to the gate and drowns it: the pool rises and the force on the gate grows. At 0.45 m a held jump is washed back over the weir; at 0.4 m or less the sheet just runs over the weir. Water is the default colouring; Speed and Froude number are in {btn:legendBtn}.",
+        ] },
+      { key: "energy", label: "Energy",
+        title: "Energy: sluice gate and hydraulic jump",
+        aim: "The same gate and jump, read for energy: almost no loss under the gate, a large loss in the jump's roller.",
+        ui: { hide: ["critical"],
+              view: ["legendBtn", "partBtn", "slineBtn", "gradeBtn", "readBtn", "hoverBtn"],
+              fields: ["water", "speed", "ehead", "head", "froude"] },
+        steps: [
+          "Turn on {btn:gradeBtn}: the energy line (EGL) and the hydraulic grade line (HGL). Under the gate the EGL stays nearly level — almost no energy is lost there.",
+          "Check it: d₁ from a {tool:gauge} in the pool, q from a {tool:flux} through the sheet; with U = q/d, d₁ + U₁²/2g ≈ d₂ + U₂²/2g (d₂ the sheet's depth).",
+          "The weir at 0.5 m makes a jump (0.46 m holds it partway). Across the jump the EGL drops: energy is lost in the roller.",
+          "Drag a {tool:cv} round the jump and press {key:B} on to energy: in > out — the difference is the loss.",
+          "Compare with ΔE = (d₂ − d₁)³ / (4 d₁ d₂) from the depths either side of the jump; pick Energy head in {btn:legendBtn} to see where it is lost.",
+        ],
+        background: [
+          "Specific energy per unit weight, E = d + U²/2g (above the bed). Where the flow contracts smoothly, as under the gate, losses are small and E is nearly conserved — Bernoulli along the bottom streamline.",
+          "In the jump the fast sheet runs into slow, deep water and the roller turns mean-flow energy into turbulence and heat. Momentum still balances (the Momentum tab); energy does not. Combining the momentum balance with continuity gives the loss ΔE = (d₂ − d₁)³ / (4 d₁ d₂).",
+          "The control volume's energy rows print the energy flux ρgqH through each face; in minus out, per metre width, is the power lost inside the box.",
+        ] },
     ],
     settle: 30,
   },

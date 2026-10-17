@@ -1,17 +1,17 @@
-# FF-1 · Wind over a lake
+# FF-1 · A fluid deforms under any shear
 
 A closed rectangular tank of still water, 6 m long and 0.30 m deep, stands in
 for a lake. At rest the water carries pressure only: u = 0 everywhere and
 p = ρg·d, with d the depth below the surface. A wind shear stress τ on the
 free surface (one signed slider) sets it moving at once, however small τ is:
-the surface water drifts downwind, piles up against the downwind wall (the
-**set-up**), and the excess returns upwind along the bed. Reverse τ and the
+the surface water drifts downwind, piles up against the downwind wall (engineers
+call it the **set-up**), and the excess returns upwind along the bed. Reverse τ and the
 circulation reverses; set τ = 0 and it dies away.
 
 **Point:** a fluid at rest can carry no shear stress. Any shear, however
 small, makes it flow, and it keeps flowing for as long as the shear acts.
 
-This is a **lecturer demo** (L2, slides 3 and 10–12): there is no
+An exercise students play with on their own; the lecturer can also show it in class. (L2, slides 3 and 10–12.) There is no
 personalised parameter and nothing to pool.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
@@ -47,17 +47,21 @@ carries back. That is the return flow near the bed.
 
 ## What to do
 
-1. **At rest.** Hover the water anywhere: u = 0, and p/ρg is the depth below
-   the surface (0.30 m at the bed). Switch the field to Pressure head: flat
-   horizontal bands. Pressure only.
+The card carries these steps; the Wind stress τ slider is on the card.
+
+1. **At rest.** Hover the water anywhere: the velocity is zero, and the
+   pressure head p/ρg is the depth below the surface (0.30 m at the bed).
+   Pressure head is the pressure divided by ρg — the pressure expressed as a
+   height of water; wherever it is higher, the pressure is higher. Choose
+   Pressure head in Field & legend: flat horizontal bands. Pressure only.
 2. **Turn on the wind.** Set τ to a small positive value (the arrows above
    the water point right). The water starts to move at once and keeps moving.
    Particles in the top layer run right; those near the bed run back left.
-3. **Watch the set-up.** The surface rises against the right wall and falls
-   at the left; on Pressure head the bands tilt. Switch to Speed to see the
+3. **Watch the water pile up.** The surface rises against the right wall and
+   falls at the left; on Pressure head the bands tilt. Choose Speed to see the
    fast surface layer and the slower return flow.
-4. **Reverse τ.** Everything reverses: set-up at the left wall, return flow
-   to the right.
+4. **Reverse τ.** Everything reverses: the water piles up at the left wall,
+   the return flow runs to the right.
 5. **τ = 0.** The circulation decays; the surface slops back level and the
    bands go flat again.
 

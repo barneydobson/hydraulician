@@ -1,4 +1,4 @@
-# MM-2 · The contraction rig, forces
+# MM-2 · Momentum: the force on a contraction
 
 The contraction rig of FF-5 and VC-1, asked about momentum. A control volume
 round the contraction balances the momentum carried in and out against the
@@ -9,7 +9,7 @@ on the contraction,
 
 The contraction slider then shows that R is fixed by the end sections, not
 by the shape in between: a gentle taper and an abrupt step give nearly the
-same force, and the small difference is the extra loss of the step. Moved
+same force, and the small difference comes from the separation at the step. Moved
 onto a straight length of the narrow pipe, the same box has the same
 momentum flux in and out, so the whole pressure drop across it is wall
 friction.
@@ -50,18 +50,18 @@ wetted length 2ΔL).
 
 ## What to do
 
-1. Open the card (L = 3 m, steady). Pick **Flux line** (`8`) and drag
+1. Open the card (L = 3 m, steady). Pick the **Flux line** tool on the strip and drag
    **upwards** across the wide pipe at x = 2.3 m (z = 0.4 → 1.6 m): section
    1 prints Q, M (momentum flux ρQU₁, roughly) and F (pressure force p₁A₁).
    Drag a second one upwards across the narrow pipe at x = 7.0 m: section 2.
    The card under the pair prints the momentum and pressure at each and the
    **force on what is between them** — that is R.
-2. Pick **Control volume** (`9`) and drag a box from (2.3, 0.3) to
+2. Pick the **Control volume** tool on the strip and drag a box from (2.3, 0.3) to
    (7.0, 1.65), top and bottom inside the pipe walls. Press **B** until the
    faces read *momentum + pressure*. F→ under the box is the same R.
 3. Work R out from the formula: U₁ = Q/1.00, U₂ = Q/0.50, and p₁A₁, p₂A₂
    from the sections' F. It matches the box.
-4. Drag **Contraction length L** (Controls → Geometry) to **0 m**, the
+4. Slide **Contraction length L** on the card to **0 m**, the
    abrupt step. The run restarts; once settled read R again. Nearly the
    same as for the taper.
 5. Move the box onto the straight narrow pipe: (7.0, 0.3) → (8.6, 1.65).

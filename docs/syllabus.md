@@ -35,7 +35,7 @@ is, and where it acts. Everything assumes this distribution can be read on sight
 
 | exercise | type | what it does |
 |---|---|---|
-| **HS-1** · Three surfaces, one level — a dyke and its piezometer ([open it](https://barneydobson.github.io/hydraulician/?ex=HS-1) · [brief](../exercises/HS-1-dyke-piezometer/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A dyke between two reservoirs at different levels, with a piezometer tapped into the culvert through it. Read the levels and the face forces with the valve shut, then open it and watch one level and equal forces arrive. |
+| **HS-1** · Dike with a piezometer ([open it](https://barneydobson.github.io/hydraulician/?ex=HS-1) · [brief](../exercises/HS-1-dyke-piezometer/)) | <span style="display:inline-block;padding:0 7px;border-radius:10px;background:#0969da;color:#fff;font-size:12px;line-height:20px;vertical-align:middle">demo</span> | A dike between two reservoirs at different levels, with a piezometer tapped into the culvert through it. Read the levels and the face forces with the valve shut, then open it and watch one level and equal forces arrive. |
 
 ## 2. Volume conservation
 

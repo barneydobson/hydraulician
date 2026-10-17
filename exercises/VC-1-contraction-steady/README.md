@@ -1,4 +1,4 @@
-# VC-1 · The contraction rig, steady
+# VC-1 · Continuity: Q in equals Q out
 
 The contraction rig of FF-5, asked about continuity. Water runs steadily
 from a reservoir at 2.80 m through a 1.00 m pipe that contracts into a
@@ -41,18 +41,18 @@ where the flow is faster, not from the flow changing in time.
 1. Open the card (L = 3 m, a gentle taper, already steady). Follow one
    particle through the contraction on **Speed**: its track lengthens as it
    goes — it accelerates.
-2. Pick **Flux line** (`8`) and drag **upwards** across the wide pipe at
+2. Pick the **Flux line** tool on the strip and drag **upwards** across the wide pipe at
    x = 2.3 m (z = 0.4 → 1.6 m), then across the narrow pipe at x = 7.0 m.
    Each prints Q; the pair prints the difference, which should be 0.
-3. Pick **Control volume** (`9`) and drag a box from (2.3, 0.3) to
+3. Pick the **Control volume** tool on the strip and drag a box from (2.3, 0.3) to
    (7.0, 1.65): its left face cuts the wide pipe, its right face the narrow
    pipe, and its top and bottom run inside the pipe walls. The faces read Q
    in and Q out; Σ Q under the box is the closure.
-4. Drag **Contraction length L** (Controls → Geometry) to **0 m**, the
+4. Slide **Contraction length L** on the card to **0 m**, the
    abrupt step. The run restarts and spins up; read the two Flux lines and
    the box again. The streamlines are now quite different (separation, a
    vena contracta); Q still matches in both pipes and has dropped by a few
-   per cent, because the step loses more energy than the taper.
+   per cent (the step costs more than the taper — losses are lecture 8).
 
 ## For the instructor
 

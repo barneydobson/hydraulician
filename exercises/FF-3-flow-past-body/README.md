@@ -1,16 +1,16 @@
-# FF-3 · Flow past a body
+# FF-3 · Steady and unsteady flow
 
 Looking down on a uniform stream (plan view, gravity out of the plane) past
 one body whose shape is a single slider: a slender ellipse lined up with the
 flow at one end, a square of the same frontal width at the other. Slide it
-and the wake goes from a thin, steady sheet to an alternating Kármán street;
-press **A** and the alternating street averages into one steady, symmetric
-wake bubble. One scene carries steady against unsteady flow, streamlined
-against bluff bodies, separation and wake width, vorticity in the shear
-layers and the shed vortices, dye against streamlines, and the difference
-between a turbulent flow and its mean.
+and the wake goes from a thin, steady streak to one that swings from side to
+side, shedding eddies; switch the colour bar from Live to Average and the
+swinging wake averages into one steady, symmetric wake bubble. The headline
+is steady against unsteady flow; the same scene also carries streamlined
+against bluff bodies, separation and wake width, dye against streamlines,
+and the difference between a turbulent flow and its mean.
 
-This is a **lecturer demo**: no personalised parameter and nothing to pool.
+An exercise students play with on their own; the lecturer can also show it in class. No personalised parameter and nothing to pool.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **FF-3**, or use the direct link
@@ -24,11 +24,11 @@ The scene alone is `?scene=body`.
   as wide as the two thin shear layers that leave it. A bluff body makes the
   flow turn sharply; it separates (at the front corners of the square), and
   the wake is about as wide as the body.
-- **Steady vs unsteady.** The two separated shear layers carry vorticity of
-  opposite sign. Behind a bluff body they are unstable and roll up
-  alternately: vortex shedding, one vortex from each side per period T.
+- **Steady vs unsteady.** The two separated layers spin in opposite
+  senses. Behind a bluff body they are unstable and roll up
+  alternately: eddy shedding, one eddy from each side per period T.
   The boundary conditions do not change in time; the flow does.
-- **Strouhal number.** St = D/(U·T), with D the frontal width and U the
+- **Strouhal number (for the instructor; not Year 1).** St = D/(U·T), with D the frontal width and U the
   free-stream speed, is close to 0.13–0.2 for bluff bodies — an order of
   magnitude a class can check off the gauge.
 - **Dye vs streamlines.** In steady flow a dye streak, a particle path and a
@@ -56,29 +56,34 @@ does not restart the water. Each change also restarts an Average window.
 
 ## What to do
 
-1. **The streamlined body.** The card boots on the ellipse with Vorticity
-   showing. Two thin sheets of opposite colour leave the body and run off
-   downstream side by side. Nothing moves: steady flow.
-2. **Make it bluffer.** Drag Controls → Geometry → Body shape up in steps,
+1. **The streamlined body.** The card boots on the ellipse with Speed
+   showing and particles on. A thin slow streak runs straight downstream
+   behind the body. Nothing moves: steady flow.
+2. **Make it bluffer.** Slide Body shape on the card up in steps,
    giving each 20–30 s. Below about 0.3 the wake stays steady. From about
-   0.3–0.4 it starts to swing, slowly at first; by 0.6 it sheds a clear
-   street within about 20 s of the change. At 1 (the square) the shear layers
-   leave at the front corners and roll up into a strong Kármán street.
-3. **Read the period.** Put a Gauge (5) in the wake (0.6 m behind the body,
+   0.3–0.4 it starts to swing, slowly at first; by 0.6 it sheds eddies clearly
+   within about 20 s of the change. At 1 (the square) the flow separates
+   at the front corners and the wake swings strongly, shedding an eddy from each side in turn.
+3. **Read the period.** Put a Gauge (the Gauge tool on the strip) in the wake (0.6 m behind the body,
    0.2 m off the centreline) and read the period from its Speed trace (⤢
    opens the inspector). About **2.9 s** for the square: St ≈ 0.4/(0.9 × 2.9)
    ≈ 0.16.
-4. **Dye and particles.** Turn on Dye (D) and Particles (P). The dye
+4. **Dye and particles.** Turn on Dye and Particles on the strip. The dye
    timelines arrive straight across the stream and bend round the body; in
    the shedding wake the particles swing from side to side across the
    centreline while the mean flow (step 5) has them going straight through.
    At Medium the timelines are faint by the time they reach the wake (see
    the caveats) — the particles carry this point better than the dye.
-5. **Average.** Press A with the square shedding. Within a few shedding
+5. **Average.** Switch the colour bar from Live to Average with the square shedding. Within a few shedding
    periods the street becomes one steady bubble, symmetric about the
    centreline, with a closed recirculation behind the body; the particles
-   now follow the mean flow's streamlines. Press A again to return to the
-   live street.
+   now follow the mean flow's streamlines. Switch back to Live to return to
+   the live street.
+6. **Pressure (optional).** Choose Pressure head in Field & legend and press
+   Fit on the legend: the pressure is highest where the stream meets the
+   front of the body. In this plan view the pressure head also carries a
+   large, slowly drifting constant (about 2–4 m), so Fit is needed to see
+   the few centimetres that matter.
 
 ## For the instructor
 

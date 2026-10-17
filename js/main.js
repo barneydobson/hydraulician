@@ -2174,6 +2174,7 @@ const START = (() => {
         const i = document.createElement("span"); i.className = "eid"; i.textContent = e.id;
         const t = document.createElement("span"); t.className = "t"; t.textContent = e.title;
         b.appendChild(i); b.appendChild(t);
+        if (e.aim) b.title = e.aim;   // the exercise's `aim`, on hover
         b.onclick = () => { close(); EX.pick(e.id); };
         box.appendChild(b);
       });

@@ -38,7 +38,10 @@
  *   studentParams  DISPLAYED, NEVER APPLIED. Values the worksheet asks the
  *                  student to set, that no digit rule covers — a staged step
  *                  (B9's two level controls), an assigned cell (B5). Each is
- *                  {control, value?, unit?, rule?}.
+ *                  {control, value?, unit?, rule?}. This is also how a
+ *                  scene's own slider (a Geometry row, geomN) gets onto the
+ *                  card: the card draws it as a slider beside its `rule`,
+ *                  under "Try it yourself" when the entry has no digit.
  *   digit          DISPLAYED, NEVER APPLIED (with one exception, below). The
  *                  personalised parameter: `base` + `step`·d, or a per-digit
  *                  `table` where the measured rule is not linear, `mod: N` for
@@ -56,6 +59,11 @@
  *
  * OTHER FIELDS
  *   id       programme id, e.g. "HJ-1"           title    the README's own h1
+ *   aim      optional: one or two plain sentences on what the scene is and
+ *            what the student does in it. When present the exercise menu
+ *            prints it under the title (instead of the start · ?scene · settle
+ *            line) and the start screen shows it on hover; it is NOT on the
+ *            card. Written in the vocabulary of the lecture it is used in.
  *   topic    grouping for the menu               folder   exercises/<folder>/
  *   scene    a SCENES key, or "sandbox"
  *   rig      null, or a key into EXERCISE_RIGS (js/exercises-rigs.js). A rig
@@ -1122,30 +1130,41 @@ const EXERCISES = [
   },
 
   // ------------------------------------------------------- hydrostatics
-  // A lecturer demo on the `dyke` scene: no rig payload, because the scene's
-  // own polygons ARE the rig, and no digit, because the point is watched, not
-  // pooled. `settle: 0` is deliberate — the water boots at rest and there is
-  // nothing to wait out; the wait that matters is the ~20 s after V, which
-  // the README states and the card's task says to watch, not to time.
+  // An exercise students play with (L3 Statics) on the `dyke` scene: no rig
+  // payload, because the scene's own polygons ARE the rig, and no digit,
+  // because the point is watched, not pooled. `settle: 0` is deliberate —
+  // the water boots at rest and there is nothing to wait out; the wait that
+  // matters is the ~45 s after V, which the card says to watch, not to time.
   {
     id: "HS-1",
-    title: "Three surfaces, one level: a dyke and its piezometer",
+    title: "Dike with a piezometer",
+    aim: "Two reservoirs either side of a dike, joined by a culvert with a piezometer tube — see connected still water stand at one level, and read the pressure force on the dike.",
     topic: "Hydrostatics",
     folder: "HS-1-dyke-piezometer",
     scene: "dyke",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "0", particles: true, gaugeField: "h" },
-    digitNote: "lecturer demo: no personalised parameter",
+    viewParams: { mode: "0", particles: true },
+    // L3 Statics. The Pressure force tool is the one instrument (lecturer,
+    // Oct 2026: no gauges); levels are read off the scale or the hover card.
     instruments: [
-      { tool: "gauge", where: "x ≈ 1.2 m, z ≈ 1.3 m — the left basin", why: "h in the left basin: 4.00 m at boot" },
-      { tool: "gauge", where: "x ≈ 4.4 m, z ≈ 1.3 m — inside the culvert, under the piezometer", why: "h in the culvert reads the LEFT level while the valve is shut — the number the piezometer column stands at, without the tube" },
-      { tool: "gauge", where: "x ≈ 5.6 m, z ≈ 1.3 m — the right basin", why: "h in the right basin: 3.10 m, then the common level after V" },
-      { tool: "force", where: "the sloped Upstream face of the dyke; click the same block again to cycle to its Culvert roof; the Downstream face is on the block past the piezometer", why: "½ρg·d² sideways on each face, plus the weight of the water on the slope downward on the upstream one, and the uplift on the roof; after V both faces read the same horizontal force" },
+      { tool: "force", where: "Pressure force tool: click the sloped upstream face of the dike; click the same block again for its culvert roof; then click the downstream face of the block past the piezometer", why: "½ρg·d² sideways on each face (28.2 and 11.0 kN/m shut), plus the weight of the water on the slope downward on the upstream one, and the push up on the roof; after V both faces read 24.2 kN/m sideways" },
     ],
-    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead", "head"], panel: "shut" },
-    start: "a dyke between two reservoirs at 4.00 and 3.10 m, joined by a shut culvert with a piezometer tapped into its roof",
-    task: "Read the three levels and the two face forces while the valve is shut, then press V: watch the culvert run and the small basin fill, and read them again once the water is still — one level, equal forces.",
+    ui: { view: ["legendBtn", "partBtn"], fields: ["water", "phead"], panel: "shut",
+          readouts: { rows: ["pos", "eta", "uw", "phead"] } },
+    start: "two reservoirs either side of a dike — water at 3.50 m on the left, 2.60 m on the right — joined by a culvert under the dike, shut by a valve; a piezometer (an open tube) rises from the culvert roof",
+    setup: [
+      "Look first. With the valve shut, the left reservoir, the culvert and the piezometer tube are one connected body of still water — so the water stands at the same level in all three, 3.50 m, even though the culvert runs under the dike.",
+      "In still water the pressure is hydrostatic: it increases with depth, p = ρg × (depth below the surface), and depends only on the depth, not on the shape of the container.",
+      "Open Field & legend on the strip and choose Pressure head. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher. Hover the water: it is just the depth below the surface.",
+      "Pick the Pressure force tool on the strip and click the sloped upstream face of the dike. The arrows show the pressure on the face, growing with depth; the label gives the force.",
+      "Compare the sideways part of that force with ½ρg·d², with d = 3.50 − 1.10 = 2.40 m (ρ = 1000 kg/m³, g = 9.81 m/s²).",
+      "Click the same block again to see its culvert roof: the water pushes it up. Then click the downstream face of the block past the piezometer (d = 2.60 − 1.10 = 1.50 m).",
+      "Press V to open the valve. Watch the water flow through the culvert and the small right reservoir fill.",
+      "Wait until everything is still again (about 45 s). Notice that both reservoirs and the piezometer now stand at one level.",
+      "Click the two faces again: the sideways forces are now equal and opposite.",
+    ],
+    task: "With the valve shut, read the force on each face of the dike and compare it with ½ρg·d²; open the valve, wait until the water is still, and read them again: one level, equal forces.",
     settle: 0,
   },
 
@@ -1192,122 +1211,154 @@ const EXERCISES = [
   // level controls. Geometry slider geom0 = contraction length L (3 m taper
   // → 0 m abrupt step); a change restarts the water (resetWater) and the
   // scene's measured spin-up runs flat out again, so every L is read steady.
-  // Lecturer demos: no digit, nothing pooled.
+  // Exercises students play with (the lecturer can show them in class): no
+  // digit, nothing pooled; the slider is on the card through studentParams.
   {
     id: "FF-5",
-    title: "The contraction rig: streamlines",
+    title: "Streamlines and separation",
+    aim: "A pipe that narrows gently or suddenly — see the streamlines follow a taper but separate at a sharp step.",
     topic: "Flow fields, shear and turbulence",
     folder: "FF-5-contraction-streamlines",
     scene: "contraction",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2", particles: true },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "geom0", unit: "m",
+        rule: "3 m is a long, gentle taper; 0 m is an abrupt step. Each change restarts the flow — wait about 25 s." },
+    ],
+    // L4. Vorticity is never offered in Year 1: the separated corners are
+    // read on Speed (slow eddies), with streamlines and the Average instead.
     ui: {
       measure: false,
-      view: ["legendBtn", "partBtn", "avgBtn"],
-      fields: ["water", "speed", "vort"],
+      view: ["legendBtn", "partBtn", "slineBtn"],
+      fields: ["water", "speed"],
       panel: "focused",
       controls: ["geom0"],
+      readouts: { rows: ["pos", "uw"] },
     },
-    start: "two reservoirs joined by a 1.00 m pipe that contracts into a 0.50 m pipe; Contraction length L = 3 m, a gentle taper",
+    start: "two reservoirs joined by a 1.00 m pipe that narrows into a 0.50 m pipe; the contraction is a gentle taper 3 m long",
     setup: [
-      "Watch the particles on Speed: smooth paths that converge and speed up through the taper.",
-      "Switch the field to Vorticity: thin sheets along the walls, nothing leaving them in the taper.",
-      "Drag Contraction length L (Controls → Geometry) to 0 m — an abrupt step. The run restarts and spins up again.",
-      "Look at the step on Vorticity and Speed: sheets leave both corners, slow eddies sit in them, and the jet necks down just past the edge (the vena contracta) before it fills the pipe.",
-      "Press A (Average) for the mean picture: the particles then follow the mean flow's streamlines.",
+      "Colour is Speed. Watch the particles: smooth paths that crowd together and speed up through the taper.",
+      "Turn on Streamlines on the strip: they converge smoothly through the taper and never leave the walls.",
+      "Slide Contraction length L on this card to 0 m — an abrupt step. The flow restarts.",
+      "Look at the step: the flow cannot turn the sharp corners. It separates, slow eddies sit in the corners, and the jet narrows just past the edge (the vena contracta) before it fills the pipe.",
+      "On the colour bar (the legend), switch from Live to Average and wait: the streamlines then show the mean flow past the step, steady even where the live flow flickers.",
     ],
     task: "Compare the taper (L = 3 m) with the step (L = 0): smooth converging streamlines against separation in the corners and a vena contracta past the edge.",
     settle: 25,
   },
   {
     id: "VC-1",
-    title: "The contraction rig, steady",
+    title: "Continuity: Q in equals Q out",
+    aim: "Water through a pipe that narrows — measure Q in the wide pipe, in the narrow pipe and round a control volume.",
     topic: "Volume conservation",
     folder: "VC-1-contraction-steady",
     scene: "contraction",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2", particles: true },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "geom0", unit: "m",
+        rule: "3 m is a gentle taper, 0 m an abrupt step. Each change restarts the flow — wait about 25 s before reading Q again." },
+    ],
     instruments: [
-      { tool: "flux", where: "Flux line (8): drag UP across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "Q₁ in the wide pipe" },
-      { tool: "flux", where: "Flux line (8): drag UP across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
-      { tool: "cv", where: "Control volume (9): drag (2.3, 0.3) → (7.0, 1.65) — round the contraction, top and bottom inside the pipe walls", why: "Σ Q = 0: in on the left face, out on the right, nothing through the walls" },
+      { tool: "flux", where: "Flux line: drag up across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "Q₁ in the wide pipe" },
+      { tool: "flux", where: "Flux line: drag up across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
+      { tool: "cv", where: "Control volume: drag (2.3, 0.3) → (7.0, 1.65) — round the contraction, top and bottom inside the pipe walls", why: "Σ Q = 0: in on the left face, out on the right, nothing through the walls" },
     ],
     ui: {
-      view: ["legendBtn", "partBtn", "avgBtn"],
+      view: ["legendBtn", "partBtn", "slineBtn"],
       fields: ["water", "speed"],
       panel: "focused",
       controls: ["geom0", "cvShow", "fluxList"],
+      readouts: { rows: ["pos", "uw"] },
     },
-    start: "two reservoirs joined by a 1.00 m pipe that contracts into a 0.50 m pipe, running steadily; Contraction length L = 3 m",
+    start: "two reservoirs joined by a 1.00 m pipe that narrows into a 0.50 m pipe, running steadily; the contraction is a gentle taper 3 m long",
     setup: [
-      "Lagrangian: follow one particle through the contraction — it speeds up although nothing on screen changes in time.",
-      "Eulerian: place the two Flux lines and read Q in each pipe.",
-      "Place the Control volume round the contraction and read Q on each face and Σ Q under the box.",
-      "Drag Contraction length L to 0 m (an abrupt step): the run restarts; after it settles read the three again.",
+      "Lagrangian: follow one particle through the contraction — it speeds up, although the flow is steady and nothing on screen changes in time.",
+      "Eulerian: pick the Flux line tool on the strip and drag one up across each pipe — the wide pipe at x = 2.3 m and the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m — and read Q in each.",
+      "Pick the Control volume tool on the strip and drag a box from (2.3, 0.3) to (7.0, 1.65) round the contraction; read Q on each face and Σ Q under the box.",
+      "Slide Contraction length L on this card to 0 m (an abrupt step): the flow restarts; after it settles read the three again.",
     ],
-    task: "Q₁ = Q₂ and Σ Q ≈ 0 for any contraction; the step changes the streamlines and lowers Q only a few per cent.",
+    task: "Check that Q₁ = Q₂ and Σ Q ≈ 0 for any contraction: the step changes the streamlines but lowers Q only a few per cent.",
     settle: 25,
   },
   {
     id: "MM-2",
-    title: "The contraction rig, forces",
+    title: "Momentum: the force on a contraction",
+    aim: "A pipe that narrows — find the force of the water on it from the momentum and the pressure at both ends, for a taper and a step.",
     topic: "Momentum conservation",
     folder: "MM-2-contraction-forces",
     scene: "contraction",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2", particles: false },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "geom0", unit: "m",
+        rule: "3 m is a gentle taper, 0 m an abrupt step. Each change restarts the flow — wait about 25 s before reading the force." },
+    ],
     instruments: [
-      { tool: "flux", where: "Flux line (8): drag UP across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "section 1: Q, momentum flux M₁ = ρQU₁ and pressure force F₁ = p₁A₁" },
-      { tool: "flux", where: "Flux line (8): drag UP across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "section 2; the card under the pair prints the force on what is between them" },
-      { tool: "cv", where: "Control volume (9): drag (2.3, 0.3) → (7.0, 1.65), then press B until the faces read momentum + pressure; later move it to (7.0, 0.3) → (8.6, 1.65)", why: "F→ on the box is R, the force of the water on the contraction (plus the wall shear inside the box)" },
+      { tool: "flux", where: "Flux line: drag up across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "section 1: Q, momentum flux M₁ = ρQU₁ and pressure force F₁ = p₁A₁" },
+      { tool: "flux", where: "Flux line: drag up across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "section 2; the card under the pair prints the force on what is between them" },
+      { tool: "cv", where: "Control volume: drag (2.3, 0.3) → (7.0, 1.65), then press B until the faces read momentum + pressure; later move it to (7.0, 0.3) → (8.6, 1.65)", why: "F→ on the box is R, the force of the water on the contraction (plus the wall shear inside the box)" },
     ],
     ui: {
-      view: ["legendBtn", "avgBtn"],
+      view: ["legendBtn", "slineBtn"],
       fields: ["speed", "phead"],
       panel: "focused",
       controls: ["geom0", "cvShow", "fluxList"],
+      readouts: { rows: ["pos", "uw", "phead"] },
     },
-    start: "two reservoirs joined by a 1.00 m pipe that contracts into a 0.50 m pipe, running steadily; Contraction length L = 3 m",
+    start: "two reservoirs joined by a 1.00 m pipe that narrows into a 0.50 m pipe, running steadily; the contraction is a gentle taper 3 m long",
     setup: [
-      "Place the two Flux lines (sections 1 and 2) and the Control volume between them. Each section prints Q, M (momentum flux) and F (pressure force); the pair prints the force on what is between them.",
+      "The Pressure head field shows the pressure. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher.",
+      "With the Flux line tool on the strip drag one up across each pipe (x = 2.3 m and x = 7.0 m, z = 0.4 to 1.6 m: sections 1 and 2); with the Control volume tool drag a box between them, (2.3, 0.3) to (7.0, 1.65), and press B until its faces read momentum + pressure. Each section prints Q, M (momentum flux) and F (pressure force); the pair prints the force on what is between them.",
       "Check R = p₁A₁ − p₂A₂ − ρQ(U₂ − U₁) per metre width (A₁ = 1.00 m, A₂ = 0.50 m, U = Q/A) against the box's F→.",
-      "Drag Contraction length L to 0 m (abrupt step), let it settle and read R again.",
-      "Then put the box on the straight 0.50 m pipe instead, (7.0, 0.3) → (8.6, 1.65): momentum in = momentum out, so the pressure drop across it is the wall friction.",
+      "Slide Contraction length L on this card to 0 m (an abrupt step), let it settle and read R again.",
+      "Then put the box on the straight 0.50 m pipe instead, (7.0, 0.3) → (8.6, 1.65): momentum in = momentum out, so the pressure drop across it is balanced by the wall friction.",
     ],
-    task: "R is set by the end sections: taper and step give nearly the same force, the difference being the extra loss; on a straight pipe the pressure drop is all friction.",
+    task: "R is set by the end sections: taper and step give nearly the same force; on a straight pipe the pressure drop is balanced by friction at the wall.",
     settle: 25,
   },
   // ===== Year 1: VC-2, MM-1 =====
-  // Two lecturer demos on scenes written for them (`fillleak`, `vane`). Each
-  // has ONE slider, the scene's own param, on Controls → Geometry (geom0).
+  // Two scenes written for these exercises (`fillleak`, `vane`). Each has ONE
+  // slider, the scene's own param (geom0), drawn on the card through
+  // `studentParams` and also on Controls → Geometry.
   {
     id: "VC-2",
-    title: "The tank that fills and leaks",
+    title: "Storage = in − out",
+    aim: "A tank filled from a spout and drained through a hole near the floor — predict the level at which the outflow balances the inflow, then check it.",
     topic: "Volume conservation",
     folder: "VC-2-fill-and-leak",
     scene: "fillleak",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "0", particles: false, gaugeField: "eta" },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "geom0", unit: "m²/s",
+        rule: "the flow into the tank from the spout, per metre width (0.25 as the card opens). Change it and the level finds a new balance." },
+    ],
+    // L5. The outlet starts OPEN (the scene's valveOpen, lecturer Oct 2026).
+    // The orifice law is L7 (Bernoulli), so the card GIVES √(2gh) and keeps
+    // storage = in − out central; C is what the students find.
     instruments: [
-      { tool: "gauge", where: "x = 1.0 m, z = 0.6 m — low in the tank, clear of the falling inflow", why: "on Level η the gauge reads the free surface itself, and its chart is the h(t) curve: a straight line while the valve is shut, a curve bending over to a plateau once it is open" },
-      { tool: "cv", where: "Control volume (9): drag (0.30, 0.40) → (2.70, 3.12) — round the whole tank, under the spout and across the outlet jet", why: "in through the top face, out through the right face, and the stored rate dV/dt — net + dV/dt = 0 at every instant" },
+      { tool: "gauge", where: "x = 1.0 m, z = 0.6 m — low in the tank, clear of the falling inflow", why: "on Level η the gauge reads the free surface itself, and its chart is the level against time: a curve bending over to a plateau with the outlet open, a straight line with the valve shut" },
+      { tool: "cv", where: "Control volume: drag (0.30, 0.40) → (2.70, 3.12) — round the whole tank, under the spout and across the outlet jet", why: "in through the top face, out through the right face, and the stored rate dV/dt — net + dV/dt = 0 at every instant" },
     ],
-    ui: { view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0"] },
-    start: "a tank 2.00 m wide (S = 2.00 m² per metre) fed from a spout at Inflow Q, with a 0.08 m outlet near the floor shut by a valve",
+    ui: { view: ["legendBtn"], fields: ["water", "speed"], controls: ["speed", "geom0"],
+          readouts: { rows: ["pos", "eta", "uw"] } },
+    start: "a tank 2.00 m wide (S = 2.00 m² per metre width), filled from a spout at Inflow Q and draining through an open outlet in its right wall: a = 0.08 m tall, centred at z = 0.59 m",
     setup: [
-      "Gauge (5) at (1.0, 0.6) — it reads the level η. Control volume (9) from (0.30, 0.40) to (2.70, 3.12).",
-      "The Control volume counts OUTWARD as positive: net = out − in. The slides count inflow positive: S dh/dt = Q_in − Q_out. So net = −S dh/dt.",
-      "Valve shut: predict dh/dt = Q/S. Valve open: predict the level where Q_out = Q_in.",
+      "Storage = in − out: S dh/dt = Q_in − Q_out. While more water comes in than goes out the level rises; it stops rising where Q_out = Q_in.",
+      "The water leaves the outlet at a speed of about √(2gh), where h is the height of the water surface above the centre of the outlet (you will derive this in lecture 7). So Q_out = C·a·√(2gh) per metre width, with a = 0.08 m and C a number close to 1.",
+      "Predict: set Q_out = Q_in and solve for h, h = (Q/(C·a))² / 2g. Work it out with C = 1 for Q = 0.25 m²/s (g = 9.81 m/s²); the level is then h + 0.59 m.",
+      "Pick the Gauge tool on the strip and click at (1.0, 0.6): its chart is the water level in the tank. Wait until the level stops rising (about a minute) and read it; h = level − 0.59 m.",
+      "Compare: the water settles higher than your C = 1 prediction. Find the C that makes the prediction match the level you read — the jet narrows just after it leaves the outlet, so less water gets out than C = 1 assumes.",
+      "Slide Inflow Q on this card to another value, predict the new level with your C, and check it.",
+      "Optional: press V to shut the valve. Now nothing goes out and the level climbs in a straight line, dh/dt = Q/S. Pick the Control volume tool on the strip and drag a box from (0.30, 0.40) to (2.70, 3.12) round the whole tank: it reads in, out and the rate the tank stores water. It counts outward as positive, net = out − in, so net = −S dh/dt. Press V again to reopen.",
     ],
-    task: "With the valve shut, read dh/dt off the gauge and compare it with Q/S, and read in, out, net and dV/dt off the box. Press V and watch the level bend over and settle; read the settled level and check net ≈ 0. Change Inflow Q and watch it settle at a new level.",
+    task: "Predict the level at which outflow equals inflow with C = 1, compare it with the level the tank settles to, find the C that matches, and check your C at a second inflow.",
     settle: 0,
   },
   {
@@ -1334,145 +1385,177 @@ const EXERCISES = [
     settle: 5,
   },
   // ===== Year 1: PF-2 =====
-  // A lecturer demo the class replays: the `wall-shape` scene, one slider
-  // morphing the wall. Every slider move restarts still, hydrostatic water
-  // (resetWater), so there is nothing to wait out: `settle: 0`. The scene's
-  // `forceRef` puts ½ρg·d² beside F_h on the wall's chip.
+  // The `wall-shape` scene, one slider morphing the wall. Every slider move
+  // restarts still, hydrostatic water (resetWater), so there is nothing to
+  // wait out: `settle: 0`. The scene's `forceRef` puts ½ρg·d² beside F_h on
+  // the wall's label.
   {
     id: "PF-2",
-    title: "The wall's shape doesn't matter",
+    title: "Pressure force: only the depth matters",
+    aim: "Still water against a wall whose shape you change — check that the sideways force stays ½ρgd², and find the up-or-down force.",
     topic: "Pressure, force and where it acts",
     folder: "PF-2-wall-shape",
     scene: "wall-shape",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "0", particles: false },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "geom0", unit: "",
+        rule: "0 overhang (30°), 0.25 vertical, 0.50 sloped 30°, 0.75 sloped 60°, 1 a staircase. Each change restarts the still water; the depth at the wall stays 1.60 m." },
+      { control: "geom1", unit: "",
+        rule: "optional: 1 puts a 0.50 × 0.50 m block under water, held still." },
+    ],
     instruments: [
       { tool: "force", where: "the right-hand wall of the tank (and the submerged block, when it is on)", why: "F_h with ½ρg·d² beside it, and F_v — the weight of the water standing on the wall, or of the water that isn't there above an overhang" },
     ],
-    ui: { view: ["legendBtn"], fields: ["water", "phead"], panel: "focused", controls: ["geom0", "geom1"] },
-    start: "still water 1.60 m deep against a right-hand wall whose shape is set by one slider; per metre width",
-    setup: ["Pick the Pressure force tool and click the right-hand wall. The chip at the centre of pressure prints F, then F_h with ½ρg·d² beside it, then F_v.",
-            "Controls → Geometry → Wall shape: 0 overhang 30°, 0.25 vertical, 0.50 sloped 30°, 0.75 sloped 60°, 1 a staircase. Each change restarts the still water; the depth at the wall stays d = 1.60 m.",
-            "At each of the five settings read F_h and F_v. Work out the weight of the water standing on the wall, ρg × (area between the wall and the surface), and compare it with F_v.",
-            "Optional: switch Submerged block on and click the block. Its four sides add up to one upward force; compare it with ρg × 0.25 m²."],
+    ui: { view: ["legendBtn"], fields: ["water", "phead"], panel: "focused", controls: ["geom0", "geom1"],
+          readouts: { rows: ["pos", "eta", "phead"] } },
+    start: "still water 1.60 m deep against a right-hand wall whose shape is the Wall shape slider on this card; forces are per metre width",
+    setup: ["Pick the Pressure force tool on the strip and click the right-hand wall. The arrows are the pressure on the wall; the label at the centre of pressure prints F, then F_h with ½ρg·d² beside it, then F_v.",
+            "Slide Wall shape on this card through its five shapes: 0 overhang, 0.25 vertical, 0.50 sloped 30°, 0.75 sloped 60°, 1 a staircase.",
+            "At each shape read F_h and F_v. Work out the weight of the water standing on the wall, ρg × (area between the wall and the surface), and compare it with F_v.",
+            "Optional: set Submerged block to 1 and click the block. The pressure on its four sides adds up to one upward force — buoyancy; compare it with ρg × 0.25 m²."],
     task: "Show that F_h stays at ½ρg·d² = 12.6 kN/m whatever the wall's shape, and that F_v is the weight of the water above the wall — pointing up under the overhang, where the water above is water that isn't there.",
     settle: 0,
   },
   // ===== Year 1: FF-1 =====
-  // A lecturer demo on the `lake` scene: a closed tank of still water with a
-  // wind shear stress τ on its free surface, the scene's one param (geom0).
-  // Boots at rest (settle 0): the first reading IS the still tank. No
-  // measuring tools — the hover probe and the field legend are the
-  // instruments (MEASURE off, so there is nothing to place).
+  // The `lake` scene: a closed tank of still water with a wind shear stress τ
+  // on its free surface, the scene's one param (geom0), on the card as a
+  // slider. Boots at rest (settle 0): the first reading IS the still tank.
+  // No measuring tools — the hover card and the field legend are the
+  // instruments. L2: the hover card shows position, velocity and pressure
+  // head only.
   {
     id: "FF-1",
-    title: "Wind over a lake",
+    title: "A fluid deforms under any shear",
+    aim: "Blow wind over a lake: the water keeps moving as long as the wind pushes, however gently — that is what makes it a fluid.",
     topic: "Flow fields, shear and turbulence",
     folder: "FF-1-wind-lake",
     scene: "lake",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "0", particles: true },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "geom0", unit: "N/m²",
+        rule: "the wind's shear stress on the water surface: positive blows to the right, negative to the left, 0 is calm." },
+    ],
     ui: {
       measure: false,
       view: ["legendBtn", "partBtn"],
       fields: ["water", "speed", "phead"],
       panel: "focused",
       controls: ["geom0"],
+      readouts: { rows: ["pos", "uw", "phead"] },
     },
-    setup: [
-      "At rest: hover the water and read u = 0 and p/ρg = the depth below the surface. Switch the field to Pressure head: flat horizontal bands — pressure only.",
-      "Set the Wind stress τ slider to a small positive value: the water starts to flow and keeps flowing while the wind blows.",
-      "Watch the surface rise against the right-hand wall and the particles near the bed run back to the left. Switch to Speed to see where the water moves fastest.",
-      "Reverse τ: everything reverses. Set τ = 0: the motion dies away and the bands go flat again.",
-    ],
     start: "a closed tank of still water, 6 m long and 0.30 m deep, with no wind",
-    task: "Read u and p at rest, then blow on the surface with τ: any shear, however small, makes the water flow — set-up at the downwind wall, return flow along the bed.",
+    setup: [
+      "At rest: hover the water and read the velocity (u, w) = 0 and the pressure head p/ρg. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher. At rest it is just the depth below the surface.",
+      "Open Field & legend on the strip and choose Pressure head: flat horizontal bands — the water at rest carries pressure only.",
+      "Set the Wind stress τ slider on this card to a small positive value: the water starts to flow, and keeps flowing for as long as the wind blows.",
+      "Watch the surface rise against the right-hand wall and the particles near the bed run back to the left (Particles on the strip turns them on and off). Choose Speed in Field & legend to see where the water moves fastest.",
+      "Reverse τ: everything reverses. Set τ = 0: the motion dies away and the pressure bands go flat again.",
+    ],
+    task: "Read the velocity and the pressure at rest, then blow on the surface with τ: any shear stress, however small, makes the water flow — it piles up at the downwind wall and flows back along the bed.",
     settle: 0,
   },
   // ===== Year 1: FF-3 =====
-  // A lecturer demo on the `body` scene: plan view, a uniform stream past one
-  // body whose shape is the single Geometry slider (0 = slender ellipse,
-  // 1 = square, frontal width held at 0.40 m). The card boots on the ellipse
-  // with its steady wake; the lecturer drags the slider through the onset of
-  // shedding (measured near 0.4) and then presses A. No digit: watched, not
-  // pooled. `settle` is the time the boot transient takes to wash past the
-  // body and leave the steady streamlined wake.
+  // The `body` scene: plan view, a uniform stream past one body whose shape
+  // is the single Geometry slider (0 = slender ellipse, 1 = square, frontal
+  // width held at 0.40 m), on the card. Boots on the ellipse with its steady
+  // wake; shedding starts near 0.4. `settle` is the time the boot transient
+  // takes to wash past the body. L4 and no vorticity in Year 1: the card
+  // boots on Speed and reads the wake with particles, dye and streamlines.
   {
     id: "FF-3",
-    title: "Flow past a body",
+    title: "Steady and unsteady flow",
+    aim: "Morph a body from a slender ellipse to a square and watch the flow behind it switch from steady to unsteady.",
     topic: "Flow fields, shear and turbulence",
     folder: "FF-3-flow-past-body",
     scene: "body",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "4", particles: false, dye: false, gaugeField: "speed" },
-    digitNote: "lecturer demo: no personalised parameter",
+    viewParams: { mode: "2", particles: true, dye: false, gaugeField: "speed" },
+    studentParams: [
+      { control: "geom0", unit: "",
+        rule: "0 is a slender ellipse lined up with the flow (streamlined), 1 a square of the same width (bluff). Go in small steps and give each 20–30 s." },
+    ],
     instruments: [
       { tool: "gauge", where: "in the wake, about 0.6 m behind the body and 0.2 m off the centreline", why: "the speed trace is flat behind a streamlined body and a steady oscillation, one cycle per shed pair, behind a bluff one — the period is read off it" },
     ],
-    ui: { measure: ["gauge"], view: ["legendBtn", "partBtn", "dyeBtn", "avgBtn"],
-          fields: ["water", "speed", "vort"], panel: "focused", controls: ["speed", "geom0"] },
-    start: "looking down on a uniform 0.9 m/s stream past a slender ellipse lined up with the flow, 0.40 m wide; colour is vorticity",
-    setup: ["Watch the wake behind the ellipse: two thin shear layers (red and blue) that run off downstream side by side, and nothing moves.",
-            "Drag Controls → Geometry → Body shape slowly towards 1 (a square of the same width). Give each step 20–30 s; shedding grows slowly near its onset.",
-            "Note where along the slider the wake starts to swing from side to side. Put a Gauge (5) in the wake and read the period of the oscillation off its Speed trace.",
-            "Turn on Dye (D) and Particles (P): compare the dye timelines and the particle tracks in the steady wake and in the shedding one.",
-            "With the square shedding, press A (Average): watch the alternating street become one steady, symmetric wake bubble."],
-    task: "Find the slider position where the wake starts to shed, read the shedding period, and compare the live wake of the square with its average.",
+    ui: { measure: ["gauge"], view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn"],
+          fields: ["speed", "phead"], panel: "focused", controls: ["speed", "geom0"],
+          readouts: { rows: ["pos", "uw", "phead"] } },
+    start: "looking down on a uniform 0.9 m/s stream past a slender ellipse lined up with the flow, 0.40 m wide; colour is speed",
+    setup: ["Watch the wake behind the ellipse: a thin slow streak that runs straight downstream and stays put — steady flow round a streamlined body.",
+            "Slide Body shape on this card slowly towards 1 (a square of the same width). Give each step 20–30 s: near the change the wake takes time to start swinging.",
+            "Note where along the slider the wake starts to swing from side to side: the flow separates from the body and sheds eddies, first from one side, then the other. Pick the Gauge tool on the strip, click in the wake and read the period of the swing off its speed chart.",
+            "Turn on Dye and Particles on the strip: compare the dye and the particle tracks in the steady wake and in the swinging one. In unsteady flow they no longer follow the streamlines.",
+            "With the square shedding, turn on Streamlines on the strip and switch the colour bar (the legend) from Live to Average: the swinging wake becomes one steady, symmetric wake bubble — the mean flow is steady.",
+            "Optional: open Field & legend on the strip and choose Pressure head. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher. Press Fit on the legend so the colours span what is there, and notice the higher pressure where the stream meets the front of the body."],
+    task: "Find the slider position where the wake starts to swing, read its period, and compare the live wake of the square with its average.",
     settle: 10,
   },
   // ===== Year 1: FF-2, FF-4 =====
-  // Two lecturer demos for the Fluid Motion lecture (L4), each one flow field
-  // talked through for several concepts at once: the velocity field, steady
-  // against unsteady, streamlines (particles over the Average), separation,
-  // fluxes, velocity profiles and turbulence as mean + fluctuation. Nothing
-  // to draw and nothing personal; students replay them afterwards. Numbers
-  // in the `why`s are measured at Medium (the READMEs have the tables).
+  // Two flow fields for the Fluid Motion lecture (L4), each one talked
+  // through for several concepts at once: the velocity field, steady against
+  // unsteady, streamlines, separation, fluxes, velocity profiles and
+  // turbulence as mean + fluctuation. Nothing to draw and nothing personal.
+  // Numbers in the `why`s are measured at Medium (the READMEs have the tables).
   {
     id: "FF-2",
-    title: "Spillway with a ski-jump",
+    title: "The velocity field, and turbulence",
+    aim: "Water speeds up over a spillway crest, flies off a ski-jump and churns in a plunge pool — read its speed everywhere, compare the live flow with its average, and measure its flow rate and velocity profiles.",
     topic: "Flow fields, shear and turbulence",
     folder: "FF-2-spillway",
     scene: "spillway",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2", particles: true, gaugeField: "speed" },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "geom0", unit: "°",
+        rule: "the angle of the bucket's lip at the foot of the spillway: a steeper lip throws the jet higher and further. Wait about 30 s after a change." },
+      { control: "inLevel", unit: "m",
+        rule: "the reservoir level (8.70 m as the card opens): higher means more water over the crest." },
+    ],
     instruments: [
-      { tool: "flux", where: "Flux lines, two sections: one over the crest (a vertical at x ≈ 7.4 m, from the crest up through the surface), one full-depth across the pool at x ≈ 30 m", why: "q = 3.46 m²/s over the crest; live the pool section wanders ±10–20% about it, averaged (T = 40 s) it reads 3.36–3.41, within 3%" },
-      { tool: "rake", where: "Rakes in the pool at x ≈ 20 m and x ≈ 25 m", why: "a wall jet hugging the pool floor after the plunge (fastest ~2.5 m/s near the bed); at x = 20 m the live profile swings by ~1 m/s, the averaged one is a smooth curve" },
+      { tool: "flux", where: "Flux lines, two sections: one over the crest (a vertical at x ≈ 7.4 m, from the crest up through the surface), one full-depth across the pool at x ≈ 22 m", why: "q = 3.52 m²/s over the crest (W = 29 m pool, Medium); live the pool section wanders 2.9–4.1, averaged (T = 40 s) it reads 3.33, within 6%" },
+      { tool: "rake", where: "Rakes: one on the spillway face (x ≈ 9 m) and one in the pool at x ≈ 20 m", why: "the face: a thin fast sheet, slow at the floor (no slip); the pool: a jet hugging the floor after the plunge, swinging live and a smooth curve averaged" },
       { tool: "gauge", where: "a Gauge in the pool at x ≈ 20 m, z ≈ 1.0 m (on Speed)", why: "its trace is the fluctuation: a mean plus wild excursions" },
     ],
     ui: {
-      view: ["legendBtn", "partBtn", "dyeBtn", "avgBtn"],
-      fields: ["water", "speed", "vort", "phead"],
+      view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn"],
+      fields: ["water", "speed"],
       controls: ["speed", "geom0", "inLevel", "dye", "dyeLine"],
+      readouts: { rows: ["pos", "d", "eta", "q", "V", "uw"] },
     },
-    start: "a reservoir spilling over an ogee crest, down the face and off a flip bucket; the jet plunges into a long, deep pool held by a tailwater at the right edge",
+    start: "a reservoir spilling over a curved crest, down the spillway face and off a bucket that throws the water into the air; the jet plunges into a deep pool held at a fixed level at the right edge",
     setup: [
-      "Colour is Speed. Read it from left to right: nearly still in the reservoir, accelerating over the crest, fastest on the face and in the bucket, slowing in the pool.",
-      "Press Space twice a few seconds apart: the reservoir, crest and face look the same both times (steady); the pool around the plunge does not (unsteady).",
-      "Place a Flux line over the crest and one full-depth across the pool at x ≈ 30 m, two Rakes in the pool at x ≈ 20 and 25 m, and a Gauge at x ≈ 20 m, z ≈ 1 m.",
-      "Press A (Average) and wait until the legend's T passes 30 s: the pool becomes a steady mean flow with a roller either side of the plunge, the rakes stop jittering, and the two fluxes agree.",
-      "Optional: Controls → Bucket lip angle changes the throw; Dye with Dye timelines on marks the reservoir water and shows it smeared through the pool (Dye stands down while Average is on).",
+      "The velocity field: colour is Speed. Read it from left to right: nearly still in the reservoir, faster over the crest, fastest on the face and in the bucket, slowing in the pool. Hover anywhere to read the velocity (u, w).",
+      "Steady or unsteady: press Pause on the strip (or Space), look, run it again and pause a few seconds later. The reservoir, crest and face look the same both times (steady); the pool around the plunge does not (unsteady).",
+      "Streamlines: turn them on on the strip. They crowd together where the water is fast and spread where it is slow.",
+      "Flow rate: pick the Flux line tool on the strip and drag one up from the crest through the surface at x ≈ 7.4 m, and one from the floor to above the surface across the pool at x ≈ 22 m. The same q passes both, at very different depths and speeds: q = V × d.",
+      "Velocity profiles: pick the Rake tool on the strip and click on the spillway face (x ≈ 9 m) and in the pool (x ≈ 20 m). On the face the water is slowest at the floor (no slip); in the pool the profile jumps about.",
+      "Turbulence: pick the Gauge tool and click in the pool at x ≈ 20 m, z ≈ 1 m: its speed chart swings wildly about a mean.",
+      "On the colour bar (the legend), switch from Live to Average and wait until its T passes 30 s: the pool becomes a steady mean flow with a slow eddy either side of the plunge, the rake shows a smooth curve, and the two flux lines agree. Turbulence = mean + fluctuation, and the mean is steady.",
+      "Optional: slide Bucket lip angle on this card to change the throw; turn on Dye on the strip to mark the reservoir water and see turbulence mix it through the pool (dye pauses while Average is on).",
     ],
-    task: "Compare q over the crest and in the pool, live and averaged, and the pool rake live against averaged: turbulence is mean + fluctuation, and the mean is steady.",
+    task: "Read the velocity field, find where the flow is steady and where it is not, compare q over the crest and in the pool and the velocity profiles, live and averaged: turbulence is mean + fluctuation, and the mean is steady.",
     settle: 40,
   },
   {
     id: "FF-4",
-    title: "A pipe jet into a still reservoir",
+    title: "Boundary layers: at a wall, in a jet",
+    aim: "A pipe shoots a jet into still water — watch the slow layer grow along the pipe wall, and the jet swirl, spread and drag still water along.",
     topic: "Flow fields, shear and turbulence",
     folder: "FF-4-pipe-jet",
     scene: "pipejet",
     rig: null,
     rigParams: { budget: "Medium" },
     viewParams: { mode: "2", particles: true, gaugeField: "speed" },
-    digitNote: "lecturer demo: no personalised parameter",
+    studentParams: [
+      { control: "inLevel", unit: "m",
+        rule: "the level that drives the pipe (6.60 m as the card opens): raise it and the jet runs faster." },
+    ],
     instruments: [
       { tool: "rake", where: "Rakes, first in the pipe near the entrance (x ≈ 3.5 m) and near the exit (x ≈ 10 m)", why: "the wall boundary layers thicken along the pipe: centreline 2.17 → 2.51 m/s, the profile goes from a flat-topped plug to a rounded one" },
       { tool: "rake", where: "then Rakes across the jet at x ≈ 12 m and x ≈ 14 m", why: "live the x = 14 m profile jumps about; averaged (T = 60 s) both are bells, 1.43 m/s peak at 12 m and a wider, flatter 0.74 m/s at 14 m" },
@@ -1480,19 +1563,21 @@ const EXERCISES = [
       { tool: "gauge", where: "a Gauge on the jet axis at x ≈ 15 m, z ≈ 3.15 m (on Speed)", why: "where the jet flaps: a trace of eddies passing" },
     ],
     ui: {
-      view: ["legendBtn", "partBtn", "dyeBtn", "avgBtn"],
-      fields: ["water", "speed", "vort"],
+      view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn"],
+      fields: ["speed", "phead"],
       controls: ["speed", "inLevel", "dye", "dyeLine"],
+      readouts: { rows: ["pos", "uw", "phead"] },
     },
-    start: "a header driving an 8 m pipe of 0.5 m bore that discharges a jet into a large tank of still water, full to its lid, with an outflow at the far edge",
+    start: "a tank held at a fixed level drives an 8 m pipe of 0.5 m bore, which shoots a jet into a large tank of still water, full to its lid, with an outflow at the far edge",
     setup: [
       "Colour is Speed. In the pipe, look at the slow layers along both walls and how they thicken downstream: no slip at the wall, a boundary layer growing.",
-      "Past the exit the jet keeps its core for a few metres, then starts to flap and breaks into eddies. Switch the field to Vorticity: two thin sheets of opposite sign leave the pipe lips, the free shear layers, and roll up.",
-      "Place Rakes in the pipe at x ≈ 3.5 and 10 m and compare them; then place two more across the jet at x ≈ 12 and 14 m (each new Rake replaces the oldest).",
-      "Press A (Average) and wait until T passes 30 s: the jet becomes a smooth spreading plume and the rakes across it bell-shaped curves, wider and lower downstream.",
-      "Place two short Flux lines across the jet only (z = 2.4–3.9 m at x = 12 m, z = 2.15–4.15 m at x = 14 m): the averaged q through the jet grows downstream as it entrains the still water.",
+      "The other colouring, Pressure head (Field & legend on the strip), shows the pressure. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher. In this full tank it mostly grows with depth.",
+      "Past the exit the jet keeps its fast core for a few metres, then starts to flap and breaks into eddies: at its edges fast water meets still water and drags it along.",
+      "Pick the Rake tool on the strip and place Rakes in the pipe at x ≈ 3.5 and 10 m and compare the profiles; then place two more across the jet at x ≈ 12 and 14 m (each new Rake replaces the oldest).",
+      "On the colour bar (the legend), switch from Live to Average and wait until its T passes 30 s: the jet becomes a smooth, spreading stream and the rakes across it bell-shaped curves, wider and lower downstream.",
+      "Pick the Flux line tool on the strip and drag two short Flux lines across the jet only (z = 2.4–3.9 m at x = 12 m, z = 2.15–4.15 m at x = 14 m): the averaged q through the jet grows downstream as it drags in the still water.",
     ],
-    task: "Compare the wall boundary layer in the pipe with the free shear layers of the jet, live and averaged: one scene, both kinds of boundary layer, and turbulence as mean + fluctuation.",
+    task: "Compare the boundary layer on the pipe wall with the edges of the jet, live and averaged: turbulence is mean + fluctuation, and the mean is steady.",
     settle: 20,
   },
   // ===== Year 1: HJ-2, WV-4 =====

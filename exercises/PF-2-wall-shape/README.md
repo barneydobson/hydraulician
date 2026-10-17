@@ -1,4 +1,4 @@
-# PF-2 · The wall's shape doesn't matter
+# PF-2 · Pressure force: only the depth matters
 
 Still water 1.60 m deep stands against a right-hand wall whose shape is set by
 one slider: overhanging, vertical, sloped at 30° or 60° from the vertical, or
@@ -8,8 +8,7 @@ changes with the shape and is always the weight of the water standing on the
 wall, or, under the overhang, the weight of the water that isn't there above
 it, pointing up.
 
-This is a **lecturer demo** the class then replays (Play): there is no
-personalised parameter and nothing to pool.
+An exercise students play with on their own; the lecturer can also show it in class. There is no personalised parameter and nothing to pool.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **PF-2**, or use the direct link
@@ -34,8 +33,8 @@ overhang the water is below the wall and pushes it up with the weight of the
 "water that isn't there", the column from the wall up to the free-surface
 level, inside the solid.
 
-The slider, `Wall shape` (0 to 1, the card's only geometry row besides the
-optional block):
+The slider, `Wall shape` (0 to 1, on the card, beside the optional
+Submerged block):
 
 | setting | shape | A (m²) | F_v closed form |
 |---|---|---|---|
@@ -65,16 +64,16 @@ restarts the water at rest and hydrostatic, so it is still at once.
 
 ## What to do
 
-1. Pick the **Pressure force** tool and click the right-hand wall. The chip at
+1. Pick the **Pressure force** tool on the strip and click the right-hand wall. The chip at
    the centre of pressure prints F, then `F_h` with `½ρgd²` and the wetted
    height d beside it, then `F_v` with its direction.
-2. Move **Controls → Geometry → Wall shape** through 0, 0.25, 0.5, 0.75 and 1.
+2. Slide **Wall shape** on the card through 0, 0.25, 0.5, 0.75 and 1.
    The selection stays on the wall while the slider moves. Read F_h and F_v at
    each setting.
 3. Ask the class to predict F_v at each setting before it is read, as the
    weight of the water above the wall. Sketch the area; for the overhang,
    sketch the column of water that isn't there.
-4. Optional: switch **Submerged block** on and click the block. Its one face
+4. Optional: set **Submerged block** (on the card) to 1 and click the block. Its one face
    runs all the way round it: the horizontal parts cancel and what is left is
    one upward force, the weight of the water it displaces.
 

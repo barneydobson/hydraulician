@@ -6,7 +6,7 @@
  * and the record of how the README's numbers were measured, through the
  * same entry points the strip uses:
  *   APP.SIM.setParam("q_in", Q)        = the Inflow Q slider (geom0)
- *   APP.SIM.setValve(false)            = V, opening the outlet
+ *   APP.SIM.setValve(false)            = V, opening the outlet (open at boot since Oct 2026; V shuts it)
  *   APP.boxFlux(...) / APP.boxForce(...) = the Control volume's faces and contents
  *   APP.tick(n)                        = n solver steps, flat out
  *

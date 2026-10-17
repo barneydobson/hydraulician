@@ -1,6 +1,6 @@
 /* HS-1 "Three surfaces, one level" — paste into the dev console.
  *
- *   ?ex=HS-1 (or ?scene=dyke), Resolution: Medium (334 x 284, dx = 0.018 m).
+ *   ?ex=HS-1 (or ?scene=dyke), Resolution: Medium (352 x 270, dx = 0.017 m).
  *
  * There is nothing to draw: the scene's three polygons ARE the rig. This is
  * the lecturer's spot-check — it prints the levels and face forces the class
@@ -16,15 +16,15 @@
  */
 window.HS1 = {
   // The bench, in metres (js/scenes.js `dyke`)
-  ZG: 1.00, ZR: 1.60, ZC: 4.30,          // ground top, culvert roof, crest
-  XT: 2.40, ZT: 2.40, XS: 3.30,          // toe, top of the toe, slope meets crest
+  ZG: 0.50, ZR: 1.10, ZC: 3.80,          // ground top, culvert roof, crest
+  XT: 2.40, ZT: 1.90, XS: 3.30,          // toe, top of the toe, slope meets crest
   S0: 4.30, S1: 4.50, X1: 5.20, W: 6.0,  // piezometer slot, downstream face, domain
 
   /** h at four stations: left basin, culvert under the tap, piezometer, right basin */
   levels: function () {
     var h = function (x, z) { var p = APP.probe(x, z); return +(p.phead + z).toFixed(3); };
-    return { t: +APP.sim.t.toFixed(1), left: h(1.2, 1.3), culvert: h(4.4, 1.3),
-             piezo: h(4.40, 2.2), right: h(5.6, 1.3) };
+    return { t: +APP.sim.t.toFixed(1), left: h(1.2, 0.8), culvert: h(4.4, 0.8),
+             piezo: h(4.40, 1.7), right: h(5.6, 0.8) };
   },
 
   /** closed-form forces per metre width at levels etaL (upstream) and etaR */
@@ -84,7 +84,7 @@ window.HS1 = {
       for (var x = x0; x <= x1; x += (x1 - x0) / 6) for (var z = z0; z <= z1; z += (z1 - z0) / 6) {
         var q = APP.probe(x, z); if (q.f > 0.5) { s += q.speed * q.speed; n++; } }
       return n ? +Math.sqrt(s / n).toFixed(4) : 0; };
-    return { left: rms(0.3, 2.2, 1.2, 3.5), right: rms(5.3, 5.9, 1.2, 2.9), culvert: rms(2.6, 4.9, 1.05, 1.55) };
+    return { left: rms(0.3, 2.2, 0.7, 3.0), right: rms(5.3, 5.9, 0.7, 2.4), culvert: rms(2.6, 4.9, 0.55, 1.05) };
   },
 
   demo: function () {
@@ -99,9 +99,10 @@ window.HS1 = {
     return out;
   },
 };
-/* Measured, Medium:  shut  left 4.01 culvert 4.01 piezo 4.01 right 3.11
- *                          upstream Fx 28.5 Fz -6.0 (28.2 / 5.9)  downstream Fx -11.2 (11.0)
- *                          roof uplift, upstream block 45.3 (44.7)           kN/m
- *                    still all four 3.82 (3.82 predicted)
- *                          upstream Fx 24.2 Fz -4.7  downstream Fx -24.2 (24.2 / 4.7)
- *                    basin RMS speed < 0.01 m/s from ~45 s; mass 3.800 -> 3.800        */
+/* Measured, Medium (Oct 2026, ground top at 0.50 m):
+ *                    shut  left 3.50 culvert 3.50 piezo 3.50 right 2.62
+ *                          upstream Fx 28.2 Fz -5.9 (28.2 / 5.9)  downstream Fx -11.5 (11.0)
+ *                          roof uplift, upstream block 45.1 (44.7)           kN/m
+ *                    still all four 3.32 (3.32 predicted)
+ *                          upstream Fx 24.1 Fz -4.7  downstream Fx -24.3 (24.2 / 4.7)
+ *                    basin RMS speed < 0.002 m/s at 60 s; mass 3.441 -> 3.441      */

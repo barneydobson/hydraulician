@@ -1,14 +1,14 @@
-# FF-2 · Spillway with a ski-jump
+# FF-2 · The velocity field, and turbulence
 
-A reservoir spills over an ogee crest, races down the spillway face and is
+A reservoir spills over an ogee (curved) crest, races down the spillway face and is
 thrown into the air by a flip bucket (a ski-jump) at the toe; the jet plunges
 into a long, deep pool. One flow field, talked through for most of the Fluid
 Motion lecture: the velocity field, steady against unsteady, streamlines,
 separation and recirculation, fluxes and mean velocity, velocity profiles,
 and turbulence as a mean plus a fluctuation.
 
-This is a **lecturer demo**: no personalised parameter, nothing to pool;
-students replay it afterwards.
+An exercise students play with on their own; the lecturer can also show it in
+class. No personalised parameter, nothing to pool.
 
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **FF-2**, or use the direct link
@@ -18,8 +18,7 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 ## Theory, in one paragraph per slide
 
 - **Velocity field.** u = (u, w) at every point; the Speed colouring shows
-  |u|. Almost still in the reservoir, accelerating over the crest (the crest
-  is the control: the flow passes through critical there), fastest on the
+  |u|. Almost still in the reservoir, accelerating over the crest, fastest on the
   face and in the bucket (~8 m/s), slowing in the pool.
 - **Steady vs unsteady.** ∂u/∂t = 0 at a point. The reservoir, crest and face
   are steady; the pool around the plunge is not.
@@ -44,41 +43,48 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 
 | item | where |
 |---|---|
-| domain | 44 m × 10 m, Resolution Medium: 647 × 147 cells, Δx = 68 mm |
+| domain | 29 m × 10 m, Resolution Medium: 525 × 181 cells, Δx = 55 mm |
 | reservoir | x = 0 → 7 m, level held at **8.70 m** by the head-driven reservoir control (sponge 5 m) |
 | ogee crest | WES shape for a design head of 1.5 m, apex at (7.42, 7.20) m |
 | spillway face | 1 : 0.75, down to a circular bucket of radius 2 m, invert z = 3.30 m |
 | bucket lip | at 40° (the slider: 20–45°), lip at (13.69, 3.77) m |
-| plunge pool | floor z = 0.30 m, x = 13.7 → 44 m, held at **3.00 m** by the tailwater on the right edge (sponge 4 m) |
+| plunge pool | floor z = 0.30 m, x = 13.7 → 29 m, held at **3.00 m** by the tailwater on the right edge (sponge 4 m) |
 
 The right edge is the pool's outflow boundary. There is no hydraulic jump and
-no stilling basin: the domain is simply long enough (26 m of pool past the
-plunge) that the plunge turbulence has decayed into a slow drift before it
-reaches the outflow edge.
+no stilling basin. The pool was halved in October 2026 (it was 44 m of
+domain, 26 m of pool past the plunge) so the fitted view shows more of the
+spillway; the plunge turbulence now reaches the outflow edge, but the edge
+never flows back and the tailwater holds (see the instructor section).
 
-**The slider.** Controls → *Bucket lip angle* (20–45°, default 40°) moves the
+**The slider.** *Bucket lip angle* on the card (20–45°, default 40°) moves the
 lip along the bucket's own arc, so the throw changes while the crest, the
 face and q do not. It is the one design choice a ski-jump designer actually
 makes, and it turns the "free jet in the air is a parabola" remark into
-something to watch. The reservoir level is also on the panel (it sets q).
+something to watch. The reservoir level is also on the card (it sets q).
 
 ## What to do
 
-1. **The velocity field.** Speed colouring (the card opens on it). Walk the
-   class from left to right.
-2. **Steady vs unsteady.** Pause (Space) twice, a few seconds apart.
-3. **Fluxes.** Flux line over the crest (a vertical at x ≈ 7.4 m from the
+The card carries these steps.
+
+1. **The velocity field.** Speed colouring (the card opens on it). Read it
+   from left to right.
+2. **Steady vs unsteady.** Pause (Space, or Pause on the strip) twice, a few
+   seconds apart.
+3. **Streamlines** (on the strip): crowded where the water is fast.
+4. **Flow rate.** Flux line over the crest (a vertical at x ≈ 7.4 m from the
    crest up through the surface) and one full-depth across the pool at
-   x ≈ 30 m. Live, the crest reads a steady **3.46 m²/s**; the pool wanders
-   about it.
-4. **Profiles and turbulence.** Rakes at x ≈ 20 and 25 m and a Gauge at
-   (20, 1.0) m. Live, the profiles jump about; press **A** and wait until T
-   passes 30 s.
-5. **Average.** The pool becomes a steady mean flow with a roller either side
-   of the plunge, particles trace its streamlines, the rakes are clean
-   curves, and the two fluxes agree.
-6. **Optional.** Move the lip angle; turn Dye on with Dye timelines to mark
-   the reservoir water (dye is live-only and stands down under Average).
+   x ≈ 22 m. Live, the crest reads a steady **3.52 m²/s**; the pool wanders
+   about it (2.9–4.1).
+5. **Velocity profiles.** Rakes on the spillway face (x ≈ 9 m: slow at the
+   floor, no slip) and in the pool at x ≈ 20 m (jumping about live).
+6. **Turbulence.** A Gauge at (20, 1.0) m: its speed chart swings about a
+   mean.
+7. **Average.** Switch the colour bar from Live to Average and wait until T
+   passes 30 s: the pool becomes a steady mean flow with an eddy either side
+   of the plunge, the rakes are clean curves, and the two fluxes agree
+   (averaged pool section **3.33**, within 6% of the crest).
+8. **Optional.** Slide the lip angle; turn Dye on to mark the reservoir water
+   (dye is live-only and stands down under Average).
 
 The card's settle is about **40 s**: the crest flux is steady by ~5 s, but
 the pool level sloshes once (its section read 2.5–4.7 m²/s between 7 and
@@ -86,7 +92,19 @@ the pool level sloshes once (its section read 2.5–4.7 m²/s between 7 and
 
 ## For the instructor
 
-Measured headless at Medium on this geometry (`rig.js` reproduces it):
+Re-measured in October 2026 on the halved pool (W = 29 m, Medium, 525 × 181,
+Δx = 55 mm), 105 s live then a 40 s Average:
+
+| reading | live | averaged (T = 40 s) |
+|---|---|---|
+| q over the crest | 3.51–3.53 m²/s from 7 s on | 3.52 |
+| q, pool at x = 22 m | 2.9–4.1 | 3.33 (−5%) |
+| q at the outflow edge (x = 28.4 m) | 3.0–4.6 | 3.51 |
+| tailwater level near the edge | 2.97–3.03 m (set 3.00) | — |
+| slowest u across the edge column, z = 0.4–3.0 m | always > +0.45 m/s: no backflow | — |
+
+Earlier, on the 44 m pool at its coarser grid (647 × 147, Δx = 68 mm;
+`rig.js` reproduces it):
 
 | reading | live | averaged (T = 40 s) |
 |---|---|---|
@@ -125,7 +143,7 @@ with a roller in the corner between the jet and the dam's downstream face.
 ### Discussion points
 
 - The crest, the face and the jet look identical in Live and Average: a
-  steady flow is its own mean. Only the pool changes when A is pressed.
+  steady flow is its own mean. Only the pool changes when Average is on.
 - The same q at very different depths and speeds (crest, face, pool): V = q/d.
 - Where is the flow fastest, and why is it not at the bottom of the face?
   (The bucket turns it; the pressure head field shows the bucket's

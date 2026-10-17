@@ -2282,68 +2282,75 @@ const SCENES = (() => {
     // ------------------------------------------- FF-4 · pipe jet into a reservoir
     // A header (head-driven level control, its whole compartment held)
     // drives a 0.5 m pipe, 8 m long, that discharges a jet horizontally into
-    // a large tank of still water. Inside the pipe the wall boundary layers
-    // grow from the rounded entrance; past the exit the jet's two free shear
-    // layers roll up, entrain the still water and spread. The pipe axis sits
-    // mid-depth, 5.7 D from the floor and from the lid, and the tank runs
-    // 19.5 m (39 D) past the exit to the outflow edge.
-    //   The tank is FULL (lid on, no free surface) and its right edge is a
-    // submerged tailwater (a piezometric head, as on venturi), so the jet
-    // leaves through the edge instead of turning on a far wall. Two
-    // free-surface versions were measured and dropped:
-    //  * a tailwater on a free surface: this tank carries almost no
-    //    through-flow (~0.1 m/s mean) and the tailwater sponge keeps the
-    //    stress-free surface extension (boundary-conditions.md §3), so an
-    //    inflowing surface current grew at the edge (-1 m/s at 2.6 s, -8 m/s
-    //    by 11 s), filled the tank to the lid and drove the pipe backwards;
-    //  * an overflow weir at the far end: stable, but the jet struck the weir
-    //    face within ~10 s and the 14 m tank filled with one big eddy, so the
-    //    averaged jet was neither straight nor symmetric.
-    //   The outflow edge needs an ABSORBING LAYER (outflowNu / outflowLen,
-    // FS_VEL). The tailwater is a pressure outlet — it pins a hydrostatic f
-    // and passes whatever u arrives, inflow included — and the 2-D eddies
-    // grow to tank size by x ≈ 20 m. Without the layer (measured, Medium) one
-    // parked on the edge most of the time: live the edge ran OUT by the floor
-    // and the lid and IN through the middle (−0.7 m/s at z ≈ 2.5–3.5 m;
-    // up to 1.1 m²/s in against 1.9 out, for a net 0.76), and a 60 s average
-    // was still two-signed (−0.2 m/s around z = 4 m). The sponge only nudges
-    // f, so it never touched u; the net flux was right all along (averaged,
-    // 0.76 m²/s out of the edge against 0.77 down the pipe). With ν raised by
-    // 0.5·s² m²/s over the last 6 m the eddies are diffused out before they
-    // arrive and the edge passes a smooth one-signed profile over its whole
-    // height, live and averaged. 0.5 is about the most that costs no speed
-    // (SIM.dt holds the layer to a diffusion number of 0.14: at 0.20, ν =
-    // 0.7, it ran to the ±80 rail; 1.0 m²/s ran clean but 30% slower); at
-    // 0.5 over 4 m the edge still took in up to 0.07 m²/s now and then.
-    // A plain open edge (tailwater off, outflow-only) was tried: with
-    // nothing holding the tank's head it rose until the pipe carried 0.34
-    // m²/s instead of 0.79.
+    // a reservoir with a FREE SURFACE. Inside the pipe the wall boundary
+    // layers grow from the rounded entrance; past the exit the jet's two free
+    // shear layers roll up, entrain the still water and spread. The pipe axis
+    // sits 2.85 m (5.7 D) over the floor and ~3 m under the surface; the
+    // reservoir ends 13.5 m (27 D) past the exit at an END WALL (x = 24 m)
+    // whose top is a 3 m broad crest, and the water leaves over it through a
+    // brink on an OUTFALL edge (open[1] = 2; a brink is what mode 2 is for).
+    // The crest holds the level (6.15–6.25 m, measured, Medium, 100 s) with
+    // nothing pinned on the right: no tailwater, no sponge, no inflow edge.
+    //   History, all measured at Medium:
+    //  * lidded full tank, submerged tailwater on the right edge behind an
+    //    absorbing layer (outflowNu 0.5 over 6 m): what shipped first. It
+    //    worked (q 0.79, the edge one-signed) but the tank had a lid.
+    //  * free surface + tailwater on the right edge, inflow allowed: a surface
+    //    current ran in from the edge (−8 m/s by 11 s) and drove the pipe
+    //    backwards. With twOutflowOnly it is fine (level 6.14–6.23, q 0.77–
+    //    0.81, no inflow through the edge face, eddies still recirculating
+    //    inside the sponge at up to −0.9 m/s) — the fallback if the end wall
+    //    ever has to go, but it has no wall to see.
+    //  * an early overflow weir in a 14 m tank: the jet struck its face within
+    //    ~10 s and one eddy filled the tank.
+    //  * this end wall with a plain OPEN right edge (mode 1): the crest passed
+    //    too little (q ≈ 1.0 h^1.5), the reservoir rose to 6.39 m, the pipe
+    //    fell to q = 0.50 and needed ~45 s to recover. The outfall brink fixes
+    //    it: the crest passes 0.82 m²/s at 0.62 m over it from t ≈ 10 s.
+    //  * the absorbing layer is not used: documented for lidded domains only.
+    //   What the end wall costs: everything the jet drives stays in a closed
+    //   reservoir, so the far field is livelier than the lidded tank's and
+    //   its eddies come back and nudge the jet: the clean core is ~1.5 m
+    //   (it was ~4 m lidded), the flapping starts by x ≈ 12 m and the jet is
+    //   in eddies by x ≈ 14–15 m. Averaged, the surface drifts 0.2–0.3 m/s
+    //   back towards the pipe over the near jet (x = 12–16 m, the entrained
+    //   water's return) and on towards the crest beyond (+0.2–0.5 m/s): no
+    //   current runs in from the boundary, and q does not move.
     //   kappa: 0 switches the open-channel mixing length off. Its l = κy
     // takes y from the nearest wall, metres from a free shear layer, and
     // with it on (measured) the jet left the pipe as a smooth laminar blob
     // with no eddies at all; with it off the Smagorinsky term alone leaves
     // the shear layers free to roll up.
-    //   nu = 2e-3 m²/s is an eddy viscosity, not water's (Re = VD/ν ≈ 400),
-    // chosen by measurement between two failures: at 1e-4 and 1e-3 the 2-D
-    // jet broke up at the lip into tank-sized eddies that throttled the pipe
-    // (q fell 0.90 → 0.41 m²/s and recovered over ~20 s) and a 90 s Average
-    // was still a blob; at 5e-3 the jet stayed laminar and steady (live =
-    // Average, nothing to show). At 2e-3 the jet leaves as a clean core,
-    // starts to flap ~4 m past the exit and breaks into eddies by ~6 m; the
-    // pipe profile still develops visibly (centreline 2.17 → 2.51 m/s from
-    // x = 3.5 to 10 m) and the averaged jet is a spreading bell.
+    //   nu = 2e-3 m²/s is an eddy viscosity, not water's (Re = VD/ν ≈ 400).
+    // Swept again (lidded tank, then this one): lowering ν no longer
+    // throttled the pipe in any run (q 0.79 → 0.89 → 0.95 → 0.99 → 1.02 m²/s at 2e-3,
+    // 1e-3, 5e-4, 2e-4 and water's 1e-6, all stable) — less wall friction —
+    // but it does not buy turbulence either. Below ~5e-4 the Smagorinsky
+    // term (cs Δx)²|S| is the larger viscosity in the shear layers, so 2e-4
+    // and 1e-6 look alike; and in a plane the eddies MERGE instead of
+    // breaking down (no vortex stretching), so a lower ν gives fewer, bigger
+    // tank-sized vortices, not finer turbulence. Lidded: clean core ~4 m at
+    // 2e-3, ~1.5 m at 1e-3 and 5e-4, none at 2e-4 and below (it flaps from
+    // the lip). In this closed reservoir 1e-3 already flapped at the lip
+    // (axis w_rms 0.37 m/s at x = 11 m against 0.11 at 2e-3), the tank was a
+    // churn and a 60 s average was not a bell (x = 12 m peak 0.25 m under
+    // the axis). 2e-3 is the lowest value at which the class still sees a
+    // clean core, its roll-up and break-up, and a converged average.
     (() => {
-      const W = 30, H = 6;
+      const W = 27, H = 7;
       const ZF = 0.3;                         // floor
       const XH = 2.2, TWALL = 0.3;            // header wall (left face) and thickness
-      const ZA = 3.15, D = 0.5;               // pipe axis (mid-depth) and bore
+      const ZA = 3.15, D = 0.5;               // pipe axis and bore
       const XE = 10.5;                        // pipe exit
       const TP = 0.25;                        // pipe wall thickness
-      const LEVEL = 6.6, TW = 6.2;            // header and tank heads (both above the lid)
+      const LEVEL = 6.6;                      // header head
+      const XW = 24, ZC = 5.55;               // end wall: its face and its crest
+      const LT = 6.2;                         // tank level, as measured settled (initial fill)
       const RB = 0.35;                        // bellmouth radius at the entrance
       const z0 = ZA - D / 2, z1 = ZA + D / 2, x1 = XH + TWALL;
-      // Two solids. Below: the header wall under the pipe and the pipe's
-      // lower wall; above: the header wall over it and the upper wall. The
+      // Three solids besides the ground. Below: the header wall under the
+      // pipe and the pipe's lower wall; above: the header wall over it and
+      // the upper wall; and the end wall, whose top is the crest. The
       // entrance corners are rounded (a bellmouth) so the flow enters the
       // pipe as a near-uniform plug rather than a separated vena contracta,
       // and the profile development along the pipe is the wall's doing.
@@ -2364,42 +2371,44 @@ const SCENES = (() => {
            { id: "exitUp", label: "Pipe exit, upper lip", e0: 1, e1: 1 }], "pipeUp");
         const ground = GEOM.rect(-1, -1, W + 1, ZF, { id: "ground",
           faces: [{ id: "top", label: "Floor", e0: 2, e1: 2 }] });
-        built = { lower, upper, ground };
+        const end = GEOM.rect(XW, -1, W + 1, ZC, { id: "endwall",
+          faces: [{ id: "face", label: "End wall", e0: 3, e1: 3 },
+                  { id: "crest", label: "Crest", e0: 2, e1: 2 }] });
+        built = { lower, upper, ground, end };
         return built;
       };
 
       return {
         id: "pipejet", name: "Pipe jet into a reservoir", key: "Boundary layers: wall and jet",
         group: "Flow fields & turbulence",
-        blurb: "A header drives a pipe that discharges a jet into a large, full tank of still water. Boundary layers grow along the pipe walls; past the exit the edges of the jet roll up into eddies, drag the still water along and spread.",
+        blurb: "A header drives a pipe that discharges a jet into a large reservoir of still water, which spills over a wall at its far end. Boundary layers grow along the pipe walls; past the exit the edges of the jet roll up into eddies, drag the still water along and spread.",
         W, H, c: 30, cf: 0.02, cs: 0.10, bulk: 0.05, nu: 2e-3,
         kappa: 0,
         mode: 2, hmax: 6, headMax: 6.5, vmax: 3, particles: 1,
         spinup: 20,
-        open: [1, 1, 0, 0],
-        spongeIn: XH, spongeTw: 2.0,
-        // The outflow's absorbing layer: ν + 0.5·s² m²/s over the last 6 m
-        // (s: 0 → 1 towards the edge). See the scene comment above.
-        outflowNu: 0.5, outflowLen: 6.0,
+        // Left: the header's level control. Right: an OUTFALL edge — the
+        // brink at the end of the crest, which is what mode 2 is for.
+        open: [1, 2, 0, 0],
+        spongeIn: XH,
         inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
-        tailwater: { level: TW, on: 1 },
-        solids: () => { const g = build(); return [g.ground, g.lower, g.upper]; },
+        solids: () => { const g = build(); return [g.ground, g.lower, g.upper, g.end]; },
         water: (x, z, P) => {
           if (z <= ZF) return 0;
           const level = Number.isFinite(P.level) ? P.level : LEVEL;
           if (x < XH) return still(level, z, P);
           if (x < x1) return z > z0 && z < z1 ? still(level, z, P) : 0;
           if (x < XE && z > z0 && z < z1) return still(level, z, P);
+          if (x >= XW) return z > ZC ? still(LT, z, P) : 0;
           const g = build();
           if (GEOM.contains(g.lower, x, z) || GEOM.contains(g.upper, x, z)) return 0;
-          return still(TW, z, P);
+          return still(LT, z, P);
         },
         tips: ["Colour is speed. In the pipe the slow layers by the walls thicken downstream: the boundary layer, with no slip at the wall.",
                "Past the exit the jet meets still water: its edges roll up into eddies and drag the still water in.",
                "Drop a <b>Rake</b> in the pipe near the entrance and one near the exit: the profile goes from a flat plug towards a rounded one.",
                "A Rake across the jet jitters live. Switch the colour bar from Live to <b>Average</b>: a smooth bell-shaped profile that widens and flattens downstream.",
                "Two <b>Flux lines</b> across the jet: the averaged q GROWS downstream — that is the entrained water.",
-               "The tank is full to its lid and its right edge is an outflow held at a fixed level; <b>Reservoir level</b> on the card drives the pipe: raise it and the jet runs faster."] };
+               "The reservoir spills over the wall at its far end, which holds its level; <b>Reservoir level</b> on the card is the header's and drives the pipe: raise it and the jet runs faster."] };
     })(),
     // ===== Year 1: HJ-2, WV-4 =====
     // ------------------------------------------------ THE FLUME LAB, SCALED UP

@@ -98,7 +98,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | VC-2 | Storage = in − out (tank that fills and leaks) | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (students play; class demo) |
 | MM-1 | The force of a jet on an inclined plate | MM-1-jet-inclined-plate/ | vane, plate angle slider | — (students play; class demo) |
 | MM-2 | Momentum: the force on a contraction (contraction rig) | MM-2-contraction-forces/ | contraction | — (students play; class demo) |
-| HJ-2 | Sluice gate with the movable weir | HJ-2-gate-jump/ | gatejump, weir crest slider | — (lecturer demo) |
+| HJ-2 | Pressure and force on a sluice gate | HJ-2-gate-jump/ | gatejump, weir crest slider | — (students play; class demo) |
 | WV-4 | How waves break on beaches | WV-4-breakers/ | beach (wall paddle), beach slope slider on the card | — (student-run preview) |
 
 Rigs: RIG-A (pressurised duct) card = FR-1/rig.js · RIG-B (flat channel) card

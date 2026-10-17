@@ -744,6 +744,81 @@ so it refreshes every 32. `analyse` costs 0.5 ms per frame against that — well
 under a percent. If a scene feels
 slow, check `state.rt` in the status bar before suspecting the overlay.
 
+## Frame pacing: the governor and the status line
+
+`state.speed` is what the user ASKS for (simulated seconds per wall second);
+each frame wants `speed · Δt_wall / Δt_sim` substeps and runs at most
+`state.nsubMax`. The governor (`governFrame` in main.js) sets that cap. Spin-up
+(`warming`) asks for the cap every frame, i.e. as fast as the governor allows.
+
+**What was wrong (Oct 2026).** The old governor was AIMD on the CPU time
+around `SIM.step` + `columns()` + particles: ×0.82 above 24 ms, ×1.05 + 1
+below 11 ms. WebGL is asynchronous, so on two frames in three that clock read
+only the enqueue (~1 ms), and on the third — `columns()`'s readback, every
+`readEvery = 3` frames, is a full pipeline sync — it read the entire GPU
+backlog of all three frames. Per-frame trace on hammer (Iris Xe, shared GPU):
+stale frames 1–2 ms, readback frames 110–260 ms, every third frame like
+clockwork. The governor saw ~3× the real cost of a frame, saw-toothed, and
+pinned the cap at ~18–24 whatever the GPU could do. The status line made it
+look worse than it was and better than it was at once: `fps` and `×RT` were
+computed from `realDt`, which is CLAMPED to 50 ms, and `×RT` from the single
+frame that happened to close the 0.5 s window — so it alternated ×3 between a
+queueing frame and a readback frame (h23: 0.07 ↔ 0.23), and on hammer it
+printed ×0.98 RT at a measured 0.18 sim-s per wall-s and "36 fps" at ~12.
+
+**What it does now.**
+
+- *Measure the interval, not the frame.* `tickFrame` times the real interval
+  between its own starts (`performance.now()`, unclamped). Long frames are
+  real and are counted — a governor that skipped >1 s frames saw only the fast
+  ones during a loaded spin-up and ran away; only the gap across a hidden tab
+  is dropped (`visibilitychange` resets the clock). The governor's signal is
+  the mean interval over a ~0.8 s exponential window (several frames even at
+  5 fps), computed as decayed wall time ÷ decayed frame count. NOT an EMA of
+  the interval with a time-based weight: that weights each interval by its own
+  length and over-counts the readback frames (16, 16, 150 ms reads 126 ms
+  against a true mean of 61).
+- *Integral control on the log error.* d ln(nsubMax)/dt = ln(target / mean),
+  limited to ±1 /s (±1.5 /s in spin-up), ±6 % dead band: no sawtooth. The
+  limit is SYMMETRIC on purpose — a fast-down/slow-up limit on a noisy
+  interval is a rectifier and settled the cap far under target. The cap is
+  only RAISED when it is what limits the frame, so a scene at ×0.25 cannot
+  ratchet it to the ceiling and then queue seconds of work on the first touch
+  of the speed slider. The rate limit is also the warm-up hand-over: the cap
+  ramps from the spin-up target to the running one over a second or two.
+- *The target.* `CONFIG.frameTargetMs` = 30 ms (≈ 33 fps) running,
+  `warmFrameTargetMs` = 200 ms in spin-up (throughput only grows with the
+  batch). Unless the machine cannot meet it with the sim taking a real share
+  of the frame: `governLearn` fits T = T0 + c·n (frame interval against
+  substeps per frame) over the status windows, ~15 s memory, slope refitted
+  only when the windows span a spread of n, and the target becomes
+  max(30 ms, 2·T0) — at least half of each frame is substeps (¾ in spin-up) —
+  capped at `frameCeilMs` = 150 ms (400 ms in spin-up; 100 ms was tried and
+  left hammer, whose particles make the render heavy, at 31 % of flat out). Without that floor a
+  machine whose render alone costs 30 ms cut the sim to 2 substeps chasing a
+  frame rate the substeps were not costing (measured: ×0.01 RT). A fit needs
+  n to move, so a cap pinned at its floor with the frame still too slow takes
+  that frame as a lower bound on T0 (`T0floor`, fading over ~15 s) — without
+  it hammer, straight after spin-up, sat at n = 2 for good.
+- `frame()` clamps `realDt` at 100 ms (was 50): the substeps a frame asks for
+  are speed · realDt / Δt, so below 20 fps a 50 ms clamp made ×1
+  unreachable however fast the GPU.
+- *The status line* reads the whole 0.5 s window: `×RT` = simulated seconds
+  advanced ÷ wall seconds elapsed, `fps` = frames ÷ wall seconds, each blended
+  half-and-half with the previous reading (~1 s effective; a paused window
+  is taken as it stands), and the speed note under the slider prints the
+  window's mean substeps per frame. It is now the truth: measured against
+  `sim.t` over 55 s, it agrees to ~2 %, where the old one over-read 3–5×.
+
+Headless numbers are only comparable within one run: on a shared iGPU the
+flat-out cost of a substep moved 0.6 → 2.5 ms between consecutive runs. The
+`APP.frames` headless path is governed by its own real intervals too, but
+always to the plain 30 ms target — no spin-up target, no share rule: a
+scripted `APP.frames(600)` on a warming m2 at 200–400 ms a frame timed
+ui-smoke out. So `APP.frames(n)` advances what n frames of ~30 ms of work
+buy, which is more sim time per call than under the old governor (whose
+readback-stalled CPU clock held a sync loop near 20 substeps a frame).
+
 ## The view
 
 ### The colour range is held, not tracked

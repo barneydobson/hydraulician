@@ -1836,10 +1836,12 @@ function togglePanel() {
  *  its students reach everything through the exercise menu, and a second menu
  *  of bare geometry beside it only confuses. The strip's ⋯ (show everything)
  *  brings it back, and with no exercise loaded — the start screen, the
- *  sandbox, a `?scene=` boot — it is always there. `?scene=` links still boot. */
+ *  sandbox, a `?scene=` boot — it is always there. `?scene=` links still boot.
+ *  A card with a `secondScene` keeps it too: its "Also:" line sends the
+ *  student to the Scenes menu for that second scene. */
 function scenesOffered() {
   const ex = typeof EX !== "undefined" && EX.current;
-  return !ex || !!(state.ui && state.ui.lifted);
+  return !ex || !!(ex.secondScene && ex.secondScene.scene) || !!(state.ui && state.ui.lifted);
 }
 
 /** Is there a wave train to fire? (wave.train > 0 on a running paddle.) The

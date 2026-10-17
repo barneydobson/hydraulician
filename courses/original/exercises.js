@@ -41,7 +41,7 @@ COURSES.exercises("original", [
       measure: false,
       view: ["legendBtn", "chanBtn"],
       controls: ["speed", "inQ"],
-      readouts: { rows: ["pos", "d", "q", "dn"] },
+      readouts: { rows: ["profile", "pos", "d", "q", "dn"] },
     },
     start: "a steep chute running uniform flow, with your own inflow to set",
     task: "Set your q, then hover mid-chute at x ≈ 3.5 m and read the MEASURED d_n off the hover box.",
@@ -61,7 +61,7 @@ COURSES.exercises("original", [
       measure: false,
       view: ["legendBtn", "chanBtn"],
       controls: ["speed"],
-      readouts: { rows: ["pos", "d", "eta"] },
+      readouts: { rows: ["profile", "pos", "d", "eta"] },
     },
     start: "the settled backwater pool behind a weir — nothing to set",
     task: "Hover at your own station and read the surface elevation straight off the hover box (the \"surface … above datum\" row).",
@@ -147,7 +147,7 @@ COURSES.exercises("original", [
       view: ["legendBtn", "avgBtn"],
       fields: ["speed"],
       controls: ["speed", "inLevel"],
-      readouts: { rows: ["pos", "d", "eta", "uw"] },
+      readouts: { rows: ["profile", "pos", "d", "eta", "uw"] },
     },
     start: "a 35 m channel at 1 in 400 fed by a reservoir and ending in a free overfall; the reservoir level sets the flow",
     setup: [
@@ -175,7 +175,7 @@ COURSES.exercises("original", [
       measure: false,
       view: ["legendBtn"],
       controls: ["speed", "inQ"],
-      readouts: { rows: ["pos", "d", "Sf"] },
+      readouts: { rows: ["profile", "pos", "d", "Sf"] },
     },
     start: "the steep flume, with your own inflow to set",
     task: "Hover at x ≈ 3.5 m and read h and S_f, then τ₀ = ρg·h·S_f and D_min = τ₀/[0.056(ρₛ−ρ)g].",
@@ -520,7 +520,7 @@ COURSES.exercises("original", [
       view: ["legendBtn"],
       fields: ["speed"],
       controls: ["gaugeField", "cvShow"],
-      readouts: { rows: ["pos", "eta", "V", "uw"] },
+      readouts: { rows: ["profile", "pos", "eta", "V", "uw"] },
     },
     start: "the fixed tutorial scheme: a 24.9 m reservoir, 42.4 m headrace, 3.0 m surge shaft and 0.48 m nozzle, running steadily",
     task: "Complete the sheet's measured column: V₀, headrace h_f, V_jet, P, η₀, k and η_max. Use the rake for depth-averaged V₀ and hover the horizontal jet for V_jet; read the two gauges on Level η, then switch them to Depth d, press V and read the first crest.",
@@ -795,9 +795,11 @@ COURSES.exercises("original", [
                  openL: "0", openR: "1", openB: "1", openT: "0",
                  spoutOn: true, spoutR: 0.10, spoutVx: 0.50, spoutVy: 0 },
     rigWhy: { spoutVx: "the dry-weather flow the 45 s pre-charge runs at — the storm ramp up from it is yours." },
-    // The spout's own dye source (the default seed at a running spout) marks
-    // the storm water: one of the few fixed sources still switched on.
-    viewParams: { gaugeField: "d", dyeSeeds: true, dyeDecay: 0 },
+    // The spout runs clear, as it always has: the only dye is what you pour
+    // (right-drag, the brief's "Also"), drawn whenever there is any and kept
+    // by dyeDecay 0. (This card's old `dye: true` / Dye button only switched
+    // the drawing on; it never turned on a fixed source.)
+    viewParams: { gaugeField: "d", dyeDecay: 0 },
     digitNote: "your throttle is DRAWN: r = d mod 4 gives 2 / 4 / 6 / 8 cells erased straight down x = 4 m",
     setup: ["Press Z once — the rig ships with a 6-cell throttle already cut, and undo restores the whole floor so every rung starts equal (an erase stroke can widen a hole, never narrow it).",
             "Cut your own throttle: press [ twenty times to shrink the erase brush, then ] once / 3 / 5 / 6 times for r = 0 / 1 / 2 / 3, and erase down the x = 4 m line.",

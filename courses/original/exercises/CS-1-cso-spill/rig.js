@@ -87,7 +87,8 @@ window.CS1 = (function () {
     S2.on = 1; S2.x = g.spoutX; S2.y = g.spoutY; S2.r = g.spoutR;
     S2.vx = (o.vx !== undefined ? o.vx : 0.5); S2.vy = 0;
     C('gaugeField').set('d');
-    C('dye').set(true);
+    // (The old Controls row 'dye' only switched the drawing on; dye is now
+    // drawn whenever there is any, and the spout still runs clear.)
     C('dyeDecay').set(0);
     APP.state.gauges.length = 0;
     APP.state.gauges.push({ x: g.gaugeX, z: g.gaugeY, hist: [], colour: "#7fd4ff" });

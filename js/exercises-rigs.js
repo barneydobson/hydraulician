@@ -333,7 +333,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0},
    "gauges": [[4.25, 1.62]],
    "rakes": [],
-   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* B8-three-orifices · ?scene=jet untouched — the sharp-edged orifice IS the scene default (no drawn strokes) */

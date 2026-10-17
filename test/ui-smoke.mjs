@@ -894,9 +894,12 @@ async function main() {
           const keep = EXERCISE_MENU.scenes;
           EXERCISE_MENU.scenes = false; APP.UIMODE.reset();
           s1 = !!document.getElementById("sceneBtn");
-          if (keep === undefined) delete EXERCISE_MENU.scenes; else EXERCISE_MENU.scenes = keep;
-          APP.UIMODE.reset();
+          // "Without it" means the switch absent, whatever this deployment's
+          // own menu says (a fork may ship scenes: false).
+          delete EXERCISE_MENU.scenes; APP.UIMODE.reset();
           s2 = !!document.getElementById("sceneBtn");
+          if (keep !== undefined) EXERCISE_MENU.scenes = keep;
+          APP.UIMODE.reset();
         }
         return { nX, afterX, afterRm, wins, armed, keptOnArm, cleared, v0, v1, v2, had, s1, s2,
                  sceneTool: APP.state.scene.id };

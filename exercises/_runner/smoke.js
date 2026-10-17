@@ -743,7 +743,8 @@ SUITES.geom = async (B) => {
   // elsewhere, and C becomes "drawn1" in B's place. Proven at the SIM level
   // first: the SAME id "drawn1" samples a materially different stretch of
   // geometry before and after. That is exactly why main.js's rasterise/
-  // addSeg/undoSeg/clearSegs wrap (in js/main.js) drops
+  // addSeg/undoSeg/clearSegs edit reaches the SIM.onGeometry
+  // listener in js/main.js, which drops
   // state.force/state.forceHover on every edit — a selection held by a raw
   // (solidId, faceId) pair cannot otherwise tell it is now pointing at a
   // different wall — so the second half checks that UI-level drop directly.
@@ -782,7 +783,10 @@ SUITES.geom = async (B) => {
     let n = 0, seen = null;
     const off = APP.SIM.onGeometry((S) => { n++; seen = S; });
     APP.SIM.setParam("gap", cur);
+    out.callsAfterParam = n;
+    APP.state.force = { solidId: "wall0", faceId: "side1", data: null, t0: 0 };
     APP.SIM.setValve(APP.sim.p.valveClosed ? 0 : 1);
+    out.keptOnValve = APP.state.force !== null;
     out.calls = n; out.sameGrid = seen === APP.sim;
     off();
     APP.SIM.setParam("gap", other);
@@ -794,8 +798,9 @@ SUITES.geom = async (B) => {
     `force: ${JSON.stringify(hook.force)}, hover: ${JSON.stringify(hook.hover)}`);
   ok("geom setParam resets the overlay's running estimates",
     Number.isNaN(hook.ynK), `_ynK: ${hook.ynK}`);
-  ok("geom SIM.onGeometry fires for setParam and a valve flip, with the live grid, and unsubscribes",
-    hook.calls === 2 && hook.sameGrid && hook.afterOff === 2,
+  ok("geom SIM.onGeometry fires for setParam (live grid), not for a valve flip, and unsubscribes",
+    hook.callsAfterParam === 1 && hook.calls === 1 && hook.keptOnValve &&
+      hook.sameGrid && hook.afterOff === 1,
     JSON.stringify(hook));
 };
 

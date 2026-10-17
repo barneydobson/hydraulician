@@ -4325,11 +4325,11 @@ function boot() {
   // edit (the same choke point averaging already resets through) is the
   // one answer that is right regardless of which id moved.
   // One listener on SIM.onGeometry, fired at the end of every rasterise()
-  // (draw, undo, clear, a Geometry param, the boundary toggles, build) and of
-  // a valve flip — so no path can skip it, which the old outside wrapper of
-  // SIM.rasterise/addSeg/undoSeg/clearSegs could not promise (setParam called
-  // the module-local rasterise). It receives the grid it fired for: during
-  // build() that is the NEW grid, before `sim` has been reassigned.
+  // (draw, undo, clear, a Geometry param, the boundary toggles) — so no edit
+  // can skip it, which the old outside wrapper of SIM.rasterise/addSeg/
+  // undoSeg/clearSegs could not promise (setParam called the module-local
+  // rasterise). Not fired by build() or a valve flip: the Force pick survives
+  // a resolution change and a V press (water-hammer cards).
   SIM.onGeometry((S) => {
     OVERLAY.resetEstimates(S);
     state.force = null;

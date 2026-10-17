@@ -254,7 +254,7 @@ const SIM = (() => {
    *  registration-only GEOM.slab wrappers for every wall, valve and drawn
    *  seg — the pickable surfaces `faceAtPx` and `faceForce` need — without
    *  the mask itself ever being touched again. */
-  function rasterise() {
+  function rasterise(notify = true) {
     const m = S.mask;
     m.fill(0);
     const sc = S.scene;
@@ -337,7 +337,9 @@ const SIM = (() => {
     // this, so it can neither double-start nor fight build()'s own wasAvg
     // restore.
     if (S.avg) avgReset();
-    emitGeometry();
+    // build() passes false: a rebuild is not an edit (the Force pick survives a
+    // resolution change; a fresh grid has fresh overlay estimates anyway).
+    if (notify) emitGeometry();
   }
 
   /** Geometry listeners — see onGeometry. */
@@ -348,11 +350,10 @@ const SIM = (() => {
     geomListeners.slice().forEach((fn) => fn(S));
   }
   /** Register fn(S), called at the end of every rasterise() — so through
-   *  addSeg, undoSeg, clearSegs, setParam, the boundary toggles and build() —
-   *  and at the end of setValve when the flag actually changes. S is the live
-   *  grid at the moment of the call (during build() that is the NEW one, before
-   *  the caller has stored it), so a listener must use the argument, not a
-   *  grid it cached. Returns an unsubscribe function. */
+   *  addSeg, undoSeg, clearSegs, setParam and the boundary toggles. NOT from
+   *  build()'s own rasterise (a rebuild is not an edit) and NOT from setValve
+   *  (a student selects the valve face, then presses V). Returns an
+   *  unsubscribe function. */
   function onGeometry(fn) {
     geomListeners.push(fn);
     return () => {
@@ -486,7 +487,6 @@ const SIM = (() => {
     wallDistance();                 // a shut valve is a wall to the closure too
     S.tcolDirty = true;             // and FS_TCOL reads u_valve: rebuild with it
     if (S.avg) avgReset();
-    emitGeometry();
   }
 
   // ------------------------------------------------------------ allocation
@@ -643,7 +643,7 @@ const SIM = (() => {
     S.pxBuf = new Float32Array(4);
     S.avg = null;                   // transport accumulator, allocated on demand
 
-    rasterise();
+    rasterise(false);               // a rebuild is not an edit: no onGeometry
     resetWater();
     if (wasAvg) avgStart();         // zeroed against the new grid, f(0) = the reset water
     return S;

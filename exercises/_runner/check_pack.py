@@ -205,6 +205,18 @@ def row_ids():
     return set(re.findall(r'"([^"]+)"', m.group(1)))
 
 
+def gauge_ids():
+    """The quantities a gauge records, read out of GAUGE_QTY in js/main.js --
+    parsed, never copied, for the reason row_ids() gives."""
+    src = open(os.path.join(ROOT, "js", "main.js"), encoding="utf-8").read()
+    m = re.search(r"const GAUGE_QTY = \[(.*?)\n\];", src, re.S)
+    if not m:
+        print("check_pack.py cannot find GAUGE_QTY in js/main.js -- the gauge "
+              "quantity register moved or was renamed, and this check will not run blind.")
+        sys.exit(1)
+    return set(re.findall(r'\bid:\s*"([^"]+)"', m.group(1)))
+
+
 def view_button_ids():
     """The strip's VIEW buttons, read out of the TOOLBAR spec in js/main.js.
 
@@ -347,6 +359,10 @@ def main():
     # card to named lines and is validated against ROW_IDS below.
     READOUT_IDS = {"gauges", "cursor", "status", "rows"}
     ROW_IDS = row_ids()
+    GAUGE_IDS = gauge_ids()
+    # Concepts `ui.hide` can withhold; the honouring sites are listed on
+    # UIMODE.hides in js/main.js.
+    HIDE_IDS = {"energy", "critical"}
     CONTROL_IDS = panel_control_ids()
     # VIEW is a family of toggle BUTTONS, not tools, so its list is matched
     # against button ids (UIMODE.allows tests both `it.tool` and `it.id`).
@@ -387,6 +403,34 @@ def main():
             elif controls is not None and controls is not True:
                 fail.append("%-5s ui.controls is %r, not true or a list of row ids"
                             % (i, controls))
+            # What a gauge may plot (GAUGE_QTY in js/main.js), the concepts a
+            # card withholds (UIMODE.hides), and per-field descriptions.
+            gf = ui.get("gaugeFields")
+            if gf is not None:
+                checked += 1
+                if not isinstance(gf, list) or not gf:
+                    fail.append("%-5s ui.gaugeFields must be a non-empty list" % i)
+                else:
+                    bad = [q for q in gf if q not in GAUGE_IDS]
+                    if bad:
+                        fail.append("%-5s ui.gaugeFields names quantities that do not exist: %s (known: %s)"
+                                    % (i, ", ".join(map(str, bad)), ", ".join(sorted(GAUGE_IDS))))
+                    gdef = (e.get("viewParams") or {}).get("gaugeField")
+                    if gdef is not None and gdef not in gf:
+                        fail.append("%-5s viewParams.gaugeField %r is not among ui.gaugeFields"
+                                    % (i, gdef))
+            hide = ui.get("hide")
+            if hide is not None:
+                checked += 1
+                bad = [h for h in (hide if isinstance(hide, list) else [hide]) if h not in HIDE_IDS]
+                if not isinstance(hide, list) or bad:
+                    fail.append("%-5s ui.hide must list concepts from %s; got %r"
+                                % (i, sorted(HIDE_IDS), hide))
+            ft = ui.get("fieldText")
+            if ft is not None:
+                bad = [k for k in (ft if isinstance(ft, dict) else {}) if k not in FIELD_IDS]
+                if not isinstance(ft, dict) or bad:
+                    fail.append("%-5s ui.fieldText must map field ids to text; bad: %r" % (i, bad or ft))
             readouts = ui.get("readouts")
             if isinstance(readouts, dict):
                 bad = [k for k in readouts if k not in READOUT_IDS]
@@ -411,6 +455,18 @@ def main():
                                         "exist: %s (known: %s)"
                                         % (i, ", ".join(map(str, bad)),
                                            ", ".join(sorted(ROW_IDS))))
+
+        # Gauges a card arrives with already placed (EX.placeCardGauges).
+        pg = e.get("gauges")
+        if pg is not None:
+            checked += 1
+            ok_pg = isinstance(pg, list) and 0 < len(pg) <= 4 and all(
+                isinstance(g, dict) and isinstance(g.get("x"), (int, float))
+                and isinstance(g.get("z"), (int, float))
+                and (g.get("field") is None or g.get("field") in GAUGE_IDS) for g in pg)
+            if not ok_pg:
+                fail.append("%-5s gauges must be 1-4 {x, z, field?} with field from %s"
+                            % (i, sorted(GAUGE_IDS)))
 
         # The derived profile hides BUILD unless the card declares a build
         # tool or says so outright. A task that tells a student to draw, cut,

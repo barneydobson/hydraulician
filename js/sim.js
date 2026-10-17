@@ -1840,21 +1840,34 @@ const SIM = (() => {
   /** A whole column of velocity — the vertical rake. Returns u(z) at cell
    *  centres; under `avg` the column comes from the Favre accumulator,
    *  unpacked to the same (u, w, P) layout. */
-  function rake(x, out, avg) {
+  /*  `fOut` (optional, a Float32Array of ny, or `true`) also returns the
+   *  column's fill f — what a rake inside a conduit needs to find where the
+   *  water in it ends. Under Average f̄ comes free with the mean; live it costs
+   *  one more 1×ny read, so a rake only asks when it needs it. */
+  function rake(x, out, avg, fOut) {
     const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
     const buf = out && out.length >= S.ny * 4 ? out : new Float32Array(S.ny * 4);
+    let f = null;
+    if (fOut) f = fOut instanceof Float32Array && fOut.length >= S.ny ? fOut : new Float32Array(S.ny);
     if (avg && S.avg) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
       gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
       for (let k = 0; k < S.ny; k++) {
         const d = Math.max(buf[k * 4 + 2], 1e-6);
+        if (f) f[k] = buf[k * 4 + 2];
         buf[k * 4] /= d; buf[k * 4 + 1] /= d; buf[k * 4 + 2] = buf[k * 4 + 3];
       }
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
       gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      if (f) {
+        const F = new Float32Array(S.ny * 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+        gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, F);
+        for (let k = 0; k < S.ny; k++) f[k] = F[k * 4];
+      }
     }
-    return { i, buf };
+    return { i, buf, f };
   }
 
   /** A rectangular strip of the velocity field, pulled back in ONE readPixels

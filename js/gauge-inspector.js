@@ -21,9 +21,11 @@
  *  canvas because the things it needs (drag, wheel-zoom over a small target,
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
-  // The gauge's own traces — what a gauge RECORDS over time, which is a
-  // different register from the FIELDS the water is painted with, and named
-  // apart from it for that reason.
+  // What a gauge records is GAUGE_QTY in main.js — the gauges' own register,
+  // a different one from the FIELDS the water is painted with, and named apart
+  // from it for that reason. Every sample carries every quantity in it; what
+  // a gauge PLOTS is its own `field` (gaugeFieldOf), and what the window
+  // OFFERS is the exercise's `ui.gaugeFields` (UIMODE.gaugeFields).
   //
   // Symbols follow free-surface convention: h is the piezometric head, d the
   // depth and η the water level (wire key "eta" — ASCII, the same pattern as
@@ -31,16 +33,11 @@ const GINSP = (() => {
   // texts included, is in docs/notation.md). Since rig format v2 the KEYS are
   // the symbols; older wire formats are rejected, not migrated — prototype,
   // no back-compat.
-  const SERIES = [
-    ["h",     "h", "m",   "piezometric head, h = z + p/ρg"],
-    ["H",     "H", "m",   "total head, H = z + p/ρg + |u|²/2g"],
-    ["d",     "d", "m",   "water depth of the column"],
-    ["eta",   "η", "m",   "water level, η = z_b + d"],
-    ["speed", "|u|", "m/s", "speed at the gauge cell"],
-  ];
+  const offered = () => UIMODE.gaugeFields();
+  const shown = (q, s) => (s && Number.isFinite(s[q.id]) ? s[q.id] * q.k : undefined);
   const open = [];              // live inspector windows
   const posMemo = {};           // gauge id → [left, top], so reopening lands home
-  let host = null, btnHost = null, btns = [];
+  let host = null, btnHost = null, btns = [], sels = [], xbtns = [];
 
   function hosts() {
     if (!host) {
@@ -67,7 +64,8 @@ const GINSP = (() => {
       '<div class="ginsp-h">' +
         '<span class="ginsp-dot"></span><b class="ginsp-name"></b>' +
         '<span class="ginsp-pos"></span><span class="ginsp-grow"></span>' +
-        '<button class="ginsp-x" title="Close">×</button>' +
+        '<button class="ginsp-rm" title="Remove this gauge — its history goes; the others keep theirs">× gauge</button>' +
+        '<button class="ginsp-x" title="Close this window (the gauge stays)">×</button>' +
       '</div>' +
       '<div class="ginsp-vals"></div>' +
       '<div class="ginsp-tabs"></div>' +
@@ -81,7 +79,7 @@ const GINSP = (() => {
         'double-click fits all. History freezes while paused; <b>R</b> (reset water) ' +
         'and loading a scene clear it.</div>';
     host.appendChild(el);
-    const o = { g, el, field: state.gaugeField, t0: 0, t1: 1, fit: true,
+    const o = { g, el, t0: 0, t1: 1, fit: true,
                 hover: null, drag: null, cv: el.querySelector(".ginsp-c") };
     open.push(o);
 
@@ -96,25 +94,11 @@ const GINSP = (() => {
     // ---- header drag (see `dragWindow`)
     dragWindow(el, el.querySelector(".ginsp-h"), (L, T) => { posMemo[g.id] = [L, T]; });
     el.querySelector(".ginsp-x").onclick = (e) => { e.currentTarget.blur(); hide(o); };
+    el.querySelector(".ginsp-rm").onclick = (e) => { e.currentTarget.blur(); removeGauge(g); };
 
-    // ---- value rows (built once; only the numbers are rewritten per frame)
-    const vals = el.querySelector(".ginsp-vals");
-    o.vb = {};
-    SERIES.forEach(([f, sym, unit, note]) => {
-      const d = document.createElement("div"); d.dataset.f = f;
-      d.innerHTML = "<span>" + sym + "</span><b>—</b><i>" + note + "</i>";
-      vals.appendChild(d);
-      o.vb[f] = { row: d, b: d.querySelector("b"), unit };
-    });
-
-    // ---- field tabs
-    const tabs = el.querySelector(".ginsp-tabs");
-    SERIES.forEach(([f, sym]) => {
-      const b = document.createElement("button");
-      b.textContent = sym; b.dataset.f = f; b.title = SERIES.find((q) => q[0] === f)[3];
-      b.onclick = () => { o.field = f; b.blur(); draw(o); };
-      tabs.appendChild(b);
-    });
+    // ---- value rows and field tabs: built from what this exercise offers,
+    // and rebuilt by `draw` whenever that changes (a profile lifted by ⋯).
+    buildRows(o);
 
     // ---- csv
     el.querySelectorAll(".ginsp-b").forEach((b) => {
@@ -162,6 +146,29 @@ const GINSP = (() => {
     return o;
   }
 
+  /** The value rows (one per offered quantity, live numbers) and the tabs
+   *  that choose what the chart — and the gauge's corner card — plots. A tab
+   *  sets the GAUGE's own field, so the card and the window always agree. */
+  function buildRows(o) {
+    const el = o.el, Q = offered();
+    o.qkey = Q.map((q) => q.id).join(",");
+    const vals = el.querySelector(".ginsp-vals"), tabs = el.querySelector(".ginsp-tabs");
+    vals.textContent = ""; tabs.textContent = "";
+    o.vb = {};
+    Q.forEach((q) => {
+      const d = document.createElement("div"); d.dataset.f = q.id;
+      d.innerHTML = "<span></span><b>—</b><i></i>";
+      d.querySelector("span").textContent = q.sym;
+      d.querySelector("i").textContent = q.note;
+      vals.appendChild(d);
+      o.vb[q.id] = { row: d, b: d.querySelector("b"), q };
+      const b = document.createElement("button");
+      b.textContent = q.sym; b.dataset.f = q.id; b.title = q.name + " — " + q.note;
+      b.onclick = () => { o.g.field = q.id; b.blur(); draw(o); };
+      tabs.appendChild(b);
+    });
+  }
+
   function hide(o) {
     const i = open.indexOf(o);
     if (i < 0) return;
@@ -202,12 +209,15 @@ const GINSP = (() => {
     el.querySelector(".ginsp-pos").textContent =
       "x " + g.x.toFixed(2) + " · z " + g.z.toFixed(2) + " m";
     const last = L.length ? L[L.length - 1] : null;
-    SERIES.forEach(([f]) => {
+    if (o.qkey !== offered().map((q) => q.id).join(",")) buildRows(o);
+    o.field = gaugeFieldOf(g);
+    const F = gaugeQty(o.field);
+    Object.keys(o.vb).forEach((f) => {
       const V = o.vb[f];
-      // A sample logged before a SERIES entry existed (stale main.js next to
-      // a fresh this) has no such key; throwing here kills the frame loop.
-      const v = last ? last[f] : undefined;
-      V.b.textContent = (Number.isFinite(v) ? v.toFixed(3) : "—") + " " + V.unit;
+      // A sample logged before a quantity existed (stale main.js next to a
+      // fresh this) has no such key; throwing here kills the frame loop.
+      const v = shown(V.q, last);
+      V.b.textContent = (Number.isFinite(v) ? v.toFixed(3) : "—") + " " + V.q.unit;
       V.row.classList.toggle("on", f === o.field);
     });
     [...el.querySelectorAll(".ginsp-tabs button")]
@@ -239,7 +249,8 @@ const GINSP = (() => {
     const x0 = 10, x1 = w - 50, y0 = 10, y1 = h - 20;
     const i0 = Math.max(0, lower(L, o.t0) - 1), i1 = Math.min(L.length - 1, lower(L, o.t1));
     let lo = Infinity, hi = -Infinity;
-    for (let i = i0; i <= i1; i++) { const v = L[i][o.field]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    const val = (smp) => smp[F.id] * F.k;
+    for (let i = i0; i <= i1; i++) { const v = val(L[i]); if (v < lo) lo = v; if (v > hi) hi = v; }
     if (!(hi > lo)) { hi = lo + 1e-3; }
     const padv = (hi - lo) * 0.12; lo -= padv; hi += padv;
     const PX = (t) => x0 + (t - o.t0) / span(o) * (x1 - x0);
@@ -271,7 +282,7 @@ const GINSP = (() => {
     c.beginPath();
     let px = -1e9, mn = 0, mx = 0, started = false;
     for (let i = i0; i <= i1; i++) {
-      const X = Math.round(PX(L[i].t)), v = L[i][o.field];
+      const X = Math.round(PX(L[i].t)), v = val(L[i]);
       if (X !== px) {
         if (started) { c.lineTo(px, PY(mn)); c.lineTo(px, PY(mx)); }
         else { c.moveTo(X, PY(v)); started = true; }
@@ -287,17 +298,16 @@ const GINSP = (() => {
       let i = lower(L, th);
       if (i > 0 && (i >= L.length || Math.abs(L[i - 1].t - th) < Math.abs(L[i].t - th))) i--;
       i = Math.max(0, Math.min(L.length - 1, i));
-      const X = PX(L[i].t), Y = PY(L[i][o.field]);
+      const X = PX(L[i].t), Y = PY(val(L[i]));
       c.strokeStyle = "rgba(255,255,255,0.35)"; c.setLineDash([3, 3]);
       c.beginPath(); c.moveTo(X, y0); c.lineTo(X, y1); c.stroke();
       c.beginPath(); c.moveTo(x0, Y); c.lineTo(x1, Y); c.stroke();
       c.setLineDash([]);
       c.fillStyle = g.colour;
       c.beginPath(); c.arc(X, Y, 2.5, 0, 6.2832); c.fill();
-      const F = SERIES.find((q) => q[0] === o.field);
-      const v = L[i][o.field];
-      const txt = "t " + L[i].t.toFixed(3) + " s   " + F[1] + " " +
-                  (Number.isFinite(v) ? v.toFixed(4) : "—") + " " + F[2];
+      const v = val(L[i]);
+      const txt = "t " + L[i].t.toFixed(3) + " s   " + F.sym + " " +
+                  (Number.isFinite(v) ? v.toFixed(4) : "—") + " " + F.unit;
       c.font = "700 10.5px ui-monospace, monospace";
       const tw = c.measureText(txt).width;
       const bx = Math.min(Math.max(X + 7, x0), x1 - tw - 10);
@@ -305,7 +315,7 @@ const GINSP = (() => {
       c.beginPath(); c.roundRect(bx - 4, y0 + 1, tw + 8, 15, 4); c.fill();
       c.fillStyle = "#e8f0f8";
       c.fillText(txt, bx, y0 + 12);
-      o.read = { t: L[i].t, v: L[i][o.field], field: o.field };
+      o.read = { t: L[i].t, v, field: o.field };
     } else o.read = null;
   }
 
@@ -328,23 +338,63 @@ const GINSP = (() => {
       b.title = "Open the gauge inspector";
       b.onclick = () => { b.blur(); show(+b.dataset.k); };
       btnHost.appendChild(b); btns.push(b);
+      // …and under it, what THIS gauge plots. A <select> rather than more
+      // canvas for the same reason the inspector is DOM; its options are the
+      // exercise's offered quantities, rebuilt when that set changes.
+      const s = document.createElement("select");
+      s.className = "gcardSel";
+      s.title = "What this gauge plots — every quantity is recorded either way";
+      s.onchange = () => {
+        const g = state.gauges[+s.dataset.k];
+        if (g) g.field = s.value;
+        s.blur();
+      };
+      btnHost.appendChild(s); sels.push(s);
+      // …and a × in the card's top-right corner that removes the gauge.
+      const x = document.createElement("button");
+      x.className = "gcardX"; x.textContent = "×";
+      x.title = "Remove this gauge (its history goes; the others keep theirs)";
+      x.onclick = () => { x.blur(); const g = state.gauges[+x.dataset.k]; if (g) removeGauge(g); };
+      btnHost.appendChild(x); xbtns.push(x);
     }
+    const Q = offered(), qkey = Q.map((q) => q.id).join(",");
     btns.forEach((b, i) => {
-      if (i >= n) { b.style.display = "none"; return; }
+      const s = sels[i], x = xbtns[i];
+      if (i >= n) { b.style.display = "none"; s.style.display = "none"; x.style.display = "none"; return; }
       const r = rects[i];
       b.dataset.k = String(r.k);
+      x.dataset.k = String(r.k);
+      x.style.display = "block";
+      x.style.left = (r.x + r.w - 21) + "px";
+      x.style.top = (r.y + 4) + "px";
       b.style.display = "block";
       // Just OUTSIDE the card's top-left corner: every worksheet screenshot in
       // the pack has one of these cards in it, so the card itself is left
       // pixel-for-pixel alone.
       b.style.left = Math.max(2, r.x - 23) + "px";
       b.style.top = (r.y + 5) + "px";
+      if (s.dataset.q !== qkey) {
+        s.dataset.q = qkey; s.textContent = "";
+        Q.forEach((q) => {
+          const o = document.createElement("option");
+          o.value = q.id; o.textContent = q.sym; o.title = q.name;
+          s.appendChild(o);
+        });
+      }
+      s.dataset.k = String(r.k);
+      // One quantity on offer is no choice at all.
+      s.style.display = Q.length > 1 ? "block" : "none";
+      s.style.left = Math.max(2, r.x - 4 - (s.offsetWidth || 48)) + "px";
+      s.style.top = (r.y + 28) + "px";
+      const want = gaugeFieldOf(state.gauges[r.k]);
+      if (document.activeElement !== s && s.value !== want) s.value = want;
     });
   }
 
   // ---------------------------------------------------------------- export
-  /** Wide CSV: one row per sample time, one column per gauge per SERIES
-   *  entry. Gauges are sampled in the same call, so their sample times are
+  /** Wide CSV: one row per sample time, one column per gauge per GAUGE_QTY
+   *  entry — ALL of them, whatever the exercise offers or the gauge plots, in
+   *  stored units (pressure in Pa). Gauges are sampled in the same call, so their sample times are
    *  bit-identical and the rows line up; a gauge dropped later simply has
    *  empty cells before its first sample. Values are printed at full
    *  precision. */
@@ -354,13 +404,13 @@ const GINSP = (() => {
     gs.forEach((g) => {
       const tag = "g" + (state.gauges.indexOf(g) + 1) +
                   "_x" + g.x.toFixed(2) + "_z" + g.z.toFixed(2);
-      SERIES.forEach(([f, , unit]) => hdr.push(tag + "_" + f + "_" + (unit === "m/s" ? "mps" : unit)));
+      GAUGE_QTY.forEach((q) => hdr.push(tag + "_" + q.id + "_" + q.csv));
     });
-    const cols = gs.length * SERIES.length, rows = new Map();
+    const NQ = GAUGE_QTY.length, cols = gs.length * NQ, rows = new Map();
     gs.forEach((g, gi) => (g.log || []).forEach((s) => {
       let r = rows.get(s.t);
       if (!r) { r = new Array(cols).fill(""); rows.set(s.t, r); }
-      SERIES.forEach(([f], fi) => r[gi * SERIES.length + fi] = String(s[f]));
+      GAUGE_QTY.forEach((q, fi) => { if (s[q.id] !== undefined) r[gi * NQ + fi] = String(s[q.id]); });
     }));
     const ts = [...rows.keys()].sort((a, b) => a - b);
     const out = [hdr.join(",")];

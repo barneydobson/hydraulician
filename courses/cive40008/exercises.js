@@ -543,12 +543,13 @@ COURSES.exercises("cive40008", [
     // Froude in plain words: `fieldText` replaces the legend's
     // critical/subcritical description, and hide "critical" turns the hover
     // card's Fr row into "fast, shallow" / "slow, deep". The reservoir marker
-    // reads "reservoir level" (hide "energy"), and the gauges offer depth,
+    // keeps its energy wording (the lecturer wants the box's energy rows here:
+    // across the jump momentum balances and energy is lost), and the gauges offer depth,
     // level, speed and u.
     ui: { view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
           fields: ["water", "speed", "froude"], panel: "focused",
           controls: ["speed", "geom1"],
-          gaugeFields: ["d", "eta", "speed", "u"], hide: ["energy", "critical"],
+          gaugeFields: ["d", "eta", "speed", "u"], hide: ["critical"],
           fieldText: { froude: "Fr = u/√(gd), from the speed and the depth. Above 1: fast and shallow (red); below 1: slow and deep (blue)." },
           readouts: { rows: ["pos", "d", "eta", "q", "V", "Fr"] } },
     steps: [
@@ -556,7 +557,7 @@ COURSES.exercises("cive40008", [
       "Drag a {tool:cv} round the gate, (2.50, 0.10) → (6.00, 3.70), and press {key:B} until its faces read momentum + pressure: F→ is the force on the gate.",
       "Work out ½ρg(d₁² − d₂²) − ρq(U₂ − U₁), d₂ the sheet's depth; compare it, and F→, with {tool:force} on the gate's upstream face.",
       "The weir starts at 0.5 m: by about 20 s the sheet jumps up to a slow, deep flow near the weir, then the jump creeps towards the gate. Set Weir crest height to 0.46 m to hold it partway; 0.6 m drowns the gate.",
-      "Drag the box round the jump: momentum flux + pressure force in on the left = out on the right, and F→ ≈ 0 — the water jumps so the books balance.",
+      "Drag the box round the jump: momentum flux + pressure force in = out, F→ ≈ 0 — the water jumps so the books balance. Press {key:B} on to energy: in > out — the jump loses energy.",
     ],
     background: [
       "Momentum balance on a control volume, per metre width: (momentum flux out − momentum flux in) = the pressure forces on its faces + the force from anything solid inside. The box prints the momentum flux and the pressure force on each face.",

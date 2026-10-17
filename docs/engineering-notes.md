@@ -1398,8 +1398,21 @@ reduction last saw) or a point at a running spout. FS_VOF sets `dye = 1` in
 wet cells (f > 0.3) within the radius of a seed, every substep, up to eight
 seeds; the scene's `dyeLine` (panel: Dye timelines) now pulses the seeds, on
 for half of each period, so the band edges are timelines (m1/m2 keep that).
-Release is tied to the DRAW flag: `render(opts.dye)` sets `S.dyeOn`, so Dye off
-or Average (no accumulator, docs/averaging.md) releases nothing.
+**Released by hand (Oct 2026).** A lecturer found FF-2's automatic sheet a
+"strange black wedge" on the crest and asked for dye released wherever the
+student clicks, for as long as the click is held. That is the **Dye tool**
+(`dye`, thirteenth in TOOLS, key D, MEASURE family; it replaced the Dye VIEW
+toggle): pointer-down sets `sim.p.dyeInj = {x, z, r}`, FS_VOF's `u_dyeInj`
+sets dye A = 1 in wet cells (f > 0.3, so air takes nothing) within r of it
+every substep, a drag moves it, pointer-up clears it. r =
+max(3 Δx, 0.008 · max(W, H)) (`SIM.dyeInjRadius`), shown as the cursor
+ring. The seeds above stay as a mechanism but are OFF unless the scene says
+`dye.on` or `dyeLine` > 0 (m1/m2's timelines), or a card sets viewParams
+`dyeSeeds` (Controls → Dye sources; rig wire key still `ui.dye`). Dye is
+always drawn now, so there is no "Dye off"; under Average (no accumulator,
+docs/averaging.md) nothing is drawn and neither source releases. The van
+Leer dye faces switch on with the first dye A released since the last reset
+(`S.dyeUsed`), so a run nobody dyes costs what it did.
 
 - **Ink is black.** No ramp contains black, so it reads on Water, Speed and
   every head ramp. Opacity is `0.92·(1 − e^(−5d))`: a plume diluted to 0.1 is
@@ -1411,10 +1424,10 @@ or Average (no accumulator, docs/averaging.md) releases nothing.
   surface against the near-black canvas is black on black — a dyed nappe
   vanished. FF-2's sheet stops 0.4 m under the reservoir surface for the same
   reason, so the nappe keeps a coloured skin.
-- **Limited faces while Dye is on.** First-order upwind (numerical diffusivity
+- **Limited faces once there is ink.** First-order upwind (numerical diffusivity
   ≈ u·Δx/2) spread a two-cell streak into grey within a couple of metres; with
   `u_dyeSeed.z` set the dye-A faces are the same van Leer `faceVal` the fill
-  uses. Off, the old upwind runs — a uniform branch, so Dye off costs what it
+  uses. Before any dye A goes in, the old upwind runs — a uniform branch, so an undyed run costs what it
   did before.
 - Separate streaks on a sheet only 2–4 cells thick (FF-2's nappe) merge into
   a faint grey; use a continuous sheet there.

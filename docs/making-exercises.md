@@ -165,8 +165,13 @@ top:
   Controls panel opens `"focused"`.
 - `ui.build` / `ui.measure` / `ui.view`: `true`, `false`, or a list of ids.
   BUILD and MEASURE lists take tool ids; the VIEW list takes **button ids**
-  (`legendBtn partBtn dyeBtn slineBtn chanBtn gradeBtn readBtn hoverBtn
-  avgBtn`), because VIEW is a family of toggles. The `V` valve button lives
+  (`legendBtn partBtn slineBtn chanBtn gradeBtn readBtn hoverBtn
+  avgBtn`), because VIEW is a family of toggles. Dye is a MEASURE **tool**,
+  `dye` (key **D**): press and hold in the water to release ink there. A card
+  that offers it names it — `ui.measure: [..., "dye"]` — and a step says
+  `{tool:dye}`. Nothing is dyed until a student releases it; a scene's fixed
+  `dye.seeds` run only if the scene says `dye: { on: true }` or the card sets
+  viewParams `dyeSeeds: true` (Controls → Dye sources). The `V` valve button lives
   in RUN and is never hidden. `readBtn` (**Readouts**, key **I**) folds away
   every instrument's number boxes — the gauges' corner cards, the Control
   volume's budget and face numbers, the flux sections' readings and their

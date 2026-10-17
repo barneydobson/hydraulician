@@ -227,7 +227,7 @@ Water enters at the top left by default; everything else is drawn.
 | **Z** / **C** | undo edge / clear drawing |
 | **V** | open / slam every valve |
 | **space** / **R** | pause / reload the scene's water |
-| **G** / **P** / **D** / **T** / **N** / **M** | cycle the field · particles · dye · streamlines · channel overlay · ruler |
+| **G** / **P** / **D** / **T** / **N** / **M** | cycle the field · particles · the Dye tool (hold in the water to release dye) · streamlines · channel overlay · ruler |
 | **S** / **E** | scene list · exercise list |
 | **H** / **?** | start screen · keyboard shortcuts |
 

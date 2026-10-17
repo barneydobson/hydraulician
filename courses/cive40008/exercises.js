@@ -123,15 +123,15 @@ COURSES.exercises("cive40008", [
         title: "Contraction rig: streamlines and separation",
         topic: "Flow fields, shear and turbulence",
         aim: "A pipe that narrows gently or suddenly — see the streamlines follow a taper but separate at a sharp step.",
-        viewParams: { hoverCard: false, dye: true, mode: "2", particles: true },
-        ui: { measure: false, view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "hoverBtn"],
+        viewParams: { hoverCard: false, mode: "2", particles: true },
+        ui: { measure: ["dye"], view: ["legendBtn", "partBtn", "slineBtn", "hoverBtn"],
               fields: ["water", "speed"], controls: ["geom0"],
               readouts: { rows: ["pos", "uw"] } },
         steps: [
           "Colour is Speed: the {btn:partBtn} crowd together and speed up through the taper.",
           "Turn on {btn:slineBtn}: they converge smoothly through the taper and follow the walls.",
-          "Slide Contraction length L to 0 m, an abrupt step. The flow restarts: wait about 25 s.",
-          "At the step the flow cannot turn the corners: it separates, slow eddies sit in the corners, and the jet narrows just past the edge.",
+          "Slide Contraction length L to 0 m, an abrupt step, and wait about 25 s: the flow cannot turn the corners, it separates, slow eddies sit in them and the jet narrows past the edge.",
+          "Pick {tool:dye} and hold the mouse in the wide pipe just upstream of the step: the ink is drawn through the middle and leaves the corner eddies clear.",
           "On the colour key switch Live to Average: the streamlines of the mean flow, steady where the live flow flickers.",
         ],
         background: [
@@ -149,11 +149,12 @@ COURSES.exercises("cive40008", [
           { tool: "flux", where: "up across the 0.50 m pipe at x = 9.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
           { tool: "cv", where: "(4.3, 0.3) → (9.0, 1.65) — round the contraction, top and bottom inside the pipe walls", why: "Σ Q = 0: in on the left face, out on the right, nothing through the walls" },
         ],
-        ui: { view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "readBtn", "hoverBtn"],
+        ui: { measure: ["flux", "cv", "dye"],
+              view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
               fields: ["water", "speed"], controls: ["geom0", "cvShow", "fluxList"],
               readouts: { rows: ["pos", "uw"] } },
         steps: [
-          "Follow one particle through the contraction: it speeds up, although the flow is steady (Lagrangian).",
+          "Pick {tool:dye} and hold the mouse in the wide pipe: the streak stretches as it speeds up through the contraction, although the flow is steady (Lagrangian).",
           "Drag a {tool:flux} up across each pipe — x = 4.3 m and x = 9.0 m, z = 0.4 to 1.6 m — and read Q in each (Eulerian).",
           "Drag a {tool:cv} from (4.3, 0.3) to (9.0, 1.65) round the contraction: Q on each face, Σ Q under the box.",
           "Slide Contraction length L to 0 m (a step), wait about 25 s and read the three again.",
@@ -260,14 +261,15 @@ COURSES.exercises("cive40008", [
       { tool: "force", where: "the plate's wet face — the side the jet strikes", why: "the pressure diagram on the plate and its resultant F, at right angles to the plate: on a smooth plate the whole force is pressure, so F matches the box's F_n" },
       { tool: "flux", where: "one across each sheet, about 0.1 m past each end of the plate, at right angles to it", why: "q₁ and q₂, the two sheets' discharges, against q(1 ± cos θ)/2" },
     ],
-    ui: { view: ["legendBtn", "dyeBtn", "slineBtn", "readBtn", "hoverBtn"], hide: ["energy", "critical"], fields: ["speed", "p"], controls: ["speed", "geom0"],
+    ui: { measure: ["cv", "force", "flux", "dye"],
+          view: ["legendBtn", "slineBtn", "readBtn", "hoverBtn"], hide: ["energy", "critical"], fields: ["speed", "p"], controls: ["speed", "geom0"],
           readouts: { rows: ["pos", "uw", "p"] } },
     steps: [
       "Drag a {tool:cv} from (0.70, 0.30) to (2.50, 2.10), round the whole plate. After every change wait about 5 s.",
       "At θ = 90° read q on the box's left face (≈ 1.04 m²/s) and hover the jet for U (≈ 4.45 m/s): ρqU ≈ 4.6 kN/m. Expect F→ = ρqU, F↑ = 0.",
       "Pick {tool:force} and click the plate's wet face: the pressure is largest where the jet hits, and F is at right angles to the plate.",
       "Set θ = 75°, 60°, 45°, 30°: from the box F_n = F_x sin θ + F_z cos θ; compare it with the Pressure force F and with ρqU sin θ.",
-      "Drag a {tool:flux} across each sheet just past each end of the plate: compare q₁ and q₂ with q(1 + cos θ)/2 and q(1 − cos θ)/2.",
+      "Pick {tool:dye} and hold the mouse in the jet to see it split; drag a {tool:flux} across each sheet past each end of the plate: compare q₁, q₂ with q(1 ± cos θ)/2.",
     ],
     background: [
       "Seen from above: gravity acts into the screen, so the Pressure colouring shows only what the moving water does — highest where the jet is stopped on the plate, about ½ρU² ≈ 10 kPa.",
@@ -369,7 +371,8 @@ COURSES.exercises("cive40008", [
   // width held at 0.40 m), on the card. Boots on the ellipse with its steady
   // wake; shedding starts near 0.4. `settle` is the time the boot transient
   // takes to wash past the body. L4 and no vorticity in Year 1: the card
-  // boots on Speed and reads the wake with particles, dye and streamlines.
+  // boots on Speed and reads the wake with particles, streamlines and the
+  // dye the student releases with the Dye tool (no fixed source runs).
   {
     id: "FF-3",
     title: "Steady and unsteady flow",
@@ -379,7 +382,7 @@ COURSES.exercises("cive40008", [
     scene: "body",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { hoverCard: false, mode: "2", particles: true, dye: true, gaugeField: "speed" },
+    viewParams: { hoverCard: false, mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
       { control: "geom0", label: "Body shape", unit: "" },
     ],
@@ -391,7 +394,7 @@ COURSES.exercises("cive40008", [
     // shows nothing worth reading; the plain Pressure does not divide by g.
     // Its level is arbitrary in a plan view (~37 kPa, creeping), so its
     // range is fitted the first time it is shown (pressureRange in main.js).
-    ui: { measure: ["gauge"], view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "readBtn", "hoverBtn"],
+    ui: { measure: ["gauge", "dye"], view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
           fields: ["speed", "p"], panel: "focused", controls: ["speed", "geom0"],
           gaugeFields: ["speed", "u", "w", "p"], hide: ["energy", "critical"],
           readouts: { rows: ["pos", "uw", "p"] } },
@@ -399,7 +402,7 @@ COURSES.exercises("cive40008", [
       "Behind the ellipse the wake is a thin slow streak that runs straight downstream and stays put: steady flow round a streamlined body.",
       "Slide Body shape slowly towards 1 (a square), 20–30 s per step, and note where the wake starts to swing from side to side.",
       "Click a {tool:gauge} in the wake (0.6 m behind the body, 0.2 m off the centreline) and read the period of the swing off its chart.",
-      "Turn on {btn:dyeBtn} and {btn:partBtn}: in the swinging wake they no longer follow the streamlines.",
+      "Pick {tool:dye} and hold the mouse just upstream of the body: in the swinging wake the ink and the {btn:partBtn} no longer follow the streamlines.",
       "With the square shedding, turn on {btn:slineBtn} and switch the colour key from Live to Average: one steady, symmetric wake bubble.",
     ],
     background: [
@@ -425,7 +428,7 @@ COURSES.exercises("cive40008", [
     scene: "spillway",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { hoverCard: false, dye: true, mode: "2", particles: true, gaugeField: "speed" },
+    viewParams: { hoverCard: false, mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
       { control: "geom0", label: "Bucket lip angle", unit: "°" },
       { control: "inLevel", label: "Reservoir level", unit: "m" },
@@ -436,16 +439,17 @@ COURSES.exercises("cive40008", [
       { tool: "gauge", where: "in the pool at x ≈ 20 m, z ≈ 1.0 m (on Speed)", why: "its trace is the fluctuation: a mean plus wild excursions" },
     ],
     ui: {
-      view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "readBtn", "hoverBtn"],
+      measure: ["flux", "rake", "gauge", "dye"],
+      view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
       fields: ["water", "speed"],
-      controls: ["speed", "geom0", "inLevel", "dye", "dyeLine"],
+      controls: ["speed", "geom0", "inLevel"],
       // No pressure colouring: nothing on this card reads the pressure.
       gaugeFields: ["speed", "u", "w", "p", "eta", "d"], hide: ["energy", "critical"],
       readouts: { rows: ["pos", "uw", "p"] },
     },
     steps: [
-      "Colour is Speed: nearly still in the reservoir, faster over the crest, fastest on the face and in the bucket, slowing in the pool.",
-      "Pause ({key:space}), look, run, pause again: reservoir, crest and face look the same (steady), the pool does not. {btn:slineBtn} crowd where it is fast.",
+      "Colour is Speed, fastest on the face and in the bucket. Pause ({key:space}), look, run, pause again: reservoir, crest and face look the same (steady), the pool does not.",
+      "Pick {tool:dye} and hold the mouse in the reservoir before the crest: the ink rides over the crest and down the face, and the pool's turbulence mixes it.",
       "Drag a {tool:flux} up from the crest at x ≈ 7.4 m and one across the pool at x ≈ 22 m: the same q, at very different depths and speeds.",
       "Click a {tool:rake} on the face (x ≈ 9 m) and in the pool (x ≈ 20 m), and a {tool:gauge} in the pool at z ≈ 1 m: slow at the floor; the pool swings wildly.",
       "On the colour key switch Live to Average and wait until T passes 30 s: steady eddies, a smooth profile, the two flux lines agree.",
@@ -453,7 +457,7 @@ COURSES.exercises("cive40008", [
     background: [
       "Hover anywhere to read the velocity (u, w). q = V × d per metre width.",
       "Turbulence = mean + fluctuation, and the mean is steady; engineers design for the mean.",
-      "Optional: a steeper Bucket lip angle throws the jet higher and further (wait about 30 s after a change); a higher Reservoir level (8.70 m as the card opens) puts more water over the crest; {btn:dyeBtn} marks the reservoir water and shows turbulence mixing it through the pool (dye pauses while Average is on).",
+      "Optional: a steeper Bucket lip angle throws the jet higher and further (wait about 30 s after a change); a higher Reservoir level (8.70 m as the card opens) puts more water over the crest; {btn:slineBtn} crowd where the water is fast; no dye is released while Average is on.",
     ],
     settle: 40,
   },
@@ -466,7 +470,7 @@ COURSES.exercises("cive40008", [
     scene: "pipejet",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { hoverCard: false, dye: true, mode: "2", particles: true, gaugeField: "speed" },
+    viewParams: { hoverCard: false, mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
       { control: "inLevel", unit: "m", label: "Reservoir level", slider: { min: 6.3, max: 8.0, step: 0.05 } },
     ],
@@ -477,15 +481,16 @@ COURSES.exercises("cive40008", [
       { tool: "gauge", where: "on the jet axis at x ≈ 15 m, z ≈ 3.15 m (on Speed)", why: "where the jet flaps: a trace of eddies passing" },
     ],
     ui: {
-      view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "readBtn", "hoverBtn"],
+      measure: ["rake", "flux", "gauge", "dye"],
+      view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
       fields: ["speed", "p"],
-      controls: ["speed", "inLevel", "dye", "dyeLine"],
+      controls: ["speed", "inLevel"],
       gaugeFields: ["speed", "u", "w", "p"], hide: ["energy", "critical"],
       readouts: { rows: ["pos", "uw", "p"] },
     },
     steps: [
       "Colour is Speed: in the pipe the slow layers along both walls thicken downstream — no slip at the wall, a boundary layer growing.",
-      "Past the exit the jet keeps its fast core for a metre or two, then flaps and breaks into eddies that drag the still water along.",
+      "Pick {tool:dye} and hold the mouse in the pipe: past the exit the jet keeps its fast core for a metre or two, then flaps and breaks into eddies that drag the still water along.",
       "Click {tool:rake}s inside the pipe at x ≈ 3.5 and 10 m and across the jet at x ≈ 12 and 14 m (each new one replaces the oldest).",
       "On the colour key switch Live to Average and wait until T passes 30 s: a smooth, spreading jet; the rakes across it become bells.",
       "Drag two {tool:flux}s across the jet only (z = 2.4–3.9 m at x = 12 m, z = 2.15–4.15 m at x = 14 m): q grows downstream.",

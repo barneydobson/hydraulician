@@ -561,7 +561,7 @@ const SIM = (() => {
     if (prev) {
       p.open = prev.open.slice();
       for (const k of ["inflow", "tailwater", "wave", "source"]) p[k] = Object.assign({}, prev[k]);
-      p.pour = null;
+      p.pour = null; p.dyeInj = null;
     }
     // A resolution rebuild keeps live param values the same way it keeps
     // p above — losing a slider position because you asked for more cells
@@ -653,6 +653,7 @@ const SIM = (() => {
     // reset followed by the same substeps is the same run — the F1 gate in
     // smoke.js compares two of them cell for cell.
     S.nsteps = 0; S.tcolDirty = true;
+    S.dyeUsed = false;              // no ink in the water: back to the cheap upwind dye faces
     const vel = new Float32Array(n * 4);
     // An initial velocity field, when the scene can say what its steady flow
     // looks like. On the staggered faces the U texture uses — `r` = u at the
@@ -1447,8 +1448,18 @@ const SIM = (() => {
     return out;
   }
   const SEED_A = new Float32Array(32), SEED_P = new Float32Array(16);
+  /** The dye uniforms for one vof substep. Two sources of dye A:
+   *  - the SEEDS (above) — a scene's fixed release, off unless the scene or
+   *    the card asks for it (`dye.on`, `dyeLine`, the Dye sources control):
+   *    `S.dyeOn`, set from render's `opts.dyeSeeds`;
+   *  - the INJECTOR — `p.dyeInj = {x, z, r}`, the Dye tool held down at a
+   *    point (main.js), released every substep while it is set.
+   *  Both stand down when the dye is not drawn (`S.dyeDraw`: Average, which
+   *  has no accumulator for it). The van Leer dye faces run once any dye A
+   *  has gone in since the last reset, so a run with no ink in it costs what
+   *  it always did. */
   function dyeUniforms(pr) {
-    const on = !!S.dyeOn;
+    const on = !!S.dyeOn && S.dyeDraw !== false;
     if (on && (!S.seeds || S.t < S.seedT || S.t - S.seedT > 0.5)) {
       S.seeds = dyeSeeds().slice(0, 8); S.seedT = S.t;
       S.seeds.forEach((d, k) => {
@@ -1460,7 +1471,16 @@ const SIM = (() => {
       gl.uniform4fv(pr.u("u_seed[0]"), SEED_A);
       gl.uniform2fv(pr.u("u_seedP[0]"), SEED_P);
     }
-    gl.uniform4f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, on ? 1 : 0, 0);
+    const inj = S.dyeDraw !== false ? S.p.dyeInj : null;
+    if (n || inj) S.dyeUsed = true;
+    gl.uniform4f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, S.dyeUsed ? 1 : 0, 0);
+    gl.uniform4f(pr.u("u_dyeInj"), inj ? inj.x : 0, inj ? inj.z : 0, inj ? inj.r : 0, inj ? 1 : 0);
+  }
+  /** The Dye tool's release radius: a few cells, and never less than a
+   *  sliver of the domain, so a coarse grid and a fine one both lay a streak
+   *  of about the same width on screen. */
+  function dyeInjRadius() {
+    return Math.max(3 * S.dx, 0.008 * Math.max(S.W, S.H));
   }
 
   function advanceParticles(realDt, avg) {
@@ -1525,9 +1545,13 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_lo"), opts.lo);
     gl.uniform1f(prog.draw.u("u_hi"), opts.hi);
     gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : (opts.avg ? 0 : 0.5));
-    // The SAME flag releases it: the seeds run while dye is drawn, and stand
-    // down with it (Dye off, or under Average — no accumulator, docs/averaging.md).
-    if (S.dyeOn !== !!opts.dye) { S.dyeOn = !!opts.dye; S.seeds = null; }
+    // What is DRAWN is also what may be RELEASED: under Average (no
+    // accumulator, docs/averaging.md) neither the seeds nor the Dye tool put
+    // anything in. The seeds also need `opts.dyeSeeds` — a scene's fixed
+    // sources are off unless something asked for them.
+    S.dyeDraw = !!opts.dye;
+    const seeds = !!opts.dye && !!opts.dyeSeeds;
+    if (S.dyeOn !== seeds) { S.dyeOn = seeds; S.seeds = null; }
     gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
     gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);
     gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
@@ -2522,7 +2546,7 @@ const SIM = (() => {
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, probeMany, rake, patch, patchVel,
-           fieldStats, particlePos, particleTrail,
+           fieldStats, particlePos, particleTrail, dyeInjRadius,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
            hydraulicGrade, streamRequest, streamPoll, streamPending,
            setValve, setParam, params, windTau, wallPaddle,

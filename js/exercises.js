@@ -1593,9 +1593,9 @@ const EXERCISES = [
         rule: "the level that drives the pipe (6.60 m as the card opens): raise it and the jet runs faster." },
     ],
     instruments: [
-      { tool: "rake", where: "Rakes, first in the pipe near the entrance (x ≈ 3.5 m) and near the exit (x ≈ 10 m)", why: "the wall boundary layers thicken along the pipe: centreline 2.17 → 2.51 m/s, the profile goes from a flat-topped plug to a rounded one" },
-      { tool: "rake", where: "then Rakes across the jet at x ≈ 12 m and x ≈ 14 m", why: "live the x = 14 m profile jumps about; averaged (T = 60 s) both are bells, 1.43 m/s peak at 12 m and a wider, flatter 0.74 m/s at 14 m" },
-      { tool: "flux", where: "Flux lines, two short sections across the jet only: z = 2.4–3.9 m at x = 12 m and z = 2.15–4.15 m at x = 14 m", why: "averaged q 0.76 m²/s in the pipe, 0.92 at 12 m, 1.03 at 14 m: the still water the jet has entrained" },
+      { tool: "rake", where: "Rakes, first in the pipe near the entrance (x ≈ 3.5 m) and near the exit (x ≈ 10 m)", why: "the wall boundary layers thicken along the pipe: centreline 2.17 → 2.47 m/s, the profile goes from a flat-topped plug to a rounded one" },
+      { tool: "rake", where: "then Rakes across the jet at x ≈ 12 m and x ≈ 14 m", why: "live the x = 14 m profile jumps about; averaged (T = 60 s) both are bells, 1.28 m/s peak at 12 m and a wider, flatter 0.78 m/s at 14 m" },
+      { tool: "flux", where: "Flux lines, two short sections across the jet only: z = 2.4–3.9 m at x = 12 m and z = 2.15–4.15 m at x = 14 m", why: "averaged q 0.80 m²/s in the pipe, 1.07 at 12 m, 1.19 at 14 m: the still water the jet has entrained" },
       { tool: "gauge", where: "a Gauge on the jet axis at x ≈ 15 m, z ≈ 3.15 m (on Speed)", why: "where the jet flaps: a trace of eddies passing" },
     ],
     ui: {
@@ -1604,11 +1604,11 @@ const EXERCISES = [
       controls: ["speed", "inLevel", "dye", "dyeLine"],
       readouts: { rows: ["pos", "uw", "phead"] },
     },
-    start: "a tank held at a fixed level drives an 8 m pipe of 0.5 m bore, which shoots a jet into a large tank of still water, full to its lid, with an outflow at the far edge",
+    start: "a tank held at a fixed level drives an 8 m pipe of 0.5 m bore, which shoots a jet into a large reservoir of still water with a free surface, which spills over a wall at its far end",
     setup: [
       "Colour is Speed. In the pipe, look at the slow layers along both walls and how they thicken downstream: no slip at the wall, a boundary layer growing.",
-      "The other colouring, Pressure head (Field & legend on the strip), shows the pressure. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher. In this full tank it mostly grows with depth.",
-      "Past the exit the jet keeps its fast core for a few metres, then starts to flap and breaks into eddies: at its edges fast water meets still water and drags it along.",
+      "The other colouring, Pressure head (Field & legend on the strip), shows the pressure. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher. Below the reservoir's free surface it mostly grows with depth.",
+      "Past the exit the jet keeps its fast core for a metre or two, then starts to flap and breaks into eddies: at its edges fast water meets still water and drags it along.",
       "Pick the Rake tool on the strip and place Rakes in the pipe at x ≈ 3.5 and 10 m and compare the profiles; then place two more across the jet at x ≈ 12 and 14 m (each new Rake replaces the oldest).",
       "On the colour bar (the legend), switch from Live to Average and wait until its T passes 30 s: the jet becomes a smooth, spreading stream and the rakes across it bell-shaped curves, wider and lower downstream.",
       "Pick the Flux line tool on the strip and drag two short Flux lines across the jet only (z = 2.4–3.9 m at x = 12 m, z = 2.15–4.15 m at x = 14 m): the averaged q through the jet grows downstream as it drags in the still water.",

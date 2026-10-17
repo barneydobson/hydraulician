@@ -524,7 +524,8 @@ const SIM = (() => {
       kappa: scene.kappa,
       // Optional outflow absorbing layer: extra viscosity (m²/s) ramped up
       // over the last `outflowLen` metres before the right edge (FS_VEL).
-      // 0 / undefined is off — every scene but pipejet.
+      // 0 / undefined is off. No shipped scene uses it at present (FF-4 moved
+      // to a free-surface reservoir); kept for full, lidded domains.
       outflowNu: scene.outflowNu || 0, outflowLen: scene.outflowLen || 0,
       // Optional: the tailwater's exchange face passes outflow only, like a
       // plain open edge (FS_VEL). 0 / undefined is off — contraction only.

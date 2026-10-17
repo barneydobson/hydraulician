@@ -160,7 +160,8 @@ Three standing rules, all measured:
   donor limiter refills it, then reverses — tail columns run dry and report
   *negative* `q` while the reach behind them floods. The full post-mortem is
   in [engineering-notes.md](engineering-notes.md#guard-rails-each-bought-with-an-explosion).
-  No shipped scene uses mode 2; the sandbox floor drains fine on mode 1.
+  Shipped use of mode 2: `pipejet` (FF-4), whose reservoir spills over an
+  end-wall crest onto an outfall brink. The sandbox floor drains fine on mode 1.
 - **Under gravity an open edge lets water out, never in.** Zero-gradient
   mirrors the interior, so on its own it passes inflow as readily as outflow,
   and once the surface stopped being dragged s2, s3, hammer and jet each drew

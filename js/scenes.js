@@ -1821,94 +1821,77 @@ const SCENES = (() => {
                "Drag a Control volume (9) round the whole tank: in, out and net. Net is the rate the tank stores water; it is NOT zero while the level moves."] };
     })(),
 
-    // MM-1 · a jet turned through an angle θ by one vane, θ on a slider from
-    // 90° (a flat plate with a hood: the jet strikes it square-on and is sent
-    // down) to 175° (a cup that sends it nearly straight back).
+    // MM-1 · a free jet striking a FLAT PLATE whose inclination θ (the angle
+    // between the jet and the plate) is the one slider: 90° (plate square to
+    // the jet, the symmetric split) down to 20°. The plate is fixed in space
+    // at each setting and turns about the point where the jet's axis meets
+    // its wet face, so the jet always strikes its middle and the split is set
+    // by the angle alone. The jet leaves as two sheets along the plate:
+    //     q₁ = q(1 + cos θ)/2  along t = (cos θ, −sin θ)  (down the screen)
+    //     q₂ = q(1 − cos θ)/2  along −t                    (up and back)
+    // and the force on the plate is normal to it, F_n = ρqU sin θ, with
+    // components F_x = F_n sin θ (→) and F_z = F_n cos θ (↑).
     //
-    // GRAVITY IS (ALMOST) OFF, and that is the design choice. The textbook
-    // vane is a horizontal jet in a horizontal plane, so the picture is a
-    // PLAN view: gravity acts into the screen. In the vertical plane the jet
-    // sags, the turned sheet speeds up or slows as it falls or climbs through
-    // the vane, a sheet turned upward rains back onto the jet (MO-2's +20%),
-    // and the box's F_z carries the weight of every drop inside it — so the
-    // vertical component, half of what this demo is for, would read gravity
-    // as much as momentum. Unlike `plan` the plane is NOT full of water: the
-    // jet is free, in air at p = 0, as the textbook assumes. That needs the
-    // free-surface EOS, which the shaders switch off at g exactly 0 (the
-    // two-sided plan-view EOS pulls an interface together), so g is
-    // 1e-3 m/s²: the free-surface path stays on and the jet sags 0.1 mm over
-    // its flight.
+    // GRAVITY IS (ALMOST) OFF, and that is the design choice: the textbook
+    // plate is a horizontal jet in a horizontal plane, so the picture is a
+    // PLAN view with gravity into the screen. In the vertical plane the jet
+    // sags, a sheet sent up slows and rains back onto the jet (MO-2's +20%
+    // on a flat plate), and the box's vertical force carries the weight of
+    // every drop inside it. Unlike `plan` the plane is NOT full of water:
+    // the jet is free, in air at p = 0. That needs the free-surface EOS,
+    // which the shaders swap for the two-sided plan-view EOS at g exactly 0
+    // (it pulls an interface together), so g is 1e-3 m/s²: the free-surface
+    // path stays on and the jet sags ~0.1 mm over its flight.
+    //
+    // NO FRICTION ALONG THE PLATE, because the teaching point is that an
+    // ideal plate takes no tangential force — that is what makes the split
+    // q(1 ± cos θ)/2. `slip: 1` mirrors the viscous stencil at a solid
+    // (free-slip) and `cf: 0` switches off the wall function; `kappa: 0`
+    // keeps the open-channel mixing length out of the sheets.
+    //
+    // Sizes. The jet is 0.24 m wide (2·RJ): at 30° the small sheet is
+    // 0.067 × 0.24 = 16 mm, ~2 cells at Medium (Δx ≈ 8.7 mm). The plate is
+    // 1.60 m long (0.80 m each side of the impact point): at 20° the jet's
+    // footprint is 0.24/sin 20° = 0.70 m, and what remains past it lets each
+    // sheet run parallel to the plate before it leaves the end. Every edge is
+    // an OUTFALL (ghosts held empty): with no gravity to drain it, spray at a
+    // plain open edge ponded against it.
     (() => {
-      const XS = 0.50, ZJ = 1.60, RJ = 0.09;          // spout centre and radius
-      const XP = 1.60;                                // the plate's water face
-      const ZT = ZJ + 0.12;                           // hood (ceiling) underside
-      const RF = 0.12;                                // hood-to-plate fillet radius
-      // The plate runs well below the jet: cut it short and the sheet leaves it
-      // before it has been turned (measured: a plate ending 0.15 m under the
-      // axis turned the jet only ~55°, and the box read half of ρqU).
-      const ZB = ZJ - 0.40;                           // plate meets the lip
-      const RL = 0.25;                                // lip radius
-      const LT = 0.20;                                // straight run-out past the lip
-      const TH = 0.06;                                // vane thickness
-      const XH = XP - 0.45;                           // upstream end of the hood
+      const XS = 0.40, ZJ = 1.20, RJ = 0.12, UJ = 4.5;  // spout centre, radius, speed
+      const XC = 1.60;                                // impact point on the wet face
+      const LH = 0.80;                                // half the plate's length
+      const TH = 0.06;                                // plate thickness (dry side)
       const deg = Math.PI / 180;
-      /** The vane's WATER face, as a polyline from the hood's upstream end
-       *  round to the lip's tip, for a total turn θ (degrees). */
-      function face(theta) {
-        const phi = Math.max(0, Math.min(theta - 90, 90)) * deg;
-        const pts = [[XH, ZT]];
-        // hood → plate fillet (clockwise, 90° → 0°)
-        GEOM.arcPts(XP - RF, ZT - RF, RF, 90 * deg, 0, 8).forEach((p) => pts.push(p));
-        pts.push([XP, ZB]);
-        // lip (clockwise from 0 to −φ)
-        if (phi > 1e-3) GEOM.arcPts(XP - RL, ZB, RL, 0, -phi).slice(1).forEach((p) => pts.push(p));
-        // …and a straight run-out along the exit direction (cos θ, −sin θ).
-        // Without it a 0.18 m sheet leaves a short arc before it has taken
-        // the arc's angle: measured at θ = 120° it left at ~107° and the box
-        // read 0.80 of ρqU(1 − cos θ).
-        const e = pts[pts.length - 1], th = theta * deg;
-        pts.push([e[0] + LT * Math.cos(th), e[1] - LT * Math.sin(th)]);
-        return pts;
-      }
-      /** Thicken the water face outward (away from the water, i.e. to the
-       *  right of travel for this clockwise curve) into a CCW polygon. */
-      function vane(theta) {
-        const f = face(theta), n = f.length, off = [];
-        for (let k = 0; k < n; k++) {
-          const a = f[Math.max(0, k - 1)], b = f[Math.min(n - 1, k + 1)];
-          const tx = b[0] - a[0], tz = b[1] - a[1], L = Math.hypot(tx, tz) || 1;
-          // The water face runs clockwise round the water, so the water is
-          // on its right and the solid on its LEFT: offset along the left normal.
-          off.push([f[k][0] - TH * tz / L, f[k][1] + TH * tx / L]);
-        }
-        // Out along the water face with the solid on the left, back along the
-        // offset: counter-clockwise, and the wet face is edges 0 … n−2.
-        const ring = f.concat(off.reverse());
-        return GEOM.poly(ring, [{ id: "face", label: "Vane (wet face)", e0: 0, e1: n - 2 }], "vane");
+      /** The plate at inclination θ (degrees): wet face from the upstream end
+       *  A = C − LH·t to the downstream end B = C + LH·t, thickened along
+       *  d = (sin θ, cos θ), the dry side. A → B → B+d → A+d is CCW. */
+      function plate(theta) {
+        const th = theta * deg, tx = Math.cos(th), tz = -Math.sin(th);
+        const dx = Math.sin(th) * TH, dz = Math.cos(th) * TH;
+        const A = [XC - LH * tx, ZJ - LH * tz], B = [XC + LH * tx, ZJ + LH * tz];
+        return GEOM.poly([A, B, [B[0] + dx, B[1] + dz], [A[0] + dx, A[1] + dz]],
+          [{ id: "face", label: "Plate (wet face)", e0: 0, e1: 0 },
+           { id: "back", label: "Plate (back)", e0: 2, e1: 2 }], "plate");
       }
       return {
-        id: "vane", name: "Jet on a vane, plan view", key: "F = ρqU(1 − cos θ), ρqU sin θ",
+        id: "vane", name: "Jet on an inclined plate, plan view", key: "F_n = ρqU sin θ",
         group: "Jets & waves",
-        blurb: "A free jet seen from above, turned by one vane through an angle you set: from a flat plate (90°) to a cup that sends it back (175°). Box it with a Control volume and read both force components.",
-        W: 3.0, H: 2.4, g: 1e-3, c: 26, cf: 0.004, cs: 0.10, nu: 1e-5,
+        blurb: "A free jet seen from above strikes a flat plate set at an angle θ to it. The jet splits into two unequal sheets along the plate; box the plate with a Control volume and read the force, which is at right angles to the plate.",
+        W: 3.4, H: 2.4, g: 1e-3, c: 26, cf: 0, cs: 0.10, nu: 1e-5, slip: 1, kappa: 0,
         mode: 2, hmax: 1, headMax: 1, vmax: 5,
         particles: 0, spinup: 0,
-        // OUTFALL on all four edges (ghosts held empty, so the edge is a
-        // brink): with no gravity to drain it, spray that reached a plain
-        // zero-gradient edge sat against it and spread along it as a pond.
         open: [2, 2, 2, 2],
         params: [
-          { key: "theta", label: "Turning angle θ", min: 90, max: 175, step: 1,
+          { key: "theta", label: "Plate angle θ", min: 20, max: 90, step: 1,
             value: 90, unit: "°",
-            fmt: (v) => v.toFixed(0) + "°  (90° flat plate → 175° cup)" },
+            fmt: (v) => v.toFixed(0) + "°  (90° square to the jet)" },
         ],
-        source: { on: 1, x: XS, z: ZJ, r: RJ, vx: 4.5, vz: 0 },
-        solids: (W, H, P, par = {}) => [vane(par.theta === undefined ? 90 : par.theta)],
+        source: { on: 1, x: XS, z: ZJ, r: RJ, vx: UJ, vz: 0 },
+        solids: (W, H, P, par = {}) => [plate(par.theta === undefined ? 90 : par.theta)],
         water: () => 0,
-        tips: ["Gravity is out of the plane: this is the jet seen from ABOVE, so it flies straight and the turned sheet keeps its speed.",
-               "Drag a Control volume (9) round the vane, clear of the spout: it reads F→ and F↑ on what is inside — the vane.",
-               "Slide θ from 90° to 175°: F→ climbs from ρqU towards 2ρqU while F↑ = ρqU sin θ falls from ρqU to almost nothing.",
-               "Field → Momentum flux: red is still heading the way the jet was fired, blue has been sent back."] };
+        tips: ["This is the jet seen from ABOVE: it flies straight, and the sheets keep their speed along the plate.",
+               "Drag a Control volume (9) round the plate, clear of the spout: it reads the force on what is inside — the plate.",
+               "Turn the plate with <b>Plate angle θ</b>: the force stays at right angles to the plate, ρqU sin θ, and the jet splits unequally, q(1 ± cos θ)/2."] };
     })(),
     // ===== Year 1: wall-shape =====
     // PF-2: a still tank whose right-hand wall changes shape under ONE slider,

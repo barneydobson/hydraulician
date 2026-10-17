@@ -45,7 +45,7 @@ Principles:
 | L3 Statics | HS-1 Dyke and piezometer · PF-2 Wall shape |
 | L4 Fluid motion | FF-2 Spillway · FF-3 Flow past a body · FF-4 Pipe jet into a reservoir · (FF-5 contraction rig, idea) |
 | L5 Mass conservation | VC-1 Contraction rig, steady · VC-2 Fill and leak |
-| L6 Momentum | MM-1 Jet turned through an angle · MM-2 Contraction rig, forces · HJ-2 Sluice gate |
+| L6 Momentum | MM-1 Jet on an inclined plate · MM-2 Contraction rig, forces · HJ-2 Sluice gate |
 | L7–L8 | taught by a colleague; rough ideas at the end |
 | Year 2 preview | WV-4 Breaking waves on a beach |
 
@@ -70,7 +70,7 @@ draft does not yet do well, as measured:
 | FF-4 | Pipe profile develops; jet flaps then breaks up ~4–6 m out; averaged bells; entrainment visible in the flux | Had to be a lidded full tank (free-surface versions failed, documented); eddy viscosity, Re ≈ 400; far-field average still lumpy at 60 s |
 | FF-5 / VC-1 / MM-2 | Contraction rig: Q equal in both pipes; ΣQ ≈ 0.2%; R from the CV matches the formula; taper vs step differ by ≈ the extra loss; vena contracta Cc ≈ 0.68 | Slider restarts the water (25 s warm-up); vena contracta is thin at Medium (best on Vorticity); straight-pipe friction is a tiny number; outlet jet runs along the right reservoir's surface; dye does not reach the pipe |
 | VC-2 | dh/dt = Q/S to 2%; settled level matches C_d ≈ 0.65; CV now shows dV/dt and closes to < 1% | Inflow slider drives the spout through a workaround in the scene's `solids()` |
-| MM-1 | Plan view (gravity ≈ 0): F_x and F_z within ~7% of ρqU(1−cos θ), ρqU sin θ from 90° to 150°; F_x nearly doubles at 175° | 90° is a hooded plate (one-sided), not the textbook split; some spray after slider moves |
+| MM-1 | Plan view (gravity ≈ 0), inclined flat plate 90°→20°, free-slip: CV F_n within 1–6% of ρqU sin θ (a few % high), along-plate force ≤ 6% of F_n; sheets q₁, q₂ within 0.01–0.04 m²/s of q(1 ± cos θ)/2 | Small sheet under two cells below 30°; start-up spray wobbles the box; CV chip still prints an energy line |
 | HJ-2 | Ported from the OneDrive copy; gate force two ways (29.3 vs ½ρg(d₀−a)² = 29.8 kN/m); non-hydrostatic pressure at the gate; weir drowns the gate | After #72 the jet keeps its momentum: the free jump exists only for crest ≈ 0.44–0.48 m, with hysteresis; default crest moved to 0.48 |
 | WV-4 | Spilling (tanβ 0.06) and surging (tanβ 0.7) clear | Plunging does not curl over: the front goes vertical and collapses (also at High) |
 
@@ -283,19 +283,20 @@ Not shown in a scene (L4):
 
 ### Momentum conservation — MM
 
-#### MM-1 · A jet turned through an angle — Demo / Play
+#### MM-1 · The force of a jet on an inclined plate — Demo / Play
 
 - **Tier:** Year 1 core · **Rung:** L1 · **Used in:** L6
-- **Slides:** 8, 19–21 (forces from solid surfaces; the jet pack; momentum
-  in 2D).
-- **Scene:** new. A jet strikes a vane whose turning angle is set by one
-  slider, from a flat plate (90°) through angled vanes to a cup (close to
-  180°).
+- **Slides:** 8, 20–21 (forces from solid surfaces; momentum in 2D, the
+  inclined plate).
+- **Scene:** `vane` (redesigned). A plan-view jet strikes a flat plate whose
+  angle θ to the jet is one slider, 90° (square to the jet) down to 20°; the
+  plate is fixed at each setting and centred on the jet's axis.
 - **What it shows:**
   - Both components of momentum at once: the control-volume box gives F_x
-    and F_z, and they change differently as the angle changes.
-  - The force rises to nearly double as the jet is turned back on itself:
-    direction matters as much as speed. Also the jet-pack argument.
+    and F_z, and they combine into a force normal to the plate,
+    F_n = ρqU sin θ.
+  - The split q₁, q₂ = q(1 ± cos θ)/2: a smooth plate takes no force along
+    itself, so the jet's momentum along the plate is shared out unequally.
 - **Existing:** MO-2, HP-2 (separate rigs for the same idea).
 - **To check:** the CV force readout shows both components clearly.
 
@@ -478,8 +479,8 @@ Not discussed. Kept as a starting point only.
 8. **Contraction rig** (FF-5, VC-1, MM-2): two full reservoirs, wide pipe
    into narrow pipe, contraction-sharpness slider.
 9. **VC-2** The fill-and-leak tank with an inflow slider.
-10. **MM-1** A jet on a vane with a turning-angle slider; the CV force with
-    both components shown clearly.
+10. **MM-1** A jet on an inclined flat plate with a plate-angle slider; the
+    CV force with both components shown clearly, and the unequal split.
 11. **HJ-2** Port HJ-2 (`gatejump`) from the OneDrive copy onto main.
 12. **WV-4** The beach with a slope slider.
 13. **Everywhere:** a streamline display (FF-2, FF-3, FF-4, the contraction

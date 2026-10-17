@@ -96,7 +96,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | FF-5 | Contraction rig: streamlines | FF-5-contraction-streamlines/ | contraction, contraction length slider | — (lecturer demo) |
 | VC-1 | Contraction rig, steady | VC-1-contraction-steady/ | contraction | — (lecturer demo) |
 | VC-2 | The tank that fills and leaks | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (lecturer demo) |
-| MM-1 | A jet turned through an angle | MM-1-jet-vane-angle/ | vane, turning angle slider | — (lecturer demo) |
+| MM-1 | The force of a jet on an inclined plate | MM-1-jet-inclined-plate/ | vane, plate angle slider | — (class exercise) |
 | MM-2 | Contraction rig, forces | MM-2-contraction-forces/ | contraction | — (lecturer demo) |
 | HJ-2 | Sluice gate with the movable weir | HJ-2-gate-jump/ | gatejump, weir crest slider | — (lecturer demo) |
 | WV-4 | Breaking waves on a beach | WV-4-breakers/ | beach, beach slope slider | — (lecturer demo) |

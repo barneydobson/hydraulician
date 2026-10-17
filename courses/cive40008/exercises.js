@@ -207,7 +207,7 @@ COURSES.exercises("cive40008", [
     scene: "fillleak",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { hoverCard: false, mode: "0", particles: false, gaugeField: "eta" },
+    viewParams: { hoverCard: false, mode: "0", particles: false, gaugeField: "eta", gaugeSpan: "all" },
     studentParams: [
       { control: "geom0", label: "Inflow Q", unit: "m²/s" },
     ],

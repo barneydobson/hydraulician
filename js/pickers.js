@@ -521,6 +521,10 @@ const EX = (() => {
     // …and how much of the interface this exercise wants in front of a
     // student. Applied here rather than in `pick` so it lands with everything
     // else the entry declares, including on a re-pick.
+    // An exercise arrives with nothing in hand — the neutral Read tool — even
+    // where it offers BUILD: a press reads the water, and drawing waits until
+    // a step says {tool:wall} and the student picks it.
+    state.tool = null; state.forceHover = null;
     UIMODE.apply(UIMODE.fromExercise(ex));
     syncPanel();
     return miss;
@@ -889,6 +893,7 @@ const EX = (() => {
     m.textContent = "";
     hideDesc();
     m.classList.toggle("compact", compact());
+    m.classList.toggle("inline", compact() && !TIP.hoverable());
     const head = document.createElement("div");
     head.className = "smh";
     const hb = document.createElement("b");
@@ -964,7 +969,14 @@ const EX = (() => {
         // An entry with an `aim` is introduced by it — what the exercise is
         // for, in the student's words; the rest keep the bench line. In the
         // compact menu it moves to the floating box beside the item.
-        if (compact()) {
+        // On a screen that cannot hover the floating box would never be seen
+        // — a tap on the item loads the exercise there and then — so the
+        // description is printed inline under the title instead.
+        if (compact() && !TIP.hoverable()) {
+          const bl = document.createElement("p");
+          bl.textContent = describe(e);
+          b.appendChild(bl);
+        } else if (compact()) {
           b.dataset.desc = describe(e);
           b.removeAttribute("title");
           b.onpointerenter = () => showDesc(b);

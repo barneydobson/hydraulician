@@ -14,6 +14,12 @@
 //
 // Every mutation below is a bug that actually happened during the work, or one
 // a review argued about. Cost is ~0.5 s each, so the whole gate is seconds.
+//
+// Two catalogues: RECON (js/reconstruct.js against test/recon-test.mjs) and
+// GEOM (js/geom.js against test/geom-test.mjs). Each suite is first run
+// UNMUTATED — a suite that is already red would "kill" every mutant for free.
+// A `kills` entry must match the start of a `FAIL <name>` line, never any other
+// text in the output (a name quoted in a failure's detail would also match).
 
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -23,6 +29,8 @@ import { join } from "node:path";
 
 const SRC = fileURLToPath(new URL("../js/reconstruct.js", import.meta.url));
 const SUITE = fileURLToPath(new URL("./recon-test.mjs", import.meta.url));
+const GEOM_FILE = fileURLToPath(new URL("../js/geom.js", import.meta.url));
+const GEOM_SUITE = fileURLToPath(new URL("./geom-test.mjs", import.meta.url));
 /** Read with the line endings NORMALISED to LF.
  *
  *  `.gitattributes` sets `* text=auto`, so the repo stores LF and a Windows
@@ -38,6 +46,7 @@ const SUITE = fileURLToPath(new URL("./recon-test.mjs", import.meta.url));
  *  mutant is written back out as LF too, which the suite does not care about —
  *  it only ever parses the file. */
 const source = readFileSync(SRC, "utf8").replace(/\r\n/g, "\n");
+const geomSource = readFileSync(GEOM_FILE, "utf8").replace(/\r\n/g, "\n");
 
 /** `find` → `replace` on js/reconstruct.js. `kills` are substrings of the
  *  assertion names that MUST appear among the failures — naming them is what
@@ -109,7 +118,8 @@ const MUTANTS = [
     why: "eta05 and eta95 swapped — the upside-down excursion band that does not look wrong",
     find: "return { eta95: crossing(gcol, j0, j1, dx, 0.05),\n             eta05: crossing(gcol, j0, j1, dx, 0.95) };",
     replace: "return { eta95: crossing(gcol, j0, j1, dx, 0.95),\n             eta05: crossing(gcol, j0, j1, dx, 0.05) };",
-    kills: ["C4"] },
+    // C4 was removed as implied by C3; C3's signed offsets are what notice.
+    kills: ["C3 eta95", "C3 eta05"] },
 
   { id: "reconstruct-transposed",
     why: "row-major index transposed — invisible on a square grid, catastrophic on the real 3400-column ones",
@@ -127,7 +137,13 @@ const MUTANTS = [
     why: "d2d built from the unmasked integral, so the 2D/1D cross-check would measure its own bug rather than check against it",
     find: "d2d[i] = b.length ? bodyDepth(gcol, b[0].j0, b[0].j1, dx) : 0;",
     replace: "d2d[i] = b.length ? columnDepth(gcol, b[0].j0, b[0].j1, dx) : 0;",
-    kills: ["C8"] },
+    kills: ["C8 depth lands in the column"] },
+
+  { id: "reconstruct-bed-offset",
+    why: "the bed reported one row too high — bed was never asserted beyond its length",
+    find: "bed[i] = b.length ? b[0].j0 * dx : 0;",
+    replace: "bed[i] = b.length ? (b[0].j0 + 1) * dx : 0;",
+    kills: ["E bed is the first wet row"] },
 
   { id: "no-zero-gravity-refusal",
     why: "the g = 0 refusal removed, so a two-sided EOS gets a plausible answer instead of an error",
@@ -182,46 +198,90 @@ const MUTANTS = [
     kills: ["K6 the mass flux counts the pressurised part"] },
 ];
 
+/** The GEOM catalogue — the same shape, against js/geom.js. */
+const GEOM_MUTANTS = [
+  { id: "edge-normal-flipped",
+    why: "the outward normal turned inward — every force changes sign and nothing looks broken until a free body diagram is drawn",
+    find: "return [tz, -tx];",
+    replace: "return [-tz, tx];",
+    kills: ["GA2"] },
+
+  { id: "force-fill-uncapped",
+    why: "fc = min(f, 1) written as the raw fill, so an over-full (pressurised) sample counts its compressible excess in the force; at f < 1 it also loses nothing, which is why only a case with f > 1 or a weighted partial sum sees it",
+    find: "const fc = Math.min(s.f, 1);",
+    replace: "const fc = s.f;",
+    kills: ["GA11 an over-full sample is capped"] },
+
+  { id: "sample-count-no-floor",
+    why: "the at-least-2-samples floor dropped, so a short edge is reduced to its midpoint",
+    find: "const nk = Math.max(2, Math.ceil(L / ds));",
+    replace: "const nk = Math.ceil(L / ds);",
+    kills: ["GA6 faceSamples count is floored"] },
+];
+
 // ------------------------------------------------------------------ harness
 const dir = mkdtempSync(join(tmpdir(), "recon-mut-"));
 const survived = [], stale = [];
-let killed = 0;
+let killed = 0, total = 0;
 
-for (const m of MUTANTS) {
-  // A mutation whose `find` no longer matches after a refactor is a SILENT
-  // PASS: the suite would run against untouched source, go green, and the gate
-  // would report success while testing nothing. That is precisely the failure
-  // mode this file exists to prevent, so it is an error, never a skip.
-  if (!source.includes(m.find)) {
-    stale.push(`${m.id}: pattern not found in js/reconstruct.js —\n      ${m.find.split("\n")[0]}`);
-    continue;
-  }
-  const mutated = source.replace(m.find, m.replace);
-  if (mutated === source) { stale.push(`${m.id}: substitution changed nothing`); continue; }
+/** The names of the assertions that failed, from a suite's `  FAIL <name>` lines. */
+const failedNames = (out) => out.split("\n")
+  .map((l) => l.match(/^\s*FAIL (.*)$/)).filter(Boolean).map((m) => m[1]);
 
-  const file = join(dir, m.id + ".js");
-  writeFileSync(file, mutated);
-  const r = spawnSync(process.execPath, [SUITE],
-                      { env: { ...process.env, RECON_SRC: file }, encoding: "utf8" });
-  const out = (r.stdout || "") + (r.stderr || "");
-
-  if (r.status === 0) {
-    survived.push(`${m.id} — ${m.why}\n      the suite stayed GREEN: ${out.trim().split("\n")[0]}`);
-    continue;
-  }
-  const missed = m.kills.filter((k) => !out.includes(k));
-  if (missed.length) {
-    survived.push(`${m.id} — the suite failed, but not on the guard this targets.\n`
-                + `      expected among the failures: ${missed.join(", ")}`);
-    continue;
-  }
-  killed++;
+function runSuite(suite, envVar, file) {
+  const env = { ...process.env };
+  if (file) env[envVar] = file; else delete env[envVar];
+  const r = spawnSync(process.execPath, [suite], { env, encoding: "utf8" });
+  return { status: r.status, out: (r.stdout || "") + (r.stderr || "") };
 }
+
+function run(label, suite, envVar, src, srcName, mutants) {
+  // Baseline: the unmutated suite must be green, or every kill below is bogus.
+  const base = runSuite(suite, envVar, null);
+  if (base.status !== 0) {
+    console.error(`${label}: the UNMUTATED suite is red — fix it before mutating.\n${base.out}`);
+    process.exit(1);
+  }
+  for (const m of mutants) {
+    total++;
+    // A mutation whose `find` no longer matches after a refactor is a SILENT
+    // PASS: the suite would run against untouched source, go green, and the gate
+    // would report success while testing nothing. That is precisely the failure
+    // mode this file exists to prevent, so it is an error, never a skip.
+    if (!src.includes(m.find)) {
+      stale.push(`${m.id}: pattern not found in ${srcName} —\n      ${m.find.split("\n")[0]}`);
+      continue;
+    }
+    const mutated = src.replace(m.find, m.replace);
+    if (mutated === src) { stale.push(`${m.id}: substitution changed nothing`); continue; }
+
+    const file = join(dir, label + "-" + m.id + ".js");
+    writeFileSync(file, mutated);
+    const r = runSuite(suite, envVar, file);
+
+    if (r.status === 0) {
+      survived.push(`${m.id} — ${m.why}\n      the suite stayed GREEN: ${r.out.trim().split("\n")[0]}`);
+      continue;
+    }
+    const names = failedNames(r.out);
+    const missed = m.kills.filter((k) => !names.some((n) => n.startsWith(k)));
+    if (missed.length) {
+      survived.push(`${m.id} — the suite failed, but not on the guard this targets.\n`
+                  + `      expected among the failures: ${missed.join(", ")}\n`
+                  + `      failed: ${names.join(" | ") || "(no FAIL lines — crashed?)"}`);
+      continue;
+    }
+    killed++;
+  }
+}
+
+run("recon", SUITE, "RECON_SRC", source, "js/reconstruct.js", MUTANTS);
+run("geom", GEOM_SUITE, "GEOM_SRC", geomSource, "js/geom.js", GEOM_MUTANTS);
 
 rmSync(dir, { recursive: true, force: true });
 
 for (const s of stale) console.error("  STALE     " + s);
 for (const s of survived) console.error("  SURVIVED  " + s);
-console.log(`${killed}/${MUTANTS.length} mutations killed, `
+console.log(`${killed}/${total} mutations killed, `
           + `${survived.length} survived, ${stale.length} stale`);
 if (survived.length || stale.length) process.exit(1);

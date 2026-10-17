@@ -2416,37 +2416,61 @@ const SCENES = (() => {
     })(),
 
     // ------------------------------------------------ WV-4 · BREAKERS ON A BEACH
-    // One flume, one wave, one slider: the beach slope tanβ. The piston at
-    // the left makes the same wave every time over a flat bed of constant
+    // One flume, one wave, one slider: the beach slope tanβ. A paddle at the
+    // left wall makes the same wave every time over a flat bed of constant
     // depth; the slider tilts the beach, and the Iribarren number
     // ξ = tanβ/√(H₀/L₀) moves through spilling (ξ < 0.5), plunging
     // (0.5–3.3) and surging (> 3.3) with nothing else changed.
     //
-    // Where the beach goes. A gentle beach is long and a steep one short, and
-    // these waves lose height to the discretisation the further they run
-    // (engineering notes, "Surface waves are damped by RESOLUTION"), so the
-    // beach is placed to keep the flat run short at both ends of the slider:
-    // the toe sits at x = 1.2 m (just off the paddle) until the beach is steep
-    // enough for its still-water shoreline to come inside x = 6 m, and from
-    // there the shoreline stays at 6 m and the toe walks right. Above the
-    // shoreline the beach runs on to the right edge, so run-up always has
-    // somewhere to go. Changing the slope is a new experiment (resetWater).
+    // The paddle is AT THE WALL, not a column inside the water. The `wave`
+    // piston elsewhere is a prescribed-velocity column at wave.x with a pocket
+    // of water behind it that rises and falls in antiphase — on this card it
+    // read as a discontinuity with water on both sides. Here wave.x = 0 puts
+    // it in column 1, the left edge is open (so the ghost column feeds it) and
+    // wave.d declares the still depth, which makes the solver impose the
+    // paddle's VOLUME flux a·ω·D·cos ωt (shaders.js, FS_VEL; SIM.wallPaddle).
+    // That is the linear piston condition — the paddle's motion imposed at its
+    // mean position — and the overlay draws a solid plate whose face moves
+    // through the displacement a·sin ωt (main.js, drawMarkers).
+    // Measured over 12–16 s at every slope: the water volume holds to 0.2%.
+    //
+    // Where the beach goes. These waves lose height to the discretisation the
+    // further they run (engineering notes, "Surface waves are damped by
+    // RESOLUTION"), so the flat run is kept short: the toe sits 1.0 m off the
+    // paddle until the beach is steep enough for its still-water shoreline to
+    // come inside x = 5.0 m (SHORE), and from there the shoreline is held and the toe
+    // walks right. Above the shoreline the beach runs on to the right edge, so
+    // run-up always has somewhere to go. Changing the slope is a new
+    // experiment (resetWater).
+    //
+    // The box is cropped to what the waves use, because the cost is cells ×
+    // substeps: the gentlest slope (0.06) puts the shoreline at 7.7 m, so the
+    // flume is 9 m long; the highest run-up (tanβ 0.7) reaches 0.18 m above
+    // still water, so the lid is 0.40 m above it; the bed is 0.10 m off the
+    // bottom. At Low that is Δx = 13 mm (the old 12 × 1.2 m box needed
+    // Medium for 12 mm) with half the cells: 671 × 67.
     (function () {
-      const W = 12, H = 1.2, BED = 0.20, LEV = 0.60, D = LEV - BED;
-      const TOE0 = 1.2, SHORE = 6.0;
+      const BED = 0.10, LEV = 0.50, D = LEV - BED;
+      const TOE0 = 1.0, SHORE = 5.0;
       const toeOf = (s) => Math.max(TOE0, SHORE - D / s);
       const slopeOf = (par) => (par && par.beach_s !== undefined ? par.beach_s : 0.06);
       return {
         id: "beach", name: "Wave flume · breakers on a beach", key: "Iribarren, one slider",
         group: "Jets & waves",
-        blurb: "Waves from a piston over deep, level water run onto a beach whose slope is one slider. Gentle: the crest crumbles and spills all the way in. Steep: the front surges up the slope and runs back without breaking.",
-        W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
-        mode: 0, hmax: 0.9, vmax: 1.6,
-        open: [0, 0, 0, 0],
-        wave: { amp: 0.18, period: 2.0, on: 1, x: 0.30 },
+        blurb: "A paddle at the left end of a flume makes the same wave every time; the wave runs onto a beach whose slope is one slider. Gentle: the crest crumbles and spills all the way in. Steep: the front surges up the slope and runs back without breaking.",
+        // c = 14, not the flumes' 26: the substep is acoustic, Δt ∝ Δx/(c + 6),
+        // so this alone is 1.6× the speed. gd/c² = 2% compression at the bed;
+        // measured, H along the flume and the run-up moved by under 5 mm
+        // between c = 12, 16 and 26.
+        W: 9.0, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+        mode: 0, hmax: 0.75, vmax: 1.6,
+        open: [1, 0, 0, 0],
+        // Stroke amplitude 0.14 m: the wall paddle loses nothing to a pocket
+        // behind it, so it makes the old piston's 0.18 m wave with less.
+        wave: { amp: 0.14, period: 2.0, on: 1, x: 0, d: 0.40 },
         particles: 1, plife: 6,
         spinup: 0,
-        params: [{ key: "beach_s", label: "Beach slope tanβ", min: 0.04, max: 0.70, step: 0.01,
+        params: [{ key: "beach_s", label: "Beach slope tanβ", min: 0.06, max: 0.70, step: 0.01,
                    value: 0.06, unit: "", resetWater: true,
                    fmt: (v) => v.toFixed(2) + "  (1 : " + (1 / v).toFixed(1) + ")" }],
         solids: (W_, H_, P_, par) => {
@@ -2463,11 +2487,11 @@ const SCENES = (() => {
           const s = slopeOf(par), xt = toeOf(s);
           return z > BED && z < LEV && x < xt + (z - BED) / s ? still(LEV, z, P) : 0;
         },
-        tips: ["One slider: the beach slope. The wave is the same every time — the piston's stroke and period do not change.",
+        tips: ["One slider: the beach slope. The wave is the same every time — the paddle's stroke and period do not change.",
                "Iribarren ξ = tanβ/√(H₀/L₀): spilling below about 0.5, plunging 0.5–3.3, surging above 3.3.",
                "Gentle beach: the wave shoals, steepens, and its crest crumbles down the front — spilling, a long surf zone.",
                "Steep beach: the front never steepens enough to break; it surges up the slope and slides back, and much of the wave reflects.",
-               "A real plunging breaker throws a tongue of water that traps an air tube. That tongue is thinner than this solver's interface — see the card."] };
+               "A real plunging breaker throws a tongue of water over a trapped air tube. That tongue is thinner than this model's interface, so here the front collapses instead of curling."] };
     })(),
   ];
 

@@ -726,6 +726,18 @@ itself ~2 cells thick. Consequences:
   Measured trapped air under the crest never exceeds 7 mm, i.e. half a cell:
   the breaks are spilling, and no parameter set changes that.
 
+**Two wavemakers.** The `wave` piston is a column of prescribed `u` at
+`wave.x`, with water on both sides: the pocket behind it rises and falls in
+antiphase and is part of the picture. WV-4's `beach` puts it AT THE WALL
+instead (`wave.x = 0`, left edge open, `wave.d` = still depth; `SIM.wallPaddle()`
+decides): the open edge's zero-gradient ghost feeds the face, and the shader
+imposes the paddle's VOLUME flux a·ω·D·cos ωt over the live depth from the
+column pass. The face velocity alone would not conserve volume — u and η are
+in phase in a progressive wave, so ⟨uη⟩ ≈ 0.02 m²/s (estimated: ~10% of the
+flume's water in 16 s) would go in — and with the volume flux the water
+holds to 0.2% over 16 s (measured at tanβ 0.06–0.7). Per unit stroke the wall paddle makes the
+taller wave (no pocket to fill): 0.14 m there matches the piston's 0.18 m.
+
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from
 `cosh k(z+d)/sinh kd`, and the vertical component vanishes at the bed as it

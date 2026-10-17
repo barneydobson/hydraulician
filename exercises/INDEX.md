@@ -99,7 +99,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | MM-1 | A jet turned through an angle | MM-1-jet-vane-angle/ | vane, turning angle slider | — (lecturer demo) |
 | MM-2 | Contraction rig, forces | MM-2-contraction-forces/ | contraction | — (lecturer demo) |
 | HJ-2 | Sluice gate with the movable weir | HJ-2-gate-jump/ | gatejump, weir crest slider | — (lecturer demo) |
-| WV-4 | Breaking waves on a beach | WV-4-breakers/ | beach, beach slope slider | — (lecturer demo) |
+| WV-4 | How waves break on beaches | WV-4-breakers/ | beach (wall paddle), beach slope slider on the card | — (student-run preview) |
 
 Rigs: RIG-A (pressurised duct) card = FR-1/rig.js · RIG-B (flat channel) card
 = WE-1/rig.js. The historical RIG-C tank family is implemented independently

@@ -120,6 +120,7 @@ uniform float u_cf;      // bed friction coefficient
 uniform float u_slip;    // 0 = no-slip walls, 1 = free-slip
 uniform float u_bulk;    // artificial bulk viscosity (damps pressure waves)
 uniform vec4  u_wave;    // amplitude (m), omega (rad/s), on, piston column
+uniform float u_waveD;   // > 0: a paddle AT THE LEFT WALL over still depth D (m)
 uniform sampler2D u_Wd;  // wall distance (m) at each cell's SW corner, CPU-built
 uniform sampler2D u_Tc;  // nx×1 open-channel columns: bed z, surface z, on, 0
 uniform float u_kappa;   // mixing-length constant (0 = closure off)
@@ -401,8 +402,24 @@ void main(){
     // "The surface is stress-free".
     un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
   }
+  bool paddle = false;   // the wall paddle's face, exempt from the outflow-only rule below
   if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
     un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker
+    // A paddle AT THE WALL (column 1, left edge open, u_waveD > 0) is the
+    // linear piston condition — the paddle's velocity imposed at its mean
+    // position — fed through the open edge's zero-gradient ghost, so there
+    // is no pocket of water behind it. The face velocity alone would not
+    // conserve volume: in a progressive wave u and η are in phase, so more
+    // goes in under the crest than comes out under the trough and the flume
+    // fills at ~⟨uη⟩. Imposing the paddle's VOLUME flux, a·ω·D·cos ωt over
+    // the column's live depth, integrates to zero over a cycle, which is
+    // what a real paddle's swept volume does.
+    // SIM.wallPaddle() decides; u_waveD is 0 for every other piston.
+    if (u_waveD > 0.0 && i == 1) {
+      paddle = true;
+      vec4 Tc1 = texelFetch(u_Tc, ivec2(1, 0), 0);
+      un *= u_waveD / max(Tc1.g - Tc1.r, 0.5 * u_waveD);
+    }
   }
 
   // --- open-boundary ring. The outermost cells see a clamped stencil, and
@@ -440,7 +457,7 @@ void main(){
   // Not in plan view: there is no free surface, the plane is full by
   // construction, and its wake legitimately crosses an open edge both ways.
   if (u_g != 0.0) {
-    if (i == 1 && u_in.z < 0.5)          un = min(un, 0.0);
+    if (i == 1 && u_in.z < 0.5 && !paddle) un = min(un, 0.0);
     if (i == NXY.x - 1 && u_tw.y < 0.5) un = max(un, 0.0);
     if (j == 1)                          wn = min(wn, 0.0);
     if (j == NXY.y - 1)                  wn = max(wn, 0.0);

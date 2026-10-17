@@ -47,7 +47,7 @@ Principles:
 | L5 Mass conservation | VC-1 Contraction rig, steady · VC-2 Fill and leak |
 | L6 Momentum | MM-1 Jet turned through an angle · MM-2 Contraction rig, forces · HJ-2 Sluice gate |
 | L7–L8 | taught by a colleague; rough ideas at the end |
-| Year 2 preview | WV-4 Breaking waves on a beach |
+| Year 2 preview | WV-4 How waves break on beaches |
 
 The course menu (`js/menu.js`, fork-local) lists exactly these, in this order.
 
@@ -359,11 +359,13 @@ Taught by a colleague. See the rough ideas at the end.
 
 ### Waves — WV
 
-#### WV-4 · Breaking waves on a beach — Demo
+#### WV-4 · How waves break on beaches — Demo
 
 - **Tier:** Preview · **Rung:** L1 · **Used in:** Year 2 preview
 - **Scene:** a wave flume, deep and of constant depth at the left with a
-  piston making waves, running onto a beach whose slope is set by a slider.
+  paddle at the end wall making waves, running onto a beach whose slope is
+  set by a slider on the card. Cropped and run at Low (c = 14) for speed:
+  ~3.7× less work than the first draft (README, "Speed").
 - **What it shows:** the breaker type changing with the slope — spilling on
   a gentle beach, plunging on a steeper one, surging on a steep one
   (the Iribarren number, for those who want it).

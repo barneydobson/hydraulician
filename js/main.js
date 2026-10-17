@@ -3243,7 +3243,39 @@ function drawMarkers(ctx) {
   if (p.tailwater.on > 0.5) {
     level("R", p.tailwater.level, "tailwater " + p.tailwater.level.toFixed(2) + " m", "#5fd08a", "tw");
   }
-  if (p.wave.on > 0.5) {
+  const wall = SIM.wallPaddle();
+  if (wall) {
+    // The paddle at the left wall (WV-4). The solver imposes its velocity
+    // a·ω·cos ωt at the mean position; it is drawn as a solid plate whose
+    // face moves through the displacement a·sin ωt to scale, about a mean
+    // 10 px off the wall, so it reads as the thing a wave flume has. The view
+    // starts at x = 0, so the back half of the stroke is drawn squashed
+    // against the wall (4 px) rather than off-screen.
+    const f = flashOf("piston");
+    const om = 2 * Math.PI / Math.max(p.wave.period, 0.05);
+    const pxm = V.w / sim.W;
+    const face = V.X(0) + Math.max(4, 10 + p.wave.amp * Math.sin(om * sim.t) * pxm);
+    const yTop = V.Y(sim.H * 0.95), yBot = V.Y(0);
+    ctx.save();
+    ctx.fillStyle = "#c98a2e"; ctx.globalAlpha = 0.92;
+    ctx.fillRect(V.X(0) - 2, yTop, face - V.X(0) + 2, yBot - yTop);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#ffcf7a"; ctx.lineWidth = 2 + 2 * f;
+    ctx.beginPath(); ctx.moveTo(face, yTop); ctx.lineTo(face, yBot); ctx.stroke();
+    // the push/pull arrow: its length is the paddle's speed now
+    const u = Math.cos(om * sim.t), ym = yTop + 34, L = 24 * u;
+    if (Math.abs(L) > 3) {
+      const tip = face + 6 + Math.max(0, L), tail = face + 6 + Math.max(0, -L);
+      const [a, b] = L > 0 ? [tail, tip] : [tip, tail];
+      const s = L > 0 ? -1 : 1;
+      ctx.beginPath(); ctx.moveTo(a, ym); ctx.lineTo(b, ym);
+      ctx.moveTo(b, ym); ctx.lineTo(b + s * 5, ym - 4);
+      ctx.moveTo(b, ym); ctx.lineTo(b + s * 5, ym + 4);
+      ctx.stroke();
+    }
+    OVERLAY.chip(ctx, face + 6, yTop + 12, "wave paddle", "#ffb648");
+    ctx.restore();
+  } else if (p.wave.on > 0.5) {
     const x = V.X(p.wave.x), f = flashOf("piston");
     ctx.save();
     ctx.globalAlpha = 0.5 + 0.5 * f;
@@ -3273,6 +3305,7 @@ function drawMarkers(ctx) {
   ctx.strokeStyle = "#dfe8f2"; ctx.lineCap = "round";
   for (const [key, on, pos, dx, dy] of sides) {
     if (!(on > 0.5)) continue;
+    if (key === "openL" && wall) continue;             // that edge IS the paddle
     const f = flashOf(key);
     ctx.globalAlpha = (on > 1.5 ? 0.55 : 0.30) + 0.5 * f;   // outfalls read stronger
     ctx.lineWidth = 1.3 + 1.5 * f;

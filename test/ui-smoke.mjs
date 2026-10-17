@@ -1936,7 +1936,7 @@ async function main() {
     console.log("\nan embedded exercise keeps the water");
     {
       // 800 x 600 is inside the 700-1000 px band a module page's content
-      // column actually offers (docs/superpowers/specs/2026-09-10-embed-design.md).
+      // column actually offers (docs/design/2026-09-10-embed-design.md).
       const embed = await launch({ width: 800, height: 600 });
       try {
         const tab = await embed.open(INDEX + "?ex=HJ-1&embed=1");

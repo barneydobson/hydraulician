@@ -887,6 +887,39 @@ CHECKS = [check_ids, check_folders, check_readme_h1, check_index_rows, check_set
           check_tabs, check_layout, check_geometry_rows, check_orphans, check_courses]
 
 
+def check_retirement_refs(c):
+    """PRINTS, never fails: every reference outside courses/original/ to an
+    original-pack card id -- the generated checklist for retiring that pack
+    (see docs/making-exercises.md, "Retiring the original pack")."""
+    ids = sorted({e["id"] for e in c.ex if e.get("course") == "original"})
+    if not ids:
+        return
+    pat = re.compile(r"(?<![\w-])(" + "|".join(re.escape(i) for i in ids) + r")(?![\w-])")
+    try:
+        files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
+                               encoding="utf-8").stdout.splitlines()
+    except FileNotFoundError:
+        return
+    text = (".md", ".js", ".mjs", ".py", ".html", ".yml", ".json", ".css")
+    rows = []
+    for rel in files:
+        if (rel.startswith(("courses/original/", "docs/_archive/", "docs/superpowers/",
+                           "exercises/_code-changes/", ".superpowers/"))
+                or not rel.endswith(text)):
+            continue
+        try:
+            with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
+                found = sorted(set(pat.findall(f.read())))
+        except (OSError, UnicodeDecodeError):
+            continue
+        if found:
+            rows.append("  %s: %s" % (rel, " ".join(found)))
+    print("retirement checklist: %d file%s outside courses/original/ mention an original-pack id"
+          % (len(rows), "" if len(rows) == 1 else "s"))
+    for r in rows:
+        print(r)
+
+
 def main():
     c = Ctx()
     if not c.ex:
@@ -897,6 +930,7 @@ def main():
     if c.unverified:
         print("note: no digit ladder found in the recognised table form, so "
               "the base/step rule is UNVERIFIED for: " + ", ".join(c.unverified))
+    check_retirement_refs(c)
     print("%d exercises, %d assertions" % (len(c.ex), c.checked))
     if c.verbose:
         for e in c.ex:

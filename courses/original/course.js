@@ -1,7 +1,9 @@
 // The original teaching pack — the cards that were the whole
 // register before courses existed. The lecturer means to retire them in time
 // ("they're not very good and eventually we'll delete them"), so they live as
-// one course folder that can go in one deletion: this file, exercises.js
+// one course folder — but retiring it is a checklist, not one deletion
+// (docs/making-exercises.md, "Retiring the original pack"; check_pack.py prints
+// every outside reference). The folder holds: this file, exercises.js
 // beside it (the cards), exercises/ (the briefs), INDEX.md, and the pack's
 // history documents (demo-programme.html, feasibility-sheet.html,
 // CHANGES-NEEDED.md, _director-status.md, _worker-recipe.md).

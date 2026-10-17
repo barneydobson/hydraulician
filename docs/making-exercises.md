@@ -484,8 +484,8 @@ except `course.js`:
 The original teaching pack (`courses/original/`) is a course like any other: its menu is the cards grouped by `topic`
 — the sections the whole-register menu draws — and `hosts:
 ["barneydobson.github.io"]` makes it the main site's default, so that site
-opens as it did before the pack moved. It is due to be retired; deleting the
-folder and its two script tags is the whole job (HS-1, which its menu still
+opens as it did before the pack moved. It is due to be retired, and that is
+more than deleting a folder: see "Retiring the original pack" below (HS-1, which its menu still
 lists, is CIVE40008's and stays). Its history documents
 (`demo-programme.html`, `feasibility-sheet.html`, `CHANGES-NEEDED.md`,
 `_director-status.md`, `_worker-recipe.md`) moved with it; the drawn-rig
@@ -646,6 +646,21 @@ candidate viscosity — the table in its README is that run.
    restores anything the derived profile would otherwise hide.
 3. Folder: lecturer README with the exact H1 and measured numbers, `rig.js` that
    reproduces them, `collect_plot.py` if the class submits.
-4. INDEX row; thumbnail in `docs/thumbs/` and the README gallery cell.
+4. INDEX row; thumbnail in `courses/<id>/thumbs/` and the README gallery cell.
 5. `check_pack.py`, `check_notation.py` clean; `smoke.js --only=api,rig`
    and `ui-smoke.mjs` run locally when `js/` changed.
+
+## Retiring the original pack
+
+Deleting `courses/original/` and its two script tags is the last step, not the
+whole job. In order:
+
+1. HS-1 already lives in `courses/cive40008/` (the original menu merely lists it); drop that menu entry from `courses/original/course.js` with the folder.
+2. Repoint `test/ui-smoke.mjs`'s `?ex=HJ-1` (6 places) and `?ex=QS-2` to CIVE40008 cards.
+3. Remove `js/exercises-rigs.js` payloads (all 18 are original-pack).
+4. Remove `docs/syllabus.md`, the README links, `check_notation.py`'s `HISTORICAL` entries and the `_config.yml` comments that name the pack.
+5. Delete the folder and its two script tags in `index.html`.
+
+The list of references is generated, not remembered: `py -3 exercises/_runner/check_pack.py`
+prints every file outside `courses/original/` that mentions an original-pack id
+(it never fails). Work it down to the files that are history only.

@@ -1914,8 +1914,10 @@ async function main() {
       const t2 = await tablet(INDEX + "?ex=VC-2", 1024, 768);
       const g0 = await t2.evaluate(`APP.state.tool = "gauge"; return { n: APP.state.gauges.length, z: APP.state.zoom };`);
       const c = await t2.evaluate(WET);
-      await touch(t2, "touchStart", [[c[0] - 30, c[1]]]);
-      await sleep(15);
+      // Both fingers in one event: the first finger's pointerdown is still
+      // held (TOUCH_HOLD_MS) when the second arrives, which is the case that
+      // used to place a gauge. Two separate CDP calls can take longer than
+      // the hold in a loaded headless browser, which is not a pinch.
       await touch(t2, "touchStart", [[c[0] - 30, c[1]], [c[0] + 30, c[1]]]);
       for (let k = 1; k <= 6; k++) {
         await touch(t2, "touchMove", [[c[0] - 30 - 12 * k, c[1]], [c[0] + 30 + 12 * k, c[1]]]);

@@ -518,6 +518,7 @@ uniform float u_Tacc;                  // window BEFORE this substep
 uniform float u_ca;        // interface compression strength
 uniform float u_dyeDecay;  // 1/s
 uniform vec2  u_dyeLine;   // period (s), on — pulsed dye timelines at the inlet
+uniform vec2  u_drain;     // residue drain: rate (1/s), speed scale (m/s); 0 = off
 
 // van Leer. Superbee is tempting here but it is over-compressive: it turns the
 // smooth thinning of an accelerating jet into a 0/1 staircase. Interface
@@ -697,6 +698,27 @@ void main(){
     float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * u_fillIn * s : 2.0 * s * s)
                                 : (tgt > fNew ? 8.0 * s * s : 2.0 * s * s);
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
+  }
+
+  // --- residue drain (a plan-view scene's residueDrain, default off). With
+  //     gravity into the screen nothing pulls spray down, so every filament
+  //     and droplet the jet sheds drifts for ever (vane: a third of the wet
+  //     cells were such relics after 20 s). Water that is SLOW and has no
+  //     PRESSURISED water within two cells leaves the plane, as if it fell
+  //     through the floor: the jet and the sheets are fast, and the one slow
+  //     place that belongs to them — the stagnation point — is pressurised
+  //     (f > 1 by ½ρU²/ρc²), so neither is touched. A source term like the
+  //     sponges: it acts on fNew after fCons, so the averaging balance books
+  //     it. Branch on the uniform: every other scene is bit-for-bit unchanged.
+  if (u_drain.x > 0.0 && fNew > 0.0) {
+    float fMax = 0.0;
+    for (int b = -2; b <= 2; b++)
+      for (int a = -2; a <= 2; a++) fMax = max(fMax, TF(ivec2(i + a, j + b)).r);
+    if (fMax < 1.003) {
+      float sp = length(vec2(0.5 * (uW + uE), 0.5 * (wS + wN)));
+      float slow = 1.0 - smoothstep(0.5 * u_drain.y, u_drain.y, sp);
+      fNew *= 1.0 - min(dt * u_drain.x * slow, 1.0);
+    }
   }
 
   // --- dye rides along (advective form, first-order upwind is plenty)

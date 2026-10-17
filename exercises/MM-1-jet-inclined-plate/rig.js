@@ -15,7 +15,8 @@
  *   MM1.jet()           -> q, U and ρqU from a section across the free jet
  *   MM1.sheets(th)      -> q₁, q₂ from a section across each sheet, 0.1 m past
  *                          each end of the plate, at right angles to it
- *   MM1.sweep()         -> F_x, F_z, F_n, F_t and q₁, q₂ at 90/75/60/45/30/20°
+ *   MM1.sweep()         -> F_x (± σ), F_z, F_n, F_t, the Pressure force F_p on
+ *                          the wet face and q₁, q₂ at 90/75/60/45/30/20°
  *                          against ρqU sin θ and q(1 ± cos θ)/2
  */
 window.MM1 = {
@@ -31,12 +32,14 @@ window.MM1 = {
   },
 
   /** A section across each sheet, D = 0.1 m past each end, normal to the plate,
-   *  from 0.03 m on the dry side to 0.16 m out on the wet side. */
+   *  from 0.03 m on the dry side to 0.30 m (q₁, up to ~0.2 m thick) or 0.16 m
+   *  (q₂, clear of the incoming jet at small θ) out on the wet side. */
   sheets: function (th) {
     var a = th * Math.PI / 180, tx = Math.cos(a), tz = -Math.sin(a), dx = Math.sin(a), dz = Math.cos(a);
     var one = function (s) {
       var px = MM1.C[0] + s * (MM1.L + 0.10) * tx, pz = MM1.C[1] + s * (MM1.L + 0.10) * tz;
-      return Math.abs(APP.SIM.lineFlux(px + 0.03 * dx, pz + 0.03 * dz, px - 0.16 * dx, pz - 0.16 * dz).Q);
+      var W = s > 0 ? 0.30 : 0.16;
+      return Math.abs(APP.SIM.lineFlux(px + 0.03 * dx, pz + 0.03 * dz, px - W * dx, pz - W * dz).Q);
     };
     return { q1: one(1), q2: one(-1) };
   },
@@ -48,18 +51,20 @@ window.MM1 = {
     angles.forEach(function (th) {
       APP.SIM.setParam("theta", th);
       MM1.adv(settle);
-      var fx = 0, fz = 0, M = 0, q = 0, q1 = 0, q2 = 0, n = 0;
+      var fx = 0, fz = 0, Fp = 0, M = 0, q = 0, q1 = 0, q2 = 0, n = 0, fxs = [];
       for (var k = 0; k < 15; k++) {
         MM1.adv(0.2);
         var f = APP.boxForce.apply(null, MM1.BOX), j = MM1.jet(), s = MM1.sheets(th);
-        fx += f.fx; fz += f.fz; M += j.rhoqU; q += j.q; q1 += s.q1; q2 += s.q2; n++;
+        fx += f.fx; fz += f.fz; M += j.rhoqU; q += j.q; q1 += s.q1; q2 += s.q2; n++; fxs.push(f.fx);
+        Fp += APP.faceForce("plate", "face").F;            // the Pressure force tool
       }
-      fx /= n; fz /= n; M /= n; q /= n; q1 /= n; q2 /= n;
+      fx /= n; fz /= n; Fp /= n; M /= n; q /= n; q1 /= n; q2 /= n;
+      var sdFx = Math.sqrt(fxs.reduce(function (a, v) { return a + (v - fx) * (v - fx); }, 0) / n);
       var c = Math.cos(th * Math.PI / 180), sn = Math.sin(th * Math.PI / 180);
       rows.push({ theta: th, rhoqU: Math.round(M),
-                  Fx: Math.round(fx), Fx_th: Math.round(M * sn * sn),
+                  Fx: Math.round(fx), sdFx: Math.round(sdFx), Fx_th: Math.round(M * sn * sn),
                   Fz: Math.round(fz), Fz_th: Math.round(M * sn * c),
-                  Fn: Math.round(fx * sn + fz * c), Fn_th: Math.round(M * sn),
+                  Fn: Math.round(fx * sn + fz * c), Fp: Math.round(Fp), Fn_th: Math.round(M * sn),
                   Ft: Math.round(fx * c - fz * sn),
                   q1: +q1.toFixed(3), q1_th: +(q * (1 + c) / 2).toFixed(3),
                   q2: +q2.toFixed(3), q2_th: +(q * (1 - c) / 2).toFixed(3) });

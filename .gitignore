@@ -1,7 +1,8 @@
 # Per-exercise long-form records (verification, director reports) live beside
 # each brief on the maintainer's machine but are deliberately not committed —
-# they are archive weight, not source. See exercises/INDEX.md.
+# they are archive weight, not source. See courses/original/INDEX.md.
 exercises/*/_archive/
+courses/*/exercises/*/_archive/
 
 # Git worktrees for parallel branches are checked out in here (see AGENTS.md).
 # They are whole working copies of the repo — never source. `.claude/launch.json`

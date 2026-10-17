@@ -61,10 +61,11 @@ those ids still open the matching tab.) On the lecturer's own Pages site,
 **Where they live.** The course owns its exercises: the cards are in
 `courses/cive40008/exercises.js` and the briefs (README, `rig.js`, thumbnail)
 in `courses/cive40008/exercises/<ID>-<slug>/`, indexed by
-`courses/cive40008/INDEX.md` — out of the shared register's
-`js/exercises.js` and `exercises/`, which a colleague's course would sit
-beside. HS-1 is the exception: it went upstream first and stays in the shared
-register; the course menu lists it like the rest.
+`courses/cive40008/INDEX.md`, beside the other courses a colleague's would
+sit with (`courses/original/` is the original teaching pack). HS-1 is the
+exception: it went upstream first, into what was then the shared register,
+and so moved with that pack to `courses/original/`; ids are global, so the
+course menu lists it like the rest.
 
 ## The cards (Oct 2026)
 
@@ -87,7 +88,7 @@ water is what it shows.
 ## First drafts: status and points for the lecturer (2026-10-16)
 
 All fourteen are built as first drafts: scene, card, brief (`courses/cive40008/exercises/<ID>-…/README.md`;
-HS-1 in the shared `exercises/HS-1-dyke-piezometer/`)
+HS-1 in the original pack's `courses/original/exercises/HS-1-dyke-piezometer/`)
 and headless `rig.js`, with the numbers in each brief measured, not assumed. New shared
 capability: a **wind shear stress** on the free surface (FF-1) and a **streamline display**
 (VIEW → Streamlines, key T; contours of ψ, of the mean flow under Average). What each

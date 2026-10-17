@@ -24,19 +24,23 @@ and `exercises/_runner/check_pack.py` asserts that the pieces agree.
 | piece | file | job |
 |---|---|---|
 | scene | `js/scenes.js` | the geometry, water and controls the demo boots into — or `"sandbox"` |
-| card | `js/exercises.js` | the machine-readable entry the picker reads: what is applied, what is printed |
+| card | `courses/<id>/exercises.js` | the machine-readable entry the picker reads: what is applied, what is printed (schema: the header of `js/exercises.js`) |
 | rig payload | `js/exercises-rigs.js` | drawn segments and panel state, **captured** from the app, never hand-edited |
-| folder | `exercises/<ID>-<slug>/` | `README.md` (lecturer notes), `rig.js` (console spot-check), `collect_plot.py` when a class submits |
-| index row | `exercises/INDEX.md` | one line of navigation |
+| folder | `courses/<id>/exercises/<ID>-<slug>/` | `README.md` (lecturer notes), `rig.js` (console spot-check), `collect_plot.py` when a class submits |
+| index row | `courses/<id>/INDEX.md` | one line of navigation |
+| menu entry | `courses/<id>/course.js` | the id in one of the course's sections |
 | syllabus row | `docs/syllabus.md` | one row under its topic — id, type badge and a one-liner; **only once the exercise has been checked** |
 
-A course may own its exercises instead: card in `courses/<id>/exercises.js`,
-folder in `courses/<id>/exercises/`, row in `courses/<id>/INDEX.md` — see
-"Courses" under §3. Everything else here applies unchanged.
+Every exercise belongs to a course — the original teaching pack is the
+course `original` (`courses/original/`), CIVE40008's Year 1 is
+`courses/cive40008/` — see "Courses" under §3. `js/exercises.js` declares the
+register (empty) they are all appended to, and its header is the card schema;
+`exercises/` keeps only the shared tooling (`_runner/`) and an index of the
+courses.
 
 Worked example throughout: **HS-1**, the dyke with a piezometer
-(`exercises/HS-1-dyke-piezometer/`), a lecturer demo on a scene written for
-it.
+(`courses/original/exercises/HS-1-dyke-piezometer/`), a lecturer demo on a
+scene written for it.
 
 ## 1. Decide where the geometry lives
 
@@ -54,7 +58,7 @@ Two routes, and the choice is made by what the demo needs at boot:
   cannot set an initial free surface or name a face.
 
 Rigs for exercises that share a bench extend a family card (RIG-A, RIG-B,
-RIG-C — see the foot of `INDEX.md`). A demo that needs both a scene and a
+RIG-C — see the foot of `courses/original/INDEX.md`). A demo that needs both a scene and a
 few drawn strokes is legal: the card names the scene and the rig.
 
 ## 2. The scene
@@ -127,8 +131,9 @@ not on the Controls panel and nobody will find it by hand.
 
 ## 3. The card
 
-An entry in `EXERCISES` (`js/exercises.js`); the file header defines every
-field and, more importantly, **the line between applied and displayed**:
+An entry in a course's `exercises.js`, appended to `EXERCISES` (declared in
+`js/exercises.js`, whose header defines every field and, more importantly,
+**the line between applied and displayed**):
 
 | field | applied? | holds |
 |---|---|---|
@@ -403,30 +408,45 @@ except `course.js`:
 | `course.js` | `COURSES.add({ id, title, sections, hosts? })` — the menu, in lecture order |
 | `exercises.js` | `COURSES.exercises(id, [ …cards ])` — the course's **own** cards, in the card schema of `js/exercises.js` |
 | `exercises/<ID>-<slug>/` | one folder per own card: `README.md` (lecturer notes, same rules as §5), `rig.js`, thumbnails |
-| `INDEX.md` | one row per own card, in the shared INDEX's column layout |
+| `INDEX.md` | one row per own card, in the columns §5 gives |
 
 `index.html` loads each course with one tag per file, after `js/courses.js`:
 
 ```html
+<script src="courses/original/course.js"></script>
+<script src="courses/original/exercises.js"></script>
 <script src="courses/cive40008/course.js"></script>
 <script src="courses/cive40008/exercises.js"></script>
 ```
+
+The original teaching pack (`courses/original/`, forty cards, HS-1 among
+them) is a course like any other: its menu is the cards grouped by `topic`
+— the sections the whole-register menu draws — and `hosts:
+["barneydobson.github.io"]` makes it the main site's default, so that site
+opens as it did before the pack moved. It is due to be retired; deleting the
+folder and its two script tags is the whole job (CIVE40008's menu then skips
+HS-1 until it has a new home). Its history documents
+(`demo-programme.html`, `feasibility-sheet.html`, `CHANGES-NEEDED.md`,
+`_director-status.md`, `_worker-recipe.md`) moved with it; the drawn-rig
+payloads stay shared in `js/exercises-rigs.js`, keyed by exercise id.
 
 **Own cards are still the register.** `COURSES.exercises` appends each card to
 the one `EXERCISES` list, stamped with `course: "<id>"` and
 `home: "courses/<id>/exercises"` (the directory its `folder` sits in), so
 `?ex=<ID>`, `?menu=all`, the whole-register menu and the card's brief link
-reach it exactly as they reach a shared card — the brief link is
+reach it wherever it is registered — the brief link is
 `<home>/<folder>/README.md`, or `<home>/<folder>/` on the Pages build, where
 Jekyll renders the README as the folder's page (`courses/` is not
-underscore-prefixed, so it is published like `exercises/`). **Ids are
+underscore-prefixed, so it is published). **Ids are
 global**: a card whose id or tab alias is already in the register is refused
 with a console warning and `check_pack.py` fails the pack. A course's menu may
-list shared cards (CIVE40008 lists HS-1) beside its own. Scenes stay in
-`js/scenes.js`, shared. Moving a card into a course is `git mv` of its folder,
-its entry from `js/exercises.js` into the course's `exercises.js`, its INDEX
-row into the course's `INDEX.md`, and the brief's relative links one level
-deeper (`../INDEX.md` → `../../INDEX.md` is the course's own index).
+list another course's cards (CIVE40008 lists HS-1, which is the original
+pack's) beside its own. Scenes stay in `js/scenes.js`, shared. Moving a card
+between courses is `git mv` of its folder, its entry into the other course's
+`exercises.js` and its INDEX row into that course's `INDEX.md`; a brief's
+relative links do not change, because every brief sits at
+`courses/<id>/exercises/<folder>/` (the app is `../../../../`, the course
+index `../../INDEX.md`, `docs/` is `../../../../docs/`).
 
 **Which course is active**, first match wins: `?course=<id>` (remembered for
 the visit; `?course=none` clears it for the visit, and that is remembered
@@ -439,7 +459,7 @@ courses may not claim the same one. With a course active the start screen
 and the Exercises menu list only its sections; the register is a
 `showAllLink: true` (menu foot) or `?menu=all` away.
 
-`check_pack.py` gives own cards the same guarantees as shared ones — folder
+`check_pack.py` gives every card the same guarantees — folder
 and README under `home`, an H1 that matches, a row in the course's
 `INDEX.md`, no orphan rows or folders — and adds the course ones: every
 `course.js` and `exercises.js` is loaded by `index.html`, ids are unique
@@ -466,7 +486,7 @@ the current version.
 
 ## 5. The folder
 
-`exercises/<ID>-<slug>/`, and `check_pack.py` insists on the first two:
+`courses/<id>/exercises/<ID>-<slug>/`, and `check_pack.py` insists on the first two:
 
 - **`README.md`** — lecturer notes. H1 exactly `# <ID> · <title>`, followed
   by what the exercise teaches and an **Open it** link for the lecturer.
@@ -486,8 +506,9 @@ the current version.
   none.
 - **`_archive/`** — untracked, local: the long verification record.
 
-Then one row in `exercises/INDEX.md` (`| ID | short title | folder/ | what it
-runs on | what students submit |`).
+Then one row in the course's `INDEX.md` (`| ID | short title | folder/ |
+what it runs on | what students submit |`), and the id in a section of its
+`course.js`.
 
 **The syllabus row is earned, not written with the card.** `docs/syllabus.md`
 (the GitHub Pages page the README links) carries only the exercises

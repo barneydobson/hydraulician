@@ -38,8 +38,11 @@ through the conservation laws to unsteady pipe flow and similitude:
 ([docs/syllabus.md](docs/syllabus.md))
 
 The full pack — including exercises not yet checked — is in the app (press
-**`E`**) and indexed in [`exercises/`](exercises/INDEX.md); each exercise has
-a written brief in its folder there. To put one exercise inside a Blackboard
+**`E`**; on this site it is the default course, `original`) and indexed in
+[`courses/original/`](courses/original/INDEX.md); each exercise has a written
+brief in its folder there. Every exercise belongs to a course, each in its
+own folder under `courses/` ([exercises/INDEX.md](exercises/INDEX.md) lists
+them). To put one exercise inside a Blackboard
 or Canvas page, see [`docs/embedding.md`](docs/embedding.md).
 
 ## Method
@@ -170,16 +173,17 @@ segments. Copy the nearest neighbour and read its comments; the ones about
 tailwater ≥ 1.3·d_c and about beds staying above the domain floor are load
 bearing.
 
-**Adding an exercise.** Append an entry to `EXERCISES` in `js/exercises.js`.
-Each is an object with an `id` (that is the `?ex=` id), `title`, `topic`,
+**Adding an exercise.** Every card belongs to a course: append an entry to
+the list in its course's `courses/<id>/exercises.js` (the card schema is the
+header of `js/exercises.js`, the register they are all appended to). Each is
+an object with an `id` (that is the `?ex=` id), `title`, `topic`,
 `folder`, `scene`, optional `rig` + `rigParams`, `viewParams`, a `digit` block
 that turns the student's last digit into a personalised parameter, `task`,
-`submit`, `settle` and `notes`. `HJ-1` is a good template. Then write the
-brief in `exercises/<folder>/README.md` and add the row to `exercises/INDEX.md`
-— the id must match in all three. A course can instead keep its own
-exercises in its folder: cards in `courses/<id>/exercises.js`
-(`COURSES.exercises(id, [...])`), briefs in `courses/<id>/exercises/<folder>/`
-and rows in `courses/<id>/INDEX.md` (see
+`submit`, `settle` and `notes`. `HJ-1` (in `courses/original/exercises.js`)
+is a good template. Then write the brief in
+`courses/<id>/exercises/<folder>/README.md`, add the row to
+`courses/<id>/INDEX.md` and list the id in a section of the course's
+`course.js` — the id must match in all of them (see
 [docs/making-exercises.md](docs/making-exercises.md), "Courses"). Once the exercise has been checked, it also
 earns a row on the [syllabus](docs/syllabus.md) under its topic.
 
@@ -191,11 +195,13 @@ for the worked example and the concurrency rules. Inside the page, `APP.frames(n
 scripted runs — the render loop stops when the tab is hidden, so drive it
 through those rather than waiting on wall-clock time.
 
-**Where things live.** The teaching pack and its standing rules are in
-[`exercises/INDEX.md`](exercises/INDEX.md); per-demo status and measured
-caveats in `exercises/_director-status.md`; open proposals — demos that need a
-change, and UI changes that have been costed but not made — in
-[`exercises/CHANGES-NEEDED.md`](exercises/CHANGES-NEEDED.md); and the reports
+**Where things live.** The original teaching pack and its standing rules are
+in [`courses/original/INDEX.md`](courses/original/INDEX.md); per-demo status
+and measured caveats in `courses/original/_director-status.md`; open
+proposals — demos that need a change, and UI changes that have been costed
+but not made — in
+[`courses/original/CHANGES-NEEDED.md`](courses/original/CHANGES-NEEDED.md);
+and the reports
 for changes already made (the exercise picker, the gauge inspector and CSV,
 rig save/share) in `exercises/_code-changes/`.
 
@@ -204,7 +210,7 @@ GitHub Pages on every push to `main`. The app itself has no build step —
 `index.html` and `js/` are copied through verbatim — but the workflow runs
 Jekyll (`_config.yml`) so every markdown brief renders as a web page: an
 exercise README is readable at its folder's URL, e.g.
-[`…/exercises/HP-1-penstock-power/`](exercises/HP-1-penstock-power/).
+[`…/courses/original/exercises/HP-1-penstock-power/`](courses/original/exercises/HP-1-penstock-power/).
 Underscore-prefixed folders (`exercises/_runner`, `_code-changes`, the
 per-exercise `_archive`) stay repo-only. The workflow turns Pages on by
 itself the first time it can run, so making the repository public is the only

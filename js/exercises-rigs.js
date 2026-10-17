@@ -1,5 +1,9 @@
 /* Generated rig payloads for the exercise picker. One entry per drawn-rig
-   exercise: the RIG snapshot JSON its folder's rig.js produces.
+   exercise: the RIG snapshot JSON its folder's rig.js produces. Every
+   entry so far belongs to the original teaching pack, so "its folder" is
+   courses/original/exercises/<folder>/, and the "FOLDER/rig.js · ..."
+   headings below are relative to that. Keys are exercise ids (global), so
+   this file is shared: any course's card may point its `rig` at one.
 
    Hand an entry to APP.RIG.apply() (js/main.js) and the drawn geometry, the
    edge modes, the level controls, the spout/piston, every Hydraulics slider,
@@ -452,10 +456,11 @@ const EXERCISE_RIGS = {
    long time being loaded into every page and read by nothing.
 
    Its content lives in the READMEs now, which is where a procedure belongs:
-   `exercises/<folder>/README.md` carries the brush width, the key presses
-   and the coordinates for each of the six. The card says WHAT is personalised
-   (`digitNote` in js/exercises.js) and links to the README for HOW.
+   `courses/original/exercises/<folder>/README.md` carries the brush width,
+   the key presses and the coordinates for each of the six. The card says
+   WHAT is personalised (`digitNote` in courses/original/exercises.js) and
+   links to the README for HOW.
 
    If a drawing procedure ever needs to reach the student in the app again,
-   it belongs on the card through js/exercises.js like every other field —
+   it belongs on the card (its course's exercises.js) like every other field —
    not in a side table here that nothing is obliged to read. */

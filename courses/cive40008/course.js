@@ -3,7 +3,7 @@
 // on the lecturer's own Pages site (mvreeuwijk.github.io, the `hosts` below)
 // it is the course with no parameter, and ?course=none shows the whole
 // register for the visit. The course's own cards are in exercises.js beside
-// this file (HS-1 is in the shared register); their briefs are under
+// this file (HS-1 is the original pack's, courses/original/); their briefs are under
 // exercises/ here, indexed by INDEX.md.
 // Order follows the lectures; the plan behind it is docs/year1-programme.md.
 // Ids the register does not have yet are skipped, and a section with nothing

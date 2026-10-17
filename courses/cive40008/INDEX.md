@@ -4,10 +4,11 @@ The exercises CIVE40008 (Fluid Mechanics, Year 1, Imperial College London)
 owns: their cards are in [`exercises.js`](exercises.js), their lecturer
 briefs in `exercises/`, one folder each (`README.md`, the
 `rig.js` spot-check, a thumbnail where there is one). The menu students see — which of these,
-plus HS-1 from the shared pack, in lecture order — is
+plus HS-1 from the original pack, in lecture order — is
 [`course.js`](course.js); the plan behind it is
 [docs/year1-programme.md](../../docs/year1-programme.md). Everything else in
-the app's register is the shared [teaching pack](../../exercises/INDEX.md).
+the app's register is the original [teaching pack](../original/INDEX.md)
+(every course: [exercises/INDEX.md](../../exercises/INDEX.md)).
 
 ## Running an exercise
 

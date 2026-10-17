@@ -8,10 +8,11 @@
 // `home: "courses/cive40008/exercises"`, so `folder` names a folder under
 // courses/cive40008/exercises/ and the card's brief link, check_pack.py and
 // courses/cive40008/INDEX.md all look there. Ids are global: none of these
-// may repeat an id (or tab alias) of the shared register or another course.
+// may repeat an id (or tab alias) of another course.
 //
-// HS-1, the dike (Statics, L3), is this course's too but lives in the shared
-// register: it went upstream first. course.js lists it like the rest.
+// HS-1, the dike (Statics, L3), is this course's too but lives in the original
+// pack (courses/original/exercises.js): it went upstream first, into what was
+// then the shared register. Ids are global, so course.js lists it like the rest.
 //
 // The fourteen Year 1 questions, on twelve entries here plus HS-1 (the
 // contraction rig's three are one entry with three tabs). Every one uses the

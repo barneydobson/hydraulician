@@ -845,7 +845,7 @@ const CONTROLS = [
       const b = document.createElement("button");
       b.textContent = state.tool === "measure" ? "✓ measuring — left-drag" : "✐ Measure with left-drag";
       b.title = "Pick the Measure tool: left-drag between two points (Shift snaps), click to clear";
-      b.onclick = () => { b.blur(); state.tool = "measure"; window.syncTools(); syncPanel(); };
+      b.onclick = () => { b.blur(); state.tool = "measure"; syncToolbar(); syncPanel(); };
       el.appendChild(b);
     },
     fmt: () => state.measure ? OVERLAY.measureText(state.measure)
@@ -1995,7 +1995,7 @@ const TOOLBAR = [
     { id: "exBtn", icon: "ex", label: "Exercises", key: "E",
       hint: "Set up one of the teaching demos",
       act: (b) => EX.toggle(b) },
-    { id: "newBtn", icon: "fresh", label: "New sandbox", key: "N",
+    { id: "newBtn", icon: "fresh", label: "New sandbox", key: "",
       hint: "A blank flume — clears what is drawn and starts over",
       act: () => newSandbox() },
   ] },
@@ -2349,7 +2349,8 @@ function syncToolbar() {
  *  nobody is looking up a shortcut. */
 const KEYS = (() => {
   let el = null, anchor = null;
-  const LINES = [
+  // The pointer lines are not keys; the keys come from KEYMAP at open time.
+  const POINTER = [
     ["left-drag", "draw with the current tool"],
     ["right-drag", "pour water, whatever tool is in your hand"],
     ["shift", "snap to horizontal / vertical / 45°"],
@@ -2357,29 +2358,9 @@ const KEYS = (() => {
     // listener) — the sheet has to say what actually zooms in a frame.
     [EMBED ? "ctrl + wheel" : "wheel", "zoom"],
     ["middle-drag", "pan"],
-    ["0", "reset the view"],
-    ["1 – 9", "pick a tool (Pour has no digit — right-drag instead)"],
-    ["[ ]", "brush size"],
-    ["Z", "undo a stroke"],
-    ["C", "clear the drawing"],
-    ["V", "valves"],
-    ["space", "pause"],
-    ["R", "reset the water"],
-    ["G", "cycle the field (the legend names it)"],
-    ["L", "the legend — which field, over what range, in what units"],
-    ["B", "what the Control volume reads on each edge: Q / momentum / energy"],
-    ["P", "particles"],
-    ["D", "the Dye tool — hold the pointer in the water to release dye"],
-    ["T", "streamlines"],
-    ["N", "open-channel overlay"],
-    ["A", "average the flow — the mean field, over one window"],
-    ["I", "the instruments' readout boxes — they keep recording while hidden"],
-    ["M", "ruler"],
-    ["F", "full screen"],
-    ...(scenesOffered() ? [["S", "scenes"]] : []),
-    ["E", "exercises"],
-    ["H", "the start screen"],
   ];
+  const lines = () => POINTER.concat(
+    KEYMAP.filter((r) => r.label && (!r.when || r.when())).map((r) => [r.label, r.what]));
   const menu = () => (el || (el = document.getElementById("keysmenu")));
   const isOpen = () => !!(el && el.classList.contains("open"));
   function render() {
@@ -2391,7 +2372,7 @@ const KEYS = (() => {
     const i = document.createElement("i"); i.textContent = "Esc closes";
     head.appendChild(b); head.appendChild(i);
     m.appendChild(head);
-    LINES.forEach(([k, what]) => {
+    lines().forEach(([k, what]) => {
       const r = document.createElement("div"); r.className = "kline";
       const kb = document.createElement("kbd"); kb.textContent = k;
       const s = document.createElement("span"); s.textContent = what;
@@ -4359,8 +4340,8 @@ function boot() {
   buildToolbar();
   // …then the legend, which lights the strip's own Field button.
   LEGEND.build();
-  // `syncTools` is the name the rest of the file (and the number keys) already
-  // uses for "repaint whatever shows the current tool".
+  // Public alias: worksheet rig scripts (WV-2, WV-3) call `window.syncTools()`
+  // after arming a tool. main.js itself calls syncToolbar() directly.
   window.syncTools = syncToolbar;
 
   // The scene menu (see PICKER). Four ways in: the scene chip at the end of
@@ -4481,8 +4462,23 @@ function boot() {
     zoomAt(px, py, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)));
   }, { passive: false });
 
+  // Typing and chords belong to the user and the browser, never to a shortcut
+  // (KEYMAP.typing) — checked before the modal cases, as an INPUT always was.
+  KEYMAP.useTools(TOOL_KEYS, (n) => {
+    const t = TOOLS[n - 1];
+    const fam = familyOf(t[0]);
+    // A hidden tool keeps its digit. Worksheets say "press 5", and renumbering
+    // the tools under a profile would make the pack lie — so the key says why
+    // the tool is not there rather than silently arming a different one.
+    if (UIMODE.allows(fam, { tool: t[0], id: t[0] })) {
+      state.tool = t[0]; state.forceHover = null; syncToolbar();
+    } else {
+      showToast(t[1] + " is off for this exercise",
+                "The ⋯ button at the end of the strip brings every control back.");
+    }
+  });
   addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (KEYMAP.typing(e)) return;
     // The start screen is modal: Esc leaves it, and nothing behind it is
     // reachable from the keyboard while it is up.
     if (START.isOpen()) {
@@ -4494,73 +4490,11 @@ function boot() {
     if (PICKER.isOpen()) { PICKER.key(e); return; }
     if (EX.isOpen()) { EX.key(e); return; }
     if (KEYS.isOpen() && e.key === "Escape") { e.preventDefault(); KEYS.close(); return; }
-    const k = e.key.toLowerCase();
-    if (k === " ") { e.preventDefault(); togglePause(); }
-    else if (k === "escape") { KEYS.close(); DOCK.fold(true); }
-    else if (k === "?" || (k === "/" && e.shiftKey)) KEYS.toggle(document.getElementById("keysBtn"));
-    else if (k === "h") START.open();
-    else if (k === "s") { if (scenesOffered()) PICKER.open(document.getElementById("sceneBtn")); }
-    else if (k === "e") EX.open(document.getElementById("exBtn"));
-    else if (k === "v") { if (trainOffered() && !hasValves()) fireTrain(); else toggleValve(); }
-    else if (k === "z") SIM.undoSeg();
-    else if (k === "c") SIM.clearSegs();
-    else if (k === "r") { SIM.resetWater(); clearGaugeHistory(); }
-    else if (k === "p") { state.particles = !state.particles; syncPanel(); }
-    else if (k === "g") {
-      // Over the fields this profile OFFERS, so the key and the card's menu
-      // cannot disagree about what there is to cycle through.
-      const F = UIMODE.fields();
-      const i = F.findIndex((f) => f.mode === state.mode);
-      state.mode = F[(i + 1) % F.length].mode;
-      LEGEND.sync(); syncPanel();
-    }
-    else if (k === "l") LEGEND.toggle();
-    else if (k === "b") {
-      state.cvShow = CV_NEXT[state.cvShow] || "Q";
-      // A card that withholds energy has two things to cycle, not three.
-      if (state.cvShow === "E" && UIMODE.hides("energy")) state.cvShow = "Q";
-      syncPanel();
-    }
-    else if (k === "d") {
-      // The Dye tool, by letter — the same gate as a digit: a hidden tool's
-      // key says why rather than arming it.
-      if (UIMODE.allows(familyOf("dye"), { tool: "dye", id: "dye" })) {
-        state.tool = "dye"; state.forceHover = null; window.syncTools();
-      } else {
-        showToast("Dye is off for this exercise",
-                  "The ⋯ button at the end of the strip brings every control back.");
-      }
-    }
-    else if (k === "t") { state.sline = !state.sline; syncPanel(); }
-    else if (k === "n") { state.channel = !state.channel; syncPanel(); }
-    else if (k === "a") setAverage(!state.avg);
-    else if (k === "i") { state.instReadouts = !state.instReadouts; syncPanel(); }
-    else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
-    // requestFullscreen needs a user gesture; a keypress is one. A frame with
-    // no allow="fullscreen" simply rejects — toggleFullscreen already swallows
-    // that — so there is nothing to guard here beyond what the button hides.
-    else if (k === "f") toggleFullscreen();
-    // Compared as a NUMBER: `k <= String(TOOLS.length)` was a string compare,
-    // so a tenth tool would have made "9" fail ("9" > "10" lexically).
-    //
-    // A hidden tool keeps its digit. Worksheets say "press 5", and renumbering
-    // the tools under a profile would make the pack lie — so the key says why
-    // the tool is not there rather than silently arming a different one.
-    else if (+k >= 1 && +k <= TOOL_KEYS) {
-      const t = TOOLS[+k - 1];
-      const fam = familyOf(t[0]);
-      if (UIMODE.allows(fam, { tool: t[0], id: t[0] })) {
-        state.tool = t[0]; state.forceHover = null; window.syncTools();
-      } else {
-        showToast(t[1] + " is off for this exercise",
-                  "The ⋯ button at the end of the strip brings every control back.");
-      }
-    }
-    else if (k === "[") state.brush = Math.max(0.015, state.brush / 1.3);
-    else if (k === "]") state.brush = Math.min(0.5, state.brush * 1.3);
-    else if (k === "0") resetZoom();
-    else if (k === "+" || k === "=") zoomAt(view.pxW / 2, view.pxH / 2, 1.3);
-    else if (k === "-") zoomAt(view.pxW / 2, view.pxH / 2, 1 / 1.3);
+    const row = KEYMAP.match(e);
+    if (!row) return;
+    // A held key must not flicker a toggle; only brush size and zoom repeat.
+    if (e.repeat && !row.repeat) { if (e.key === " ") e.preventDefault(); return; }
+    row.run(e);
   });
 
   requestAnimationFrame(frame);

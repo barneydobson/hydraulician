@@ -1764,6 +1764,93 @@ async function main() {
       await tab.close();
     });
 
+    // --------------------------------------------------------- the keymap
+    // One KEYMAP describes every key (js/keymap.js); typing, chords and
+    // auto-repeat never fire a shortcut.
+    await runCase("typing in the rig box fires no shortcut", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const S = APP.sim;
+        S.segs.push([1, 1, 2, 1, 0.05, 0]);
+        const before = S.segs.length, paused = APP.state.paused;
+        const box = document.querySelector(".rigtx");
+        if (!box) return { noBox: true };
+        box.focus();
+        for (const key of ["c", "r", " ", "5", "a"]) {
+          box.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+        }
+        return { before, after: S.segs.length, paused: APP.state.paused,
+                 wasPaused: paused, tool: APP.state.tool, avg: APP.state.avg };
+      `);
+      check("the rig textarea exists", !r.noBox);
+      eq("C in the rig box does not clear the drawing", r.after, r.before);
+      eq("space in the rig box does not pause", r.paused, r.wasPaused);
+      check("a digit or A in the rig box arms nothing", r.tool !== "gauge" && !r.avg, JSON.stringify(r));
+      await tab.close();
+    });
+
+    await runCase("Ctrl+V does not toggle the valves", async () => {
+      const tab = await browser.open(INDEX + "?scene=dyke");
+      const r = await tab.evaluate(`
+        const before = APP.sim.p.valveClosed;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "v", ctrlKey: true, bubbles: true }));
+        dispatchEvent(new KeyboardEvent("keydown", { key: "v", metaKey: true, bubbles: true }));
+        const chord = APP.sim.p.valveClosed;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "v", bubbles: true }));
+        return { before, chord, plain: APP.sim.p.valveClosed };
+      `);
+      eq("Ctrl/Cmd+V leaves the valve alone", r.chord, r.before);
+      check("a plain V still toggles it", r.plain !== r.before, JSON.stringify(r));
+      await tab.close();
+    });
+
+    await runCase("held A does not flicker Average", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+        dispatchEvent(new KeyboardEvent("keydown", { key: "a", repeat: true, bubbles: true }));
+        return { avg: APP.state.avg };
+      `);
+      eq("the auto-repeat of A is ignored", r.avg, true);
+      await tab.close();
+    });
+
+    await runCase("every TOOLBAR key is in KEYMAP and no key is claimed twice", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const norm = (k) => (k === "space" ? " " : String(k).toLowerCase());
+        const rows = KEYMAP.map((x) => x.key);
+        const strip = APP.ui.TOOLBAR.flatMap((g) => g.items).map((i) => i.key).filter(Boolean);
+        return { missing: strip.filter((k) => !rows.includes(norm(k))),
+                 dup: rows.filter((k, i) => rows.indexOf(k) !== i),
+                 digits: rows.filter((k) => /^[1-9]$/.test(k)).length, want: APP.TOOLS.length };
+      `);
+      eq("every strip key has a KEYMAP row", JSON.stringify(r.missing), "[]");
+      eq("no key is claimed twice", JSON.stringify(r.dup), "[]");
+      eq("one digit row per reachable tool", r.digits, Math.min(9, r.want));
+      await tab.close();
+    });
+
+    await runCase("the keyboard sheet lists S only when scenes are offered", async () => {
+      const tab = await browser.open(INDEX + "?ex=HJ-1");
+      const r = await tab.evaluate(`
+        const kbds = () => [...document.querySelectorAll("#keysmenu kbd")].map((k) => k.textContent);
+        return APP.EX.ready.then(() => {
+          APP.ui.KEYS.open();
+          const locked = kbds();
+          APP.ui.KEYS.close();
+          APP.UIMODE.lift();
+          APP.ui.KEYS.open();
+          return { locked, lifted: kbds() };
+        });
+      `);
+      check("S is absent while the card owns the scene", !r.locked.includes("S"), r.locked.join(" "));
+      check("S appears once the interface is lifted", r.lifted.includes("S"), r.lifted.join(" "));
+      check("the sheet lists the zoom and Esc keys it used to omit",
+            r.lifted.includes("+ / −") && r.lifted.includes("Esc"), r.lifted.join(" "));
+      await tab.close();
+    });
+
     // ------------------------------------------------------- touch parity
     await runCase("everything reachable without a keyboard or a second button", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");

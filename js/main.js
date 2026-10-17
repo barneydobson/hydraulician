@@ -229,6 +229,9 @@ function loadScene(id, keepDrawing) {
   // A scene whose whole subject is the particle motion should not open with
   // the particles switched off and a tip asking you to find the key.
   if (sc.particles !== undefined) state.particles = !!sc.particles;
+  // Dye is off unless the scene asks: it releases from seeds, and a scene
+  // that never thought about where would release from a default inlet line.
+  state.dye = !!(sc.dye && sc.dye.on) || sc.dyeLine > 0;
   state.slineBuf = null; state.slineDpsi = 0; state.slineT = -1;
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.measure = null; state.measDrag = null;
@@ -750,8 +753,13 @@ const CONTROLS = [
   { id: "particles", type: "check", label: "Particles",
     get: () => state.particles, set: (v) => state.particles = v,
     info: "Massless tracers. The clearest way to see wave orbits and jet spreading." },
+  { id: "partTrail", label: "Particle trail", min: 0.2, max: 10, step: 0.1,
+    get: () => SIM.particleTrail(), set: (v) => SIM.particleTrail(v),
+    fmt: (v) => v.toFixed(1) + " s of flow",
+    info: "How much flow each particle's trail records. It starts at a length fitted to the scene — a typical particle draws about a seventh of the view — so slow flow still leaves a visible trace and a fast jet does not become a smear." },
   { id: "dye", type: "check", label: "Dye",
-    get: () => state.dye, set: (v) => state.dye = v },
+    get: () => state.dye, set: (v) => state.dye = v,
+    info: "Black dye released continuously from short seed lines placed where the flow goes — ahead of the body, at the pipe entrance, in the jet. It is carried by the water and diffuses as it goes, so its streaks show separation, wakes and mixing. Stands down under <b>Average</b>, which has no record of it." },
   { id: "sline", type: "check", label: "Streamlines",
     get: () => state.sline, set: (v) => state.sline = v,
     info: "Contours of the stream function ψ, drawn at equal steps Δψ, so every tube between two neighbouring lines carries the same discharge per unit width — where the lines crowd the water is fast, where they spread it is slow. Walls, the bed and (in steady flow) the free surface are streamlines themselves. Under <b>Average</b> they are the streamlines of the MEAN flow: compare them with the dye and the particles, which follow the unsteady flow, and they agree only where the flow is steady. Refreshed about four times a second; the key at the bottom left quotes Δψ." },
@@ -761,8 +769,8 @@ const CONTROLS = [
     info: "Roughly how many equal-discharge tubes the whole range of ψ is cut into. The step is rounded to 1, 2, 2.5 or 5 × 10ⁿ m²/s so it can be quoted, and then held while the flow develops." },
   { id: "dyeLine", label: "Dye timelines", min: 0, max: 4, step: 0.1,
     get: () => sim.p.dyeLine, set: (v) => sim.p.dyeLine = v,
-    fmt: (v) => v === 0 ? "off" : "every " + v.toFixed(1) + " s",
-    info: "Injects a vertical line of dye at the inlet. It shears as it travels — that shape IS the velocity–depth distribution." },
+    fmt: (v) => v === 0 ? "off — continuous" : "pulsed every " + v.toFixed(1) + " s",
+    info: "Pulses the dye release: on for half of each period, off for the other half. The front of each band leaves the seed line at one instant, so it is a timeline — it shears as it travels, and in a channel that shape IS the velocity–depth distribution." },
   { id: "dyeDecay", label: "Dye fade", min: 0, max: 0.3, step: 0.005,
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
@@ -1695,7 +1703,7 @@ const TOOLBAR = [
       on: () => state.particles,
       act: () => { state.particles = !state.particles; syncPanel(); } },
     { id: "dyeBtn", icon: "dye", label: "Dye", key: "D",
-      hint: "Dye and the dye timelines injected at the inlet",
+      hint: "Black dye released where the flow goes",
       on: () => state.dye,
       act: () => { state.dye = !state.dye; syncPanel(); } },
     { id: "slineBtn", icon: "sline", label: "Streamlines", key: "T",

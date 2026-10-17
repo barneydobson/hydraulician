@@ -1275,3 +1275,63 @@ having settled before anything calls into it.
   valve reads the real diagram — the water-hammer teaching number — and an
   erased hole in a wall contributes nothing to the integral either side of
   it.
+
+## Tracers: dye and particles
+
+Both were reworked (Oct 2026) after a lecturer's report that the dye "doesn't
+really work" and the particle traces were too short to see in slow scenes.
+
+**Dye is a field, released where the flow goes.** It stays the `F.g` channel
+(it diffuses, which is what real dye does), but it is no longer injected as
+pulsed timelines at the left ghost: in the contraction rig those never reached
+the pipe, and in FF-3 they had spread into a wash before the wake. A scene
+declares `dye: { seeds: [[x0, z0, x1, z1, ports?, radius?], …], on? }` (or a
+function of its params); `ports` 0 is a continuous sheet, n > 0 that many
+point releases (separate streaks). With none declared, `SIM` seeds a vertical
+six-port line just inside an upstream inflow (over the depth the column
+reduction last saw) or a point at a running spout. FS_VOF sets `dye = 1` in
+wet cells (f > 0.3) within the radius of a seed, every substep, up to eight
+seeds; the scene's `dyeLine` (panel: Dye timelines) now pulses the seeds, on
+for half of each period, so the band edges are timelines (m1/m2 keep that).
+Release is tied to the DRAW flag: `render(opts.dye)` sets `S.dyeOn`, so Dye off
+or Average (no accumulator, docs/averaging.md) releases nothing.
+
+- **Ink is black.** No ramp contains black, so it reads on Water, Speed and
+  every head ramp. Opacity is `0.92·(1 − e^(−5d))`: a plume diluted to 0.1 is
+  still ≈ 0.35 opaque — the old linear 0.85·d lost a plume the moment it had
+  spread over a few cells. The exception is the dark end of a ramp (slow water
+  on Speed is near-black purple): there the plume's edge gets a pale rim from
+  the ink gradient, only where the ground's luminance is low.
+- **The free-surface line is drawn over the ink.** Ink right at a free
+  surface against the near-black canvas is black on black — a dyed nappe
+  vanished. FF-2's sheet stops 0.4 m under the reservoir surface for the same
+  reason, so the nappe keeps a coloured skin.
+- **Limited faces while Dye is on.** First-order upwind (numerical diffusivity
+  ≈ u·Δx/2) spread a two-cell streak into grey within a couple of metres; with
+  `u_dyeSeed.z` set the dye-A faces are the same van Leer `faceVal` the fill
+  uses. Off, the old upwind runs — a uniform branch, so Dye off costs what it
+  did before.
+- Separate streaks on a sheet only 2–4 cells thick (FF-2's nappe) merge into
+  a faint grey; use a continuous sheet there.
+
+**Particle trails are sized to the scene.** The trail spans τ seconds of flow,
+τ = 0.2 × visible width / (½ × the scene's speed scale), clamped to 0.6–8 s;
+a scene may state `particleTrail` (s) and the Controls slider *Particle
+trail* overrides both until the next scene. The particle lifetime is at
+least 2.5 τ so the respawn does not cut the trail. Three faults made the old
+trails invisible, each worth knowing:
+
+- the tail dabs were blended `SRC_ALPHA, ONE` from a premultiplied colour,
+  which SQUARED the amplitude (0.3 laid down 0.09, ~23 counts the fade took
+  back in a few frames);
+- one dab per frame left a dotted line wherever a particle moves more than a
+  dab per frame; the tail pass now draws six dabs per particle along the
+  frame's step, from the other half of the ping-pong (the previous position);
+- a white trail added to a pale ramp is white on near-white; the composite
+  now lays a dark ±1.5 px shadow of the trail first, and the heads are a
+  white core in a dark ring, alpha-blended.
+
+Respawns land in the water (four tries for a wet, open cell), and the drawn
+count is a DENSITY — 2.5·10⁻³ per screen pixel of water, water share from the
+column reduction (plan view taken as full), 300–2600 — so a shallow flume is
+not a white mat and a full plan-view box is not sparse.

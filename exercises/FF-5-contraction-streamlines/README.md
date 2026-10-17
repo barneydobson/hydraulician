@@ -101,10 +101,11 @@ there a few centimetres under the 2.40 m tailwater. That is the jet's
 entrainment, fed from inside the reservoir. (Before the reservoirs were
 rebuilt the 2.5 m right reservoir took a 2 m/s current IN from its edge
 along the surface and the water piled up 0.17 m against the outlet wall.)
-Dye is not offered: the app's dye timelines are injected at the left edge
-of the left reservoir, and in a 2 s headless check nothing had reached the
-pipe; whether they read well here (they would have to cross the reservoir
-first) is untested. Particles carry the demo.
+Dye now works here: the scene releases six black streaks in the left
+reservoir 0.5 m ahead of the pipe entrance, and they are drawn through the
+bellmouth and along the whole pipe within ~10 s (they thin, as they must,
+where the flow accelerates). The card does not offer the Dye button yet;
+particles carry the demo either way.
 
 ### Discussion points
 

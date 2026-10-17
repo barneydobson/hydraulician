@@ -49,7 +49,7 @@ The scene alone is `?scene=body`.
 | s = 0 | ellipse 1.20 m long, 0.40 m wide |
 | s = 1 | square, 0.40 m, slightly rounded corners (n = 12) |
 | viscosity | ν = 1·10⁻³ m²/s (an eddy viscosity): Re = U·2b/ν ≈ 360 at every slider position |
-| dye | timelines injected across the whole inlet every 1.0 s |
+| dye | black, released continuously from eight points on a line 0.5 m ahead of the nose, spanning z = 1.38–2.02 m (scene `dye.seeds`) |
 
 Changing the slider re-rasterises the body and keeps the flow running; it
 does not restart the water. Each change also restarts an Average window.
@@ -69,11 +69,11 @@ does not restart the water. Each change also restarts an Average window.
    opens the inspector). About **2.9 s** for the square: St ≈ 0.4/(0.9 × 2.9)
    ≈ 0.16.
 4. **Dye and particles.** Turn on Dye and Particles on the strip. The dye
-   timelines arrive straight across the stream and bend round the body; in
-   the shedding wake the particles swing from side to side across the
-   centreline while the mean flow (step 5) has them going straight through.
-   At Medium the timelines are faint by the time they reach the wake (see
-   the caveats) — the particles carry this point better than the dye.
+   streaks split on the nose, run along the body and are drawn into the
+   wake: behind the ellipse they stay straight; behind the square they roll
+   up and swing with the street. In the shedding wake the particles swing
+   from side to side across the centreline while the mean flow (step 5) has
+   them going straight through.
 5. **Average.** Switch the colour bar from Live to Average with the square shedding. Within a few shedding
    periods the street becomes one steady bubble, symmetric about the
    centreline, with a closed recirculation behind the body; the particles
@@ -166,12 +166,11 @@ behind the tail.
 - The shedding Strouhal number of the square, 0.16, sits just above the
   ≈ 0.14–0.15 measured for square cylinders at this Re; the 12 % blockage of
   the 3.4 m channel pushes it up a little.
-- **Dye is weak here.** The inlet timelines (every 1.0 s, the default fade)
-  are crisp upstream but diffuse into a faint wash by the time they reach
-  the wake, so "dye no longer looks like streamlines" is not convincing from
-  the dye alone in the screenshots taken; particles live against particles
-  under A carry it. A longer timeline period or `Dye fade` → permanent is
-  worth trying live.
+- **Dye.** Released just upstream of the body (not at the inlet, where the
+  old timelines had diffused into a wash before the wake), the streaks reach
+  the wake intact and stay readable to the right edge at Medium; past
+  x ≈ 4 m in a shedding wake they merge into one dark rolled-up band. Dye
+  stands down under Average (it has no accumulator).
 - The card's `settle` (10 s) only lets the start-up transient pass the
   ellipse; the shedding wait after each slider move is the lecturer's.
 

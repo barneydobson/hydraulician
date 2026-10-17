@@ -18,18 +18,39 @@ const SIM = (() => {
   // nearly a whole vel pass): every 8 substeps it cost hammer 20%. A length
   // scale lagging 32 substeps (6 ms on m2, 26 on hammer) is still current.
   const TCOL_EVERY = 32;
-  // How long a particle's trail lives, in SIMULATED seconds. About a second of
-  // flow: long enough to read a path, short enough that a jet does not fill
-  // the screen with a solid wash.
-  // Long enough that a streak reads as a PATH — thin and drawn out, tapering
-  // behind the head — rather than as a dot with a smudge after it.
-  const TRAIL_TAU = 1.5;
+  // How long a particle's trail lives, in SIMULATED seconds — fitted to the
+  // scene rather than fixed. A fixed 1.5 s was a speck in a slow plan-view
+  // stream (0.9 m/s across a 6 m box) and a smear down a fast pipe; what
+  // reads as a PATH is a trail that is a set fraction of what is on screen.
+  // So τ = TRAIL_FRAC × (visible width) / (typical speed), the typical speed
+  // being half the scene's speed scale (its Speed legend's top), clamped to
+  // [TRAIL_MIN, TRAIL_MAX]. A scene may state its own (`particleTrail`, s);
+  // the panel's Particle trail slider overrides both until the next scene.
+  const TRAIL_FRAC = 0.2, TRAIL_MIN = 0.6, TRAIL_MAX = 8;
+  function trailTau(view, vmax) {
+    if (S.trailSet > 0) return S.trailSet;
+    if (S.scene.particleTrail > 0) return S.scene.particleTrail;
+    const n = view && view.ndc, span = n ? Math.max(2, n[2] - n[0]) : 2;
+    const wVis = S.W * 2 / span, u = 0.5 * Math.max(vmax || S.scene.vmax || 1, 0.05);
+    return Math.min(TRAIL_MAX, Math.max(TRAIL_MIN, TRAIL_FRAC * wVis / u));
+  }
+  let lastTau = 1.5;
+  /** The trail time in use (s of flow); with an argument, set it for this
+   *  scene (a rebuild for a new scene clears it). */
+  function particleTrail(v) {
+    if (v !== undefined && S) S.trailSet = +v;
+    return S && S.trailSet > 0 ? S.trailSet : lastTau;
+  }
   // How many of the 128 × 128 particles are actually DRAWN. All of them are
   // advected — the update is one fullscreen pass either way — but drawing all
   // 16384 with a trail each fills a flume with white and shows nothing at all.
-  // A few thousand distinct paths is what reads as flow visualisation; the
-  // count follows the width so a big window gets more of them, not fatter ones.
-  const TRAIL_N = (pxW) => Math.round(Math.max(500, Math.min(2200, pxW * 1.1)));
+  // A fixed DENSITY over the water on screen, not a fixed count: respawns
+  // land in the water (FS_PART), so a count sized for a full plan-view box
+  // crowded a shallow flume, whose water is a strip of the rect, into a white
+  // mat. `wetFrac` is the water's share of the domain (column reduction).
+  const TRAIL_RHO = 2.5e-3;    // drawn particles per screen pixel of water
+  const TRAIL_N = (view, wetFrac) =>
+    Math.round(Math.max(300, Math.min(2600, TRAIL_RHO * wetFrac * (view.vis ? view.vis.w * view.vis.h : view.w * view.h))));
 
   let gl, quad, rect, points, prog = {};
   let S = null;              // the live grid
@@ -70,6 +91,7 @@ const SIM = (() => {
     prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
     prog.fill = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_FILL);
     prog.tex  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TEX);
+    prog.tshadow = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TRAIL_SHADOW);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     return gl;
@@ -1227,7 +1249,7 @@ const SIM = (() => {
       simUniforms(pv, h);
       gl.uniform1f(pv.u("u_ca"), p.ca);
       gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
-      gl.uniform2f(pv.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
+      dyeUniforms(pv);
       const rd = p.residueDrain && Math.abs(p.g) < 0.1 ? p.residueDrain : null;
       gl.uniform2f(pv.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
       if (useAcc) {
@@ -1272,6 +1294,62 @@ const SIM = (() => {
     return S.colBuf;
   }
 
+  // ---------------------------------------------------------------- dye seeds
+  /** Where the dye is released: a scene's own `dye.seeds` (an array, or a
+   *  function of its params — the seed moves with the geometry), each
+   *  [x0, z0, x1, z1, ports?, radius?] in metres; ports 0/absent is a
+   *  continuous line, n > 0 that many point releases along it; radius
+   *  defaults to one cell. A scene that declares none gets one: a vertical
+   *  line of six ports just inside an upstream inflow, over the depth the
+   *  column reduction last saw there, or a point at a running spout. The
+   *  scene's `dyeLine` (or the panel's) pulses the release; 0 is continuous.
+   *  Refreshed about twice a second, because the default follows the water. */
+  function dyeSeeds() {
+    const sc = S.scene, p = S.p, out = [];
+    const decl = sc.dye && sc.dye.seeds;
+    const list = typeof decl === "function" ? decl(S.params) : decl;
+    if (list && list.length) {
+      for (const d of list) {
+        const pt = d.length < 4;
+        out.push([d[0], d[1], pt ? d[0] : d[2], pt ? d[1] : d[3],
+                  pt ? 1 : (d[4] || 0), d[5] || (pt ? 2 : 0.75) * S.dx]);
+      }
+      return out;
+    }
+    if (p.inflow && p.inflow.on) {
+      // Clear of the inflow's own sponge where the scene has a short one,
+      // never further in than a tenth of the domain.
+      const x = Math.min(0.1 * S.W, (sc.spongeIn || 6 * S.dx) + 3 * S.dx);
+      const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
+      const cb = S.colBuf;
+      let z0 = 0, z1 = S.H;
+      if (cb && cb[i * 4 + 1] > 4 * S.dx) {
+        z0 = cb[i * 4] + 0.12 * cb[i * 4 + 1];
+        z1 = cb[i * 4] + 0.88 * cb[i * 4 + 1];
+      }
+      out.push([x, z0, x, z1, 6, 0.75 * S.dx]);
+    } else if (p.source && p.source.on) {
+      out.push([p.source.x, p.source.z, p.source.x, p.source.z, 1, 0.6 * p.source.r]);
+    }
+    return out;
+  }
+  const SEED_A = new Float32Array(32), SEED_P = new Float32Array(16);
+  function dyeUniforms(pr) {
+    const on = !!S.dyeOn;
+    if (on && (!S.seeds || S.t < S.seedT || S.t - S.seedT > 0.5)) {
+      S.seeds = dyeSeeds().slice(0, 8); S.seedT = S.t;
+      S.seeds.forEach((d, k) => {
+        SEED_A.set(d.slice(0, 4), k * 4); SEED_P[k * 2] = d[4]; SEED_P[k * 2 + 1] = d[5];
+      });
+    }
+    const n = on && S.seeds ? S.seeds.length : 0;
+    if (n) {
+      gl.uniform4fv(pr.u("u_seed[0]"), SEED_A);
+      gl.uniform2fv(pr.u("u_seedP[0]"), SEED_P);
+    }
+    gl.uniform4f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, on ? 1 : 0, 0);
+  }
+
   function advanceParticles(realDt, avg) {
     // Under an open window the particles ride the FAVRE MEAN: u_U becomes the
     // accumulator texture and the shader's u_avg branch divides <f u>/f-bar at
@@ -1290,7 +1368,9 @@ const SIM = (() => {
     // Particle lifetime is per scene: a tracer has to outlive a wave period
     // or it respawns before it has drawn a single orbit, which is the whole
     // point of the long-wave flume (T = 4 s against the 6 s default).
-    gl.uniform1f(prog.part.u("u_plife"), S.scene.plife || 6.0);
+    // …and has to outlive its own trail, or the trail is cut short by the
+    // respawn and the slow scenes the fitted τ exists for lose it again.
+    gl.uniform1f(prog.part.u("u_plife"), Math.max(S.scene.plife || 6.0, 2.5 * lastTau));
     gl.uniform1f(prog.part.u("u_time"), S.t);
     gl.uniform1f(prog.part.u("u_valve"), S.p.valveClosed);
     GLH.bindTarget(gl, S.P.write.fbo, S.pn, S.pn);
@@ -1331,7 +1411,10 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_vmax"), opts.vmax);
     gl.uniform1f(prog.draw.u("u_lo"), opts.lo);
     gl.uniform1f(prog.draw.u("u_hi"), opts.hi);
-    gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : 0);
+    gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : (opts.avg ? 0 : 0.5));
+    // The SAME flag releases it: the seeds run while dye is drawn, and stand
+    // down with it (Dye off, or under Average — no accumulator, docs/averaging.md).
+    if (S.dyeOn !== !!opts.dye) { S.dyeOn = !!opts.dye; S.seeds = null; }
     gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
     gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);
     gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
@@ -1374,7 +1457,21 @@ const SIM = (() => {
     return moved;
   }
 
+  /** The water's share of the domain, from the last column reduction, about
+   *  once a second. Plan view (no gravity) has no columns: taken as full. */
+  function wetFraction() {
+    if (Math.abs(S.p.g) < 0.1 || !S.colBuf) return 1;
+    if (S.wetT === undefined || S.t < S.wetT || S.t - S.wetT > 1) {
+      let a = 0;
+      for (let i = 0; i < S.nx; i++) a += Math.max(0, S.colBuf[i * 4 + 1]);
+      S.wetFr = Math.min(1, Math.max(0.08, a / (S.nx * S.H)));
+      S.wetT = S.t;
+    }
+    return S.wetFr;
+  }
+  const TAIL_SUB = 6;           // dabs per particle per frame along its step
   function drawParticles(view, opts, cw, ch) {
+    lastTau = trailTau(view, opts.vmax);
     const clear = trailFor(cw, ch, view);
     GLH.bindTarget(gl, trail.fbo, cw, ch);
     if (clear) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
@@ -1386,7 +1483,7 @@ const SIM = (() => {
       // tail is a fixed span of FLOW — about a second of it — however fast or
       // slow the frame rate happens to be. Skipped entirely while the clock
       // is stopped, so a paused picture keeps its trails frozen.
-      const k = Math.exp(-Math.max(opts.pdt, 0) / TRAIL_TAU);
+      const k = Math.exp(-Math.max(opts.pdt, 0) / lastTau);
       gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
       gl.useProgram(prog.fill);
       gl.uniform4f(prog.fill.u("u_col"), k, k, k, k);
@@ -1403,9 +1500,16 @@ const SIM = (() => {
       gl.blendEquation(gl.FUNC_ADD);
     }
 
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    // ONE, ONE: the dab is premultiplied, so it adds its own amplitude.
+    // SRC_ALPHA here SQUARED it — a 0.3 dab laid down 0.09, about 23 counts
+    // of 255, which the fade took back within a few frames: the trails were
+    // there, at a brightness nobody could see.
+    gl.blendFunc(gl.ONE, gl.ONE);
     gl.useProgram(prog.pdraw);
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
+    // u_Q is the other half of the ping-pong: where each particle was before
+    // the last advance, so the tail can fill in the whole step.
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    gl.uniform1i(prog.pdraw.u("u_sub"), TAIL_SUB);
     gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
     gl.uniform4f(prog.pdraw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
@@ -1413,14 +1517,23 @@ const SIM = (() => {
     // Big enough to see. The old 1.5-3 px dot disappeared over a pale field
     // and read as sensor noise over a dark one.
     // Fine. The streak's LENGTH is the reading; its width is only noise.
-    const n = Math.min(S.pn * S.pn, TRAIL_N(view.pxW));
+    const n = Math.min(S.pn * S.pn, TRAIL_N(view, wetFraction()));
     const tail = Math.max(2.0, view.pxW / 620);
     gl.uniform1f(prog.pdraw.u("u_psize"), tail);
-    gl.uniform1f(prog.pdraw.u("u_amp"), 0.30);
-    points.draw(n);
+    // Six dabs a frame where there was one, so each is dimmer: the same ink
+    // per length of trail where the step is long, and a solid line where the
+    // old single dab left a dotted one.
+    gl.uniform1f(prog.pdraw.u("u_amp"), 0.12);
+    points.draw(n * TAIL_SUB);
 
-    // The tail, composited under everything that follows.
+    // The tail, composited under everything that follows: first its dark
+    // shadow (FS_TRAIL_SHADOW), then the trail itself.
     GLH.bindTarget(gl, null, cw, ch);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(prog.tshadow);
+    GLH.bindTex(gl, prog.tshadow, [["u_T", trail.tex]]);
+    gl.uniform2f(prog.tshadow.u("u_px"), 1 / cw, 1 / ch);
+    quad.draw();
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // it is premultiplied
     gl.useProgram(prog.tex);
     GLH.bindTex(gl, prog.tex, [["u_T", trail.tex]]);
@@ -1429,13 +1542,16 @@ const SIM = (() => {
     // …then the heads, once, straight to the screen at full strength. Drawn
     // outside the trail buffer on purpose: inside it they would fade with
     // everything else and there would be no particle, only a smear.
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    // Alpha-blended, not added: a head is a white core in a dark ring
+    // (FS_PART_DRAW), which is what keeps it visible on the pale colourings.
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(prog.pdraw);
     // Re-bind: the composite above pointed texture unit 0 at the trail, and
     // `u_P` still names unit 0 — without this the heads read the trail as
     // their own positions and land nowhere.
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
-    gl.uniform1f(prog.pdraw.u("u_psize"), tail + 1.6);
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    gl.uniform1i(prog.pdraw.u("u_sub"), 1);
+    gl.uniform1f(prog.pdraw.u("u_psize"), tail + 3.0);
     gl.uniform1f(prog.pdraw.u("u_amp"), 1.0);
     points.draw(n);
     gl.disable(gl.BLEND);
@@ -1711,7 +1827,7 @@ const SIM = (() => {
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const g = Math.abs(S.p.g) || 9.81;
     return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, speed: Math.hypot(u, w),
-             solid: S.mask[j * S.nx + i] };
+             dye: S.pxBuf[1], solid: S.mask[j * S.nx + i] };
   }
 
   /** `probe` for several points at once, returning the same objects in the
@@ -2279,7 +2395,7 @@ const SIM = (() => {
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, probeMany, rake, patch, patchVel,
-           fieldStats, particlePos,
+           fieldStats, particlePos, particleTrail,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
            hydraulicGrade, streamRequest, streamPoll, streamPending,
            setValve, setParam, params, windTau, wallPaddle,

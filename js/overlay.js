@@ -490,8 +490,34 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
-  /** Grade lines + profile classification over the channel. */
-  function drawChannel(ctx, V, A, sim) {
+  /** The on-canvas key, top-left of the visible frame. Every drawer that owns
+   *  a line adds a row with keyRow() while the frame is drawn; drawOverlay
+   *  calls flushKeys() once at the end, so the rows stack in one column
+   *  instead of each drawer painting at the same position. */
+  let keyRows = [];
+  function keyRow(text, colour, dash) { keyRows.push({ text, colour, dash: dash || [] }); }
+  function flushKeys(ctx, V) {
+    const rows = keyRows; keyRows = [];
+    if (!rows.length) return;
+    const B = V.vis || V;
+    const ly = B.y + 16;
+    ctx.save();
+    ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
+    ctx.textBaseline = "middle";
+    rows.forEach((r, k) => {
+      ctx.strokeStyle = r.colour; ctx.lineWidth = 1.6; ctx.setLineDash(r.dash);
+      ctx.beginPath(); ctx.moveTo(B.x + 12, ly + k * 15); ctx.lineTo(B.x + 40, ly + k * 15);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = C.dim;
+      ctx.fillText(r.text, B.x + 46, ly + k * 15 + 1);
+    });
+    ctx.restore();
+  }
+
+  /** d_n, d_c and (unless `grade` is on) the energy line over the channel;
+   *  their key rows go through keyRow. */
+  function drawChannel(ctx, V, A, sim, grade) {
     const nx = sim.nx, step = Math.max(1, Math.round(nx / 900));
     const g = Math.abs(sim.p.g) || 9.81;
     const pc = [], pn = [], pe = [];
@@ -504,25 +530,16 @@ const OVERLAY = (() => {
       if (A.ok[i] && isFinite(A.dn[i]) && A.d[i] > 3 * sim.dx) pn.push([x, V.Y(A.bed[i] + A.dn[i])]);
       else pn.push(null);
     }
-    line(ctx, pe, C.egl, 1.0, [1, 3]);
+    // With the grade lines on, drawGradeLines owns the energy line (h + hv is
+    // the better estimate) and its key row; drawing both put two lines
+    // captioned "H" in one column.
+    if (!grade) line(ctx, pe, C.egl, 1.0, [1, 3]);
     line(ctx, pn, C.dn, 1.4, [7, 5]);
     line(ctx, pc, C.dc, 1.4, [3, 4]);
 
-    // legend
-    const B = V.vis || V;
-    let ly = B.y + 16;
-    [["energy grade line  H", C.egl], ["normal depth  dₙ", C.dn], ["critical depth  d𝆑", C.dc]]
-      .forEach(([t, c], k) => {
-        ctx.save();
-        ctx.strokeStyle = c; ctx.lineWidth = 1.6;
-        ctx.setLineDash(k === 0 ? [1, 3] : k === 1 ? [7, 5] : [3, 4]);
-        ctx.beginPath(); ctx.moveTo(B.x + 12, ly + k * 15); ctx.lineTo(B.x + 40, ly + k * 15);
-        ctx.stroke(); ctx.restore();
-        ctx.fillStyle = C.dim;
-        ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
-        ctx.textBaseline = "middle";
-        ctx.fillText(t.replace("d𝆑", "d_c"), B.x + 46, ly + k * 15 + 1);
-      });
+    if (!grade) keyRow("energy grade line  H", C.egl, [1, 3]);
+    keyRow("normal depth  dₙ", C.dn, [7, 5]);
+    keyRow("critical depth  d_c", C.dc, [3, 4]);
   }
 
   /** Name each surface-profile reach in place: M1, S2, H3 … */
@@ -669,19 +686,8 @@ const OVERLAY = (() => {
     line(ctx, pe, C.egl, 1.4, [6, 3]);
     line(ctx, ph, C.hgl, 1.4, [2, 3]);
 
-    const B = V.vis || V;
-    let ly = B.y + 16;
-    [["energy grade line  H", C.egl, [6, 3]],
-     ["hydraulic grade line  h", C.hgl, [2, 3]]].forEach(([t, c, d], k) => {
-      ctx.save();
-      ctx.strokeStyle = c; ctx.lineWidth = 1.6; ctx.setLineDash(d);
-      ctx.beginPath(); ctx.moveTo(B.x + 12, ly + k * 15); ctx.lineTo(B.x + 40, ly + k * 15);
-      ctx.stroke(); ctx.restore();
-      ctx.fillStyle = C.dim;
-      ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
-      ctx.textBaseline = "middle";
-      ctx.fillText(t, B.x + 46, ly + k * 15 + 1);
-    });
+    keyRow("energy grade line  H", C.egl, [6, 3]);
+    keyRow("hydraulic grade line  h", C.hgl, [2, 3]);
   }
 
   /** Streamlines: contour segments of ψ (STREAM.contours), in metres, plus a
@@ -928,7 +934,7 @@ const OVERLAY = (() => {
     for (let j = 0; j < sim.ny; j++) {
       const y = (j + 0.5) * sim.dx;
       if (y < bed || y > surf) continue;
-      const u = 0.5 * (buf[j * 4] + (j + 1 < sim.ny ? buf[j * 4] : 0)) || buf[j * 4];
+      const u = buf[j * 4];   // SIM.rake already returns cell-centred u
       umax = Math.max(umax, Math.abs(u)); sum += u; cnt++;
     }
     const Vbar = cnt ? sum / cnt : 0;
@@ -1789,7 +1795,7 @@ const OVERLAY = (() => {
   }
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
-           drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawPinMark, drawRake,
+           keyRow, flushKeys, drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawPinMark, drawRake,
            drawGradeLines, drawStreamlines, drawWind, drawRakeScale,
            ROW_IDS, DEFAULT_ROWS, setPrint, PRINT,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,

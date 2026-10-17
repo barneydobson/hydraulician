@@ -504,9 +504,9 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .ginsp-x:hover { background: rgba(255,255,255,0.12); }
 
-.ginsp-vals { display: flex; gap: 6px; padding: 8px 10px 2px; }
+.ginsp-vals { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 2px; }
 .ginsp-vals div {
-  flex: 1 1 0; padding: 4px 6px; border-radius: 7px;
+  flex: 1 1 88px; padding: 4px 6px; border-radius: 7px;
   background: rgba(255,255,255,0.04); border: 1px solid transparent;
 }
 .ginsp-vals div.on { border-color: rgba(77,195,255,0.40); background: rgba(77,195,255,0.10); }

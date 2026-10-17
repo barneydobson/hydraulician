@@ -197,7 +197,7 @@ const RIG = (() => {
     state.gauges.length = 0;
     (o.gauges || []).slice(0, 4).forEach((g) => {
       state.gauges.push( { x: +g[0], z: +g[1], hist: [], log: [], id: ++state.gaugeSeq,
-                          colour: CONFIG.gaugeColours[state.gauges.length % 4] });
+                          colour: freeGaugeColour() });
     });
     state.rakes.length = 0;
     (o.rakes || []).slice(0, 2).forEach((x) => state.rakes.push({ x: +x, buf: null }));

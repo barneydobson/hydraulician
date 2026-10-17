@@ -1061,7 +1061,7 @@ function buildPanel() {
     let infoEl = null;
     if (c.info) {
       infoEl = document.createElement("span"); infoEl.className = "info"; infoEl.textContent = "ⓘ";
-      infoEl.onclick = (e) => { e.preventDefault(); showToast(c.label, c.info); };
+      infoEl.onclick = (e) => { e.preventDefault(); showToast(c.label, c.info, { html: true, sticky: true }); };
     }
     // A stacked row wraps its block onto the next line, so the ⓘ has to be
     // placed BEFORE it or it ends up stranded on a third line of its own.
@@ -1185,13 +1185,19 @@ function applyPanelFocus() {
 
 // ------------------------------------------------------------------ toasts
 let toastTimer = 0;
-function showToast(title, sub) {
+/** opt.html: `sub` is markup (innerHTML) -- TRUSTED constant strings only,
+ *  i.e. the Controls `info` text; never anything typed or loaded.
+ *  opt.sticky: no 5.2 s auto-hide; stays up until clicked or replaced. */
+function showToast(title, sub, opt) {
   const t = document.getElementById("toast");
+  const o = opt || {};
   document.getElementById("toastTitle").textContent = title;
-  document.getElementById("toastSub").textContent = sub || "";
+  const s = document.getElementById("toastSub");
+  if (o.html) s.innerHTML = sub || ""; else s.textContent = sub || "";
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 5200);
+  // a click already dismisses any toast (the handler wired at boot)
+  if (!o.sticky) toastTimer = setTimeout(() => t.classList.remove("show"), 5200);
 }
 /** The first plain wheel over the canvas, embedded, is a surprise — nothing
  *  seemed to happen because the page scrolled instead. Said once per page,
@@ -3822,7 +3828,7 @@ function drawOverlay(A) {
   ctx.rect(view.vis.x, view.vis.y, view.vis.w, view.vis.h);
   ctx.clip();
   if (state.channel && sim.p.g > 0.5) {
-    OVERLAY.drawChannel(ctx, view, A, sim);
+    OVERLAY.drawChannel(ctx, view, A, sim, state.grade);
     if (state.labels) OVERLAY.drawProfileLabels(ctx, view, A, sim);
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
   }
@@ -3893,6 +3899,7 @@ function drawOverlay(A) {
     document.documentElement.style.setProperty("--gcw", gcw + "px");
   }
   if (state.grade) OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
+  OVERLAY.flushKeys(ctx, view);       // one key column for every line drawn above
   // The pinned readout (a tap with the Read tool): the same card and the same
   // rows as the hover readout, held at the point that was touched and kept
   // live. It answers to the card's `readouts.cursor`, not to the Hover
@@ -3973,11 +3980,26 @@ function faceAtPx(solids, x, z, tolPx) {
 function placeGauge(x, z) {
   const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < grabPx());
   if (hit >= 0) { removeGauge(state.gauges[hit]); return; }
+  addGauge(x, z);
+}
+
+/** First gauge colour no live gauge is using (the old length % 4 collided
+ *  after a shift or a removal). */
+function freeGaugeColour() {
+  const used = state.gauges.map((g) => g.colour);
+  return CONFIG.gaugeColours.find((c) => used.indexOf(c) < 0) || CONFIG.gaugeColours[0];
+}
+
+/** Always add a gauge (the oldest goes at the cap of four); `field` defaults
+ *  to the session's. placeGauge is the click, which toggles. */
+function addGauge(x, z, field) {
   if (state.gauges.length >= 4) state.gauges.shift();
-  state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
-                      field: gaugeFieldOf(null),     // starts on the session default
-                      colour: CONFIG.gaugeColours[state.gauges.length % 4] });
+  const g = { x, z, hist: [], log: [], id: ++state.gaugeSeq,
+              field: field || gaugeFieldOf(null),     // starts on the session default
+              colour: freeGaugeColour() };
+  state.gauges.push(g);
   syncPanel();                      // the inspector row lists the live gauges
+  return g;
 }
 
 /** Take one gauge away — the click on its mark, the × on its corner card and

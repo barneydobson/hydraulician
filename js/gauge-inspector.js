@@ -50,12 +50,16 @@ const GINSP = (() => {
 
   function fmtT(t) { return (t < 10 ? t.toFixed(2) : t.toFixed(1)) + " s"; }
 
+  /** Stacking counter: every show / click takes the next value, so the most
+   *  recently touched window is always on top. */
+  let zTop = 21;
+
   /** Open (or front) the inspector for gauge index k. */
   function show(k) {
     const g = state.gauges[k];
     if (!g) return null;
     const was = open.find((o) => o.g === g);
-    if (was) { was.el.style.zIndex = String(21 + open.length); return was; }
+    if (was) { was.el.style.zIndex = String(++zTop); return was; }
     if (!g.id) g.id = ++state.gaugeSeq;   // rig scripts push bare gauge objects
     hosts();
     const el = document.createElement("div");
@@ -86,9 +90,9 @@ const GINSP = (() => {
     const p = posMemo[g.id] ||
       [Math.max(8, innerWidth - 428), 76 + 26 * (open.length - 1)];
     el.style.left = p[0] + "px"; el.style.top = p[1] + "px";
-    el.style.zIndex = String(21 + open.length);
+    el.style.zIndex = String(++zTop);
     el.addEventListener("pointerdown", () => {
-      el.style.zIndex = String(22 + open.length);
+      el.style.zIndex = String(++zTop);
     }, true);
 
     // ---- header drag (see `dragWindow`)

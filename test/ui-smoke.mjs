@@ -1448,6 +1448,83 @@ async function main() {
       await tab.close();
     });
 
+    await runCase("info help renders markup and stays until dismissed", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // Every Controls info string is markup (<b>, <code>, &lt;); showToast
+      // used to write textContent, so the student read the tags themselves.
+      const r = await tab.evaluate(`
+        const row = document.querySelector('[data-control="scene"]');
+        const sp = row && row.querySelector(".info");
+        if (!sp) return { found: false };
+        sp.click();
+        const sub = document.getElementById("toastSub");
+        return { found: true, bold: !!sub.querySelector("b"),
+                 code: !!sub.querySelector("code"),
+                 literal: sub.textContent.includes("<b>") || sub.textContent.includes("&lt;"),
+                 shown: document.getElementById("toast").classList.contains("show") };
+      `);
+      check("the Scene row has an info mark", r.found);
+      check("the help carries a real <b> element", r.bold);
+      check("and a real <code> element", r.code);
+      check("no literal tag text", !r.literal);
+      check("the toast is up", r.shown);
+      await new Promise((res) => setTimeout(res, 5800));    // past the old 5.2 s auto-hide
+      const still = await tab.evaluate(`return document.getElementById("toast").classList.contains("show");`);
+      check("long help does not auto-hide", still);
+      await tab.close();
+    });
+
+    await runCase("five gauges have four distinct colours", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // colour was gaugeColours[length % 4]: at the cap the oldest is shifted
+      // out first, so the fifth gauge took the fourth's colour.
+      const c = await tab.evaluate(`
+        [1, 3, 5, 7].forEach((x) => APP.placeGauge(x, 0.5));
+        const four = APP.state.gauges.map((g) => g.colour);
+        APP.placeGauge(8.5, 0.5);
+        const five = APP.state.gauges.map((g) => g.colour);
+        return { four, five };
+      `);
+      eq("four gauges, four colours", new Set(c.four).size, 4);
+      eq("a fifth drops the oldest and keeps them distinct", new Set(c.five).size, 4);
+      await tab.close();
+    });
+
+    await runCase("card gauges never cancel", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // placeCardGauges used the toggling placeGauge, so two gauges within the
+      // grab radius deleted each other. Give VC-2 two gauges 1 cm apart.
+      const r = await tab.evaluate(`
+        const ex = EXERCISES.find((e) => e.id === "VC-2");
+        ex.gauges = [{ x: 1.0, z: 0.6, field: "eta" }, { x: 1.01, z: 0.6, field: "h" }];
+        APP.pickExercise("VC-2");
+        return APP.EX.ready.then(() => APP.state.gauges.map((g) => g.field));
+      `);
+      eq("both gauges are placed, each on its own quantity", r.join(","), "eta,h");
+      await tab.close();
+    });
+
+    await runCase("inspector raise: the last window clicked is on top", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // zIndex was 22 + open.length: every click set the same number, so the
+      // window clicked second sat level with the first and DOM order won.
+      const r = await tab.evaluate(`
+        APP.placeGauge(2, 0.5); APP.placeGauge(6, 0.5);
+        APP.GINSP.show(0); APP.GINSP.show(1);
+        const w = [...document.querySelectorAll(".ginsp")];
+        const z = (el) => +el.style.zIndex;
+        const click = (el) => el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        click(w[0]); click(w[1]);
+        const secondOver = z(w[1]) > z(w[0]);
+        click(w[0]);
+        return { n: w.length, secondOver, firstOver: z(w[0]) > z(w[1]) };
+      `);
+      eq("two inspector windows", r.n, 2);
+      check("click A then B puts B on top", r.secondOver);
+      check("click A again puts A on top", r.firstOver);
+      await tab.close();
+    });
+
     // ------------------------------------------------------------ particles
     await runCase("particles travel at the water's speed, not the wall clock's", async () => {
       const tab = await browser.open(INDEX + "?scene=m2");

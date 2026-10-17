@@ -612,9 +612,7 @@ const EX = (() => {
    *  measure is not the question and a gauge dropped late misses the point. */
   function placeCardGauges(ex) {
     (ex.gauges || []).slice(0, 4).forEach((g) => {
-      placeGauge(+g.x, +g.z);
-      const k = state.gauges.length - 1;
-      if (g.field && gaugeQty(g.field) && state.gauges[k]) state.gauges[k].field = g.field;
+      addGauge(+g.x, +g.z, g.field && gaugeQty(g.field) ? g.field : undefined);
     });
   }
   /** A rig payload may be the rig object itself, an encoded `#rig=` code, a

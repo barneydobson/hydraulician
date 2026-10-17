@@ -4660,7 +4660,7 @@ window.APP = {
   // side panel and the start screen through here rather than by synthesising
   // clicks at pixel positions.
   ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor,
-        RAMPS: Shaders.RAMPS },
+        RAMPS: Shaders.RAMPS, GAUGE_QTY },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   LEGEND,                                  // the colour key and field picker
   UIMODE,                                  // the exercise UI profile

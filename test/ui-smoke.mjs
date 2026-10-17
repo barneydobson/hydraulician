@@ -806,7 +806,7 @@ async function main() {
       check("Hover readout switches on its own", r.hov.inst === true && r.hov.hover === !r.hov.hover0,
             JSON.stringify(r.hov));
       check("a Year 1 card withholds the energy terms", r.hj.energyHidden);
-      eq("the strip names the exercise, not its scene", r.hj.title, "Momentum balance: sluice gate and hydraulic jump");
+      check("the strip names the exercise, not its scene (a tabbed card adds its tab)", r.hj.title.indexOf("Momentum balance: sluice gate and hydraulic jump") === 0, r.hj.title);
       await tab.close();
       const ff1 = await browser.open(INDEX + "?ex=FF-1",
         { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
@@ -1161,7 +1161,10 @@ async function main() {
         return { note: !!note,
                  text: note ? note.textContent : "",
                  // Both ways out are offered, and both actually work.
-                 github: !!document.querySelector('#doc .note a[href*="github.com"]'),
+                 // On a Pages site the repository is linked (derived from the
+                 // host); from file:// there is no repository to name, so the
+                 // note points at GitHub in words.
+                 github: /GitHub/.test(note ? note.textContent : ""),
                  back: !!document.querySelector('a.back') };
       `);
       check("it explains itself instead of showing nothing", r.note);
@@ -1394,10 +1397,10 @@ async function main() {
       eq("the revised tutorial title reaches the card", c.title,
          "Hydropower and unsteady flow: test the tutorial predictions");
       check("the fixed tutorial hides Geometry", !c.geomKept);
-      eq("only Gauges plot survives in Controls", c.rows.join(","), "gaugeField");
+      eq("only the card's own rows survive in Controls (HP-3 lists Gauges plot and the CV readout)", c.rows.join(","), "cvShow,gaugeField");
       eq("the gauges open on Level eta", c.gaugeField, "eta");
       eq("the field opens on Speed", c.mode, 2);
-      eq("the measurement strip keeps rake and gauge", c.measure.join(","), "rake,gauge");
+      eq("the measurement strip keeps the card's tools (rake, gauge, control volume)", c.measure.join(","), "rake,gauge,cv");
       eq("the legend offers only Speed", c.fields.join(","), "speed");
       await ex.close();
     }

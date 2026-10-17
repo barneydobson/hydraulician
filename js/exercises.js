@@ -1426,7 +1426,7 @@ const EXERCISES = [
       { tool: "force", where: "the plate's wet face — the side the jet strikes", why: "the pressure diagram on the plate and its resultant F, at right angles to the plate: on a smooth plate the whole force is pressure, so F matches the box's F_n" },
       { tool: "flux", where: "one across each sheet, about 0.1 m past each end of the plate, at right angles to it", why: "q₁ and q₂, the two sheets' discharges, against q(1 ± cos θ)/2" },
     ],
-    ui: { view: ["legendBtn"], fields: ["speed", "mom"], controls: ["speed", "geom0"],
+    ui: { view: ["legendBtn", "readBtn", "hoverBtn"], hide: ["energy", "critical"], fields: ["speed", "mom"], controls: ["speed", "geom0"],
           readouts: { rows: ["pos", "uw"] } },
     start: "a free jet seen from above (gravity acts into the screen) striking a flat plate; the angle θ between the jet and the plate is the slider on this card",
     setup: [

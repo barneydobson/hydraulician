@@ -10,7 +10,21 @@ const CONFIG = {
   // (m2, c13) is a genuinely long wait before the scene settles.
   budgets: { Low: 45000, Medium: 95000, High: 175000, "Very high": 350000, Ultra: 700000 },
   defaultBudget: "Medium",
-  frameBudgetMs: 15,          // sim time we are willing to spend per frame
+  // The frame-rate governor (see `governFrame` and the engineering notes,
+  // "Frame pacing"). It regulates the SMOOTHED wall-clock frame interval, not
+  // the CPU time of one frame: WebGL is asynchronous, so a frame's own timing
+  // measures either the enqueue (~1 ms) or, on a readback frame, the whole
+  // queue the previous frames left behind. Running: ~33 fps, the slowest the
+  // interface still feels live, which buys the most substeps per frame.
+  // Spin-up: ~5 fps, near flat out — nobody is reading the numbers yet, and
+  // throughput only grows with the batch (the per-frame cost is amortised).
+  frameTargetMs: 30,
+  warmFrameTargetMs: 200,
+  // ...but never steer slower than this outside spin-up, whatever the share
+  // rule in governTarget asks for: much below ~7 fps a drag stops feeling
+  // attached. (100 ms was tried: on hammer, whose particles make the render
+  // heavy, it left the sim a third of the frame — 31% of flat out.)
+  frameCeilMs: 150,
   histMax: 900,               // samples the CORNER card plots — its look is fixed
   // The deep store behind the inspector. Sampling is one point per rendered
   // frame, so ~60 per simulated second at speed 1: 20 000 is ~5.5 minutes of
@@ -2463,24 +2477,54 @@ function onUp(e) {
 }
 
 // -------------------------------------------------------------------- loop
-let lastT = performance.now(), acc = 0, fpsAcc = 0, fpsN = 0, probeTick = 0;
+let lastT = performance.now(), acc = 0, probeTick = 0;
+// The status line's window: frames, wall seconds and SIMULATED seconds over
+// the last ~0.5 s, so ×RT is (sim advanced) / (wall elapsed) across the whole
+// window rather than one frame's ratio — which alternated ×3 between a frame
+// that queued work and the readback frame that waited for it.
+const statWin = { wall: 0, sim: 0, n: 0, sub: 0 };
+// The governor's state: when the previous tickFrame started (measured here, so
+// APP.frames in a headless loop is governed by what it really costs too) and
+// the time-windowed mean interval between frames (ms) — see governFrame.
+const gov = { last: 0, W: 0, N: 0, ema: 0,
+  win: { W: 0, N: 0, S: 0 },                     // this window's measured frames
+  fit: { w: 0, n: 0, T: 0, nn: 0, nT: 0 },       // decayed sums for T = T0 + c n
+  c: 0, T0: 0, T0floor: 0, warming: false,
+  raf: false };                                  // inside frame(), not APP.frames
+document.addEventListener("visibilitychange", () => { gov.last = 0; });
 // Whether the previous frame was still warming up, so the end of spin-up can
 // be caught as an edge rather than as a state — see tickFrame.
 let wasWarming = false;
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const realDt = Math.min(0.05, (now - lastT) / 1000);
+  // 100 ms, not less: the governor may run as slow as CONFIG.frameCeilMs,
+  // and a frame must be able to ask for the sim time its wall time covers or
+  // ×1 is unreachable below 20 fps however fast the GPU is.
+  const realDt = Math.min(0.1, (now - lastT) / 1000);
   lastT = now;
+  gov.raf = true;
   tickFrame(realDt);
+  gov.raf = false;
 }
 
 function tickFrame(realDt) {
+  // The real interval since the previous frame started, unclamped: `realDt`
+  // is capped at 100 ms for the sim's sake and is fixed at 1/60 under
+  // APP.frames, and neither is what a frame actually cost. A gap longer than
+  // A hidden tab stops requestAnimationFrame, so the gap across one is not a
+  // frame: `visibilitychange` zeroes `gov.last` and that frame goes
+  // unmeasured. Long frames are otherwise REAL and must be counted — under a
+  // heavy load a spin-up readback frame can take more than a second, and a
+  // governor that ignored those frames saw only the fast ones and ran away.
+  const tNow = performance.now();
+  const wallMs = gov.last ? tNow - gov.last : 0;
+  gov.last = tNow;
+  const measured = wallMs > 0 && wallMs < 10000;
   computeView();
   collectStream();               // before this frame's substeps: see requestStream
 
-  const t0 = performance.now();
-  let simAdvanced = 0;
+  let simAdvanced = 0, warming = false, binding = false;
   if (!state.paused) {
     const h = SIM.dt();
     state.simDt = h;
@@ -2493,7 +2537,7 @@ function tickFrame(realDt) {
     // way. It is a sim-clock target, so the speed slider does not lengthen it.
     const exWarm = EX.settleTarget();
     const warmTo = Math.max(state.scene.spinup || 0, exWarm);
-    const warming = sim.t < warmTo;
+    warming = sim.t < warmTo;
     // The last of §9's reset conditions. Spin-up is an initialisation
     // interval, not part of the reported flow state — a pipe filling, a
     // channel finding its depth — and a window opened across it carries the
@@ -2503,8 +2547,11 @@ function tickFrame(realDt) {
     if (wasWarming && !warming) SIM.avgReset();
     wasWarming = warming;
     let want = warming ? state.nsubMax : Math.round(state.speed * realDt / h);
-    // nsubMax is fractional (the AIMD governor creeps it), so round at the
-    // point of use — a substep count is an integer, and the panel prints it.
+    // The cap is what holds this frame back — the only case in which the
+    // governor may RAISE it (see governFrame).
+    binding = want >= state.nsubMax;
+    // nsubMax is fractional (the governor moves it continuously), so round at
+    // the point of use — a substep count is an integer, and the panel prints it.
     want = Math.max(1, Math.round(Math.min(state.nsubMax, want)));
     simAdvanced = SIM.step(want);
     state.nsub = want;
@@ -2541,10 +2588,7 @@ function tickFrame(realDt) {
   // a particle through a wall rather than round it.
   if (state.particles) SIM.advanceParticles(Math.min(simAdvanced, 0.05), measuringAvg());
 
-  const simMs = performance.now() - t0;
-  // AIMD governor: creep up while there is headroom, back off hard when not
-  if (simMs > CONFIG.frameBudgetMs * 1.6) state.nsubMax = Math.max(2, state.nsubMax * 0.82);
-  else if (simMs < CONFIG.frameBudgetMs * 0.75) state.nsubMax = Math.min(4000, state.nsubMax * 1.05 + 1);
+  if (measured && !state.paused) governFrame(wallMs, warming, binding);
 
   // Average mode must describe ONE window: the field, the overlay and every
   // number derived from it. Mixing a mean field with live markers would put
@@ -2595,14 +2639,137 @@ function tickFrame(realDt) {
   drawOverlay(analysis);
   EX.tick();                    // the card's settle countdown, when one is open
 
-  fpsAcc += realDt; fpsN++;
-  if (fpsAcc > 0.5) {
-    state.fps = fpsN / fpsAcc;
-    state.rt = simAdvanced / Math.max(realDt, 1e-4);
-    fpsAcc = 0; fpsN = 0;
+  // The status line reads the whole window: simulated over wall seconds, and
+  // frames over wall seconds. A frame with no measurable interval (the first,
+  // or one after a hidden tab) still counts its sim time against `realDt`.
+  statWin.wall += measured ? wallMs / 1000 : realDt;
+  statWin.sim += simAdvanced; statWin.n++; statWin.sub += state.paused ? 0 : state.nsub;
+  if (measured) { gov.win.W += wallMs; gov.win.N++; gov.win.S += state.paused ? 0 : state.nsub; }
+  if (statWin.wall > 0.5) {
+    governLearn();
+    // Each window's own ratio, then blended half-and-half with the previous
+    // reading (~1 s effective): a 0.5 s window holds only a handful of
+    // frames when the GPU is busy, and one readback more or less moved it
+    // ±30%. A paused window is taken as it stands, so a pause reads ×0 at once.
+    const fps = statWin.n / statWin.wall, rt = statWin.sim / statWin.wall;
+    const fresh = state.paused;
+    state.fps = fresh ? fps : 0.5 * (state.fps + fps);
+    state.rt = fresh ? rt : 0.5 * (state.rt + rt);
+    state.nsubAvg = statWin.sub / statWin.n;
+    statWin.wall = statWin.sim = statWin.n = statWin.sub = 0;
     updateStatus();
   }
   cycleTips(realDt);
+}
+
+/** The frame-rate governor: sets `state.nsubMax`, the most substeps one frame
+ *  may run, so that the SMOOTHED frame interval sits at the target
+ *  (`governTarget`).
+ *
+ *  What it replaced timed the CPU around SIM.step and cut ×0.82 above 24 ms /
+ *  crept ×1.05 below 11 ms. WebGL is asynchronous, so that clock read ~1 ms
+ *  on two frames in three and the WHOLE queued GPU backlog on the third, when
+ *  `columns()`'s readback forced a sync — the governor saw 3× the real cost,
+ *  saw-toothed, and settled at a quarter of what the GPU could deliver
+ *  (h23: ×0.1–0.2 RT interactive against ×0.42 flat out). The interval
+ *  between frames is what the GPU's throughput actually sets, and over a few
+ *  readback cycles it is not bimodal.
+ *
+ *  An integral controller on the log error, rate-limited and with a dead
+ *  band: d ln(nsubMax)/dt = ln(target / mean) per second, limited to ±1 /s
+ *  (±1.5 /s in spin-up), no move within ±6% of target; the mean interval is
+ *  windowed over τ = 0.8 s, long enough to hold several frames even at
+ *  5 fps. It may only RAISE the cap when the cap is what limits the frame —
+ *  otherwise a scene running at ×0.25 speed would ratchet it to the ceiling
+ *  and the first touch of the speed slider would queue seconds of work.
+ *  Spin-up has its own, longer target, so it runs near flat out; the rate
+ *  limit makes the hand-over a ramp of a second or two rather than a cliff,
+ *  and halves a cap made absurd by a resolution change in under a second. */
+function governFrame(wallMs, warming, binding) {
+  const dt = wallMs / 1000;
+  gov.warming = warming;
+  // Frames per unit time, exponentially windowed in TIME: the mean interval
+  // is (decayed wall time) / (decayed frame count). Not an EMA of the
+  // interval with a time-based weight — that weights each interval by its own
+  // length and so over-counts the readback frames (16, 16, 150 ms reads as
+  // 126 ms against a true mean of 61) and starves the sim.
+  const k = Math.exp(-dt / 0.8);
+  gov.W = gov.W * k + wallMs; gov.N = gov.N * k + 1;
+  gov.ema = gov.W / gov.N;
+  const target = governTarget(warming);
+  const err = Math.log(target / gov.ema);
+  if (Math.abs(err) < 0.06) return;
+  if (err > 0 && !binding) return;
+  // Symmetric. An asymmetric limit (fast down, slow up) looked kinder to
+  // the interface, but on a noisy interval it is a rectifier: every spike
+  // above target cut harder than the dips below it restored, and the cap
+  // settled well under the target (hammer spin-up, shared GPU: n 30–45 at
+  // T ≈ 130 ms against a 220 ms target).
+  const lim = warming ? 1.5 : 1;
+  const rate = Math.max(-lim, Math.min(lim, err));
+  state.nsubMax = Math.max(2, Math.min(4000, state.nsubMax * Math.exp(rate * dt)));
+}
+
+/** The interval the governor steers to. The configured frame time when the
+ *  machine can meet it with the sim taking a real share of the frame — and
+ *  otherwise long enough that it does: at least half the frame (¾ in
+ *  spin-up) goes to substeps, up to CONFIG.frameCeilMs (400 ms in spin-up).
+ *  Without that floor a machine whose render alone takes 30 ms (an integrated GPU on a 4K panel; measured here: Iris Xe at
+ *  1440×900 shared with other headless Chromes paused at 27 fps) would cut
+ *  the sim to two substeps a frame chasing a frame rate that substeps were
+ *  not costing — ×0.01 RT for no visible gain in smoothness. */
+function governTarget(warming) {
+  // A scripted APP.frames(n) loop is not being watched: there is no frame
+  // rate to keep, and the caller sized n for frames of the plain running
+  // cost. Giving it the spin-up target made ui-smoke's APP.frames(600) on m2
+  // (still warming) take minutes — 600 frames of 200–400 ms. It gets the
+  // running target without the share rule.
+  if (!gov.raf) return CONFIG.frameTargetMs;
+  const base = warming ? CONFIG.warmFrameTargetMs : CONFIG.frameTargetMs;
+  const share = warming ? 0.75 : 0.5;
+  return Math.max(base, Math.min(warming ? 400 : CONFIG.frameCeilMs, gov.T0 / (1 - share)));
+}
+
+/** Learns the frame's cost model T = T0 + c·n from each status window (mean
+ *  substeps per frame against mean interval): least squares with a ~15 s
+ *  memory (×0.97 a window). T0 is the cost of a frame that runs no substeps
+ *  — render, overlay, instruments — and c the cost of one substep, readback
+ *  stalls and all. The slope is refitted only when the windows in memory
+ *  span a spread of n (it is otherwise undetermined); T0 follows the
+ *  windows' mean through the held slope, so a heavier overlay or a resized
+ *  window is picked up as the memory turns over. Paused windows (n = 0)
+ *  measure T0 directly. */
+function governLearn() {
+  const w = gov.win, F = gov.fit;
+  if (w.N >= 3) {
+    const n = w.S / w.N, T = w.W / w.N;
+    const k = 0.97;
+    F.w = F.w * k + 1; F.n = F.n * k + n; F.T = F.T * k + T;
+    F.nn = F.nn * k + n * n; F.nT = F.nT * k + n * T;
+    const mn = F.n / F.w, mT = F.T / F.w;
+    const vn = F.nn / F.w - mn * mn, cv = F.nT / F.w - mn * mT;
+    if (vn > Math.max(1, 0.01 * mn * mn) && cv > 0) gov.c = cv / vn;
+    // No slope learned yet: assume the frame is all substeps (T0 = 0), which
+    // is the plain frame-rate target and moves n enough to learn one. The
+    // intercept comes from the fit's own means, not from this window: taken
+    // per window it followed T up whenever the slope was underestimated, the
+    // target followed T0, and the frame rate walked away.
+    // A fit needs n to MOVE, and a governor pinned at its floor never moves
+    // it: measured on hammer straight after spin-up, the backlog draining
+    // made T rise as n fell, no slope was accepted, T0 stayed 0, the 30 ms
+    // target was out of reach and n sat at 2 for good (×0.03 RT). Pinned at
+    // the floor with the frame still too slow, the frame IS its overhead, so
+    // that is taken as a lower bound on T0 — which raises the target, lets n
+    // climb, and gives the fit its spread back. It fades over ~15 s.
+    // Not in spin-up: the first frames of a scene (shader compiles, the
+    // initial fill) are pinned and slow for reasons that pass, and latching
+    // one of those read a 650 ms "overhead" off hammer's boot.
+    const pinned = !gov.warming && state.nsubMax <= 4 && T > CONFIG.frameTargetMs;
+    gov.T0floor = pinned ? Math.max(gov.T0floor, T) : gov.T0floor * k;
+    const T0fit = gov.c > 0 ? Math.max(0, Math.min(mT, mT - gov.c * mn)) : 0;
+    gov.T0 = Math.max(T0fit, gov.T0floor);
+  }
+  w.W = w.N = w.S = 0;
 }
 
 /** The speed scale — the particle colouring and the Water view's brightness
@@ -3371,7 +3538,7 @@ function updateStatus() {
   const nSpeed = document.getElementById("n_speed");
   if (nSpeed) nSpeed.textContent =
     "×" + state.speed.toFixed(2) + " asked, ×" + state.rt.toFixed(2) + " achieved  " +
-    "(Δt " + (state.simDt * 1e3).toFixed(2) + " ms × " + state.nsub + ")";
+    "(Δt " + (state.simDt * 1e3).toFixed(2) + " ms × " + Math.round(state.nsubAvg || state.nsub) + ")";
   // The delivered numbers move on their own, so their notes are refreshed on
   // this cadence rather than only when a slider is touched.
   if (state.deliv) { refreshNote("inQ"); refreshNote("inLevel"); }

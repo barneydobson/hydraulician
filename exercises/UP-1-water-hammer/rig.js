@@ -1,6 +1,6 @@
 /* UP-1 "Pressure travels at the speed of sound" — paste into the dev console.
  *
- *   ?ex=UP-1 (or ?scene=pipeline), Resolution: Medium (563 x 169, dx = 0.107 m).
+ *   ?ex=UP-1 (or ?scene=pipeline), Resolution: Medium (627 x 152, dx = 0.096 m).
  *
  * Nothing to draw: the scene's two polygons and its valve ARE the rig. This
  * is the lecturer's spot-check — it places the three gauges the card lists,
@@ -11,8 +11,9 @@
  *   toggleValve()                     = the V key
  *   APP.tick(n)                       = n solver substeps, flat out
  *
- *   UP1.demo()        -> settle 20 s, slam, 6 s of record, print the table
- *   UP1.demo(35)      -> the same at c = 35 m/s (set through the Controls row)
+ *   UP1.demo()              -> from rest, settle 25 s, slam, 14 s of record, print the table
+ *   UP1.demo(20)            -> the same at c = 20 m/s (set through the Controls row)
+ *   UP1.demo(30, 25, 10.2)  -> c = 30 with the overflow crest at 10.2 m (Geometry row)
  *
  * A headless driver calls the pieces instead (setup, run, slam, record,
  * report), each in chunks short enough for one CDP evaluate. The page's own
@@ -20,18 +21,22 @@
  * APP.tick and the 5 ms record is uniform.
  */
 window.UP1 = {
-  XS: [14, 30, 46], Z: 3.0,            // gauge stations on the pipe axis
+  XS: [14, 30, 46], Z: 2.5,            // gauge stations on the pipe axis
   XR: 5.0, XV: 51.75,                  // reservoir face, valve's upstream face
-  ZI: 2.0,                             // invert; the bore is 2 m
+  ZI: 1.5,                             // invert; the bore is 2 m
 
   h: function (x) { return APP.probe(x, UP1.Z).phead + UP1.Z; },
   /** bore-mean u at station x: 19 points across the 2 m bore */
   U: function (x) { var s = 0; for (var k = 0; k < 19; k++) s += APP.probe(x, UP1.ZI + 0.05 + 0.1 * k).u; return s / 19; },
   run: function (T) { var t1 = APP.sim.t + T; while (APP.sim.t < t1) APP.tick(1); return APP.sim.t; },
 
-  setup: function (c) {
+  setup: function (c, crest) {
     APP.state.paused = true;
+    if (APP.sim.p.valveClosed > 0.5) toggleValve();   // a previous demo left it shut
+    // the crest first: a Geometry change restarts the water (and the clock)
+    if (crest) CONTROLS.find(function (r) { return r.id === "geom0"; }).set(crest);
     if (c) CONTROLS.find(function (r) { return r.id === "cel"; }).set(c);
+    APP.SIM.resetWater();                                // = R: every demo starts from rest
     APP.state.gauges.length = 0;
     UP1.XS.forEach(function (x) { APP.placeGauge(x, UP1.Z); });
     return APP.sim.p.c;
@@ -71,16 +76,19 @@ window.UP1 = {
       dt_46_30: f(arr[1] - arr[2], 3), dt_30_14: f(arr[0] - arr[1], 3), spacing_over_c: f(16 / c, 3),
       dH_46: f(dH, 2), cv0g_bore: f(c * U0 / g, 2), cv0g_gauge: f(c * UP1.v46 / g, 2),
       h_min_46: f(Math.min.apply(null, rec.map(function (s) { return s[3]; })), 2),
+      // the lowest pressure head anywhere on the record, at the bore's crown
+      // (z = soffit, 1 m above the axis): below 0 the column separates
+      ph_min_crown: f(Math.min.apply(null, rec.map(function (s) { return Math.min(s[1], s[2], s[3]); })) - (UP1.ZI + 2), 2),
       period: up.length > 1 ? f(up[1] - up[0], 3) : null, fourL_c: f(4 * L / c, 3),
     };
     return out;
   },
 
-  demo: function (c, settle) {
-    UP1.setup(c);
-    UP1.run(settle || 20);
+  demo: function (c, settle, crest) {
+    UP1.setup(c, crest);
+    UP1.run(settle || 25);
     UP1.slam();
-    UP1.record(6);
+    UP1.record(14);
     var out = UP1.report();
     console.table(out);
     APP.state.paused = false;

@@ -1589,75 +1589,90 @@ const SCENES = (() => {
     // edge, so nothing downstream ponds, drifts or reflects back into the
     // pipe. The steady pipe velocity is set by the level difference between
     // the reservoir and the tank — entry, friction and exit losses — and the
-    // tank level by the weir, so the flow regulates itself: no throttle in
+    // tank level by the crest, so the flow regulates itself: no throttle in
     // the pipe, and the valve, when shut, is a plain closed end.
     //
-    // Why not a free discharge to air: an unthrottled pipe under h_s of head
-    // would run at ~√(2g·h_s), and the Joukowsky surge c·v/g would exceed
-    // h_s many times over (the downsurge cavitates for any h_s < 2c²/g, i.e.
-    // a kilometre at c = 70). A drowned outlet into a tank standing just
-    // below the reservoir keeps v small with nothing in the bore.
+    // Why not a free discharge to air: an unthrottled pipe under d_s of
+    // water would run at ~√(2g·d_s), and the surge c·v/g would exceed d_s
+    // many times over (the low-pressure return wave would empty the pipe).
+    // A drowned outlet into a tank standing a little below the reservoir
+    // keeps v moderate with nothing in the bore.
+    //
+    // ONE Geometry slider, the overflow crest height (geom0): lower crest →
+    // lower tank → bigger level difference → faster pipe flow → bigger surge.
+    // Its range is the one where the return wave stays above zero pressure
+    // at the card's c (see the UP-1 brief for the measured table).
     //
     // Scale: L ≈ 47 m of 2 m bore (reservoir face x = 5.0 to the valve's
-    // upstream face x = 51.75), axis z = 3, reservoir 16 m so the static head
-    // at the axis is 13 m and the c·v₀/g surge at c = 70 stays under it.
-    // c, cf, cs, bulk and nu are hammer's.
+    // upstream face x = 51.75), axis z = 2.5; reservoir 12.8 m, so the water
+    // over the axis is 10.3 m at rest. 14.5 m tall (was 18 m: the empty band
+    // above the pipe ran up under the strip). cf, cs, bulk and nu are
+    // hammer's; c is 30 (see the brief: at c·v₀/g the surge must stay under
+    // the ~10 m of water over the axis, or the return wave separates the
+    // column).
     (() => {
-      const W = 60, H = 18;
-      const LEVEL = 16.0;                  // reservoir surface
+      const W = 60, H = 14.5;
+      const LEVEL = 12.8;                  // reservoir surface
       const XR = 5.0, XV = 52.0;           // reservoir wall (pipe mouth), valve centreline
-      const ZI = 2.0, ZS = 4.0, TS = 0.6;  // pipe invert, soffit, soffit wall thickness
+      const ZI = 1.5, ZS = 3.5, TS = 0.6;  // pipe invert, soffit, soffit wall thickness
       const RB = 1.0;                      // bellmouth radius at the pipe's mouth
-      const ZC = 14.65;                    // overflow crest (tuned with LEVEL, see below)
+      const ZC0 = 10.6;                    // default overflow crest (measured, see the brief)
       const XC = W - 1.6;                  // tank's right wall / crest block
-      const ZTOP = 17.5;                   // top of the reservoir and tank walls
+      const ZTOP = 14.0;                   // top of the reservoir and tank walls
+      const zc = (par) => (par && par.crestZ !== undefined ? par.crestZ : ZC0);
       return {
         id: "pipeline", name: "Water hammer: reservoir, pipe, valve", key: "Speed of sound",
         group: "Pressure & transients",
-        blurb: "A reservoir at constant level feeds a long straight pipe that discharges through a valve into a small overflowing tank. Slam the valve and a pressure wave runs up the pipe at the celerity c, reflects at the reservoir and returns: period 4L/c, surge cΔv/g.",
-        W, H, c: 70, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
+        blurb: "A reservoir at constant level feeds a long straight pipe that discharges through a valve into a small overflowing tank. Shut the valve suddenly and a pressure wave runs up the pipe at the speed of sound c, reflects at the reservoir and returns.",
+        W, H, c: 30, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
         valveOpen: 1, particles: 1, spinup: 20,
-        mode: 1, headMax: 24, hmax: 17, vmax: 3,
+        mode: 1, headMax: 20, hmax: 13, vmax: 4,
         open: [1, 1, 0, 0],
         spongeIn: XR - 0.5,                // hold the whole reservoir compartment
         inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
-        solids: () => [
-          // Ground, the tank's right wall, and the crest block whose steep
-          // downstream face carries the spill out of the right edge. CCW.
-          GEOM.poly([[-1, -0.5], [W + 1, -0.5], [W + 1, ZC - 5.0], [XC + 0.4, ZC],
-                     [XC, ZC], [XC, ZI], [-1, ZI]],
-            [{ id: "chute", label: "Overflow chute", e0: 2, e1: 2 },
-             { id: "crest", label: "Overflow crest", e0: 3, e1: 3 },
-             { id: "tankR", label: "Tank, right wall", e0: 4, e1: 4 },
-             { id: "invert", label: "Pipe invert and beds", e0: 5, e1: 5 }], "ground"),
-          // The pipe's soffit with the reservoir wall rising from its mouth
-          // and the tank's left wall rising from its end: an inverted U. CCW.
-          // The mouth's top corner is rounded (a bellmouth of radius RB):
-          // MEASURED, a square corner sheds a vena-contracta jet that ran
-          // the axis at 1.96 m/s against a 1.4 m/s bore 9 m in, and wandered
-          // down the pipe for the whole settle.
-          (() => {
-            const mouth = GEOM.arcPts(XR + RB, ZS + RB, RB, Math.PI, 1.5 * Math.PI);
-            const n = mouth.length;                       // edges 0 … n−2 are the bellmouth
-            return GEOM.poly(mouth.concat([[XV + 0.25, ZS], [XV + 0.25, ZTOP], [XV - 0.25, ZTOP],
-                       [XV - 0.25, ZS + TS], [XR + RB, ZS + TS], [XR + RB, ZTOP], [XR, ZTOP]]),
-              [{ id: "mouth", label: "Bellmouth", e0: 0, e1: n - 2 },
-               { id: "soffit", label: "Pipe soffit", e0: n - 1, e1: n - 1 },
-               { id: "tankL", label: "Tank, left wall", e0: n, e1: n },
-               { id: "res", label: "Reservoir wall", e0: n + 6, e1: n + 6 }], "pipe");
-          })(),
+        params: [
+          { key: "crestZ", label: "Overflow crest height", min: 10.2, max: 11.6, step: 0.1, value: ZC0, unit: "m", resetWater: true },
         ],
+        solids: (W_, H_, P, par) => {
+          const ZC = zc(par);
+          return [
+            // Ground, the tank's right wall, and the crest block whose steep
+            // downstream face carries the spill out of the right edge. CCW.
+            GEOM.poly([[-1, -0.5], [W + 1, -0.5], [W + 1, ZC - 5.0], [XC + 0.4, ZC],
+                       [XC, ZC], [XC, ZI], [-1, ZI]],
+              [{ id: "chute", label: "Overflow chute", e0: 2, e1: 2 },
+               { id: "crest", label: "Overflow crest", e0: 3, e1: 3 },
+               { id: "tankR", label: "Tank, right wall", e0: 4, e1: 4 },
+               { id: "invert", label: "Pipe invert and beds", e0: 5, e1: 5 }], "ground"),
+            // The pipe's soffit with the reservoir wall rising from its mouth
+            // and the tank's left wall rising from its end: an inverted U. CCW.
+            // The mouth's top corner is rounded (a bellmouth of radius RB):
+            // MEASURED, a square corner sheds a vena-contracta jet that ran
+            // the axis at 1.96 m/s against a 1.4 m/s bore 9 m in, and wandered
+            // down the pipe for the whole settle.
+            (() => {
+              const mouth = GEOM.arcPts(XR + RB, ZS + RB, RB, Math.PI, 1.5 * Math.PI);
+              const n = mouth.length;                       // edges 0 … n−2 are the bellmouth
+              return GEOM.poly(mouth.concat([[XV + 0.25, ZS], [XV + 0.25, ZTOP], [XV - 0.25, ZTOP],
+                         [XV - 0.25, ZS + TS], [XR + RB, ZS + TS], [XR + RB, ZTOP], [XR, ZTOP]]),
+                [{ id: "mouth", label: "Bellmouth", e0: 0, e1: n - 2 },
+                 { id: "soffit", label: "Pipe soffit", e0: n - 1, e1: n - 1 },
+                 { id: "tankL", label: "Tank, left wall", e0: n, e1: n },
+                 { id: "res", label: "Reservoir wall", e0: n + 6, e1: n + 6 }], "pipe");
+            })(),
+          ];
+        },
         valves: () => [[XV, ZI, XV, ZS, 0.5]],      // the pipe's end, flush with the tank wall
-        water: (x, z, P) => (z <= ZI ? 0
+        water: (x, z, P, par) => (z <= ZI ? 0
                              : x < XR + 0.5 ? still(LEVEL, z, P)                 // reservoir
                              : x < XV + 0.25 ? (z < ZS ? still(LEVEL, z, P) : 0) // pipe, full
-                             : x < XC ? still(ZC, z, P)                          // tank, to the crest
+                             : x < XC ? still(zc(par), z, P)                     // tank, to the crest
                              : 0),
-        tips: ["Drop three <b>gauges</b> on the pipe axis (z = 3 m), then press <b>V</b> to slam the valve.",
-               "The gauge nearest the valve jumps first; the others follow one after another — the pressure wave travels at c, not instantly.",
-               "Open the <b>Gauge inspector</b> to read the arrival times: Δt between two gauges is their spacing / c.",
-               "The surge is ΔH = c·Δv/g. Lower the Slot celerity c and repeat: the delay grows and the surge shrinks.",
-               "The wave reflects at the reservoir as a low-pressure wave: the trace is a square wave of period 4L/c."] };
+        tips: ["Drop three <b>gauges</b> on the pipe's centre line (z = 2.5 m), then press <b>V</b> to shut the valve suddenly.",
+               "The gauge nearest the valve reacts first and the others follow one after another: the pressure rise travels up the pipe as a wave, at the speed of sound c.",
+               "In the <b>Gauge inspector</b> the time between two gauges reacting is their spacing divided by c.",
+               "Lower the speed of sound c on the card and repeat: the wave takes longer to arrive and the pressure jump is smaller.",
+               "The wave bounces off the reservoir and comes back as a low-pressure wave: the pressure at the valve rises and falls in a square wave."] };
     })(),
     // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
     // The shared contraction rig: two reservoirs held at fixed levels, a

@@ -88,7 +88,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | B9 | Three reservoirs, one junction | B9-three-reservoirs/ | RIG-C ×3, dynamic | (z_B(0), Q_B, junction head) |
 | B10 | Lift the crest until the pipe gives up | B10-crest-vs-hgl/ | RIG-A + raised crest | (level, z_sep, HGL at the crest) |
 | FF-1 | Wind over a lake | FF-1-wind-lake/ | lake, wind stress τ slider | — (lecturer demo) |
-| UP-1 | Pressure travels at the speed of sound (water hammer) | UP-1-water-hammer/ | pipeline | — (lecturer demo) |
+| UP-1 | Pressure travels at the speed of sound | UP-1-water-hammer/ | pipeline, speed of sound c and overflow crest sliders | — |
 | PF-2 | The wall's shape doesn't matter | PF-2-wall-shape/ | wall-shape, wall shape slider | — (lecturer demo) |
 | FF-2 | Spillway with a ski-jump | FF-2-spillway/ | spillway, bucket lip angle slider | — (lecturer demo) |
 | FF-3 | Flow past a body | FF-3-flow-past-body/ | body, body shape slider | — (lecturer demo) |

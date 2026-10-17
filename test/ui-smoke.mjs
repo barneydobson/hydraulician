@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const INDEX = pathToFileURL(join(ROOT, "index.html")).href;
-const DOCK_W = 348;      // must match #dock in index.html and W in the DOCK module
+const DOCK_W = 348;      // must match #dock in css/app.css and W in the DOCK module
 
 let passed = 0, failed = 0;
 const fails = [];
@@ -299,7 +299,7 @@ async function main() {
       eq("the overlay stops there too", p.overW, p.canvasW);
       check("the strip still shows every control", !p.groupsClipped);
       check("the fold handle is on the seam", p.foldShown);
-      // Fold-on-land is an EMBEDDED behaviour (spec §1.1 of the embed design);
+      // Fold-on-land is an EMBEDDED behaviour (docs/design/2026-09-10-embed-design.md §1);
       // a plain `?ex=` boot must not pick it up by accident.
       check("the reopen tab is put away", !p.tabShown);
       check("the brief carries the task", await tab.evaluate(
@@ -1963,7 +1963,7 @@ async function main() {
         `);
         check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
         check("APP.embed is true", p.embed === true);
-        // Fold on land (spec §1.1): the brief lives on the page around the
+        // Fold on land (docs/design/2026-09-10-embed-design.md §1): the brief lives on the page around the
         // frame, so the card starts parked on its edge tab.
         check("the dock is not open", !p.dockOpen);
         check("the reopen tab is shown", p.tabShown);

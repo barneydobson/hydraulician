@@ -414,14 +414,17 @@ the cursor is, so a zero is itself the statement that the column is simple.
 
 The reconstruction numerics are a pure function with no WebGL in it
 (`RECON`, `js/reconstruct.js`), so most of the above is pinned by closed-form
-tests. The battery is organised in groups: **A** accumulator arithmetic,
+tests. The `RECON` battery is organised in groups: **A** accumulator arithmetic,
 **B** compaction and compressibility, **C** surface statistics on a wobbling
 surface with known answers, **D** jets and connectivity, **E** geometry,
-**F** end-to-end conservation on the GPU, **G** float32 robustness, **H**
-overlay consistency. Groups A–E and G live in `node test/recon-test.mjs`;
-`node test/mutation-test.mjs` proves those tests can fail; groups F and H run
-on the GPU in `node exercises/_runner/smoke.js --only=avg`, which gates the
-transport residual on the window-scaled bound of §5 — in the source-free
+**G** float32 robustness, **H** the specific-energy inlet, **K** the energy
+line's velocity head. All of them live in `node test/recon-test.mjs`;
+`node test/mutation-test.mjs` proves those tests can fail. The GPU checks in
+`node exercises/_runner/smoke.js --only=avg` keep smoke.js's own letters, which
+it prints and its mutant catalogue cites, so they reuse two letters that mean
+something else in `recon-test`: **F** end-to-end conservation, and **H**
+(`H2`, `H2a`–`H2c`, `H5`) the overlay's consistency on the averaged path, which
+is not `recon-test`'s **H**. They gate the transport residual on the window-scaled bound of §5 — in the source-free
 interior (F1) and in the `⟨S⟩ ≠ 0` population (F4: the sponge, the Dirichlet
 bands and every clamp event, counted rather than silently excluded; its
 drift does not follow the √T law cleanly, so it is gated on separation from
@@ -442,7 +445,8 @@ All three accumulators are zeroed, `T ← 0`, and `f(0)` re-copied, on:
   switched on and close it again when switched off. An edge is a wall of the
   control volume, so changing one ends the window that was accumulating
   across the old one. These read as settings rather than edits, which is why
-  the legend card names them among the reset conditions;
+  the Controls panel's Average row (its `info` text) lists them among the
+  reset conditions;
 - a **valve toggle** — it reclassifies every valve cell between solid and
   open, which changes the set of cells being averaged;
 - a **celerity change** — it rewrites `f` in place to keep the pressure

@@ -31,20 +31,18 @@ const SRC = fileURLToPath(new URL("../js/reconstruct.js", import.meta.url));
 const SUITE = fileURLToPath(new URL("./recon-test.mjs", import.meta.url));
 const GEOM_FILE = fileURLToPath(new URL("../js/geom.js", import.meta.url));
 const GEOM_SUITE = fileURLToPath(new URL("./geom-test.mjs", import.meta.url));
-/** Read with the line endings NORMALISED to LF.
+/** Read with the line endings NORMALISED to LF: each CRLF becomes LF.
  *
- *  `.gitattributes` sets `* text=auto`, so the repo stores LF and a Windows
- *  checkout gets CRLF. The catalogue below is written with `\n`, so on Windows
- *  the one multi-line pattern (`band-inverted`) stopped matching and the mutant
- *  went STALE — the excursion-band orientation, test C4, was no longer being
- *  proven killable, on exactly the platform this repo is developed on. The
- *  gate did fail loudly, which is the design working; it just blamed a
- *  refactor that had not happened.
+ *  The catalogue below is written with `\n`. A source file with CRLF endings
+ *  (a Windows checkout) would not match the one multi-line pattern
+ *  (`band-inverted`), so that mutant went STALE and test C4 stopped being
+ *  proven killable on the platform this repo is developed on. The gate did
+ *  fail loudly, but it blamed a refactor that had not happened.
  *
- *  Normalising here rather than in each pattern keeps the catalogue readable
- *  and platform-blind: a `find` is written the way the source reads, once. The
- *  mutant is written back out as LF too, which the suite does not care about —
- *  it only ever parses the file. */
+ *  Folding here rather than in each pattern keeps the catalogue readable: a
+ *  `find` is written the way the source reads, once. The mutated copy is
+ *  written back with LF endings too; the suite only parses it, so that does
+ *  not matter. */
 const source = readFileSync(SRC, "utf8").replace(/\r\n/g, "\n");
 const geomSource = readFileSync(GEOM_FILE, "utf8").replace(/\r\n/g, "\n");
 

@@ -242,8 +242,8 @@ slab of thickness `Δ`, per unit volume:
 Two consequences follow directly, and both show up in how the model behaves:
 
 - The term exists **only in cells touching a solid**, gated transverse to the
-  component it acts on: `u` keys on walls above and below (a bed), `v` on walls
-  left and right. A wide pond has no friction on `v` at all.
+  component it acts on: `u` keys on walls above and below (a bed), `w` on walls
+  left and right. A wide pond has no friction on `w` at all.
 - It carries an explicit `Δ`. The delivered resistance is therefore a property of
   the grid as well as of `C_f` — see §5 for what it delivers.
 
@@ -413,7 +413,7 @@ update. Over 200 s:
 | | start | end |
 | --- | --- | --- |
 | `\|∂P/∂z + g\|/g` | 1 | 2.3×10⁻⁶ |
-| residual `max\|v\|` | 0 | 1.8×10⁻⁵ m/s |
+| residual `max\|w\|` | 0 | 1.8×10⁻⁵ m/s |
 
 falling monotonically. The strongest form of the check needs no predicted `η` at
 all: if the profile is hydrostatic, the surface elevation implied by the pressure
@@ -571,8 +571,8 @@ Both cannot hold at once: putting `F` after `G` interposes it between `G` and
 `P`, so the discrete hydrostatic balance of §3 is broken in wall-adjacent cells
 by `O(C_f g Δt²/Δx)` — around 10⁻¹⁰ m/s per substep at default settings. The
 friction gate is transverse to the component (`u` keys on the bed above and
-below, `v` on side walls left and right), so a wide pond has no friction on
-`v` at all.
+below, `w` on side walls left and right), so a wide pond has no friction on
+`w` at all.
 
 **Volume second, with `uⁿ⁺¹`.** The flux that moves mass is the velocity the
 pressure step has just acted on, so the EOS on the next substep sees the volume

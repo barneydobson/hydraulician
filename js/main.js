@@ -4420,7 +4420,7 @@ function boot() {
   if (exId && !EX.pick(exId, q.get("tab") ? { tab: q.get("tab") } : undefined)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
   // Embedded, the brief lives on the page around the frame; the card starts
-  // folded to its tab so the water keeps the width (spec §1.1).
+  // folded to its tab so the water keeps the width (docs/design/2026-09-10-embed-design.md §1).
   if (EMBED && exId) EX.ready.then(() => DOCK.fold(true));
   // A `#rig=` link carries its own base scene, so it wins over `?scene=` —
   // but `?scene=` is loaded first anyway, so a link that fails to decode

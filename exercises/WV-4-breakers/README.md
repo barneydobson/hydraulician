@@ -103,11 +103,14 @@ after 12 s from still water:
 **Spilling and surging work; plunging does not, and that is the solver, not
 the slider.** In the plunging band (tanβ ≈ 0.1–0.5) the front goes vertical
 and collapses onto the beach. It never throws a tongue forward over an air
-pocket. This is the limit the engineering notes record ("Plunging breakers
-are out of reach"): an overturning tongue is thinner than the interface can
-hold, and the voids carry no pressure, so nothing holds an air tube open.
-Going from Medium to High resolution did not change it on the earlier
-version of this flume. Say so to the class: what they see in the middle band
+pocket. The engineering notes ("Plunging breakers are out of reach — and
+resolution is not the reason", re-diagnosed 2026-10-17) record why: the
+mixing-length closure puts an eddy viscosity of ~10⁻³ m²/s through the crest
+(independent of the grid, so refining does not help), and the stress-free
+treatment above the surface makes a fast surface layer that, with the
+closure off, breaks into cell-sized curls rather than a tongue. It is a
+property of the open-channel closure this solver is tuned for, not of the
+missing air pressure and not of resolution. Say so to the class: what they see in the middle band
 is closest to the *collapsing* breaker of the classification, the transition
 between plunging and surging — the card says "collapses rather than curling
 over". A larger stroke (H/h → 0.6) only makes the wave break as a bore before

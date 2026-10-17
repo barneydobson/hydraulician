@@ -2615,7 +2615,7 @@ const SCENES = (() => {
                "Iribarren ξ = tanβ/√(H₀/L₀): spilling below about 0.5, plunging 0.5–3.3, surging above 3.3.",
                "Gentle beach: the wave shoals, steepens, and its crest crumbles down the front — spilling, a long surf zone.",
                "Steep beach: the front never steepens enough to break; it surges up the slope and slides back, and much of the wave reflects.",
-               "A real plunging breaker throws a tongue of water over a trapped air tube. That tongue is thinner than this model's interface, so here the front collapses instead of curling."] };
+               "A real plunging breaker throws a tongue of water over a trapped air tube. This model's turbulence closure damps the crest too much for that, so here the front collapses instead of curling."] };
     })(),
 
     // ------------------------------------------- WV-5 · GROUP VELOCITY

@@ -616,6 +616,15 @@ const EX = (() => {
     return typeof EXERCISE_MENU !== "undefined" && !!EXERCISE_MENU &&
            EXERCISE_MENU.compact === true;
   }
+  /** COLLAPSIBLE SECTIONS, a deployment switch: `collapsible: true` in
+   *  EXERCISE_MENU. Only the section headings show, each with its count; a
+   *  click opens that section and closes the others. The section holding the
+   *  exercise on screen opens by itself, and a filter opens every section
+   *  with a match, so typing still finds things at once. */
+  let openSec = null;
+  function collapsible() {
+    return !!course() && EXERCISE_MENU.collapsible === true;
+  }
   function describe(e) {
     return e.aim ? e.aim : (e.start ? e.start + "  ·  " : "") +
       "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
@@ -686,6 +695,9 @@ const EX = (() => {
   /** The foot of the menu: switch between the course and the whole register. */
   function scopeLink() {
     if (typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU) return null;
+    // `showAllLink: false` keeps the register out of a course's menu (the
+    // URL `?menu=all` still reaches it, for the maintainer).
+    if (EXERCISE_MENU.showAllLink === false && !showAll) return null;
     const a = document.createElement("button");
     a.type = "button"; a.className = "smscope";
     a.textContent = showAll
@@ -734,10 +746,25 @@ const EX = (() => {
       const s0 = scopeLink(); if (s0) m.appendChild(s0);
       return;
     }
+    const fold = collapsible() && !filter.trim();
+    if (fold && openSec === null) {
+      const mine = groups.find(([, l]) => cur && l.some((e) => e.id === cur.id));
+      openSec = mine ? mine[0] : "";
+    }
     groups.forEach(([g, list]) => {
       const h = document.createElement("div");
-      h.className = "smg"; h.textContent = g;
+      h.className = "smg";
+      const open = !fold || openSec === g;
+      if (fold) {
+        h.classList.add("fold");
+        h.textContent = (open ? "▾ " : "▸ ") + g;
+        const n = document.createElement("i"); n.textContent = " " + list.length;
+        h.appendChild(n);
+        h.setAttribute("role", "button");
+        h.onclick = (ev) => { ev.stopPropagation(); openSec = open ? "" : g; hi = -1; render(); place(); };
+      } else h.textContent = g;
       m.appendChild(h);
+      if (!open) return;
       list.forEach((e) => {
         const on = !!(cur && cur.id === e.id);
         const b = document.createElement("button");
@@ -831,7 +858,7 @@ const EX = (() => {
   function open(a) {
     PICKER.close();
     anchor = a || document.getElementById("exBtn");
-    pending = null; hi = -1;
+    pending = null; hi = -1; openSec = null;   // reopen on the current exercise's section
     render();
     menu().classList.add("open");
     place();

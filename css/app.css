@@ -940,3 +940,8 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   color: inherit; font-size: 11.5px; opacity: .6; cursor: pointer;
 }
 .gmenu .smscope:hover { opacity: 1; }
+
+/* Collapsible course sections (EXERCISE_MENU.collapsible). */
+.gmenu .smg.fold { cursor: pointer; user-select: none; }
+.gmenu .smg.fold:hover { opacity: 1; color: #fff; }
+.gmenu .smg.fold i { opacity: .5; font-style: normal; }

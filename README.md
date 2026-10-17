@@ -176,7 +176,11 @@ Each is an object with an `id` (that is the `?ex=` id), `title`, `topic`,
 that turns the student's last digit into a personalised parameter, `task`,
 `submit`, `settle` and `notes`. `HJ-1` is a good template. Then write the
 brief in `exercises/<folder>/README.md` and add the row to `exercises/INDEX.md`
-— the id must match in all three. Once the exercise has been checked, it also
+— the id must match in all three. A course can instead keep its own
+exercises in its folder: cards in `courses/<id>/exercises.js`
+(`COURSES.exercises(id, [...])`), briefs in `courses/<id>/exercises/<folder>/`
+and rows in `courses/<id>/INDEX.md` (see
+[docs/making-exercises.md](docs/making-exercises.md), "Courses"). Once the exercise has been checked, it also
 earns a row on the [syllabus](docs/syllabus.md) under its topic.
 
 **Testing headless.** `exercises/_runner/runner.py` (stdlib only) drives a

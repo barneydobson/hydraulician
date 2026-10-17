@@ -197,7 +197,8 @@ const PICKER = (() => {
 })();
 
 // ------------------------------------------------------- exercise picker
-/** The teaching pack, in the UI. Forty demos live in `exercises/`, and each
+/** The teaching pack, in the UI. Forty demos live in `exercises/` (a
+ *  course's own cards in `courses/<id>/exercises/`), and each
  *  one is a scene PLUS a set of panel settings PLUS (often) a drawn rig, so
  *  far described only in prose in its README. In a lecture hall that is
  *  unusable: this turns "HJ-1" into a set-up simulation and a card telling you
@@ -237,6 +238,13 @@ const EX = (() => {
   // ------------------------------------------------------------ the data
   function all() {
     return (typeof EXERCISES !== "undefined" && Array.isArray(EXERCISES)) ? EXERCISES : [];
+  }
+  /** The folder holding an entry's brief, relative to the page:
+   *  `exercises/<folder>` for the shared register, `courses/<id>/exercises/
+   *  <folder>` for a card a course owns (COURSES.exercises stamps its `home`;
+   *  a tab's view copies it from the entry). */
+  function briefDir(e) {
+    return (e.home || "exercises") + "/" + e.folder;
   }
   /** An exercise by id. A plain id returns the register entry itself; a TAB
    *  reference — "CR-1#forces", or a tab's `alias` such as "MM-2" — returns
@@ -942,7 +950,7 @@ const EX = (() => {
         b.className = "smi" + (on ? " on" : "");
         b.dataset.id = e.ref || e.id;
         b.setAttribute("role", "menuitem");
-        b.title = "exercises/" + e.folder + "/README.md";
+        b.title = briefDir(e) + "/README.md";
         if (needsRig(e)) {
           const t = document.createElement("span");
           t.className = "rigtag";
@@ -1221,7 +1229,7 @@ const EX = (() => {
       const a = box.querySelector(".exlink");
       // On the Pages build Jekyll renders README.md as the folder's page and
       // does not serve the raw .md; everywhere else the file itself is right.
-      const brief = "exercises/" + cur.folder +
+      const brief = briefDir(cur) +
         (/\.github\.io$/i.test(location.hostname) ? "/" : "/README.md");
       a.href = brief;
       a.textContent = "Lecturer notes";

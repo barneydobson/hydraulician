@@ -30,6 +30,10 @@ and `exercises/_runner/check_pack.py` asserts that the pieces agree.
 | index row | `exercises/INDEX.md` | one line of navigation |
 | syllabus row | `docs/syllabus.md` | one row under its topic — id, type badge and a one-liner; **only once the exercise has been checked** |
 
+A course may own its exercises instead: card in `courses/<id>/exercises.js`,
+folder in `courses/<id>/exercises/`, row in `courses/<id>/INDEX.md` — see
+"Courses" under §3. Everything else here applies unchanged.
+
 Worked example throughout: **HS-1**, the dyke with a piezometer
 (`exercises/HS-1-dyke-piezometer/`), a lecturer demo on a scene written for
 it.
@@ -347,7 +351,8 @@ because the piezometer's one level is what piezometric head shows.
 The exercise menu (Exercises / `E`) lists the whole register by `topic`,
 unless a **course** is active. A course is a file `courses/<id>/course.js`
 that registers its menu, loaded by one script tag in `index.html`;
-`?course=<id>` selects it (see "Courses" below):
+`?course=<id>` selects it, as does a course's `hosts` on that hostname (see
+"Courses" below):
 
 ```js
 COURSES.add({ id: "cive40008", title: "CIVE40008 · Year 1",
@@ -382,6 +387,60 @@ painted over with the eraser still counts — it is still in the stroke list).
 
 A card whose only "Yours" rows are `studentParams` (no digit rule) heads
 them "Try it yourself" rather than with the student-number line.
+
+### Courses
+
+A course is a folder, `courses/<id>/`, and everything in it is optional
+except `course.js`:
+
+| file | job |
+|---|---|
+| `course.js` | `COURSES.add({ id, title, sections, hosts? })` — the menu, in lecture order |
+| `exercises.js` | `COURSES.exercises(id, [ …cards ])` — the course's **own** cards, in the card schema of `js/exercises.js` |
+| `exercises/<ID>-<slug>/` | one folder per own card: `README.md` (lecturer notes, same rules as §5), `rig.js`, thumbnails |
+| `INDEX.md` | one row per own card, in the shared INDEX's column layout |
+
+`index.html` loads each course with one tag per file, after `js/courses.js`:
+
+```html
+<script src="courses/cive40008/course.js"></script>
+<script src="courses/cive40008/exercises.js"></script>
+```
+
+**Own cards are still the register.** `COURSES.exercises` appends each card to
+the one `EXERCISES` list, stamped with `course: "<id>"` and
+`home: "courses/<id>/exercises"` (the directory its `folder` sits in), so
+`?ex=<ID>`, `?menu=all`, the whole-register menu and the card's brief link
+reach it exactly as they reach a shared card — the brief link is
+`<home>/<folder>/README.md`, or `<home>/<folder>/` on the Pages build, where
+Jekyll renders the README as the folder's page (`courses/` is not
+underscore-prefixed, so it is published like `exercises/`). **Ids are
+global**: a card whose id or tab alias is already in the register is refused
+with a console warning and `check_pack.py` fails the pack. A course's menu may
+list shared cards (CIVE40008 lists HS-1) beside its own. Scenes stay in
+`js/scenes.js`, shared. Moving a card into a course is `git mv` of its folder,
+its entry from `js/exercises.js` into the course's `exercises.js`, its INDEX
+row into the course's `INDEX.md`, and the brief's relative links one level
+deeper (`../INDEX.md` → `../../INDEX.md` is the course's own index).
+
+**Which course is active**, first match wins: `?course=<id>` (remembered for
+the visit; `?course=none` clears it for the visit, and that is remembered
+too); what the visit remembered; else the course whose `hosts` lists the
+page's hostname. So a lecturer's own deployment opens on their course with no
+parameter — CIVE40008 declares `hosts: ["mvreeuwijk.github.io"]` — while the
+same build on any other host, or from `file://` (empty hostname), behaves as
+before. Hostnames are bare and lower-case (no scheme, port or path); two
+courses may not claim the same one. With a course active the start screen
+and the Exercises menu list only its sections; the register is a
+`showAllLink: true` (menu foot) or `?menu=all` away.
+
+`check_pack.py` gives own cards the same guarantees as shared ones — folder
+and README under `home`, an H1 that matches, a row in the course's
+`INDEX.md`, no orphan rows or folders — and adds the course ones: every
+`course.js` and `exercises.js` is loaded by `index.html`, ids are unique
+across the register and every course, a course's `exercises.js` registers
+only under its own id, `hosts` is well-formed, and every id a menu lists
+exists.
 
 ## 4. The rig payload, when there is one
 

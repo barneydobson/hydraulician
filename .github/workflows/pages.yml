@@ -38,7 +38,7 @@ jobs:
       # Renders every .md into a themed page (jekyll-theme-primer, see
       # _config.yml) and copies everything else — the app included — verbatim.
       # README.md serves as its folder's index, so an exercise brief lives at
-      # .../exercises/<folder>/.
+      # .../exercises/<folder>/ (a course's own: .../courses/<id>/exercises/<folder>/).
       - uses: actions/jekyll-build-pages@v1
         with:
           source: .

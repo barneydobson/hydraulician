@@ -12,7 +12,7 @@ q₂ = q(1 − cos θ)/2 sent back up it. L6, momentum in 2D (slides 20–21).
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **MM-1**, or use the direct link
 [`?ex=MM-1`](https://barneydobson.github.io/hydraulician/?ex=MM-1).
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory
 

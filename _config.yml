@@ -1,6 +1,8 @@
 # GitHub Pages (see .github/workflows/pages.yml) runs Jekyll over the repo so
 # every markdown brief renders as a themed web page — an exercise README is
-# readable at its folder's URL, e.g. /exercises/HP-1-penstock-power/.
+# readable at its folder's URL, e.g. /exercises/HP-1-penstock-power/, and a
+# course's own at /courses/<id>/exercises/<folder>/ (courses/ is published:
+# it is not underscore-prefixed).
 #
 # The app is untouched by this: index.html, js/ and css/ carry no front matter,
 # so Jekyll copies them through verbatim — keep them that way. Directories that

@@ -2625,7 +2625,7 @@ const SCENES = (() => {
     // per press of the strip's Wave train button or V (wave.train = 6
     // periods with 1.5-period cosine ramps); the paddle stands still
     // otherwise. Measured on the card's grid (Medium, 960 × 99, Δx = 10.4 mm;
-    // the tables are in exercises/WV-5-group-velocity/README.md):
+    // the tables are in courses/cive40008/exercises/WV-5-group-velocity/README.md):
     // c_g/c_p = 0.53 against linear theory's 0.53.
     //
     // THE NUMBERS ARE SET BY THE GRID, not by taste. A deep-water wave loses

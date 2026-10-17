@@ -753,39 +753,36 @@ const EX = (() => {
   const menu = () => (el || (el = document.getElementById("exmenu")));
   const isOpen = () => !!(el && el.classList.contains("open"));
 
-  /** The course menu, if this deployment ships one (js/menu.js, optional):
-   *  `const EXERCISE_MENU = { title, sections: [{ title, ids: [...] }], briefLink }`
-   *  (`briefLink: false` hides the card's link to the brief; `scenes: false`
-   *  hides the scene menu's entry points — the strip's Scenes button, the
-   *  start screen's Scenes door and the S key — and makes the title chip open
-   *  this menu instead, for a course whose students need only the exercises;
-   *  `?scene=` links still boot, and Controls → Scene stays as the escape
-   *  hatch. See scenesOffered() in main.js.)
-   *  It only chooses what the MENU lists and in what order — every exercise
-   *  in the register still boots from `?ex=`, and `?menu=all` (or the link at
-   *  the foot of the menu) lists the whole register by topic as before. Ids
-   *  the register does not have are skipped, so a menu can name an exercise
-   *  before it lands. */
+  /** The course menu, if one is active (see COURSES / `?course=` in
+   *  js/courses.js): `{ id, title, sections: [{ title, ids: [...] }] }` plus
+   *  optional switches, all defaulting to the student-facing behaviour:
+   *  `compact: false` (old long rows), `collapsible: false` (all sections
+   *  open), `showAllLink: true` (link to the whole register), `briefLink:
+   *  true` (the card's link to the brief). It only chooses what the MENU
+   *  lists and in what order — every exercise in the register still boots
+   *  from `?ex=`, and `?menu=all` lists the whole register by topic. Ids the
+   *  register does not have are skipped, so a menu can name an exercise
+   *  before it lands. (The Scenes button is not a menu matter: it hides while
+   *  an exercise is on screen — see scenesOffered() in main.js.) */
   let showAll = /[?&]menu=all\b/.test(location.search);
-  /** COMPACT MENU, a deployment switch: `compact: true` in EXERCISE_MENU.
-   *  Each item is then one line, id and title; its description (the `aim`,
-   *  or the start · ?scene · settle line for an entry without one) moves to
-   *  a small floating box beside the item, shown on hover and for the
-   *  keyboard-highlighted item. Off by default, so a deployment with no
-   *  js/menu.js, or one that does not set the flag, sees the menu as before.
-   *  The flag holds in both scopes (the course and "show all"). */
+  /** COMPACT MENU (default): each item is one line, id and title; its
+   *  description (the `aim`, or the start · ?scene · settle line for an entry
+   *  without one) is a small floating box beside the item, shown on hover and
+   *  for the keyboard-highlighted item. `compact: false` brings back the long
+   *  rows. */
   function compact() {
-    return typeof EXERCISE_MENU !== "undefined" && !!EXERCISE_MENU &&
-           EXERCISE_MENU.compact === true;
+    // On by default; a deployment may ask for the old long rows (compact: false).
+    return !((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.compact === false);
   }
-  /** COLLAPSIBLE SECTIONS, a deployment switch: `collapsible: true` in
-   *  EXERCISE_MENU. Only the section headings show, each with its count; a
-   *  click opens that section and closes the others. The section holding the
-   *  exercise on screen opens by itself, and a filter opens every section
-   *  with a match, so typing still finds things at once. */
+  /** COLLAPSIBLE SECTIONS (default; `collapsible: false` opens them all).
+   *  Only the section headings show, each with its count; a click opens that
+   *  section and closes the others. The section holding the exercise on
+   *  screen opens by itself, and a filter opens every section with a match,
+   *  so typing still finds things at once. */
   let openSec = null;
   function collapsible() {
-    return !!course() && EXERCISE_MENU.collapsible === true;
+    // On by default, for a course menu and for the register by topic alike.
+    return !((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.collapsible === false);
   }
   function describe(e) {
     return e.aim ? e.aim : (e.start ? e.start + "  ·  " : "") +
@@ -867,9 +864,9 @@ const EX = (() => {
   /** The foot of the menu: switch between the course and the whole register. */
   function scopeLink() {
     if (typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU) return null;
-    // `showAllLink: false` keeps the register out of a course's menu (the
-    // URL `?menu=all` still reaches it, for the maintainer).
-    if (EXERCISE_MENU.showAllLink === false && !showAll) return null;
+    // The register stays out of a course's menu unless it asks for the link
+    // (`showAllLink: true`); `?menu=all` still reaches it, for the maintainer.
+    if (EXERCISE_MENU.showAllLink !== true && !showAll) return null;
     const a = document.createElement("button");
     a.type = "button"; a.className = "smscope";
     a.textContent = showAll
@@ -1229,10 +1226,9 @@ const EX = (() => {
       a.href = brief;
       a.textContent = "Lecturer notes";
       a.title = brief;
-      // A course whose students read the card can drop the link to the brief
-      // (`briefLink: false` in js/menu.js); without a course menu it stays.
-      a.style.display = (typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU &&
-                         EXERCISE_MENU.briefLink === false) ? "none" : "";
+      // Students read the card; the brief is the lecturer's. The link to it
+      // shows only when a deployment asks for it (`briefLink: true`).
+      a.style.display = ((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.briefLink === true) ? "" : "none";
       tick();
     }
     /** The "Yours" block: the printed rule, and beside it the control the

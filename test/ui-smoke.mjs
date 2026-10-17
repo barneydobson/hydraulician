@@ -126,7 +126,9 @@ async function main() {
           rightField:+right.value,leftSlider:+sliders[0].value,types:sliders.map(s=>s.type),
           selfContained:! /readme|see the brief/i.test([card.start,card.task,...card.setup].join(' ')),
           rule:card.digit.base===6.75 && card.digit.step===0.25 && card.digit.also[0].base===3.75,
-          lecturerLink:document.querySelector('#dock .exlink').textContent};
+          lecturerLink:document.querySelector('#dock .exlink').textContent,
+          linkShown:getComputedStyle(document.querySelector('#dock .exlink')).display!=='none',
+          scenesOnCard:!!document.getElementById('sceneBtn')};
       `);
       eq("both Geometry controls are sliders",r.types.join(','),'range,range');
       eq("card fields use the scene's own bounds",r.bounds.join(','),'6,9,0.25,3,6,0.25');
@@ -139,6 +141,8 @@ async function main() {
       check("student instructions stand alone",r.selfContained);
       check("both student-number rules are declared",r.rule);
       eq("README link identifies its lecturer audience",r.lecturerLink,'Lecturer notes');
+      check("the brief link is hidden unless a deployment asks for it",!r.linkShown);
+      check("no Scenes button while an exercise is on screen",!r.scenesOnCard);
       check("no uncaught errors",tab.errors.length===0,tab.errors[0]);
       await tab.close();
     }
@@ -151,7 +155,7 @@ async function main() {
       check("start screen is up", p.startOpen);
       // What the start screen lists is the exercise menu: the course menu when
       // this deployment ships one (js/menu.js), otherwise the whole register.
-      eq("the menu's exercises are listed", p.startItems, await tab.evaluate("return APP.EX.listed().length;"));
+      eq("the menu's exercises are listed", p.startItems, await tab.evaluate("return APP.EX.groupsFor('').reduce((n, g) => n + g[1].length, 0);"));
       check("the pack does not overflow sideways", !p.startSideways);
       check("every strip button has an icon", p.emptyIcons === 0, p.emptyIcons + " empty");
       check("every strip button is labelled", p.unlabelled === 0, p.unlabelled + " bare");
@@ -887,20 +891,8 @@ async function main() {
         const v1 = !!document.getElementById("valveBtn");
         APP.SIM.undoSeg(); APP.frames(1);
         const v2 = !!document.getElementById("valveBtn");
-        // A course menu with scenes: false takes the Scenes button away.
-        const had = typeof EXERCISE_MENU !== "undefined";
-        let s1 = null, s2 = null;
-        if (had) {
-          const keep = EXERCISE_MENU.scenes;
-          EXERCISE_MENU.scenes = false; APP.UIMODE.reset();
-          s1 = !!document.getElementById("sceneBtn");
-          // "Without it" means the switch absent, whatever this deployment's
-          // own menu says (a fork may ship scenes: false).
-          delete EXERCISE_MENU.scenes; APP.UIMODE.reset();
-          s2 = !!document.getElementById("sceneBtn");
-          if (keep !== undefined) EXERCISE_MENU.scenes = keep;
-          APP.UIMODE.reset();
-        }
+        // No exercise on screen (a ?scene= boot): the Scenes button is offered.
+        const had = true, s1 = !!document.getElementById("sceneBtn"), s2 = null;
         return { nX, afterX, afterRm, wins, armed, keptOnArm, cleared, v0, v1, v2, had, s1, s2,
                  sceneTool: APP.state.scene.id };
       `);
@@ -914,8 +906,7 @@ async function main() {
       eq("a second press on Gauge clears every gauge", r.cleared, 0);
       check("Valves is off the strip until a valve is drawn, and goes with it",
             !r.v0 && r.v1 && !r.v2, JSON.stringify(r));
-      if (r.had) check("scenes: false hides the Scenes button; without it, it is back",
-                       r.s1 === false && r.s2 === true, JSON.stringify(r));
+      check("with no exercise loaded the Scenes button is offered", r.s1 === true, JSON.stringify(r));
       await tab.close();
     }
 

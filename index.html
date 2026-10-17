@@ -167,12 +167,12 @@
      drawing, and the exercise still loads its scene and its settings. -->
 <script src="js/exercises.js"></script>
 <script src="js/exercises-rigs.js"></script>
-<!-- Optional course menu: which exercises the Exercises menu lists, in which
-     order and under which headings. Each deployment keeps its own (or none,
-     and the menu lists the whole register by topic). A missing file costs
-     nothing: a classic script that fails to load just leaves EXERCISE_MENU
-     undefined. -->
-<script src="js/menu.js"></script>
+<!-- Course menus: the registry, then one tag per course folder. ?course=<id>
+     picks one (remembered for the visit); without it the exercise menu lists
+     the whole register by topic. Add a course: a folder under courses/ and
+     one line here. -->
+<script src="js/courses.js"></script>
+<script src="courses/cive40008/course.js"></script>
 <!-- Modules lifted out of main.js. They must load BEFORE it: main.js ends by
      putting PICKER, EX, GINSP and RIG on window.APP, and that runs at parse
      time, so the bindings have to exist by then. Everything pointing the

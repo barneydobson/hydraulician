@@ -342,36 +342,40 @@ Up to L6 the Year 1 cards show **Pressure**, not pressure head (lecturer,
 Oct 2026) — except HS-1, which offers Pressure head and Piezometric head,
 because the piezometer's one level is what piezometric head shows.
 
-### The menu: `aim`, the course menu and `compact`
+### The menu: `aim`, courses, tabs
 
 The exercise menu (Exercises / `E`) lists the whole register by `topic`,
-unless a deployment ships `js/menu.js` with a course menu:
+unless a **course** is active. A course is a file `courses/<id>/course.js`
+that registers its menu, loaded by one script tag in `index.html`;
+`?course=<id>` selects it (see "Courses" below):
 
 ```js
-const EXERCISE_MENU = { title: "…", compact: true,
-                        sections: [{ title: "L2 · Fundamentals", ids: ["FF-1", "UP-1"] }] };
+COURSES.add({ id: "cive40008", title: "CIVE40008 · Year 1",
+  sections: [{ title: "Fundamentals", ids: ["FF-1", "UP-1"] }, …] });
 ```
 
 A menu id may name a **tab**: `"CR-1#forces"` lists that tab under its
-lecture (its own `title` and `aim`) and opens the card on it; choosing another
+section (its own `title` and `aim`) and opens the card on it; choosing another
 tab of the exercise already on the bench switches tabs in place.
 
-Under each title the menu prints the entry's `aim` when it has one, and
-otherwise the `start · ?scene · settles in N s` line. `compact: true` turns
-the menu into one line per item (id and title); the same description then
-appears in a small floating box beside the item on hover, and for the item
-highlighted with the arrow keys. The menu's height is capped to the viewport
-and scrolls inside. Without the flag (or without `js/menu.js`) the menu is
-unchanged. The start screen's list shows id and title only, with the `aim`
-as a hover tooltip.
+The menu is **compact** (one line per item, id and title; the entry's `aim`,
+or for entries without one the `start · ?scene · settles in N s` line, in a
+small floating box beside the item on hover or arrow-key highlight) and
+**collapsible** (section headings only; one opens at a time; the current
+exercise's section opens by itself; a filter opens every section with a
+match). Its height is capped to the viewport. A course may switch these off
+(`compact: false`, `collapsible: false`), offer a link to the whole register
+(`showAllLink: true`) or show the card's link to the brief (`briefLink:
+true`); by default neither link shows. The start screen's list shows id and
+title, with the `aim` as a hover tooltip.
 
-`scenes: false` in the same object removes the scene menu's entry points —
-the strip's Scenes button, the start screen's Scenes door and the S key —
-and makes the title chip at the top right open the exercise menu instead,
-for a course whose students need only the exercises. `?scene=` links still
-boot, and Controls → Scene stays as the escape hatch. Absent, the scenes
-stay. (That chip names the loaded exercise by its title, and the scene only
-when no exercise is loaded.) The strip's **Valves** button likewise appears
+The **Scenes** button and the `S` key are offered only while no exercise is
+on screen (start screen, sandbox, a `?scene=` boot) or after ⋯ (show
+everything): a student working an exercise needs only the exercise menu.
+`?scene=` links always boot. The title chip names the loaded exercise by its
+title, and the scene only when no exercise is loaded.
+
+The strip's **Valves** button likewise appears
 only where the bench has a valve — the scene's own, or one drawn — and goes
 when the last drawn one is undone or the drawing cleared (a valve stroke
 painted over with the eraser still counts — it is still in the stroke list).

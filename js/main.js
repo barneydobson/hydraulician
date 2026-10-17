@@ -1801,13 +1801,14 @@ function togglePanel() {
   setPanel(!document.getElementById("panel").classList.contains("open"));
 }
 
-/** Does this deployment offer the scene menu? A course menu (js/menu.js) may
- *  say `scenes: false`: its students reach everything through the exercise
- *  menu, and a second menu of bare geometry beside it only confused them. That
- *  hides the strip's Scenes button and the start screen's Scenes door and
- *  disarms S; `?scene=` links still boot. Absent, the scenes stay (upstream). */
+/** Is the scene menu offered right now? Not while an exercise is on screen:
+ *  its students reach everything through the exercise menu, and a second menu
+ *  of bare geometry beside it only confuses. The strip's ⋯ (show everything)
+ *  brings it back, and with no exercise loaded — the start screen, the
+ *  sandbox, a `?scene=` boot — it is always there. `?scene=` links still boot. */
 function scenesOffered() {
-  return typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU || EXERCISE_MENU.scenes !== false;
+  const ex = typeof EX !== "undefined" && EX.current;
+  return !ex || !!(state.ui && state.ui.lifted);
 }
 
 /** Is there a valve on the bench — one the scene declares, or a drawn one
@@ -2365,7 +2366,6 @@ const START = (() => {
     const host = document.getElementById("startside");
     host.textContent = "";
     DOORS.forEach((d) => {
-      if (d.title === "Scenes" && !scenesOffered()) return;   // EXERCISE_MENU.scenes: false
       const b = document.createElement("button");
       b.type = "button";
       b.className = "startcard glass" + (d.cls ? " " + d.cls : "");

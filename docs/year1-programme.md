@@ -50,7 +50,7 @@ Principles:
 | L7–L8 | taught by a colleague; rough ideas at the end |
 | Year 2 preview | WV-4 How waves break on beaches |
 
-The course menu (`js/menu.js`, fork-local) lists exactly these, in this order;
+The course menu (`courses/cive40008/course.js`, opened with `?course=cive40008`) lists exactly these, in this order;
 the contraction rig appears three times, as `"CR-1#streamlines"`,
 `"CR-1#continuity"` and `"CR-1#forces"`, each opening the card on its tab.
 (Until Oct 2026 the three tabs were three exercises, FF-5, VC-1 and MM-2;

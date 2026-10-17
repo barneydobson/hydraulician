@@ -31,6 +31,8 @@ shallow water); this one resolves the depth.
 | `js/rig.js` | `RIG` — rig save / load / share, the wire format and its version gate |
 | `js/exercises.js` | the exercise register the picker reads (machine-readable source of the pack) |
 | `js/exercises-rigs.js` | drawn rigs + applied settings per exercise, as rig-format JSON |
+| `js/courses.js` | `COURSES` — the course-menu registry; `?course=<id>` picks one (remembered for the visit) and exposes it as `EXERCISE_MENU` |
+| `courses/<id>/course.js` | one course menu each (`COURSES.add({id, title, sections})`), loaded by one script tag in `index.html`; `check_pack.py` checks every listed id |
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |

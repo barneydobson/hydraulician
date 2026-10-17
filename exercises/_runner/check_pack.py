@@ -617,6 +617,45 @@ def main():
         if os.path.isdir(p) and not d.startswith("_") and d not in seen_folders:
             fail.append("%-5s exercises/%s/ has no card in js/exercises.js" % ("", d))
 
+    # 8. courses: every courses/<id>/course.js is loaded by index.html, has a
+    # unique id, and lists only exercises (or tabs) the register has.
+    cdir = os.path.join(ROOT, "courses")
+    if os.path.isdir(cdir):
+        html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
+        ids_ok = {e.get("id") for e in ex}
+        tabs_ok = {(e.get("id"), t.get("key")) for e in ex for t in (e.get("tabs") or [])}
+        aliases = {t.get("alias") for e in ex for t in (e.get("tabs") or []) if t.get("alias")}
+        loader = ("const out=[];global.COURSES={add:(c)=>out.push(c)};"
+                  "for(const f of process.argv.slice(1)){eval(require('fs').readFileSync(f,'utf8'));}"
+                  "console.log(JSON.stringify(out));")
+        files = []
+        for d in sorted(os.listdir(cdir)):
+            f = os.path.join(cdir, d, "course.js")
+            if os.path.isfile(f):
+                files.append(f)
+                if ('src="courses/%s/course.js"' % d) not in html:
+                    fail.append("%-5s courses/%s/course.js is not loaded by index.html" % ("", d))
+        if files:
+            proc = subprocess.run(["node", "-e", loader] + files, capture_output=True,
+                                  timeout=30, encoding="utf-8")
+            if proc.returncode != 0:
+                fail.append("courses/*/course.js did not evaluate: " + proc.stderr.strip()[:200])
+            else:
+                seen = set()
+                for c in json.loads(proc.stdout):
+                    cid = c.get("id")
+                    if cid in seen:
+                        fail.append("course %r is registered twice" % cid)
+                    seen.add(cid)
+                    for sec in c.get("sections") or []:
+                        for ref in sec.get("ids") or []:
+                            checked += 1
+                            base, _, tab = ref.partition("#")
+                            if tab and (base, tab) not in tabs_ok:
+                                fail.append("course %s lists %s: no such tab" % (cid, ref))
+                            elif not tab and base not in ids_ok and base not in aliases:
+                                fail.append("course %s lists %s: not in the register" % (cid, ref))
+
     if unverified:
         print("note: no digit ladder found in the recognised table form, so "
               "the base/step rule is UNVERIFIED for: " + ", ".join(unverified))

@@ -2588,6 +2588,9 @@ const SCENES = (() => {
         open: [1, 0, 0, 0],
         // Stroke amplitude 0.14 m: the wall paddle loses nothing to a pocket
         // behind it, so it makes the old piston's 0.18 m wave with less.
+        // A hinged flap (wave.flap, WV-5) was tried here and is not better:
+        // at kd = 0.68 it needs a 0.27 m stroke for the same wave, and H
+        // along the flume and the breakers matched the piston's (README).
         wave: { amp: 0.14, period: 2.0, on: 1, x: 0, d: 0.40 },
         particles: 1, plife: 6,
         spinup: 0,
@@ -2613,6 +2616,58 @@ const SCENES = (() => {
                "Gentle beach: the wave shoals, steepens, and its crest crumbles down the front — spilling, a long surf zone.",
                "Steep beach: the front never steepens enough to break; it surges up the slope and slides back, and much of the wave reflects.",
                "A real plunging breaker throws a tongue of water over a trapped air tube. That tongue is thinner than this model's interface, so here the front collapses instead of curling."] };
+    })(),
+
+    // ------------------------------------------- WV-5 · GROUP VELOCITY
+    // A wave TRAIN in deep water: the group travels at c_g ≈ c_p/2, so crests
+    // are born at its back, run through it and die at its front. A hinged
+    // FLAP at the left wall (wave.flap; SIM.paddle, FS_VEL) fires one train
+    // per press of the strip's Wave train button or V (wave.train = 6
+    // periods with 1.5-period cosine ramps); the paddle stands still
+    // otherwise. Measured on the card's grid (Medium, 960 × 99, Δx = 10.4 mm;
+    // the tables are in exercises/WV-5-group-velocity/README.md):
+    // c_g/c_p = 0.53 against linear theory's 0.53.
+    //
+    // THE NUMBERS ARE SET BY THE GRID, not by taste. A deep-water wave loses
+    // height to the discretisation far faster than WV-4's long wave
+    // (engineering notes, "Surface waves are damped by RESOLUTION"): at
+    // L = 1 m on a 13.7 mm grid it was gone within one wavelength, and a
+    // wave dies quickly once H falls under ~4 cells. So the wave is as long
+    // as a Medium grid holds several of — T = 1.13 s, L ≈ 2 m, 190 cells per
+    // wavelength — and steepish, H ≈ 0.14 m (H/L ≈ 0.07, 13 cells); the
+    // depth 0.80 m is kh = 2.55 (tanh kh = 0.99, deep for every purpose;
+    // c_g/c_p = 0.53 in theory). Even so the group fades from H ≈ 0.14 m at
+    // 1 m to ≈ 0.09 m at 6 m and ≈ 0.04 m at 8 m.
+    //
+    // The far end absorbs: an extra viscosity ramped up over the last 2 m
+    // (outflowNu, FS_VEL) in front of a closed wall. The box is no taller
+    // than the waves need: 0.05 m of bed, 0.80 m of water, 0.18 m of air.
+    (function () {
+      const BED = 0.05, D = 0.80, LEV = BED + D, W = 10.0;
+      return {
+        id: "wavetrain", name: "Wave flume · a wave train in deep water", key: "Group velocity",
+        group: "Jets & waves",
+        blurb: "A hinged flap at the left end of a deep flume makes a short train of waves. Watch one crest: it is born at the back of the group, runs forward through it and dies at its front. The group travels at half the speed of its crests.",
+        // c = 14 as on the beach: H along the flume moved by under 5% between
+        // c = 14 and 16 (gd/c² = 4% at the bed).
+        W, H: LEV + 0.18, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+        mode: 0, hmax: LEV + 0.1, vmax: 0.5,
+        open: [1, 0, 0, 0],
+        outflowNu: 0.06, outflowLen: 2.0,
+        // amp is the flap's stroke amplitude at the still-water level. Biésel
+        // gives H/S = 1.24 at kh = 2.55, so 0.095 m is H ≈ 0.24 m in linear
+        // theory; the grid delivers 0.16 m half a metre out and 0.14 m at 1 m.
+        wave: { amp: 0.095, period: 1.13, on: 1, x: 0, d: D, flap: 1, hinge: 0, train: 6, ramp: 1.5 },
+        particles: 1, plife: 3,
+        spinup: 0,
+        solids: () => [GEOM.rect(-0.5, -0.5, W + 1, BED,
+          { id: "bed", faces: [{ id: "bed", label: "Flume bed", e0: 2, e1: 2 }] })],
+        water: (x, z, P) => (z > BED ? still(LEV, z, P) : 0),
+        tips: ["Press V (or Wave train on the strip) to send one train down the flume.",
+               "Follow ONE crest: it appears at the back of the group, overtakes the others and fades away at the front.",
+               "Follow the GROUP, where the waves are tallest: it moves at about half the speed of a crest.",
+               "In deep water c_g = c_p/2: the wave energy travels with the group, not with the crests.",
+               "The waves shrink as they go: this grid damps short waves, so the group fades by the far end."] };
     })(),
   ];
 

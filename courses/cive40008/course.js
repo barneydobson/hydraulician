@@ -15,6 +15,6 @@ COURSES.add({
     { title: "Energy conservation",   ids: [] },
     { title: "Pipes",                 ids: [] },
     { title: "Free-surface flows",    ids: [] },
-    { title: "Showcase",              ids: ["WV-4"] },
+    { title: "Showcase",              ids: ["WV-4", "WV-5"] },
   ],
 });

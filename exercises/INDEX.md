@@ -98,6 +98,7 @@ pause-and-read promptly (the chart buffer keeps moving).
 | MM-1 | The force of a jet on an inclined plate | MM-1-jet-inclined-plate/ | vane, plate angle slider | — (students play; class demo) |
 | HJ-2 | Momentum balance: sluice gate and hydraulic jump | HJ-2-gate-jump/ | gatejump, weir crest slider | — (students play; class demo) |
 | WV-4 | How waves break on beaches | WV-4-breakers/ | beach (wall paddle), beach slope slider on the card | — (student-run preview) |
+| WV-5 | Group velocity: waves travel slower than their crests | WV-5-group-velocity/ | wavetrain (hinged flap, one wave train per press of V), period and stroke on the card, two η gauges placed | — (showcase) |
 
 Rigs: RIG-A (pressurised duct) card = FR-1/rig.js · RIG-B (flat channel) card
 = WE-1/rig.js. The historical RIG-C tank family is implemented independently

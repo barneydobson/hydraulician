@@ -122,6 +122,8 @@ uniform float u_slip;    // 0 = no-slip walls, 1 = free-slip
 uniform float u_bulk;    // artificial bulk viscosity (damps pressure waves)
 uniform vec4  u_wave;    // amplitude (m), omega (rad/s), on, piston column
 uniform float u_waveD;   // > 0: a paddle AT THE LEFT WALL over still depth D (m)
+uniform vec2  u_waveU;   // y = 1: the paddle's velocity x comes from the CPU (train envelope / flap); 0 = the plain piston
+uniform vec2  u_flap;    // flap: hinge z, still-water z (m); y > x turns the linear profile on, else a piston
 uniform sampler2D u_Wd;  // wall distance (m) at each cell's SW corner, CPU-built
 uniform sampler2D u_Tc;  // nx×1 open-channel columns: bed z, surface z, on, 0
 uniform float u_kappa;   // mixing-length constant (0 = closure off)
@@ -431,10 +433,30 @@ void main(){
     // the column's live depth, integrates to zero over a cycle, which is
     // what a real paddle's swept volume does.
     // SIM.wallPaddle() decides; u_waveD is 0 for every other piston.
+    //
+    // Opt-in (SIM.paddle, SIM.flapOn): a train envelope hands the paddle's
+    // velocity in from the CPU, and a FLAP hinged at z_h makes it grow
+    // linearly from the hinge, u(z) = U·(z − z_h)/(z₀ − z_h), with U the
+    // velocity at the still-water level z₀. At the wall the flap's volume
+    // flux is its swept rate U·[(z₀−z_h)² − (z_b−z_h)²]/2(z₀−z_h), held over
+    // the live depth the same way the piston's is.
+    bool flap = u_flap.y > u_flap.x;
+    if (u_waveU.y > 0.5) un = u_waveU.x;
+    float shp = flap ? max(pu.y - u_flap.x, 0.0) / (u_flap.y - u_flap.x) : 1.0;
     if (u_waveD > 0.0 && i == 1) {
       paddle = true;
       vec4 Tc1 = texelFetch(u_Tc, ivec2(1, 0), 0);
-      un *= u_waveD / max(Tc1.g - Tc1.r, 0.5 * u_waveD);
+      if (flap) {
+        float eta = max(Tc1.g, Tc1.r + 0.5 * u_waveD);
+        float b2 = (Tc1.r - u_flap.x) * (Tc1.r - u_flap.x);
+        float sw = (u_flap.y - u_flap.x) * (u_flap.y - u_flap.x) - b2;
+        float lv = (eta - u_flap.x) * (eta - u_flap.x) - b2;
+        un *= shp * sw / max(lv, 1e-6);
+      } else {
+        un *= u_waveD / max(Tc1.g - Tc1.r, 0.5 * u_waveD);
+      }
+    } else if (flap) {
+      un *= shp;
     }
   }
 

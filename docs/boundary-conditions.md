@@ -349,7 +349,14 @@ are source terms the averaging balance accounts for, not boundary exchange:
 - **The piston wavemaker** (`u_wave`): at its column, in wet cells, the vel
   pass prescribes `u = a\,\omega\cos(\omega t)`. It is a paddle standing in
   the water, not an edge condition — the wave scenes run with all four edges
-  closed.
+  closed. At the LEFT WALL (`wave.x = 0`, left edge open, `wave.d` the still
+  depth; `SIM.wallPaddle()`) it becomes the wall paddle of WV-4 and WV-5: the
+  open edge's ghost feeds the face and the paddle's volume flux is imposed
+  over the live depth. Two opt-in keys shape it (engineering notes, "Two
+  wavemakers"): `wave.flap` makes the velocity grow linearly from a hinge on
+  (or `wave.hinge` below) the bed, and `wave.train` fires one ramped train of
+  N periods per `SIM.fireTrain()` (V) — the paddle is a still wall between
+  trains.
 
 ## 8. Who owns an edge
 
@@ -401,6 +408,9 @@ Where each piece of the above enters the GPU passes; all are set in
 | `u_Tc` (texture) | per column: bed, surface, open-channel flag (`FS_TCOL`) | vel mixing length, surface extension |
 | `u_kappa` | von Kármán's κ (0 = closure off) | vel mixing length |
 | `u_wave` | amplitude, ω, on, piston column | vel wavemaker |
+| `u_waveD` | the wall paddle's still depth (0 = not at the wall) | vel wavemaker |
+| `u_waveU` | the paddle's velocity from `SIM.paddle` (train envelope / flap), on | vel wavemaker |
+| `u_flap` | the flap's hinge z and still-water z (y ≤ x = piston) | vel wavemaker |
 | `u_src0`, `u_src1`, `u_sv0`, `u_sv1` | point sources: position, radius, on; velocity + dye | both passes |
 
 <!-- Pages build only: github.com strips this tag and renders the math fences

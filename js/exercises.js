@@ -1773,4 +1773,49 @@ const EXERCISES = [
     ],
     settle: 10,
   },
+  // WV-5: a showcase (lecturer, Oct 2026). One wave TRAIN in deep water, so
+  // the group and its crests visibly part company: c_g = c_p/2. The flap
+  // (wave.flap) and the train envelope (wave.train) are the scene's; the
+  // strip's Wave train button and V fire one train. The two sliders are the
+  // Wavemaker panel's own Period and Amplitude rows (waveT, waveA). Two η
+  // gauges arrive placed, 3 m apart, so the class can time the group and a
+  // crest over the same distance. Medium: the deep-water wave needs the
+  // cells (README, "Why these numbers"). The legend opens folded: in its
+  // corner it sat on the surface just where the group runs out of flume.
+  {
+    id: "WV-5",
+    title: "Group velocity: waves travel slower than their crests",
+    aim: "Send a short train of waves down a deep flume and watch the crests run through it: each is born at the back of the group and dies at its front, because the group moves at half their speed.",
+    topic: "Waves",
+    folder: "WV-5-group-velocity",
+    scene: "wavetrain",
+    rig: null,
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { mode: "0", particles: false, gaugeField: "eta" },
+    gauges: [{ x: 2.0, z: 0.5, field: "eta" }, { x: 5.0, z: 0.5, field: "eta" }],
+    studentParams: [
+      { control: "waveT", label: "Wave period", unit: "s" },
+      { control: "waveA", label: "Stroke", unit: "m" },
+    ],
+    instruments: [
+      { tool: "gauge", where: "already placed at x = 2 m and x = 5 m, plotting the level η", why: "the tallest waves of the group pass the second gauge about 3 s after the first; one crest covers the same 3 m in about 1.6 s" },
+    ],
+    ui: { view: ["legendBtn", "partBtn", "readBtn", "hoverBtn"], fields: ["water", "speed"],
+          panel: "shut", legend: false, controls: ["speed", "waveT", "waveA"], gaugeFields: ["eta"],
+          readouts: { rows: ["pos", "eta", "uw"] } },
+    steps: [
+      "Press {btn:trainBtn} (or {key:V}): the flap at the left end rocks six times — gently up, steady, gently down — and stops.",
+      "Follow ONE crest: it appears at the back of the group, runs forward through it and fades away at the front.",
+      "Now follow the GROUP, where the waves are tallest: it moves at about half the speed of a crest.",
+      "Time both on the two {tool:gauge}s, 3 m apart: when do the tallest waves pass each one? How long does one crest take?",
+      "Change the Wave period and fire again. Pick Speed in {btn:legendBtn}: the water moves only under the group.",
+    ],
+    background: [
+      "The flume holds 0.80 m of still water; the flap is hinged on the bed and swings most at the surface, as the water does in a deep-water wave. Each train is six waves of period 1.13 s, about 2 m long.",
+      "A crest moves at the phase speed c_p = L/T. In deep water (depth more than about half a wavelength) c_p = gT/2π, about 1.8 m/s here, and the group moves at the group velocity c_g = c_p/2, about 0.9 m/s.",
+      "The wave energy travels with the group, not with the crests: a crest that runs ahead of the group has nothing to carry it and dies away.",
+      "The waves shrink as they travel: the grid damps short waves, so the group fades towards the far end, where the flume absorbs what is left.",
+    ],
+    settle: 0,
+  },
 ];

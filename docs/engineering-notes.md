@@ -720,11 +720,61 @@ itself ~2 cells thick. Consequences:
   deep flume's train arrives at 0.04–0.07 m in its far half against 0.05–0.07
   (a strain-based `ν_t` took it to one cell — no wave — by x = 3 m). The
   stress-free surface itself did not make waves last longer.
-- **Plunging breakers are out of reach.** The Iribarren number on the 1 : 3.4
-  beach is ξ ≈ 1.3, squarely in the plunging band, so the *conditions* are
-  right — but an overturning tongue is thinner than the interface can hold.
-  Measured trapped air under the crest never exceeds 7 mm, i.e. half a cell:
-  the breaks are spilling, and no parameter set changes that.
+- **Plunging breakers are out of reach — and resolution is not the reason.**
+  The conditions can be right (ξ ≈ 0.9–1.8 on WV-4's beach; the 1 : 3.4 beach
+  was ξ ≈ 1.3), and overturning needs no air pressure: it is kinematic. What
+  stops it was measured on the textbook plunger, a solitary wave of
+  H/h = 0.45 on a 1 : 15 slope (h = 0.25 m, the beach scene's c 14, C_f 0.01,
+  C_s 0.08, bulk 0.03, c_α 0.8), at five resolutions and with one switch at a
+  time at Ultra (Δx = 2.4 mm, 105 cells of depth, 47 of wave height).
+  Overturning is scored off the fill field as water standing over air in the
+  same column ("overhang": horizontal span, trapped-air area, gap height).
+  - *Resolution alone does nothing.* h/Δx = 27, 39, 53, 74, 105: the largest
+    overhang is 9, 6, 5, 3, 2 mm across (≤ 90 mm² of air, gaps ≤ 13 mm),
+    i.e. a cell or two: the crest frays at its top and the front stands at
+    55–60° and then runs up the beach as a bore.
+  - *The mixing length is the damper.* Measured under the crest, `ν_t` is
+    0.8–1.0 × 10⁻³ m²/s through the body of the wave and up to 4 × 10⁻³ near
+    the top, the same at every resolution (it is `κy`, a physical length) —
+    a thousand times water's, a crest Reynolds number of ~100. With
+    `kappa: 0` the crest overturns at every resolution (span 26–33 mm, gaps
+    to 24 mm, trapped air to 540 mm² at Ultra) — but as cell-sized curls,
+    not a tongue, and it starts at h ≈ 0.18 m, metres before a real wave of
+    this height breaks: the closure was hiding grid-scale surface noise, not
+    a physical breaker. (The WV-5 deep-water train saw the same: `kappa: 0`
+    takes a short wave a little further and fills the flume with noise.)
+    `C_s` = 0.16 or 0.3 on top of `kappa: 0` does not clean it up.
+  - *The near-surface layer runs too fast, and the void treatment sets it.*
+    Under the crest on the flat bed, u is 0.46 m/s at the bed (theory: about
+    the same) and 0.99 m/s in the top cells (1.16 with `kappa: 0`) against
+    ~0.6 from solitary-wave theory. Without the stress-free extension the
+    void is a sink instead (0.32 m/s at the surface; the front never passes
+    32°); an extension that copies u up with `∂u/∂z = ∂w/∂x` (zero vorticity
+    at the corner) brings the top to 0.55–0.59 m/s but the wave then fails
+    to steepen at all (front ≤ 61°, no overhang). `∂u/∂z = 0` is a channel's
+    stress-free condition, not a wave's, and every variant tried leaves the
+    surface layer's speed to the void rather than to the dynamics. The face
+    on top of every part-full cell also free-falls: it reads w ≈ −0.26 m/s
+    over a still pond.
+  - *The crest does not shoal.* A small solitary wave (H/h = 0.2) keeps its
+    crest elevation to the millimetre from h = 0.24 m to 0.07 m, where Green's
+    law asks for +36%; the H/h = 0.45 wave stays within 0.40–0.43 m in every
+    run. A plunger is the crest outrunning a wave that has grown; this one
+    never grows. Cause not isolated.
+  - *No effect* (overhang, front angle and crest speed within the
+    run-to-run scatter): bulk viscosity 0, `C_s` 0, `C_f` 0, c 14 → 28, the
+    void bleed off or ×10, gravity without the 5% fade, the transport cap off,
+    a superbee limiter, `c_α` 0. Worse: `c_α` 2 (front ≤ 61°) and first-order
+    advection of either f or u.
+
+  So the old wording here ("thinner than the interface can hold … no
+  parameter set changes that") was wrong on both counts: the tongue is
+  stopped by the closure and the surface treatment, not by Δx, and one
+  parameter (`kappa`) does change it — into noise. Do not build a demo that
+  needs a plunging tongue; the nearest honest picture is WV-4's collapsing
+  front. The scratch harness behind these numbers (a solitary-wave scene,
+  shader switches, the overhang metric) is described in the plunge-diag
+  branch's commit message.
 
 **Two wavemakers.** The `wave` piston is a column of prescribed `u` at
 `wave.x`, with water on both sides: the pocket behind it rises and falls in

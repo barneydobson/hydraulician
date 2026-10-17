@@ -780,15 +780,15 @@ async function main() {
             .filter((e) => e.style.display !== "none").map((e) => e.value + ":" +
               [...e.options].map((o) => o.value).join("|"));
           const panelOpts = [...document.querySelectorAll("#c_gaugeField option")].map((o) => o.value).join(",");
-          const n0 = G[0].log.length;
+          const n0 = G[0].log.length, hover0 = APP.state.hoverCard;
           document.getElementById("readBtn").click();
           APP.frames(10);
-          const hidden = { inst: APP.state.instReadouts, hover: APP.state.hoverCard,
+          const hidden = { inst: APP.state.instReadouts, hover: APP.state.hoverCard, hover0,
                            recorded: G[0].log.length - n0,
                            sels: [...document.querySelectorAll(".gcardSel")].filter((e) => e.style.display !== "none").length };
           document.getElementById("readBtn").click();
           document.getElementById("hoverBtn").click();
-          const hov = { inst: APP.state.instReadouts, hover: APP.state.hoverCard };
+          const hov = { inst: APP.state.instReadouts, hover: APP.state.hoverCard, hover0 };
           const hj = { energyHidden: APP.UIMODE.hides("energy"), title: document.getElementById("sceneName").textContent };
           return { startOn, keys, hdr, sels, panelOpts, hidden, hov, hj };
         });
@@ -801,9 +801,9 @@ async function main() {
          r.sels.join(" "), "speed:u|speed|eta|d d:u|speed|eta|d");
       eq("Gauges plot offers the card's quantities only", r.panelOpts, "u,speed,eta,d");
       check("Readouts off hides the boxes, keeps recording, leaves the hover card",
-            r.hidden.inst === false && r.hidden.recorded > 0 && r.hidden.sels === 0 && r.hidden.hover === true,
+            r.hidden.inst === false && r.hidden.recorded > 0 && r.hidden.sels === 0 && r.hidden.hover === r.hidden.hover0,
             JSON.stringify(r.hidden));
-      check("Hover readout switches on its own", r.hov.inst === true && r.hov.hover === false,
+      check("Hover readout switches on its own", r.hov.inst === true && r.hov.hover === !r.hov.hover0,
             JSON.stringify(r.hov));
       check("a Year 1 card withholds the energy terms", r.hj.energyHidden);
       eq("the strip names the exercise, not its scene", r.hj.title, "Momentum balance: sluice gate and hydraulic jump");

@@ -152,6 +152,13 @@
  * student to the README for an equation, a procedure or what to record.
  * Derivations, worked answers and verification remain in lecturer notes.
  *
+ * `tips` (optional, on an entry or a tab): the card's own lines for the tips
+ * strip at the foot of the screen, replacing its scene's `tips` while the
+ * card is on screen — plain text with the inline markup ({tool:…}, {btn:…},
+ * {key:…}), in the vocabulary of the lecture the card belongs to. Without
+ * it the scene's tips show, as before (docs/making-exercises.md, "The tips
+ * line").
+ *
  * Standing rules every worksheet carries: Resolution Medium · wait out the
  * settle · median-of-the-wobble reads, never one frame · after changing q,
  * re-check any tailwater ≥ 1.3·d_c · keep the tab visible.

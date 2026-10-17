@@ -30,8 +30,10 @@ courses/<id>/exercises/<folder>/ and courses/<id>/INDEX.md):
      each tab's VIEW (the entry with the tab merged over it, as EX.view does
      in js/pickers.js), reported as "CR-1#forces"
  10. the short card layout: `steps` holds at most five, and the inline
-     markup in steps / background / setup — {tool:id}, {btn:id}, {key:K} —
-     names a tool or strip button that exists
+     markup in steps / background / setup / tips — {tool:id}, {btn:id},
+     {key:K} — names a tool or strip button that exists. A card's (or a
+     tab's) own `tips`, the lines that replace its scene's tips at the foot
+     of the screen, must be a non-empty list of non-empty strings
   8. a digit rule (or studentParams entry) on a Geometry row -- `geomN` --
      names a param its scene actually declares at index N. The panel binds
      those rows BY INDEX, so a reordered `params` list moves a student's
@@ -599,7 +601,15 @@ def main():
             elif len(steps) > 5:
                 fail.append("%-5s has %d steps; the short layout holds at most 5 -- move the rest "
                             "into `background`" % (i, len(steps)))
-        texts = (v.get("steps") or []) + paras(v.get("background")) + (v.get("setup") or [])
+        tips = v.get("tips")
+        if tips is not None:
+            checked += 1
+            if (not isinstance(tips, list) or not tips
+                    or not all(isinstance(t, str) and t.strip() for t in tips)):
+                fail.append("%-5s tips must be a non-empty list of non-empty strings" % i)
+                tips = []
+        texts = ((v.get("steps") or []) + paras(v.get("background")) + (v.get("setup") or [])
+                 + (tips or []))
         for txt in texts:
             for kind, ident in MARK.findall(str(txt)):
                 checked += 1

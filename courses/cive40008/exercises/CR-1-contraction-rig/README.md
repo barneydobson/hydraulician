@@ -1,12 +1,12 @@
 # CR-1 · The contraction rig
 
-One scene asked three questions, one per lecture. Two reservoirs held at
+One scene asked four questions, one per lecture. Two reservoirs held at
 fixed levels (2.80 m and 2.40 m) are joined by a 1.00 m pipe that contracts
 into a 0.50 m pipe discharging into the right-hand reservoir. One slider,
 **Contraction length L**, takes the contraction from a long gentle taper
 (L = 3 m) through ever shorter, steeper tapers to an abrupt step (L = 0).
 
-The card has three **tabs**; switching tabs swaps the steps and the
+The card has four **tabs**; switching tabs swaps the steps and the
 interface (fields, strip buttons, tools) and leaves the flow running:
 
 | tab | lecture | the question | was |
@@ -14,12 +14,14 @@ interface (fields, strip buttons, tools) and leaves the flow running:
 | **Streamlines** | L4 Fluid motion | the taper's streamlines follow the walls; the step separates, with a vena contracta | FF-5 |
 | **Continuity** | L5 Mass conservation | Lagrangian and Eulerian; Q₁ = Q₂ and Σ Q = 0 round a control volume, for any shape | VC-1 |
 | **Forces** | L6 Momentum | the force on the contraction from a momentum balance, R = p₁A₁ − p₂A₂ − ρQ(U₂ − U₁); a straight pipe's friction | MM-2 |
+| **Energy** | L7 Energy (the colleague's) | grade lines: the EGL nearly level through a taper, falling past a step and at the outlet; the head loss H₁ − H₂ for each | — |
 
 **Open it:** press **E** in the [app](../../../../)
 and pick **CR-1**, or link straight to a tab:
 [`?ex=CR-1&tab=streamlines`](../../../../?ex=CR-1&tab=streamlines),
 [`&tab=continuity`](../../../../?ex=CR-1&tab=continuity),
-[`&tab=forces`](../../../../?ex=CR-1&tab=forces).
+[`&tab=forces`](../../../../?ex=CR-1&tab=forces),
+[`&tab=energy`](../../../../?ex=CR-1&tab=energy).
 The old links `?ex=FF-5`, `?ex=VC-1` and `?ex=MM-2` still work and open the
 matching tab. A course menu lists a tab as `"CR-1#forces"`.
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
@@ -159,6 +161,48 @@ reads the pressure in kPa.
 
 The level controls concede a few centimetres under draw (2.77 m against
 2.80 m, 2.38 m against 2.40 m), so quote the levels the probe reads.
+
+## Energy (L7)
+
+The colleague's lecture, after Forces: the same flow read for energy. The tab
+opens on the **Energy head** colouring with the grade lines on (EGL = H,
+HGL = h = z + p/ρg) and offers Piezometric head and Speed; the hover card
+reads p/ρg and h; gauges may plot H, h, speed or p; the Control volume's
+energy rows (Ė) and the flux sections' "energy lost" are shown (`hide:
+["critical"]` only).
+
+    H = z + p/ρg + U²/2g          head loss between two sections  H₁ − H₂ = (Ė₁ − Ė₂)/(ρgQ)
+
+Bernoulli holds where the flow contracts smoothly; the loss comes where it
+expands and mixes — past the step's vena contracta, where the jet spreads to
+fill the narrow pipe and the corner eddies dissipate it, and above all at the
+outlet, where the jet's whole velocity head U₂²/2g ≈ 0.38 m is mixed away in
+the right reservoir (the EGL falls to the tailwater there).
+
+Measured at Medium (`?ex=CR-1&tab=forces`, 2026-10-18): each L restarted and
+run 35–40 s, then the mean of 40 samples, two flux sections drawn up across
+the pipe, z = 0.4 → 1.6 m. H is the flux-weighted mean, Ė/(ρgQ).
+
+| reading | taper, L = 3 m | step, L = 0 |
+|---|---|---|
+| Q | 1.366 m²/s | 1.313 m²/s |
+| H at x = 4.3 m (wide pipe) | 2.826 m | 2.828 m |
+| H at x = 9.0 m | 2.780 m | 2.766–2.774 m |
+| H at x = 10.6 m (near the outlet) | 2.772 m | 2.756–2.762 m |
+| **head loss 4.3 → 10.6 m** | **0.05 m** (0.053–0.054) | **0.07 m** (0.068–0.072) |
+| the Control volume (4.3, 0.3) → (10.6, 1.65), Ė lost ÷ ρgQ | 0.036 m | 0.055 m |
+
+- The taper's loss is the wall friction along ~6 m of pipe (most of it in
+  the fast narrow pipe); the step adds ≈ 0.015–0.02 m — small in this 2D
+  model at this resolution, against ≈ 0.4 U₂²/2g ≈ 0.15 m for a real sudden
+  contraction. Say so: the direction is right, the size is not a design
+  number.
+- The box reads a smaller loss than the two sections (its faces integrate the
+  cell-face fluxes rather than interpolating along a line); the card quotes
+  the sections.
+- Read on the Average: live, the grade lines past the step wobble by ±0.1 m
+  with the eddies. The EGL has a one-cell spike at the step's face itself;
+  ignore it.
 
 ## For the instructor
 

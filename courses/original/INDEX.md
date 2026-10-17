@@ -2,7 +2,9 @@
 
 The original teaching pack: every demo from
 [demo-programme.html](demo-programme.html), packaged one folder each under
-`exercises/` here, and HS-1. Their cards are in [`exercises.js`](exercises.js);
+`exercises/` here. (HS-1 used to be here; it is CIVE40008's now, under
+[../cive40008/](../cive40008/INDEX.md), and this course's menu still lists
+it.) Their cards are in [`exercises.js`](exercises.js);
 the menu — the cards grouped by topic, as the app listed them before courses
 existed — is [`course.js`](course.js). This is the default course on the main
 site (`barneydobson.github.io`, `hosts` in `course.js`); elsewhere open the
@@ -66,7 +68,6 @@ pause-and-read promptly (the chart buffer keeps moving).
 | HP-1 | Max power transmission h_f = H/3 | HP-1-penstock-power/ | hammer + drawn throttle | (gap, q, u) |
 | HP-2 | Cups vs plates | HP-2-pelton/ | shared jet rig | — (lecturer demo) |
 | HP-3 | Hydropower and unsteady flow | HP-3-surge-tower/ | hydro (fixed tutorial scheme) | (V₀, h_f, V_jet, P, η₀, k, η_max) |
-| HS-1 | Dike with a piezometer | HS-1-dyke-piezometer/ | dyke | — (students play; class demo) |
 | NC-2 | Gauging a vertical: 0.6 d against 0.2 d + 0.8 d | NC-2-gauging-methods/ | gauging, reservoir level 0.68 m then 1.33 m, own station | (x, d, u₀.₂, u₀.₆, u₀.₈, V) per run |
 | NC-3 | Bed shear and riprap | NC-3-bed-shear/ | s2 sweep + m2 anchor | (τ₀, D_min) |
 | QS-1 | Predict the drain | QS-1-drain-predict/ | jet | (t_pred, t_meas) |

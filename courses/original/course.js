@@ -1,4 +1,4 @@
-// The original teaching pack — the forty cards (HS-1 among them) that were the whole
+// The original teaching pack — the cards that were the whole
 // register before courses existed. The lecturer means to retire them in time
 // ("they're not very good and eventually we'll delete them"), so they live as
 // one course folder that can go in one deletion: this file, exercises.js

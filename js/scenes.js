@@ -1159,7 +1159,7 @@ const SCENES = (() => {
                            : x < 5.00 ? still(3.50, z, P)   // left basin, culvert, piezometer
                            : still(2.60, z, P)),            // right basin
       tips: ["Three water surfaces, one level: the left reservoir, the culvert and the piezometer tube are one connected body of still water.",
-             "Pick the <b>Pressure force</b> tool and click a face of the dike: the pressure grows with depth, and the sideways force is ½ρg·d².",
+             "Pick the <b>Pressure force</b> tool and select a face of the dike: the pressure grows with depth, and the sideways force is ½ρg·d².",
              "The sloped upstream face also carries the weight of the water standing on it, pushing down; the vertical downstream face does not.",
              "Press <b>V</b> to open the valve. The small right reservoir fills; once the water is still, every surface stands at one level.",
              "When all is still again — about 45 s — both faces carry the same sideways force: the dike feels no net push."] },
@@ -1964,7 +1964,7 @@ const SCENES = (() => {
         tips: ["This is the jet seen from ABOVE: it flies straight, and the sheets keep their speed along the plate.",
                "Drag a Control volume (9) round the plate, clear of the spout: it reads the force on what is inside — the plate.",
                "Turn the plate with <b>Plate angle θ</b>: the force stays at right angles to the plate, ρqU sin θ, and the jet splits unequally, q(1 ± cos θ)/2.",
-               "Click the plate's wet face with the <b>Pressure force</b> tool: the pressure diagram's resultant is the same force the box reads — on a smooth plate it is all pressure."] };
+               "Select the plate's wet face with the <b>Pressure force</b> tool: the pressure diagram's resultant is the same force the box reads — on a smooth plate it is all pressure."] };
     })(),
     // ===== Year 1: wall-shape =====
     // PF-2: a still tank whose right-hand wall changes shape under ONE slider,
@@ -2045,11 +2045,11 @@ const SCENES = (() => {
           return out;
         },
         water: (x, z, P) => (z > ZB && z < ETA ? still(ETA, z, P) : 0),
-        tips: ["Pick the <b>Pressure force</b> tool and click the right-hand wall. The chip prints F, then F_h with ½ρg·d² beside it, then F_v.",
+        tips: ["Pick the <b>Pressure force</b> tool and select the right-hand wall. The chip prints F, then F_h with ½ρg·d² beside it, then F_v.",
                "Slide <b>Wall shape</b> on the card: overhang → vertical → 30° → 60° → steps. Each change restarts the still water; the depth at the wall stays 1.60 m.",
                "F_h never changes: only the wall's vertical projection, d, matters.",
                "F_v is the weight of the water standing on the wall. Under an overhang it is the weight of the water that ISN'T there above it, and it points up.",
-               "Switch <b>Submerged block</b> on and click the block: the pressure all round it adds up to one upward force, its displaced weight."] };
+               "Switch <b>Submerged block</b> on and select the block: the pressure all round it adds up to one upward force, its displaced weight."] };
     })(),
     // ===== Year 1: lake =====
     // FF-1 · Wind over a lake. A closed rectangular tank of still water, 6 m
@@ -2079,7 +2079,7 @@ const SCENES = (() => {
           faces: [{ id: "top", label: "Lake bed", e0: 2, e1: 2 }] }),
       ],
       water: (x, z, P) => (z <= 0.10 ? 0 : still(0.40, z, P)),
-      tips: ["At rest: hover the water — the velocity is zero and the pressure head p/ρg is just the depth below the surface. Pressure head shows flat bands: pressure only.",
+      tips: ["At rest: tap or point at the water — the velocity is zero and the pressure head p/ρg is just the depth below the surface. Pressure head shows flat bands: pressure only.",
              "Move the <b>Wind stress τ</b> slider: the surface water is dragged downwind at once, however small τ is.",
              "Watch the surface pile up against the downwind wall, and the particles near the bed run back upwind.",
              "Reverse τ and the whole circulation reverses. Set τ = 0 and the motion dies away."] },
@@ -2166,7 +2166,7 @@ const SCENES = (() => {
         water: () => 1,
         tips: ["Slide the shape from streamlined to bluff and watch the wake: steady and thin, then wider, then alternating.",
                "Colour is speed: behind a bluff body the flow separates from the surface, and the slow wake swings from side to side as eddies are shed.",
-               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Pick the Dye tool (D) and hold it just upstream of the body: the black streak splits on the nose and rolls up in the wake.",
+               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Pick the Dye tool (D) and press and hold just upstream of the body: the black streak splits on the nose and rolls up in the wake.",
                "Switch the colour bar from Live to Average: the average of the alternating wake is a steady, symmetric wake bubble."] };
     })(),
     // ===== Year 1: spillway, pipejet (FF-2, FF-4) =====
@@ -2535,7 +2535,7 @@ const SCENES = (() => {
       return Object.assign(s, {
         id: "gatejump", name: "Sluice gate → hydraulic jump", key: "The flume lab, scaled up",
         blurb: "The teaching flume at several times its size: a deep reservoir behind a sluice gate, released into an empty flume. The water shoots under the gate as a fast thin sheet; raise the weir at the far end and the sheet jumps up to a slow deep flow, which can be driven back until it drowns the gate.",
-        tips: ["Click the gate with the Pressure force tool: the pressure grows with depth near the surface as in still water, and falls to zero at the lip, where the water curves under the gate and speeds up.",
+        tips: ["Select the gate with the Pressure force tool: the pressure grows with depth near the surface as in still water, and falls to zero at the lip, where the water curves under the gate and speeds up.",
                "Froude number: above 1 the flow is fast and shallow (red), below 1 slow and deep (blue). The sheet under the gate is red.",
                "Weir crest height (Controls → Geometry): at 0.5 m a jump forms at the weir and creeps up the flume; at 0.6 m or more it runs up to the gate and drowns it.",
                "A drowned gate: the water below it covers the lip, the reservoir rises and the force on the gate grows."] });

@@ -1,6 +1,7 @@
 "use strict";
-// The original teaching pack (course `original`): forty cards — the verified
-// demos built from demo-programme.html (beside this file), and HS-1. They were
+// The original teaching pack (course `original`): the verified demos built
+// from demo-programme.html (beside this file). HS-1, which used to sit here,
+// is CIVE40008's (courses/cive40008/exercises.js); course.js still lists it. They were
 // the whole shared register, js/exercises.js, until they moved here; the
 // lecturer means to retire them in time, so they live as one course folder
 // that can be deleted in one go.
@@ -1019,61 +1020,6 @@ COURSES.exercises("original", [
             "The sheet's five models, one per value of B/d, all at a/d = 0.2 (B, d in m): A 1, 1.0; B 2, 1.0; C 4, 1.0; D 8, 1.0; E 8, 0.5.",
             "For each, K = T√(g/d): the period with the tank's size divided out, so any two tanks can be compared."],
     task: "Time the five tanks, work out K = T√(g/d) for each and plot K against B/d on the sheet's chart: the design chart, from five models instead of 125.",
-    settle: 0,
-  },
-
-  // ===================================================== Year 1 (CIVE40008)
-  // HS-1 is a CIVE40008 card that lives in this pack (it went upstream
-  // first, into the register this file used to be); CIVE40008's course.js
-  // lists it by id, which reaches it wherever it is registered. The course's
-  // other Year 1 cards are its own, in courses/cive40008/exercises.js. Like
-  // them, HS-1 uses the SHORT card layout
-  // (`steps` and a `background` fold, with inline strip icons). Vocabulary
-  // follows the lecture it is used in: it shows Pressure head and Piezometric
-  // head, not the plain Pressure colouring of the cards up to L6, because the
-  // piezometer's one level is exactly what piezometric head shows (taught in
-  // Statics, L3); like every card before L7 it carries hide: ["energy",
-  // "critical"].
-
-  // ------------------------------------------------------- hydrostatics
-  // An exercise students play with (L3 Statics) on the `dyke` scene: no rig
-  // payload, because the scene's own polygons ARE the rig, and no digit,
-  // because the point is watched, not pooled. `settle: 0` is deliberate —
-  // the water boots at rest and there is nothing to wait out; the wait that
-  // matters is the ~45 s after V, which the card says to watch, not to time.
-  {
-    id: "HS-1",
-    title: "Dike with a piezometer",
-    aim: "Two reservoirs either side of a dike, joined by a culvert with a piezometer tube — see connected still water stand at one level, and read the pressure force on the dike.",
-    topic: "Hydrostatics",
-    folder: "HS-1-dyke-piezometer",
-    scene: "dyke",
-    rig: null,
-    rigParams: { budget: "Medium" },
-    viewParams: { hoverCard: false, mode: "0", particles: true },
-    // L3 Statics. The Pressure force tool is the one instrument (lecturer,
-    // Oct 2026: no gauges); levels are read off the scale or the hover card.
-    instruments: [
-      { tool: "force", where: "the sloped upstream face of the dike; the same block again for its culvert roof; then the downstream face of the block past the piezometer", why: "½ρg·d² sideways on each face (28.2 and 11.0 kN/m shut), plus the weight of the water on the slope downward on the upstream one, and the push up on the roof; after V both faces read 24.2 kN/m sideways" },
-    ],
-    // Pressure head AND piezometric head, not the plain Pressure (lecturer,
-    // 2026-10-17): the piezometer standing at one level across connected
-    // still water is what the piezometric-head colouring shows in one colour.
-    ui: { view: ["legendBtn", "partBtn", "readBtn", "hoverBtn"], fields: ["water", "phead", "head"], panel: "shut",
-          hide: ["energy", "critical"],
-          readouts: { rows: ["pos", "eta", "uw", "phead", "h"] } },
-    steps: [
-      "The valve is shut. The left reservoir, the culvert and the piezometer tube are one body of still water: all three stand at 3.50 m.",
-      "In {btn:legendBtn} pick Piezometric head: one colour through all that connected water. Then Pressure head: it grows with depth.",
-      "Pick {tool:force} and click the dike's sloped upstream face: compare the sideways force with ½ρgd², d = 3.50 − 1.10 = 2.40 m.",
-      "Click the same block again for the culvert roof (pushed up), then the downstream face of the block past the tube (d = 1.50 m).",
-      "Press {key:V}: water flows through the culvert. When all is still (about 45 s) everything stands at one level and the two sideways forces are equal.",
-    ],
-    background: [
-      "In still water the pressure grows with depth: p = ρg × (depth below the surface), whatever the shape of the container. ρ = 1000 kg/m³, g = 9.81 m/s².",
-      "Pressure head p/ρg is the pressure divided by ρg — the pressure as a height of water. In still water it is the depth below the surface.",
-      "Piezometric head h = z + p/ρg is the height plus the pressure head: the level a piezometer tube connected at that point would stand at. In connected still water it is the same everywhere, so it shows as one colour.",
-    ],
     settle: 0,
   },
 ]);

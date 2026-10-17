@@ -859,16 +859,16 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #dock .exsteps li { opacity: .88; }
 /* A strip button named in a step ({tool:force}, {btn:legendBtn}): its own
    icon and label, in line, looking like the button and not like a link. */
-#dock .exico {
+#dock .exico, #hint .exico {
   display: inline-flex; align-items: center; gap: 3px; vertical-align: -2px;
   padding: 0 5px 0 3px; margin: 0 1px; border-radius: 5px; white-space: nowrap;
   background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
   line-height: 17px;
 }
-#dock .exico svg { flex: 0 0 auto; color: #7fd4ff; }
-#dock .exico b { font-weight: 600; opacity: 1; }
-#dock .exico.bad { color: #ffb648; }
-#dock .exkey {
+#dock .exico svg, #hint .exico svg { flex: 0 0 auto; color: #7fd4ff; }
+#dock .exico b, #hint .exico b { font-weight: 600; opacity: 1; }
+#dock .exico.bad, #hint .exico.bad { color: #ffb648; }
+#dock .exkey, #hint .exkey {
   display: inline-block; min-width: 15px; padding: 0 4px; text-align: center;
   font: 700 10.5px ui-monospace, monospace; line-height: 16px;
   border: 1px solid rgba(255,255,255,0.28); border-bottom-width: 2px; border-radius: 4px;

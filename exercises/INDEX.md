@@ -9,7 +9,7 @@ of them.
 
 | Course | `?course=` | Default on | Index |
 | --- | --- | --- | --- |
-| Hydraulics teaching pack — the original forty cards (HS-1 among them), due to be retired | `original` | barneydobson.github.io | [courses/original/INDEX.md](../courses/original/INDEX.md) |
+| Hydraulics teaching pack — the original cards, due to be retired | `original` | barneydobson.github.io | [courses/original/INDEX.md](../courses/original/INDEX.md) |
 | CIVE40008 · Year 1 (Imperial College London) | `cive40008` | mvreeuwijk.github.io | [courses/cive40008/INDEX.md](../courses/cive40008/INDEX.md) |
 
 What is left in this folder is shared tooling, not exercises:

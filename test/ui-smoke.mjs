@@ -855,7 +855,7 @@ async function main() {
       check("the address bar follows the tab", /tab=streamlines/.test(r.url1), r.url1);
       eq("the tab's own fields", r.fields, "water,speed");
       eq("the tab's own tools — only the Dye tool", JSON.stringify(r.measure), '["dye"]');
-      eq("the tab bar marks the open tab", r.tabs, "Streamlines*,Continuity,Forces");
+      eq("the tab bar marks the open tab", r.tabs, "Streamlines*,Continuity,Forces,Energy");
       eq("five steps", r.steps, 5);
       eq("the steps name strip buttons by their own labels", r.icons, "Particles|Streamlines|Dye");
       eq("each with the strip's own icon", r.svgs, 3);

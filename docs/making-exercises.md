@@ -39,7 +39,7 @@ register (empty) they are all appended to, and its header is the card schema;
 courses.
 
 Worked example throughout: **HS-1**, the dyke with a piezometer
-(`courses/original/exercises/HS-1-dyke-piezometer/`), a lecturer demo on a
+(`courses/cive40008/exercises/HS-1-dyke-piezometer/`), a lecturer demo on a
 scene written for it.
 
 ## 1. Decide where the geometry lives
@@ -145,6 +145,7 @@ An entry in a course's `exercises.js`, appended to `EXERCISES` (declared in
 | `instruments` | **no** | `{tool, where, why}` — where the gauges go; the picker places none and clears any a payload carried |
 | `steps`, `background` | printed | **the short layout** (below): at most five one-line numbered steps, and a closed Background fold for definitions, formulas and remarks |
 | `setup`, `start`, `task`, `note` | printed | the older layout: the staged steps, one line on the bench, one or two on what to do and read. A card with `steps` prints neither `start` nor `task` |
+| `tips` | printed at the foot of the screen | optional: the card's own rotating tips, replacing the scene's while the card (or the tab carrying them) is on screen — see *The tips line* below |
 | `tabs` | — | one scene asked several questions: a list of tabs, each with its own steps and interface (below) |
 | `aim` | printed in the menu | optional: one or two plain sentences on what the scene is and what the student does in it; the exercise menu prints it under the title instead of the `start · ?scene · settle` line, the start screen shows it on hover, the card does not |
 | `settle` | yes | sim-seconds the picker runs flat out before the card counts down; `0` is meaningful |
@@ -330,10 +331,42 @@ the two cannot drift:
 force and click the gate". An unknown id prints in amber on the card and
 fails `check_pack.py`. `EX.plain(text)` spells the markup out in words.
 
+### The tips line: a card's own `tips`
+
+The line of rotating tips at the foot of the screen (`#hint`, a new one every
+9 s; `cycleTips` in `js/main.js`) comes from the **scene's** `tips` — shared
+by every exercise built on that scene, and so unable to keep pace with a
+course: a scene used in the momentum lecture cannot talk about Froude
+numbers if one of its exercises comes before them. A card (or a tab) may
+therefore carry its own:
+
+```js
+tips: [
+  "Continuity: nothing is stored in a full pipe, so Q₁ = Q₂.",
+  "Lagrangian: follow the water, as the dye does. Eulerian: measure what passes, as a {tool:flux} does.",
+]
+```
+
+While that card is on screen on its own scene, its tips replace the scene's;
+a tab's replace the entry's (a tab without `tips` inherits the entry's, like
+every other tab field). Picking the card, switching tabs, or closing the card
+starts the line again from the first tip; during a settle countdown the
+countdown owns the line and the first tip follows it. Card tips are plain
+text with the inline markup below (`{tool:…}`, `{btn:…}`, `{key:…}`), drawn
+as the strip's own chips; a scene's tips stay HTML as before. A card without
+`tips` — every card of the original pack — shows its scene's tips exactly as
+it always did.
+
+Write them as the lecture's vocabulary allows (the card's, not the scene's):
+one idea each, three to five of them, each telling the student what to look
+at and what to take from it — the physics, not the interface.
+`check_pack.py` checks that `tips` is a non-empty list of non-empty strings
+and that its markup names real tools and buttons.
+
 ### Tabs: one scene, several questions
 
 The contraction rig is one scene asked about streamlines in L4, continuity
-in L5 and forces in L6, so it is ONE entry, CR-1, with three tabs:
+in L5, forces in L6 and energy in L7, so it is ONE entry, CR-1, with four tabs:
 
 ```js
 { id: "CR-1", title: "The contraction rig", scene: "contraction",
@@ -343,12 +376,13 @@ in L5 and forces in L6, so it is ONE entry, CR-1, with three tabs:
     { key: "streamlines", label: "Streamlines", alias: "FF-5", topic: "…",
       title: "…", aim: "…", viewParams: {...}, ui: {...}, steps: [...], background: [...] },
     { key: "continuity", label: "Continuity", alias: "VC-1", instruments: [...], … },
-    { key: "forces", label: "Forces", alias: "MM-2", … } ] }
+    { key: "forces", label: "Forces", alias: "MM-2", … },
+    { key: "energy", label: "Energy", ui: { hide: ["critical"], … }, tips: [...], … } ] }
 ```
 
 A tab's own fields replace the entry's (`viewParams` and `ui` are merged over
 the entry's, shallowly) — `title`, `aim`, `topic`, `steps`, `background`,
-`instruments`, `studentParams`, `note`, `ui`, `viewParams`. The scene, the rig,
+`tips`, `instruments`, `studentParams`, `note`, `ui`, `viewParams`. The scene, the rig,
 `rigParams` and `settle` are the entry's alone: **switching tabs does not
 reload the scene or restart the flow**. It swaps the steps and the interface
 profile (fields, strip buttons, tools, gauges, `hide`, …) and applies the
@@ -447,13 +481,12 @@ except `course.js`:
 <script src="courses/cive40008/exercises.js"></script>
 ```
 
-The original teaching pack (`courses/original/`, forty cards, HS-1 among
-them) is a course like any other: its menu is the cards grouped by `topic`
+The original teaching pack (`courses/original/`) is a course like any other: its menu is the cards grouped by `topic`
 — the sections the whole-register menu draws — and `hosts:
 ["barneydobson.github.io"]` makes it the main site's default, so that site
 opens as it did before the pack moved. It is due to be retired; deleting the
-folder and its two script tags is the whole job (CIVE40008's menu then skips
-HS-1 until it has a new home). Its history documents
+folder and its two script tags is the whole job (HS-1, which its menu still
+lists, is CIVE40008's and stays). Its history documents
 (`demo-programme.html`, `feasibility-sheet.html`, `CHANGES-NEEDED.md`,
 `_director-status.md`, `_worker-recipe.md`) moved with it; the drawn-rig
 payloads stay shared in `js/exercises-rigs.js`, keyed by exercise id.
@@ -468,8 +501,8 @@ Jekyll renders the README as the folder's page (`courses/` is not
 underscore-prefixed, so it is published). **Ids are
 global**: a card whose id or tab alias is already in the register is refused
 with a console warning and `check_pack.py` fails the pack. A course's menu may
-list another course's cards (CIVE40008 lists HS-1, which is the original
-pack's) beside its own. Scenes stay in `js/scenes.js`, shared. Moving a card
+list another course's cards beside its own (the original pack's menu still
+lists HS-1, which moved to CIVE40008). Scenes stay in `js/scenes.js`, shared. Moving a card
 between courses is `git mv` of its folder, its entry into the other course's
 `exercises.js` and its INDEX row into that course's `INDEX.md`; a brief's
 relative links do not change, because every brief sits at

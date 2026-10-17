@@ -12,6 +12,7 @@ const EXERCISE_MENU = {
   compact: true,             // one line per exercise; its aim in a box on hover
   collapsible: true,         // headings only; click one to open it
   showAllLink: false,        // no "show all exercises in the register" link
+  scenes: false,             // no Scenes menu: students start from an exercise
   sections: [
     { title: "Fundamentals",          ids: ["FF-1", "UP-1"] },
     { title: "Statics",               ids: ["HS-1", "PF-2"] },

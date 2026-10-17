@@ -1294,8 +1294,8 @@ const EXERCISES = [
         title: "Contraction rig: streamlines and separation",
         topic: "Flow fields, shear and turbulence",
         aim: "A pipe that narrows gently or suddenly — see the streamlines follow a taper but separate at a sharp step.",
-        viewParams: { mode: "2", particles: true },
-        ui: { measure: false, view: ["legendBtn", "partBtn", "slineBtn", "hoverBtn"],
+        viewParams: { dye: true, mode: "2", particles: true },
+        ui: { measure: false, view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "hoverBtn"],
               fields: ["water", "speed"], controls: ["geom0"],
               readouts: { rows: ["pos", "uw"] } },
         steps: [
@@ -1320,7 +1320,7 @@ const EXERCISES = [
           { tool: "flux", where: "up across the 0.50 m pipe at x = 9.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
           { tool: "cv", where: "(4.3, 0.3) → (9.0, 1.65) — round the contraction, top and bottom inside the pipe walls", why: "Σ Q = 0: in on the left face, out on the right, nothing through the walls" },
         ],
-        ui: { view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
+        ui: { view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "readBtn", "hoverBtn"],
               fields: ["water", "speed"], controls: ["geom0", "cvShow", "fluxList"],
               readouts: { rows: ["pos", "uw"] } },
         steps: [
@@ -1431,7 +1431,7 @@ const EXERCISES = [
       { tool: "force", where: "the plate's wet face — the side the jet strikes", why: "the pressure diagram on the plate and its resultant F, at right angles to the plate: on a smooth plate the whole force is pressure, so F matches the box's F_n" },
       { tool: "flux", where: "one across each sheet, about 0.1 m past each end of the plate, at right angles to it", why: "q₁ and q₂, the two sheets' discharges, against q(1 ± cos θ)/2" },
     ],
-    ui: { view: ["legendBtn", "slineBtn", "readBtn", "hoverBtn"], hide: ["energy", "critical"], fields: ["speed", "p"], controls: ["speed", "geom0"],
+    ui: { view: ["legendBtn", "dyeBtn", "slineBtn", "readBtn", "hoverBtn"], hide: ["energy", "critical"], fields: ["speed", "p"], controls: ["speed", "geom0"],
           readouts: { rows: ["pos", "uw", "p"] } },
     steps: [
       "Drag a {tool:cv} from (0.70, 0.30) to (2.50, 2.10), round the whole plate. After every change wait about 5 s.",
@@ -1550,7 +1550,7 @@ const EXERCISES = [
     scene: "body",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "2", particles: true, dye: false, gaugeField: "speed" },
+    viewParams: { mode: "2", particles: true, dye: true, gaugeField: "speed" },
     studentParams: [
       { control: "geom0", label: "Body shape", unit: "" },
     ],
@@ -1596,7 +1596,7 @@ const EXERCISES = [
     scene: "spillway",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "2", particles: true, gaugeField: "speed" },
+    viewParams: { dye: true, mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
       { control: "geom0", label: "Bucket lip angle", unit: "°" },
       { control: "inLevel", label: "Reservoir level", unit: "m" },
@@ -1637,7 +1637,7 @@ const EXERCISES = [
     scene: "pipejet",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "2", particles: true, gaugeField: "speed" },
+    viewParams: { dye: true, mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
       { control: "inLevel", unit: "m", label: "Reservoir level", slider: { min: 6.3, max: 8.0, step: 0.05 } },
     ],

@@ -517,7 +517,21 @@ uniform float u_Tacc;                  // window BEFORE this substep
 #endif
 uniform float u_ca;        // interface compression strength
 uniform float u_dyeDecay;  // 1/s
-uniform vec2  u_dyeLine;   // period (s), on — pulsed dye timelines at the inlet
+// Dye SEEDS — where the dye is released, continuously, into the water that is
+// there: up to eight short segments (x0, z0, x1, z1 in metres), each with
+// (ports, radius): ports 0 releases along the whole segment (a sheet that
+// splits round a body and shows the dividing streamline), ports n releases
+// from n evenly spaced points on it (n separate streaks). The seeds are where
+// the FLOW goes in each scene — scenes.js declares them, sim.js supplies a
+// default — because dye injected at the far inlet of a long rig never reached
+// the thing the picture was about. u_dyeSeed.x = how many are live (0 with
+// Dye off or under Average: nothing is released and nothing extra is paid);
+// .y = pulse period (s, 0 = continuous; on, released for the first half of
+// each period, the dye forms bands whose edges are timelines); .z = 1 for
+// the limited (van Leer) dye faces, 0 for first-order upwind.
+uniform vec4  u_seed[8];
+uniform vec2  u_seedP[8];
+uniform vec4  u_dyeSeed;
 uniform vec2  u_drain;     // residue drain: rate (1/s), speed scale (m/s); 0 = off
 
 // van Leer. Superbee is tempting here but it is over-compressive: it turns the
@@ -600,7 +614,7 @@ void main(){
     if (gL) {
       if (u_in.z > 0.5) {                   // upstream reservoir
         m.r = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2 : 0.0;
-        m.g = (u_dyeLine.y > 0.5 && fract(u_time / max(u_dyeLine.x, 0.05)) < 0.07) ? 1.0 : 0.0;
+        m.g = 0.0;                          // inflow runs clear: dye comes from the seeds
         m.b = 0.0;
       } else if (u_openMode.x > 1.5) m = vec4(0.0);
     }
@@ -721,14 +735,43 @@ void main(){
     }
   }
 
-  // --- dye rides along (advective form, first-order upwind is plenty)
+  // --- dye rides along (advective form). First-order upwind spread a
+  //     two-cell streak into a grey wash within a couple of metres (its
+  //     numerical diffusivity is ~u·dx/2, far above any real dye's), so while
+  //     Dye is on the faces are the same van Leer limited values the fill
+  //     uses: the streak still thickens and pales downstream — the scheme
+  //     keeps some diffusion and the decay below fades it — but it reads as a
+  //     plume, not a haze. Off, it is the old upwind and costs what it did.
   float div = ((uE - uW) + (wN - wS)) / dx;
   vec2 dC = F0.gb;
   vec2 dWu = uW > 0.0 ? Fw.gb : dC, dEu = uE > 0.0 ? dC : Fe.gb;
   vec2 dSu = wS > 0.0 ? Fs.gb : dC, dNu = wN > 0.0 ? dC : Fn.gb;
+  if (u_dyeSeed.z > 0.5) {
+    float aW = TF(ivec2(i-2,j)).g, aE = TF(ivec2(i+2,j)).g;
+    float aS = TF(ivec2(i,j-2)).g, aN = TF(ivec2(i,j+2)).g;
+    dWu.x = faceVal(aW, Fw.g, dC.x, Fe.g, uW);
+    dEu.x = faceVal(Fw.g, dC.x, Fe.g, aE, uE);
+    dSu.x = faceVal(aS, Fs.g, dC.x, Fn.g, wS);
+    dNu.x = faceVal(Fs.g, dC.x, Fn.g, aN, wN);
+  }
   vec2 dNew = dC - dt * ((uE*dEu - uW*dWu + wN*dNu - wS*dSu) / dx - dC*div);
   dNew *= 1.0 - dt * u_dyeDecay;
   dNew = clamp(dNew, 0.0, 1.0);
+
+  // --- dye seeds release continuously into whatever water is at them
+  if (u_dyeSeed.x > 0.5 && fC > 0.3 &&
+      (u_dyeSeed.y <= 0.0 || fract(u_time / u_dyeSeed.y) < 0.5)) {
+    vec2 q = vec2(x, z);
+    for (int k = 0; k < 8; k++) {
+      if (float(k) >= u_dyeSeed.x) break;
+      vec2 a = u_seed[k].xy, b = u_seed[k].zw, ab = b - a;
+      float L2 = dot(ab, ab);
+      float t = L2 > 1e-12 ? clamp(dot(q - a, ab) / L2, 0.0, 1.0) : 0.0;
+      float n = u_seedP[k].x;
+      if (n > 0.5) t = n > 1.5 ? (floor(t * (n - 1.0) + 0.5)) / (n - 1.0) : 0.5;
+      if (distance(q, a + t * ab) < u_seedP[k].y) dNew.x = 1.0;
+    }
+  }
 
   // --- point sources add volume and colour
   if (u_src0.w > 0.5 && distance(vec2(x,z), u_src0.xy) < u_src0.z) {
@@ -958,8 +1001,18 @@ void main(){
 
   if (p.z > u_plife || solid || !wet ||
       p.x < 0.0 || p.y < 0.0 || p.x > dom.x || p.y > dom.y) {
+    // Respawn IN THE WATER: up to four tries for a wet, open cell. One blind
+    // draw over the whole domain put most of the cloud in the air or the
+    // rock of a rig that is mostly both (a pipe between two reservoirs), so
+    // the water itself was sparsely seeded however many were drawn.
     vec2 seed = vec2(p.w, u_time);
-    p.xy = vec2(hash(seed), hash(seed + 7.3)) * dom;
+    for (int k = 0; k < 4; k++) {
+      p.xy = vec2(hash(seed), hash(seed + 7.3)) * dom;
+      ivec2 q = ivec2(clamp(p.xy / u_dx, vec2(0.0), u_res - vec2(1.0)));
+      float fq = u_avg > 0.5 ? texelFetch(u_U, q, 0).b : texelFetch(u_F, q, 0).r;
+      if (fq > 0.5 && texelFetch(u_S, q, 0).r < 0.25) break;
+      seed += vec2(1.37, 2.71);
+    }
     p.z  = -hash(seed + 3.1) * u_plife;       // negative age = invisible until born
   }
   o = p;
@@ -968,14 +1021,26 @@ void main(){
   const VS_PART = `#version 300 es
 precision highp float;
 precision highp sampler2D;
-uniform sampler2D u_P, u_U;
+uniform sampler2D u_P, u_Q, u_U;
 uniform vec2  u_pres, u_res;
 uniform vec4  u_rect;
 uniform float u_dx, u_psize;
+uniform int   u_sub;          // dabs per particle per frame (tail pass > 1)
 out float vFade;
 void main(){
-  ivec2 c = ivec2(gl_VertexID % int(u_pres.x), gl_VertexID / int(u_pres.x));
+  int id = gl_VertexID / u_sub, k = gl_VertexID - id * u_sub;
+  ivec2 c = ivec2(id % int(u_pres.x), id / int(u_pres.x));
   vec4 p = texelFetch(u_P, c, 0);
+  // The tail fills in the whole of this frame's step, from where the
+  // particle was (u_Q, the other half of the ping-pong) to where it is: one
+  // dab per frame left a dotted line wherever the flow moves more than a dab
+  // per frame — the trail of a slow scene was a row of specks. Not across a
+  // respawn (the age went DOWN), which would draw a streak through the water.
+  if (u_sub > 1) {
+    vec4 q = texelFetch(u_Q, c, 0);
+    if (q.z <= p.z && distance(q.xy, p.xy) < 64.0 * u_dx)
+      p.xy = mix(q.xy, p.xy, (float(k) + 1.0) / float(u_sub));
+  }
   vec2 dom = u_res * u_dx;
   vec2 uv  = p.xy / dom;
   // Fade IN over the first fraction of a life, and OUT over the last, so a
@@ -997,6 +1062,16 @@ out vec4 o;
 uniform float u_amp;          // 1 = a head, drawn once; < 1 = a tail dab
 void main(){
   float r = length(gl_PointCoord - 0.5) * 2.0;
+  if (u_amp > 0.99) {
+    // A head is a white core in a thin dark ring, alpha-blended rather than
+    // added: a white dot ADDED to the pale middle of a diverging ramp or the
+    // yellow of Speed is white on near-white, and vanished. The ring keeps it
+    // a definite dot on every colouring, the dark ones included (the core).
+    float disc = smoothstep(1.0, 0.82, r);
+    float core = smoothstep(0.62, 0.42, r);
+    o = vec4(mix(vec3(0.03, 0.04, 0.06), vec3(1.00, 0.97, 0.90), core), disc * 0.9 * vFade);
+    return;
+  }
   // A small hard dab with only a hint of edge. The tail is what carries the
   // reading, and a tail is only fine if the thing drawing it is: a fat glowing
   // dab lays down a fat glowing stripe and the reach turns into a wash.
@@ -1023,6 +1098,25 @@ precision highp float;
 out vec4 o;
 uniform vec4 u_col;
 void main(){ o = u_col; }`;
+
+  // The trail's SHADOW: the trail buffer's alpha, spread over ±1.5 px and
+  // laid down dark under the trail itself. A white trail added to the pale
+  // or yellow-green colourings was white on near-white; with a dark edge
+  // either side it is a line on every ground.
+  const FS_TRAIL_SHADOW = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 o;
+uniform sampler2D u_T;
+uniform vec2 u_px;            // one texel in uv
+void main(){
+  float a = 0.0;
+  a = max(a, texture(u_T, vUv + vec2( 1.5, 0.0) * u_px).a);
+  a = max(a, texture(u_T, vUv + vec2(-1.5, 0.0) * u_px).a);
+  a = max(a, texture(u_T, vUv + vec2(0.0,  1.5) * u_px).a);
+  a = max(a, texture(u_T, vUv + vec2(0.0, -1.5) * u_px).a);
+  o = vec4(0.02, 0.03, 0.05, min(1.0, a * 1.6) * 0.55);
+}`;
 
   const FS_TEX = `#version 300 es
 precision highp float;
@@ -1166,6 +1260,9 @@ float nrmMid(float v, float mid){
                  : 0.5 + 0.5 * clamp((v - mid) / max(u_hi - mid, 1e-6), 0.0, 1.0);
 }
 
+// Ink opacity of a dye concentration: steep, then saturating (see the dye block).
+float inkA(float d){ return 0.92 * (1.0 - exp(-5.0 * clamp(d, 0.0, 1.0))); }
+
 float segDist(vec2 p, vec2 a, vec2 b){
   vec2 pa = p - a, ba = b - a;
   float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-9), 0.0, 1.0);
@@ -1297,16 +1394,48 @@ void main(){
   }
   c = mix(c, water, wet);
 
-  // ---- free-surface line
-  float band = (1.0 - smoothstep(0.0, 0.22, abs(fs - 0.55))) * smoothstep(0.10, 0.35, fs);
-  c = mix(c, vec3(0.78, 0.92, 1.0), band * 0.50 * (1.0 - sol));
+  // ---- pressurised marker: cells above the slot threshold get a sheen so
+  //      the free-surface → pressurised transition is legible
+  //      (under the dye: over it, it turned the black ink brown)
+  if (u_mode == 0) {
+    float pz = smoothstep(1.004, 1.05, f);
+    c = mix(c, vec3(0.95, 0.85, 0.55), pz * 0.30 * wet);
+  }
 
   // ---- dye
-  if (u_dyeOn > 0.5) {
-    float dA = F.g, dB = F.b;
-    c = mix(c, vec3(0.15, 0.95, 0.85), clamp(dA, 0.0, 1.0) * 0.85 * wet);
+  // u_dyeOn: 1 = the seeded ink and the pour's dye B; 0.5 = dye B alone (Dye
+  // off — the pour still shows what it poured); 0 = neither (Average).
+  if (u_dyeOn > 0.25) {
+    float dA = u_dyeOn > 0.75 ? F.g : 0.0, dB = F.b;
+    // Seeded dye is INK: near-black, because every colouring is a bright
+    // ramp and the one colour none of them contains is black. Opacity rises
+    // steeply and saturates, 1 − e^(−5d), so a streak that has diffused to a
+    // tenth of its release strength is still a visible grey plume (≈ 0.35)
+    // rather than vanishing — the linear 0.85·d it replaced lost a plume
+    // the moment it had spread over a few cells.
+    float a = inkA(dA);
+    // Black is the one colour no ramp contains — except at their DARK ends:
+    // ink drifting into the slow, near-black purple of Speed vanished. So
+    // where the ground under it is dark, the plume's edge gets a pale rim
+    // (the ink's gradient over ±1.5 cells, on its outer side), and only there:
+    // on the bright colourings the rim is off and the ink is just ink.
+    float lum = dot(c, vec3(0.299, 0.587, 0.114));
+    float dark = 1.0 - smoothstep(0.16, 0.38, lum);
+    if (dark > 0.0 && dA > 0.004) {     // (dA is 0 with Dye off: no rim)
+      float gx = inkA(blF(g + vec2(1.5, 0.0)).g) - inkA(blF(g - vec2(1.5, 0.0)).g);
+      float gz = inkA(blF(g + vec2(0.0, 1.5)).g) - inkA(blF(g - vec2(0.0, 1.5)).g);
+      float edge = clamp(length(vec2(gx, gz)) * 1.4, 0.0, 1.0);
+      c = mix(c, vec3(0.78, 0.84, 0.92), edge * dark * (1.0 - a) * 0.75 * wet);
+    }
+    c = mix(c, vec3(0.02, 0.02, 0.035), a * wet);
     c = mix(c, vec3(1.00, 0.66, 0.20), clamp(dB, 0.0, 1.0) * 0.85 * wet);
   }
+
+  // ---- free-surface line — drawn OVER the dye: ink in a nappe or a jet
+  //      against the near-black canvas is black on black, and the line is
+  //      what keeps the water's outline there.
+  float band = (1.0 - smoothstep(0.0, 0.22, abs(fs - 0.55))) * smoothstep(0.10, 0.35, fs);
+  c = mix(c, vec3(0.78, 0.92, 1.0), band * 0.50 * (1.0 - sol));
 
   // ---- solids
   vec3 rock = vec3(0.16, 0.17, 0.20);
@@ -1314,13 +1443,6 @@ void main(){
   rock += vec3(0.030) * hatch;
   c = mix(c, rock, sol);
   c = mix(c, u_valve > 0.5 ? vec3(0.86, 0.33, 0.22) : vec3(0.35, 0.72, 0.45), valv * 0.85);
-
-  // ---- pressurised marker: cells above the slot threshold get a sheen so
-  //      the free-surface → pressurised transition is legible
-  if (u_mode == 0) {
-    float pz = smoothstep(1.004, 1.05, f);
-    c = mix(c, vec3(0.95, 0.85, 0.55), pz * 0.30 * wet);
-  }
 
   // ---- preview line while dragging a wall
   if (u_guideOn > 0.5) {
@@ -1451,5 +1573,5 @@ void main(){
 }`;
 
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_HGL, FS_PART, VS_PART,
-           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL, FS_SFLUX };
+           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, FS_TRAIL_SHADOW, RAMPS, FS_ACC, FS_ACOL, FS_SFLUX };
 })();

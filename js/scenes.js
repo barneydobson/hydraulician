@@ -1748,6 +1748,11 @@ const SCENES = (() => {
         blurb: "Two reservoirs joined by a wide pipe that contracts into a narrow one. One slider takes the contraction from a long gentle taper to an abrupt step.",
         W, H: 2.9, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
         mode: 2, hmax: 3.0, headMax: 2.6, vmax: 4, particles: 1, plife: 6,
+        // Dye: six streaks in the left reservoir 0.5 m ahead of the pipe
+        // entrance, over the bore and a little beyond it, so they are drawn
+        // into the bellmouth and down the pipe rather than (as from the
+        // inlet edge) idling in the reservoir.
+        dye: { seeds: [[XL - 0.5, ZC - A1 - 0.1, XL - 0.5, ZC + A1 + 0.1, 6]] },
         spinup: 25,                               // measured: from a fresh start Q overshoots ~30% at 8 s and is back within a few per cent of steady by 25 s, at either end of the slider
         open: [1, 1, 0, 0],
         spongeIn: 2.4, spongeTw: 1.5, spongeFill: 4,
@@ -1942,6 +1947,9 @@ const SCENES = (() => {
         // stagnation pressure ½ρU² ≈ 9.9 kPa where the 4.45 m/s jet meets the
         // plate (measured 9.2-9.9 at the 99th percentile).
         pRange: [0, 10],
+        // Dye: three streaks across the jet just out of the spout — the
+        // middle one finds the stagnation point, the outer two the sheets.
+        dye: { seeds: [[XS + RJ + 0.05, ZJ - 0.7 * RJ, XS + RJ + 0.05, ZJ + 0.7 * RJ, 3]] },
         particles: 0, spinup: 0,
         open: [2, 2, 2, 2],
         residueDrain: { rate: 2, speed: 1.0 },
@@ -2133,7 +2141,11 @@ const SCENES = (() => {
         group: "Jets & waves",
         blurb: "Looking down on a uniform stream past one body whose shape you morph with a slider, from a slender ellipse lined up with the flow to a square. Streamlined: a thin steady wake. Bluff: the flow separates and the wake swings from side to side, shedding eddies.",
         W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 1e-3, slip: 1, bulk: 0.03,
-        mode: 2, ca: 0, vmax: 1.6, vortMax: 12, headMax: 3.2, dyeLine: 1.0,
+        mode: 2, ca: 0, vmax: 1.6, vortMax: 12, headMax: 3.2,
+        // Dye: eight streaks released 0.5 m upstream of the nose, spanning
+        // a little more than the frontal width, so the outer ones graze the
+        // body and are drawn into the wake and the inner ones split on it.
+        dye: { seeds: [[XC - 1.1, ZC - 0.32, XC - 1.1, ZC + 0.32, 8]] },
         // Left edge open and NOT walled: the inflow prescribes the stream over
         // the whole of it (see `plan` for why the edge itself must be open).
         open: [1, 1, 0, 0],
@@ -2149,7 +2161,7 @@ const SCENES = (() => {
         water: () => 1,
         tips: ["Slide the shape from streamlined to bluff and watch the wake: steady and thin, then wider, then alternating.",
                "Colour is speed: behind a bluff body the flow separates from the surface, and the slow wake swings from side to side as eddies are shed.",
-               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Dye (D) sends lines of dye across the stream from the inlet.",
+               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Dye (D) releases black streaks just upstream of the body: watch them split on the nose and roll up in the wake.",
                "Switch the colour bar from Live to Average: the average of the alternating wake is a steady, symmetric wake bubble."] };
     })(),
     // ===== Year 1: spillway, pipejet (FF-2, FF-4) =====
@@ -2254,6 +2266,15 @@ const SCENES = (() => {
         blurb: "A reservoir spills over a curved crest, races down the spillway face and is thrown into the air by a flip bucket. The jet plunges into a deep pool: steady above, wildly unsteady below — and its average is steady again.",
         W, H, c: 30, cf: 0.005, cs: 0.10, bulk: 0.05, nu: 1e-4,
         mode: 2, hmax: 9, headMax: 10, vmax: 10, particles: 1,
+        // Dye: a continuous sheet on the crest approach, 0.8 m upstream of
+        // the dam's face, from just under crest level to 0.4 m under the
+        // surface — the core of the layer that actually spills, so the nappe
+        // carries ink and the plunge pool shows it being mixed. Separate
+        // streaks were tried: on a sheet 2–4 cells thick they merged into a
+        // faint grey. The top 0.4 m stays clear so the nappe keeps a
+        // coloured skin: ink right at a free surface, against the dark
+        // canvas, is black on black.
+        dye: { seeds: [[XU - 0.8, ZC - 0.3, XU - 0.8, LEVEL - 0.4, 0, 1.5 * 0.055]] },
         view: { vex: 1 },
         spinup: 40,
         open: [1, 1, 0, 0],
@@ -2389,6 +2410,10 @@ const SCENES = (() => {
         W, H, c: 30, cf: 0.02, cs: 0.10, bulk: 0.05, nu: 2e-3,
         kappa: 0,
         mode: 2, hmax: 6, headMax: 6.5, vmax: 3, particles: 1,
+        // Dye: four streaks inside the pipe 0.5 m past the entrance; the two
+        // outer ones run in the wall boundary layers and roll up in the jet's
+        // shear layers past the exit.
+        dye: { seeds: [[x1 + 0.5, z0 + 0.07, x1 + 0.5, z1 - 0.07, 4]] },
         spinup: 20,
         // Left: the header's level control. Right: an OUTFALL edge — the
         // brink at the end of the crest, which is what mode 2 is for.

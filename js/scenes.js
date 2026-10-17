@@ -1746,7 +1746,7 @@ const SCENES = (() => {
         id: "contraction", name: "Contraction rig", key: "Taper ↔ step",
         group: "Pressure & transients",
         blurb: "Two reservoirs joined by a wide pipe that contracts into a narrow one. One slider takes the contraction from a long gentle taper to an abrupt step.",
-        W, H: 2.9, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
+        W, H: 3.4, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
         mode: 2, hmax: 3.0, headMax: 2.6, vmax: 4, particles: 1, plife: 6,
         // Dye: six streaks in the left reservoir 0.5 m ahead of the pipe
         // entrance, over the bore and a little beyond it, so they are drawn
@@ -1754,7 +1754,7 @@ const SCENES = (() => {
         // inlet edge) idling in the reservoir.
         dye: { seeds: [[XL - 0.5, ZC - A1 - 0.1, XL - 0.5, ZC + A1 + 0.1, 6]] },
         spinup: 25,                               // measured: from a fresh start Q overshoots ~30% at 8 s and is back within a few per cent of steady by 25 s, at either end of the slider
-        open: [1, 1, 0, 0],
+        open: [1, 1, 0, 1],                      // top open: no lid over the reservoirs (was a closed edge 0.1 m above the left water)
         spongeIn: 2.4, spongeTw: 1.5, spongeFill: 4,
         twOutflowOnly: true,                      // see the comment above: the edge must not feed the jet
         inflow: { level: L1, q: 0, on: 1, free: 1 },

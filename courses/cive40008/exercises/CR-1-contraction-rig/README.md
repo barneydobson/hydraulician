@@ -182,3 +182,5 @@ into the pipe.
 
 `rig.js` is the console spot-check: `CR.demo()`, `CR.read(5)`,
 `CR.friction(5)`, `CR.profile(x)`.
+
+**Domain made taller (2026-10-17).** H 2.9 → 3.4 m with the top edge open, so the reservoirs no longer sit under a closed lid. Re-measured at Medium (689 × 138): Q 1.374 m²/s (taper) and 1.318 (step), 2–3% above the figures above; reservoir levels 2.73 / 2.38 m.

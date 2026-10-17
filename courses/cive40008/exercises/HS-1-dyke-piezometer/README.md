@@ -25,7 +25,7 @@ numbers the class can do on paper.
 **Open it:** press **E** in the [app](../../../../)
 and pick **HS-1**, or use the direct link
 [`?ex=HS-1`](../../../../?ex=HS-1).
-How to run any exercise: see the [teaching pack index](../../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory
 

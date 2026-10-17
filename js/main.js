@@ -1253,7 +1253,14 @@ const MINI = (() => {
     const t = txt || it.label;
     if (it.pill.textContent !== t) it.pill.textContent = t;
   }
-  return { add, set, isMin, anchor, pillText };
+  /** Put a box's own minimise button back after its content was rewritten
+   *  (the tips line is rewritten wholesale on every tip and every frame of a
+   *  countdown, which used to take the button with it). */
+  function keep(id) {
+    const it = items[id];
+    if (it && it.btn.parentNode !== it.el) it.el.appendChild(it.btn);
+  }
+  return { add, set, isMin, anchor, pillText, keep };
 })();
 
 // ------------------------------------------------------------------ tools
@@ -3097,10 +3104,14 @@ function tickFrame(realDt) {
         ? EX.settleHint()
         : "establishing steady flow… <b>" + sim.t.toFixed(1) + " / " +
           state.scene.spinup.toFixed(0) + " s</b>";
+      MINI.keep("hint");
       // A minimised tips pill still shows the countdown — reading a number
       // before the flow has settled is the classic worksheet mistake.
       MINI.pillText("hint", "▸ " + Math.max(0, warmTo - sim.t).toFixed(0) + " s");
       state.tipAt = 9.5;   // pop the first tip the moment spin-up finishes
+      // …and for a card's own tips that is the FIRST one, not the second (a
+      // scene's keeps its old order: it showed tips[0] before the countdown).
+      if (exerciseTips()) state.tipIdx = -1;
     } else {
       MINI.pillText("hint", "");
     }
@@ -4222,14 +4233,44 @@ function refreshNote(id) {
   if (c && n && c.fmt) n.textContent = c.fmt(c.get());
 }
 
+/** THE TIPS LINE at the foot of the screen. A scene's `tips` are shared by
+ *  every exercise built on it, so they cannot keep pace with a course: a
+ *  scene used in the momentum lecture may not talk about a quantity taught
+ *  later. An exercise card (or one of its tabs — EX.view merges it) may
+ *  therefore carry its own `tips: [...]`, which replace the scene's while
+ *  that exercise is on screen ON ITS OWN SCENE. A card's tips are plain text
+ *  with the card's inline markup ({tool:…}, {btn:…}, {key:…}) drawn as the
+ *  strip's own chips; a scene's tips stay HTML, exactly as before. With no
+ *  card tips nothing changes — every scene and every card without `tips`
+ *  behaves as it always did. */
+function exerciseTips() {
+  const ex = (typeof EX !== "undefined") ? EX.current : null;
+  return (ex && ex.scene === state.scene.id && Array.isArray(ex.tips) && ex.tips.length)
+    ? ex.tips : null;
+}
+function tipList() { return exerciseTips() || state.scene.tips || []; }
+function showTip(i) {
+  const el = document.getElementById("hint"), own = exerciseTips();
+  if (own) EX.rich(el, own[((i % own.length) + own.length) % own.length]);
+  else el.innerHTML = state.scene.tips[i] || "";
+  MINI.keep("hint");
+}
+/** Start the line again from the first tip — a card or a tab was just put
+ *  on screen (or taken off it). While a settle countdown is running the
+ *  frame loop owns the line, and the first tip follows it. */
+function restartTips() {
+  state.tipIdx = 0; state.tipAt = 0;
+  showTip(0);
+}
+
 function cycleTips(dt) {
-  const tips = state.scene.tips;
+  const tips = tipList();
   if (!tips.length || sim.t < (state.scene.spinup || 0)) return;
   state.tipAt += dt;
   if (state.tipAt > 9) {
     state.tipAt = 0;
     state.tipIdx = (state.tipIdx + 1) % tips.length;
-    document.getElementById("hint").innerHTML = tips[state.tipIdx];
+    showTip(state.tipIdx);
   }
 }
 
@@ -4385,7 +4426,7 @@ function boot() {
   // The status line is otherwise written on the half-second cadence in
   // `tickFrame`, which leaves the chip half-empty for the first frames.
   updateStatus();
-  document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
+  showTip(0);
 
   // A BARE visit lands on the start screen: this is a teaching tool, so the
   // pack is the front door and the sandbox is a card on it. Any address that

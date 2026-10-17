@@ -675,6 +675,7 @@ const EX = (() => {
       digit = (d === null || d === undefined || d === "") ? null : (+d | 0);
       if (digit !== null) { memo[ex.id] = digit; lastDigit = digit; }
       cur = ex;
+      restartTips();         // the card's own tips, if it has any (main.js)
       syncTitle();           // the strip names the exercise, not its scene
       arm(ex.settle || 0, ex.id);
       syncURLEx(ex.id, ex.tabKey);
@@ -723,6 +724,7 @@ const EX = (() => {
     const v = cur.viewParams || {};
     Object.keys(v).forEach((k) => setControl(k, v[k]));
     UIMODE.apply(UIMODE.fromExercise(cur));
+    restartTips();           // a tab may carry tips of its own
     syncTitle();
     syncURLEx(cur.id, cur.tabKey);
     card.refresh();
@@ -1555,7 +1557,9 @@ const EX = (() => {
    *  that, and each of them rebuilds the domain anyway. */
   function clear() {
     if (!cur) return;
+    const hadTips = !!(cur.tips && cur.tips.length);
     cur = null; settleTo = 0; settleWhat = "";
+    if (hadTips) restartTips();   // back to the scene's own
     card.hide();
     UIMODE.reset();          // the exercise's focus goes with the exercise
     refresh();
@@ -1564,7 +1568,7 @@ const EX = (() => {
   }
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
-           pick, reset, clear, setDigit, setTab, all, byId, listed, course, resolve, plain,
+           pick, reset, clear, setDigit, setTab, all, byId, listed, course, resolve, plain, rich,
            groupsFor: grouped, rules, ruleValue, digitSummary,
            studentControls,
            settleTarget, settleHint, tick, statusLine, card,

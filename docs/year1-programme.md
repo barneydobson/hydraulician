@@ -47,12 +47,13 @@ Principles:
 | L4 Fluid motion | FF-2 Spillway · FF-3 Flow past a body · FF-4 Pipe jet into a reservoir · CR-1 Contraction rig, tab Streamlines |
 | L5 Mass conservation | CR-1 Contraction rig, tab Continuity · VC-2 Fill and leak |
 | L6 Momentum | MM-1 Jet on an inclined plate · CR-1 Contraction rig, tab Forces · HJ-2 Momentum balance: sluice gate and hydraulic jump |
-| L7–L8 | taught by a colleague; rough ideas at the end |
+| L7–L8 | taught by a colleague: CR-1 tab Energy and HJ-2 tab Energy; rough ideas at the end |
 | Year 2 preview | WV-4 How waves break on beaches |
 
 The course menu (`courses/cive40008/course.js`, opened with `?course=cive40008`) lists exactly these, in this order;
-the contraction rig appears three times, as `"CR-1#streamlines"`,
-`"CR-1#continuity"` and `"CR-1#forces"`, each opening the card on its tab.
+the contraction rig is listed once, as CR-1, and its four tabs (Streamlines,
+Continuity, Forces, Energy) are on the card; `"CR-1#forces"` and the like
+still open a tab directly.
 (Until Oct 2026 the three tabs were three exercises, FF-5, VC-1 and MM-2;
 those ids still open the matching tab.) On the lecturer's own Pages site,
 `mvreeuwijk.github.io`, the course is on without the parameter (`hosts` in
@@ -62,10 +63,9 @@ those ids still open the matching tab.) On the lecturer's own Pages site,
 `courses/cive40008/exercises.js` and the briefs (README, `rig.js`, thumbnail)
 in `courses/cive40008/exercises/<ID>-<slug>/`, indexed by
 `courses/cive40008/INDEX.md`, beside the other courses a colleague's would
-sit with (`courses/original/` is the original teaching pack). HS-1 is the
-exception: it went upstream first, into what was then the shared register,
-and so moved with that pack to `courses/original/`; ids are global, so the
-course menu lists it like the rest.
+sit with (`courses/original/` is the original teaching pack). HS-1 went
+upstream first, into what was then the shared register, and moved here in
+Oct 2026; ids are global, so the original pack's menu still lists it.
 
 ## The cards (Oct 2026)
 
@@ -88,7 +88,7 @@ water is what it shows.
 ## First drafts: status and points for the lecturer (2026-10-16)
 
 All fourteen are built as first drafts: scene, card, brief (`courses/cive40008/exercises/<ID>-…/README.md`;
-HS-1 in the original pack's `courses/original/exercises/HS-1-dyke-piezometer/`)
+HS-1's now there too)
 and headless `rig.js`, with the numbers in each brief measured, not assumed. New shared
 capability: a **wind shear stress** on the free surface (FF-1) and a **streamline display**
 (VIEW → Streamlines, key T; contours of ψ, of the mean flow under Average). What each

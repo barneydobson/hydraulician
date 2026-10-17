@@ -4,17 +4,23 @@
 // ships its own, or none, and gets the whole register by topic.
 //
 // Order follows the lectures; the plan behind it is docs/year1-programme.md.
-// Ids the register does not have yet are skipped, not errors.
+// Ids the register does not have yet are skipped, and a section with nothing
+// in it is not shown — so the later sections can be named before they fill.
 const EXERCISE_MENU = {
   title: "CIVE40008 · Year 1",
   briefLink: false,          // students read the card; no "Lecturer notes" link
   compact: true,             // one line per exercise; its aim in a box on hover
+  collapsible: true,         // headings only; click one to open it
+  showAllLink: false,        // no "show all exercises in the register" link
   sections: [
-    { title: "L2 · Fundamentals",       ids: ["FF-1", "UP-1"] },
-    { title: "L3 · Statics",            ids: ["HS-1", "PF-2"] },
-    { title: "L4 · Fluid motion",       ids: ["FF-2", "FF-3", "FF-4", "FF-5"] },
-    { title: "L5 · Mass conservation",  ids: ["VC-1", "VC-2"] },
-    { title: "L6 · Momentum",           ids: ["MM-1", "MM-2", "HJ-2"] },
-    { title: "Year 2 preview",          ids: ["WV-4"] },
+    { title: "Fundamentals",          ids: ["FF-1", "UP-1"] },
+    { title: "Statics",               ids: ["HS-1", "PF-2"] },
+    { title: "Fluid dynamics",        ids: ["FF-2", "FF-3", "FF-4", "FF-5",
+                                            "VC-1", "VC-2",
+                                            "MM-1", "MM-2", "HJ-2"] },
+    { title: "Energy conservation",   ids: [] },
+    { title: "Pipes",                 ids: [] },
+    { title: "Free-surface flows",    ids: [] },
+    { title: "Showcase",              ids: ["WV-4"] },
   ],
 };

@@ -920,7 +920,9 @@ const EXERCISES = [
                  openL: "0", openR: "1", openB: "1", openT: "0",
                  spoutOn: true, spoutR: 0.10, spoutVx: 0.50, spoutVy: 0 },
     rigWhy: { spoutVx: "the dry-weather flow the 45 s pre-charge runs at — the storm ramp up from it is yours." },
-    viewParams: { gaugeField: "d", dye: true, dyeDecay: 0 },
+    // The spout's own dye source (the default seed at a running spout) marks
+    // the storm water: one of the few fixed sources still switched on.
+    viewParams: { gaugeField: "d", dyeSeeds: true, dyeDecay: 0 },
     digitNote: "your throttle is DRAWN: r = d mod 4 gives 2 / 4 / 6 / 8 cells erased straight down x = 4 m",
     setup: ["Press Z once — the rig ships with a 6-cell throttle already cut, and undo restores the whole floor so every rung starts equal (an erase stroke can widen a hole, never narrow it).",
             "Cut your own throttle: press [ twenty times to shrink the erase brush, then ] once / 3 / 5 / 6 times for r = 0 / 1 / 2 / 3, and erase down the x = 4 m line.",
@@ -935,7 +937,7 @@ const EXERCISES = [
     // derive a measure-only profile and the Erase tool would not be there.
     ui: {
       build: ["erase", "undoBtn"],
-      view: ["legendBtn", "dyeBtn"],
+      view: ["legendBtn"],
       controls: ["speed", "spoutVx"],
     },
     start: "a sewer feeding a CSO chamber with a spill crest",

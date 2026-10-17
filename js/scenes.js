@@ -2161,7 +2161,7 @@ const SCENES = (() => {
         water: () => 1,
         tips: ["Slide the shape from streamlined to bluff and watch the wake: steady and thin, then wider, then alternating.",
                "Colour is speed: behind a bluff body the flow separates from the surface, and the slow wake swings from side to side as eddies are shed.",
-               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Dye (D) releases black streaks just upstream of the body: watch them split on the nose and roll up in the wake.",
+               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Pick the Dye tool (D) and hold it just upstream of the body: the black streak splits on the nose and rolls up in the wake.",
                "Switch the colour bar from Live to Average: the average of the alternating wake is a steady, symmetric wake bubble."] };
     })(),
     // ===== Year 1: spillway, pipejet (FF-2, FF-4) =====

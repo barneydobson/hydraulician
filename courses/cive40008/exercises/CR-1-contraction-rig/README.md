@@ -77,9 +77,12 @@ With the taper the profiles are full and monotonic all the way through. The
 separated regions are only a few cells thick at Medium, so the vena contracta
 is a modest necking, not the crisp textbook picture; the shear layers shed
 small eddies, so the live picture flutters and Average gives the clean mean
-streamlines. Dye works here: the scene releases six black streaks in the left
-reservoir 0.5 m ahead of the pipe entrance, drawn through the bellmouth and
-along the whole pipe within ~10 s (they thin where the flow accelerates).
+streamlines. Dye works here: nothing is dyed until the student picks the
+**Dye** tool and holds the pointer in the water — in the wide pipe, or in the
+left reservoir ahead of the entrance — and the ink is drawn through the
+bellmouth and along the pipe, thinning where the flow accelerates. (The
+scene still declares six fixed streaks 0.5 m ahead of the entrance; they run
+only with Controls → Dye sources.)
 
 ## Continuity (L5)
 

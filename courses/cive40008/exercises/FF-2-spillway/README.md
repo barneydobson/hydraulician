@@ -83,8 +83,11 @@ The card carries these steps.
    passes 30 s: the pool becomes a steady mean flow with an eddy either side
    of the plunge, the rakes are clean curves, and the two fluxes agree
    (averaged pool section **3.33**, within 6% of the crest).
-8. **Optional.** Slide the lip angle; turn Dye on to mark the reservoir water
-   (dye is live-only and stands down under Average).
+8. **Optional.** Slide the lip angle. With the **Dye** tool, hold the pointer
+   in the reservoir before the crest to mark the water going over it (dye is
+   live-only: nothing is released under Average). The card no longer runs the
+   scene's fixed sheet on the crest approach — it read as a black wedge on
+   the crest; Controls → Dye sources still turns it on.
 
 The card's settle is about **40 s**: the crest flux is steady by ~5 s, but
 the pool level sloshes once (its section read 2.5–4.7 m²/s between 7 and

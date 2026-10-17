@@ -546,14 +546,19 @@ uniform float u_dyeDecay;  // 1/s
 // from n evenly spaced points on it (n separate streaks). The seeds are where
 // the FLOW goes in each scene — scenes.js declares them, sim.js supplies a
 // default — because dye injected at the far inlet of a long rig never reached
-// the thing the picture was about. u_dyeSeed.x = how many are live (0 with
-// Dye off or under Average: nothing is released and nothing extra is paid);
-// .y = pulse period (s, 0 = continuous; on, released for the first half of
-// each period, the dye forms bands whose edges are timelines); .z = 1 for
-// the limited (van Leer) dye faces, 0 for first-order upwind.
+// the thing the picture was about. u_dyeSeed.x = how many are live (0 unless
+// the scene or the card switched its fixed sources on, and 0 under Average:
+// nothing is released and nothing extra is paid); .y = pulse period (s, 0 =
+// continuous; on, released for the first half of each period, the dye forms
+// bands whose edges are timelines); .z = 1 for the limited (van Leer) dye
+// faces — once any dye A is in the water — 0 for first-order upwind.
 uniform vec4  u_seed[8];
 uniform vec2  u_seedP[8];
 uniform vec4  u_dyeSeed;
+// The Dye TOOL: x, z, radius (m) of the point the student is holding the
+// pointer on, w = 1 while it is held. Same release as a seed point — dye A
+// set to 1 in the wet cells inside the radius, every substep, never pulsed.
+uniform vec4  u_dyeInj;
 uniform vec2  u_drain;     // residue drain: rate (1/s), speed scale (m/s); 0 = off
 
 // van Leer. Superbee is tempting here but it is over-compressive: it turns the
@@ -793,6 +798,11 @@ void main(){
       if (n > 0.5) t = n > 1.5 ? (floor(t * (n - 1.0) + 0.5)) / (n - 1.0) : 0.5;
       if (distance(q, a + t * ab) < u_seedP[k].y) dNew.x = 1.0;
     }
+  }
+  // --- the Dye tool, held down: released into whatever water is under it
+  //     (air and solid have fC <= 0.3 and take nothing)
+  if (u_dyeInj.w > 0.5 && fC > 0.3 && distance(vec2(x, z), u_dyeInj.xy) < u_dyeInj.z) {
+    dNew.x = 1.0;
   }
 
   // --- point sources add volume and colour
@@ -1425,8 +1435,9 @@ void main(){
   }
 
   // ---- dye
-  // u_dyeOn: 1 = the seeded ink and the pour's dye B; 0.5 = dye B alone (Dye
-  // off — the pour still shows what it poured); 0 = neither (Average).
+  // u_dyeOn: 1 = the ink (Dye tool and seeds) and the pour's dye B — what the
+  // app always draws now; 0.5 = dye B alone (a caller that asks for no ink);
+  // 0 = neither (Average).
   if (u_dyeOn > 0.25) {
     float dA = u_dyeOn > 0.75 ? F.g : 0.0, dB = F.b;
     // Seeded dye is INK: near-black, because every colouring is a bright

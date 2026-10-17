@@ -116,7 +116,9 @@ const RIG = (() => {
             // being LOOKED at with, which is part of the rig for a demo
             // whose whole subject is where the HGL runs.
             grade: b01(state.grade), sline: b01(state.sline),
-            dye: b01(state.dye) },
+            // The scene's FIXED dye sources (Dye sources); the wire key
+            // stays `dye` — the Dye tool's ink is not part of a rig.
+            dye: b01(state.dyeSeeds) },
     };
     // additive, optional — a scene with no `params` declaration writes none,
     // and an old rig read back into one just keeps that scene's defaults.
@@ -217,9 +219,10 @@ const RIG = (() => {
     if (U.field) setAllGaugeFields(U.field);
     if (U.cvShow && CV_NEXT[U.cvShow]) state.cvShow = U.cvShow;
     if (U.speed !== undefined) state.speed = +U.speed;
-    ["channel", "labels", "jumps", "particles", "dye", "grade", "sline"].forEach((k) => {
+    ["channel", "labels", "jumps", "particles", "grade", "sline"].forEach((k) => {
       if (U[k] !== undefined) state[k] = !!(+U[k]);
     });
+    if (U.dye !== undefined) state.dyeSeeds = !!(+U.dye);
 
     SIM.resetWater();                        // R — a clean start on the new bed
     state.deliv = null;

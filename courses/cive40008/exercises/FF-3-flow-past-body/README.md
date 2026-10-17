@@ -49,7 +49,7 @@ The scene alone is `?scene=body`.
 | s = 0 | ellipse 1.20 m long, 0.40 m wide |
 | s = 1 | square, 0.40 m, slightly rounded corners (n = 12) |
 | viscosity | ν = 1·10⁻³ m²/s (an eddy viscosity): Re = U·2b/ν ≈ 360 at every slider position |
-| dye | black, released continuously from eight points on a line 0.5 m ahead of the nose, spanning z = 1.38–2.02 m (scene `dye.seeds`) |
+| dye | black, released by the student with the Dye tool, held just upstream of the body; the scene's fixed eight-point line 0.5 m ahead of the nose (z = 1.38–2.02 m, `dye.seeds`) runs only with Controls → Dye sources |
 
 Changing the slider re-rasterises the body and keeps the flow running; it
 does not restart the water. Each change also restarts an Average window.
@@ -68,8 +68,8 @@ does not restart the water. Each change also restarts an Average window.
    0.2 m off the centreline) and read the period from its Speed trace (⤢
    opens the inspector). About **2.9 s** for the square: St ≈ 0.4/(0.9 × 2.9)
    ≈ 0.16.
-4. **Dye and particles.** Turn on Dye and Particles on the strip. The dye
-   streaks split on the nose, run along the body and are drawn into the
+4. **Dye and particles.** Pick the Dye tool and hold the pointer just
+   upstream of the body, with Particles on. The dye streak splits on the nose, run along the body and are drawn into the
    wake: behind the ellipse they stay straight; behind the square they roll
    up and swing with the street. In the shedding wake the particles swing
    from side to side across the centreline while the mean flow (step 5) has
@@ -176,7 +176,7 @@ behind the tail.
   ≈ 0.14–0.15 measured for square cylinders at this Re; the 12 % blockage of
   the 3.4 m channel pushes it up a little.
 - **Dye.** Released just upstream of the body (not at the inlet, where the
-  old timelines had diffused into a wash before the wake), the streaks reach
+  old timelines had diffused into a wash before the wake), the streak reaches
   the wake intact and stay readable to the right edge at Medium; past
   x ≈ 4 m in a shedding wake they merge into one dark rolled-up band. Dye
   stands down under Average (it has no accumulator).

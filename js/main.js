@@ -37,7 +37,7 @@ const CONFIG = {
 const state = {
   scene: null, budget: CONFIG.defaultBudget,
   tool: "wall", brush: 0.055,
-  mode: 0, range: {}, particles: false, dye: true, channel: true, labels: true, jumps: true,
+  mode: 0, range: {}, particles: false, dyeSeeds: false, channel: true, labels: true, jumps: true,
   ui: null,                   // the resolved UI profile; UIMODE.full() when absent
   // The legend sits top right, immediately left of the Controls panel, until
   // somebody drags it; then the position is theirs for the session and stops
@@ -99,7 +99,7 @@ const state = {
   gaugeSeq: 0,                // ever-increasing gauge id, for inspector identity
   deliv: null,                // measured inlet discharge / level, for the panel
   cursor: [0, 0], inside: false, hover: null,
-  drag: null, pour: null,
+  drag: null, pour: null, dyeInj: null,
   zoom: 1, vex: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false, vexDrag: null,
   // The exaggeration is fitted to the window until somebody sets it by hand —
   // then it is theirs, and a resize stops moving it (see autoVex).
@@ -237,9 +237,11 @@ function loadScene(id, keepDrawing) {
   // A scene whose whole subject is the particle motion should not open with
   // the particles switched off and a tip asking you to find the key.
   if (sc.particles !== undefined) state.particles = !!sc.particles;
-  // Dye is off unless the scene asks: it releases from seeds, and a scene
-  // that never thought about where would release from a default inlet line.
-  state.dye = !!(sc.dye && sc.dye.on) || sc.dyeLine > 0;
+  // Nothing is dyed until somebody releases it with the Dye tool. A scene's
+  // FIXED sources (its `dye.seeds`, or the default inlet line) run only when
+  // it asks — `dye.on`, or the pulsed timelines of `dyeLine` (m1/m2) — or a
+  // card sets `dyeSeeds` in its viewParams.
+  state.dyeSeeds = !!(sc.dye && sc.dye.on) || sc.dyeLine > 0;
   state.slineBuf = null; state.slineDpsi = 0; state.slineT = -1;
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.measure = null; state.measDrag = null;
@@ -312,7 +314,7 @@ function syncTitle() {
 function switchScene(id) {
   if (!SCENES.byId[id]) return false;
   state.speed = 1.0;
-  state.dye = true;
+  state.dyeSeeds = false;             // loadScene turns them on where the scene asks
   state.jumps = true;
   state.particles = false;            // scenes that want them set `sc.particles`
   state.grade = false;                // an exercise that wants them says so in viewParams
@@ -899,9 +901,9 @@ const CONTROLS = [
     get: () => SIM.particleTrail(), set: (v) => SIM.particleTrail(v),
     fmt: (v) => v.toFixed(1) + " s of flow",
     info: "How much flow each particle's trail records. It starts at a length fitted to the scene — a typical particle draws about a seventh of the view — so slow flow still leaves a visible trace and a fast jet does not become a smear." },
-  { id: "dye", type: "check", label: "Dye",
-    get: () => state.dye, set: (v) => state.dye = v,
-    info: "Black dye released continuously from short seed lines placed where the flow goes — ahead of the body, at the pipe entrance, in the jet. It is carried by the water and diffuses as it goes, so its streaks show separation, wakes and mixing. Stands down under <b>Average</b>, which has no record of it." },
+  { id: "dyeSeeds", type: "check", label: "Dye sources",
+    get: () => state.dyeSeeds, set: (v) => state.dyeSeeds = v,
+    info: "The scene's own FIXED dye sources: short seed lines placed where the flow goes — ahead of the body, at the pipe entrance, in the jet — or, where a scene names none, a line just inside the inflow. Off unless the scene asks (the timeline flumes do). To release dye anywhere else, pick the <b>Dye</b> tool and hold the pointer in the water. Either way it is black ink, carried by the water and diffusing as it goes; it stands down under <b>Average</b>, which has no record of it." },
   { id: "sline", type: "check", label: "Streamlines",
     get: () => state.sline, set: (v) => state.sline = v,
     info: "Contours of the stream function ψ, drawn at equal steps Δψ, so every tube between two neighbouring lines carries the same discharge per unit width — where the lines crowd the water is fast, where they spread it is slow. Walls, the bed and (in steady flow) the free surface are streamlines themselves. Under <b>Average</b> they are the streamlines of the MEAN flow: compare them with the dye and the particles, which follow the unsteady flow, and they agree only where the flow is steady. Refreshed about four times a second; the key at the bottom left quotes Δψ." },
@@ -912,7 +914,7 @@ const CONTROLS = [
   { id: "dyeLine", label: "Dye timelines", min: 0, max: 4, step: 0.1,
     get: () => sim.p.dyeLine, set: (v) => sim.p.dyeLine = v,
     fmt: (v) => v === 0 ? "off — continuous" : "pulsed every " + v.toFixed(1) + " s",
-    info: "Pulses the dye release: on for half of each period, off for the other half. The front of each band leaves the seed line at one instant, so it is a timeline — it shears as it travels, and in a channel that shape IS the velocity–depth distribution." },
+    info: "Pulses the fixed dye sources (<b>Dye sources</b>): on for half of each period, off for the other half. The front of each band leaves the seed line at one instant, so it is a timeline — it shears as it travels, and in a channel that shape IS the velocity–depth distribution." },
   { id: "dyeDecay", label: "Dye fade", min: 0, max: 0.3, step: 0.005,
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
@@ -1251,7 +1253,15 @@ const TOOLS = [
   // click on (Task 2 of the polygon-geometry work), which nothing draws yet,
   // so it has no digit of its own either.
   ["force", "Pressure force", "Click a wall or gate face for its pressure diagram — click the same solid again to cycle faces, click open water to clear"],
+  // THIRTEENTH, appended like Flux and Force so no digit moves. Its key is the
+  // letter D (TOOL_LETTER), which used to toggle the Dye view button this
+  // replaced: dye is no longer released automatically, the student puts it
+  // where the question is.
+  ["dye", "Dye", "Hold the pointer in the water to release black dye there — drag to move the release point, let go to stop"],
 ];
+
+/** Tools with a LETTER shortcut rather than a digit. */
+const TOOL_LETTER = { dye: "D" };
 
 /** The tools the number keys can reach. */
 const TOOL_KEYS = Math.min(9, TOOLS.length);
@@ -1934,9 +1944,9 @@ const TOOLBAR = [
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
   { cap: "MEASURE", family: "measure",
-    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux", "force") },
+    items: toolItems("gauge", "rake", "tracer", "dye", "measure", "cv", "flux", "force") },
   // VIEW: how the water is DRAWN. The three toggles were reachable only from
-  // the P / D / N keys or from a scroll of the Controls panel, which on a
+  // the P / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
   { cap: "VIEW", family: "view", items: [
     { id: "legendBtn", icon: "legend", label: "Field & legend", key: "L",
@@ -1946,10 +1956,6 @@ const TOOLBAR = [
       hint: "Massless tracers — the clearest way to see orbits and jets",
       on: () => state.particles,
       act: () => { state.particles = !state.particles; syncPanel(); } },
-    { id: "dyeBtn", icon: "dye", label: "Dye", key: "D",
-      hint: "Black dye released where the flow goes",
-      on: () => state.dye,
-      act: () => { state.dye = !state.dye; syncPanel(); } },
     { id: "slineBtn", icon: "sline", label: "Streamlines", key: "T",
       hint: "Streamlines — equal discharge between neighbouring lines; of the mean flow under Average",
       on: () => state.sline,
@@ -2069,7 +2075,7 @@ function toolItem([id, label, tip]) {
   // `tool` is the item's own name for the thing it arms, and it is what a UI
   // profile names — an exercise says `measure: ["gauge"]`, not "Gauge".
   return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
-           key: n <= TOOL_KEYS ? String(n) : "",
+           key: n <= TOOL_KEYS ? String(n) : (TOOL_LETTER[id] || ""),
            on: () => state.tool === id,
            act: () => {
              // The Gauge button pressed while the Gauge tool is ALREADY in
@@ -2253,7 +2259,7 @@ const KEYS = (() => {
     ["L", "the legend — which field, over what range, in what units"],
     ["B", "what the Control volume reads on each edge: Q / momentum / energy"],
     ["P", "particles"],
-    ["D", "dye"],
+    ["D", "the Dye tool — hold the pointer in the water to release dye"],
     ["T", "streamlines"],
     ["N", "open-channel overlay"],
     ["A", "average the flow — the mean field, over one window"],
@@ -2538,6 +2544,12 @@ function pointerPos(e) {
 
 const pointers = new Map();          // active pointers, for pinch zoom
 
+/** Let go of the Dye tool: the release stops at once. */
+function stopDye() {
+  state.dyeInj = null;
+  if (sim && sim.p) sim.p.dyeInj = null;
+}
+
 function onDown(e) {
   try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* synthetic events */ }
   pointers.set(e.pointerId, pointerPx(e));
@@ -2547,6 +2559,7 @@ function onDown(e) {
     state.drag = null; state.spoutDrag = false; state.measDrag = null;
     state.cvDrag = null; state.fluxDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
+    stopDye();
     const ps = [...pointers.values()];
     state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
     return;
@@ -2577,6 +2590,14 @@ function onDown(e) {
   if (e.button === 2 || state.tool === "pour") {
     state.pour = { x, z, r: state.brush * 4, vx: 0, vz: sim.p.g > 0.5 ? -2.0 : 0, lx: x, lz: z };
     sim.p.pour = state.pour;
+    return;
+  }
+  // The Dye tool: press and HOLD. While the pointer is down the solver
+  // releases ink at it every substep (FS_VOF, u_dyeInj) — into water only, so
+  // a press in the air releases nothing until the drag reaches the water.
+  if (state.tool === "dye") {
+    state.dyeInj = { x, z, r: SIM.dyeInjRadius() };
+    sim.p.dyeInj = state.dyeInj;
     return;
   }
   if (state.tool === "spout") {
@@ -2682,6 +2703,10 @@ function onMove(e) {
     sim.p.source.x = x; sim.p.source.z = z;
     return;
   }
+  if (state.dyeInj) {
+    state.dyeInj.x = x; state.dyeInj.z = z;
+    return;
+  }
   if (state.pour) {
     const dt = 1 / 60;
     state.pour.vx = Math.max(-6, Math.min(6, (x - state.pour.lx) / dt * 0.35));
@@ -2720,6 +2745,7 @@ function onUp(e) {
   state.spoutDrag = false;
   if (state.vexDrag) { state.vexDrag = null; syncPanel(); return; }
   if (state.pour) { state.pour = null; sim.p.pour = null; }
+  stopDye();
   if (state.measDrag) {
     const d = state.measDrag;
     // Shorter than a cell is a click: clear the tape rather than keep a dot.
@@ -2911,12 +2937,17 @@ function tickFrame(realDt) {
     // The same simulated step the particles were advanced by, so the trail
     // fades over a fixed span of FLOW rather than of wall clock.
     pdt: Math.min(simAdvanced, 0.05),
-    // Dye has no accumulator, so a live tracer over a mean picture would put
-    // two flow states in one screenshot: under an open window it stands down.
-    dye: state.dye && !measuringAvg(), particles: state.particles,
+    // Dye is drawn whenever there is any (the Dye tool, or a scene's fixed
+    // sources). It has no accumulator, so a live tracer over a mean picture
+    // would put two flow states in one screenshot: under an open window it
+    // stands down, and nothing is released either.
+    dye: !measuringAvg(), dyeSeeds: state.dyeSeeds, particles: state.particles,
     // One window, one picture: the same flag the overlay above was built with.
     avg: state.avg,
-    cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1 : state.brush * 0.55],
+    // The Dye tool's ring is its release radius, so the student sees where
+    // the ink will go in before pressing.
+    cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1
+             : state.tool === "dye" ? SIM.dyeInjRadius() : state.brush * 0.55],
     guide: state.drag ? [state.drag.x0, state.drag.z0, state.drag.x1, state.drag.z1] : [0, 0, 0, 0],
     guideOn: !!state.drag,
   });
@@ -4152,7 +4183,16 @@ function boot() {
       if (state.cvShow === "E" && UIMODE.hides("energy")) state.cvShow = "Q";
       syncPanel();
     }
-    else if (k === "d") { state.dye = !state.dye; syncPanel(); }
+    else if (k === "d") {
+      // The Dye tool, by letter — the same gate as a digit: a hidden tool's
+      // key says why rather than arming it.
+      if (UIMODE.allows(familyOf("dye"), { tool: "dye", id: "dye" })) {
+        state.tool = "dye"; state.forceHover = null; window.syncTools();
+      } else {
+        showToast("Dye is off for this exercise",
+                  "The ⋯ button at the end of the strip brings every control back.");
+      }
+    }
     else if (k === "t") { state.sline = !state.sline; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "a") setAverage(!state.avg);

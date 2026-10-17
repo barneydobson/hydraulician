@@ -854,11 +854,11 @@ async function main() {
             r.scene === "contraction" && r.t1 >= r.t0 && r.t0 > 0, JSON.stringify([r.t0, r.t1]));
       check("the address bar follows the tab", /tab=streamlines/.test(r.url1), r.url1);
       eq("the tab's own fields", r.fields, "water,speed");
-      eq("the tab's own tools", r.measure, false);
+      eq("the tab's own tools — only the Dye tool", JSON.stringify(r.measure), '["dye"]');
       eq("the tab bar marks the open tab", r.tabs, "Streamlines*,Continuity,Forces");
       eq("five steps", r.steps, 5);
-      eq("the steps name strip buttons by their own labels", r.icons, "Particles|Streamlines");
-      eq("each with the strip's own icon", r.svgs, 2);
+      eq("the steps name strip buttons by their own labels", r.icons, "Particles|Streamlines|Dye");
+      eq("each with the strip's own icon", r.svgs, 3);
       eq("no unknown markup", r.bad, 0);
       check("Background is there, and closed", r.bgShown && !r.bgOpen, JSON.stringify(r));
       check("the short layout drops Start and Do", r.start === "none" && r.task === "none",
@@ -1263,6 +1263,54 @@ async function main() {
       check("every strip button is still labelled", p.unlabelled === 0, p.unlabelled + " bare");
       eq("the strip still renders the whole spec", p.buttons, p.specCount);
       check("no control fell out of the strip", !p.groupsClipped);
+      await tab.close();
+    }
+
+    // ------------------------------------------------- the Dye tool
+    console.log("\nthe Dye tool releases ink only while it is held");
+    {
+      // Nothing is dyed on boot (a scene's fixed sources are off unless it
+      // asks); press-and-hold releases at the pointer, a drag moves the
+      // release point, letting go stops it. Plan view (`body`), so every cell
+      // is water. Driven through real pointer events on the canvas.
+      const tab = await browser.open(INDEX + "?scene=body");
+      const r = await tab.evaluate(`
+        const S = APP.sim, cv = document.querySelector("canvas");
+        const strip = APP.ui.TOOLBAR.flatMap((g) => g.items);
+        const item = strip.find((i) => i.tool === "dye");
+        const inMeasure = APP.ui.TOOLBAR.find((g) => g.cap === "MEASURE").items
+                             .some((i) => i.tool === "dye");
+        const oldBtn = strip.some((i) => i.id === "dyeBtn");
+        APP.frames(20);
+        const x0 = 0.2 * S.W, z0 = 0.5 * S.H, x1 = 0.3 * S.W;
+        const before = APP.probe(x0, z0).dye;
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true }));
+        const byKey = APP.state.tool;
+        const R = cv.getBoundingClientRect(), sc = R.width / cv.clientWidth;
+        const at = (x, z) => ({ clientX: R.left + APP.view.X(x) * sc,
+                                clientY: R.top + APP.view.Y(z) * sc,
+                                pointerId: 7, button: 0, buttons: 1, bubbles: true });
+        cv.dispatchEvent(new PointerEvent("pointerdown", at(x0, z0)));
+        const held = !!S.p.dyeInj;
+        APP.frames(30);
+        const dyed = APP.probe(x0, z0).dye;
+        cv.dispatchEvent(new PointerEvent("pointermove", at(x1, z0)));
+        const moved = S.p.dyeInj ? S.p.dyeInj.x : -1;
+        APP.frames(10);
+        cv.dispatchEvent(new PointerEvent("pointerup", at(x1, z0)));
+        return { inMeasure, oldBtn, key: item && item.key, byKey, before, held, dyed,
+                 moved, x1, released: S.p.dyeInj == null, seeds: APP.state.dyeSeeds };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("Dye is a tool in MEASURE", r.inMeasure);
+      check("the old Dye view toggle is gone", !r.oldBtn);
+      eq("its key is D", r.key, "D");
+      eq("D arms it", r.byKey, "dye");
+      check("nothing is dyed before a release", r.before === 0 && !r.seeds, JSON.stringify(r));
+      check("pressing starts the release", r.held);
+      check("holding dyes the water under the pointer", r.dyed > 0.5, String(r.dyed));
+      check("dragging moves the release point", Math.abs(r.moved - r.x1) < 1e-6, String(r.moved));
+      check("letting go stops it", r.released);
       await tab.close();
     }
 

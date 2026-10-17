@@ -1677,32 +1677,63 @@ const SCENES = (() => {
     })(),
     // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
     // The shared contraction rig: two reservoirs held at fixed levels, a
-    // 0.80 m pipe that contracts into a 0.40 m pipe discharging into the
-    // right reservoir. ONE slider, the contraction length L: at L = 4 m the
-    // wide pipe tapers the whole way from x = 3 to x = 7; shorter L keeps the
-    // wide bore constant for longer and converges over a shorter, steeper
-    // taper, always ending at the fixed narrow pipe at x = 7.0; L = 0 is the
-    // abrupt step. The contraction is symmetric about the pipe axis
-    // (z = 1.20), so both corners separate alike.
+    // 1.00 m pipe (x = 3.6 →) that contracts into a 0.50 m pipe discharging
+    // into the right reservoir at x = 11.0. ONE slider, the contraction
+    // length L: at L = 3 m the wide pipe tapers from x = 4.6 to x = 7.6;
+    // shorter L keeps the wide bore constant for longer and converges over a
+    // shorter, steeper taper, always ending at the fixed narrow pipe at
+    // x = 7.6; L = 0 is the abrupt step. The contraction is symmetric about
+    // the pipe axis (z = 1.00), so both corners separate alike.
     //
     // Pressurised duct flow between two head-driven level controls, the
-    // venturi pattern: the left sponge holds the WHOLE left compartment
-    // (a narrow sponge cannot supply the pipe and the reservoir draws down),
-    // the right one the whole right compartment (or the pipe jet blows
-    // through the tailwater and the bore never feels its pressure). The
-    // pipe sits deep — its crown 1.1 m under the tailwater — so the lowest
-    // pressure in the rig, at the vena contracta past the step, stays well
-    // above zero gauge (the EOS clips there and would void).
+    // venturi pattern. The pipe sits deep — its crown 1.15 m under the
+    // tailwater — so the lowest pressure in the rig, at the vena contracta
+    // past the step, stays well above zero gauge (the EOS clips there and
+    // would void).
+    //
+    // The two reservoirs were rebuilt after a lecturer's report (measured,
+    // Medium, on the old 11.5 m domain: a 1.6 m left reservoir, a 2.5 m right
+    // one with its sponge over 2.3 m of it):
+    //  * RIGHT: the surface stood 0.17 m ABOVE the 2.40 m tailwater where the
+    //    pipe discharges, dropped abruptly at x ≈ 9.55 and sat at 2.40 from
+    //    there to the edge. Under it ran a surface current of −1.6 to −2.2 m/s
+    //    flowing IN from the right edge (the jet ran out along the floor at
+    //    +1.3–1.9 m/s): the tailwater, a level control, passes inflow as
+    //    readily as outflow, so the edge fed the jet's entrainment directly,
+    //    and the mound was that current's stagnation head against the
+    //    reservoir wall (u²/2g ≈ 0.2 m) — and the abrupt drop the sponge
+    //    holding the level. It also throttled the pipe (Q 0.95 m²/s).
+    //    Now: a 6 m reservoir (W = 17), a 1.5 m sponge at its far end, and
+    //    the tailwater's exchange face passing OUTFLOW ONLY (twOutflowOnly,
+    //    FS_VEL; default off elsewhere). The jet's entrainment has to be fed
+    //    from inside the reservoir, so the return current is a near-field
+    //    roller (−1.1 m/s at the wall, gone by x ≈ 15) and the edge passes
+    //    the spread jet outward over the whole depth. Lengthening alone (no
+    //    clamp) still left −0.8 to −1.4 m/s coming in along the whole surface.
+    //    An absorbing layer (outflowNu, as pipejet) ran to the ±80 rail here:
+    //    it is for full, lidded domains only.
+    //  * LEFT: the level drew down 6–14 cm under its 2.80 m across a 1.6 m
+    //    reservoir. A head-driven sponge supplies the pipe by its deficit, so
+    //    the level it holds sits ~Q / (fill rate × width) under the setting.
+    //    Now 3.6 m wide (the whole rig moved 2.0 m right), a 2.4 m sponge, and
+    //    its fill 4× stiffer (spongeFill): the reservoir holds 2.78–2.80 m and
+    //    the remaining ~5 cm is the real drawdown of water accelerating into
+    //    the pipe. A shorter sponge (0.5 / 1.2 m) drew down MORE (to 2.59 /
+    //    2.62), and the whole compartment (3.4 m) at the default fill only
+    //    moved the dip.
+    // Q rose to ~1.3 m²/s with the outlet no longer throttled; the briefs
+    // carry the re-measured numbers.
     //
     // Above the pipe is a sealed EMPTY pocket between the two reservoir
     // walls: the pipe is a casing with air over it, not a buried tunnel.
     ...(() => {
-      const XL = 1.6, XS = 5.6, XR = 9.0;           // pipe entry, contraction end, pipe exit
+      const XL = 3.6, XS = 7.6, XR = 11.0;          // pipe entry, contraction end, pipe exit
+      const W = 17.0;                               // domain: a 6 m right reservoir
       const ZC = 1.00, A1 = 0.50, A2 = 0.25;        // axis, wide and narrow half-bores
       const ZF = 0.20, ZTOP = 1.75, TW = 0.20;      // reservoir floors, casing top, wall thickness
       const L1 = 2.80, L2 = 2.40;                   // reservoir levels
       const RB = 0.30, NB = 8;                      // bellmouth radius, chords per lip
-      const LMAX = 3.0;                             // longest taper: x = 2.6 → 5.6
+      const LMAX = 3.0;                             // longest taper: x = 4.6 → 7.6
       const Q0 = 0.95;                              // measured steady Q, m²/s (taper)
       const Lof = (par) => (par && par.taperL !== undefined ? par.taperL : LMAX);
       // Half-bore at x: wide, then a straight taper of length L, then narrow.
@@ -1715,11 +1746,12 @@ const SCENES = (() => {
         id: "contraction", name: "Contraction rig", key: "Taper ↔ step",
         group: "Pressure & transients",
         blurb: "Two reservoirs joined by a wide pipe that contracts into a narrow one. One slider takes the contraction from a long gentle taper to an abrupt step.",
-        W: 11.5, H: 2.9, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
+        W, H: 2.9, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
         mode: 2, hmax: 3.0, headMax: 2.6, vmax: 4, particles: 1, plife: 6,
         spinup: 25,                               // measured: from a fresh start Q overshoots ~30% at 8 s and is back within a few per cent of steady by 25 s, at either end of the slider
         open: [1, 1, 0, 0],
-        spongeIn: 1.4, spongeTw: 2.3,
+        spongeIn: 2.4, spongeTw: 1.5, spongeFill: 4,
+        twOutflowOnly: true,                      // see the comment above: the edge must not feed the jet
         inflow: { level: L1, q: 0, on: 1, free: 1 },
         tailwater: { level: L2, on: 1 },
         params: [
@@ -2251,6 +2283,25 @@ const SCENES = (() => {
     //  * an overflow weir at the far end: stable, but the jet struck the weir
     //    face within ~10 s and the 14 m tank filled with one big eddy, so the
     //    averaged jet was neither straight nor symmetric.
+    //   The outflow edge needs an ABSORBING LAYER (outflowNu / outflowLen,
+    // FS_VEL). The tailwater is a pressure outlet — it pins a hydrostatic f
+    // and passes whatever u arrives, inflow included — and the 2-D eddies
+    // grow to tank size by x ≈ 20 m. Without the layer (measured, Medium) one
+    // parked on the edge most of the time: live the edge ran OUT by the floor
+    // and the lid and IN through the middle (−0.7 m/s at z ≈ 2.5–3.5 m;
+    // up to 1.1 m²/s in against 1.9 out, for a net 0.76), and a 60 s average
+    // was still two-signed (−0.2 m/s around z = 4 m). The sponge only nudges
+    // f, so it never touched u; the net flux was right all along (averaged,
+    // 0.76 m²/s out of the edge against 0.77 down the pipe). With ν raised by
+    // 0.5·s² m²/s over the last 6 m the eddies are diffused out before they
+    // arrive and the edge passes a smooth one-signed profile over its whole
+    // height, live and averaged. 0.5 is about the most that costs no speed
+    // (SIM.dt holds the layer to a diffusion number of 0.14: at 0.20, ν =
+    // 0.7, it ran to the ±80 rail; 1.0 m²/s ran clean but 30% slower); at
+    // 0.5 over 4 m the edge still took in up to 0.07 m²/s now and then.
+    // A plain open edge (tailwater off, outflow-only) was tried: with
+    // nothing holding the tank's head it rose until the pipe carried 0.34
+    // m²/s instead of 0.79.
     //   kappa: 0 switches the open-channel mixing length off. Its l = κy
     // takes y from the nearest wall, metres from a free shear layer, and
     // with it on (measured) the jet left the pipe as a smooth laminar blob
@@ -2311,6 +2362,9 @@ const SCENES = (() => {
         spinup: 20,
         open: [1, 1, 0, 0],
         spongeIn: XH, spongeTw: 2.0,
+        // The outflow's absorbing layer: ν + 0.5·s² m²/s over the last 6 m
+        // (s: 0 → 1 towards the edge). See the scene comment above.
+        outflowNu: 0.5, outflowLen: 6.0,
         inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
         tailwater: { level: TW, on: 1 },
         solids: () => { const g = build(); return [g.ground, g.lower, g.upper]; },

@@ -38,9 +38,9 @@ How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-ex
 | header | x = 0 → 2.2 m, head held at **6.60 m** (head-driven control, whole compartment) |
 | pipe | bore 0.5 m (z = 2.90–3.40 m, axis 3.15 m), x = 2.5 → 10.5 m (16 D), rounded (bellmouth) entrance |
 | tank | full to its lid at z = 6 m, floor z = 0.3 m: 5.7 D clear of the jet axis above and below |
-| outflow | the right edge, 19.5 m (39 D) past the exit, held at a head of **6.20 m** (a submerged tailwater, sponge 2 m) |
+| outflow | the right edge, 19.5 m (39 D) past the exit, held at a head of **6.20 m** (a submerged tailwater, sponge 2 m) behind a 6 m absorbing layer that damps the eddies before they reach it |
 
-The driving head is 0.40 m; the pipe carries **q ≈ 0.76–0.80 m²/s** (mean
+The driving head is 0.40 m; the pipe carries **q ≈ 0.78–0.80 m²/s** (mean
 velocity ~1.6 m/s, centreline 2.2–2.5 m/s). *Reservoir level* is
 the header head and is the one value offered on the card: raise it and the jet runs
 faster; it is on the card. There is no Geometry slider: nothing about the
@@ -83,13 +83,14 @@ from z = 1.90 m (x = 12 m) and 1.40 m (x = 14 m):
 
 | reading | live | averaged (T = 60 s) |
 |---|---|---|
-| pipe, x = 3.5 m | 0.51 1.37 1.92 2.13 2.17 2.17 2.17 2.13 1.94 1.40 0.52 | centreline 2.09 |
-| pipe, x = 10 m | 0.42 1.17 1.76 2.18 2.43 2.51 2.43 2.19 1.77 1.18 0.43 | centreline 2.40 |
-| jet, x = 12 m | a thin core, 2.35 peak, barely moving | bell, 1.43 peak on the axis |
-| jet, x = 14 m | the core wanders ~0.25 m, its peak 1.9–2.2 m/s | wider bell, 0.74 peak |
-| q, pipe at x = 10 m | 0.79–0.80 m²/s | 0.76 |
-| q, jet only at x = 12 m | 0.91 | 0.92 (+20%) |
-| q, jet only at x = 14 m | 1.00–1.02 | 1.03 (+35%) |
+| pipe, x = 3.5 m | 0.51 1.37 1.92 2.13 2.17 2.17 2.17 2.13 1.93 1.40 0.52 | centreline 2.14 |
+| pipe, x = 10 m | 0.42 1.17 1.76 2.18 2.42 2.51 2.43 2.18 1.77 1.18 0.43 | centreline 2.46 |
+| jet, x = 12 m | a thin core, 2.3 peak, barely moving | bell, 1.37 peak on the axis |
+| jet, x = 14 m | the core wanders ~0.25 m, its peak 1.7–2.0 m/s | wider bell, 0.78 peak |
+| q, pipe at x = 10 m | 0.78–0.80 m²/s | 0.78 |
+| q, jet only at x = 12 m | 0.88–0.92 | 1.07 (+37%) |
+| q, jet only at x = 14 m | 0.8–2.0, as eddies cross it | 1.15 (+47%) |
+| q out of the right edge | 0.79–0.82, never any inflow | 0.79, every cell outward |
 
 **What does not work as well as the brief hoped.**
 
@@ -98,7 +99,8 @@ from z = 1.90 m (x = 12 m) and 1.40 m (x = 14 m):
   a few tank-sized vortices and the averaged far field needs minutes, not
   seconds, to converge — after 60 s it is still lumpy. Use the near jet
   (x = 11–15 m) for the bells and the entrainment; the averaged x = 14 m bell
-  is slightly lopsided (more flow below the axis) after a 60 s window.
+  is slightly lopsided after a 60 s window (its peak a quarter-metre under
+  the axis, a long tail above it, and a slow return flow under it).
 - **The viscosity is an eddy viscosity.** The scene sets ν = 2·10⁻³ m²/s
   (Re = VD/ν ≈ 400) and switches the open-channel mixing length off. At
   water's viscosity the jet broke up at the lip into eddies that throttled
@@ -113,8 +115,24 @@ from z = 1.90 m (x = 12 m) and 1.40 m (x = 14 m):
   takes the profile from a plug to a rounded one, not to the final shape;
   that is the point being made (development), but do not call the exit
   profile "fully developed".
-- The pipe q drifts down ~5% over the first minute as the tank's eddies
-  organise themselves.
+- **The outflow edge has an absorbing layer.** The right edge is a fixed
+  head (a pressure outlet), and a pressure outlet passes whatever velocity
+  reaches it — inflow too. Without help, the tank-sized eddies parked on the
+  edge: live it took water IN over part of its height in 12 of 16 samples
+  (up to 0.45 m²/s in, against ~1.2 out), and a 60 s average went out by
+  the floor (0.57 m/s) and the lid (0.44) and IN through the middle
+  (from z ≈ 3 to 5 m, −0.22 m/s at its strongest), which is what the class saw. The net was
+  always right (0.75 out against 0.75 down the pipe); it was the picture
+  that was wrong. The scene now raises the viscosity smoothly over the last
+  6 m before the edge (to +0.5 m²/s at the edge itself), which diffuses the
+  eddies away before they arrive: the edge passes a smooth bell over its
+  whole height (≈0.2 m/s in the middle, falling to 0 at floor and lid), and
+  never once took water in, live or averaged. Over x ≈ 24–30 m the eddies
+  therefore fade — that is the layer, not physics; read the jet upstream of
+  it. The averaged jet bells (x = 12 and 14 m) are unchanged by it to within
+  0.02 m/s; the averaged pipe q rose from 0.75 to 0.78 m²/s (the backflow at
+  the edge had been costing the pipe some head), and it now holds at
+  0.78–0.80 m²/s throughout instead of drifting down.
 
 ### Discussion points
 

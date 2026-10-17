@@ -1288,9 +1288,9 @@ const EXERCISES = [
         rule: "3 m is a gentle taper, 0 m an abrupt step. Each change restarts the flow — wait about 25 s before reading Q again." },
     ],
     instruments: [
-      { tool: "flux", where: "Flux line: drag up across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "Q₁ in the wide pipe" },
-      { tool: "flux", where: "Flux line: drag up across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
-      { tool: "cv", where: "Control volume: drag (2.3, 0.3) → (7.0, 1.65) — round the contraction, top and bottom inside the pipe walls", why: "Σ Q = 0: in on the left face, out on the right, nothing through the walls" },
+      { tool: "flux", where: "Flux line: drag up across the wide pipe at x = 4.3 m, from z = 0.4 to 1.6 m", why: "Q₁ in the wide pipe" },
+      { tool: "flux", where: "Flux line: drag up across the 0.50 m pipe at x = 9.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
+      { tool: "cv", where: "Control volume: drag (4.3, 0.3) → (9.0, 1.65) — round the contraction, top and bottom inside the pipe walls", why: "Σ Q = 0: in on the left face, out on the right, nothing through the walls" },
     ],
     ui: {
       view: ["legendBtn", "partBtn", "slineBtn"],
@@ -1302,8 +1302,8 @@ const EXERCISES = [
     start: "two reservoirs joined by a 1.00 m pipe that narrows into a 0.50 m pipe, running steadily; the contraction is a gentle taper 3 m long",
     setup: [
       "Lagrangian: follow one particle through the contraction — it speeds up, although the flow is steady and nothing on screen changes in time.",
-      "Eulerian: pick the Flux line tool on the strip and drag one up across each pipe — the wide pipe at x = 2.3 m and the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m — and read Q in each.",
-      "Pick the Control volume tool on the strip and drag a box from (2.3, 0.3) to (7.0, 1.65) round the contraction; read Q on each face and Σ Q under the box.",
+      "Eulerian: pick the Flux line tool on the strip and drag one up across each pipe — the wide pipe at x = 4.3 m and the 0.50 m pipe at x = 9.0 m, from z = 0.4 to 1.6 m — and read Q in each.",
+      "Pick the Control volume tool on the strip and drag a box from (4.3, 0.3) to (9.0, 1.65) round the contraction; read Q on each face and Σ Q under the box.",
       "Slide Contraction length L on this card to 0 m (an abrupt step): the flow restarts; after it settles read the three again.",
     ],
     task: "Check that Q₁ = Q₂ and Σ Q ≈ 0 for any contraction: the step changes the streamlines but lowers Q only a few per cent.",
@@ -1324,9 +1324,9 @@ const EXERCISES = [
         rule: "3 m is a gentle taper, 0 m an abrupt step. Each change restarts the flow — wait about 25 s before reading the force." },
     ],
     instruments: [
-      { tool: "flux", where: "Flux line: drag up across the wide pipe at x = 2.3 m, from z = 0.4 to 1.6 m", why: "section 1: Q, momentum flux M₁ = ρQU₁ and pressure force F₁ = p₁A₁" },
-      { tool: "flux", where: "Flux line: drag up across the 0.50 m pipe at x = 7.0 m, from z = 0.4 to 1.6 m", why: "section 2; the card under the pair prints the force on what is between them" },
-      { tool: "cv", where: "Control volume: drag (2.3, 0.3) → (7.0, 1.65), then press B until the faces read momentum + pressure; later move it to (7.0, 0.3) → (8.6, 1.65)", why: "F→ on the box is R, the force of the water on the contraction (plus the wall shear inside the box)" },
+      { tool: "flux", where: "Flux line: drag up across the wide pipe at x = 4.3 m, from z = 0.4 to 1.6 m", why: "section 1: Q, momentum flux M₁ = ρQU₁ and pressure force F₁ = p₁A₁" },
+      { tool: "flux", where: "Flux line: drag up across the 0.50 m pipe at x = 9.0 m, from z = 0.4 to 1.6 m", why: "section 2; the card under the pair prints the force on what is between them" },
+      { tool: "cv", where: "Control volume: drag (4.3, 0.3) → (9.0, 1.65), then press B until the faces read momentum + pressure; later move it to (9.0, 0.3) → (10.6, 1.65)", why: "F→ on the box is R, the force of the water on the contraction (plus the wall shear inside the box)" },
     ],
     ui: {
       view: ["legendBtn", "slineBtn"],
@@ -1338,10 +1338,10 @@ const EXERCISES = [
     start: "two reservoirs joined by a 1.00 m pipe that narrows into a 0.50 m pipe, running steadily; the contraction is a gentle taper 3 m long",
     setup: [
       "The Pressure head field shows the pressure. Pressure head is the pressure divided by ρg — the pressure expressed as a height of water. It is the pressure up to a constant factor, so wherever it is higher, the pressure is higher.",
-      "With the Flux line tool on the strip drag one up across each pipe (x = 2.3 m and x = 7.0 m, z = 0.4 to 1.6 m: sections 1 and 2); with the Control volume tool drag a box between them, (2.3, 0.3) to (7.0, 1.65), and press B until its faces read momentum + pressure. Each section prints Q, M (momentum flux) and F (pressure force); the pair prints the force on what is between them.",
+      "With the Flux line tool on the strip drag one up across each pipe (x = 4.3 m and x = 9.0 m, z = 0.4 to 1.6 m: sections 1 and 2); with the Control volume tool drag a box between them, (4.3, 0.3) to (9.0, 1.65), and press B until its faces read momentum + pressure. Each section prints Q, M (momentum flux) and F (pressure force); the pair prints the force on what is between them.",
       "Check R = p₁A₁ − p₂A₂ − ρQ(U₂ − U₁) per metre width (A₁ = 1.00 m, A₂ = 0.50 m, U = Q/A) against the box's F→.",
       "Slide Contraction length L on this card to 0 m (an abrupt step), let it settle and read R again.",
-      "Then put the box on the straight 0.50 m pipe instead, (7.0, 0.3) → (8.6, 1.65): momentum in = momentum out, so the pressure drop across it is balanced by the wall friction.",
+      "Then put the box on the straight 0.50 m pipe instead, (9.0, 0.3) → (10.6, 1.65): momentum in = momentum out, so the pressure drop across it is balanced by the wall friction.",
     ],
     task: "R is set by the end sections: taper and step give nearly the same force; on a straight pipe the pressure drop is balanced by friction at the wall.",
     settle: 25,

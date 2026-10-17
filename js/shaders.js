@@ -93,6 +93,7 @@ uniform vec2  u_inBand;       // z-range the inflow control applies to (bed of t
                               // to the clamp — the steep-scene explosion.
 uniform vec2  u_twBand;       // same for the right tailwater column
 uniform vec2  u_spongeN;      // relaxation-sponge width in columns (inflow, tailwater)
+uniform float u_fillIn;       // head-driven inflow sponge: fill-rate multiplier (a scene's spongeFill, default 1)
 uniform vec4  u_openMode;     // L R B T : 0 wall, 1 open (zero-gradient), 2 outfall
 uniform vec4  u_src0, u_src1; // point sources: x, z, radius (m), on
 uniform vec4  u_sv0,  u_sv1;  // source velocity x, z and dye A, dye B
@@ -125,6 +126,8 @@ uniform sampler2D u_Wd;  // wall distance (m) at each cell's SW corner, CPU-buil
 uniform sampler2D u_Tc;  // nx×1 open-channel columns: bed z, surface z, on, 0
 uniform float u_kappa;   // mixing-length constant (0 = closure off)
 uniform float u_tau;     // wind stress on the free surface, KINEMATIC: τ/ρ (m²/s²), +x
+uniform vec2  u_nuOut;   // outflow absorbing layer: extra ν (m²/s), width (columns) at the right edge; 0 = off
+uniform float u_twOut;   // 1 = the tailwater's exchange face passes outflow only; 0 = both ways (default)
 
 // --- the depth-scale closure: Prandtl's mixing length, κy damped towards the
 //     free surface, l = κ·y·√((η − z)/d), y the distance to the nearest WALL
@@ -218,6 +221,19 @@ void main(){
   float sxy  = 0.5 * ((tN.r - tS.r) + (tE.g - tW.g)) / (2.0 * dx);
   float smag = sqrt(2.0*(dudx*dudx + dwdz*dwdz) + 4.0*sxy*sxy);
   float nuT  = u_nu + (u_cs*dx)*(u_cs*dx)*smag;
+  // --- outflow absorbing layer (a scene's outflowNu, default off). A
+  //     pressure outlet — the tailwater's pinned hydrostatic f — passes
+  //     whatever velocity reaches it, inflow included, so a tank-sized 2-D
+  //     eddy parked on the edge turns it into an inlet over part of its
+  //     height (pipejet: out by the floor and the lid, IN through the
+  //     middle). A viscosity ramped up quadratically over the last columns
+  //     diffuses the eddies away before they arrive, and what leaves is a
+  //     smooth one-signed profile across the whole edge. Branch on the
+  //     uniform: every scene without it is bit-for-bit unchanged.
+  if (u_nuOut.x > 0.0) {
+    float sO = clamp((float(i) - (u_res.x - 1.0 - u_nuOut.y)) / max(u_nuOut.y, 1.0), 0.0, 1.0);
+    nuT += u_nuOut.x * sO * sO;
+  }
 
   // --- wall-aware Laplacian: a solid neighbour reflects (no-slip) or mirrors
   float sUp = max(SO(ivec2(i,j+1)), SO(ivec2(i-1,j+1)));
@@ -456,9 +472,13 @@ void main(){
   // chamber above the pipe was full. Inflow is the level controls' job.
   // Not in plan view: there is no free surface, the plane is full by
   // construction, and its wake legitimately crosses an open edge both ways.
+  // A scene may hold its TAILWATER face to outflow too (u_twOut): a level
+  // control otherwise passes inflow, and behind a short pool it fed a pipe
+  // jet's entrainment straight from the edge (contraction: −2 m/s coming in
+  // along the surface, a 0.17 m mound against the outlet wall).
   if (u_g != 0.0) {
     if (i == 1 && u_in.z < 0.5 && !paddle) un = min(un, 0.0);
-    if (i == NXY.x - 1 && u_tw.y < 0.5) un = max(un, 0.0);
+    if (i == NXY.x - 1 && (u_tw.y < 0.5 || u_twOut > 0.5)) un = max(un, 0.0);
     if (j == 1)                          wn = min(wn, 0.0);
     if (j == NXY.y - 1)                  wn = max(wn, 0.0);
   }
@@ -674,7 +694,7 @@ void main(){
     float s = (1.0 + u_spongeN.x - float(i)) / u_spongeN.x;
     float tgt = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2
               : (z >= u_in.x ? 0.0 : fNew);
-    float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * s : 2.0 * s * s)
+    float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * u_fillIn * s : 2.0 * s * s)
                                 : (tgt > fNew ? 8.0 * s * s : 2.0 * s * s);
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }

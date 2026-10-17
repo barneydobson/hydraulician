@@ -17,7 +17,7 @@ personalised parameter and nothing to pool.
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **FF-1**, or use the direct link
 [`?ex=FF-1`](https://barneydobson.github.io/hydraulician/?ex=FF-1).
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory
 

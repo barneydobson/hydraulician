@@ -22,7 +22,7 @@ and pick **CR-1**, or link straight to a tab:
 [`&tab=forces`](https://barneydobson.github.io/hydraulician/?ex=CR-1&tab=forces).
 The old links `?ex=FF-5`, `?ex=VC-1` and `?ex=MM-2` still work and open the
 matching tab. A course menu lists a tab as `"CR-1#forces"`.
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## The bench
 

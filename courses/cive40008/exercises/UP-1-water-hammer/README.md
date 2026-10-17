@@ -19,7 +19,7 @@ things to play with; there is no personalised parameter and nothing to pool.
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **UP-1**, or use the direct link
 [`?ex=UP-1`](https://barneydobson.github.io/hydraulician/?ex=UP-1).
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory
 

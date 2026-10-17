@@ -54,7 +54,17 @@ The course menu (`courses/cive40008/course.js`, opened with `?course=cive40008`)
 the contraction rig appears three times, as `"CR-1#streamlines"`,
 `"CR-1#continuity"` and `"CR-1#forces"`, each opening the card on its tab.
 (Until Oct 2026 the three tabs were three exercises, FF-5, VC-1 and MM-2;
-those ids still open the matching tab.)
+those ids still open the matching tab.) On the lecturer's own Pages site,
+`mvreeuwijk.github.io`, the course is on without the parameter (`hosts` in
+`course.js`), so the start screen lists only these.
+
+**Where they live.** The course owns its exercises: the cards are in
+`courses/cive40008/exercises.js` and the briefs (README, `rig.js`, thumbnail)
+in `courses/cive40008/exercises/<ID>-<slug>/`, indexed by
+`courses/cive40008/INDEX.md` — out of the shared register's
+`js/exercises.js` and `exercises/`, which a colleague's course would sit
+beside. HS-1 is the exception: it went upstream first and stays in the shared
+register; the course menu lists it like the rest.
 
 ## The cards (Oct 2026)
 
@@ -76,7 +86,8 @@ water is what it shows.
 
 ## First drafts: status and points for the lecturer (2026-10-16)
 
-All fourteen are built as first drafts: scene, card, brief (`exercises/<ID>-…/README.md`)
+All fourteen are built as first drafts: scene, card, brief (`courses/cive40008/exercises/<ID>-…/README.md`;
+HS-1 in the shared `exercises/HS-1-dyke-piezometer/`)
 and headless `rig.js`, with the numbers in each brief measured, not assumed. New shared
 capability: a **wind shear stress** on the free surface (FF-1) and a **streamline display**
 (VIEW → Streamlines, key T; contours of ψ, of the mean flow under Average). What each

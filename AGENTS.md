@@ -31,8 +31,8 @@ shallow water); this one resolves the depth.
 | `js/rig.js` | `RIG` — rig save / load / share, the wire format and its version gate |
 | `js/exercises.js` | the exercise register the picker reads (machine-readable source of the pack) |
 | `js/exercises-rigs.js` | drawn rigs + applied settings per exercise, as rig-format JSON |
-| `js/courses.js` | `COURSES` — the course-menu registry; `?course=<id>` picks one (remembered for the visit) and exposes it as `EXERCISE_MENU` |
-| `courses/<id>/course.js` | one course menu each (`COURSES.add({id, title, sections})`), loaded by one script tag in `index.html`; `check_pack.py` checks every listed id |
+| `js/courses.js` | `COURSES` — the course registry; `?course=<id>` picks one (remembered for the visit), else a course whose `hosts` names the page's hostname; exposed as `EXERCISE_MENU`. `COURSES.exercises(id, [...])` appends a course's own cards to `EXERCISES`, stamped `course` and `home` |
+| `courses/<id>/` | one course each: `course.js` (`COURSES.add({id, title, sections, hosts?})`), optionally its own cards in `exercises.js`, their briefs in `exercises/<ID>-<slug>/` and `INDEX.md`; one script tag per file in `index.html`; `check_pack.py` holds them to the shared pack's rules. CIVE40008's Year 1 exercises live here (HS-1 stays shared) |
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
@@ -202,7 +202,9 @@ hand: `node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds`.
 Each catalogue entry carries what was measured when the control was performed.
 
 Both checkers read the register the way it should be read: `check_pack.py`
-hands `js/exercises.js` to `node` and gets `EXERCISES` back as JSON, so a
+runs `js/exercises.js`, `js/courses.js` and every course's `course.js` /
+`exercises.js` in `node` as script tags would (one shared global scope) and
+gets `EXERCISES` back as JSON, so a
 nested `ui` profile parses instead of being truncated at the first `}`; and
 `check_notation.py` walks `git ls-files`, so an untracked scratch file cannot
 fail a commit gate. Neither is a new dependency — Node is already required by
@@ -239,6 +241,14 @@ one, end to end** — which of these files it touches, in what order, and what
 each gate will ask of it — is
 [docs/making-exercises.md](docs/making-exercises.md); read it before
 writing a card or a scene.
+
+A **course** may own exercises: the same four pieces, in its folder
+(`courses/<id>/exercises.js`, `courses/<id>/exercises/<ID>-<slug>/`,
+`courses/<id>/INDEX.md`). They are still the one register — `?ex=` reaches
+every card wherever it lives, and ids are unique across all of them — and
+nothing in the app may assume a brief is under `exercises/`: use the card's
+`home` (pickers.js `briefDir`). A course is upstream-shaped by construction:
+another lecturer's course is another folder beside it.
 
 An entry may also carry a **`ui` profile** — which strip families and
 instruments it wants in front of a student, how focused the Controls panel

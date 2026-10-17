@@ -33,7 +33,7 @@ the momentum-balance aim, Oct 2026.)
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **HJ-2**, or use the direct link
 [`?ex=HJ-2`](https://barneydobson.github.io/hydraulician/?ex=HJ-2).
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory
 

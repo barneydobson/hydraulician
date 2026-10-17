@@ -106,6 +106,19 @@ def walk(*globs):
                     yield p
 
 
+def register_files():
+    """The register's card files: js/exercises.js and every course's own
+    courses/<id>/exercises.js (see js/courses.js)."""
+    out = [os.path.join(ROOT, "js", "exercises.js")]
+    cdir = os.path.join(ROOT, "courses")
+    if os.path.isdir(cdir):
+        for d in sorted(os.listdir(cdir)):
+            p = os.path.join(cdir, d, "exercises.js")
+            if os.path.isfile(p):
+                out.append(p)
+    return out
+
+
 def read(path):
     with open(path, encoding="utf-8") as fh:
         return fh.read()
@@ -202,22 +215,21 @@ def main():
 
     # --- 4. gauge field keys --------------------------------------------------
     LIVE_FIELDS = {"h", "H", "d", "eta", "speed"}
-    register = read(os.path.join(ROOT, "js", "exercises.js"))
-    checked[0] += 1
-    for n, line in enumerate(register.splitlines(), 1):
-        for val in re.findall(r'gaugeField:\s*"([^"]+)"', line):
-            if val not in LIVE_FIELDS:
-                fails.append('js/exercises.js:%d  gaugeField: "%s" is not a live key %s'
-                             % (n, val, sorted(LIVE_FIELDS)))
+    for reg_path in register_files():
+        register = read(reg_path)
+        checked[0] += 1
+        for n, line in enumerate(register.splitlines(), 1):
+            for val in re.findall(r'gaugeField:\s*"([^"]+)"', line):
+                if val not in LIVE_FIELDS:
+                    fails.append('%s:%d  gaugeField: "%s" is not a live key %s'
+                                 % (rel(reg_path), n, val, sorted(LIVE_FIELDS)))
 
     # --- 5 & 6. what a student reads -----------------------------------------
     # Briefs, the register's card text, and the docs all print the same symbols
     # the app does. `y+` is boundary-layer notation and `y = 2x` is a chart line;
     # neither is this notation.
-    prose = [p for p in walk(".md", ".html") if rel(p) not in REGISTER] + [
-        os.path.join(ROOT, "js", "exercises.js"),
-        os.path.join(ROOT, "js", "exercises-rigs.js"),
-    ]
+    prose = [p for p in walk(".md", ".html") if rel(p) not in REGISTER] + \
+        register_files() + [os.path.join(ROOT, "js", "exercises-rigs.js")]
     ALLOW = (r"y\s*=\s*2x", r"y⁺", r"y\+")
     scan(fails, checked, prose, r"\by_c\b|\by_n\b|y₁|y₂|y₀|\by_max\b|\by_crest\b|\by_brink\b",
          "retired depth symbol — the displayed set is d, d_c, d_n, d1, d2, z_max",

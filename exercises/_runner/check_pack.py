@@ -83,13 +83,74 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # only because the source is this repo's own checked-in js/exercises.js, not
 # untrusted input from a user or the network; this script never runs on
 # anything else.
+#
+# COURSES. A course may own cards (courses/<id>/exercises.js, which calls
+# COURSES.exercises(id, [...]) to append them to the same EXERCISES list), so
+# the register is no longer one file. The loader below therefore runs the
+# files the way index.html does — js/exercises.js, js/courses.js, then each
+# course's course.js and exercises.js — as separate classic scripts sharing
+# one global scope (`vm.runInThisContext` gives exactly a browser's
+# script-tag semantics: a top-level `const` of one script is visible to the
+# next). The real js/courses.js runs, so the `course` / `home` stamps and the
+# duplicate-id refusals are the app's own, not a re-implementation. Which
+# cards each course file added is recorded, so a course registering cards
+# under another course's id is caught.
 _LOADER_JS = r"""
 "use strict";
-const fs = require("fs");
-const src = fs.readFileSync(process.argv[2], "utf8");
-const EXERCISES = new Function(src + "\nreturn EXERCISES;")();
-process.stdout.write(JSON.stringify(EXERCISES));
+const fs = require("fs"), vm = require("vm");
+global.window = global;
+global.location = { search: "", hostname: "" };
+const files = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const run = (f) => vm.runInThisContext(fs.readFileSync(f, "utf8"), { filename: f });
+const added = {};
+// Every COURSES.add call, in order -- the registry is a Map, so a course
+// registered twice would otherwise show up once.
+global.__adds = [];
+let patched = false;
+for (const f of files) {
+  const before = vm.runInThisContext("typeof EXERCISES === 'undefined' ? 0 : EXERCISES.length");
+  run(f.path);
+  if (!patched && vm.runInThisContext("typeof COURSES !== 'undefined'")) {
+    vm.runInThisContext("{ const add = COURSES.add; COURSES.add = (c) => { __adds.push(c); add(c); }; }");
+    patched = true;
+  }
+  if (f.course) {
+    const now = vm.runInThisContext("EXERCISES");
+    added[f.course] = (added[f.course] || []).concat(now.slice(before).map((e) => e.id + "@" + (e.course || "")));
+  }
+}
+const has = (n) => vm.runInThisContext("typeof " + n + " !== 'undefined'");
+process.stdout.write(JSON.stringify({
+  exercises: vm.runInThisContext("EXERCISES"),
+  courses: __adds,
+  rejected: has("COURSES") ? vm.runInThisContext("COURSES.rejected") : [],
+  added: added,
+}));
 """
+
+
+def course_dirs():
+    """courses/<id>/ folders, sorted (the order index.html is checked in)."""
+    cdir = os.path.join(ROOT, "courses")
+    if not os.path.isdir(cdir):
+        return []
+    return [d for d in sorted(os.listdir(cdir))
+            if os.path.isdir(os.path.join(cdir, d)) and not d.startswith((".", "_"))]
+
+
+def register_files():
+    """The scripts that build the register, in index.html's order."""
+    out = [{"path": os.path.join(ROOT, "js", "exercises.js")},
+           {"path": os.path.join(ROOT, "js", "courses.js")}]
+    for d in course_dirs():
+        for name in ("course.js", "exercises.js"):
+            p = os.path.join(ROOT, "courses", d, name)
+            if os.path.isfile(p):
+                out.append({"path": p, "course": d if name == "exercises.js" else None})
+    return out
+
+
+_LOADED = None
 
 
 _SCENES_LOADER_JS = r"""
@@ -128,19 +189,35 @@ def scene_params():
         sys.exit(1)
 
 
+def loaded():
+    """Run the register's scripts once (see _LOADER_JS) and return
+    {exercises, courses, rejected, added}."""
+    global _LOADED
+    if _LOADED is None:
+        _LOADED = _load()
+    return _LOADED
+
+
 def cards():
-    """Return js/exercises.js's EXERCISES array as real Python lists/dicts —
-    see the module docstring for why Node does the parsing now."""
-    js_path = os.path.join(ROOT, "js", "exercises.js")
+    """Return the whole register — js/exercises.js's EXERCISES with every
+    course's own cards appended — as real Python lists/dicts. See the module
+    docstring for why Node does the parsing now."""
+    return loaded()["exercises"]
+
+
+def _load():
     fd, loader_path = tempfile.mkstemp(suffix=".js")
+    fd2, list_path = tempfile.mkstemp(suffix=".json")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(_LOADER_JS)
+        with os.fdopen(fd2, "w", encoding="utf-8") as f:
+            json.dump(register_files(), f)
         try:
             # Explicit UTF-8, not `text=True` (which decodes with the
             # console's locale encoding -- cp1252 on Windows, which chokes on
             # the ², ·, ₁ and similar symbols the pack's prose is full of).
-            proc = subprocess.run(["node", loader_path, js_path],
+            proc = subprocess.run(["node", loader_path, list_path],
                                    capture_output=True, timeout=30,
                                    encoding="utf-8")
         except FileNotFoundError:
@@ -153,16 +230,18 @@ def cards():
             sys.exit(1)
     finally:
         os.unlink(loader_path)
+        os.unlink(list_path)
 
     if proc.returncode != 0:
-        print("node failed to evaluate js/exercises.js as JavaScript:\n" + proc.stderr)
+        print("node failed to evaluate the register (js/exercises.js, js/courses.js, "
+              "courses/*/course.js, courses/*/exercises.js) as JavaScript:\n" + proc.stderr)
         sys.exit(1)
     try:
         data = json.loads(proc.stdout)
     except json.JSONDecodeError as exc:
         print("node did not print JSON for EXERCISES (%s)" % exc)
         sys.exit(1)
-    if not isinstance(data, list):
+    if not isinstance(data.get("exercises"), list):
         print("EXERCISES did not evaluate to an array")
         sys.exit(1)
     return data
@@ -326,24 +405,71 @@ def main():
         print("could not parse any exercise from js/exercises.js")
         return 1
 
-    index_path = os.path.join(ROOT, "exercises", "INDEX.md")
-    index_ids = set()
-    for line in open(index_path, encoding="utf-8"):
-        c = [x.strip() for x in line.split("|")]
-        if len(c) > 2 and re.match(r'^[A-Z]{1,2}-?\d+$', c[1]):
-            index_ids.add(c[1])
+    # Where each card lives. A shared card: its folder under exercises/, its
+    # row in exercises/INDEX.md. A course's own card (COURSES.exercises
+    # stamped `course` and `home`): its folder under courses/<id>/exercises/,
+    # its row in courses/<id>/INDEX.md. The guarantees are the same for both.
+    def home_of(e):
+        return e.get("home") or "exercises"
+
+    def index_of(e):
+        return "courses/%s/INDEX.md" % e["course"] if e.get("course") else "exercises/INDEX.md"
+
+    def index_rows(rel_path):
+        ids = set()
+        p = os.path.join(ROOT, *rel_path.split("/"))
+        if os.path.isfile(p):
+            for line in open(p, encoding="utf-8"):
+                c = [x.strip() for x in line.split("|")]
+                if len(c) > 2 and re.match(r'^[A-Z]{1,2}-?\d+$', c[1]):
+                    ids.add(c[1])
+        return ids
+
+    indexes = {"exercises/INDEX.md": index_rows("exercises/INDEX.md")}
+    for d in course_dirs():
+        rel_idx = "courses/%s/INDEX.md" % d
+        if os.path.isfile(os.path.join(ROOT, "courses", d, "INDEX.md")) or \
+           any(e.get("course") == d for e in ex):
+            indexes[rel_idx] = index_rows(rel_idx)
+    index_ids = set().union(*indexes.values())
+
+    # 0. ids are global: one register, whoever's file a card is written in.
+    reg = loaded()
+    for r in reg.get("rejected") or []:
+        fail.append("%-5s courses/%s/exercises.js: id %s is already in the register "
+                    "(ids are unique across js/exercises.js and every course)"
+                    % (r.get("id") or "?", r.get("course"), r.get("clash")))
+    seen_ids = {}
+    for e in ex:
+        names = [e.get("id")] + [t.get("alias") for t in (e.get("tabs") or [])
+                                 if isinstance(t, dict) and t.get("alias")]
+        for n in names:
+            where = e.get("course") or "js/exercises.js"
+            if n in seen_ids and n == e.get("id"):
+                fail.append("%-5s id is registered twice (%s and %s)" % (n, seen_ids[n], where))
+            seen_ids.setdefault(n, where)
+    # A course's exercises.js registers under its own folder's id only.
+    for cdir_id, added in (reg.get("added") or {}).items():
+        for tag in added:
+            cid, _, owner = tag.partition("@")
+            checked += 1
+            if owner != cdir_id:
+                fail.append("%-5s courses/%s/exercises.js registers it for course %r "
+                            "-- a course file adds cards under its own id"
+                            % (cid, cdir_id, owner))
 
     seen_folders = set()
     for e in ex:
         i, folder = e.get("id"), e.get("folder")
-        seen_folders.add(folder)
-        d = os.path.join(ROOT, "exercises", folder or "")
+        home = home_of(e)
+        seen_folders.add((home, folder))
+        d = os.path.join(ROOT, *home.split("/"), folder or "")
         readme = os.path.join(d, "README.md")
         if not folder or not os.path.isdir(d):
-            fail.append("%-5s folder missing: exercises/%s" % (i, folder))
+            fail.append("%-5s folder missing: %s/%s" % (i, home, folder))
             continue
         if not os.path.isfile(readme):
-            fail.append("%-5s no README.md in exercises/%s" % (i, folder))
+            fail.append("%-5s no README.md in %s/%s" % (i, home, folder))
             continue
         txt = open(readme, encoding="utf-8").read()
 
@@ -360,8 +486,8 @@ def main():
                             % (i, e.get("title"), h1.group(2).strip()))
 
         # 3. INDEX row
-        if i not in index_ids:
-            fail.append("%-5s has no row in exercises/INDEX.md" % i)
+        if i not in indexes.get(index_of(e), set()):
+            fail.append("%-5s has no row in %s" % (i, index_of(e)))
         else:
             checked += 1
 
@@ -610,51 +736,70 @@ def main():
                 print("  %-5s %s -> %s (%s)" % (e.get("_ref"), r["control"], decl[n]["key"], decl[n]["label"]))
 
     # 7. orphans
-    for i in sorted(index_ids - {e.get("id") for e in ex}):
-        fail.append("%-5s row in INDEX.md with no card in js/exercises.js" % i)
-    for d in sorted(os.listdir(os.path.join(ROOT, "exercises"))):
-        p = os.path.join(ROOT, "exercises", d)
-        if os.path.isdir(p) and not d.startswith("_") and d not in seen_folders:
-            fail.append("%-5s exercises/%s/ has no card in js/exercises.js" % ("", d))
+    #    Each INDEX against the cards that belong in it, and each exercise
+    #    directory (exercises/, courses/<id>/exercises/) against the cards
+    #    whose `home` it is.
+    for rel_idx, rows in sorted(indexes.items()):
+        mine = {e.get("id") for e in ex if index_of(e) == rel_idx}
+        for i in sorted(rows - mine):
+            elsewhere = [index_of(e) for e in ex if e.get("id") == i]
+            fail.append("%-5s row in %s with no card %s" % (
+                i, rel_idx, ("there (its card is indexed in %s)" % elsewhere[0]) if elsewhere
+                else "in the register"))
+    homes = ["exercises"] + ["courses/%s/exercises" % d for d in course_dirs()]
+    for home in homes:
+        base = os.path.join(ROOT, *home.split("/"))
+        if not os.path.isdir(base):
+            continue
+        for d in sorted(os.listdir(base)):
+            p = os.path.join(base, d)
+            if os.path.isdir(p) and not d.startswith("_") and (home, d) not in seen_folders:
+                fail.append("%-5s %s/%s/ has no card whose folder it is" % ("", home, d))
 
-    # 8. courses: every courses/<id>/course.js is loaded by index.html, has a
-    # unique id, and lists only exercises (or tabs) the register has.
-    cdir = os.path.join(ROOT, "courses")
-    if os.path.isdir(cdir):
+    # 8. courses: every courses/<id>/course.js (and exercises.js) is loaded by
+    # index.html, has a unique id, names hosts as a list of hostnames no other
+    # course claims, and lists only exercises (or tabs) the register has.
+    if course_dirs():
         html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
         ids_ok = {e.get("id") for e in ex}
         tabs_ok = {(e.get("id"), t.get("key")) for e in ex for t in (e.get("tabs") or [])}
         aliases = {t.get("alias") for e in ex for t in (e.get("tabs") or []) if t.get("alias")}
-        loader = ("const out=[];global.COURSES={add:(c)=>out.push(c)};"
-                  "for(const f of process.argv.slice(1)){eval(require('fs').readFileSync(f,'utf8'));}"
-                  "console.log(JSON.stringify(out));")
-        files = []
-        for d in sorted(os.listdir(cdir)):
-            f = os.path.join(cdir, d, "course.js")
-            if os.path.isfile(f):
-                files.append(f)
-                if ('src="courses/%s/course.js"' % d) not in html:
-                    fail.append("%-5s courses/%s/course.js is not loaded by index.html" % ("", d))
-        if files:
-            proc = subprocess.run(["node", "-e", loader] + files, capture_output=True,
-                                  timeout=30, encoding="utf-8")
-            if proc.returncode != 0:
-                fail.append("courses/*/course.js did not evaluate: " + proc.stderr.strip()[:200])
-            else:
-                seen = set()
-                for c in json.loads(proc.stdout):
-                    cid = c.get("id")
-                    if cid in seen:
-                        fail.append("course %r is registered twice" % cid)
-                    seen.add(cid)
-                    for sec in c.get("sections") or []:
-                        for ref in sec.get("ids") or []:
-                            checked += 1
-                            base, _, tab = ref.partition("#")
-                            if tab and (base, tab) not in tabs_ok:
-                                fail.append("course %s lists %s: no such tab" % (cid, ref))
-                            elif not tab and base not in ids_ok and base not in aliases:
-                                fail.append("course %s lists %s: not in the register" % (cid, ref))
+        for d in course_dirs():
+            for name in ("course.js", "exercises.js"):
+                if os.path.isfile(os.path.join(ROOT, "courses", d, name)):
+                    checked += 1
+                    if ('src="courses/%s/%s"' % (d, name)) not in html:
+                        fail.append("%-5s courses/%s/%s is not loaded by index.html" % ("", d, name))
+        seen, host_owner = set(), {}
+        for c in reg.get("courses") or []:
+            cid = c.get("id")
+            if cid in seen:
+                fail.append("course %r is registered twice" % cid)
+            seen.add(cid)
+            hosts = c.get("hosts")
+            if hosts is not None:
+                checked += 1
+                if not isinstance(hosts, list) or not all(
+                        isinstance(h, str) and re.match(r'^[a-z0-9.-]+$', h) for h in hosts):
+                    fail.append("course %s: hosts must be a list of lower-case hostnames "
+                                "(no scheme, port or path), got %r" % (cid, hosts))
+                else:
+                    for h in hosts:
+                        if h in host_owner and host_owner[h] != cid:
+                            fail.append("course %s: host %s is already the default of course %s"
+                                        % (cid, h, host_owner[h]))
+                        host_owner.setdefault(h, cid)
+            for sec in c.get("sections") or []:
+                for ref in sec.get("ids") or []:
+                    checked += 1
+                    base, _, tab = ref.partition("#")
+                    if tab and (base, tab) not in tabs_ok:
+                        fail.append("course %s lists %s: no such tab" % (cid, ref))
+                    elif not tab and base not in ids_ok and base not in aliases:
+                        fail.append("course %s lists %s: not in the register" % (cid, ref))
+        for cid in sorted({e.get("course") for e in ex if e.get("course")} - seen):
+            fail.append("course %s owns cards (courses/%s/exercises.js) but has no "
+                        "course.js registering it" % (cid, cid))
 
     if unverified:
         print("note: no digit ladder found in the recognised table form, so "

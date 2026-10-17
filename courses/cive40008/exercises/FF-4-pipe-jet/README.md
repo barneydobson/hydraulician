@@ -13,7 +13,7 @@ An exercise students play with on their own; the lecturer can also show it in cl
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **FF-4**, or use the direct link
 [`?ex=FF-4`](https://barneydobson.github.io/hydraulician/?ex=FF-4).
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory
 

@@ -15,7 +15,7 @@ are for the lecturer.
 **Open it:** press **E** in the [app](https://barneydobson.github.io/hydraulician/)
 and pick **WV-5**, or use the direct link
 [`?ex=WV-5`](https://barneydobson.github.io/hydraulician/?ex=WV-5).
-How to run any exercise: see the [teaching pack index](../INDEX.md#running-an-exercise).
+How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## Theory
 

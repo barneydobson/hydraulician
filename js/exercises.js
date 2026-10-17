@@ -164,3 +164,19 @@
  * re-check any tailwater ≥ 1.3·d_c · keep the tab visible.
  */
 const EXERCISES = [];
+
+/* The card schema, machine-readable: every top-level key a card may carry.
+ * exercises/_runner/check_pack.py reads these by evaluating this file and
+ * fails the pack on any other key, so a misspelt key (`instrument`) is an
+ * error rather than a field the app silently never reads. Add a key here in
+ * the same commit that teaches the app to read it, and document it above.
+ * CARD_KEYS_STAMPED are the two COURSES.exercises writes itself. */
+const CARD_KEYS = ["id", "title", "aim", "topic", "folder", "scene", "rig", "rigParams",
+  "viewParams", "studentParams", "digit", "rigTable", "instruments", "digitNote", "setup",
+  "start", "task", "steps", "background", "note", "settle", "rigWhy", "secondScene", "ui",
+  "gauges", "tabs", "tips"];
+const CARD_KEYS_STAMPED = ["course", "home"];
+/* What one entry of a card's `tabs` may carry: `key`, `label` and `alias`
+ * name the tab; the rest are the fields a tab overrides (see EX.view). */
+const TAB_KEYS = ["key", "label", "alias", "title", "topic", "aim", "steps", "background",
+  "ui", "viewParams", "instruments", "studentParams", "tips"];

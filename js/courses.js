@@ -110,3 +110,8 @@ const COURSES = (() => {
 // What the exercise menu reads. A getter, so courses registered after this
 // file (and a later COURSES.choose) are seen without any ordering dance.
 Object.defineProperty(window, "EXERCISE_MENU", { get: () => COURSES.active(), configurable: true });
+
+// The keys a course.js object may carry; check_pack.py rejects any other, so
+// a misspelt switch fails the pack instead of being silently ignored.
+const COURSE_KEYS = ["id", "title", "sections", "hosts", "briefLink", "showAllLink",
+  "compact", "collapsible"];

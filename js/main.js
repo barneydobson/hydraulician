@@ -1727,6 +1727,9 @@ const LEGEND = (() => {
  *  reproduce any scene by hand — is why it has to. */
 const UIMODE = (() => {
   const BUILD_TOOLS = ["wall", "erase", "valve", "spout", "pour"];
+  // The concepts `ui.hide` can withhold (see hides() for where each is
+  // honoured). Exported so check_pack.py reads it rather than keeping a copy.
+  const HIDE_IDS = ["energy", "critical"];
 
   function full() {
     return { build: true, measure: true, view: true, fields: true,
@@ -1878,7 +1881,7 @@ const UIMODE = (() => {
   }
 
   return { full, fromExercise, apply, lift, reset, allows, offers, anyTool, narrowed,
-           fields, shows, rows, gaugeFields, hides };
+           fields, shows, rows, gaugeFields, hides, HIDE_IDS };
 })();
 
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,

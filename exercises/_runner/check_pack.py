@@ -882,9 +882,30 @@ def check_courses(c):
                                        "lists it in no section" % (cid, cid))
 
 
+# Card constants that used to be asserted in a browser (test/ui-smoke.mjs):
+# the page holds no more information than the register does, so they are pack
+# checks. QS-2's brief must stand alone, and its student-number rules (the
+# two reservoir widths) are exactly 6.75 + 0.25 d and 3.75 + 0.25 d.
+def check_card_constants(c):
+    card = next((e for e in c.ex if e.get("id") == "QS-2"), None)
+    if card is None:
+        c.bad("QS-2", "card not found in the register")
+        return
+    c.checked += 1
+    text = " ".join(str(x) for x in [card.get("start"), card.get("task")] + list(card.get("setup") or []))
+    if re.search(r"readme|see the brief", text, re.I):
+        c.bad("QS-2", "student instructions point at the README / brief instead of standing alone")
+    c.checked += 1
+    digit = card.get("digit") or {}
+    also = digit.get("also") or [{}]
+    if not (digit.get("base") == 6.75 and digit.get("step") == 0.25 and also[0].get("base") == 3.75):
+        c.bad("QS-2", "digit rule is not B1 = 6.75 + 0.25 d, B2 = 3.75 + 0.25 d (got %a)" % (digit,))
+
+
 CHECKS = [check_ids, check_folders, check_readme_h1, check_index_rows, check_settle,
           check_digit_ladder, check_keys, check_references, check_params, check_ui_profile,
-          check_tabs, check_layout, check_geometry_rows, check_orphans, check_courses]
+          check_tabs, check_layout, check_geometry_rows, check_orphans, check_courses,
+          check_card_constants]
 
 
 def check_retirement_refs(c):

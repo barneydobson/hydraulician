@@ -79,11 +79,13 @@ does not restart the water. Each change also restarts an Average window.
    centreline, with a closed recirculation behind the body; the particles
    now follow the mean flow's streamlines. Switch back to Live to return to
    the live street.
-6. **Pressure (optional).** Choose Pressure head in Field & legend and press
-   Fit on the legend: the pressure is highest where the stream meets the
-   front of the body. In this plan view the pressure head also carries a
-   large, slowly drifting constant (about 2–4 m), so Fit is needed to see
-   the few centimetres that matter.
+
+The card offers Speed only (Oct 2026). Pressure head was an optional sixth
+step, but in this plan view it carries a large, slowly drifting constant
+(about 2–4 m) and shows nothing a student can read without Fit, so the
+field, its hover row and its gauge quantity were withdrawn. A lecturer who
+wants it — the stagnation pressure at the front of the body — has it under
+`⋯ Show everything` → Field → Pressure head, then Fit on the legend.
 
 ## For the instructor
 

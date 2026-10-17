@@ -472,6 +472,17 @@ const EX = (() => {
     state.cv = null;
     state.gaugeT = -1;
   }
+  /** The exception to the rule above, opt-in per card: `gauges: [{x, z,
+   *  field}]` arrives PLACED, each on its own quantity. For a card whose
+   *  subject is a time series from t = 0 (VC-2's level curve), where where to
+   *  measure is not the question and a gauge dropped late misses the point. */
+  function placeCardGauges(ex) {
+    (ex.gauges || []).slice(0, 4).forEach((g) => {
+      placeGauge(+g.x, +g.z);
+      const k = state.gauges.length - 1;
+      if (g.field && gaugeQty(g.field) && state.gauges[k]) state.gauges[k].field = g.field;
+    });
+  }
   /** A rig payload may be the rig object itself, an encoded `#rig=` code, a
    *  share URL, or raw JSON — RIG reads all of them. Async because the deflate
    *  branch is. */
@@ -523,11 +534,13 @@ const EX = (() => {
       // happened to have; the student places their own instruments and sets
       // their own values, from an identical bench whatever their digit.
       clearInstruments();
+      placeCardGauges(ex);
       resetStudentControls(fresh);
       const d = d0;
       digit = (d === null || d === undefined || d === "") ? null : (+d | 0);
       if (digit !== null) { memo[ex.id] = digit; lastDigit = digit; }
       cur = ex;
+      syncTitle();           // the strip names the exercise, not its scene
       arm(ex.settle || 0, ex.id);
       syncURLEx(ex.id);
       card.show();
@@ -598,7 +611,12 @@ const EX = (() => {
 
   /** The course menu, if this deployment ships one (js/menu.js, optional):
    *  `const EXERCISE_MENU = { title, sections: [{ title, ids: [...] }], briefLink }`
-   *  (`briefLink: false` hides the card's link to the brief).
+   *  (`briefLink: false` hides the card's link to the brief; `scenes: false`
+   *  hides the scene menu's entry points — the strip's Scenes button, the
+   *  start screen's Scenes door and the S key — and makes the title chip open
+   *  this menu instead, for a course whose students need only the exercises;
+   *  `?scene=` links still boot, and Controls → Scene stays as the escape
+   *  hatch. See scenesOffered() in main.js.)
    *  It only chooses what the MENU lists and in what order — every exercise
    *  in the register still boots from `?ex=`, and `?menu=all` (or the link at
    *  the foot of the menu) lists the whole register by topic as before. Ids
@@ -1117,7 +1135,7 @@ const EX = (() => {
         el.onchange = () => { c.set(el.checked); syncPanel(); };
       } else if (c.type === "select") {
         el = document.createElement("select");
-        (c.opts || []).forEach(([v, txt]) => {
+        ((c.optsNow ? c.optsNow() : c.opts) || []).forEach(([v, txt]) => {
           const o = document.createElement("option");
           o.value = v; o.textContent = txt; el.appendChild(o);
         });
@@ -1256,6 +1274,11 @@ const EX = (() => {
         if (k === "budget") return;
         items.push([ctlLabel(k), ctlText(k, p[k]), why[k]]);
       });
+      (cur.gauges || []).forEach((g) => {
+        const q = gaugeQty(g.field);
+        items.push(["gauge", "at x " + (+g.x).toFixed(2) + ", z " + (+g.z).toFixed(2) + " m" +
+                    (q ? ", plotting " + q.name : "")]);
+      });
       const v = cur.viewParams || {};
       const vs = Object.keys(v).map((k) => ctlLabel(k) + " " + ctlText(k, v[k]));
       if (vs.length) items.push(["view", vs.join(", "), why.view]);
@@ -1308,6 +1331,7 @@ const EX = (() => {
     card.hide();
     UIMODE.reset();          // the exercise's focus goes with the exercise
     refresh();
+    syncTitle();             // the scene's own name again
     syncPanel();
   }
 

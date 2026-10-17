@@ -456,6 +456,31 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   border-radius: 6px; font: 11px/17px ui-monospace, monospace; text-align: center;
 }
 .gcardBtn:hover { background: rgba(77,195,255,0.30); }
+/* What one gauge plots: a small select hung just outside its corner card,
+   under the ⤢, so the card itself stays as every worksheet shows it. */
+.gcardSel {
+  position: fixed; z-index: 12; min-width: 42px; max-width: 64px; height: 20px; padding: 0 2px;
+  cursor: pointer; color: #dfe8f2; background: rgba(12,17,26,0.85);
+  border: 1px solid rgba(255,255,255,0.20); border-radius: 6px;
+  font: 11px ui-monospace, monospace;
+}
+.gcardSel:hover { background: rgba(77,195,255,0.30); }
+.gcardSel option { background: #0c111a; color: #dfe8f2; }
+/* Remove this gauge: inside the card's top-right corner (the card moves its
+   upper value label down to make room). */
+.gcardX {
+  position: fixed; z-index: 12; width: 17px; height: 17px; padding: 0;
+  appearance: none; cursor: pointer; color: #dfe8f2; background: rgba(12,17,26,0.6);
+  border: 1px solid rgba(255,255,255,0.18); border-radius: 5px;
+  font: 13px/15px ui-monospace, monospace; text-align: center;
+}
+.gcardX:hover { background: rgba(255,90,110,0.45); }
+.ginsp-rm {
+  appearance: none; cursor: pointer; color: #ffb3bf; background: transparent;
+  border: 1px solid rgba(255,143,163,0.35); border-radius: 6px;
+  font: 11px ui-monospace, monospace; padding: 2px 7px;
+}
+.ginsp-rm:hover { background: rgba(255,90,110,0.30); }
 
 .ginsp {
   position: fixed; z-index: 21; width: 400px;

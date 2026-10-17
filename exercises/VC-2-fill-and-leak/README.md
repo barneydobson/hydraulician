@@ -61,10 +61,12 @@ The card carries these steps.
 
 1. **Predict with C = 1.** For Q = 0.25 m²/s: h = (0.25/0.08)²/19.62 =
    0.50 m, so a level of 1.09 m.
-2. **Read the level.** A Gauge (the Gauge tool on the strip) at
-   **(1.0, 0.6)** — the card sets Gauges plot to *Level η*, so it reads the
-   free surface itself. Wait until it stops rising (about a minute): it
-   settles near **1.73 m**, well above the C = 1 prediction.
+2. **Read the level.** The card arrives with a Gauge already placed at
+   **(1.0, 0.6)**, plotting *Level η* (the card's `gauges` entry), so it
+   records the free surface from t = 0: the tank boots at 0.70 m and the
+   curve rises (in > out) and flattens (in = out). Wait until it is flat
+   (about a minute): it settles near **1.73 m**, well above the C = 1
+   prediction.
 3. **Find C.** h = 1.73 − 0.59 = 1.14 m, so C = Q/(a√(2gh)) ≈ **0.66**.
 4. **Check it.** Slide Inflow Q to 0.15: with C = 0.66 the prediction is
    1.00 m; the tank settles at **1.04 m**.
@@ -93,6 +95,15 @@ card asks for lands within 4 cm. The jet contracting just past the sharp
 edge is most of it (C_c ≈ 0.6–0.65 for a sharp-edged slot). From the boot
 level of 0.70 m the tank needs about 80 s at Q = 0.25 to reach its level
 within 1 cm (≈ 1.63 at 40 s, 1.69 at 60 s, 1.72 at 80 s).
+
+Re-measured Oct 2026 off the card's own pre-placed gauge (one column,
+x = 1.0 m, Level η, Medium): 0.70 → 1.03 m by 5 s (the spout's first
+splash), 1.39 at 20 s, 1.52 at 30 s, 1.60 at 45 s, 1.65 at 60 s, 1.68 at
+90 s, 1.69 at 120 s; **95% of the rise at ≈ 59 s**. The single column reads
+2–4 cm under the two-station mean above — its surface sits in one-cell
+terraces and the spout's disturbance reaches it — so a student's gauge
+reading of 1.69–1.70 m gives C ≈ 0.67–0.68 rather than 0.66; well inside
+what the exercise asks.
 
 ### In the lecture
 

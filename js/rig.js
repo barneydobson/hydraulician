@@ -211,7 +211,10 @@ const RIG = (() => {
 
     const U = o.ui || {};
     if (U.mode !== undefined) state.mode = U.mode | 0;
-    if (U.field) state.gaugeField = U.field;
+    // One quantity for every gauge, as the rig was shared showing. A gauge's
+    // own `field` is deliberately NOT on the wire (no V bump): a rig carries
+    // the session default, and per-gauge choices are made in the room.
+    if (U.field) setAllGaugeFields(U.field);
     if (U.cvShow && CV_NEXT[U.cvShow]) state.cvShow = U.cvShow;
     if (U.speed !== undefined) state.speed = +U.speed;
     ["channel", "labels", "jumps", "particles", "dye", "grade", "sline"].forEach((k) => {

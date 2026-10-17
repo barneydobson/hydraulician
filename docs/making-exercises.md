@@ -128,9 +128,10 @@ field and, more importantly, **the line between applied and displayed**:
 | field | applied? | holds |
 |---|---|---|
 | `rigParams` | yes | the plumbing without which the rig is not a rig: `budget` (Resolution) first, then the edges (`openL..openT`), then supplies and levels — *edges before level controls*, because ticking a level opens its own edge |
-| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField`, `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall) |
+| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' number boxes, default on) and `hoverCard` (the cursor's hover card, default on — FF-1 opens with it off), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
+| `gauges` | yes | `[{x, z, field}]`, at most four: gauges the card arrives with ALREADY PLACED, each on its own quantity. The exception to "the picker places no instruments", for a card whose subject is a time series from t = 0 (VC-2's level curve). The card lists them under *Already set* |
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
-| `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule` |
+| `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule`. For a slider give a short `label` ("Speed of sound in water, c", "Wall shape", "Inflow Q") and **no** `rule`: a sentence under every slider made the Year 1 cards mostly slider, so what it does and its starting value go in `setup` |
 | `instruments` | **no** | `{tool, where, why}` — where the gauges go; the picker places none and clears any a payload carried |
 | `setup`, `start`, `task`, `note` | printed | the staged steps, one line on the bench, one or two on what to do and read |
 | `aim` | printed in the menu | optional: one or two plain sentences on what the scene is and what the student does in it; the exercise menu prints it under the title instead of the `start · ?scene · settle` line, the start screen shows it on hover, the card does not |
@@ -157,8 +158,16 @@ top:
   Controls panel opens `"focused"`.
 - `ui.build` / `ui.measure` / `ui.view`: `true`, `false`, or a list of ids.
   BUILD and MEASURE lists take tool ids; the VIEW list takes **button ids**
-  (`legendBtn partBtn dyeBtn chanBtn gradeBtn avgBtn`), because VIEW is a
-  family of toggles. The `V` valve button lives in RUN and is never hidden.
+  (`legendBtn partBtn dyeBtn slineBtn chanBtn gradeBtn readBtn hoverBtn
+  avgBtn`), because VIEW is a family of toggles. The `V` valve button lives
+  in RUN and is never hidden. `readBtn` (**Readouts**, key **I**) folds away
+  every instrument's number boxes — the gauges' corner cards, the Control
+  volume's budget and face numbers, the flux sections' readings and their
+  balance, the rakes' q / u_max chips and the Pressure force values — while
+  the instruments stay placed and keep recording; `hoverBtn` (**Hover
+  readout**) switches the cursor's card. Both are also Controls → View
+  checks (`instReadouts`, `hoverCard`) and so `viewParams` keys. A card that
+  lists VIEW should name them where it has instruments or a hover card.
 - `ui.fields`: the `FIELDS` ids the legend offers (`water speed ehead head
   phead vort froude mom`); if the live field is not among them, the first one
   is applied.
@@ -167,7 +176,60 @@ top:
   the exercise needs; the section headings are retained automatically.
   `ui.legend: false` closes the legend. `ui.readouts`:
   `{gauges, cursor, status}` booleans and `rows: [...]`, validated against
-  `OVERLAY`'s row register.
+  `OVERLAY`'s row register. The hover card's TITLE — the open-channel
+  profile class, "H2 profile" — is the row `profile`: a card with a `rows`
+  list that does not name it never shows it (it used to appear whatever the
+  list said).
+- `ui.gaugeFields`: the quantities a gauge may plot here, by id (below).
+  Narrows the corner card's selector, the inspector's rows and tabs and the
+  Gauges plot select; it never narrows what is recorded or the CSV.
+  `viewParams.gaugeField` must be one of them (`check_pack.py`).
+- `ui.hide`: concepts withheld from the words on the canvas, for a card
+  before the lecture that introduces them —
+  `"energy"`: the Control volume's energy row and its Ė face labels (B
+  cycles Q and M only), ρgQH on a flux section and the energy lost between
+  two, and the reservoir marker's "· energy line" / "· head-driven" — it
+  reads "reservoir level 3.16 m";
+  `"critical"`: the profile class and the words critical / subcritical /
+  supercritical on the hover card — an `Fr` row a card keeps reads "fast,
+  shallow" / "slow, deep".
+  Every Year 1 card before L7 carries `hide: ["energy", "critical"]`.
+- `ui.fieldText`: `{fieldId: "text"}` replaces a field's one-line
+  description in the legend's menu and the Controls Field note — HJ-2 says
+  Froude is "above 1: fast and shallow; below 1: slow and deep" instead of
+  naming critical flow.
+
+All of these are labels, not locks: `⋯ Show everything` brings back the
+full registry's words and quantities.
+
+**Gauges.** Each gauge plots its OWN quantity: a small selector hangs beside
+its corner card (under the ⤢), and the tabs in its Gauge inspector set the
+same thing. A gauge goes three ways — a click on its mark with the Gauge
+tool, the × in its corner card's top-right corner, or **× gauge** in its
+inspector's header (the plain × there only closes the window) — taking its
+own history with it; pressing the strip's Gauge button while the Gauge tool
+is already in hand clears every gauge (the first press only arms the tool,
+and the 5 key never clears). Every sample records every quantity — `p` (pressure, stored in
+Pa, shown in kPa), `phead` (p/ρg), `u`, `w`, `speed` (|u|), `eta` (η),
+`d`, `h` (piezometric head) and `H` (total head) — from the one batched
+probe, so switching shows the whole history and the CSV (`⤓ CSV`) always has
+every column at full precision. The register is `GAUGE_QTY` in `js/main.js`.
+Controls → **Gauges plot** (`viewParams.gaugeField`) sets every gauge at
+once and the quantity new gauges start on, which is what old worksheets
+("set Gauges plot to Depth") and rigs mean by it. A gauge's own choice is
+**not** in the rig wire format (no version bump): a rig carries the one
+`ui.field`, applied to all its gauges.
+
+**Rakes.** A rake reads the water around the point CLICKED: down to the
+first solid, up to the first solid or the end of the water. In open water
+that is bed → surface exactly as before; inside a pipe it is wall → wall.
+A rake loaded from a rig (stored as x only) spans bed → surface. Every rake
+in the scene is drawn on ONE velocity scale — the Speed field's held range
+(the scene's `vmax` until the Speed legend is Fitted) maps to the rake's
+nominal length — so rakes compare side by side and still water draws a
+nearly flat line; a scale bar ("rake: 5 m/s") sits at the bottom left, and
+a section faster than the range is clipped at 1.6× the length. The profile
+is white over a dark casing, readable on every colouring.
 
 Keep the profile as small as the exercise can manage: expose only the tools,
 view toggles, fields and Controls rows that the student or demonstrator will
@@ -203,6 +265,17 @@ highlighted with the arrow keys. The menu's height is capped to the viewport
 and scrolls inside. Without the flag (or without `js/menu.js`) the menu is
 unchanged. The start screen's list shows id and title only, with the `aim`
 as a hover tooltip.
+
+`scenes: false` in the same object removes the scene menu's entry points —
+the strip's Scenes button, the start screen's Scenes door and the S key —
+and makes the title chip at the top right open the exercise menu instead,
+for a course whose students need only the exercises. `?scene=` links still
+boot, and Controls → Scene stays as the escape hatch. Absent, the scenes
+stay. (That chip names the loaded exercise by its title, and the scene only
+when no exercise is loaded.) The strip's **Valves** button likewise appears
+only where the bench has a valve — the scene's own, or one drawn — and goes
+when the last drawn one is undone or the drawing cleared (a valve stroke
+painted over with the eraser still counts — it is still in the stroke list).
 
 A card whose only "Yours" rows are `studentParams` (no digit rule) heads
 them "Try it yourself" rather than with the student-number line.
@@ -268,7 +341,10 @@ menu files it.
 README is missing; the H1 id or title differs from the card; the INDEX row
 is missing; a bold "about **N s**" disagrees with `settle`; a base/step
 ladder disagrees with the rule; the `ui` profile names a tool, button, field,
-panel or readout row that does not exist; a drawing task hides BUILD; or a
+panel or readout row that does not exist, a gauge quantity outside
+`GAUGE_QTY` (or a `viewParams.gaugeField` it does not offer), a `hide`
+concept other than `energy` / `critical`, or a `fieldText` key that is not a
+field; a card's `gauges` entry is malformed; a drawing task hides BUILD; or a
 folder or INDEX row has no card. `check_notation.py` then greps the brief for
 retired names (the y-family, old gauge keys). Both are instant and run in CI.
 

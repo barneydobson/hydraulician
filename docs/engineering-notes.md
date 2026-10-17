@@ -1011,6 +1011,24 @@ points and need a stopping rule at every boundary.
   s1's roller — never fall below tolerance at all; for those the mean profile
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
+- **Average used to survive a scene switch.** `switchScene` reset the view
+  toggles but not `state.avg`, so a class that switched FF-5 to Average
+  opened VC-2 — an unsteady fill — still averaging, its level curve smeared
+  into a window mean. It now calls `setAverage(false)` (the single writer:
+  the flag alone would leave the accumulators open) before loading.
+- **A rake inside a conduit.** The rake used to span the column analysis's
+  `A.bed → A.surf`, which in a pipe over a full tank (FF-4) is the tank, not
+  the pipe. It now spans the water around the clicked point (`rakeSpan` in
+  overlay.js): open water — same bed, nothing solid between the click and
+  `A.surf` — keeps `A.bed → A.surf` bit-for-bit (NC-2's q is unchanged
+  whatever z is clicked); anything else walks to the walls and needs the
+  column's fill to find a free surface inside the conduit, one extra 1 × ny
+  read per such rake per frame (`needF`), none for an open-channel rake.
+- **The hover card's title is a row.** The profile class ("H2 profile") was
+  drawn whenever the column could be classified, outside the `rows` filter,
+  so every Year 1 card that named its rows still printed it. It is the row
+  id `profile` now (in the default set), and `ui.hide: ["critical"]` drops it
+  with the sub/supercritical words.
 
 ## Hydropower scheme (`hydro`): the surge shaft
 

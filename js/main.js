@@ -56,6 +56,14 @@ const state = {
   sline: false, slineN: 12, slineBuf: null, slineGrid: null,
   slineDpsi: 0, slineAt: 0, slineT: -1,
   ruler: true,                // metre ticks on the view edges — a workspace preference
+  // The instruments' on-canvas readout BOXES — gauge corner cards, the
+  // Control volume's budget and face numbers, flux-section and rake chips,
+  // the pressure-force values — folded away together (VIEW → Readouts, I).
+  // The instruments keep measuring and recording while they are hidden.
+  instReadouts: true,
+  // The card that follows the cursor over the water (VIEW → Hover readout).
+  // A profile's `readouts.cursor: false` still withholds it outright.
+  hoverCard: true,
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
   flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
@@ -258,9 +266,24 @@ function loadScene(id, keepDrawing) {
   // syncing at the callers instead is how one of them gets missed.
   LEGEND.sync();
   showToast(sc.name, sc.blurb);
-  document.getElementById("sceneName").textContent = sc.name;
-  document.getElementById("sceneKey").textContent = sc.key;
+  syncTitle();
   PICKER.refresh();
+}
+
+/** The label at the top right: the loaded EXERCISE's title (what its menu
+ *  calls it) while one is open, the scene's name otherwise. Several exercises
+ *  share one scene, and a student who opened "Steady and unsteady flow" should
+ *  not find "Plan view — flow past a body" named over it. Called when a scene
+ *  loads and when an exercise is picked or cleared. */
+function syncTitle() {
+  const sc = state.scene || {};
+  let ex = typeof EX !== "undefined" ? EX.current : null;
+  // Only while the bench IS that exercise's scene: a scene picked from the
+  // menu afterwards is named as itself.
+  if (ex && ex.scene !== sc.id) ex = null;
+  const n = document.getElementById("sceneName"), k = document.getElementById("sceneKey");
+  if (n) n.textContent = ex ? ex.title : (sc.name || "");
+  if (k) k.textContent = ex ? ex.id + " · " + (sc.name || "") : (sc.key || "");
 }
 
 /** Load a scene from the UI — the picker, the bar button, the panel row.
@@ -292,7 +315,13 @@ function switchScene(id) {
   state.grade = false;                // an exercise that wants them says so in viewParams
   state.sline = false; state.slineN = 12;   // likewise the streamlines
   state.gaugeField = "h";
+  state.instReadouts = true;          // an exercise that wants them off says so in viewParams
+  state.hoverCard = true;
   state.tracerN = 9;
+  // Live, as a fresh boot is. Average used to survive a switch, so a class
+  // that had averaged FF-5 opened VC-2 — an unsteady fill — on Average. An
+  // exercise that wants it says `avg: true` in viewParams (none does).
+  if (state.avg) setAverage(false);
   UIMODE.reset();                     // a new scene is a whole interface again
   GINSP.closeAll();
   if (state.paused) togglePause();    // via the toggle, so the glyph follows
@@ -396,6 +425,69 @@ function momScene() { return 0.5 * Math.pow(sceneNow().vmax || 4, 2); }
 
 /** The registry entry for a shader mode integer. */
 function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }
+
+/** The field's one-line description, as THIS exercise wants it said. A card
+ *  can replace a description that names concepts its lecture has not met
+ *  (`ui.fieldText: { froude: "above 1: fast and shallow; …" }`); `⋯ Show
+ *  everything` brings the registry's own words back with the rest. */
+function fieldBlurb(f) {
+  const u = state.ui;
+  const t = u && !u.lifted && u.fieldText && u.fieldText[f.id];
+  return t || f.blurb;
+}
+
+/** What a GAUGE can record — the gauges' own register, kept apart from FIELDS
+ *  (what the water is painted with) for the reason GINSP's header gives.
+ *  Described once, like FIELDS: the sampler writes every one of these keys on
+ *  every sample, the corner card, the inspector, the panel's "Gauges plot"
+ *  select and the CSV all read this list, and `ui.gaugeFields` narrows what is
+ *  OFFERED by id — never what is recorded.
+ *
+ *  `id` is the sample key and the wire key (rig `ui.field`, `viewParams
+ *  .gaugeField`, `ui.gaugeFields`): ASCII, notation-register symbols
+ *  (docs/notation.md) — `eta` for η and `speed` for |u|, as before; `phead`
+ *  is p/ρg, the same name `probe()` uses. `k` converts the STORED value to the
+ *  displayed one: pressure is stored in Pa and shown in kPa; the CSV writes
+ *  the stored value in `csv` units at full precision. Order is the order a
+ *  student meets them in the course (pressure first, heads last). */
+const GAUGE_QTY = [
+  { id: "p",     sym: "p",    unit: "kPa", csv: "Pa",  k: 1e-3, name: "Pressure p",
+    note: "pressure at the gauge, above atmospheric" },
+  { id: "phead", sym: "p/ρg", unit: "m",   csv: "m",   k: 1, name: "Pressure head p/ρg",
+    note: "the pressure as a height of water" },
+  { id: "u",     sym: "u",    unit: "m/s", csv: "mps", k: 1, name: "Velocity u (horizontal)",
+    note: "horizontal velocity, + to the right" },
+  { id: "w",     sym: "w",    unit: "m/s", csv: "mps", k: 1, name: "Velocity w (vertical)",
+    note: "vertical velocity, + upwards" },
+  { id: "speed", sym: "|u|",  unit: "m/s", csv: "mps", k: 1, name: "Speed |u|",
+    note: "speed at the gauge cell" },
+  { id: "eta",   sym: "η",    unit: "m",   csv: "m",   k: 1, name: "Level η",
+    note: "water level, η = z_b + d" },
+  { id: "d",     sym: "d",    unit: "m",   csv: "m",   k: 1, name: "Depth d",
+    note: "water depth of the column" },
+  { id: "h",     sym: "h",    unit: "m",   csv: "m",   k: 1, name: "Piezometric head h",
+    note: "piezometric head, h = z + p/ρg" },
+  { id: "H",     sym: "H",    unit: "m",   csv: "m",   k: 1, name: "Total head H",
+    note: "total head, H = z + p/ρg + |u|²/2g" },
+];
+function gaugeQty(id) { return GAUGE_QTY.find((q) => q.id === id) || null; }
+/** The quantity a gauge plots: its own choice, else the session default
+ *  (`state.gaugeField`), moved to the first one offered when the profile does
+ *  not offer it. Rig scripts push bare `{x, z}` gauges, so `field` is optional. */
+function gaugeFieldOf(g) {
+  const offer = UIMODE.gaugeFields();
+  const want = (g && g.field) || state.gaugeField;
+  if (offer.some((q) => q.id === want)) return want;
+  return offer.length ? offer[0].id : "h";
+}
+/** Set what EVERY gauge plots, and the default for the next one — what the
+ *  old global "Gauges plot" select meant, which old rigs and printed
+ *  worksheets ("set Gauges plot to Depth") still rely on. */
+function setAllGaugeFields(id) {
+  if (!gaugeQty(id)) return;
+  state.gaugeField = id;
+  state.gauges.forEach((g) => { g.field = id; });
+}
 
 /** The live colour range for a field, in its own units. Seeded from the
  *  registry default the first time it is asked for, then owned by whatever
@@ -667,7 +759,7 @@ const CONTROLS = [
     opts: FIELDS.map((f) => [String(f.mode), f.name]),
     get: () => String(state.mode),
     set: (v) => { state.mode = +v; LEGEND.sync(); },
-    fmt: () => fieldFor(state.mode).blurb },
+    fmt: () => fieldBlurb(fieldFor(state.mode)) },
   // The same toggle as the strip's A. The sandbox must be able to reproduce
   // any scene by hand, so every strip toggle needs a panel row as well.
   { id: "avg", type: "check", label: "Average the flow",
@@ -703,6 +795,7 @@ const CONTROLS = [
       [["Q", "Q", "volume flow rate through each face, m²/s"],
        ["M", "M→", "momentum flux plus pressure force on each face, N/m"],
        ["E", "Ė", "energy flow rate through each face, W/m"]].forEach(([id, txt, why]) => {
+        if (id === "E" && UIMODE.hides("energy")) return;     // ui.hide "energy"
         const b = document.createElement("button");
         b.textContent = txt; b.title = why;
         b.className = state.cvShow === id ? "on" : "";
@@ -712,8 +805,8 @@ const CONTROLS = [
     },
     fmt: () => !state.cv ? "left-drag a box on the water with the Control volume tool (9)"
       : !state.cv.flux ? "settling…"
-      : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s  ·  " +
-        "Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m",
+      : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s" +
+        (UIMODE.hides("energy") ? "" : "  ·  Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m"),
     info: "The box is a control volume, and every face of it carries a budget: the volume crossing it, the momentum it carries plus the pressure on it, and the energy going with them. Air contributes nothing — every term is weighted by the fill fraction, so an empty cell adds zero and a half-full one adds half. Read outward-positive: what leaves is positive wherever it leaves from, so Σ Q is continuity and Σ Ė is the loss." },
   { id: "fluxList", type: "buttons", label: "Flux sections",
     sync: (el) => {
@@ -747,6 +840,12 @@ const CONTROLS = [
   { id: "jumps", type: "check", label: "Jump analysis",
     get: () => state.jumps, set: (v) => state.jumps = v,
     info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction d₂/d₁ = ½(√(1+8Fr₁²) − 1)." },
+  { id: "instReadouts", type: "check", label: "Instrument readouts",
+    get: () => state.instReadouts, set: (v) => state.instReadouts = v,
+    info: "The number boxes the instruments draw on the water: the gauges' corner cards, the Control volume's budget and the numbers on its faces, each flux section's readings and the balance between two, the rakes' q and u_max, and the pressure-force values. Off folds them all away — the instruments stay where they are and keep measuring and recording, so the gauge histories, the inspector and the CSV are complete when they come back. I toggles it." },
+  { id: "hoverCard", type: "check", label: "Hover readout",
+    get: () => state.hoverCard, set: (v) => state.hoverCard = v,
+    info: "The card of numbers that follows the cursor over the water — position, and whatever the exercise lists of depth, level, velocity and pressure there." },
   { id: "particles", type: "check", label: "Particles",
     get: () => state.particles, set: (v) => state.particles = v,
     info: "Massless tracers. The clearest way to see wave orbits and jet spreading." },
@@ -766,9 +865,15 @@ const CONTROLS = [
   { id: "dyeDecay", label: "Dye fade", min: 0, max: 0.3, step: 0.005,
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
+  // Sets what EVERY gauge plots and what the next one starts on; each gauge
+  // can then be changed on its own corner card or in its inspector. The
+  // options the panel shows follow `ui.gaugeFields` (`optsNow`, re-read by
+  // syncPanel); `opts` stays the whole register for the card's own text.
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["h", "Piezometric head"], ["H", "Total head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
-    get: () => state.gaugeField, set: (v) => state.gaugeField = v },
+    opts: GAUGE_QTY.map((q) => [q.id, q.name]),
+    optsNow: () => UIMODE.gaugeFields().map((q) => [q.id, q.name]),
+    get: () => gaugeFieldOf(null), set: (v) => setAllGaugeFields(v),
+    info: "What every gauge plots, and what a new gauge starts on. Each gauge can then be switched on its own: the small selector beside its card, or the tabs in its inspector window. Every quantity is recorded all the time whatever is plotted, and the CSV carries all of them." },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
     // opens), plus a CSV of everything recorded.
@@ -794,12 +899,7 @@ const CONTROLS = [
       x.textContent = "✕ Clear all";
       x.title = "Remove every gauge — or click one with the Gauge tool to remove just that one";
       x.disabled = !state.gauges.length;
-      x.onclick = () => {
-        x.blur();
-        GINSP.closeAll();
-        state.gauges.length = 0;
-        syncPanel();
-      };
+      x.onclick = () => { x.blur(); clearAllGauges(); };
       el.appendChild(x);
     },
     fmt: () => state.gauges.length
@@ -926,6 +1026,16 @@ function syncPanel() {
         c.label = d.label; c.min = d.min; c.max = d.max; c.step = d.step;
         input.step = d.step;           // the range input's own step, not just c's
         input.parentElement.querySelector(".lbl").textContent = d.label;
+      }
+    }
+    // A select whose choices depend on the exercise (Gauges plot under
+    // `ui.gaugeFields`) is rebuilt when the set changes, and only then.
+    if (c.type === "select" && c.optsNow) {
+      const opts = c.optsNow(), key = opts.map((o) => o[0]).join(",");
+      if (input.dataset.opts !== key) {
+        input.dataset.opts = key;
+        input.textContent = "";
+        opts.forEach(([ov, t]) => { const o = document.createElement("option"); o.value = ov; o.textContent = t; input.appendChild(o); });
       }
     }
     const v = c.get();
@@ -1072,7 +1182,7 @@ const TOOLS = [
   ["erase", "Erase", "Left-drag to remove"],
   ["valve", "Valve", "Draw a gate you can slam with V"],
   ["spout", "Spout", "Click or drag to move the falling inflow"],
-  ["gauge", "Gauge", "Click to log head / depth — click one again to remove it"],
+  ["gauge", "Gauge", "Click to log a time series — click one again (or its ×) to remove it; press this button again to clear all gauges"],
   ["rake", "Rake", "Click for a velocity–depth profile — click it again to remove it"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
@@ -1171,6 +1281,12 @@ const ICONS = {
   // The two grade lines over a wavy surface: what the overlay actually draws.
   channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
            '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
+  // A corner card with a trace on it — what the gauge cards look like.
+  readouts: '<rect x="2.5" y="5" width="15" height="10" rx="2"/>' +
+            '<path d="M5 12l2.5-2.5 2 1.5 2.5-3.5 3 2.5"/>',
+  // A pointer with its little card of numbers beside it.
+  hover:   '<path d="M3.5 3.5l4.5 11 1.6-4.4 4.4-1.6z"/>' +
+           '<path d="M11.5 12.5h6v5h-6z" opacity=".7"/><path d="M13 14.5h3M13 16h2" opacity=".7"/>',
   // A vertical face with three arrows of growing length pressing on it — the
   // textbook pressure diagram drawForce paints on the canvas.
   force:   '<path d="M13.5 3v14"/><path d="M4 6.5h5M6 10h3M8 13.5h1"/>' +
@@ -1441,7 +1557,7 @@ const LEGEND = (() => {
       b.dataset.mode = String(f.mode);
       const t = document.createElement("b"); t.textContent = f.name;
       const s = document.createElement("i"); s.textContent = f.sym;
-      const w = document.createElement("span"); w.textContent = f.blurb;
+      const w = document.createElement("span"); w.textContent = fieldBlurb(f);
       b.appendChild(t); b.appendChild(s); b.appendChild(w);
       b.onclick = () => { state.mode = f.mode; closeMenu(); sync(); syncPanel(); };
       m.appendChild(b);
@@ -1545,6 +1661,7 @@ const UIMODE = (() => {
     return ["build", "measure", "view"].some((f) => u[f] !== true) ||
            u.fields !== true || u.panel !== "full" || u.controls !== true ||
            u.legend !== true ||
+           Array.isArray(u.gaugeFields) || (Array.isArray(u.hide) && u.hide.length > 0) ||
            Object.keys(u.readouts || {}).some((k) => u.readouts[k] === false);
   }
 
@@ -1603,7 +1720,37 @@ const UIMODE = (() => {
     return u.readouts[what] !== false;
   }
 
-  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows, rows };
+  /** The quantities a gauge may plot here — GAUGE_QTY unless `ui.gaugeFields`
+   *  narrows it (ids, in the register's order). Narrows what is OFFERED on
+   *  the corner card, the inspector and the Gauges plot select; every
+   *  quantity is still recorded and still in the CSV. */
+  function gaugeFields() {
+    const u = state.ui;
+    if (!u || u.lifted || !Array.isArray(u.gaugeFields) || !u.gaugeFields.length) return GAUGE_QTY;
+    const L = GAUGE_QTY.filter((q) => u.gaugeFields.indexOf(q.id) >= 0);
+    return L.length ? L : GAUGE_QTY;
+  }
+
+  /** Is a CONCEPT withheld from this card's on-canvas words? `ui.hide` lists
+   *  them (see HIDE_IDS); each id is honoured where that concept is printed:
+   *
+   *    "energy"    the energy row of the Control volume budget, its Ė face
+   *                labels (B skips them), ρgQH on a flux section and the
+   *                energy line between two, and the reservoir marker's
+   *                "· energy line" — it reads "reservoir level 3.16 m".
+   *    "critical"  the words critical / subcritical / supercritical and the
+   *                profile class (H2, M1 …) on the hover card; the Fr row,
+   *                where a card keeps it, says "fast, shallow" / "slow, deep".
+   *
+   *  A label, not a cage: ⋯ Show everything brings the words back. */
+  function hides(concept) {
+    const u = state.ui;
+    if (!u || u.lifted || !Array.isArray(u.hide)) return false;
+    return u.hide.indexOf(concept) >= 0;
+  }
+
+  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows, rows,
+           gaugeFields, hides };
 })();
 
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
@@ -1615,6 +1762,32 @@ function setPanel(open) {
 }
 function togglePanel() {
   setPanel(!document.getElementById("panel").classList.contains("open"));
+}
+
+/** Does this deployment offer the scene menu? A course menu (js/menu.js) may
+ *  say `scenes: false`: its students reach everything through the exercise
+ *  menu, and a second menu of bare geometry beside it only confused them. That
+ *  hides the strip's Scenes button and the start screen's Scenes door and
+ *  disarms S; `?scene=` links still boot. Absent, the scenes stay (upstream). */
+function scenesOffered() {
+  return typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU || EXERCISE_MENU.scenes !== false;
+}
+
+/** Is there a valve on the bench — one the scene declares, or a drawn one
+ *  (segment kind 128)? The strip shows the Valves button only then. */
+function hasValves() {
+  if (!sim || !sim.scene) return false;
+  if (sim.segs && sim.segs.some((s) => (s[5] | 0) === 128)) return true;
+  const sc = sim.scene;
+  if (!sc.valves) return false;
+  try { return sc.valves(sc.W, sc.H, SIM.params().values || {}).length > 0; }
+  catch (_) { return true; }               // a scene that cannot say keeps its button
+}
+/** Rebuild the strip when the answer changes — cheap to ask, rare to change. */
+let valvesShown = null;
+function syncValveBtn() {
+  const v = hasValves();
+  if (v !== valvesShown) { valvesShown = v; buildToolbar(); }
 }
 
 /** A blank flume, from wherever you are. This is the sandbox's "new document":
@@ -1661,6 +1834,7 @@ const TOOLBAR = [
       act: () => START.open() },
     { id: "sceneBtn", icon: "scenes", label: "Scenes", key: "S",
       hint: "Ready-made flumes, tanks and pipe runs",
+      when: () => scenesOffered(),
       act: (b) => PICKER.toggle(b) },
     { id: "exBtn", icon: "ex", label: "Exercises", key: "E",
       hint: "Set up one of the teaching demos",
@@ -1710,6 +1884,18 @@ const TOOLBAR = [
       hint: "Energy and hydraulic grade lines — the gap between them is the velocity head",
       on: () => state.grade,
       act: () => { state.grade = !state.grade; syncPanel(); } },
+    // The two readout switches. Separate, because they answer different
+    // wishes: the boxes are the instruments' numbers (fold them away to look
+    // at the water, or to ask for a prediction first); the hover card is the
+    // cursor's own probe, which a first lecture may not want at all.
+    { id: "readBtn", icon: "readouts", label: "Readouts", key: "I",
+      hint: "The instruments' number boxes — gauge cards, control volume, flux lines, rakes, force. They keep recording while hidden",
+      on: () => state.instReadouts,
+      act: () => { state.instReadouts = !state.instReadouts; syncPanel(); } },
+    { id: "hoverBtn", icon: "hover", label: "Hover readout", key: "",
+      hint: "The card of numbers that follows the cursor over the water",
+      on: () => state.hoverCard,
+      act: () => { state.hoverCard = !state.hoverCard; syncPanel(); } },
     // VIEW and not MEASURE, deliberately, although it is the one toggle here
     // that changes what the numbers say: it changes how the water is DRAWN,
     // and everything else follows the picture — the overlay, the instruments
@@ -1734,6 +1920,10 @@ const TOOLBAR = [
     // explicit `valveOpen` starts shut, valve drawn or not.
     { id: "valveBtn", icon: "valve", label: "Valves", key: "V",
       hint: "Open or slam every valve you have drawn",
+      // Only where there is a valve to work: the scene's own or one drawn.
+      // Re-read every frame (tickFrame → syncValveBtn), so drawing the first
+      // valve puts the button up and erasing the last takes it away.
+      when: () => hasValves(),
       on: () => !!sim && sim.p.valveClosed < 0.5, act: () => toggleValve() },
   ] },
   // Chrome, not a family: captioning it would put it in the same taxonomy as
@@ -1796,7 +1986,15 @@ function toolItem([id, label, tip]) {
   return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
            key: n <= TOOL_KEYS ? String(n) : "",
            on: () => state.tool === id,
-           act: () => { state.tool = id; state.forceHover = null; syncToolbar(); syncPanel(); } };
+           act: () => {
+             // The Gauge button pressed while the Gauge tool is ALREADY in
+             // hand clears every gauge (its hint says so); the first press
+             // only arms the tool, as every other tool does. The digit key
+             // never clears — a key pressed twice by habit must not cost a
+             // run's histories.
+             if (id === "gauge" && state.tool === "gauge") { clearAllGauges(); return; }
+             state.tool = id; state.forceHover = null; syncToolbar(); syncPanel();
+           } };
 }
 
 /** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
@@ -1974,9 +2172,10 @@ const KEYS = (() => {
     ["T", "streamlines"],
     ["N", "open-channel overlay"],
     ["A", "average the flow — the mean field, over one window"],
+    ["I", "the instruments' readout boxes — they keep recording while hidden"],
     ["M", "ruler"],
     ["F", "full screen"],
-    ["S", "scenes"],
+    ...(scenesOffered() ? [["S", "scenes"]] : []),
     ["E", "exercises"],
     ["H", "the start screen"],
   ];
@@ -2129,6 +2328,7 @@ const START = (() => {
     const host = document.getElementById("startside");
     host.textContent = "";
     DOORS.forEach((d) => {
+      if (d.title === "Scenes" && !scenesOffered()) return;   // EXERCISE_MENU.scenes: false
       const b = document.createElement("button");
       b.type = "button";
       b.className = "startcard glass" + (d.cls ? " " + d.cls : "");
@@ -2302,7 +2502,7 @@ function onDown(e) {
     return;
   }
   if (state.tool === "gauge") { placeGauge(x, z); return; }
-  if (state.tool === "rake") { placeRake(x); return; }
+  if (state.tool === "rake") { placeRake(x, z); return; }
   if (state.tool === "tracer") {
     // Click anywhere in the water to hang a fresh column of tracers there;
     // click on dry ground to clear them.
@@ -2522,6 +2722,7 @@ function tickFrame(realDt) {
   gov.last = tNow;
   const measured = wallMs > 0 && wallMs < 10000;
   computeView();
+  syncValveBtn();                // a valve drawn or erased shows / hides V on the strip
   collectStream();               // before this frame's substeps: see requestStream
 
   let simAdvanced = 0, warming = false, binding = false;
@@ -2822,8 +3023,14 @@ function sampleGauges(A) {
     // by the friction loss between them; a still column (reservoir, shaft) has
     // |u| ≈ 0, so there H = h = η.
     const g = Math.abs(sim.p.g) || 9.81;
+    // EVERY quantity in GAUGE_QTY, on every sample, whatever the gauge is
+    // plotting: the probe returns all of them from the one batched read, so
+    // switching a gauge's quantity later shows its whole history, and the
+    // CSV always has the lot. The solver's p is kinematic (p/ρ, m²/s²);
+    // ×ρ = 1000 kg/m³ stores it in Pa — the unit the CSV writes.
     const s = { t: sim.t, h: z + pr.phead, H: z + pr.phead + pr.speed * pr.speed / (2 * g),
-                d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
+                d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed,
+                u: pr.u, w: pr.w, p: 1000 * pr.p, phead: pr.phead };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
     if (!gg.log) gg.log = [];
@@ -2847,7 +3054,13 @@ function measuringAvg() { return state.avg && SIM.avgActive(); }
 
 function sampleRakes() {
   const av = measuringAvg();
-  state.rakes.forEach((rk) => { const r = SIM.rake(rk.x, rk.buf, av); rk.buf = r.buf; rk.i = r.i; });
+  // The fill column only for a rake that drawRake found inside a conduit
+  // (`needF`): an open-channel rake spans bed → surface off the column
+  // analysis and costs no extra readback.
+  state.rakes.forEach((rk) => {
+    const r = SIM.rake(rk.x, rk.buf, av, rk.needF ? (rk.f || true) : null);
+    rk.buf = r.buf; rk.i = r.i; rk.f = r.f;
+  });
 }
 
 /** Place (or move) the force control volume. Corners are normalised and the
@@ -3223,6 +3436,11 @@ function drawOverlay(A) {
   const ctx = octx;
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   ctx.clearRect(0, 0, view.pxW, view.pxH);
+  // What the overlay may print this frame: the instruments' boxes (VIEW →
+  // Readouts) and the concepts this card's `ui.hide` withholds.
+  OVERLAY.setPrint({ boxes: state.instReadouts,
+                     energy: !UIMODE.hides("energy"),
+                     critical: !UIMODE.hides("critical") });
   OVERLAY.drawFrame(ctx, view, sim);
   if (state.ruler) OVERLAY.drawRuler(ctx, view, sim);
   ctx.save();
@@ -3237,7 +3455,16 @@ function drawOverlay(A) {
   if (state.sline && state.slineBuf && state.slineBuf.avg === measuringAvg()) {
     OVERLAY.drawStreamlines(ctx, view, state.slineBuf);
   }
-  state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
+  // ONE velocity scale for every rake: the Speed field's held range (the
+  // scene's `vmax` until someone Fits the Speed legend), so rakes compare side
+  // by side and still water draws flat. Held, not tracked — the same rule as
+  // the colour ranges; the bar at the bottom left says what it is.
+  if (state.rakes.some((rk) => rk.buf)) {
+    const uRef = Math.max(0.05, rangeFor("speed")[1]);
+    const pxPerMps = Math.min(view.w * 0.13, 110) / uRef;
+    state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A, pxPerMps); });
+    OVERLAY.drawRakeScale(ctx, view, pxPerMps);
+  }
   // Wind over the water (FF-1): only a scene declaring a "tau" param has one.
   const tau = SIM.windTau();
   if (tau) {
@@ -3270,18 +3497,20 @@ function drawOverlay(A) {
   drawSpout(ctx);
   ctx.restore();
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
-  const fld = state.gaugeField;
   // The MARKS always stay — a gauge you cannot see is a gauge you place twice.
   // What a profile can withhold is the card that reads it out, for an exercise
-  // that wants a prediction before a number.
-  const cards = UIMODE.shows("gauges")
-    ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-        fld === "h" ? "h" : fld === "H" ? "H" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
-        fld === "speed" ? "m/s" : "m")
+  // that wants a prediction before a number; and the Readouts view toggle
+  // (state.instReadouts) folds every instrument's boxes away — the gauges go
+  // on recording either way. Each card plots its own gauge's quantity.
+  const cards = UIMODE.shows("gauges") && state.instReadouts
+    ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, (gg) => {
+        const q = gaugeQty(gaugeFieldOf(gg));
+        return { label: q.sym, unit: q.unit, get: (s) => s[q.id] * q.k };
+      })
     : [];
   GINSP.tick(cards);
   if (state.grade) OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
-  if (state.inside && !state.drag && UIMODE.shows("cursor")) {
+  if (state.inside && !state.drag && UIMODE.shows("cursor") && state.hoverCard) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
     if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1], measuringAvg()); }
@@ -3342,25 +3571,44 @@ function faceAtPx(solids, x, z, tolPx) {
  *  so this is the convention the rest of the toolbox was using. */
 function placeGauge(x, z) {
   const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < GRAB_PX);
-  if (hit >= 0) {
-    const gone = state.gauges.splice(hit, 1)[0];
-    GINSP.closeFor(gone);
-    syncPanel();
-    return;
-  }
+  if (hit >= 0) { removeGauge(state.gauges[hit]); return; }
   if (state.gauges.length >= 4) state.gauges.shift();
   state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
+                      field: gaugeFieldOf(null),     // starts on the session default
                       colour: CONFIG.gaugeColours[state.gauges.length % 4] });
   syncPanel();                      // the inspector row lists the live gauges
 }
 
-/** Place a rake — or take away the one at that station. A rake is a whole
- *  column, so only the station is compared. */
-function placeRake(x) {
+/** Take one gauge away — the click on its mark, the × on its corner card and
+ *  the Remove in its inspector all come here. Its history goes with it; the
+ *  others' (and so their CSV columns) are untouched. */
+function removeGauge(g) {
+  const k = state.gauges.indexOf(g);
+  if (k < 0) return;
+  state.gauges.splice(k, 1);
+  GINSP.closeFor(g);
+  syncPanel();
+}
+/** Every gauge at once: the panel's ✕ Clear all, and the strip's Gauge button
+ *  pressed while the Gauge tool is already in hand. */
+function clearAllGauges() {
+  GINSP.closeAll();
+  state.gauges.length = 0;
+  syncPanel();
+}
+
+/** Place a rake — or take away the one at that station. A rake spans the
+ *  water around the CLICKED point: from the first solid below it up to the
+ *  first solid above it or the free surface, whichever comes first. In an
+ *  open channel that is bed → surface, exactly as before; inside a pipe it is
+ *  wall → wall (drawRake works the span out each frame). `z` is optional — a
+ *  rake from a rig or a script without one spans the column's bed → surface.
+ *  Removal compares the station only. */
+function placeRake(x, z) {
   const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < GRAB_PX);
   if (hit >= 0) { state.rakes.splice(hit, 1); syncPanel(); return; }
   if (state.rakes.length >= 2) state.rakes.shift();
-  state.rakes.push({ x, buf: null });
+  state.rakes.push({ x, z: Number.isFinite(z) ? z : undefined, buf: null });
   syncPanel();
 }
 
@@ -3406,11 +3654,16 @@ function drawMarkers(ctx) {
     // named on the chip so nobody reads the marker as a promised surface.
     const st = SIM.inletStage();
     const drawn = p.inflow.level - st.stage;
+    // A card before the energy lecture (ui.hide "energy") gets the plain
+    // reading — "reservoir level 3.16 m" — with neither the energy line nor
+    // "head-driven" (a head, also L7) attached.
     level("L", p.inflow.level,
-      "reservoir " + p.inflow.level.toFixed(2) + " m"
-        + (p.inflow.free > 0.5 ? " · head-driven"
-           : st.choked ? " · energy line · over-drawn"
-           : drawn > 0.005 ? " · energy line" : ""),
+      UIMODE.hides("energy")
+        ? "reservoir level " + p.inflow.level.toFixed(2) + " m"
+        : "reservoir " + p.inflow.level.toFixed(2) + " m"
+          + (p.inflow.free > 0.5 ? " · head-driven"
+             : st.choked ? " · energy line · over-drawn"
+             : drawn > 0.005 ? " · energy line" : ""),
       "#7fd4ff", "res");
   }
   if (p.tailwater.on > 0.5) {
@@ -3645,12 +3898,15 @@ function boot() {
 
   // The scene menu (see PICKER). Four ways in: the scene chip at the end of
   // the strip, the strip's Scenes icon, the panel's Scene row, and the S key.
+  // Under a course menu with `scenes: false` the chip names the exercise and
+  // opens the EXERCISE menu instead.
   const title = document.getElementById("title");
-  title.onclick = (e) => PICKER.toggle(e.currentTarget);
+  const chipMenu = (el) => (scenesOffered() ? PICKER.toggle(el) : EX.toggle(el));
+  title.onclick = (e) => chipMenu(e.currentTarget);
   title.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault(); e.stopPropagation();          // not the global Space = pause
-    PICKER.toggle(title);
+    chipMenu(title);
   });
   window.addEventListener("pointerdown", PICKER.onDown, true);
   addEventListener("resize", () => { if (PICKER.isOpen()) PICKER.place(); });
@@ -3771,7 +4027,7 @@ function boot() {
     else if (k === "escape") { KEYS.close(); DOCK.fold(true); }
     else if (k === "?" || (k === "/" && e.shiftKey)) KEYS.toggle(document.getElementById("keysBtn"));
     else if (k === "h") START.open();
-    else if (k === "s") PICKER.open(document.getElementById("sceneBtn"));
+    else if (k === "s") { if (scenesOffered()) PICKER.open(document.getElementById("sceneBtn")); }
     else if (k === "e") EX.open(document.getElementById("exBtn"));
     else if (k === "v") toggleValve();
     else if (k === "z") SIM.undoSeg();
@@ -3787,11 +4043,17 @@ function boot() {
       LEGEND.sync(); syncPanel();
     }
     else if (k === "l") LEGEND.toggle();
-    else if (k === "b") { state.cvShow = CV_NEXT[state.cvShow] || "Q"; syncPanel(); }
+    else if (k === "b") {
+      state.cvShow = CV_NEXT[state.cvShow] || "Q";
+      // A card that withholds energy has two things to cycle, not three.
+      if (state.cvShow === "E" && UIMODE.hides("energy")) state.cvShow = "Q";
+      syncPanel();
+    }
     else if (k === "d") { state.dye = !state.dye; syncPanel(); }
     else if (k === "t") { state.sline = !state.sline; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "a") setAverage(!state.avg);
+    else if (k === "i") { state.instReadouts = !state.instReadouts; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
     // requestFullscreen needs a user gesture; a keypress is one. A frame with
     // no allow="fullscreen" simply rejects — toggleFullscreen already swallows
@@ -3931,6 +4193,7 @@ window.APP = {
   probe: (x, z) => SIM.probe(x, z),
   particlePos: (n) => SIM.particlePos(n),  // x, z pairs — headless only
   placeGauge, placeRake,                   // place, or remove one already there
+  removeGauge, clearAllGauges,             // what the ×s and the second Gauge press do
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
   faceForce: (sid, fid, avg) => SIM.faceForce(sid, fid, avg),   // the pressure diagram on one named face

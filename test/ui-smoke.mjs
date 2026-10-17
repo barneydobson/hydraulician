@@ -92,8 +92,10 @@ const PROBE = `
       n + grp.items.filter((it) => !it.when || it.when()).length, 0),
     toolCount: APP.TOOLS.length,
     litTools: [...document.querySelectorAll("#groups .tbtn.on")].length,
-    valveHot: document.getElementById("valveBtn").classList.contains("on") ||
-              document.getElementById("valveBtn").classList.contains("hot"),
+    // The Valves button is only on the strip where there is a valve (hasValves).
+    valveHot: ((b) => !!b && (b.classList.contains("on") || b.classList.contains("hot")))(
+              document.getElementById("valveBtn")),
+    valveShown: !!document.getElementById("valveBtn"),
     exId: APP.EX.current ? APP.EX.current.id : null,
     sceneId: APP.state.scene ? APP.state.scene.id : null,
   };
@@ -712,6 +714,13 @@ async function main() {
         const def = cap(null);
         const narrow = cap(["pos", "d", "Sf"]);
         const withF = cap(["pos", "f"]);
+        // The class title ("M1 profile") is governed by the list too — it
+        // used to be drawn whatever the list said — and by ui.hide "critical".
+        const title = (seen) => seen.some((t) => / profile$/.test(t));
+        const crit = (seen) => seen.some((t) => /critical/.test(t));
+        OVERLAY.setPrint({ critical: false });
+        const plain = cap(null);
+        OVERLAY.setPrint({ critical: true });
         const idsCovered = OVERLAY.ROW_IDS.every((id) => typeof id === "string" && id.length);
         return {
           nIds: OVERLAY.ROW_IDS.length,
@@ -721,6 +730,9 @@ async function main() {
           narrowDropsQ: !narrow.some((t) => t === "q"),
           narrowKeepsSf: narrow.some((t) => /S_f/.test(t)),
           fReturnsWhenNamed: withF.some((t) => /fill f/.test(t)),
+          defTitle: title(def), defCrit: crit(def),
+          narrowTitle: title(narrow), plainTitle: title(plain), plainCrit: crit(plain),
+          plainFr: plain.some((t) => /fast, shallow|slow, deep/.test(t)),
           idsCovered,
         };
       `);
@@ -734,6 +746,120 @@ async function main() {
       check("a profile's row list drops what it omits", p.narrowDropsQ);
       check("and keeps what it names", p.narrowKeepsSf);
       check("naming f puts it back", p.fReturnsWhenNamed);
+      check("the default card carries the profile class and the regime word",
+            p.defTitle && p.defCrit, JSON.stringify(p));
+      check("a row list without `profile` drops the class title", !p.narrowTitle);
+      check("ui.hide critical drops the class and the regime words",
+            !p.plainTitle && !p.plainCrit && p.plainFr, JSON.stringify(p));
+      await tab.close();
+    }
+
+    // ------------------------- per-gauge quantities and the readout switches
+    console.log("\neach gauge plots its own quantity; readouts and hover switch independently");
+    {
+      const tab = await browser.open(INDEX + "?ex=HJ-2",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const r = await tab.evaluate(`
+        return APP.EX.ready.then(() => {
+          APP.placeGauge(2.5, 0.6); APP.placeGauge(8.0, 0.3);
+          const G = APP.state.gauges;
+          const startOn = G.map((g) => g.field).join(",");
+          G[1].field = "speed";
+          APP.frames(20);
+          const s = G[0].log[G[0].log.length - 1] || {};
+          const keys = ["p", "phead", "u", "w", "speed", "eta", "d", "h", "H"]
+            .filter((k) => Number.isFinite(s[k]));
+          const hdr = APP.gaugeCSV().split("\\n")[0].split(",").length;
+          const sels = [...document.querySelectorAll(".gcardSel")]
+            .filter((e) => e.style.display !== "none").map((e) => e.value + ":" +
+              [...e.options].map((o) => o.value).join("|"));
+          const panelOpts = [...document.querySelectorAll("#c_gaugeField option")].map((o) => o.value).join(",");
+          const n0 = G[0].log.length;
+          document.getElementById("readBtn").click();
+          APP.frames(10);
+          const hidden = { inst: APP.state.instReadouts, hover: APP.state.hoverCard,
+                           recorded: G[0].log.length - n0,
+                           sels: [...document.querySelectorAll(".gcardSel")].filter((e) => e.style.display !== "none").length };
+          document.getElementById("readBtn").click();
+          document.getElementById("hoverBtn").click();
+          const hov = { inst: APP.state.instReadouts, hover: APP.state.hoverCard };
+          const hj = { energyHidden: APP.UIMODE.hides("energy"), title: document.getElementById("sceneName").textContent };
+          return { startOn, keys, hdr, sels, panelOpts, hidden, hov, hj };
+        });
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("new gauges start on the card's Gauges plot", r.startOn, "d,d");
+      eq("every sample records all nine quantities", r.keys.length, 9);
+      eq("the CSV carries every quantity of every gauge", r.hdr, 1 + 2 * 9);
+      eq("each card's selector shows its own gauge, from the offered set",
+         r.sels.join(" "), "speed:u|speed|eta|d d:u|speed|eta|d");
+      eq("Gauges plot offers the card's quantities only", r.panelOpts, "u,speed,eta,d");
+      check("Readouts off hides the boxes, keeps recording, leaves the hover card",
+            r.hidden.inst === false && r.hidden.recorded > 0 && r.hidden.sels === 0 && r.hidden.hover === true,
+            JSON.stringify(r.hidden));
+      check("Hover readout switches on its own", r.hov.inst === true && r.hov.hover === false,
+            JSON.stringify(r.hov));
+      check("a Year 1 card withholds the energy terms", r.hj.energyHidden);
+      eq("the strip names the exercise, not its scene", r.hj.title, "Pressure and force on a sluice gate");
+      await tab.close();
+      const ff1 = await browser.open(INDEX + "?ex=FF-1",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const h = await ff1.evaluate("return APP.EX.ready.then(() => APP.state.hoverCard);");
+      eq("FF-1 opens with the hover card off", h, false);
+      await ff1.close();
+    }
+    console.log("\na gauge can be removed one by one or all at once; the strip shows only what the bench can use");
+    {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      const r = await tab.evaluate(`
+        const G = APP.state.gauges;
+        APP.placeGauge(3, 0.3); APP.placeGauge(6, 0.3); APP.placeGauge(9, 0.3);
+        APP.frames(5);
+        const xs = [...document.querySelectorAll(".gcardX")].filter((e) => e.style.display !== "none");
+        const nX = xs.length;
+        xs[0].click();                                   // the × on one corner card
+        const afterX = G.length;
+        APP.inspect(0);
+        document.querySelector(".ginsp .ginsp-rm").click();   // Remove in the inspector
+        const afterRm = G.length, wins = document.querySelectorAll(".ginsp").length;
+        APP.placeGauge(4, 0.3);
+        const gb = () => [...document.querySelectorAll("#groups .tbtn")].find((b) => b.getAttribute("aria-label") === "Gauge");
+        gb().click();                                    // arms the tool: nothing removed
+        const armed = APP.state.tool, keptOnArm = G.length;
+        gb().click();                                    // again: clears every gauge
+        const cleared = G.length;
+        // Valves: none on m2, one drawn puts the button up, undo takes it away.
+        const v0 = !!document.getElementById("valveBtn");
+        APP.SIM.addSeg(5, 0.1, 5, 0.6, 0.05, 128); APP.frames(1);
+        const v1 = !!document.getElementById("valveBtn");
+        APP.SIM.undoSeg(); APP.frames(1);
+        const v2 = !!document.getElementById("valveBtn");
+        // A course menu with scenes: false takes the Scenes button away.
+        const had = typeof EXERCISE_MENU !== "undefined";
+        let s1 = null, s2 = null;
+        if (had) {
+          const keep = EXERCISE_MENU.scenes;
+          EXERCISE_MENU.scenes = false; APP.UIMODE.reset();
+          s1 = !!document.getElementById("sceneBtn");
+          if (keep === undefined) delete EXERCISE_MENU.scenes; else EXERCISE_MENU.scenes = keep;
+          APP.UIMODE.reset();
+          s2 = !!document.getElementById("sceneBtn");
+        }
+        return { nX, afterX, afterRm, wins, armed, keptOnArm, cleared, v0, v1, v2, had, s1, s2,
+                 sceneTool: APP.state.scene.id };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("every corner card carries a ×", r.nX, 3);
+      eq("its × removes that gauge", r.afterX, 2);
+      check("the inspector's Remove removes its gauge and closes its window",
+            r.afterRm === 1 && r.wins === 0, JSON.stringify(r));
+      check("a first press on Gauge arms the tool and removes nothing",
+            r.armed === "gauge" && r.keptOnArm === 2, JSON.stringify(r));
+      eq("a second press on Gauge clears every gauge", r.cleared, 0);
+      check("Valves is off the strip until a valve is drawn, and goes with it",
+            !r.v0 && r.v1 && !r.v2, JSON.stringify(r));
+      if (r.had) check("scenes: false hides the Scenes button; without it, it is back",
+                       r.s1 === false && r.s2 === true, JSON.stringify(r));
       await tab.close();
     }
 
@@ -1356,10 +1482,18 @@ async function main() {
           const sim = { dx: 1, ny: 3 };
           const A = { bed: [0], surf: [3] };
           const rk = { i: 0, buf: new Float32Array(12) };
+          // Every rake on ONE scale (px per m/s handed in): the profile's
+          // reach is proportional to u, never renormalised to the rake's own
+          // maximum — so a slow section draws short and still water flat.
           const paint = (u) => {
             for (let j = 0; j < 3; j++) rk.buf[j * 4] = u;
-            APP.OVERLAY.drawRake(ctx, V, sim, rk, A);
-            return rk.uScaleMax;
+            let reach = 0;
+            const mt = ctx.moveTo.bind(ctx), lt = ctx.lineTo.bind(ctx);
+            ctx.moveTo = (x, y) => { reach = Math.max(reach, x); return mt(x, y); };
+            ctx.lineTo = (x, y) => { reach = Math.max(reach, x); return lt(x, y); };
+            APP.OVERLAY.drawRake(ctx, V, sim, rk, A, 20);
+            ctx.moveTo = mt; ctx.lineTo = lt;
+            return Math.round(reach - 0.5);       // x0 = 0.5 (cell centre)
           };
           const scale = [paint(2), paint(0.5), paint(3)];
 
@@ -1405,8 +1539,8 @@ async function main() {
       eq("the nozzle slider is plainly labelled", un1.gap.label, "Nozzle width");
       check("widening the nozzle opens more cells", un1.gap.after > un1.gap.before,
             JSON.stringify(un1.gap));
-      eq("a slower rake frame keeps the experienced maximum", un1.scale.join(","),
-         "2,2,3");
+      eq("every rake shares one velocity scale (reach ∝ u at 20 px per m/s)", un1.scale.join(","),
+         "40,10,60");
       await tab.close();
     }
 

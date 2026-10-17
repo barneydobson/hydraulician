@@ -1391,7 +1391,7 @@ const EXERCISES = [
       { tool: "gauge", where: "already in the tank at x = 1.0 m, z = 0.6 m, plotting the level η — low, clear of the falling inflow", why: "on Level η the gauge reads the free surface itself, and its chart is the level against time: a curve bending over to a plateau with the outlet open, a straight line with the valve shut" },
       { tool: "cv", where: "(0.30, 0.40) → (2.70, 3.12) — round the whole tank, under the spout and across the outlet jet", why: "in through the top face, out through the right face, and the stored rate dV/dt — net + dV/dt = 0 at every instant" },
     ],
-    ui: { view: ["legendBtn", "readBtn", "hoverBtn"], fields: ["water", "speed"], controls: ["speed", "geom0"],
+    ui: { view: ["legendBtn", "slineBtn", "readBtn", "hoverBtn"], fields: ["water", "speed"], controls: ["speed", "geom0"],
           gaugeFields: ["eta", "d", "p", "speed", "u", "w"], hide: ["energy", "critical"],
           readouts: { rows: ["pos", "eta", "uw"] } },
     steps: [
@@ -1431,7 +1431,7 @@ const EXERCISES = [
       { tool: "force", where: "the plate's wet face — the side the jet strikes", why: "the pressure diagram on the plate and its resultant F, at right angles to the plate: on a smooth plate the whole force is pressure, so F matches the box's F_n" },
       { tool: "flux", where: "one across each sheet, about 0.1 m past each end of the plate, at right angles to it", why: "q₁ and q₂, the two sheets' discharges, against q(1 ± cos θ)/2" },
     ],
-    ui: { view: ["legendBtn", "readBtn", "hoverBtn"], hide: ["energy", "critical"], fields: ["speed", "p"], controls: ["speed", "geom0"],
+    ui: { view: ["legendBtn", "slineBtn", "readBtn", "hoverBtn"], hide: ["energy", "critical"], fields: ["speed", "p"], controls: ["speed", "geom0"],
           readouts: { rows: ["pos", "uw", "p"] } },
     steps: [
       "Drag a {tool:cv} from (0.70, 0.30) to (2.50, 2.10), round the whole plate. After every change wait about 5 s.",
@@ -1709,7 +1709,7 @@ const EXERCISES = [
     // card's Fr row into "fast, shallow" / "slow, deep". The reservoir marker
     // reads "reservoir level" (hide "energy"), and the gauges offer depth,
     // level, speed and u.
-    ui: { view: ["legendBtn", "partBtn", "readBtn", "hoverBtn"],
+    ui: { view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
           fields: ["water", "speed", "froude"], panel: "focused",
           controls: ["speed", "geom1"],
           gaugeFields: ["d", "eta", "speed", "u"], hide: ["energy", "critical"],

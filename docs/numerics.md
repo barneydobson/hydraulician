@@ -705,8 +705,20 @@ upwind, which keeps the pinned ghost out of the stencil.
 
 ## 7. What is not represented
 
-No surface tension. Voids carry no pressure, so nothing pneumatic exists and
-breakers spill rather than plunge. Pressure cannot fall below zero gauge when
+No surface tension. Voids carry no pressure, so nothing pneumatic exists — no
+air cushion under a slamming crest, no compression of entrained air. That is
+NOT why breakers fail to plunge here: overturning is kinematic (the crest keeps
+its speed while the wave under it slows) and needs no air pressure. Measured
+on a solitary wave on a 1 : 15 slope (H/h = 0.45, a textbook plunger), at
+h/Δx = 27 to 105, the solver does not throw a tongue because (i) the
+depth-scale mixing length of step 1 puts `ν_t` ≈ 10⁻³ m²/s through the body
+of the wave, a thousand times water's and independent of `Δx`, so resolution
+cannot remove it; (ii) with that closure off the crest does overturn, but in
+cell-sized curls that start too early, driven by a near-surface layer the
+void extension of step 4 runs at up to twice the speed potential theory
+gives; and (iii) the crest does not grow as it shoals. Breakers therefore
+spill or collapse; the numbers are in
+[engineering-notes.md](engineering-notes.md), "Plunging breakers". Pressure cannot fall below zero gauge when
 gravity is on, so a cell that cannot stay full simply cavitates — which is
 roughly what column separation does downstream of a slammed valve, though there
 is no vapour-pressure model behind it. The domain is a vertical slice one metre

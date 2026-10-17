@@ -303,6 +303,26 @@ applied on the exchange face of a level-controlled edge. The transport cap
 alone leaves ~12 m/s of headroom, and the Dirichlet can resonate with pond
 slosh right up to it.
 
+**Three per-scene options, all default-off** (each bought on one scene;
+the comments at those scenes have the measurements):
+
+- `spongeFill` multiplies a head-driven inflow sponge's fill rate. That
+  sponge supplies the pipe by its deficit, so the level it holds sits about
+  Q / (fill rate × width) under the setting; contraction runs it at 4.
+- `twOutflowOnly` holds the tailwater's exchange face to outflow, like a
+  plain open edge. A level control otherwise passes inflow too, and behind a
+  short pool it fed a pipe jet's entrainment straight from the edge — a
+  current running in along the surface and a mound against the outlet wall
+  (contraction).
+- `outflowNu` / `outflowLen` add an **absorbing layer**: a viscosity ramped
+  up quadratically over the last `outflowLen` metres before the right edge,
+  to `outflowNu` m²/s at the edge. A tailwater is a pressure outlet and
+  passes whatever velocity reaches it, so a tank-sized 2-D eddy parked on
+  the edge made it an inlet over part of its height (pipejet). `SIM.dt`
+  holds the layer to a diffusion number of 0.14 — at 0.20, alongside the
+  acoustic Courant number, it ran away. For full, lidded domains only: on a
+  free surface (contraction) it ran to the ±80 rail.
+
 The panel's "delivered level" readout is measured just clear of the sponge —
 the first columns the boundary treatment no longer touches — and sits below
 the slider by however much head the sponge is giving up.
@@ -361,6 +381,9 @@ Where each piece of the above enters the GPU passes; all are set in
 | `u_tw` | tailwater: level, on | vel clamp, vof ghost + sponge |
 | `u_inBand`, `u_twBand` | the control band z-range from `columnBand` | vel plug, vof ghost + sponge |
 | `u_spongeN` | sponge widths in columns (from metres per scene) | vof sponges |
+| `u_fillIn` | head-driven inflow sponge's fill multiplier (`spongeFill`, default 1) | vof inflow sponge |
+| `u_twOut` | 1 = tailwater exchange face passes outflow only (`twOutflowOnly`) | vel outflow clamp |
+| `u_nuOut` | absorbing layer: extra ν at the right edge, width in columns (`outflowNu`, `outflowLen`) | vel viscosity |
 | `u_slip` | 0 no-slip / 1 free-slip | vel mirror ghost |
 | `u_cf` | wall-function coefficient | vel drag |
 | `u_Wd` (texture) | distance to the nearest solid, at cell corners | vel mixing length |

@@ -1,6 +1,6 @@
 /* The contraction rig (FF-5, VC-1, MM-2) — paste into the dev console.
  *
- *   ?ex=VC-1 (or ?scene=contraction), Resolution: Medium (614 x 155, dx = 0.0187 m).
+ *   ?ex=VC-1 (or ?scene=contraction), Resolution: Medium (746 x 127, dx = 0.0228 m).
  *
  * Nothing to draw: the scene's two polygons ARE the rig, and the one slider
  * (geom0, `taperL`) redraws them. This is the lecturer's spot-check: it reads
@@ -17,7 +17,7 @@
  *   CR.friction(5)     -> the box on the straight narrow pipe
  */
 window.CR = {
-  X1: 2.3, X2: 7.0, X3: 8.6,             // section 1 (wide), section 2 (narrow), end of the straight box
+  X1: 4.3, X2: 9.0, X3: 10.6,            // section 1 (wide), section 2 (narrow), end of the straight box
   ZB: 0.3, ZT: 1.65,                     // box bottom / top: inside the pipe walls
   A1: 1.00, A2: 0.50, RHO: 1000,         // bore heights (m), per metre width
 
@@ -26,7 +26,7 @@ window.CR = {
 
   /** reservoir levels from the hydrostatic pressure near each floor */
   levels: function () {
-    var a = APP.probe(0.8, 0.3), b = APP.probe(10.2, 0.3);
+    var a = APP.probe(3.0, 0.3), b = APP.probe(14.0, 0.3);
     return { left: a.phead + 0.3, right: b.phead + 0.3 };
   },
   /** a section drawn UP across the bore at x: Q, momentum flux M, pressure force F */
@@ -87,7 +87,7 @@ window.CR = {
 
   /** the lowest pressure head anywhere in the bore, and where (one readback) */
   minP: function () {
-    var S = APP.SIM.get(), dx = S.dx, m = 1e9, at = null, P = APP.SIM.patch(1.7, 9.0);
+    var S = APP.SIM.get(), dx = S.dx, m = 1e9, at = null, P = APP.SIM.patch(3.7, 11.0);
     for (var ii = 0; ii < P.w; ii++) {
       var i = P.i0 + ii;
       for (var j = Math.floor(0.45 / dx); j < Math.ceil(1.55 / dx); j++) {

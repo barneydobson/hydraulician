@@ -36,11 +36,11 @@ energy.
 
 | item | where |
 |---|---|
-| left reservoir | x = 0 → 1.60 m, held at 2.80 m by a head-driven level control |
-| wide pipe | bore z = 0.50 → 1.50 m (1.00 m), bellmouth entry at x = 1.60 m |
-| contraction | ends at x = 5.60 m; starts at x = 5.60 − L |
-| narrow pipe | bore z = 0.75 → 1.25 m (0.50 m), x = 5.60 → 9.00 m |
-| right reservoir | x = 9.00 → 11.50 m, held at 2.40 m by a tailwater control |
+| left reservoir | x = 0 → 3.60 m, held at 2.80 m by a head-driven level control |
+| wide pipe | bore z = 0.50 → 1.50 m (1.00 m), bellmouth entry at x = 3.60 m |
+| contraction | ends at x = 7.60 m; starts at x = 7.60 − L |
+| narrow pipe | bore z = 0.75 → 1.25 m (0.50 m), x = 7.60 → 11.00 m |
+| right reservoir | x = 11.00 → 17.00 m, held at 2.40 m by a tailwater control that only lets water out |
 
 The contraction is symmetric about the pipe axis (z = 1.00 m), so both
 corners behave alike. Changing L restarts the water (it redraws the pipe)
@@ -66,32 +66,37 @@ and the scene's spin-up then runs flat out again, so each L is seen steady.
 
 ## For the instructor
 
-Measured on Resolution Medium (614 × 155, Δx = 18.7 mm, so the narrow pipe
-is 27 cells across) with `CR.profile(x)` in `rig.js`, 30 s after a restart.
-The card waits about **25 s**, the scene's measured spin-up; each change of
-L replays it.
+Measured on Resolution Medium (746 × 127, Δx = 22.8 mm, so the narrow pipe
+is 22 cells across) with `CR.profile(x)` in `rig.js`, 35–40 s after a
+restart. The card waits about **25 s**, the scene's measured spin-up; each
+change of L replays it.
 
 u across the bore, bottom to top, with the step (L = 0):
 
 | x | what the profile shows |
 |---|---|
-| 5.50 m, just before the step | reverse flow (−0.2 m/s) in the bottom and top 0.1 m: the corner eddies in front of the step |
-| 5.65–6.00 m | the core at 2.3–2.5 m/s with ~0 or slightly reversed flow in the outer 2–3 cells each side |
-| 6.30 m | core peak 3.0 m/s, reverse flow −1.0 m/s at the bottom wall and −0.2 m/s at the top: the vena contracta, effective width about Q/U_core ≈ 0.34 m, so C_c ≈ 0.68 |
-| 7.50 m | reattached: 2.2 m/s across the core, ordinary wall layers |
+| 7.50 m, just before the step | reverse flow (−0.2 to −0.5 m/s) in the bottom and top 0.1 m most of the time: the corner eddies in front of the step |
+| 7.65–8.00 m | the core at 2.8–3.5 m/s with ~0 or slightly reversed flow in the outer 1–2 cells each side |
+| 8.15–8.45 m | core peak 3.6–3.8 m/s, reverse flow down to −0.7 to −1.5 m/s at the walls (bottom and top in turn): the vena contracta, effective width about Q/U_core ≈ 1.28/3.7 ≈ 0.35 m, so C_c ≈ 0.69 |
+| 9.50 m | reattached: 3.0–3.5 m/s across the core, ordinary wall layers |
 
 With the taper (L = 3 m) the same profiles are full and monotonic all the
 way through, with no reverse flow anywhere. The lowest pressure in the bore
-with the step is 1.1 m of head, at the vena contracta (x ≈ 6.4 m), so
-nothing voids.
+with the step is 0.55–0.75 m of head, at the vena contracta (x ≈ 8.4–8.5 m),
+so nothing voids.
 
 Caveats. The separated regions are only a few cells thick at Medium, so the
 vena contracta is a modest necking (C_c ≈ 0.7), not the crisp textbook
 picture; the corner eddies and the two shear layers are clearest on
 Vorticity. The shear layers shed small eddies, so the live picture flutters;
-Average gives the clean mean streamlines. The jet into the right reservoir
-rises and runs out along the surface at the right edge — that is the
-outlet's tailwater control taking the water away, not part of the demo.
+Average gives the clean mean streamlines. Past the pipe exit the jet spreads
+through the 6 m right reservoir and leaves through the whole depth of the
+right edge; a slow roller runs back along the surface towards the outlet
+wall (about 1 m/s at the wall, gone by x ≈ 15 m) and pulls the surface
+there a few centimetres under the 2.40 m tailwater. That is the jet's
+entrainment, fed from inside the reservoir. (Before the reservoirs were
+rebuilt the 2.5 m right reservoir took a 2 m/s current IN from its edge
+along the surface and the water piled up 0.17 m against the outlet wall.)
 Dye is not offered: the app's dye timelines are injected at the left edge
 of the left reservoir, and in a 2 s headless check nothing had reached the
 pipe; whether they read well here (they would have to cross the reservoir

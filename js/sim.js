@@ -522,6 +522,13 @@ const SIM = (() => {
       // l = κy takes y from the nearest WALL, metres away from a free shear
       // layer, and its ν_t smeared the jet into a laminar blob (pipejet).
       kappa: scene.kappa,
+      // Optional outflow absorbing layer: extra viscosity (m²/s) ramped up
+      // over the last `outflowLen` metres before the right edge (FS_VEL).
+      // 0 / undefined is off — every scene but pipejet.
+      outflowNu: scene.outflowNu || 0, outflowLen: scene.outflowLen || 0,
+      // Optional: the tailwater's exchange face passes outflow only, like a
+      // plain open edge (FS_VEL). 0 / undefined is off — contraction only.
+      twOutflowOnly: scene.twOutflowOnly ? 1 : 0,
     };
     if (prev) {
       p.open = prev.open.slice();
@@ -989,7 +996,12 @@ const SIM = (() => {
     const acoustic = CFL * S.dx / (p.c + UREF);
     const nuMax = p.nu + (p.cs * S.dx) * (p.cs * S.dx) * 400;
     const viscous = 0.20 * S.dx * S.dx / Math.max(nuMax, 1e-9);
-    return Math.min(acoustic, viscous);
+    // The outflow absorbing layer's ν gets a tighter diffusion number: at
+    // 0.20 it coexists with the acoustic Courant 0.45 only up to a point —
+    // pipejet's layer at ν = 0.7 (diffusion number 0.20) ran to the ±80 rail
+    // within 20 s, while 0.14 (ν = 0.5 at the acoustic Δt) ran clean.
+    const layer = p.outflowNu ? 0.14 * S.dx * S.dx / (p.nu + p.outflowNu) : Infinity;
+    return Math.min(acoustic, viscous, layer);
   }
 
   /** The z-range a level control (inflow / tailwater) is allowed to touch:
@@ -1117,6 +1129,10 @@ const SIM = (() => {
     gl.uniform2f(pr.u("u_spongeN"),
       sc.spongeIn ? Math.round(sc.spongeIn / S.dx) : 10,
       sc.spongeTw ? Math.round(sc.spongeTw / S.dx) : 10);
+    // A head-driven sponge supplies the pipe by its deficit, so the level it
+    // holds sits Q / (fill rate × width) under the setting; a scene may stiffen
+    // the fill (`spongeFill`, default 1 — every scene but contraction).
+    gl.uniform1f(pr.u("u_fillIn"), sc.spongeFill || 1);
     gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
     gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
@@ -1168,6 +1184,9 @@ const SIM = (() => {
       simUniforms(prog.vel, h);
       gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
       gl.uniform1f(prog.vel.u("u_nu"), p.nu);
+      gl.uniform2f(prog.vel.u("u_nuOut"), p.outflowNu || 0,
+        p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);
+      gl.uniform1f(prog.vel.u("u_twOut"), p.twOutflowOnly ? 1 : 0);
       gl.uniform1f(prog.vel.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
       gl.uniform1f(prog.vel.u("u_cs"), p.cs);
       gl.uniform1f(prog.vel.u("u_cf"), p.cf);

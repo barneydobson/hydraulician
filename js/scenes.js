@@ -2158,6 +2158,11 @@ const SCENES = (() => {
                             [{ id: "body", label: "Body", e0: 0, e1: NPTS - 1 }], "body")];
         },
         shape,
+        // Start the box already moving at the stream speed: from rest the
+        // inflow switched on impulsively and sent pressure waves rattling
+        // through the closed plan-view box for seconds (lecturer, 2026-10-17).
+        // The first vel pass zeroes the faces inside the body.
+        flow: () => [0.9, 0],
         water: () => 1,
         tips: ["Slide the shape from streamlined to bluff and watch the wake: steady and thin, then wider, then alternating.",
                "Colour is speed: behind a bluff body the flow separates from the surface, and the slow wake swings from side to side as eddies are shed.",

@@ -192,3 +192,5 @@ after 40 s, rms cross-stream velocity 1.1 m behind the body: ellipse
 0.05 m/s (steady along the body, a gentle wiggle far downstream), halfway
 0.38 m/s, square 0.59 m/s (a strong vortex street). The onset numbers in the
 sections above were measured at 2·10⁻³ and now sit earlier on the slider.
+
+**Start-up seeded (2026-10-17).** The box now starts moving at the stream speed (0.9 m/s) instead of from rest. Over the first 4 s the pressure swing 0.8 m upstream of the body fell from 37.7 to 6.0 kPa and the velocity swing from 1.03 to 0.27 m/s: the impulsive start no longer sends pressure waves rattling through the box.

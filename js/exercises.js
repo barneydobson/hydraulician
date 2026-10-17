@@ -1170,7 +1170,7 @@ const EXERCISES = [
     scene: "dyke",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "0", particles: true },
+    viewParams: { hoverCard: false, mode: "0", particles: true },
     // L3 Statics. The Pressure force tool is the one instrument (lecturer,
     // Oct 2026: no gauges); levels are read off the scale or the hover card.
     instruments: [

@@ -52,7 +52,7 @@ COURSES.exercises("cive40008", [
     scene: "pipeline",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "8", particles: true, gaugeField: "speed", speed: 0.25 },
+    viewParams: { hoverCard: false, mode: "8", particles: true, gaugeField: "speed", speed: 0.25 },
     // Slider rows carry a short label only (lecturer, Oct 2026: the long
     // `rule` sentences made the card mostly slider); what each does is in
     // the background.
@@ -110,7 +110,7 @@ COURSES.exercises("cive40008", [
     scene: "contraction",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "2", particles: true },
+    viewParams: { hoverCard: false, mode: "2", particles: true },
     studentParams: [
       { control: "geom0", label: "Contraction length L", unit: "m" },
     ],
@@ -123,7 +123,7 @@ COURSES.exercises("cive40008", [
         title: "Contraction rig: streamlines and separation",
         topic: "Flow fields, shear and turbulence",
         aim: "A pipe that narrows gently or suddenly — see the streamlines follow a taper but separate at a sharp step.",
-        viewParams: { dye: true, mode: "2", particles: true },
+        viewParams: { hoverCard: false, dye: true, mode: "2", particles: true },
         ui: { measure: false, view: ["legendBtn", "partBtn", "dyeBtn", "slineBtn", "hoverBtn"],
               fields: ["water", "speed"], controls: ["geom0"],
               readouts: { rows: ["pos", "uw"] } },
@@ -143,7 +143,7 @@ COURSES.exercises("cive40008", [
         title: "Contraction rig: Q in equals Q out",
         topic: "Volume conservation",
         aim: "Water through a pipe that narrows — measure Q in the wide pipe, in the narrow pipe and round a control volume.",
-        viewParams: { mode: "2", particles: true },
+        viewParams: { hoverCard: false, mode: "2", particles: true },
         instruments: [
           { tool: "flux", where: "up across the wide pipe at x = 4.3 m, from z = 0.4 to 1.6 m", why: "Q₁ in the wide pipe" },
           { tool: "flux", where: "up across the 0.50 m pipe at x = 9.0 m, from z = 0.4 to 1.6 m", why: "Q₂ in the 0.50 m pipe; equal to Q₁" },
@@ -168,7 +168,7 @@ COURSES.exercises("cive40008", [
         title: "Contraction rig: the force on a contraction",
         topic: "Momentum conservation",
         aim: "A pipe that narrows — find the force of the water on it from the momentum and the pressure at both ends, for a taper and a step.",
-        viewParams: { mode: "8", particles: false },
+        viewParams: { hoverCard: false, mode: "8", particles: false },
         instruments: [
           { tool: "flux", where: "up across the wide pipe at x = 4.3 m, from z = 0.4 to 1.6 m", why: "section 1: Q, momentum flux M₁ = ρQU₁ and pressure force F₁ = p₁A₁" },
           { tool: "flux", where: "up across the 0.50 m pipe at x = 9.0 m, from z = 0.4 to 1.6 m", why: "section 2; the card under the pair prints the force on what is between them" },
@@ -205,7 +205,7 @@ COURSES.exercises("cive40008", [
     scene: "fillleak",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "0", particles: false, gaugeField: "eta" },
+    viewParams: { hoverCard: false, mode: "0", particles: false, gaugeField: "eta" },
     studentParams: [
       { control: "geom0", label: "Inflow Q", unit: "m²/s" },
     ],
@@ -250,7 +250,7 @@ COURSES.exercises("cive40008", [
     scene: "vane",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "2", particles: false },
+    viewParams: { hoverCard: false, mode: "2", particles: false },
     aim: "Draw a control volume round a flat plate struck by a jet and find the force on it: it is at right angles to the plate, ρqU sin θ. Turning the plate also splits the jet unequally.",
     studentParams: [
       { control: "geom0", label: "Plate angle θ", unit: "°" },
@@ -291,7 +291,7 @@ COURSES.exercises("cive40008", [
     scene: "wall-shape",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "0", particles: false },
+    viewParams: { hoverCard: false, mode: "0", particles: false },
     studentParams: [
       { control: "geom0", label: "Wall shape", unit: "" },
       { control: "geom1", label: "Submerged block", unit: "" },
@@ -379,7 +379,7 @@ COURSES.exercises("cive40008", [
     scene: "body",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "2", particles: true, dye: true, gaugeField: "speed" },
+    viewParams: { hoverCard: false, mode: "2", particles: true, dye: true, gaugeField: "speed" },
     studentParams: [
       { control: "geom0", label: "Body shape", unit: "" },
     ],
@@ -425,7 +425,7 @@ COURSES.exercises("cive40008", [
     scene: "spillway",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { dye: true, mode: "2", particles: true, gaugeField: "speed" },
+    viewParams: { hoverCard: false, dye: true, mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
       { control: "geom0", label: "Bucket lip angle", unit: "°" },
       { control: "inLevel", label: "Reservoir level", unit: "m" },
@@ -441,7 +441,7 @@ COURSES.exercises("cive40008", [
       controls: ["speed", "geom0", "inLevel", "dye", "dyeLine"],
       // No pressure colouring: nothing on this card reads the pressure.
       gaugeFields: ["speed", "u", "w", "p", "eta", "d"], hide: ["energy", "critical"],
-      readouts: { rows: ["pos", "d", "eta", "q", "V", "uw"] },
+      readouts: { rows: ["pos", "uw", "p"] },
     },
     steps: [
       "Colour is Speed: nearly still in the reservoir, faster over the crest, fastest on the face and in the bucket, slowing in the pool.",
@@ -466,7 +466,7 @@ COURSES.exercises("cive40008", [
     scene: "pipejet",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { dye: true, mode: "2", particles: true, gaugeField: "speed" },
+    viewParams: { hoverCard: false, dye: true, mode: "2", particles: true, gaugeField: "speed" },
     studentParams: [
       { control: "inLevel", unit: "m", label: "Reservoir level", slider: { min: 6.3, max: 8.0, step: 0.05 } },
     ],
@@ -523,7 +523,7 @@ COURSES.exercises("cive40008", [
     scene: "gatejump",
     rig: null,
     rigParams: { budget: "Medium" },
-    viewParams: { mode: "0", particles: true, channel: false, grade: false, jumps: false, labels: false, gaugeField: "d" },
+    viewParams: { hoverCard: false, mode: "0", particles: true, channel: false, grade: false, jumps: false, labels: false, gaugeField: "d" },
     studentParams: [
       { control: "geom1", label: "Weir crest height", unit: "m" },
     ],
@@ -579,7 +579,7 @@ COURSES.exercises("cive40008", [
     scene: "beach",
     rig: null,
     rigParams: { budget: "Low", waveOn: true },
-    viewParams: { mode: "0", particles: true },
+    viewParams: { hoverCard: false, mode: "0", particles: true },
     studentParams: [
       { control: "geom0", label: "Beach slope tanβ", unit: "" },
     ],
@@ -587,7 +587,7 @@ COURSES.exercises("cive40008", [
     // profile class ("H2 profile"), d_c, d_n and slopes over a wave flume.
     ui: { view: ["legendBtn", "partBtn", "hoverBtn"], fields: ["water", "speed"], measure: false,
           panel: "shut", controls: ["speed", "geom0"],
-          readouts: { rows: ["pos", "d", "eta", "uw"] } },
+          readouts: { rows: ["pos", "eta", "uw"] } },
     steps: [
       "The paddle sends the same wave down the flume every 2 s; the beach slope on this card is the only thing you change.",
       "Gentle beach, 0.06: the wave steepens, its crest crumbles down its own front, and a bore runs up a long surf zone — SPILLING.",
@@ -620,7 +620,7 @@ COURSES.exercises("cive40008", [
     scene: "wavetrain",
     rig: null,
     rigParams: { budget: "Medium", waveOn: true },
-    viewParams: { mode: "0", particles: false, gaugeField: "eta" },
+    viewParams: { hoverCard: false, mode: "0", particles: false, gaugeField: "eta" },
     gauges: [{ x: 2.0, z: 0.5, field: "eta" }, { x: 5.0, z: 0.5, field: "eta" }],
     studentParams: [
       { control: "waveT", label: "Wave period", unit: "s" },

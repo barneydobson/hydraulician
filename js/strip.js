@@ -11,7 +11,7 @@
  * Defines: TOOLS, TOOL_LETTER, TOOL_KEYS, ICONS, iconEl, TIP, scenesOffered,
  *          trainOffered, fireTrain, valveWarned, hasValves, valvesShown, trainLit,
  *          syncValveBtn, newArmed, newSandbox, TOOLBAR, toolItems, familyOf,
- *          toolItem, aboutHref, OPENERS, buildToolbar, showAllGroup, fitBar,
+ *          toolItem, aboutHref, OPENERS, buildToolbar, showAllGroup, fitBar, syncBarH,
  *          syncToolbar, KEYS
  *
  * Reads:   applyAutoVex, canvas, clearAllGauges, clearGaugeHistory, EMBED, EX,
@@ -604,7 +604,7 @@ function fitBar() {
   // screen the last rungs (26 px glyphs, then a sideways scroll nobody finds)
   // would leave half of an iPad's strip out of sight or out of reach, so the
   // groups wrap onto a second row instead, and whatever hangs under the strip
-  // moves down with it (--barb).
+  // moves down with it (--bar-h).
   // Before a second row, the title chip goes — the brief beside the water
   // already names the exercise — if that alone makes one row enough.
   const coarse = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
@@ -613,7 +613,7 @@ function fitBar() {
     if (over()) { bar.classList.remove("notitle"); bar.classList.add("wraps"); }
   } else if (over()) bar.classList.add("tightest");
   const barb = bar.classList.contains("wraps") ? Math.round(bar.getBoundingClientRect().bottom) : 0;
-  document.documentElement.style.setProperty("--barb", barb + "px");
+  syncBarH();
   // A two-row strip is tall enough to hide the top of the flume, so the
   // fitted view starts under it (baseRect); one row sits in the letterbox
   // band as it always has.
@@ -622,6 +622,15 @@ function fitBar() {
   // Still too many for the room: the groups scroll, and the last one visible
   // is faded so that it looks like it continues rather than like it ends.
   bar.classList.toggle("scrolls", over());
+}
+
+/** Publish the strip's height as `--bar-h`, which the panel, the toast and the
+ *  legend hang from (css/app.css). The heights themselves are the stylesheet's
+ *  — one per compaction step, and a wrapped touch strip's is its natural
+ *  height — so this reads whichever the current classes give. */
+function syncBarH() {
+  const h = document.getElementById("bar").getBoundingClientRect().height;
+  document.documentElement.style.setProperty("--bar-h", Math.round(h) + "px");
 }
 
 /** Repaint the strip from live state. Cheap enough to call from anywhere that

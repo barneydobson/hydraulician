@@ -34,9 +34,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const INDEX = pathToFileURL(join(ROOT, "index.html")).href;
-// The docked panel's width, read from the computed width of #dock (css/app.css
-// is the single place it is written; the DOCK module's W must agree). Set by
-// the first case that has the dock open.
+// The docked panel's width: the `--dock-w` variable on :root (css/app.css is
+// the single place it is written; js/dock.js reads it back). Set by the first
+// case that has the dock open.
 let DOCK_W = 0;
 const DOCK_READY = { ready: "return !!window.APP && !!document.querySelector('#dock.open');" };
 
@@ -334,7 +334,7 @@ async function main() {
       const tab = await browser.open(INDEX + "?ex=HJ-1",
         DOCK_READY);
       const p = await tab.evaluate(PROBE);
-      DOCK_W = await tab.evaluate('return parseFloat(getComputedStyle(document.getElementById("dock")).width);');
+      DOCK_W = await tab.evaluate('return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dock-w"));');
       check("the docked panel has a width", DOCK_W > 0, "width " + DOCK_W);
       check("start screen stays down", !p.startOpen);
       eq("the exercise is loaded", p.exId, "HJ-1");
@@ -1007,6 +1007,69 @@ async function main() {
       // are still in the panel's own info and docs/averaging.md section 9. If
       // it grows back past a few hundred characters, the prose has crept in.
       check("the Average block stays short", p.avgChars < 320, p.avgChars + " chars");
+      await tab.close();
+    });
+
+    // ------------------------------------------- dock geometry, one source
+    await runCase("the dock width JS uses equals the CSS width", async () => {
+      const tab = await browser.open(INDEX + "?ex=HJ-1", DOCK_READY);
+      const r = await tab.evaluate(`
+        const cs = getComputedStyle(document.documentElement);
+        return { w: parseFloat(cs.getPropertyValue("--dock-w")),
+                 phone: parseFloat(cs.getPropertyValue("--phone-max")),
+                 dockVar: parseFloat(cs.getPropertyValue("--dock")),
+                 dockEl: document.getElementById("dock").getBoundingClientRect().width,
+                 innerW: window.innerWidth,
+                 canvasW: document.getElementById("view").clientWidth,
+                 over: document.getElementById("dock").classList.contains("over") };`);
+      check("--dock-w is a width", r.w > 0, "w " + r.w);
+      check("--phone-max is a width", r.phone > 0, "phone " + r.phone);
+      check("the panel is docked here", !r.over);
+      eq("the panel element is --dock-w wide", r.dockEl, r.w);
+      eq("--dock (what JS sets) is --dock-w", r.dockVar, r.w);
+      eq("so the canvas stops where the panel starts", r.canvasW, r.innerW - r.w);
+      await tab.close();
+    });
+
+    // ------------------------------- what hangs from the strip follows it
+    await runCase("panel top clears the bar at every compaction step", async () => {
+      const tab = await browser.open(INDEX + "?scene=m3",
+        { ready: "return !!window.APP && !!window.APP.sim;" });
+      const rows = await tab.evaluate(`
+        const bar = document.getElementById("bar");
+        const panel = document.getElementById("panel");
+        const toast = document.getElementById("toast");
+        const legend = document.getElementById("legend");
+        panel.classList.add("open"); APP.LEGEND.open();
+        const steps = [[], ["tight"], ["tight", "tighter"], ["tight", "tighter", "tightest"]];
+        const out = [];
+        for (const s of steps) {
+          bar.classList.remove("tight", "tighter", "tightest", "wraps", "notitle");
+          s.forEach((c) => bar.classList.add(c));
+          APP.ui.syncBarH();
+          const bottom = bar.getBoundingClientRect().bottom;
+          out.push({ step: s.join(" ") || "normal", bottom,
+                     barH: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")),
+                     height: bar.getBoundingClientRect().height,
+                     panel: panel.getBoundingClientRect().top,
+                     toast: parseFloat(getComputedStyle(toast).top),
+                     legend: legend.getBoundingClientRect().top });
+        }
+        return out;`);
+      for (const r of rows) {
+        near("--bar-h is the bar's height at " + r.step, r.barH, r.height, 1);
+        // The full-height strip has always let the panel overlap its bottom
+        // edge by a pixel (72 vs 73); that is the tolerance.
+        check("the panel clears the bar at " + r.step, r.panel >= r.bottom - 1,
+              "panel " + r.panel + " vs bar bottom " + r.bottom);
+        check("the panel hugs the bar at " + r.step, r.panel <= r.bottom + 12,
+              "panel " + r.panel + " vs bar bottom " + r.bottom);
+        check("the toast clears the bar at " + r.step, r.toast >= r.bottom,
+              "toast " + r.toast + " vs bar bottom " + r.bottom);
+        check("the legend clears the bar at " + r.step, r.legend >= r.bottom,
+              "legend " + r.legend + " vs bar bottom " + r.bottom);
+      }
+      eq("the full-height strip puts the panel at 72", Math.round(rows[0].panel), 72);
       await tab.close();
     });
 

@@ -24,7 +24,6 @@ const CONTROLS = [
     sync: (el) => {
       el.textContent = "";
       const b = document.createElement("button");
-      b.className = "scenebtn";
       b.textContent = (state.scene ? state.scene.name : "—") + "  ▾";
       b.title = "Choose a scene";
       b.onclick = () => { b.blur(); PICKER.toggle(b); };
@@ -41,7 +40,6 @@ const CONTROLS = [
     sync: (el) => {
       el.textContent = "";
       const b = document.createElement("button");
-      b.className = "scenebtn";
       const c = EX.current;
       b.textContent = (c ? c.id + " · " + c.title : "Pick an exercise") + "  ▾";
       b.title = "Set up one of the teaching demos";

@@ -115,10 +115,10 @@ const PICKER = (() => {
       "(or ⤓ Export JSON): the link rebuilds this rig exactly."));
     const r = document.createElement("div"); r.className = "r";
     const go = document.createElement("button");
-    go.className = "go"; go.textContent = "Discard and load";
+    go.className = "btn-sm go"; go.textContent = "Discard and load";
     go.onclick = (e) => { e.stopPropagation(); load(s.id); };
     const no = document.createElement("button");
-    no.className = "no"; no.textContent = "Cancel";
+    no.className = "btn-sm no"; no.textContent = "Cancel";
     no.onclick = (e) => { e.stopPropagation(); pending = null; render(); place(); };
     r.appendChild(go); r.appendChild(no);
     w.appendChild(p); w.appendChild(r);
@@ -930,10 +930,9 @@ const EX = (() => {
         b.title = briefDir(e) + "/README.md";
         if (needsRig(e)) {
           const t = document.createElement("span");
-          t.className = "rigtag";
           const has = hasRig(e);
+          t.className = "rigtag " + (has ? "has" : "draw");
           t.textContent = has ? "rig ✓" : "rig: draw it";
-          t.style.color = has ? "#5fd08a" : "#ffb648";
           b.appendChild(t);
         }
         const idc = document.createElement("span"); idc.className = "eid"; idc.textContent = e.id;
@@ -985,10 +984,10 @@ const EX = (() => {
       " will be gone. Save it first with Controls → Rig → ⇪ Share link."));
     const r = document.createElement("div"); r.className = "r";
     const go = document.createElement("button");
-    go.className = "go"; go.textContent = "Discard and set up";
+    go.className = "btn-sm go"; go.textContent = "Discard and set up";
     go.onclick = (ev) => { ev.stopPropagation(); load(e.id); };
     const no = document.createElement("button");
-    no.className = "no"; no.textContent = "Cancel";
+    no.className = "btn-sm no"; no.textContent = "Cancel";
     no.onclick = (ev) => { ev.stopPropagation(); pending = null; render(); place(); };
     r.appendChild(go); r.appendChild(no);
     w.appendChild(p); w.appendChild(r);
@@ -1019,7 +1018,10 @@ const EX = (() => {
     // Compact: hang below the anchor and scroll inside rather than ride up
     // over the strip — unless that leaves less than 240 px.
     const room = innerHeight - (r.bottom + 8) - 8;
-    m.style.maxHeight = compact() && room >= 240 ? room + "px" : "";
+    // `#exmenu.compact` caps its height at the window (css/app.css); this
+    // narrows the cap when the menu hangs below its opener.
+    if (compact() && room >= 240) m.style.setProperty("--menu-room", room + "px");
+    else m.style.removeProperty("--menu-room");
     const w = m.offsetWidth, h = m.offsetHeight;
     m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
     m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
@@ -1120,7 +1122,7 @@ const EX = (() => {
         '<details class="exset"><summary>Already set</summary><div class="exsetl"></div></details>';
       DOCK.foot.innerHTML =
         '<span class="exsettle"></span>' +
-        '<button class="exb" data-a="reset">↻ Reset to the starting point</button>' +
+        '<button class="btn-sm exb" data-a="reset">↻ Reset to the starting point</button>' +
         '<a class="exlink" target="_blank" rel="noopener"></a>';
       digitEl = box.querySelector(".exd input");
       digitEl.oninput = () => setDigit(digitEl.value);
@@ -1177,7 +1179,7 @@ const EX = (() => {
       // The one thing a digit still DOES is pick which captured drawing loads
       // (B8's re-entrant lip is a different rig, not a different number), so the
       // input survives only on those cards.
-      box.querySelector(".exd").style.display = cur.rigTable ? "flex" : "none";
+      gone(box.querySelector(".exd"), !cur.rigTable);
       box.querySelector(".exval").textContent =
         cur.rigTable ? "picks which captured drawing loads" : "";
       // Where the personalised thing is a stroke or a station there is no value
@@ -1193,7 +1195,7 @@ const EX = (() => {
       steps.forEach((s) => {
         const li = document.createElement("li"); rich(li, s); st.appendChild(li);
       });
-      st.style.display = steps.length ? "block" : "none";
+      gone(st, !steps.length);
       line(box.querySelector(".exstations"), stationLabel(), short ? "" : stations());
       background();
       // Six demos SPAN two scenes (WV-1's second cohort, NC-3's m2 anchor,
@@ -1216,7 +1218,7 @@ const EX = (() => {
       a.title = brief;
       // Students read the card; the brief is the lecturer's. The link to it
       // shows only when a deployment asks for it (`briefLink: true`).
-      a.style.display = menuFlag("briefLink") === true ? "" : "none";
+      gone(a, menuFlag("briefLink") !== true);
       tick();
     }
     /** The "Yours" block: the printed rule, and beside it the control the
@@ -1237,8 +1239,8 @@ const EX = (() => {
       host.textContent = "";
       fields.length = 0;
       const rows = yourRows(cur);
-      if (!rows.length) { host.style.display = "none"; return; }
-      host.style.display = "flex";
+      gone(host, !rows.length);
+      if (!rows.length) return;
 
       const h = document.createElement("div");
       h.className = "exhead";
@@ -1390,8 +1392,8 @@ const EX = (() => {
       const host = box.querySelector(".extabs");
       host.textContent = "";
       const T = cur.base && cur.base.tabs;
-      if (!T || !T.length) { host.style.display = "none"; return; }
-      host.style.display = "flex";
+      gone(host, !T || !T.length);
+      if (!T || !T.length) return;
       T.forEach((tb) => {
         const b = document.createElement("button");
         const on = tb.key === cur.tabKey;
@@ -1417,20 +1419,23 @@ const EX = (() => {
       if (k !== bgFor) { det.open = false; bgFor = k; }
       host.textContent = "";
       paras.forEach((t) => { const p = document.createElement("p"); rich(p, t); host.appendChild(p); });
-      det.style.display = paras.length ? "block" : "none";
+      gone(det, !paras.length);
     }
     /** One plain line: a bold lead-in and the sentence. No line has a colour, a
      *  border or a background of its own — that is the point of the card. */
     function line(el, label, text) {
       el.textContent = "";
-      if (!text) { el.style.display = "none"; return; }
+      gone(el, !text);
+      if (!text) return;
       if (label) {
         const b = document.createElement("b"); b.textContent = label + " ";
         el.appendChild(b);
       }
       el.appendChild(document.createTextNode(text));
-      el.style.display = "block";
     }
+    /** Hide or show a part of the card. A class, not an inline display: the
+     *  stylesheet owns what "shown" means for each part (`#dock .gone`). */
+    function gone(el, hide) { el.classList.toggle("gone", !!hide); }
     /** Where the instruments GO. The picker places none of them — choosing the
      *  station is part of every one of these demos — so this is the one thing
      *  from `instruments` the card still needs to say. The reason each station
@@ -1489,7 +1494,7 @@ const EX = (() => {
         list.appendChild(d);
       });
       sum.textContent = "Already set";
-      det.style.display = "block";
+      gone(det, false);
     }
     /** The countdown while it settles, and nothing at all once it has: a card
      *  that keeps announcing it is ready is a card nobody reads. */
@@ -1498,9 +1503,9 @@ const EX = (() => {
       const s = box.querySelector(".exsettle");
       if (cur.settle && settleTo && sim.t < settleTo) {
         s.textContent = "settling — " + Math.max(0, settleTo - sim.t).toFixed(0) + " s";
-        s.style.display = "inline";
+        gone(s, false);
       } else {
-        s.textContent = ""; s.style.display = "none";
+        s.textContent = ""; gone(s, true);
       }
     }
     return { show, hide, shown, refresh, tick, syncValues, get el() { return box; } };

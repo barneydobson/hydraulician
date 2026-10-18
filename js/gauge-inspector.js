@@ -81,8 +81,8 @@ const GINSP = (() => {
       '<div class="ginsp-tabs"></div>' +
       '<canvas class="ginsp-c"></canvas>' +
       '<div class="ginsp-foot">' +
-        '<button class="ginsp-b" data-a="csv">⤓ CSV this gauge</button>' +
-        '<button class="ginsp-b" data-a="csvall">⤓ CSV all gauges</button>' +
+        '<button class="btn-sm ginsp-b" data-a="csv">⤓ CSV this gauge</button>' +
+        '<button class="btn-sm ginsp-b" data-a="csvall">⤓ CSV all gauges</button>' +
         '<span class="ginsp-span"></span>' +
       '</div>' +
       '<div class="ginsp-cap">Wheel zooms the time axis about the cursor · drag pans · ' +

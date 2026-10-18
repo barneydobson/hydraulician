@@ -103,10 +103,12 @@ const MINI = (() => {
  *  being all water, and one click brings the brief back. */
 const DOCK = (() => {
   // MINW: below this there is no width to give away, so the panel overlays.
-  // PHONE: below THIS a 348 px panel would cover almost the whole screen, so
-  // it becomes a bottom sheet instead — the water keeps the top of the screen,
-  // which on a phone is the only part tall enough to read a flume in.
-  const W = 348, MINW = 900, PHONE = 620;
+  // The panel's own width (--dock-w), the width below which it becomes a
+  // bottom sheet (--phone-max: a 348 px panel would cover almost the whole
+  // screen, so the water keeps the top, which on a phone is the only part tall
+  // enough to read a flume in) and the sheet's height (--sheet-h) are written
+  // once, in css/app.css, and read back by sync() — never restated here.
+  const MINW = 900;
   let shown = false, folded = false, id = "";
   const el = () => document.getElementById("dock");
   const body = () => el().querySelector(".dock-body");
@@ -118,23 +120,28 @@ const DOCK = (() => {
   // (whose buttons ran on behind it). Upright there is height to spare and
   // never width, so it gets the bottom sheet as a phone does: the water keeps
   // the full width, the strip its full length.
-  function phone() {
-    return innerWidth < PHONE || (innerWidth < MINW && innerHeight > innerWidth * 1.1);
+  function phone(phoneMax) {
+    return innerWidth < phoneMax || (innerWidth < MINW && innerHeight > innerWidth * 1.1);
   }
-  /** Must agree with `--sheet-h` in the stylesheet. */
-  function sheetH() { return Math.round(Math.min(0.58 * innerHeight, 520)); }
   function sync() {
+    // Read once per sync (a resize or an open/close), never per frame.
+    const cs = getComputedStyle(document.documentElement);
+    const dockW = parseFloat(cs.getPropertyValue("--dock-w"));
+    const sheeted = phone(parseFloat(cs.getPropertyValue("--phone-max")));
     const open = shown && !folded;
     el().classList.toggle("open", open);
     el().classList.toggle("over", narrow());
-    el().classList.toggle("sheet", phone());
+    el().classList.toggle("sheet", sheeted);
     // The dock takes WIDTH out of the viewport; the same dock as a bottom
     // sheet takes HEIGHT. Either way the water is drawn in what is left, never
     // behind the dock — otherwise the domain centres itself on a canvas whose
     // lower half nobody can see.
     const root = document.documentElement.style;
-    root.setProperty("--dock", (open && !narrow() && !phone()) ? W + "px" : "0px");
-    root.setProperty("--dockb", (open && phone()) ? sheetH() + "px" : "0px");
+    root.setProperty("--dock", (open && !narrow() && !sheeted) ? dockW + "px" : "0px");
+    // The sheet's height is `--sheet-h` evaluated by the stylesheet (a calc on
+    // vh); the open sheet IS that height, so measure it rather than redo the sum.
+    root.setProperty("--dockb", (open && sheeted)
+      ? Math.round(el().getBoundingClientRect().height) + "px" : "0px");
     fitBar();                    // the dock takes its width out of the strip
     applyAutoVex();              // …and out of what "fills the window" means
     el().querySelector(".dock-h .eid").textContent = id;

@@ -28,7 +28,7 @@
  *          removeFluxAt, removeGauge, requestStream, RIG, sampleCV,
  *          sampleFlux, sampleForce, sampleGauges, sampleInlet, sampleRakes,
  *          SCENES, scenesOffered, seedTracers, setPanel, Shaders, showToast,
- *          sim, SIM, START, state, statWin, syncPanel, syncToolbar,
+ *          sim, SIM, START, state, statWin, syncBarH, syncPanel, syncToolbar,
  *          syncValveBtn, toastTimer, TOOL_KEYS, TOOLBAR, TOOLS, UIMODE,
  *          VEX_FIT_MAX, VEX_MAX, view, vmaxFor, wheelHint
  */
@@ -194,9 +194,8 @@ function syncTitle() {
   // Only while the bench IS that exercise's scene: a scene picked from the
   // menu afterwards is named as itself.
   if (ex && ex.scene !== sc.id) ex = null;
-  const n = document.getElementById("sceneName"), k = document.getElementById("sceneKey");
+  const n = document.getElementById("sceneName");
   if (n) n.textContent = ex ? ex.title : (sc.name || "");
-  if (k) k.textContent = ex ? ex.id + " · " + (sc.name || "") : (sc.key || "");
 }
 
 /** Load a scene from the UI — the picker, the bar button, the panel row.
@@ -1187,7 +1186,7 @@ function drawSpout(ctx) {
 }
 
 function updateStatus() {
-  document.getElementById("status").style.display = UIMODE.shows("status") ? "" : "none";
+  document.getElementById("status").classList.toggle("gone", !UIMODE.shows("status"));
   document.getElementById("status").textContent =
     sim.nx + "×" + sim.ny + " · Δx " + (sim.dx * 1000).toFixed(0) + " mm · " +
     "t " + sim.t.toFixed(1) + " s · ×" + state.rt.toFixed(2) + " RT · " +
@@ -1553,7 +1552,7 @@ window.APP = {
   // The chrome, for headless work: test/ui-smoke.mjs drives the strip, the
   // dock and the start screen through here rather than by synthesising
   // clicks at pixel positions.
-  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor,
+  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncBarH, syncToolbar, FIELDS, rangeFor,
         RAMPS: Shaders.RAMPS, GAUGE_QTY },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   LEGEND,                                  // the colour key and field picker

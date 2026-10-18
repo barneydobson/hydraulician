@@ -290,7 +290,7 @@ that is silently not there. Hidden tools keep their digit: worksheets say
   Wall. A finger's press is held ~90 ms (`TOUCH_HOLD_MS`) so a pinch never
   places, pins or dyes anything. On a coarse pointer the strip wraps onto a
   second row rather than shrinking below 40 px or scrolling (`fitBar`,
-  `--barb`, `state.barTop`), and an upright tablet under 900 px gets the
+  `--bar-h`, `state.barTop`), and an upright tablet under 900 px gets the
   bottom sheet, not an overlaid side panel. `ui-smoke.mjs` drives a real
   emulated iPad (touch events, dpr 2); details in
   [docs/making-exercises.md](docs/making-exercises.md) → *Reading the water

@@ -797,7 +797,10 @@ and at the wall its volume flux is the flap's swept rate, held over the live
 depth as the piston's is. `wave.train = N` makes it fire one train of N
 periods with `wave.ramp`-period cosine ramps (default 1.5) on `SIM.fireTrain()`
 — the strip's Wave train button and V where there is no valve — and stand
-still otherwise; the velocity is the exact derivative of the displacement
+still otherwise. Every fire resets the water first (`resetWater`, t = 0, the
+gauges' history with it): a lecturer could not see how to run WV-5 twice,
+because a press was refused while the paddle moved and a second train ran
+into the first one's leftovers; the velocity is the exact derivative of the displacement
 a·E(τ)·sin ωτ, so a train ends with the paddle where it started. The CPU
 computes U per substep (`SIM.paddle`) and hands it in as `u_waveU`. Neither
 key is in the rig wire format (v2): a saved rig carries the scene's own.
@@ -821,9 +824,38 @@ gone within one wavelength of the paddle; at L/Δx = 106, 145 and 204 it
 lasted about 2, 2.5 and 3.5 wavelengths, and a wave dies quickly once H is
 under ~4 cells. The mixing length takes part (with `kappa: 0` the wave goes
 further, but the whole flume fills with grid-scale surface noise within
-10 s — not a usable fix); `c`, `ca`, `bulk` and `cf` do not. WV-5 is sized
-around it: L ≈ 2 m on 10.4 mm (190 cells), H ≈ 0.14 m (13 cells), and the
-group still fades from 0.14 m at 1 m to 0.04 m at 8 m.
+10 s — not a usable fix); `c`, `bulk` and `cf` do not. The first WV-5 was
+sized around it: L ≈ 2 m on 10.4 mm (190 cells), H ≈ 0.14 m (13 cells), and
+the group still faded from 0.14 m at 1 m to 0.04 m at 8 m.
+
+**WV-5, round 2: what actually damps a wave train (Oct 2026).** Measured
+on a 0.5 m deep flume, T = 1.0–1.1 s (L = 1.5–1.8 m), a 0.05 m flap stroke
+(H ≈ 0.07–0.09 m), envelope height along the flume from the fill fraction:
+- *kappa* is the first damper (issue #77): at 0.41 the train was gone by
+  5 m at Medium and at High; 0.1 took H at 4 m from 0.02 to 0.04 m
+  (Medium, T = 1.0 s); 0 a little further.
+- *ca* is the second — the old line above that it "does not" was measured
+  with the closure on, which hid it. With the closure at 0.1, ca 0.8 → 0
+  took H at 7 m from 0.011 to 0.044 m (Medium). But ca 0 smears the
+  interface and traps air: columns of missing water stand behind the train.
+  0.2 keeps most of the gain without that.
+- *nu* then decides between reach and noise, and it is NOT the bulk 2νk²:
+  that is 0.007 /s at ν = 3e-4, nothing, yet going 1e-4 → 3e-4 cut H at
+  6 m from ~0.06 to 0.03 m. A uniform ν works on the shear layer the void
+  treatment leaves at the surface, not on the wave's interior. With
+  kappa 0, ca 0.2 at High: ν 1e-4 carried the train to 9 m at 0.05 m but
+  left cell-sized spikes and drifting air holes behind it; 1.5e-4 and
+  2e-4 fewer; 3e-4 none, but then the train is down to 0.016 m by 8 m.
+  WV-5 ships 1e-4: the train reaching the end came first (lecturer).
+- *cs*, *bulk*: cs 0 with bulk 0.01 left the water behind the train rough
+  and carried it no further; cs 0.2 on top of ν 3e-4 damped more. Kept.
+- *Resolution* still matters for the same settings: Medium (9.4 mm) lost
+  the train by ~6–7 m where High (6.2 mm) carried it to 9 m.
+- The beach (WV-4, H/d ≈ 0.4, T = 2 s in 0.4 m) is a different case: there
+  every setting tried, kappa 0 included, lost about a third of the height
+  over 6 m of flat bed — the steep long wave reshaping (first harmonic into
+  higher ones), not viscosity — and kappa 0 broke the undertow (Average) into
+  a row of small cells. WV-4 keeps the closure; see its README.
 
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from

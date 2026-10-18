@@ -1291,14 +1291,19 @@ const SIM = (() => {
              cp, cg: 0.5 * cp * (1 + 2 * kh / Math.sinh(2 * kh)) };
   }
 
-  /** Fire one wave train (wave.train > 0). Refused while one is still being
-   *  made — restarting mid-stroke would jerk the paddle. Returns true when a
-   *  train starts. */
+  /** Fire one wave train (wave.train > 0). Every press is a fresh
+   *  experiment: the flume is reset to still water and t = 0 (resetWater,
+   *  which also clears the gauges' history through main.js's t-went-back
+   *  check), then the train starts at t = 0. A lecturer could not see how to
+   *  run WV-5 a second time: the old rule refused a press while the paddle
+   *  was still moving, and a second train fired after the first ran into its
+   *  leftovers. A reset also means the paddle never jerks — it restarts from
+   *  rest in still water. Returns true when a train starts. */
   function fireTrain() {
     const w = S.p.wave;
     if (!(w.train > 0) || !(w.on > 0.5)) return false;
-    if (paddle().running) return false;
-    w.t0 = S.t;
+    resetWater();
+    S.p.wave.t0 = S.t;
     return true;
   }
 

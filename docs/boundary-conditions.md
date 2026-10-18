@@ -355,8 +355,8 @@ are source terms the averaging balance accounts for, not boundary exchange:
   over the live depth. Two opt-in keys shape it (engineering notes, "Two
   wavemakers"): `wave.flap` makes the velocity grow linearly from a hinge on
   (or `wave.hinge` below) the bed, and `wave.train` fires one ramped train of
-  N periods per `SIM.fireTrain()` (V) — the paddle is a still wall between
-  trains.
+  N periods per `SIM.fireTrain()` (V), which first resets the water to rest
+  (t = 0) — the paddle is a still wall between trains.
 
 ## 8. Who owns an edge
 

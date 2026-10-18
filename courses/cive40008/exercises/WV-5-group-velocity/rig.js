@@ -1,6 +1,6 @@
 /* WV-5 "Group velocity" — paste into the dev console.
  *
- *   ?ex=WV-5 (or ?scene=wavetrain), Resolution: Medium (960 x 99, dx = 10.4 mm).
+ *   ?ex=WV-5 (or ?scene=wavetrain), Resolution: High (1762 x 99, dx = 6.2 mm).
  *
  * Nothing to draw: the flume, the hinged flap and the absorbing far end are
  * the scene's. This is the lecturer's spot-check and the record of how the
@@ -13,12 +13,12 @@
  *   WV5.theory()      -> linear theory: L, kh, c_p, c_g, and Biésel's H/S
  *   WV5.run(t)        -> fire a train, run t s (default 16), then print
  *                        H(x), c_p, c_g and c_g/c_p
- *   WV5.run(t, {flap: 0, amp: 0.063})   the same with a piston of equal H
+ *   WV5.run(t, {flap: 0, amp: 0.03})    the same with a piston of equal H
  *
  * c_g: the time the envelope (the one-period Fourier amplitude at the paddle
- * frequency) peaks at each station 1.5–6 m, fitted against x. c_p: the
+ * frequency) peaks at each station 1.5–7 m, fitted against x. c_p: the
  * phase of that amplitude along x at fixed times, unwrapped and fitted; ω/k.
- * A run is ~70 000 solver steps: allow a minute.
+ * A run is ~90 000 solver steps at High: allow a few minutes.
  */
 window.WV5 = {
   theory: function () {
@@ -49,7 +49,7 @@ window.WV5 = {
     APP.SIM.resetWater(); clearGaugeHistory();
     const r = WV5.theory(), T = s.p.wave.period, om = 2 * Math.PI / T;
     APP.SIM.fireTrain();
-    const xs = []; for (let x = 0.3; x < 9.05; x += 0.1) xs.push(+x.toFixed(2));
+    const xs = []; for (let x = 0.3; x < 10.05; x += 0.1) xs.push(+x.toFixed(2));
     const ix = xs.map((x) => Math.round(x / s.dx - 0.5));
     const dtS = T / 20, per = Math.max(1, Math.round(dtS / APP.SIM.dt()));
     const ts = [], E = [];
@@ -71,7 +71,7 @@ window.WV5 = {
     const fit = (X, Y) => { const N = X.length; let sx = 0, sy = 0, sxx = 0, sxy = 0;
       for (let i = 0; i < N; i++) { sx += X[i]; sy += Y[i]; sxx += X[i] * X[i]; sxy += X[i] * Y[i]; }
       return (N * sxy - sx * sy) / (N * sxx - sx * sx); };
-    const sel = xs.map((x, m) => m).filter((m) => xs[m] >= 1.5 && xs[m] <= 6);
+    const sel = xs.map((x, m) => m).filter((m) => xs[m] >= 1.5 && xs[m] <= 7);
     const tp = sel.map((m) => { let mx = 0; for (let i = 0; i < n; i++) mx = Math.max(mx, A(m, i));
       let a = 0, b = 0; for (let i = 0; i < n; i++) { const v = A(m, i) - 0.6 * mx; if (v > 0) { a += v; b += v * ts[i]; } }
       return b / a; });
@@ -79,7 +79,7 @@ window.WV5 = {
     const ks = [];
     for (let i = 0; i < n; i += 2) {
       const mx = Math.max(...sel.map((m) => A(m, i)));
-      const ok = sel.filter((m) => A(m, i) > 0.02 && A(m, i) > 0.5 * mx);
+      const ok = sel.filter((m) => A(m, i) > 0.01 && A(m, i) > 0.5 * mx);
       if (ok.length < 8) continue;
       let prev = null; const ph = [], X = [];
       ok.forEach((m) => { let p = Math.atan2(im[m][i], re[m][i]);
@@ -89,7 +89,7 @@ window.WV5 = {
     }
     ks.sort((a, b) => a - b);
     const cp = om / ks[ks.length >> 1];
-    console.table([0.5, 1, 2, 3, 4, 5, 6, 7, 8].map((x) => {
+    console.table([0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((x) => {
       const m = xs.indexOf(x); let mx = 0; for (let i = 0; i < n; i++) mx = Math.max(mx, A(m, i));
       return { "x (m)": x, "H (m)": +(2 * mx).toFixed(3) };
     }));

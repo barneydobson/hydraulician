@@ -1,6 +1,6 @@
 /* WV-4 "Breaking waves on a beach" — paste into the dev console.
  *
- *   ?ex=WV-4 (or ?scene=beach), Resolution: Low (671 x 67, dx = 13 mm).
+ *   ?ex=WV-4 (or ?scene=beach), Resolution: Medium (1102 x 86, dx = 10.4 mm).
  *
  * Nothing to draw: the beach is the scene's polygon and its slope is the
  * Geometry slider `beach_s` (geom0). This is the lecturer's spot-check — it
@@ -13,6 +13,12 @@
  *
  *   WV4.xi(s)        -> the Iribarren number for the flume's wave
  *   WV4.run(s, t)    -> set slope s, run t s (default 12), print H(x) and ξ
+ *   WV4.undertow(t)  -> Average on, run t s more (default 60), print the
+ *                       mean velocity ū up the column at x = 4…8 m
+ *
+ * APP.tick queues GPU work without waiting for it; a long tick on a busy
+ * GPU can trip the driver's timeout and lose the WebGL context. Break very
+ * long runs into a few calls if that happens.
  *
  * Each call is a few hundred thousand solver steps: on a shared GPU run one
  * slope per call.
@@ -43,5 +49,26 @@ window.WV4 = {
                                      "η max (m)": hi[m] > -1e8 ? +hi[m].toFixed(3) : "" }));
     console.table(rows);
     return rows;
+  },
+
+  // The undertow: switch the colour key to Average (the strip's A does the
+  // same), run t s more (default 60) and print the Favre-mean horizontal
+  // velocity up the water column at a few stations: negative = offshore.
+  // The first ~20 s of waves should have arrived before it is called.
+  undertow: function (t) {
+    const sim = APP.sim, dt = APP.SIM.dt();
+    APP.avg.set(true);
+    APP.tick(Math.round((t || 60) / dt));
+    const C = APP.avg.columns().C, out = [];
+    [4, 5, 6, 7, 8].forEach((x) => {
+      const i = Math.floor(x / sim.dx), zb = C[i * 4], d = C[i * 4 + 1], row = { "x (m)": x, "d̄ (m)": +d.toFixed(3) };
+      [0.02, 0.05, 0.1, 0.15, 0.2].forEach((h) => {
+        const p = h < d ? APP.avg.probe(x, zb + h) : null;
+        row["ū at " + h + " m"] = p && p.fbar > 0.5 ? +p.ubar.toFixed(3) : "";
+      });
+      out.push(row);
+    });
+    console.table(out);
+    return out;
   },
 };

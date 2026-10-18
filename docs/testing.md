@@ -74,9 +74,9 @@ request. Its `instant` job runs the instant gates: `check_pack.py`,
 `check_notation.py`, `check_headers.py`, `check_docs.py`, `recon-test.mjs`,
 `geom-test.mjs`, `mutation-test.mjs` and `smoke.mjs --check-catalogue`. Its
 `no-gpu` job runs the browser checks that need no GPU and no physics budget
-(`smoke.mjs --only=docs`, `ui-smoke.mjs --only=file://`) under `SOFTWARE=1`;
-it is unproven on hosted runners and `continue-on-error` until it has run
-green there. `.github/workflows/pages.yml` deploys the Pages build only after
+(`smoke.mjs --only=docs`, `ui-smoke.mjs --only=file://`) under `SOFTWARE=1`,
+and it blocks like the instant job: it has run green on hosted runners.
+`.github/workflows/pages.yml` deploys the Pages build only after
 Checks has succeeded on `main`.
 
 The full `smoke.mjs` and `ui-smoke.mjs` are not in the workflow at all, not

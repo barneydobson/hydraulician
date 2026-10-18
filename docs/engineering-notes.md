@@ -950,6 +950,31 @@ ui-smoke out. So `APP.frames(n)` advances what n frames of ~30 ms of work
 buy, which is more sim time per call than under the old governor (whose
 readback-stalled CPU clock held a sync loop near 20 substeps a frame).
 
+## Legend
+
+The colour key (`#legend`) is DOM rather than part of the overlay canvas. It
+carries a menu, a button and two editable numbers, which is hit-testing and
+text entry the 2D context would have to be taught from scratch. A window or
+CDP screenshot captures it either way, which is the point: a screenshot in a
+worksheet should say what it is showing.
+
+The Live / Average switch lives on the legend because the legend is what
+declares which flow you are looking at. Under Average the colour, the surface
+line and every instrument come from one window, and each field's own `mean`
+string prints two rows below the switch. Putting the statement and the switch
+on one object is what stops them disagreeing. `setAverage` is still the single
+writer: the strip's A, the panel checkbox and the legend switch all go through
+it.
+
+The Average block (`#legAvg`) is deliberately short. It once carried two more
+paragraphs, what the window covers and the six things that restart it, about
+seven lines of prose that never changed. Both already exist in substance in the
+Controls panel's `info` for Average and in [averaging.md](averaging.md) §9.
+Three copies of a list is how the three come to disagree. What is left is the
+window length, the hover readout and the field's own `mean` string, all of
+which are either live or field-specific. It is the same lesson the exercise
+cards learned: see the note on `start` and `task` in `js/exercises.js`.
+
 ## The view
 
 ### The colour range is held, not tracked

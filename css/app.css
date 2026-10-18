@@ -78,6 +78,8 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   opacity: .92; padding-right: 4px; white-space: nowrap;
 }
 #brand svg { flex: 0 0 auto; }
+.brandmark { fill: none; stroke: #4dc3ff; stroke-width: 1.7; stroke-linecap: round;
+  stroke-linejoin: round; flex: 0 0 auto; }
 /* The strip must never silently drop a control. It shrinks first (the two
    media queries below), and if a window is narrower than even that, the
    groups scroll sideways rather than being clipped away. */

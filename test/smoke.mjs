@@ -43,6 +43,8 @@
  *                     instead of comparing against it; only ever on code known good.
  *                     Goldens are GPU-specific: each records the WebGL renderer and is
  *                     compared only on the same one ("golden skipped: ..." otherwise).
+ *         --write-throughput  records test/golden/throughput-h23.json (best of 3 timings
+ *                     of 2000 substeps), the baseline of "substep throughput did not regress".
  *         --write-golden-meta  rewrites only the renderer recorded in the instrument golden.
  *         --mutate=<id>  patches one known bug into a served file and runs the
  *                     suite that owns it (the default --only). Exit 0 only if
@@ -62,6 +64,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8731 + (process.pid % 200);          // out of the way of a dev server
 const KEEP = process.argv.includes("--keep");
 const WRITE_GOLDEN = process.argv.includes("--write-golden");
+const WRITE_THROUGHPUT = process.argv.includes("--write-throughput");
 // Rewrites ONLY the GPU identity stored in the instrument golden, keeping its values.
 const WRITE_GOLDEN_META = process.argv.includes("--write-golden-meta");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
@@ -731,6 +734,45 @@ SUITES.api = async (B) => {
         ok("API display golden: the nine fields paint as before (live and Average)",
           !!want && worst <= 2,
           want ? `worst ${worst}/255 at ${where}` : "no golden at " + dispGoldPath + " (run once with --write-golden)");
+      }
+    }
+  }
+
+  // ---- substep throughput (Task 3.3): h23 at its default (Medium) budget,
+  // APP.tick(2000) wall time, best of 3, each ended by a synchronous readback
+  // so the GPU queue is drained inside the timing. The baseline is recorded
+  // by `--write-throughput` on the commit BEFORE the task, in
+  // test/golden/throughput-h23.json, with the GPU it was taken on. The bound
+  // is x1.10, not x1.05: this machine's load noise between runs is of that
+  // order, which is why best-of-3 and a loose bound are used together.
+  {
+    await B.goto(`http://localhost:${PORT}/?scene=h23`);
+    const tp = JSON.parse(await B.evaluate(`(() => {
+      APP.tick(200); APP.SIM.columns(true);                     // warm-up: shaders, caches
+      const t = [];
+      for (let k = 0; k < 3; k++) {
+        const t0 = performance.now();
+        APP.tick(2000); APP.SIM.columns(true);
+        t.push(performance.now() - t0);
+      }
+      return JSON.stringify({ t, nx: APP.sim.nx, ny: APP.sim.ny });
+    })()`));
+    const best = Math.min(...tp.t);
+    const tpPath = path.join(ROOT, "test", "golden", "throughput-h23.json");
+    console.log(`    throughput: 2000 substeps at ${tp.nx}x${tp.ny}: ${tp.t.map((x) => x.toFixed(0)).join(", ")} ms, best ${best.toFixed(0)}`);
+    if (WRITE_THROUGHPUT) {
+      fs.writeFileSync(tpPath, JSON.stringify({ _renderer: renderer, nx: tp.nx, ny: tp.ny, bestMs: best, runsMs: tp.t }, null, 1) + "\n");
+      console.log("    wrote " + tpPath);
+    } else {
+      let want = null;
+      try { want = JSON.parse(fs.readFileSync(tpPath, "utf8")); } catch (_) { /* reported below */ }
+      if (want && want._renderer !== renderer) {
+        console.log(`    throughput baseline skipped: captured on ${want._renderer}, running on ${renderer}`);
+      } else {
+        ok("API substep throughput did not regress",
+          !!want && want.nx === tp.nx && best <= want.bestMs * 1.10,
+          want ? `best ${best.toFixed(0)} ms vs baseline ${want.bestMs.toFixed(0)} ms (limit x1.10)`
+               : "no baseline at " + tpPath + " (run once with --write-throughput)");
       }
     }
   }

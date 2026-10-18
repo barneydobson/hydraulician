@@ -791,83 +791,95 @@ COURSES.exercises("cive40008", [
   // no digit and no lecturer wording; the solver spills and surges honestly,
   // and a true plunging tongue is thinner than its interface (engineering
   // notes), so the card calls the middle band what it is on screen — the
-  // front stands up and collapses — and the README says why. Low, not
-  // Medium: the box was cropped to what the waves use, so Low is the old
-  // Medium's Δx with half the cells (README, "Speed").
+  // front stands up and collapses — and the README says why. Medium: the
+  // flume is 11.5 m now (twice the run to the beach, round 2), and Medium
+  // keeps Δx = 10.4 mm on it (README, "Speed").
   {
     id: "WV-4",
     title: "How waves break on beaches",
-    aim: "See the same wave spill on a gentle beach, collapse on a steeper one and surge up a steep one.",
+    aim: "See the same wave spill on a gentle beach, collapse on a steeper one and surge up a steep one — then the orbits, the undertow along the bed and the bores of the surf zone.",
     topic: "Waves",
     folder: "WV-4-breakers",
     scene: "beach",
     rig: null,
-    rigParams: { budget: "Low", waveOn: true },
-    viewParams: { hoverCard: false, mode: "0", particles: true },
+    rigParams: { budget: "Medium", waveOn: true },
+    viewParams: { hoverCard: false, mode: "0", particles: true, sline: false },
     studentParams: [
       { control: "geom0", label: "Beach slope tanβ", unit: "" },
     ],
-    // Hover rows kept plain: without a list the card printed the open-channel
-    // profile class ("H2 profile"), d_c, d_n and slopes over a wave flume.
-    ui: { view: ["legendBtn", "partBtn", "hoverBtn"], fields: ["water", "speed"], measure: false,
-          panel: "shut", controls: ["speed", "geom0"],
+    // Round 2 (lecturer, 2026-10-17): more to look at. The Dye tool and
+    // Streamlines; Average on the colour key shows the undertow (the mean
+    // flow: onshore near the surface, offshore along the bed — measured in
+    // the README); Froude number shows the surf zone's bores, |u|/√(gd)
+    // from the horizontal velocity (engineering notes, "Is it the
+    // numerator?"), in plain words through fieldText. Hover rows kept plain:
+    // without a list the card printed the open-channel profile class
+    // ("H2 profile"), d_c, d_n and slopes over a wave flume.
+    ui: { view: ["legendBtn", "partBtn", "slineBtn", "hoverBtn"], fields: ["water", "speed", "froude"],
+          measure: ["dye"], panel: "shut", controls: ["speed", "geom0"],
+          fieldText: { froude: "Fr = |u|/√(gd): the water's speed against the speed √(gd) of a long wave in water that deep. Blue below 1, pale near 1, red above." },
           readouts: { rows: ["pos", "eta", "uw"] } },
     steps: [
-      "The paddle sends the same wave down the flume every 2 s; the beach slope on this card is the only thing you change.",
-      "Gentle beach, 0.06: the wave steepens, its crest crumbles down its own front, and a bore runs up a long surf zone — SPILLING.",
-      "Set 0.15 and wait about 10 s: the front stands up nearly vertical and collapses in one go — the PLUNGING range. Try 0.3 too.",
-      "Set 0.7: nothing breaks. The water SURGES up the slope as a sheet and slides back, and much of the wave reflects.",
-      "Pick Speed in {btn:legendBtn}: the breaking front is the fastest water. Which beach soaks up wave energy, and which throws it back?",
+      "The paddle sends the same wave down the flume every 2 s. Gentle beach, 0.06: the wave steepens, its crest crumbles down its front and a bore runs up a long surf zone — SPILLING.",
+      "Set 0.15 and wait about 15 s: the front stands up and collapses in one go (the PLUNGING range). At 0.7 nothing breaks: the water SURGES up the slope and slides back, and much of the wave reflects.",
+      "Back at 0.06, hold {tool:dye} near the bed, then near the surface, before the breakers: the ink rocks to and fro with each wave. The {btn:partBtn} trace the orbits — flatter near the bed.",
+      "Switch the colour key from Live to Average and turn on {btn:slineBtn}: the mean flow runs onshore near the surface and back offshore along the bed — the undertow.",
+      "Back on Live, pick Froude number in {btn:legendBtn}: offshore Fr stays near 0.2–0.5 (blue); under the breaking fronts near the shore it climbs to 0.6–0.9, close to 1 — the fronts are bores.",
     ],
     background: [
-      "The flume holds 0.40 m of still water; each change of slope starts it again from still water. tanβ = 0.06 is 1 in 17.",
+      "The flume holds 0.40 m of still water; each change of slope starts it again from still water. The beach's still-water shoreline is 10 m from the paddle. tanβ = 0.06 is 1 in 17.",
       "The surf similarity number ξ = tanβ/√(H₀/L₀), with the wave's height H₀ and deep-water length L₀ = gT²/2π, sorts the three: spilling below about 0.5, surging above about 3.3. Here ξ ≈ 6·tanβ.",
       "Here a plunging breaker's front collapses rather than curling right over.",
+      "Undertow: each wave carries water towards the beach near the surface, between its trough and its crest. That water has to go back, and it returns along the bed. Average shows it once a few waves have passed; give it about 30 s.",
+      "Froude number Fr = u/√(gd) compares the water's own speed with the speed √(gd) of a long wave in that depth. A bore is a hydraulic jump on the move: the bore itself outruns √(gd) of the water ahead of it, while the water behind it, measured from the bed, stays a little below 1. Only the thin run-up and backwash at the shoreline go past 1.",
     ],
-    settle: 10,
+    settle: 15,
   },
-  // WV-5: a showcase (lecturer, Oct 2026). One wave TRAIN in deep water, so
-  // the group and its crests visibly part company: c_g = c_p/2. The flap
-  // (wave.flap) and the train envelope (wave.train) are the scene's; the
-  // strip's Wave train button and V fire one train. The two sliders are the
-  // Wavemaker panel's own Period and Amplitude rows (waveT, waveA). Two η
-  // gauges arrive placed, 3 m apart, so the class can time the group and a
-  // crest over the same distance. Medium: the deep-water wave needs the
-  // cells (README, "Why these numbers"). The legend opens folded: in its
-  // corner it sat on the surface just where the group runs out of flume.
+  // WV-5: a showcase (lecturer, Oct 2026). One wave TRAIN, so the group and
+  // its crests visibly part company: c_g ≈ 0.6 c_p. The flap (wave.flap)
+  // and the train envelope (wave.train) are the scene's; the strip's Wave
+  // train button and V fire one train, and every press starts again from
+  // still water (SIM.fireTrain) — round 2: the lecturer could not see how
+  // to start it or run it twice, so step 1 is the button. The two sliders
+  // are the Wavemaker panel's own Period and Amplitude rows (waveT, waveA);
+  // Stroke opens at 0.05 m. Two η gauges arrive placed, 4 m apart, so the
+  // class can time the group and a crest over the same distance. High: the
+  // wave needs ~11 cells of height to reach the far end (README,
+  // "Viscosities"). The legend opens folded: in its corner it sat on the
+  // surface just where the group runs out of flume.
   {
     id: "WV-5",
     title: "Group velocity: waves travel slower than their crests",
-    aim: "Send a short train of waves down a deep flume and watch the crests run through it: each is born at the back of the group and dies at its front, because the group moves at half their speed.",
+    aim: "Send a short train of waves down a flume and watch the crests run through it: each is born at the back of the group and dies at its front, because the group moves slower than its crests.",
     topic: "Waves",
     folder: "WV-5-group-velocity",
     scene: "wavetrain",
     rig: null,
-    rigParams: { budget: "Medium", waveOn: true },
+    rigParams: { budget: "High", waveOn: true },
     viewParams: { hoverCard: false, mode: "0", particles: false, gaugeField: "eta" },
-    gauges: [{ x: 2.0, z: 0.5, field: "eta" }, { x: 5.0, z: 0.5, field: "eta" }],
+    gauges: [{ x: 2.0, z: 0.3, field: "eta" }, { x: 6.0, z: 0.3, field: "eta" }],
     studentParams: [
       { control: "waveT", label: "Wave period", unit: "s" },
       { control: "waveA", label: "Stroke", unit: "m" },
     ],
     instruments: [
-      { tool: "gauge", where: "already placed at x = 2 m and x = 5 m, plotting the level η", why: "the tallest waves of the group pass the second gauge about 3 s after the first; one crest covers the same 3 m in about 1.6 s" },
+      { tool: "gauge", where: "already placed at x = 2 m and x = 6 m, plotting the level η", why: "the tallest waves of the group pass the second gauge about 4 s after the first; one crest covers the same 4 m in about 2.5 s" },
     ],
     ui: { view: ["legendBtn", "partBtn", "readBtn", "hoverBtn"], fields: ["water", "speed"],
           panel: "shut", legend: false, controls: ["speed", "waveT", "waveA"], gaugeFields: ["eta"],
           readouts: { rows: ["pos", "eta", "uw"] } },
     steps: [
-      "Press {btn:trainBtn} (or {key:V}): the flap at the left end rocks six times — gently up, steady, gently down — and stops.",
+      "Press {btn:trainBtn} (or {key:V}) to start: the flap at the left end rocks eight times — gently up, steady, gently down — and stops. Each press starts again from still water.",
       "Follow ONE crest: it appears at the back of the group, runs forward through it and fades away at the front.",
-      "Now follow the GROUP, where the waves are tallest: it moves at about half the speed of a crest.",
-      "Time both on the two {tool:gauge}s, 3 m apart: when do the tallest waves pass each one? How long does one crest take?",
-      "Change the Wave period and fire again. Pick Speed in {btn:legendBtn}: the water moves only under the group.",
+      "Now follow the GROUP, where the waves are tallest: it moves at about 0.6 of a crest's speed, all the way to the far end.",
+      "Time both on the two {tool:gauge}s, 4 m apart: when do the tallest waves pass each one? How long does one crest take?",
+      "Change the Wave period and press {btn:trainBtn} again. Pick Speed in {btn:legendBtn}: the water moves only under the group.",
     ],
     background: [
-      "The flume holds 0.80 m of still water; the flap is hinged on the bed and swings most at the surface, as the water does in a deep-water wave. Each train is six waves of period 1.13 s, about 2 m long.",
-      "A crest moves at the phase speed c_p = L/T. In deep water (depth more than about half a wavelength) c_p = gT/2π, about 1.8 m/s here, and the group moves at the group velocity c_g = c_p/2, about 0.9 m/s.",
+      "The flume holds 0.50 m of still water; the flap is hinged on the bed and swings most at the surface. Each train is eight waves of period 1.1 s, about 1.8 m long. The last 2 m of the flume absorb them, so nothing comes back.",
+      "A crest moves at the phase speed c_p = L/T, about 1.6 m/s here. The group moves at the group velocity c_g = n·c_p, n = ½(1 + 2kh/sinh 2kh) with k = 2π/L and h the depth: n ≈ 0.6 here, so c_g ≈ 1.0 m/s. In deep water (h more than about L/2) n = ½; in shallow water n = 1 and the two travel together.",
       "The wave energy travels with the group, not with the crests: a crest that runs ahead of the group has nothing to carry it and dies away.",
-      "The waves shrink as they travel: the grid damps short waves, so the group fades towards the far end, where the flume absorbs what is left.",
+      "Pause ({key:space}) to look at one moment, and run again to follow a crest.",
     ],
     settle: 0,
   },

@@ -2560,24 +2560,39 @@ const SCENES = (() => {
     // through the displacement a·sin ωt (main.js, drawMarkers).
     // Measured over 12–16 s at every slope: the water volume holds to 0.2%.
     //
-    // Where the beach goes. These waves lose height to the discretisation the
-    // further they run (engineering notes, "Surface waves are damped by
-    // RESOLUTION"), so the flat run is kept short: the toe sits 1.0 m off the
-    // paddle until the beach is steep enough for its still-water shoreline to
-    // come inside x = 5.0 m (SHORE), and from there the shoreline is held and the toe
-    // walks right. Above the shoreline the beach runs on to the right edge, so
-    // run-up always has somewhere to go. Changing the slope is a new
-    // experiment (resetWater).
+    // Where the beach goes. Round 2 (lecturer, 2026-10-17): at least twice
+    // the old distance from the paddle to the beach. The still-water
+    // shoreline is held at x = 10.0 m (SHORE) for every slope and the toe
+    // walks: 3.3 m off the paddle at tanβ 0.06, 7.3 m at 0.15, 9.4 m at 0.7
+    // (it was 1.0 / 2.3 / 4.4 m with the shoreline at 5 m). Above the
+    // shoreline the beach runs on to the right edge, so run-up always has
+    // somewhere to go. Changing the slope is a new experiment (resetWater).
+    //
+    // Damping (round 2: "lose energy only where they break"). Measured on the
+    // flat run at tanβ 0.15, Medium (README, "Damping"): the wave's height
+    // falls by about a third over the first 6 m whatever the dampers — with
+    // the mixing length off (kappa 0, nu 1e-4, as WV-5), at kappa 0.2, and
+    // at the default 0.41 with ca 0.8 or 0.2. For this steep long wave
+    // (H/d ≈ 0.4, T = 2 s in 0.4 m) the loss is the wave reshaping — its
+    // first harmonic hands energy to higher ones — not the viscosity. What
+    // the closure DOES decide is the mean flow: with kappa 0 the Average
+    // broke into a row of small cells and the live surface filled with
+    // chop; at 0.2 the undertow ran at twice the default's speed (0.3 m/s,
+    // several times the return flow the waves' mass flux asks for). So the
+    // closure stays at its default and only the interface compression is
+    // lowered (ca 0.2, as WV-5: it keeps a little more height near the
+    // paddle). The undertow at the default: about 0.13–0.19 m/s offshore
+    // along the bed 4–6 m from the paddle.
     //
     // The box is cropped to what the waves use, because the cost is cells ×
-    // substeps: the gentlest slope (0.06) puts the shoreline at 7.7 m, so the
-    // flume is 9 m long; the highest run-up (tanβ 0.7) reaches 0.18 m above
-    // still water, so the lid is 0.40 m above it; the bed is 0.10 m off the
-    // bottom. At Low that is Δx = 13 mm (the old 12 × 1.2 m box needed
-    // Medium for 12 mm) with half the cells: 671 × 67.
+    // substeps: the gentlest slope (0.06) has its shoreline at 10 m and
+    // run-up to ~11 m, so the flume is 11.5 m long; the highest run-up
+    // (tanβ 0.7) reaches 0.18 m above still water, so the lid is 0.40 m
+    // above it; the bed is 0.10 m off the bottom. At Medium that is
+    // 1102 × 86 cells, Δx = 10.4 mm.
     (function () {
       const BED = 0.10, LEV = 0.50, D = LEV - BED;
-      const TOE0 = 1.0, SHORE = 5.0;
+      const TOE0 = 2.5, SHORE = 10.0;
       const toeOf = (s) => Math.max(TOE0, SHORE - D / s);
       const slopeOf = (par) => (par && par.beach_s !== undefined ? par.beach_s : 0.06);
       return {
@@ -2588,7 +2603,7 @@ const SCENES = (() => {
         // so this alone is 1.6× the speed. gd/c² = 2% compression at the bed;
         // measured, H along the flume and the run-up moved by under 5 mm
         // between c = 12, 16 and 26.
-        W: 9.0, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+        W: 11.5, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2,
         mode: 0, hmax: 0.75, vmax: 1.6,
         open: [1, 0, 0, 0],
         // Stroke amplitude 0.14 m: the wall paddle loses nothing to a pocket
@@ -2624,55 +2639,74 @@ const SCENES = (() => {
     })(),
 
     // ------------------------------------------- WV-5 · GROUP VELOCITY
-    // A wave TRAIN in deep water: the group travels at c_g ≈ c_p/2, so crests
-    // are born at its back, run through it and die at its front. A hinged
-    // FLAP at the left wall (wave.flap; SIM.paddle, FS_VEL) fires one train
-    // per press of the strip's Wave train button or V (wave.train = 6
-    // periods with 1.5-period cosine ramps); the paddle stands still
-    // otherwise. Measured on the card's grid (Medium, 960 × 99, Δx = 10.4 mm;
-    // the tables are in courses/cive40008/exercises/WV-5-group-velocity/README.md):
-    // c_g/c_p = 0.53 against linear theory's 0.53.
+    // A wave TRAIN in intermediate-to-deep water: the group travels at
+    // c_g ≈ 0.6 c_p, so crests are born at its back, run through it and die
+    // at its front. A hinged FLAP at the left wall (wave.flap; SIM.paddle,
+    // FS_VEL) fires one train per press of the strip's Wave train button or
+    // V (wave.train = 8 periods with 2-period cosine ramps: about five
+    // crests in the group at once, 8 × 0.6); every press resets the flume to
+    // still water first (SIM.fireTrain), so the experiment is repeated by
+    // pressing again. The paddle stands still otherwise. The tables are in
+    // courses/cive40008/exercises/WV-5-group-velocity/README.md.
     //
-    // THE NUMBERS ARE SET BY THE GRID, not by taste. A deep-water wave loses
-    // height to the discretisation far faster than WV-4's long wave
-    // (engineering notes, "Surface waves are damped by RESOLUTION"): at
-    // L = 1 m on a 13.7 mm grid it was gone within one wavelength, and a
-    // wave dies quickly once H falls under ~4 cells. So the wave is as long
-    // as a Medium grid holds several of — T = 1.13 s, L ≈ 2 m, 190 cells per
-    // wavelength — and steepish, H ≈ 0.14 m (H/L ≈ 0.07, 13 cells); the
-    // depth 0.80 m is kh = 2.55 (tanh kh = 0.99, deep for every purpose;
-    // c_g/c_p = 0.53 in theory). Even so the group fades from H ≈ 0.14 m at
-    // 1 m to ≈ 0.09 m at 6 m and ≈ 0.04 m at 8 m.
+    // The lecturer's classic lab demo, second round (2026-10-17): 0.5 m of
+    // water, an 11 m flume, L ≈ 1.8 m (T = 1.1 s, kh = 1.76, c_g/c_p = 0.60
+    // in linear theory), a 0.05 m stroke. The first version (0.8 m deep,
+    // L ≈ 2 m, Medium, the default closure) lost its train before the far
+    // end. Every damper was taken as low as it would go while the surface
+    // stayed free of grid noise, measured on this flume at High (README,
+    // "Viscosities"):
+    //   · kappa — the open-channel mixing length. Its ν_t ≈ 1e-3 m²/s in a
+    //     crest (issue #77) was the main damper: at the default 0.41 the
+    //     train was gone by x = 5 m. OFF (kappa: 0): a wave flume has no
+    //     channel shear for it to model.
+    //   · ca — the interface compression, the second damper: at 0.8 with
+    //     the closure off the train still faded to 0.01 m by 8 m. 0.2 lets
+    //     it through; 0 smears the interface and traps air behind the train.
+    //   · nu — with the closure off this is what takes out grid-scale noise,
+    //     and it is the knob that trades reach against noise. 1e-4 m²/s
+    //     carries the train to the absorber (H 0.07 m at 1 m, 0.056 at 8 m,
+    //     0.053 at 9 m) but leaves cell-sized spikes and drifting air holes
+    //     on the surface behind it; 2e-4 fewer; 3e-4 none at all, but then
+    //     the group is down to 0.016 m by 8 m and the flume looks empty by
+    //     the time it should arrive. The lecturer's first complaint was the
+    //     train not reaching the end, so 1e-4 (a tenth of the closure's ν_t);
+    //     3e-4 is the clean alternative (README, "Viscosities").
+    //   · cs, bulk — kept at 0.08 / 0.03: cs 0 with bulk 0.01 left the
+    //     water behind the train rough and did not carry it further; cs 0.3
+    //     cleaned the surface but damped the train like nu 3e-4.
+    // High: H ≈ 0.07 m is ~11 cells at Δx = 6.2 mm; at Medium (9 mm) the
+    // same settings lose the train by about 7 m.
     //
     // The far end absorbs: an extra viscosity ramped up over the last 2 m
-    // (outflowNu, FS_VEL) in front of a closed wall. The box is no taller
-    // than the waves need: 0.05 m of bed, 0.80 m of water, 0.18 m of air.
+    // (outflowNu, FS_VEL) in front of a closed wall — 0.03, which does not
+    // set the time step at High. c = 10: Δt ∝ Δx/(c + 6), so this runs
+    // 1.25× faster than c = 14; gd/c² = 5% at the bed. The box is no taller
+    // than the waves need: 0.02 m of bed, 0.50 m of water, 0.10 m of air.
     (function () {
-      const BED = 0.05, D = 0.80, LEV = BED + D, W = 10.0;
+      const BED = 0.02, D = 0.50, LEV = BED + D, W = 11.0;
       return {
-        id: "wavetrain", name: "Wave flume · a wave train in deep water", key: "Group velocity",
+        id: "wavetrain", name: "Wave flume · a wave train", key: "Group velocity",
         group: "Jets & waves",
-        blurb: "A hinged flap at the left end of a deep flume makes a short train of waves. Watch one crest: it is born at the back of the group, runs forward through it and dies at its front. The group travels at half the speed of its crests.",
-        // c = 14 as on the beach: H along the flume moved by under 5% between
-        // c = 14 and 16 (gd/c² = 4% at the bed).
-        W, H: LEV + 0.18, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+        blurb: "A hinged flap at the left end of a wave flume makes a short train of waves. Watch one crest: it is born at the back of the group, runs forward through it and dies at its front. The group travels at about 0.6 of the speed of its crests.",
+        W, H: LEV + 0.10, c: 10, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2, nu: 1e-4, kappa: 0,
         mode: 0, hmax: LEV + 0.1, vmax: 0.5,
         open: [1, 0, 0, 0],
-        outflowNu: 0.06, outflowLen: 2.0,
+        outflowNu: 0.03, outflowLen: 2.0,
         // amp is the flap's stroke amplitude at the still-water level. Biésel
-        // gives H/S = 1.24 at kh = 2.55, so 0.095 m is H ≈ 0.24 m in linear
-        // theory; the grid delivers 0.16 m half a metre out and 0.14 m at 1 m.
-        wave: { amp: 0.095, period: 1.13, on: 1, x: 0, d: D, flap: 1, hinge: 0, train: 6, ramp: 1.5 },
+        // gives H/S = 0.94 at kh = 1.76, so 0.05 m is H ≈ 0.094 m in linear
+        // theory; the grid delivers 0.07–0.09 m in the first metres.
+        wave: { amp: 0.05, period: 1.1, on: 1, x: 0, d: D, flap: 1, hinge: 0, train: 8, ramp: 2 },
         particles: 1, plife: 3,
         spinup: 0,
         solids: () => [GEOM.rect(-0.5, -0.5, W + 1, BED,
           { id: "bed", faces: [{ id: "bed", label: "Flume bed", e0: 2, e1: 2 }] })],
         water: (x, z, P) => (z > BED ? still(LEV, z, P) : 0),
-        tips: ["Press V (or Wave train on the strip) to send one train down the flume.",
+        tips: ["Press V (or Wave train on the strip) to send one train down the flume. Press again to start again from still water.",
                "Follow ONE crest: it appears at the back of the group, overtakes the others and fades away at the front.",
-               "Follow the GROUP, where the waves are tallest: it moves at about half the speed of a crest.",
-               "In deep water c_g = c_p/2: the wave energy travels with the group, not with the crests.",
-               "The waves shrink as they go: this grid damps short waves, so the group fades by the far end."] };
+               "Follow the GROUP, where the waves are tallest: it moves at about 0.6 of the speed of a crest.",
+               "The wave energy travels with the group, not with the crests. In deep water c_g = c_p/2.",
+               "The last 2 m of the flume absorb the waves, so nothing comes back."] };
     })(),
   ];
 

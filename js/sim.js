@@ -29,8 +29,10 @@ const SIM = (() => {
     m >= MASK.SOLID_MIN || (!!valveClosed && m >= MASK.VALVE_MIN);
   /** A 0/1 flag held as a number (it is a uniform and a wire value). */
   const isOn = (v) => v > 0.5;
-  /** |g|, or 9.81 where the scene has none (plan view), so a head p/rho g stays finite. */
-  const gMag = () => Math.abs(S.p.g) || 9.81;
+  /** |g|, or 9.81 where the scene has none (plan view), so a head p/rho g stays
+   *  finite. With no grid built yet it is 9.81 too: every other module that
+   *  wants "the" gravity asks here rather than keeping a copy. */
+  const gMag = () => (S && Math.abs(S.p.g)) || 9.81;
   /** Plan view: no gravity, so no columns, no free surface, no depth. */
   const planView = () => Math.abs(S.p.g) < 0.1;
 
@@ -726,7 +728,7 @@ const SIM = (() => {
     }
     // texSubImage2D (GLH.upload), never texImage2D: these textures are FBO
     // colour attachments, and sub-image leaves their storage untouched.
-    for (const b of [S.F.a, S.F.b]) GLH.upload(gl, b.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, d, 4);
+    S.F.uploadBoth(S.nx, S.ny, gl.RGBA, gl.FLOAT, d, 4);
     // A fresh experiment restarts the closure's refresh cadence, so the same
     // reset followed by the same substeps is the same run — the F1 gate in
     // smoke.mjs compares two of them cell for cell.
@@ -754,7 +756,7 @@ const SIM = (() => {
         }
       }
     }
-    for (const b of [S.U.a, S.U.b]) GLH.upload(gl, b.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, vel, 4);
+    S.U.uploadBoth(S.nx, S.ny, gl.RGBA, gl.FLOAT, vel, 4);
     S.t = 0;
     // A wave train belongs to the run it was fired in: the clock restarts,
     // so does the paddle (the scene's own t0, if it fires one by itself).
@@ -904,8 +906,8 @@ const SIM = (() => {
    *  ∇ₕ·⟨F⟩ itself runs to 135 s⁻¹ here.
    *
    *  Cells where ⟨S⟩ is nonzero are the sponge, the Dirichlet bands, the point
-   *  sources AND every positivity-clamp event — the invented-water signature
-   *  the Conservation notes warn about — so `nSrc` is reported separately
+   *  sources AND every NaN/rounding-guard event — the rare cells where the donor-side
+   *  flux cap's guard fires — so `nSrc` is reported separately
    *  rather than silently folded into the exclusion. Solid cells are excluded
    *  too: they early-return in the shader and merely pass their accumulator
    *  through. */
@@ -938,7 +940,7 @@ const SIM = (() => {
         const a = Math.abs(r);
         if (Math.abs(A[k + 2]) > 1e-9) {
           // Source cell — the sponge, a Dirichlet band, a point source, or a
-          // positivity-clamp event. §5's identity holds HERE TOO because ⟨S⟩
+          // NaN/rounding-guard event. §5's identity holds HERE TOO because ⟨S⟩
           // carries the whole non-conservative difference; kept as its own
           // population (F4) with its own scale, since the drift in these
           // cells rides on ‖⟨S⟩‖ as well as ‖⟨F⟩‖/Δx.
@@ -1401,7 +1403,7 @@ const SIM = (() => {
    *  integral. Returns {k, L, kh, H_S, cp, cg}; k from ω² = gk tanh kh.
    *  On the grid the measured H falls short of it (WV-5's README). */
   function wavemakerHS(T, h, flap, l) {
-    const g = 9.81, om = 2 * Math.PI / T;
+    const g = gMag(), om = 2 * Math.PI / T;
     let k = Math.max(om * om / g, om / Math.sqrt(g * h));
     for (let n = 0; n < 40; n++) {
       const th = Math.tanh(k * h);

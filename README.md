@@ -201,7 +201,8 @@ for changes already made (the exercise picker, the gauge inspector and CSV,
 rig save/share) in `exercises/_code-changes/`.
 
 **Deploying.** `.github/workflows/pages.yml` publishes the repository to
-GitHub Pages on every push to `main`. The app itself has no build step —
+GitHub Pages after the Checks workflow has succeeded on `main`
+(and on a manual dispatch). The app itself has no build step —
 `index.html` and `js/` are copied through verbatim — but the workflow runs
 Jekyll (`_config.yml`) so every markdown brief renders as a web page: an
 exercise README is readable at its folder's URL, e.g.

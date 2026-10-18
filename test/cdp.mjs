@@ -14,7 +14,7 @@
  * Environment: `$CHROME` names the browser binary; `$ANGLE` picks the ANGLE backend and
  * `$SOFTWARE=1` asks for `--disable-gpu`.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -101,6 +101,9 @@ export async function launch({ port = 0, width = 1440, height = 900,
     "about:blank",
   ];
   const proc = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
+  // Settles when the browser process has exited (it may already have, by the
+  // time close() asks), so close() can wait for the file locks to drop.
+  const exited = new Promise((r) => proc.once("exit", r));
   // Chrome prints the endpoint on stderr; with port 0 that is the only way to
   // learn which port it actually took.
   const url = await new Promise((resolve, reject) => {
@@ -228,9 +231,21 @@ export async function launch({ port = 0, width = 1440, height = 900,
     send: (method, params, { timeout, sessionId } = {}) => send(method, params, sessionId, timeout),
     close: async () => {
       try { ws.close(); } catch (_) { /* already gone */ }
+      // Windows: kill() ends only the main process; the renderer / GPU children
+      // keep the profile open, so take the whole tree down.
+      if (process.platform === "win32" && proc.pid) {
+        try { spawnSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" }); } catch (_) { /* fall through to kill() */ }
+      }
       proc.kill();
-      await sleep(150);
-      try { rmSync(profile, { recursive: true, force: true }); } catch (_) { /* Windows holds it briefly */ }
+      await Promise.race([exited, sleep(5000)]);
+      // Windows holds the profile's files for a moment after the process is
+      // gone: retry the delete, and say so if it still will not go.
+      let err = null;
+      for (let k = 0; k < 10; k++) {
+        try { rmSync(profile, { recursive: true, force: true }); err = null; break; }
+        catch (e) { err = e; await sleep(200); }
+      }
+      if (err) process.stderr.write("cdp: could not remove Chrome profile " + profile + ": " + err.message + "\n");
     },
   };
 }

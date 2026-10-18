@@ -267,7 +267,7 @@ const CONTROLS = [
     fmt: (v) => v === 0 ? "off — the surface smears" : "cα " + v.toFixed(2),
     info: "The interFoam-style compression flux that keeps the free surface a couple of cells thick. Too high and thin jets bead up." },
   { id: "grav", type: "check", label: "Plan view (gravity off)",
-    get: () => SIM.planView(), set: (v) => sim.p.g = v ? 0 : (state.scene.g || 9.81),
+    get: () => SIM.planView(), set: (v) => sim.p.g = v ? 0 : (state.scene.g || SIM.gMag()),
     info: "Switches between the vertical profile and looking down on a horizontal plane." },
 
   { h: "Wavemaker" },
@@ -409,7 +409,7 @@ const CONTROLS = [
     info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction d₂/d₁ = ½(√(1+8Fr₁²) − 1)." },
   { id: "instReadouts", type: "check", label: "Instrument readouts",
     get: () => state.instReadouts, set: (v) => state.instReadouts = v,
-    info: "The number boxes the instruments draw on the water: the gauges' corner cards, the Control volume's budget and the numbers on its faces, each flux section's readings and the balance between two, the rakes' q and u_max, and the pressure-force values. Off folds them all away — the instruments stay where they are and keep measuring and recording, so the gauge histories, the inspector and the CSV are complete when they come back. I toggles it." },
+    info: "The readout boxes the instruments draw on the water: the gauges' corner cards, the Control volume's budget and the numbers on its faces, each flux section's readings and the balance between two, the rakes' q and u_max, and the pressure-force values. Off folds them all away — the instruments stay where they are and keep measuring and recording, so the gauge histories, the inspector and the CSV are complete when they come back. I toggles it." },
   { id: "hoverCard", type: "check", label: "Hover readout",
     get: () => state.hoverCard, set: (v) => state.hoverCard = v,
     info: "The card of numbers that follows the cursor over the water — position, and whatever the exercise lists of depth, level, velocity and pressure there." },

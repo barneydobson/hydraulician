@@ -126,7 +126,7 @@
  *            exercises.md, "The tips line"). A non-empty list of non-empty
  *            strings.
  *   tabs     optional: one scene asking several questions (CR-1 is streamlines,
- *            continuity and forces, in three tabs). A list of objects with the
+ *            continuity, forces and energy, in four tabs). A list of objects with the
  *            TAB_KEYS: `key` (unique) and `label` name the tab. `title`, `topic`, `aim`, `steps`, `background`,
  *            `tips`, `instruments` and `studentParams` replace the entry's own;
  *            `ui` and `viewParams` are merged over the entry's, shallowly. The
@@ -145,8 +145,8 @@
  *            and `fieldText` (a field's description, reworded for the card's
  *            lecture). docs/making-exercises.md has each of them.
  *
- *            MOST CARDS DECLARE IT: every current card carries a `ui`, and the
- *            derivation below still fills in what it omits. `instruments`
+ *            EVERY CURRENT CARD DECLARES ONE, and the derivation below still
+ *            fills in whatever a card's `ui` omits. `instruments`
  *            narrows MEASURE to the tools it names; an entry naming no build
  *            tool loses BUILD, on the reasoning that an exercise arrives with
  *            its rig already built; and the panel opens focused on the sections

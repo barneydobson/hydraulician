@@ -185,7 +185,7 @@ An entry in a course's `exercises.js`, appended to `EXERCISES` (declared in
 | field | applied? | holds |
 |---|---|---|
 | `rigParams` | yes | the plumbing without which the rig is not a rig: `budget` (Resolution) first, then the edges (`openL..openT`), then supplies and levels — *edges before level controls*, because ticking a level opens its own edge |
-| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `gaugeSpan` (`"window"`, the default, or `"all"`: the corner charts span the whole run from t = 0 — VC-2), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' number boxes, default on) and `hoverCard` (the hover card that follows a mouse, default on — FF-1 opens with it off; it does not govern the tap-to-read card, see *Reading the water by touch*), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
+| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `gaugeSpan` (`"window"`, the default, or `"all"`: the corner charts span the whole run from t = 0 — VC-2), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' readout boxes, default on) and `hoverCard` (the hover card that follows a mouse, default on — FF-1 opens with it off; it does not govern the tap-to-read card, see *Reading the water by touch*), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
 | `gauges` | yes | `[{x, z, field}]`, at most four: gauges the card arrives with ALREADY PLACED, each on its own quantity. The exception to "the picker places no instruments", for a card whose subject is a time series from t = 0 (VC-2's level curve). The card lists them under *Already set* |
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
 | `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule`. For a slider give a short `label` ("Speed of sound in water, c", "Wall shape", "Inflow Q") and **no** `rule`: a sentence under every slider made the Year 1 cards mostly slider, so what it does and its starting value go in `setup` |
@@ -226,7 +226,7 @@ top:
   `dye.seeds` run only if the scene says `dye: { on: true }` or the card sets
   viewParams `dyeSeeds: true` (Controls → Dye sources). The `V` valve button lives
   in RUN and is never hidden. `readBtn` (**Readouts**, key **I**) folds away
-  every instrument's number boxes — the gauges' corner cards, the Control
+  every instrument's readout boxes — the gauges' corner cards, the Control
   volume's budget and face numbers, the flux sections' readings and their
   balance, the rakes' q / u_max chips and the Pressure force values — while
   the instruments stay placed and keep recording; `hoverBtn` (**Hover
@@ -661,7 +661,13 @@ test/ui-smoke.mjs` proves the profile leaves the strip and legend as agreed.
 
 The render loop stops on a hidden tab, so headless work drives the solver
 directly: `APP.tick(n)` steps, `APP.frames(n)` also fills gauge history,
-`APP.probe(x, z)` returns `u, w, p, phead, f, speed` (so `h = zp + phead`, `zp = j·Δx` the pressure's reference elevation, which `probe` also returns),
+`APP.probe(x, z)` returns `i, j, f, u, w, p, phead, zp, speed, dye, solid`
+(the live cell; `APP.avg.probe` returns the same set from the averaging
+window, without `dye`), where `zp = j·Δx` is the pressure's reference
+elevation. A gauge's head is `h = zp + phead − tiltS0·x`, the last term
+nonzero only in the tilted-gravity scenes that set `tiltS0` (see
+`js/instruments.js` and `js/overlay.js`), so on an untilted scene
+`h = zp + phead`,
 `APP.faceForce(solidId, faceId)` returns `{F, Fx, Fz, cop, wetLen}` in N per
 metre, `APP.volume()` the water area the column reduction can see, and
 `toggleValve()` the V key.
@@ -709,7 +715,10 @@ Deleting `courses/original/` and its two script tags is the last step, not the
 whole job. In order:
 
 1. HS-1 already lives in `courses/cive40008/` (the original menu merely lists it); drop that menu entry from `courses/original/course.js` with the folder.
-2. Repoint every `?ex=HJ-1` and `?ex=QS-2` in `test/ui-smoke.mjs` to CIVE40008 cards.
+2. Repoint the gates' original-pack ids to CIVE40008 cards. Today that is
+   `test/ui-smoke.mjs` (`?ex=HJ-1`, `QS-2`, `UF-1`, and the HP-3, UN-1, UN-2
+   cases) and `test/smoke.mjs` (HP-3); the `check_pack.py` output below is the
+   authoritative list — those are the examples, not the whole of it.
 3. Remove `js/exercises-rigs.js` payloads (every payload is original-pack).
 4. Remove `docs/syllabus.md`, the README links, `check_notation.py`'s `HISTORICAL` entries and the `_config.yml` comments that name the pack.
 5. Delete the folder and its two script tags in `index.html`.

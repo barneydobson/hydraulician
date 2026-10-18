@@ -1084,14 +1084,14 @@ function drawMarkers(ctx) {
     const faceAt = (z) => V.X(0) + Math.max(4, 10 + pd.X * (flap ? (z - zh) / (z0 - zh) : 1) * pxm);
     const face = faceAt(sim.H * 0.95), faceBot = faceAt(flap ? zh : 0);
     ctx.save();
-    ctx.fillStyle = "#c98a2e"; ctx.globalAlpha = 0.92;
+    ctx.fillStyle = OVERLAY.C.pistonFill; ctx.globalAlpha = 0.92;
     ctx.beginPath();
     ctx.moveTo(V.X(0) - 2, yTop); ctx.lineTo(face, yTop);
     if (flap) { ctx.lineTo(faceBot, V.Y(zh)); ctx.lineTo(faceBot, yBot); }
     else ctx.lineTo(face, yBot);
     ctx.lineTo(V.X(0) - 2, yBot); ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = "#ffcf7a"; ctx.lineWidth = 2 + 2 * f;
+    ctx.strokeStyle = OVERLAY.C.pistonEdge; ctx.lineWidth = 2 + 2 * f;
     ctx.beginPath(); ctx.moveTo(face, yTop);
     if (flap) {
       ctx.lineTo(faceBot, V.Y(zh)); ctx.stroke();
@@ -1137,7 +1137,7 @@ function drawMarkers(ctx) {
     ["openT", p.open[3], (t) => [V.X(sim.W * t), V.Y(sim.H) + 8], 0, -1],
   ];
   ctx.save();
-  ctx.strokeStyle = "#dfe8f2"; ctx.lineCap = "round";
+  ctx.strokeStyle = OVERLAY.C.ink; ctx.lineCap = "round";
   for (const [key, on, pos, dx, dy] of sides) {
     if (!SIM.isOn(on)) continue;
     if (key === "openL" && wall) continue;             // that edge IS the paddle

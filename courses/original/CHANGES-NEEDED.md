@@ -41,8 +41,11 @@ q ranges (valid, conservative) — widening them under the new 2.0 cap
 needs re-measurement first. P11's reset lives in a main.js wrapper;
 folding it into SIM.rasterise is a suggested tidy-up.
 
-## 2 · Interface / panel change proposals (still open, deferred with
-## reasons)
+## 2 · Interface / panel change proposals
+
+**Done:** P1 and P4 (acbe904, marked DONE below); P13 (rig save / share is
+now `js/rig.js`). **Open, deferred with reasons:** P2, P3, P5-P12 — not
+re-checked against the current tree; verify before relying on one.
 
 - **[P1, from UN-1] Suppress the free-surface hover block inside pressurised
   pipes. DONE (acbe904):** the profile chip is withheld on a capped column

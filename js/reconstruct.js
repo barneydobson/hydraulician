@@ -79,6 +79,9 @@ const RECON = (() => {
 
   // FS_COL's own thresholds, exported so that nothing restates them. A second
   // definition of "wet" anywhere would put two different surfaces on one screen.
+  // Standard gravity. RECON must not depend on SIM, so it keeps its own copy;
+  // it is the same number as the default in SIM.gMag (js/sim.js).
+  const DEFAULT_G = 9.81;
   const WET = 0.25;         // a cell counts as water above this fill
   const DRY_BREAK = 3;       // this many successive dry cells ends the body
   const SURF = 0.5;          // the fill that marks the top-cell surface
@@ -168,7 +171,7 @@ const RECON = (() => {
     // one-sided. `g` is optional and defaults to the scene default; a caller
     // reading it off a live sim should pass `g: sim.p.g` so a zero-gravity
     // scene lands in the refusal below rather than in a plausible answer.
-    const g = o.g === undefined ? 9.81 : o.g;
+    const g = o.g === undefined ? DEFAULT_G : o.g;
     // docs/averaging.md §7.1 / test E4: the g = 0 scene is excluded by
     // construction. Its EOS is TWO-SIDED, so P_diag goes negative, and
     // geomFill's clamp(g, 0, 1) would silently absorb that and hand back a

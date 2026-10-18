@@ -8,8 +8,11 @@ commands, and both rotted before: a table row for a file that had moved, a
 `smoke.js --only=...` for a suite that no longer exists, an assertion count
 that was wrong within a week. This gate asserts:
 
-  1. every path written in backticks in AGENTS.md, docs/testing.md, README.md
-     and docs/making-exercises.md exists. A token counts as a path when it has
+  1. every path written in backticks in AGENTS.md, README.md, every tracked
+     docs/**/*.md (not docs/_archive) and every courses/*/INDEX.md exists, and so
+     does the target of every Markdown link `[text](path)` there (relative
+     paths only; URLs and bare #anchors are ignored, a trailing #anchor or
+     ?query is stripped first). A token counts as a path when it has
      no spaces and either contains a `/` or ends in a file extension the repo
      uses. Globs, placeholders (`<id>`, `*`, `{`), URLs, query strings and
      `plots/` output, a Jekyll page (`x.html` for an existing `x.md`) and
@@ -91,6 +94,8 @@ def looks_like_path(tok):
         return False
     if not tok.isascii() or tok.startswith("/"):
         return False                      # `p/rho g` in Greek, `/proc`, `.../courses/...`
+    if re.match(r"^[\w-]+(\.[\w-]+)*\.(io|com|org|net|uk|edu)/", tok):
+        return False                      # a host name written without its https://
     if tok.startswith("plots/"):
         return False                      # collect_plot.py's output, not a tracked file
     if tok.startswith(("-", "~", ".", "#")) and not tok.startswith(".github/") \
@@ -130,6 +135,53 @@ def check_paths(doc):
                 fail("%s:%d: `%s` does not exist" % (doc, ln, tok))
 
 
+def check_links(doc):
+    """Every relative `[text](target)` points at something that exists."""
+    docdir = os.path.dirname(doc)
+    fence = False
+    for ln, line in enumerate(read(doc).splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fence = not fence
+        if fence:
+            continue                      # code samples: `a[i](x)` is not a link
+        line = re.sub(r"`[^`]*`", "", line)           # inline code is not a link either
+        for tgt in re.findall(r"\]\(\s*<?([^)\s>]+)", line):
+            if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", tgt) or tgt.startswith(("#", "//")):
+                continue                  # a URL / mailto / anchor-only
+            path = re.split(r"[#?]", tgt, 1)[0]
+            if not path or "_archive" in path.split("/"):
+                continue
+            if path.startswith("/"):
+                cands = [os.path.join(ROOT, path.lstrip("/"))]   # site-absolute: from the root
+            else:
+                cands = [os.path.join(ROOT, docdir, path)]
+            if path.endswith(".html"):
+                cands.append(cands[0][:-5] + ".md")              # a Jekyll page
+            if not any(os.path.exists(c) for c in cands):
+                fail("%s:%d: link target `%s` does not exist" % (doc, ln, tgt))
+
+
+def tracked_docs():
+    """AGENTS.md, README.md, tracked docs/**/*.md (minus _archive), course INDEX.md files.
+
+    Under CI a failing `git ls-files` is a failure, as in check_notation.py:
+    the gate would otherwise shrink to two files and still go green. Off CI
+    the filesystem is walked instead, which may include untracked drafts."""
+    import glob
+    import subprocess
+    try:
+        out = subprocess.run(["git", "ls-files", "docs/*.md", "courses/*/INDEX.md"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout.split()
+    except (OSError, subprocess.CalledProcessError):
+        if os.environ.get("CI"):
+            print("check_docs.py: `git ls-files` failed under CI -- refusing to fall back "
+                  "to a filesystem walk that checks a different set.")
+            sys.exit(1)
+        out = [os.path.relpath(f, ROOT).replace("\\", "/") for pat in ("docs/**/*.md", "courses/*/INDEX.md")
+               for f in glob.glob(os.path.join(ROOT, pat), recursive=True)]
+    return ["AGENTS.md", "README.md"] + sorted(d for d in out if "_archive" not in d.split("/"))
+
+
 def suites():
     src = read("test/smoke.mjs")
     return re.findall(r"^SUITES\.(\w+)\s*=", src, re.M)
@@ -152,11 +204,13 @@ def main():
     known = suites()
     if not known:
         fail("test/smoke.mjs: found no `SUITES.<name> =` lines")
-    for doc in ("AGENTS.md", "docs/testing.md", "README.md", "docs/making-exercises.md"):
+    docs = tracked_docs()
+    for doc in docs:
         if not os.path.exists(os.path.join(ROOT, doc)):
             fail("%s: missing" % doc)
             continue
         check_paths(doc)
+        check_links(doc)
         check_suites(doc, known)
 
     if os.path.exists(os.path.join(ROOT, "docs/testing.md")):
@@ -174,8 +228,7 @@ def main():
         for f in failures:
             print("  " + f)
         return 1
-    print("check_docs: ok (AGENTS.md, docs/testing.md, README.md, docs/making-exercises.md; %d suites)"
-          % len(known))
+    print("check_docs: ok (%d documents, paths and links; %d suites)" % (len(docs), len(known)))
     return 0
 
 

@@ -146,8 +146,10 @@ reads the pressure in kPa.
   real profiles (∫ρu² exceeds ρQU by the momentum coefficient β, most just
   past the step) and includes the wall shear.
 - **Taper against step.** R moves by +0.23 kN/m (box) or +0.45 kN/m
-  (formula), 3–5%; the step loses 0.072 m more head between the faces, and
-  ρg·0.072·A₂ ≈ 0.35 kN/m is the same size (energy is L7 — for the lecturer).
+  (formula), 3–5%; the step loses 0.021 m more head than the taper over
+  4.3 → 10.6 m (0.073 − 0.052, from the Energy table below), and
+  ρg·0.021·A₂ ≈ 9.81 × 0.021 × 0.50 ≈ 0.10 kN/m accounts for only a quarter
+  to a half of that shift (energy is L7 — for the lecturer).
 - **Straight pipe.** Friction is small at this Reynolds number and
   resolution, so read the box's F→ (it prints in N/m under 1 kN) or the
   "force on what is between them" line of the two Flux sections. With the
@@ -178,7 +180,11 @@ fill the narrow pipe and the corner eddies dissipate it, and above all at the
 outlet, where the jet's whole velocity head U₂²/2g ≈ 0.38 m is mixed away in
 the right reservoir (the EGL falls to the tailwater there).
 
-Measured at Medium (`?ex=CR-1&tab=energy`, Δx = 24.7 mm, after the pressure-reference fix: H is read against the cell's lower face, which lowered every absolute H by about Δx/2 and left the losses alone): each L restarted and
+Measured at Medium (`?ex=CR-1&tab=energy`, Δx = 24.7 mm). The three H rows
+and the head-loss row were re-measured after the pressure-reference fix (H is
+read against the cell's lower face, which lowered every absolute H by about
+Δx/2 and left the losses alone); the Q row and the Control-volume row are the
+earlier measurement, untouched by it. Each L restarted and
 run 35–40 s, then the mean of 40 samples, two flux sections drawn up across
 the pipe, z = 0.4 → 1.6 m. H is the flux-weighted mean, Ė/(ρgQ).
 

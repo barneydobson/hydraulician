@@ -83,12 +83,11 @@ jobs:
       - name: smoke.mjs --check-catalogue — the mutation catalogue is sound (no browser)
         run: node test/smoke.mjs --check-catalogue
 
-  # Browser checks that need no GPU and no physics budget. UNPROVEN on hosted
-  # runners (the software rasteriser may be too slow or Chrome may not launch),
-  # so it does not block: make it required once it has run green there.
+  # Browser checks that need no GPU and no physics budget, under the software
+  # rasteriser. Blocking since it ran green on hosted runners (the fork's
+  # Checks, 2026-10-18, on main and two branches).
   no-gpu:
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       SOFTWARE: "1"
     steps:

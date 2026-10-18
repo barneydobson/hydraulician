@@ -1,5 +1,7 @@
 # Code-review remediation Implementation Plan
 
+> EXECUTED (archived 2026-10-18). Checkboxes were not maintained; the git history is the record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix every finding of the 2026-10-17 critical review — the confirmed bugs, the interface and duplication problems in `js/`, the weak and unchecked tests, and the documentation drift — without changing anything a student, a worksheet or a shared link can observe except where the finding is itself a bug.

@@ -199,6 +199,12 @@ const MUTANTS = [
 
 /** The GEOM catalogue — the same shape, against js/geom.js. */
 const GEOM_MUTANTS = [
+  { id: "poly-aliases-vertices",
+    why: "poly keeps the caller's vertex arrays instead of copying them — a later nudge of the input moves the solid, which no scene build notices until the next rebuild reuses the array",
+    find: "verts: verts.map(v => [v[0], v[1]]),",
+    replace: "verts: verts,",
+    kills: ["GA10b poly copies its vertices (mutating the input afterwards leaves the solid alone)"] },
+
   { id: "edge-normal-flipped",
     why: "the outward normal turned inward — every force changes sign and nothing looks broken until a free body diagram is drawn",
     find: "return [tz, -tx];",
@@ -249,6 +255,13 @@ function run(label, suite, envVar, src, srcName, mutants) {
     // mode this file exists to prevent, so it is an error, never a skip.
     if (!src.includes(m.find)) {
       stale.push(`${m.id}: pattern not found in ${srcName} —\n      ${m.find.split("\n")[0]}`);
+      continue;
+    }
+    // `find` must name ONE place: replace() would silently patch the first of
+    // several, and the mutant would then test whatever happens to come first.
+    const hits = src.split(m.find).length - 1;
+    if (hits !== 1) {
+      stale.push(`${m.id}: pattern occurs ${hits} times in ${srcName}, must be exactly once —\n      ${m.find.split("\n")[0]}`);
       continue;
     }
     const mutated = src.replace(m.find, m.replace);

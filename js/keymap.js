@@ -112,13 +112,22 @@ const KEYMAP = [
 
 /** True when a keystroke belongs to the user's typing or to the browser — an
  *  input, select, textarea or contenteditable (the legend's range numbers),
- *  or any of Ctrl / Cmd / Alt held (Ctrl+V is paste, not Valves). */
+ *  or a Ctrl / Cmd / Alt chord (Ctrl+V is paste, not Valves) — but not AltGr or
+ *  Option typing a character. */
 KEYMAP.typing = function (e) {
   const t = e.target;
   const tag = t && t.tagName;
   if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return true;
   if (t && t.isContentEditable) return true;
-  return !!(e.ctrlKey || e.metaKey || e.altKey);
+  // AltGr reports ctrl+alt on Windows and types [ ] + - on European layouts:
+  // a character, not a chord.
+  if (e.getModifierState && e.getModifierState("AltGraph")) return false;
+  if (e.ctrlKey || e.metaKey) return true;
+  // Alt alone: on macOS Option changes e.key ("[" becomes a curly quote), so a
+  // printable key that is not a letter or digit is a typed character and
+  // KEYMAP.match decides by e.key; Alt+letter stays the browser's (menus).
+  if (e.altKey) return !(typeof e.key === "string" && e.key.length === 1 && !/[a-z0-9]/i.test(e.key));
+  return false;
 };
 
 /** The row an event triggers, or null. Shift+/ is "?" on every layout the

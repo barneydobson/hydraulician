@@ -2010,6 +2010,24 @@ async function main() {
       await tab.close();
     });
 
+    await runCase("AltGr types a shortcut character; Ctrl+V stays a chord", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const b0 = APP.state.brush;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "[", ctrlKey: true, altKey: true,
+          modifierAltGraph: true, bubbles: true }));
+        const b1 = APP.state.brush;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "[", ctrlKey: true, bubbles: true }));
+        const b2 = APP.state.brush;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "\\u201c", altKey: true, bubbles: true }));
+        return { b0, b1, b2, b3: APP.state.brush };
+      `);
+      check("AltGr+[ shrinks the brush", r.b1 < r.b0, JSON.stringify(r));
+      eq("Ctrl+[ is a chord and does nothing", r.b2, r.b1);
+      eq("Option+[ (a curly quote) matches nothing", r.b3, r.b1);
+      await tab.close();
+    });
+
     await runCase("held A does not flicker Average", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");
       const r = await tab.evaluate(`

@@ -18,7 +18,10 @@
 //                                rig.js, thumbnails — one folder per card
 //   courses/<id>/INDEX.md       one row per card the course owns
 //
-// Nothing here knows a course id.
+// Nothing here knows a course id. This file holds no cards of its own: the
+// shared register is js/exercises.js, and each course's cards live in its
+// folder. The card schema, and the one definition of a folder's README
+// (lecturer notes, never a student's source), is the header of js/exercises.js.
 //
 // COURSE-OWNED EXERCISES. A course may keep its own cards instead of adding
 // them to the shared register (js/exercises.js). COURSES.exercises(id, list)

@@ -7,7 +7,8 @@ model behind what the demo shows is in [numerics.md](numerics.md).
 
 **Two audiences, two documents.** The in-app card is the complete student
 exercise. The folder's README is for the lecturer: derivation, worked
-answers, teaching notes and verification. A student must be able to perform
+answers, teaching notes and verification (the one definition of that, and of
+the card schema, is the header of `js/exercises.js`). A student must be able to perform
 the task from the card alone, without opening the README or being referred
 to it. HS-1's on-screen description is the model: state the starting setup,
 where to measure, the action to take and the readings to compare afterwards.
@@ -525,8 +526,8 @@ and README under `home`, an H1 that matches, a row in the course's
 `INDEX.md`, no orphan rows or folders — and adds the course ones: every
 `course.js` and `exercises.js` is loaded by `index.html`, ids are unique
 across the register and every course, a course's `exercises.js` registers
-only under its own id, `hosts` is well-formed, and every id a menu lists
-exists.
+only under its own id, `hosts` is well-formed, every id a menu lists
+exists, and every card a course owns is listed in one of its sections.
 
 ## 4. The rig payload, when there is one
 
@@ -586,7 +587,7 @@ menu files it.
 
 ## 6. What the gates check
 
-`python exercises/_runner/check_pack.py` fails the pack when: a folder or
+`py -3 exercises/_runner/check_pack.py` fails the pack when: a folder or
 README is missing; the H1 id or title differs from the card; the INDEX row
 is missing; a bold "about **N s**" disagrees with `settle`; a base/step
 ladder disagrees with the rule; the `ui` profile names a tool, button, field,
@@ -600,8 +601,8 @@ collides with an id (every check above runs on each tab's merged view); or a
 folder or INDEX row has no card. `check_notation.py` then greps the brief for
 retired names (the y-family, old gauge keys). Both are instant and run in CI.
 
-Then, locally with a GPU: `node exercises/_runner/smoke.js --only=api,rig`
-boots every card and every scene (the PACK section), and `node
+Then, locally with a GPU: `node exercises/_runner/smoke.js --only=pack,scenes`
+boots every card (applying its rig) and every scene (the PACK and SCENES sections), and `node
 test/ui-smoke.mjs` proves the profile leaves the strip and legend as agreed.
 
 ## 7. Measuring before shipping
@@ -646,7 +647,7 @@ candidate viscosity — the table in its README is that run.
    restores anything the derived profile would otherwise hide.
 3. Folder: lecturer README with the exact H1 and measured numbers, `rig.js` that
    reproduces them, `collect_plot.py` if the class submits.
-4. INDEX row; thumbnail in `courses/<id>/thumbs/` and the README gallery cell.
+4. INDEX row; thumbnail in the card's own folder (`thumb.jpg`) and the README gallery cell.
 5. `check_pack.py`, `check_notation.py` clean; `smoke.js --only=api,rig`
    and `ui-smoke.mjs` run locally when `js/` changed.
 

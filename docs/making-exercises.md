@@ -639,7 +639,7 @@ test/ui-smoke.mjs` proves the profile leaves the strip and legend as agreed.
 
 The render loop stops on a hidden tab, so headless work drives the solver
 directly: `APP.tick(n)` steps, `APP.frames(n)` also fills gauge history,
-`APP.probe(x, z)` returns `u, w, p, phead, f, speed` (so `h = phead + z`),
+`APP.probe(x, z)` returns `u, w, p, phead, f, speed` (so `h = zp + phead`, `zp = j·Δx` the pressure's reference elevation, which `probe` also returns),
 `APP.faceForce(solidId, faceId)` returns `{F, Fx, Fz, cop, wetLen}` in N per
 metre, `APP.volume()` the water area the column reduction can see, and
 `toggleValve()` the V key.

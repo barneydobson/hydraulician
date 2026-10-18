@@ -178,17 +178,17 @@ fill the narrow pipe and the corner eddies dissipate it, and above all at the
 outlet, where the jet's whole velocity head U₂²/2g ≈ 0.38 m is mixed away in
 the right reservoir (the EGL falls to the tailwater there).
 
-Measured at Medium (`?ex=CR-1&tab=forces`, 2026-10-18): each L restarted and
+Measured at Medium (`?ex=CR-1&tab=energy`, Δx = 24.7 mm, after the pressure-reference fix: H is read against the cell's lower face, which lowered every absolute H by about Δx/2 and left the losses alone): each L restarted and
 run 35–40 s, then the mean of 40 samples, two flux sections drawn up across
 the pipe, z = 0.4 → 1.6 m. H is the flux-weighted mean, Ė/(ρgQ).
 
 | reading | taper, L = 3 m | step, L = 0 |
 |---|---|---|
 | Q | 1.366 m²/s | 1.313 m²/s |
-| H at x = 4.3 m (wide pipe) | 2.826 m | 2.828 m |
-| H at x = 9.0 m | 2.780 m | 2.766–2.774 m |
-| H at x = 10.6 m (near the outlet) | 2.772 m | 2.756–2.762 m |
-| **head loss 4.3 → 10.6 m** | **0.05 m** (0.053–0.054) | **0.07 m** (0.068–0.072) |
+| H at x = 4.3 m (wide pipe) | 2.813 m | 2.814 m |
+| H at x = 9.0 m | 2.768 m | 2.752 m |
+| H at x = 10.6 m (near the outlet) | 2.761 m | 2.741 m |
+| **head loss 4.3 → 10.6 m** | **0.05 m** (0.052) | **0.07 m** (0.073) |
 | the Control volume (4.3, 0.3) → (10.6, 1.65), Ė lost ÷ ρgQ | 0.036 m | 0.055 m |
 
 - The taper's loss is the wall friction along ~6 m of pipe (most of it in

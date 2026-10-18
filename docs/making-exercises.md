@@ -693,7 +693,10 @@ Deleting `courses/original/` and its two script tags is the last step, not the
 whole job. In order:
 
 1. HS-1 already lives in `courses/cive40008/` (the original menu merely lists it); drop that menu entry from `courses/original/course.js` with the folder.
-2. Repoint every `?ex=HJ-1` and `?ex=QS-2` in `test/ui-smoke.mjs` to CIVE40008 cards.
+2. Repoint the gates' original-pack ids to CIVE40008 cards. Today that is
+   `test/ui-smoke.mjs` (`?ex=HJ-1`, `QS-2`, `UF-1`, and the HP-3, UN-1, UN-2
+   cases) and `test/smoke.mjs` (HP-3); the `check_pack.py` output below is the
+   authoritative list — those are the examples, not the whole of it.
 3. Remove `js/exercises-rigs.js` payloads (every payload is original-pack).
 4. Remove `docs/syllabus.md`, the README links, `check_notation.py`'s `HISTORICAL` entries and the `_config.yml` comments that name the pack.
 5. Delete the folder and its two script tags in `index.html`.

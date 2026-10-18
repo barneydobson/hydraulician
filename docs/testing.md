@@ -32,7 +32,7 @@ The suites are:
 
 | Suite | What it asserts |
 | --- | --- |
-| `api` | probe / analyse / findJumps / boxForce / gauge records carry the notation's field names, and not the retired ones |
+| `api` | probe / analyse / findJumps / boxForce / gauge records carry the notation's field names, and not the retired ones; the instrument and display goldens (h23, GPU-specific, skipped on another renderer); every program links and every uniform `sim.js` sets exists. The substep-throughput timing is not here by default: `--perf` adds it |
 | `geom` | polygon rasterisation, face-force wiring and its closed forms, solid renumbering |
 | `rig` | the wire format round-trips at the current version and an older one is refused |
 | `physics` | volume is conserved, hydrostatic water stays put, no NaN reaches the field, a jump reads its conjugates, face forces bracket their closed forms |
@@ -46,6 +46,7 @@ The suites are:
 Subsets worth knowing:
 
 - `--only=api,rig` is the fast subset (a couple of minutes).
+- `--perf` adds "API substep throughput did not regress" (best of 3 of 2000 h23 substeps within x1.10 of `test/golden/throughput-h23.json`). It is wall-clock bound and GPU-specific, so it is off by default; `--write-throughput` re-records the baseline (and implies `--perf`).
 - `--only=pack,scenes` boots every card and every scene.
 - `--only=profile` (about a minute) is the gate for anything that touches the
   stress-free surface or the mixing length; its mutants are `surface-sink` and

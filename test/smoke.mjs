@@ -43,7 +43,9 @@
  *                     instead of comparing against it; only ever on code known good.
  *                     Goldens are GPU-specific: each records the WebGL renderer and is
  *                     compared only on the same one ("golden skipped: ..." otherwise).
- *         --write-throughput  records test/golden/throughput-h23.json (best of 3 timings
+ *         --perf      also runs "API substep throughput did not regress" (wall-clock, GPU-bound,
+ *                     off by default so a busy machine cannot redden the push gate).
+ *         --write-throughput  (implies --perf) records test/golden/throughput-h23.json (best of 3 timings
  *                     of 2000 substeps), the baseline of "substep throughput did not regress".
  *         --write-golden-meta  rewrites only the renderer recorded in the instrument golden.
  *         --mutate=<id>  patches one known bug into a served file and runs the
@@ -65,6 +67,7 @@ const PORT = 8731 + (process.pid % 200);          // out of the way of a dev ser
 const KEEP = process.argv.includes("--keep");
 const WRITE_GOLDEN = process.argv.includes("--write-golden");
 const WRITE_THROUGHPUT = process.argv.includes("--write-throughput");
+const PERF = process.argv.includes("--perf") || WRITE_THROUGHPUT;
 // Rewrites ONLY the GPU identity stored in the instrument golden, keeping its values.
 const WRITE_GOLDEN_META = process.argv.includes("--write-golden-meta");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
@@ -738,14 +741,14 @@ SUITES.api = async (B) => {
     }
   }
 
-  // ---- substep throughput (Task 3.3): h23 at its default (Medium) budget,
+  // ---- substep throughput (Task 3.3; opt-in via --perf, wall-clock bound): h23 at its default (Medium) budget,
   // APP.tick(2000) wall time, best of 3, each ended by a synchronous readback
   // so the GPU queue is drained inside the timing. The baseline is recorded
   // by `--write-throughput` on the commit BEFORE the task, in
   // test/golden/throughput-h23.json, with the GPU it was taken on. The bound
   // is x1.10, not x1.05: this machine's load noise between runs is of that
   // order, which is why best-of-3 and a loose bound are used together.
-  {
+  if (PERF) {
     await B.goto(`http://localhost:${PORT}/?scene=h23`);
     const tp = JSON.parse(await B.evaluate(`(() => {
       APP.tick(200); APP.SIM.columns(true);                     // warm-up: shaders, caches

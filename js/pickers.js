@@ -8,7 +8,7 @@
  * between what it applies and what it leaves for the student IS the design.
  *
  * What they borrow from the other files is the machine-checked `Reads:` line
- * below (exercises/_runner/check_headers.py), used only from inside functions
+ * below (test/check_headers.py), used only from inside functions
  * — except POPUP.make, which runs while this file loads, so popup.js comes
  * first — so index.html loads this BEFORE them (and must: main.js puts PICKER
  * and EX on window.APP at parse time).

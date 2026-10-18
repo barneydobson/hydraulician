@@ -1,5 +1,5 @@
 /**
- * exercises-rigs.js — dependency record (checked by exercises/_runner/check_headers.py).
+ * exercises-rigs.js — dependency record (checked by test/check_headers.py).
  *
  * Defines: EXERCISE_RIGS
  *
@@ -29,7 +29,7 @@
    Captured and verified headless (exercises/_code-changes/RIGCAP-report.md):
    each payload was applied to a freshly booted page and compared against the
    rig.js-built original on an FNV-1a hash of sim.mask plus wall/valve cell
-   counts and 18 further state keys. `smoke.js --only=pack` applies every
+   counts and 18 further state keys. `smoke.mjs --only=pack` applies every
    card's payload to its scene.
 
    The DA exercises need no payload: DA-1's two tanks and DA-3's sloshing

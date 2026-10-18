@@ -1,5 +1,5 @@
 /**
- * courses.js — dependency record (checked by exercises/_runner/check_headers.py).
+ * courses.js — dependency record (checked by test/check_headers.py).
  *
  * Defines: COURSES, COURSE_KEYS
  *

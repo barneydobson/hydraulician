@@ -22,7 +22,7 @@ Object.defineProperty). A local variable or parameter that happens to share a
 global's name counts as a use -- the check is lexical, so such a name is simply
 listed; rename the local if that reads wrongly.
 
-Usage:  py -3 exercises/_runner/check_headers.py [file ...]
+Usage:  py -3 test/check_headers.py [file ...]
         (no arguments: the nine files)
 Exit 1 on any mismatch.
 """
@@ -31,7 +31,7 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NINE = ["state", "fields", "panel", "strip", "legend", "dock",
         "instruments", "governor", "main"]
 EXTRA_GLOBALS = {"EXERCISE_MENU"}

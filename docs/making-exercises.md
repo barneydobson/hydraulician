@@ -601,7 +601,7 @@ collides with an id (every check above runs on each tab's merged view); or a
 folder or INDEX row has no card. `check_notation.py` then greps the brief for
 retired names (the y-family, old gauge keys). Both are instant and run in CI.
 
-Then, locally with a GPU: `node exercises/_runner/smoke.js --only=pack,scenes`
+Then, locally with a GPU: `node test/smoke.mjs --only=pack,scenes`
 boots every card (applying its rig) and every scene (the PACK and SCENES sections), and `node
 test/ui-smoke.mjs` proves the profile leaves the strip and legend as agreed.
 
@@ -648,7 +648,7 @@ candidate viscosity — the table in its README is that run.
 3. Folder: lecturer README with the exact H1 and measured numbers, `rig.js` that
    reproduces them, `collect_plot.py` if the class submits.
 4. INDEX row; thumbnail in the card's own folder (`thumb.jpg`) and the README gallery cell.
-5. `check_pack.py`, `check_notation.py` clean; `smoke.js --only=api,rig`
+5. `check_pack.py`, `check_notation.py` clean; `smoke.mjs --only=api,rig`
    and `ui-smoke.mjs` run locally when `js/` changed.
 
 ## Retiring the original pack

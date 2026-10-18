@@ -7,7 +7,7 @@
  * why it is DOM rather than more canvas is documented on it.
  *
  * What it borrows from the other files is the machine-checked `Reads:` line
- * below (exercises/_runner/check_headers.py), used only from inside functions,
+ * below (test/check_headers.py), used only from inside functions,
  * which is what makes the load order in index.html a free choice rather than
  * a constraint.
  *

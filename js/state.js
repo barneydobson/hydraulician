@@ -5,7 +5,7 @@
  *   view, sim) the other files assign in boot.
  *
  * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
+ * so the lists below (checked by test/check_headers.py) are the
  * dependency record. Load order is index.html's.
  *
  * Defines: CONFIG, VEX_FIT_MAX, VEX_MAX, state, EMBED, canvas, over, octx, view, sim

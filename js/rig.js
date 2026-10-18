@@ -7,7 +7,7 @@
  * Read the note on `V` before adding a key to the format.
  *
  * What it borrows from the other files is the machine-checked `Reads:` line
- * below (exercises/_runner/check_headers.py), used only from inside functions.
+ * below (test/check_headers.py), used only from inside functions.
  *
  * Defines: RIG
  *

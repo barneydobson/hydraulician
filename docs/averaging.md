@@ -420,7 +420,7 @@ surface with known answers, **D** jets and connectivity, **E** geometry,
 **G** float32 robustness, **H** the specific-energy inlet, **K** the energy
 line's velocity head. All of them live in `node test/recon-test.mjs`;
 `node test/mutation-test.mjs` proves those tests can fail. The GPU checks in
-`node exercises/_runner/smoke.js --only=avg` keep smoke.js's own letters, which
+`node test/smoke.mjs --only=avg` keep smoke.mjs's own letters, which
 it prints and its mutant catalogue cites, so they reuse two letters that mean
 something else in `recon-test`: **F** end-to-end conservation, and **H**
 (`H2`, `H2a`–`H2c`, `H5`) the overlay's consistency on the averaged path, which

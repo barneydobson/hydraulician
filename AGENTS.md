@@ -55,13 +55,13 @@ shallow water); this one resolves the depth.
 | `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
 | `exercises/` | shared tooling only, plus `INDEX.md` pointing at each course's index; no exercise folders (they are under `courses/<id>/exercises/`: `README.md` brief, `rig.js` headless script, `collect_plot.py`) |
-| `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker, `check_notation.py`, `smoke.js` |
+| `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
 | `exercises/_code-changes/` | reports and screenshots from app changes (picker, gauges, rig share, card fixes) |
-| `test/` | `ui-smoke.mjs` layout gate, `recon-test.mjs` (RECON's unit tests, no browser) and `cdp.mjs`, its portable headless-Chrome client |
+| `test/` | every gate: `smoke.mjs` (browser contracts), `check_notation.py`, `check_headers.py`, `ui-smoke.mjs` layout gate, `recon-test.mjs` (RECON's unit tests, no browser) and `cdp.mjs`, its portable headless-Chrome client |
 | `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
 
 `main.js` and the eight files split out of it each open with a header listing
-the globals they define and read; `exercises/_runner/check_headers.py` holds the headers to the code.
+the globals they define and read; `test/check_headers.py` holds the headers to the code.
 Load order is `index.html`'s, and matters only where a file touches an earlier
 name while loading.
 
@@ -118,7 +118,7 @@ to look fine for a minute and explode in an exercise.
   (its slow top layer is never shed). The mixing length acts on the
   VORTICITY in conservative form: on the strain it kills the deep flume's
   waves, and as `ν_t∇²u` it puts the maximum back at mid-depth.
-  `smoke.js --only=profile` is the gate.
+  `smoke.mjs --only=profile` is the gate.
 - **Geometry contracts:** wall segments have butt ends; slabs leaving the
   domain are extrapolated, not clamped; a scene's bed stays above `z = 0`;
   ground is solid all the way down; the closed outer ring is stamped last.
@@ -167,30 +167,30 @@ Ten gates, all zero-dependency and all non-zero on failure:
 | Command | Guards | Cost |
 | --- | --- | --- |
 | `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
-| `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
+| `python3 test/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
 | `node test/geom-test.mjs` | `GEOM`'s closed forms — winding, slab corners, arc lengths, ½ρgH² — no browser; runs in checks.yml with the other instant gates | instant |
-| `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, the open-channel velocity profile, every scene, every exercise | ~9 min |
-| `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
+| `node test/smoke.mjs` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, the open-channel velocity profile, every scene, every exercise | ~9 min |
+| `node test/smoke.mjs --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
 | `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
 | `node test/mutation-test.mjs` | that `recon-test.mjs` can actually FAIL: fifteen known bugs patched into `RECON` one at a time, each required to kill the assertion it targets | ~9 s |
-| `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, every reset condition, the Favre display field, the mean columns, the overlay, the display pass painting the mean and the legend's Fit — 46 assertions | ~4 min |
-| `node exercises/_runner/smoke.js --only=profile` | uniform open-channel flow (sa1, Medium) has a channel's velocity profile: the maximum at the surface, the 0.6-depth and 0.2/0.8 rules, a log law with κ 0.33–0.50, α, and the bed delivering the `n` — 7 assertions; `--mutate=surface-sink` and `--mutate=no-mixing-length` put each half of issue #72 back | ~1 min |
+| `node test/smoke.mjs --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, every reset condition, the Favre display field, the mean columns, the overlay, the display pass painting the mean and the legend's Fit — 46 assertions | ~4 min |
+| `node test/smoke.mjs --only=profile` | uniform open-channel flow (sa1, Medium) has a channel's velocity profile: the maximum at the surface, the 0.6-depth and 0.2/0.8 rules, a log law with κ 0.33–0.50, α, and the bed delivering the `n` — 7 assertions; `--mutate=surface-sink` and `--mutate=no-mixing-length` put each half of issue #72 back | ~1 min |
 | `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
 
-Run the first two before printing worksheets, and `smoke.js` before pushing
+Run the first two before printing worksheets, and `smoke.mjs` before pushing
 anything that touches `js/`. Run `mutation-test.mjs` after touching
 `js/reconstruct.js` or its suite — it is the only gate that fails when a *test*
-stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
+stops testing, which is a failure the others cannot see. `smoke.mjs --only=api,rig` is the fast subset
 (~2.5 min); `--keep` leaves the browser open on failure.
 
 `.github/workflows/checks.yml` runs the first, second, third, sixth and
 seventh of these gates on every push and pull request — the ones that are
-instant and need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
+instant and need no browser. `smoke.mjs` and `ui-smoke.mjs` are not in that workflow at
 all, not even as a manual `workflow_dispatch` job: both need a real
 GPU-backed Chrome (see `angleArgs()` in `test/cdp.mjs` and
-`exercises/_runner/smoke.js`, which pick the ANGLE backend by platform —
+`test/smoke.mjs`, which pick the ANGLE backend by platform —
 `d3d11`/`metal`/`gl` — because the software rasteriser is too slow to settle
-a scene inside `smoke.js`'s physics budget), and standard GitHub-hosted
+a scene inside `smoke.mjs`'s physics budget), and standard GitHub-hosted
 runners have no GPU passthrough, so ubuntu-latest's `gl` backend would very
 likely fall back to the same class of software rasteriser and fail the same
 way. Run both locally, where a real GPU is available.
@@ -214,9 +214,9 @@ survived a deliberately broken variance, a bed compared against the very buffer
 it was copied from. Every one was caught by breaking the code and watching the
 suite stay green; none by reading it. `test/mutation-test.mjs` runs that
 practice on every commit for the pure numerics. For the shader and sim code it
-cannot reach, `smoke.js --mutate=<id>` patches one known bug into a served file
+cannot reach, `smoke.mjs --mutate=<id>` patches one known bug into a served file
 in flight — never touching the working tree — so the same control can be run by
-hand: `node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds`.
+hand: `node test/smoke.mjs --only=avg --mutate=favre-reynolds`.
 Each catalogue entry carries what was measured when the control was performed.
 
 Both checkers read the register the way it should be read: `check_pack.py`
@@ -229,7 +229,7 @@ fail a commit gate. Neither is a new dependency — Node is already required by
 the browser gates.
 
 The two checkers are complements: `check_notation.py` greps for *names*,
-`smoke.js` proves the names are *connected* — a field renamed at the write
+`smoke.mjs` proves the names are *connected* — a field renamed at the write
 site but not the read site greps clean and returns `undefined` at runtime.
 
 Driving the app yourself: the render loop stops when the page is hidden, so
@@ -237,9 +237,9 @@ headless work goes through `APP.frames(n)`, `APP.tick(n)`, `APP.probe(x,z)`
 (returns `u, w, p, phead, f, speed` — `phead` is pressure head only),
 `APP.volume()`, `APP.zoomAt(...)`, `APP.boxForce` / `APP.placeCV`.
 `exercises/_runner/runner.py` wraps that over CDP (Linux-bound — macOS shims
-in its HOWTO.md); `smoke.js` carries its own portable CDP client.
+in its HOWTO.md); `test/smoke.mjs` and `test/ui-smoke.mjs` use the portable `test/cdp.mjs`.
 
-Two sharp edges that have cost time, both now commented in `smoke.js`:
+Two sharp edges that have cost time, both now commented in `smoke.mjs`:
 `APP.volume()` reads the **cached** column reduction, so straight after a
 rebuild or `resetWater()` it returns 0 until `SIM.columns(true)` forces the
 readback; and `APP.pickExercise()` lands its rig a microtask later, so

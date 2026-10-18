@@ -296,7 +296,7 @@ that have both cost time:
   is a measurement of a different thing, and no tolerance makes it right.
 
 This is what issue #46 actually was. A 2.6x spread looked like a conservation
-bug; it was an unsettled scene read on a single frame. `smoke.js --only=physics`
+bug; it was an unsettled scene read on a single frame. `smoke.mjs --only=physics`
 now settles, opens a 20 s averaging window, and gates the spread at 0.01 —
 where the old gate was 0.8.
 
@@ -372,7 +372,7 @@ exactly where suction runs away. Anything along these lines has to be measured
 against `hammer` and against `docs/hydrostatic-attractor.js` before it is
 believed.
 
-So the voids stand, and `smoke.js --only=physics` **bounds** them instead:
+So the voids stand, and `smoke.mjs --only=physics` **bounds** them instead:
 enclosed void must stay under 4% of the water volume (about twice the worst
 scene). It is a bound, not a zero — its job is to stop the number growing
 silently when someone edits the advection, the flux cap or the EOS.
@@ -533,11 +533,11 @@ Two parts, together:
   maximum at mid-depth.
 
 What it delivers, on sa1's uniform reach at Medium (Average mode, x = 6–10 m,
-the `smoke.js` PROFILE suite): the maximum at y/d = 0.93–0.98 with the
+the `smoke.mjs` PROFILE suite): the maximum at y/d = 0.93–0.98 with the
 surface at 1.22–1.27 V; u(0.6 d below the surface)/V = 1.015–1.025;
 ½(u(0.2d) + u(0.8d))/V = 1.02; a log law over 0.05–0.35 d with fitted
 κ = 0.41–0.43; α = 1.17–1.19; n = 0.031–0.033 at C_f = 0.25. Two GPU mutants
-in `smoke.js` (`surface-sink`, `no-mixing-length`) put each half back and
+in `smoke.mjs` (`surface-sink`, `no-mixing-length`) put each half back and
 watch the suite fail; their recorded numbers are the old profile.
 
 **The inflow plug is full to the surface.** A prescribed-q inlet's plug used
@@ -610,7 +610,7 @@ off.
   −8%; −39% before #72): the horizontal-bed momentum balance has no weight
   component, and s1's bed falls 1 in 4.
 - **Velocity profile** (`sa1`): the 0.6-depth and 0.2/0.8 gauging rules within
-  2.5%, κ 0.41–0.43 — see the section above; `smoke.js --only=profile`.
+  2.5%, κ 0.41–0.43 — see the section above; `smoke.mjs --only=profile`.
 - **Sloshing period** (`slosh-tank`, DA-3): the first standing mode, released
   from a tilt a/d = 0.2. Against T = 2π/√(gk·tanh kd), k = π/B, timed crest
   to crest on a Depth gauge at x = 0.5 m, Medium: +2.2% (B/d = 4, d = 1 m,
@@ -1084,7 +1084,7 @@ points and need a stopping rule at every boundary.
   outward-positive and per metre of width: `Q` volume, `M` momentum flux,
   `Fp` pressure force, `Ė` energy. `M` and `Fp` are kept apart rather than
   summed — distinguishing them is the content of a control-volume question —
-  and their sum is exactly what `boxForce` returns, which `smoke.js` asserts
+  and their sum is exactly what `boxForce` returns, which `smoke.mjs` asserts
   so the two integrals cannot drift.
 - **`Q` and `ṁ/ρ` are not the same number, and the gap is the compression.**
   `Q` uses `min(f, 1)`, the geometric volume; the mass terms use `f`, which
@@ -1102,7 +1102,7 @@ points and need a stopping rule at every boundary.
   way you would draw a section on paper and the sign comes out as expected.
   It is exact only along a cell face; at an angle it interpolates the
   staggered velocities, the same thing the rake and the orbit tracers do.
-  `smoke.js` checks a vertical section against the control-volume face it lies
+  `smoke.mjs` checks a vertical section against the control-volume face it lies
   on, which is the only way to know the two integrals still agree.
 - **A section reports all four at once** — Q, the momentum flux M, the
   pressure force F and ρgQH — with M and F kept apart, because telling them
@@ -1331,7 +1331,7 @@ having settled before anything calls into it.
   every upstream-face sample read solid and Fx measured 0 N/m regardless of
   pool depth. Skipping the stroke on a solid that clears the 2-cell floor
   restored a real pressure diagram: **Fx = 9.61 kN/m against a ~8.94 kN/m
-  hydrostatic estimate** (`exercises/_runner/smoke.js`'s closed-form case
+  hydrostatic estimate** (`test/smoke.mjs`'s closed-form case
   has the derivation and the run-to-run spread — the two are not expected to
   match exactly because the diagram integrates the actual flow field, not
   still water).
@@ -1352,7 +1352,7 @@ having settled before anything calls into it.
 - **The shim (a scene still declaring `walls()` instead of `solids()`)
   rasterises byte-for-byte identically to the old path** — same `stampSeg`,
   same capsule, same measured geometry — which is the promise that lets 20
-  pre-existing scenes go untouched by this branch. `smoke.js` measures the
+  pre-existing scenes go untouched by this branch. `smoke.mjs` measures the
   diff directly on the sandbox's drawn segments: at Medium the segments
   clear the same 2-cell floor as s3's gate, so the stroke never runs on
   either the reference or the polygon path and there is no rim left to

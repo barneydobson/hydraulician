@@ -170,7 +170,7 @@ untouched: embedding is a property of the app, not of a card.
   synthetic wheel without ctrl leaves the view transform unchanged and is not
   default-prevented, one with ctrl changes it. The existing `?ex=` case at
   1440 keeps its docked expectations — `embed` off changes nothing.
-- `smoke.js --only=api,rig` after the `js/` edits; the instant gates always.
+- `smoke.mjs --only=api,rig` after the `js/` edits; the instant gates always.
 - The manual step nobody else can do: the snippet pasted into the real
   Ultra document and a Canvas page, once each, recorded in the docs page as
   confirmed or not.

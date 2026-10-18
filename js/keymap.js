@@ -1,5 +1,5 @@
 /**
- * keymap.js — dependency record (checked by exercises/_runner/check_headers.py).
+ * keymap.js — dependency record (checked by test/check_headers.py).
  *
  * Defines: KEYMAP
  *

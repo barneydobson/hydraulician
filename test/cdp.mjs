@@ -8,7 +8,7 @@
  *
  * `exercises/_runner/runner.py` does the same job for the exercise pack and is
  * Linux-bound; this is the cross-platform half. Both browser gates use it:
- * test/ui-smoke.mjs directly, and exercises/_runner/smoke.js through a dynamic
+ * test/ui-smoke.mjs directly, and test/smoke.mjs through a dynamic
  * `import()` (it is CommonJS, so it cannot use a static one).
  *
  * Environment: `$CHROME` names the browser binary (`$CHROME_PATH` is a
@@ -67,7 +67,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * overrides the browser binary. `$SOFTWARE=1` asks for the old
  * `--disable-gpu` behaviour, for a machine with no working GPU backend.
  *
- * One copy only: smoke.js loads this module with a dynamic `import()`.
+ * One copy only: smoke.mjs loads this module with a dynamic `import()`.
  * `angle` (a `launch` option) beats `$ANGLE`, which beats the platform pick.
  */
 export function angleArgs(angle) {

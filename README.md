@@ -184,8 +184,8 @@ earns a row on the [syllabus](docs/syllabus.md) under its topic.
 real Chrome over CDP: `launch`, `eval`, `pump --sim-seconds`, `shot`, `bench`,
 `status`, `close`. It is Linux-bound (it reads `/proc`); see
 [`exercises/_runner/HOWTO.md`](exercises/_runner/HOWTO.md) for the macOS shims,
-the worked example and the concurrency rules. `smoke.js` and `test/cdp.mjs`
-carry their own portable CDP client. Inside the page, `APP.frames(n)`,
+the worked example and the concurrency rules. `test/smoke.mjs` and `test/ui-smoke.mjs`
+use the portable `test/cdp.mjs`. Inside the page, `APP.frames(n)`,
 `APP.tick(n)`, `APP.probe(x,z)`, `APP.volume()` and `APP.zoomAt(...)` exist for
 scripted runs — the render loop stops when the tab is hidden, so drive it
 through those rather than waiting on wall-clock time.

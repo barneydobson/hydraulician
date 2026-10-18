@@ -1196,7 +1196,7 @@ async function main() {
     });
 
     // ------------------------------------------------- the control-volume budget
-    // The BALANCES — continuity, the energy loss — are asserted in smoke.js,
+    // The BALANCES — continuity, the energy loss — are asserted in smoke.mjs,
     // on a scene that has actually settled. This gate boots a tab per case
     // and cannot afford a 90 s spin-up, and an unsettled reach is still filling,
     // so it genuinely does not close. What belongs here is the wiring.
@@ -1240,7 +1240,7 @@ async function main() {
       // file:// refuses a page's request for the file beside it, and there is
       // nothing docs/view.html can do about that. What it must not do is show
       // a broken screen: the app is DOUBLE-CLICKABLE by design, so this is a
-      // path real readers take. Whether it renders is checked in smoke.js,
+      // path real readers take. Whether it renders is checked in smoke.mjs,
       // which has a server.
       const url = pathToFileURL(join(ROOT, "docs", "view.html")).href + "?doc=numerics.md";
       const tab = await browser.open(url,

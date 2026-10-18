@@ -8,13 +8,13 @@ name: Checks
 # recon-test.mjs can actually fail). All five are instant-to-~10s, so they
 # gate every push rather than running on a schedule.
 #
-# The browser gates (smoke.js, ui-smoke.mjs) are NOT here, and there is no
+# The browser gates (smoke.mjs, ui-smoke.mjs) are NOT here, and there is no
 # `workflow_dispatch` job for them either — deliberately, not an oversight.
 # Both drive a real headless Chrome through an ANGLE GPU backend
-# (test/cdp.mjs and exercises/_runner/smoke.js's browser() now pick
+# (test/cdp.mjs and test/smoke.mjs's browser() now pick
 # d3d11/metal/gl by platform, see their angleArgs() comments), because the
 # software rasteriser renders a full-window WebGL canvas about 50x too
-# slowly for smoke.js's physics checks to settle before their wall-clock
+# slowly for smoke.mjs's physics checks to settle before their wall-clock
 # budget runs out (measured locally: SwiftShader reaches sim t~9.5 of a
 # t=30 target in the 150s `__settle` allows; the GPU backend reaches t=30 in
 # ~6.5s). Standard GitHub-hosted runners, ubuntu-latest included, have no
@@ -24,7 +24,7 @@ name: Checks
 # cannot run GitHub Actions to check), but a job built on that assumption
 # would be red from day one and train everyone to ignore it. Run both
 # locally instead, where a real GPU is available:
-#   node exercises/_runner/smoke.js
+#   node test/smoke.mjs
 #   node test/ui-smoke.mjs
 on:
   push:
@@ -80,7 +80,7 @@ jobs:
         run: python3 exercises/_runner/check_pack.py
 
       - name: check_notation.py — one notation everywhere
-        run: python3 exercises/_runner/check_notation.py
+        run: python3 test/check_notation.py
 
       - name: recon-test.mjs — RECON's closed-form answers
         run: node test/recon-test.mjs

@@ -5,7 +5,7 @@
  *   and the Keyboard sheet (KEYS, which renders from KEYMAP at call time).
  *
  * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
+ * so the lists below (checked by test/check_headers.py) are the
  * dependency record. Load order is index.html's.
  *
  * Defines: TOOLS, TOOL_LETTER, TOOL_KEYS, ICONS, iconEl, TIP, scenesOffered,

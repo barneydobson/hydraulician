@@ -29,14 +29,15 @@ Deliberately NOT flagged, because they are not this notation at all:
 GLSL swizzles (`.xy`, `U.g`) and screen-space pixel coordinates in the view
 transform, `y+` wall units, and chart reference lines like `y = 2x`.
 
-Usage:  python3 exercises/_runner/check_notation.py [-v]
+Usage:  python3 test/check_notation.py [-v]
 """
 import os
 import re
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "exercises", "_runner"))
 import check_pack  # the app evaluator: registers are read, never copied
 
 # The symbols this file is about do not survive a cp1252 console.
@@ -46,7 +47,7 @@ for stream in (sys.stdout, sys.stderr):
     except AttributeError:                      # pre-3.7, or a redirected pipe
         pass
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Files whose job is to record what the app said ON A GIVEN DATE. Renaming
 # inside them would falsify the record, so they are out of scope for every

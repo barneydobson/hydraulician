@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * smoke.js — boot the real app in a real browser and assert its contracts.
+ * smoke.mjs — boot the real app in a real browser and assert its contracts.
  *
  * Zero dependencies (node >= 22: global fetch and WebSocket), so it runs the
  * same on the three platforms the project is used on. It is the counterpart
@@ -32,7 +32,7 @@
  *
  * After every suite it also asserts the page threw nothing uncaught.
  *
- * Usage:  node exercises/_runner/smoke.js [--keep] [--only=api,rig,...]
+ * Usage:  node test/smoke.mjs [--keep] [--only=api,rig,...]
  *                                         [--mutate=<id>]
  *         --only=<suite,...>  api, geom, rig, physics, profile, scenes, hydro,
  *                             docs, pack, avg (default: all, in that order of
@@ -47,12 +47,13 @@
  *         $CHROME names the browser (see test/cdp.mjs, which also reads the
  *         deprecated $CHROME_PATH), $ANGLE the backend, $SOFTWARE=1 --disable-gpu.
  */
-"use strict";
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as cdp from "./cdp.mjs";
 
-const ROOT = path.resolve(__dirname, "..", "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8731 + (process.pid % 200);          // out of the way of a dev server
 const KEEP = process.argv.includes("--keep");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
@@ -73,7 +74,7 @@ const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
  *  run deliberately, one at a time. `measured` is what was actually observed
  *  when the control was performed by hand.
  *
- *      node exercises/_runner/smoke.js --mutate=favre-reynolds
+ *      node test/smoke.mjs --mutate=favre-reynolds
  *
  *  Each entry names the `suite` that owns it and a `kills` text that must be a
  *  prefix of a real `ok()` name in that suite (checkCatalogue() enforces both
@@ -384,11 +385,8 @@ function serve() {
 }
 
 async function browser() {
-  // The CDP client is test/cdp.mjs (an ES module, hence the dynamic import
-  // from this CommonJS file): one Chrome discovery, one backend policy, one
-  // timeout rule, and the profile directory removed on close.
-  const cdp = await import(require("url").pathToFileURL(
-    path.join(__dirname, "..", "..", "test", "cdp.mjs")).href);
+  // The CDP client is test/cdp.mjs: one Chrome discovery, one backend
+  // policy, one timeout rule, and the profile directory removed on close.
   const chrome = await cdp.launch({ width: 1280, height: 800 });
   // raw: evaluate() takes an expression as written, as it always did here.
   const tab = await chrome.open("about:blank", { raw: true, ready: "true", settleMs: 0 });

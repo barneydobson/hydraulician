@@ -171,7 +171,7 @@ const SIM = (() => {
    *  0 N/m regardless of how deep the pool behind the gate stood. Skipping
    *  the stroke here (the blade clears the 2-cell floor) restored a real
    *  pressure diagram: Fx = 9.61 kN/m against a ~8.94 kN/m hydrostatic
-   *  estimate (exercises/_runner/smoke.js's closed-form case has the derivation
+   *  estimate (test/smoke.mjs's closed-form case has the derivation
    *  and the run-to-run spread).
    *
    *  MEASURED on the hump crest (160 edges, ~0.025 m chords, before the
@@ -676,7 +676,7 @@ const SIM = (() => {
     }
     // A fresh experiment restarts the closure's refresh cadence, so the same
     // reset followed by the same substeps is the same run — the F1 gate in
-    // smoke.js compares two of them cell for cell.
+    // smoke.mjs compares two of them cell for cell.
     S.nsteps = 0; S.tcolDirty = true;
     S.dyeUsed = false;              // no ink in the water: back to the cheap upwind dye faces
     const vel = new Float32Array(n * 4);
@@ -845,7 +845,7 @@ const SIM = (() => {
    *  C stays inside 0.40–0.54 over that whole range (0.745 on an ANGLE/D3D11
    *  path), which is what makes the law usable as a gate: scale by √(T/Δt) and
    *  the margin stops moving. `Fmax` is returned so a caller can do exactly
-   *  that — see `avgBound` in exercises/_runner/smoke.js. Those numbers are
+   *  that — see `avgBound` in test/smoke.mjs. Those numbers are
    *  from before the stress-free surface (#72); its steadier chute sheet
    *  leaves the random-walk regime on long windows, where the updates fall
    *  under half an ulp and round away systematically — docs/averaging.md §5.

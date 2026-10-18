@@ -38,6 +38,8 @@
  *                             docs, pack, avg (default: all, in that order of
  *                             declaration); `api,rig` is the fast subset.
  *         --keep      leaves the browser open on failure for a look.
+ *         --write-golden  (re)writes exercises/_runner/golden/instruments-h23.json
+ *                     instead of comparing against it; only ever on code known good.
  *         --mutate=<id>  patches one known bug into a served file and runs the
  *                     suite that owns it (the default --only). Exit 0 only if
  *                     an assertion named by the mutant's `kills` text FAILED;
@@ -55,6 +57,7 @@ import * as cdp from "./cdp.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8731 + (process.pid % 200);          // out of the way of a dev server
 const KEEP = process.argv.includes("--keep");
+const WRITE_GOLDEN = process.argv.includes("--write-golden");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
   .replace("--only=", "").split(",").filter(Boolean);
 
@@ -511,6 +514,73 @@ SUITES.api = async (B) => {
   ok("API gauge record values are finite", r.recFinite);
   ok("API gauge objects carry z", r.gaugeZ === 0.30);
 
+  // ---- refactor golden (Task 3.1): every instrument read of one settled,
+  // averaging h23, so a change to how sim.js unpacks, masks or loops cannot
+  // move a number unseen. Written once by `--write-golden` on the code before
+  // the refactor, compared at 1e-6 relative after. APP.tick(n) is exactly n
+  // substeps, so the run does not depend on how fast the machine is.
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);
+  const gold = await B.evaluate(`(() => {
+    __low(); APP.tick(4000);
+    const S = APP.SIM, box = [4.0, 0.10, 5.2, 0.60];
+    const pts = [[2.0, 0.6], [2.5, 0.5], [4.0, 0.2], [5.5, 0.15], [7.0, 0.3]];
+    const grab = (avg) => ({
+      probe: pts.map(([x, z]) => avg ? S.avgProbe(x, z) : S.probe(x, z)),
+      probeMany: S.probeMany(pts, avg),
+      rake: [2, 5.5].map((x) => { const r = S.rake(x, null, avg, true);
+        return { i: r.i, buf: Array.from(r.buf), f: Array.from(r.f) }; }),
+      boxFlux: S.boxFlux(...box, avg),
+      boxForce: S.boxForce(...box, avg),
+      boxFlux2: S.boxFlux(2.0, 0.05, 6.0, 0.9, avg),
+      lineFlux: S.lineFlux(2, 0.2, 2, 1.5, avg),
+      lineFlux2: S.lineFlux(1, 0.0, 6, 0.0, avg),
+      grade: (() => { const h = S.hydraulicGrade(null, avg);
+        return { h: Array.from(h), hv: Array.from(h.hv) }; })(),
+      patch: Array.from(S.patch(2, 4, null, avg).buf),
+    });
+    const live = grab(false);
+    S.avgStart();
+    // The display accumulators advance from the frame loop, not from tick():
+    // drive them by hand, 40 chunks of 20 substeps = 800, each weighted by the
+    // simulated time it covers.
+    for (let k = 0; k < 40; k++) {
+      APP.tick(20); S.columns(true);
+      S.avgStepField(20 * S.dt()); S.avgStepColumns(20 * S.dt());
+    }
+    const avg = grab(true);
+    S.avgStop();
+    return JSON.stringify({ live, avg });
+  })()`);
+  const goldPath = path.join(ROOT, "exercises", "_runner", "golden", "instruments-h23.json");
+  if (WRITE_GOLDEN) {
+    fs.mkdirSync(path.dirname(goldPath), { recursive: true });
+    fs.writeFileSync(goldPath, gold + "\n");
+    console.log("\n    wrote " + goldPath);
+  } else {
+    let want = null;
+    try { want = JSON.parse(fs.readFileSync(goldPath, "utf8")); } catch (_) { /* reported below */ }
+    let worst = 0, where = "", count = 0, shape = "";
+    const walk = (a, b, at) => {
+      if (shape) return;
+      if (a && typeof a === "object") {
+        if (!b || typeof b !== "object" || Object.keys(a).length !== Object.keys(b).length) { shape = at; return; }
+        for (const k of Object.keys(a)) walk(a[k], b[k], at + "." + k);
+        return;
+      }
+      count++;
+      if (a === null || b === null || typeof a !== "number" || typeof b !== "number") {
+        if (a !== b) { shape = at + " (" + a + " vs " + b + ")"; }
+        return;
+      }
+      const rel = Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1e-12);
+      if (rel > worst) { worst = rel; where = at; }
+    };
+    if (want) walk(want, JSON.parse(gold), "golden");
+    ok("API refactor golden: instruments unchanged",
+      !!want && !shape && worst <= 1e-6,
+      want ? (shape ? "shape differs at " + shape : `worst relative ${worst.toExponential(2)} at ${where} of ${count} values`)
+           : "no golden at " + goldPath + " (run once with --write-golden)");
+  }
 };
 
 /** Geometry and force-on-a-face cases: polygon rasterisation, faceForce
@@ -991,6 +1061,28 @@ SUITES.rig = async (B) => {
   ok("rig round-trips which quantity the control volume/sections read (cvShow)",
      cov.before.cvShow === "M" && cov.after.cvShow === "M" && cov.snapCvShow === "M",
      JSON.stringify({ before: cov.before.cvShow, after: cov.after.cvShow, snap: cov.snapCvShow }));
+
+  // Every packaged payload applies and snapshots back to itself (to 1 µm):
+  // the refactors of Phase 3 must not change what a drawn rig means.
+  await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
+  const rt = await B.evaluate(`(() => {
+    const bad = [], keys = Object.keys(EXERCISE_RIGS);
+    const cmp = (a, b, at) => {
+      if (a && typeof a === "object") {
+        if (!b || typeof b !== "object") { bad.push(at); return; }
+        for (const k of Object.keys(a)) cmp(a[k], b[k], at + "." + k);
+      } else if (typeof a === "number") {
+        if (typeof b !== "number" || !(Math.abs(a - b) <= 1e-6)) bad.push(at + " " + a + " vs " + b);
+      } else if (a !== b) bad.push(at + " " + a + " vs " + b);
+    };
+    for (const id of keys) {
+      try { APP.RIG.apply(EXERCISE_RIGS[id]); cmp(EXERCISE_RIGS[id], APP.RIG.snapshot(), id); }
+      catch (e) { bad.push(id + " threw " + e.message); }
+    }
+    return { n: keys.length, bad: bad.slice(0, 8) };
+  })()`);
+  ok("rig every packaged payload round-trips", rt.n >= 18 && rt.bad.length === 0,
+    rt.n + " payloads; " + rt.bad.join(" | "));
 };
 
 SUITES.physics = async (B) => {

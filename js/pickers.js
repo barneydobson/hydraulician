@@ -7,11 +7,19 @@
  * and each documents itself below -- EX at length, because the line it draws
  * between what it applies and what it leaves for the student IS the design.
  *
- * They reach back into main.js for state, sim, showToast, syncPanel,
- * switchScene, loadScene, CONFIG, UIMODE, DOCK, TIP, CONTROLS, GINSP and RIG --
- * all from inside functions, so index.html may load this before main.js (and
- * must: main.js puts PICKER and EX on window.APP at parse time).
+ * They reach back into the files split out of main.js (state.js, panel.js,
+ * strip.js, dock.js, instruments.js ...) and main.js itself for state, sim,
+ * showToast, syncPanel, switchScene, loadScene, CONFIG, UIMODE, DOCK, TIP, ctl,
+ * clearInstruments, syncURL, GINSP and RIG -- all from inside functions, so
+ * index.html loads this BEFORE them (and must: main.js puts PICKER and EX on
+ * window.APP at parse time).
  */
+
+/** One flag of the active course's menu (`EXERCISE_MENU`, which is null when no
+ *  course is active): `menuFlag("compact")`, `menuFlag("collapsible")`,
+ *  `menuFlag("briefLink")`, `menuFlag("showAllLink")`, `menuFlag("sections")`.
+ *  Undefined when there is no course or the course does not say. */
+function menuFlag(name) { return EXERCISE_MENU ? EXERCISE_MENU[name] : undefined; }
 
 // ----------------------------------------------------------- scene picker
 /** The menu behind the title box, the bar's "Scenes ▾" button, the panel's
@@ -237,7 +245,7 @@ const EX = (() => {
 
   // ------------------------------------------------------------ the data
   function all() {
-    return (typeof EXERCISES !== "undefined" && Array.isArray(EXERCISES)) ? EXERCISES : [];
+    return Array.isArray(EXERCISES) ? EXERCISES : [];
   }
   /** The folder holding an entry's brief, relative to the page:
    *  `exercises/<folder>` for the shared register, `courses/<id>/exercises/
@@ -271,7 +279,6 @@ const EX = (() => {
    *  fails the pack over it before it reaches a lecture. */
   const MARK = /\{(tool|btn|key):([^}\s]+)\}/g;
   function stripItem(kind, id) {
-    if (typeof TOOLBAR === "undefined") return null;
     for (const g of TOOLBAR) {
       for (const it of (g.items || [])) {
         if (kind === "tool" ? it.tool === id : it.id === id) return it;
@@ -289,11 +296,9 @@ const EX = (() => {
     const it = stripItem(kind, id);
     if (!it) { s.classList.add("bad"); s.textContent = id; return s; }
     const icon = typeof it.icon === "function" ? it.icon() : it.icon;
-    if (typeof iconEl === "function") {
-      const ic = iconEl(icon);
-      ic.setAttribute("width", "14"); ic.setAttribute("height", "14");
-      s.appendChild(ic);
-    }
+    const ic = iconEl(icon);
+    ic.setAttribute("width", "14"); ic.setAttribute("height", "14");
+    s.appendChild(ic);
     const b = document.createElement("b");
     b.textContent = typeof it.label === "function" ? it.label() : it.label;
     s.appendChild(b);
@@ -432,7 +437,7 @@ const EX = (() => {
   /** The name of the panel row a value has to be set on, so the card can say
    *  "set it on the Inflow q slider" rather than setting it. */
   function ctlLabel(id) {
-    const c = CONTROLS.find((x) => x.id === id);
+    const c = ctl(id);
     // A Geometry row (geom0…geom5) carries a placeholder label and takes the
     // name of whatever param the loaded scene bound to it — the card has to
     // say "Surge shaft width slider", not "— slider".
@@ -442,7 +447,7 @@ const EX = (() => {
   /** A control value as the panel would name it: an option's own text for a
    *  select, on/off for a checkbox, the number otherwise. */
   function ctlText(id, v) {
-    const c = CONTROLS.find((x) => x.id === id);
+    const c = ctl(id);
     if (c && c.type === "select" && c.opts) {
       const o = c.opts.find((x) => String(x[0]) === String(v));
       if (o) return o[1];
@@ -462,7 +467,7 @@ const EX = (() => {
    *  "Inflow q slider", "Tailwater control tickbox". Only the first value gets
    *  it — once you know the card is naming panel rows, the rest are findable. */
   function ctlWhere(id) {
-    const c = CONTROLS.find((x) => x.id === id);
+    const c = ctl(id);
     if (!c) return "";
     const label = ctlLabel(id);
     if (c.type === "check") return label + " tickbox";
@@ -492,7 +497,7 @@ const EX = (() => {
 
   // ------------------------------------------------------------- applying
   function setControl(id, v) {
-    const c = CONTROLS.find((x) => x.id === id);
+    const c = ctl(id);
     if (!c || !c.set) return false;
     if (c.type === "check") c.set(!!v);
     else if (c.type === "select") c.set(String(v));
@@ -559,7 +564,7 @@ const EX = (() => {
     if (!ex) return [];
     const owned = studentControls(ex), rows = [], seen = new Set();
     const usable = (id) => id && owned.indexOf(id) >= 0 &&
-                           !!CONTROLS.find((c) => c.id === id && c.set);
+                           !!(ctl(id) || {}).set;
     rules(ex).forEach((r) => {
       rows.push({ label: ruleLabel(r), unit: r.unit,
                   text: r.rule || "see the brief",
@@ -599,13 +604,6 @@ const EX = (() => {
    *  of these exercises — B1's entire failure mode is a gauge at the wrong
    *  station, and NC-2's station IS the personalisation — so the card prints the
    *  station rule and the picker clears whatever a rig payload carried. */
-  function clearInstruments() {
-    GINSP.closeAll();
-    state.gauges.length = 0;
-    state.rakes.length = 0;
-    state.cv = null;
-    state.gaugeT = -1;
-  }
   /** The exception to the rule above, opt-in per card: `gauges: [{x, z,
    *  field}]` arrives PLACED, each on its own quantity. For a card whose
    *  subject is a time series from t = 0 (VC-2's level curve), where where to
@@ -644,7 +642,7 @@ const EX = (() => {
     // `resetStudentControls`.
     const fresh = {};
     studentControls(ex).forEach((id) => {
-      const c = CONTROLS.find((x) => x.id === id);
+      const c = ctl(id);
       if (c && c.get) fresh[id] = c.get();
     });
     // The digit is settled BEFORE the rig, because a variant rig (DA-1's three
@@ -666,7 +664,11 @@ const EX = (() => {
       // A rig payload carries the gauges and the panel state the capture
       // happened to have; the student places their own instruments and sets
       // their own values, from an identical bench whatever their digit.
-      clearInstruments();
+      // Instruments are NOT placed (choosing where to measure is part of the
+      // exercise), so the picker clears whatever a rig payload carried; the
+      // narrow form leaves flux, force, measure and tracers (instruments.js).
+      GINSP.closeAll();
+      clearInstruments({ all: false });
       placeCardGauges(ex);
       resetStudentControls(fresh);
       const d = d0;
@@ -676,7 +678,7 @@ const EX = (() => {
       restartTips();         // the card's own tips, if it has any (main.js)
       syncTitle();           // the strip names the exercise, not its scene
       arm(ex.settle || 0, ex.id);
-      syncURLEx(ex.id, ex.tabKey);
+      syncURL({ ex: ex.id, tab: ex.tabKey });
       card.show();
       syncPanel();
       showToast(ex.id + " · " + ex.title,
@@ -724,7 +726,7 @@ const EX = (() => {
     UIMODE.apply(UIMODE.fromExercise(cur));
     restartTips();           // a tab may carry tips of its own
     syncTitle();
-    syncURLEx(cur.id, cur.tabKey);
+    syncURL({ ex: cur.id, tab: cur.tabKey });
     card.refresh();
     syncPanel();
     refresh();
@@ -784,7 +786,7 @@ const EX = (() => {
    *  rows. */
   function compact() {
     // On by default; a deployment may ask for the old long rows (compact: false).
-    return !((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.compact === false);
+    return menuFlag("compact") !== false;
   }
   /** COLLAPSIBLE SECTIONS (default; `collapsible: false` opens them all).
    *  Only the section headings show, each with its count; a click opens that
@@ -794,7 +796,7 @@ const EX = (() => {
   let openSec = null;
   function collapsible() {
     // On by default, for a course menu and for the register by topic alike.
-    return !((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.collapsible === false);
+    return menuFlag("collapsible") !== false;
   }
   function describe(e) {
     return e.aim ? e.aim : (e.start ? e.start + "  ·  " : "") +
@@ -830,8 +832,7 @@ const EX = (() => {
   }
   function hideDesc() { if (descEl) descEl.classList.remove("open"); }
   function course() {
-    if (showAll || typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU ||
-        !Array.isArray(EXERCISE_MENU.sections)) return null;
+    if (showAll || !Array.isArray(menuFlag("sections"))) return null;
     return EXERCISE_MENU;
   }
   function listed() {
@@ -875,10 +876,10 @@ const EX = (() => {
 
   /** The foot of the menu: switch between the course and the whole register. */
   function scopeLink() {
-    if (typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU) return null;
+    if (!EXERCISE_MENU) return null;
     // The register stays out of a course's menu unless it asks for the link
     // (`showAllLink: true`); `?menu=all` still reaches it, for the maintainer.
-    if (EXERCISE_MENU.showAllLink !== true && !showAll) return null;
+    if (menuFlag("showAllLink") !== true && !showAll) return null;
     const a = document.createElement("button");
     a.type = "button"; a.className = "smscope";
     a.textContent = showAll
@@ -1249,7 +1250,7 @@ const EX = (() => {
       a.title = brief;
       // Students read the card; the brief is the lecturer's. The link to it
       // shows only when a deployment asks for it (`briefLink: true`).
-      a.style.display = ((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.briefLink === true) ? "" : "none";
+      a.style.display = menuFlag("briefLink") === true ? "" : "none";
       tick();
     }
     /** The "Yours" block: the printed rule, and beside it the control the
@@ -1312,7 +1313,7 @@ const EX = (() => {
      *  panel's own min/max/step, so a value typed here is a value the slider
      *  could have reached; a tickbox stays a tickbox and a menu a menu. */
     function fieldFor(id) {
-      const c = CONTROLS.find((x) => x.id === id);
+      const c = ctl(id);
       if (!c || !c.set) return null;
       const wrap = document.createElement("div");
       wrap.className = "exrowf";
@@ -1392,7 +1393,7 @@ const EX = (() => {
       if (!box || !cur) return;
       fields.forEach(({ id, el, type, out, own }) => {
         if (!el.isConnected || el === document.activeElement) return;
-        const c = CONTROLS.find((x) => x.id === id);
+        const c = ctl(id);
         if (!c || !c.get) return;
         const v = c.get();
         if (type === "check") el.checked = !!v;
@@ -1576,17 +1577,3 @@ const EX = (() => {
            get current() { return cur; }, get digit() { return digit; },
            get pending() { return pending; } };
 })();
-
-/** `?ex=<id>` for what is set up. The exercise owns the address bar while it
- *  is loaded (its scene is implied), and `#rig=` is dropped for the same
- *  reason `switchScene` drops it. */
-function syncURLEx(id, tab) {
-  try {
-    const u = new URL(location.href);
-    u.hash = "";
-    u.searchParams.delete("scene");
-    u.searchParams.set("ex", id);
-    if (tab) u.searchParams.set("tab", tab); else u.searchParams.delete("tab");
-    history.replaceState(null, "", u.pathname + u.search);
-  } catch (_) { /* file:// refuses — harmless */ }
-}

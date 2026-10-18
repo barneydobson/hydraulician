@@ -156,6 +156,19 @@
 <script src="js/gauge-inspector.js"></script>
 <script src="js/rig.js"></script>
 <script src="js/keymap.js"></script>
+<!-- main.js, split by responsibility (each file's header lists what it defines
+     and reads; exercises/_runner/check_headers.py holds them to it). Order matters
+     only where a file touches an earlier name WHILE LOADING: state, fields,
+     panel, strip (TOOLS, TOOLBAR, KEYS), legend, dock, instruments, governor,
+     then main.js, which boots on DOMContentLoaded. -->
+<script src="js/state.js"></script>
+<script src="js/fields.js"></script>
+<script src="js/panel.js"></script>
+<script src="js/strip.js"></script>
+<script src="js/legend.js"></script>
+<script src="js/dock.js"></script>
+<script src="js/instruments.js"></script>
+<script src="js/governor.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

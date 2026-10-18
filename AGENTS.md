@@ -15,7 +15,7 @@ shallow water); this one resolves the depth.
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | markup and the classic script tags, and little else — under 200 lines; the control panel is generated from a spec in `main.js` |
+| `index.html` | markup and the classic script tags, and little else — under 200 lines; the control panel is generated from a spec in `panel.js` |
 | `css/app.css` | every rule the app uses. A `<link rel=stylesheet>` to a relative path works under `file://` (unlike `fetch` and ES modules), so this costs the no-server guarantee nothing |
 | `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
 | `js/reconstruct.js` | `RECON` — the averaging numerics with no WebGL in them: running mean, Welford, geometric fill, connected bodies, column compaction, band level sets |
@@ -24,7 +24,15 @@ shallow water); this one resolves the depth.
 | `js/geom.js` | `GEOM` — polygon solids with named faces: builders, samplers, point-in-polygon, face force integration; no WebGL |
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
-| `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
+| `js/main.js` | boot, the view transform, scenes (`loadScene`, `syncURL`), pointer tools, the frame loop, `drawOverlay`/markers, the status bar, tips, Average, `window.APP` — the part of the old file that is left once the eight below were taken out |
+| `js/state.js` | `CONFIG`, `state`, `EMBED`, and the mutable view handles (`canvas`, `over`, `octx`, `view`, `sim`) |
+| `js/fields.js` | `FIELDS` (the nine colourings), `GAUGE_QTY` (what a gauge records), the scene-scaled ranges |
+| `js/panel.js` | `CONTROLS` (the panel spec), `ctl(id)`, `buildPanel`, `syncPanel`, the focus profile |
+| `js/strip.js` | `TOOLS`, icons, `TIP`, the `TOOLBAR` spec and its builder, `KEYS` |
+| `js/legend.js` | `LEGEND` (the colour key), `UIMODE` (the exercise interface profile) |
+| `js/dock.js` | toasts, `MINI`, `DOCK` (the docked side panel), `START` (the start screen), `dragWindow` |
+| `js/instruments.js` | gauges, rakes, flux sections, the control volume, force, orbit tracers, `clearInstruments` |
+| `js/governor.js` | the frame-rate governor: `gov`, `governFrame`, `governTarget`, `governLearn` |
 | `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards — the short layout, inline strip icons, tabs —, digit rules, the settings a pick applies) |
 | `js/stream.js` | `STREAM` — streamlines as contours of the stream function ψ, built on the CPU from a fenced face-flux readback; of the mean flow under Average |
 | `js/gauge-inspector.js` | `GINSP` — a draggable window per gauge: identity, live values, the full history chart, CSV export |
@@ -49,6 +57,11 @@ shallow water); this one resolves the depth.
 | `exercises/_code-changes/` | reports and screenshots from app changes (picker, gauges, rig share, card fixes) |
 | `test/` | `ui-smoke.mjs` layout gate, `recon-test.mjs` (RECON's unit tests, no browser) and `cdp.mjs`, its portable headless-Chrome client |
 | `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
+
+`main.js` and the eight files split out of it each open with a header listing
+the globals they define and read; `exercises/_runner/check_headers.py` holds the headers to the code.
+Load order is `index.html`'s, and matters only where a file touches an earlier
+name while loading.
 
 ## The model, in one paragraph
 

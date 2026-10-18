@@ -309,6 +309,26 @@ async function main() {
       await tab.close();
     });
 
+    // The app is a set of classic scripts that must boot from a double-click:
+    // INDEX is a file:// URL, so this is that path. It pins the registers the
+    // split of main.js into js/{state,fields,panel,strip,legend,dock,
+    // instruments,governor}.js has to leave populated, and the shared check in
+    // runCase fails it on any uncaught error while the scripts load.
+    await runCase("file:// boot has no errors and the registers are populated", async () => {
+      check("INDEX is a file:// URL", INDEX.startsWith("file://"), INDEX);
+      const tab = await browser.open(INDEX + "?scene=sandbox",
+        { ready: "return !!window.APP && !!window.APP.sim;" });
+      const r = await tab.evaluate(`return {
+        sim: !!APP.sim, scene: APP.state.scene && APP.state.scene.id,
+        fields: APP.ui.FIELDS.length, tools: APP.TOOLS.length };`);
+      check("APP.sim exists", r.sim);
+      eq("the sandbox scene loaded", r.scene, "sandbox");
+      eq("nine fields are registered", r.fields, 9);
+      eq("thirteen tools are registered", r.tools, 13);
+      check("no uncaught errors while loading", tab.errors.length === 0, tab.errors[0]);
+      await tab.close();
+    });
+
     // ---------------------------------------------------- an exercise link
     await runCase("?ex= docks the brief and the viewport gives way to it", async () => {
       const tab = await browser.open(INDEX + "?ex=HJ-1",

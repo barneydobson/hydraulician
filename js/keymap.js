@@ -15,11 +15,12 @@
  *           row ignores e.repeat, so a held key cannot flicker a toggle
  *   run(e)  the action
  *
- * Load order: this file is evaluated BEFORE main.js, so nothing here may touch
- * a main.js binding at parse time. The `run`/`when` closures name main.js
- * functions and consts, which is fine — they are only called from the keydown
- * handler, long after main.js has run. The digit rows depend on TOOLS, which
- * main.js owns, so the array carries one placeholder row and main.js calls
+ * Load order: this file is evaluated BEFORE state.js … main.js (the files
+ * main.js was split into), so nothing here may touch one of their bindings at
+ * parse time. The `run`/`when` closures name those functions and consts, which
+ * is fine — they are only called from the keydown handler, long after they
+ * have all loaded. The digit rows depend on TOOLS, which strip.js owns, so the
+ * array carries one placeholder row and main.js calls
  * KEYMAP.useTools() once at boot to expand it in place (same sheet position).
  *
  * Modal behaviour (start screen, open menus own the keyboard) stays in the

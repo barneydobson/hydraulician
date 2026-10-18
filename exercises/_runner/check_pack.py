@@ -581,7 +581,7 @@ def check_params(c):
                     continue
                 for k in p:
                     if k not in R.control_ids:
-                        c.bad(ref, "%s.%s is not a Controls row (CONTROLS in js/main.js)" % (kind, k))
+                        c.bad(ref, "%s.%s is not a Controls row (CONTROLS in js/panel.js)" % (kind, k))
                     elif k not in R.settable:
                         c.bad(ref, "%s.%s is a Controls row with no setter, so applyParams "
                                    "would skip it" % (kind, k))
@@ -599,7 +599,7 @@ def check_params(c):
 
 
 # 9. the UI profile. An exercise may narrow the interface a student meets
-#    (see UIMODE in js/main.js); what it must not do is narrow away a tool
+#    (see UIMODE in js/legend.js); what it must not do is narrow away a tool
 #    its own task asks for, or name something that does not exist.
 def check_ui_profile(c):
     R = c.R

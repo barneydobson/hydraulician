@@ -353,7 +353,7 @@ const TOOLBAR = [
       on: () => state.grade,
       act: () => { state.grade = !state.grade; syncPanel(); } },
     // The two readout switches. Separate, because they answer different
-    // wishes: the boxes are the instruments' numbers (fold them away to look
+    // wishes: the readout boxes are the instruments' numbers (fold them away to look
     // at the water, or to ask for a prediction first); the hover card is the
     // cursor's own probe, which a first lecture may not want at all.
     { id: "readBtn", icon: "readouts", label: "Readouts", key: "I",
@@ -583,8 +583,8 @@ function showAllGroup() {
 }
 
 /** Fit the strip to the width it actually has. A media query cannot do this:
- *  the side panel takes its width out of the bar as well, so a 1440 px window
- *  with the panel open has the room of an 1100 px one. Three steps — the
+ *  the dock takes its width out of the bar as well, so a 1440 px window
+ *  with the dock open has the room of an 1100 px one. Three steps — the
  *  family captions and the wordmark go, then the status line, then the icons
  *  shrink again and the group rules go with them — and if even that is not
  *  enough the groups scroll rather than losing a control. */

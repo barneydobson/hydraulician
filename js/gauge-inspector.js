@@ -30,8 +30,8 @@ const GINSP = (() => {
   // What a gauge records is GAUGE_QTY in fields.js — the gauges' own register,
   // a different one from the FIELDS the water is painted with, and named apart
   // from it for that reason. Every sample carries every quantity in it; what
-  // a gauge PLOTS is its own `field` (gaugeFieldOf), and what the window
-  // OFFERS is the exercise's `ui.gaugeFields` (UIMODE.gaugeFields).
+  // a gauge PLOTS is its own quantity (`g.field`, the wire name; gaugeFieldOf),
+  // and what the window OFFERS is the exercise's `ui.gaugeFields` (UIMODE.gaugeFields).
   //
   // Symbols follow free-surface convention: h is the piezometric head, d the
   // depth and η the water level (wire key "eta" — ASCII, the same pattern as

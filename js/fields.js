@@ -143,6 +143,11 @@ function fieldBlurb(f) {
  *  select and the CSV all read this list, and `ui.gaugeFields` narrows what is
  *  OFFERED by id — never what is recorded.
  *
+ *  A row here is a **gauge quantity**. `g.field`, `state.gaugeField`,
+ *  `ui.gaugeFields` and the `gaugeField` control id keep the word "field":
+ *  they are wire and worksheet names, and renaming them would break rigs and
+ *  worksheets.
+ *
  *  `id` is the sample key and the wire key (rig `ui.field`, `viewParams
  *  .gaugeField`, `ui.gaugeFields`): ASCII, notation-register symbols
  *  (docs/notation.md) — `eta` for η and `speed` for |u|, as before; `phead`

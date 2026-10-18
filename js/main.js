@@ -855,9 +855,9 @@ function drawOverlay(A) {
   const ctx = octx;
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   ctx.clearRect(0, 0, view.pxW, view.pxH);
-  // What the overlay may print this frame: the instruments' boxes (VIEW →
+  // What the overlay may print this frame: the instruments' readout boxes (VIEW →
   // Readouts) and the concepts this card's `ui.hide` withholds.
-  OVERLAY.setPrint({ boxes: state.instReadouts,
+  OVERLAY.setPrint({ readouts: state.instReadouts,
                      energy: !UIMODE.hides("energy"),
                      critical: !UIMODE.hides("critical") });
   OVERLAY.drawFrame(ctx, view, sim);
@@ -919,7 +919,7 @@ function drawOverlay(A) {
   // The MARKS always stay — a gauge you cannot see is a gauge you place twice.
   // What a profile can withhold is the card that reads it out, for an exercise
   // that wants a prediction before a number; and the Readouts view toggle
-  // (state.instReadouts) folds every instrument's boxes away — the gauges go
+  // (state.instReadouts) folds every instrument's readout boxes away — the gauges go
   // on recording either way. Each card plots its own gauge's quantity.
   const cards = UIMODE.shows("gauges") && state.instReadouts
     ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, (gg) => {
@@ -1328,11 +1328,11 @@ function boot() {
   addEventListener("resize", () => { if (KEYS.isOpen()) KEYS.place(); });
   addEventListener("resize", () => { if (LEGEND.menuIsOpen()) LEGEND.place(); });
 
-  // The side panel's two handles. Wired here rather than when a brief is first
-  // built, so folding works whatever ends up in the panel.
+  // The dock's two handles. Wired here rather than when a brief is first
+  // built, so folding works whatever ends up in the dock.
   document.getElementById("dockfold").onclick = (e) => { e.currentTarget.blur(); DOCK.fold(true); };
   document.getElementById("docktab").onclick = (e) => { e.currentTarget.blur(); DOCK.fold(false); };
-  // The panel is inset by --dock, so a window resize can cross the width where
+  // The dock is inset by --dock, so a window resize can cross the width where
   // docking stops being affordable and it has to go back to overlaying.
   // A resize (or a rotated phone) changes what "fills the window" means, and
   // the panel opening or closing changes it too — DOCK.sync calls this as well.
@@ -1551,7 +1551,7 @@ window.APP = {
   EX,                                      // the exercise picker (see ?ex=<id>)
   TOOLS,                                   // the pointer tools, in number-key order
   // The chrome, for headless work: test/ui-smoke.mjs drives the strip, the
-  // side panel and the start screen through here rather than by synthesising
+  // dock and the start screen through here rather than by synthesising
   // clicks at pixel positions.
   ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncToolbar, FIELDS, rangeFor,
         RAMPS: Shaders.RAMPS, GAUGE_QTY },

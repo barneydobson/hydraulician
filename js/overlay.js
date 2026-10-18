@@ -468,7 +468,7 @@ const OVERLAY = (() => {
 
   // --------------------------------------------------------------- drawing
   /** What the overlay may PRINT, set by main.js once a frame (setPrint):
-   *    boxes     the instruments' readout boxes — VIEW → Readouts. Off, the
+   *    readouts  the instruments' readout boxes — VIEW → Readouts. Off, the
    *              instruments draw their geometry (box, line, profile, arrows)
    *              and no numbers; they go on measuring either way.
    *    energy    the energy terms (CV energy row and Ė faces, ρgQH, the
@@ -476,11 +476,11 @@ const OVERLAY = (() => {
    *              "energy" for a card before the energy lecture.
    *    critical  the critical-flow vocabulary on the hover card (profile
    *              class, sub/supercritical) — off under ui.hide "critical". */
-  const PRINT = { boxes: true, energy: true, critical: true };
+  const PRINT = { readouts: true, energy: true, critical: true };
   function setPrint(o) { Object.assign(PRINT, o || {}); }
   /** A chip that is an instrument READOUT, and so goes with the boxes. */
   function rchip(ctx, x, y, text, colour, align) {
-    if (PRINT.boxes) chip(ctx, x, y, text, colour, align);
+    if (PRINT.readouts) chip(ctx, x, y, text, colour, align);
   }
 
   function line(ctx, pts, style, width, dash) {
@@ -1321,7 +1321,7 @@ const OVERLAY = (() => {
     // B was last left on.
     const q = (show === "E" && !PRINT.energy) ? CV_Q.Q : (CV_Q[show] || CV_Q.Q);
     ctx.font = "10px ui-monospace, monospace";
-    if (F && PRINT.boxes) {
+    if (F && PRINT.readouts) {
       const e = F.edges;
       const mid = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
       const put = (key, x, y, ha, va) => {

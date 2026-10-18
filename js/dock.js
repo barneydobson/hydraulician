@@ -1,7 +1,7 @@
 "use strict";
 /**
  * dock.js — floating furniture: toasts, the minimisable boxes (MINI), the docked
- *   side panel (DOCK), the start screen (START), and window dragging.
+ *   dock (DOCK), the start screen (START), and window dragging.
  *
  * Classic script: its top-level names are globals shared with every other file,
  * so the lists below (checked by exercises/_runner/check_headers.py) are the
@@ -89,11 +89,11 @@ const MINI = (() => {
   return { add, pillText, keep };
 })();
 
-// ============================================================= side panel
+// ============================================================= dock
 /** The dock: a panel down the right-hand edge that the VIEWPORT gives way to,
  *  rather than one that sits on top of it. Opening it sets `--dock`, and both
  *  canvases are inset by that in the stylesheet, so nothing is ever drawn
- *  underneath the panel and `computeView` — which runs every frame off
+ *  underneath the dock and `computeView` — which runs every frame off
  *  `canvas.clientWidth` — re-letterboxes the domain into what is left with no
  *  further help.
  *
@@ -128,14 +128,14 @@ const DOCK = (() => {
     el().classList.toggle("open", open);
     el().classList.toggle("over", narrow());
     el().classList.toggle("sheet", phone());
-    // A side panel takes WIDTH out of the viewport; the same panel as a bottom
+    // The dock takes WIDTH out of the viewport; the same dock as a bottom
     // sheet takes HEIGHT. Either way the water is drawn in what is left, never
-    // behind the panel — otherwise the domain centres itself on a canvas whose
+    // behind the dock — otherwise the domain centres itself on a canvas whose
     // lower half nobody can see.
     const root = document.documentElement.style;
     root.setProperty("--dock", (open && !narrow() && !phone()) ? W + "px" : "0px");
     root.setProperty("--dockb", (open && phone()) ? sheetH() + "px" : "0px");
-    fitBar();                    // the panel takes its width out of the strip
+    fitBar();                    // the dock takes its width out of the strip
     applyAutoVex();              // …and out of what "fills the window" means
     el().querySelector(".dock-h .eid").textContent = id;
     const fold = document.getElementById("dockfold");

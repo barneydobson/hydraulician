@@ -14,12 +14,12 @@
 html, body { height: 100%; overflow: hidden; background: #070b0f; }
 body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #dfe8f2; }
 
-/* --dock is the width the docked side panel takes OUT of the viewport. The
+/* --dock is the width the docked dock takes OUT of the viewport. The
    canvases are inset by it, so the simulation is never drawn underneath the
-   panel — a docked panel that overlaps the water is just a floating card
+   dock — a docked dock that overlaps the water is just a floating card
    with extra steps. Everything that centres on the water (the tips line, the
    toast) centres on `100vw - var(--dock)` for the same reason. */
-/* --dock is what the side panel takes; --dockb is what the same panel takes
+/* --dock is what the dock takes; --dockb is what the same dock takes
    as a bottom sheet on a phone. One of the two is always zero. */
 :root { --dock: 0px; --dockb: 0px; --barb: 0px; --gcw: 0px; --sheet-h: min(58vh, 520px); }
 
@@ -177,7 +177,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* Two steps of compaction, applied by `fitBar()` from a MEASUREMENT of the
-   strip rather than from a viewport media query — the side panel takes its
+   strip rather than from a viewport media query — the dock takes its
    width out of the bar too, so the window size does not say whether the
    icons fit. */
 /* The caption is decoration before it is information, so it is the first
@@ -607,7 +607,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 
 /* ---------------------------------------------------------- exercises */
 /* The exercise menu is the scene menu's twin (.gmenu above) plus a filter
-   box and an id chip. Picking one loads it into the side panel below. */
+   box and an id chip. Picking one loads it into the dock below. */
 #exmenu { width: 428px; }
 .gmenu .smf {
   display: block; width: calc(100% - 6px); margin: 2px 3px 4px;
@@ -658,9 +658,9 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   flex: 0 0 auto; min-width: 62px; text-align: center;
 }
 
-/* ============================================================ side panel */
+/* ============================================================ dock */
 /* The exercise lives HERE, not in a window over the water: the canvases are
-   inset by --dock, so the panel takes its width out of the viewport instead
+   inset by --dock, so the dock takes its width out of the viewport instead
    of covering it. Below the width where there is anything to give away it
    goes back to overlaying (`.over`) and the canvas keeps the whole window. */
 #dock {

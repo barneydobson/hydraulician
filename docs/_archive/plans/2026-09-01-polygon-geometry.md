@@ -1,5 +1,7 @@
 # Polygon Geometry + Surface Pressure Forces Implementation Plan
 
+> EXECUTED (archived 2026-10-18). Checkboxes were not maintained; the git history is the record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make polygons the core geometry primitive (slider-driven parametric shapes, per-scene) and add a pressure-force instrument that shows the distribution and resultant on any named wetted face, curved faces included.

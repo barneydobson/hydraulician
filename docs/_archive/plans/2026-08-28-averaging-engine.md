@@ -1,5 +1,7 @@
 # Averaging engine (phase C) — Implementation Plan
 
+> EXECUTED (archived 2026-10-18). Checkboxes were not maintained; the git history is the record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a Live/Average measurement mode whose mean field satisfies the

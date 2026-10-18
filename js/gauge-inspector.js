@@ -249,10 +249,10 @@ const GINSP = (() => {
     const c = cv.getContext("2d");
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, w, h);
-    c.fillStyle = "rgba(6,10,16,0.55)";
+    c.fillStyle = OVERLAY.C.chartBg;
     c.beginPath(); c.roundRect(0, 0, w, h, 8); c.fill();
     if (L.length < 2) {
-      c.fillStyle = "rgba(223,232,242,0.45)";
+      c.fillStyle = OVERLAY.C.chartText;
       c.font = OVERLAY.FONT.mono(11);
       c.fillText(L.length ? "one sample so far" : "no history yet — press ▶︎ Run", 12, h / 2);
       return;
@@ -272,8 +272,8 @@ const GINSP = (() => {
 
     // gridlines + value labels
     c.font = OVERLAY.FONT.mono(10);
-    c.strokeStyle = "rgba(255,255,255,0.07)"; c.lineWidth = 1;
-    c.fillStyle = "rgba(223,232,242,0.45)";
+    c.strokeStyle = OVERLAY.C.chartGrid; c.lineWidth = 1;
+    c.fillStyle = OVERLAY.C.chartText;
     for (let n = 0; n <= 4; n++) {
       const v = lo + (hi - lo) * n / 4, y = PY(v);
       c.beginPath(); c.moveTo(x0, y); c.lineTo(x1, y); c.stroke();
@@ -284,7 +284,7 @@ const GINSP = (() => {
     const stp = FMT.nice(tgt, undefined, 1e-4);
     for (let t = Math.ceil(o.t0 / stp) * stp; t <= o.t1; t += stp) {
       const x = PX(t);
-      c.strokeStyle = "rgba(255,255,255,0.07)";
+      c.strokeStyle = OVERLAY.C.chartGrid;
       c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y1); c.stroke();
       c.fillText(stp < 1 ? t.toFixed(1) : t.toFixed(0), x - 8, h - 7);
     }
@@ -311,7 +311,7 @@ const GINSP = (() => {
       if (i > 0 && (i >= L.length || Math.abs(L[i - 1].t - th) < Math.abs(L[i].t - th))) i--;
       i = Math.max(0, Math.min(L.length - 1, i));
       const X = PX(L[i].t), Y = PY(val(L[i]));
-      c.strokeStyle = "rgba(255,255,255,0.35)"; c.setLineDash([3, 3]);
+      c.strokeStyle = OVERLAY.C.chartCursor; c.setLineDash([3, 3]);
       c.beginPath(); c.moveTo(X, y0); c.lineTo(X, y1); c.stroke();
       c.beginPath(); c.moveTo(x0, Y); c.lineTo(x1, Y); c.stroke();
       c.setLineDash([]);
@@ -323,9 +323,9 @@ const GINSP = (() => {
       c.font = OVERLAY.FONT.mono(10.5, 700);
       const tw = c.measureText(txt).width;
       const bx = Math.min(Math.max(X + 7, x0), x1 - tw - 10);
-      c.fillStyle = "rgba(6,10,16,0.88)";
+      c.fillStyle = OVERLAY.C.chartLabelBg;
       c.beginPath(); c.roundRect(bx - 4, y0 + 1, tw + 8, 15, 4); c.fill();
-      c.fillStyle = "#e8f0f8";
+      c.fillStyle = OVERLAY.C.chartLabelText;
       c.fillText(txt, bx, y0 + 12);
       o.read = { t: L[i].t, v, field: o.field };
     } else o.read = null;

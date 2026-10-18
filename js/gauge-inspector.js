@@ -55,16 +55,22 @@ const GINSP = (() => {
   }
 
 
-  /** Stacking counter: every show / click takes the next value, so the most
-   *  recently touched window is always on top. */
-  let zTop = 21;
+  /** Raise window `o`: move it to the end of `open` and renumber every open
+   *  window 21..21+n-1 in stacking order, so the z-indices stay bounded below
+   *  the popups (30/31) and menus (40) however often windows are clicked. */
+  function raise(o) {
+    const i = open.indexOf(o);
+    if (i >= 0) open.splice(i, 1);
+    open.push(o);
+    open.forEach((w, n) => { w.el.style.zIndex = String(21 + n); });
+  }
 
   /** Open (or front) the inspector for gauge index k. */
   function show(k) {
     const g = state.gauges[k];
     if (!g) return null;
     const was = open.find((o) => o.g === g);
-    if (was) { was.el.style.zIndex = String(++zTop); return was; }
+    if (was) { raise(was); return was; }
     if (!g.id) g.id = ++state.gaugeSeq;   // rig scripts push bare gauge objects
     hosts();
     const el = document.createElement("div");
@@ -95,10 +101,8 @@ const GINSP = (() => {
     const p = posMemo[g.id] ||
       [Math.max(8, innerWidth - 428), 76 + 26 * (open.length - 1)];
     el.style.left = p[0] + "px"; el.style.top = p[1] + "px";
-    el.style.zIndex = String(++zTop);
-    el.addEventListener("pointerdown", () => {
-      el.style.zIndex = String(++zTop);
-    }, true);
+    raise(o);
+    el.addEventListener("pointerdown", () => raise(o), true);
 
     // ---- header drag (see `dragWindow`)
     dragWindow(el, el.querySelector(".ginsp-h"), (L, T) => { posMemo[g.id] = [L, T]; });

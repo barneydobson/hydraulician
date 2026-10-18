@@ -226,6 +226,147 @@ float press(float f, float dv){
   return (u_g == 0.0) ? p : max(p, 0.0);
 }
 
+// The void handling and the stress-free extension (the long comment above its
+// call in main() explains both): the dry faces bleed their momentum away, and
+// the two u-faces over the water take the water's own u. Moved out of main()
+// verbatim; fS is the fill south of the cell, tS/tSS the u texels below.
+void voidBleed(inout float un, inout float wn, int i, int j,
+               float fFu, float fFw, float fS, vec4 tS, vec4 tSS){
+  float dx = u_dx, dt = u_dt;
+  float dryU = 1.0 - smoothstep(0.0, 0.02, fFu);
+  float dryW = 1.0 - smoothstep(0.0, 0.02, fFw);
+  float eU = 0.0, uX = 0.0;
+  bool inSponge = u_in.z > 0.5 && float(i) < 1.0 + u_spongeN.x;
+  // Only in the few cells over a column's main surface (FS_TCOL, lagged a
+  // few substeps, hence the margin): the water skips the fetches, and so does
+  // the open air, which in a scene like hammer is most of the domain.
+  vec4 TcX = texelFetch(u_Tc, ivec2(i, 0), 0);
+  float zj = float(j) * dx;
+  if (dryU > 0.0 && !inSponge && TcX.g > TcX.r && zj > TcX.r && zj < TcX.g + 4.0 * dx) {
+    float fSW = TF(ivec2(i-1,j-1)).r;
+    float fS2 = TF(ivec2(i,j-2)).r, fSW2 = TF(ivec2(i-1,j-2)).r;
+    float wU1 = smoothstep(0.3, 0.6, max(fS, fSW));      // u-face below is water
+    float wU2 = smoothstep(0.3, 0.6, max(fS2, fSW2)) * (1.0 - wU1);
+    eU = dryU * (wU1 + wU2);
+    uX = (wU1 * tS.r + wU2 * tSS.r) / max(wU1 + wU2, 1e-6);
+  }
+  un *= 1.0 - min(dt * 1.5 * dryU * (1.0 - eU), 1.0);
+  wn *= 1.0 - min(dt * 1.5 * dryW, 1.0);
+  un = mix(un, uX, eU);
+}
+
+// Prescribed point sources: a spout and a pour impose their velocity inside
+// their radius. (pu, pw) are the u- and w-node positions of this face.
+void pointSources(inout float un, inout float wn, vec2 pu, vec2 pw){
+  if (u_src0.w > 0.5) {
+    if (distance(pu, u_src0.xy) < u_src0.z) un = u_sv0.x;
+    if (distance(pw, u_src0.xy) < u_src0.z) wn = u_sv0.y;
+  }
+  if (u_src1.w > 0.5) {
+    if (distance(pu, u_src1.xy) < u_src1.z) un = u_sv1.x;
+    if (distance(pw, u_src1.xy) < u_src1.z) wn = u_sv1.y;
+  }
+}
+
+// The inflow plug at column 1 of a prescribed-discharge reservoir.
+void inflowPlug(inout float un, int i, vec2 pu){
+  if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) {
+    // The full plug, up to the delivered surface. It used to taper to zero
+    // over its top three cells, because a hard step at the waterline shed
+    // ripples while the surface was a drag boundary. With the surface
+    // stress-free that taper is a slow layer injected at the inlet that
+    // nothing takes out (ν_t vanishes at the surface): on a 1.0 m reach at
+    // Low the surface ran at 0.66 V two metres in, and at 0.97 V with the
+    // full plug; m2's inlet fluctuates no more than it did with the taper.
+    // It is not the whole story: at Medium a deep, fast inlet still sheds a
+    // slow surface layer, taper or not — an open problem, engineering notes
+    // "The surface is stress-free".
+    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
+  }
+}
+
+// The piston/flap wavemaker. paddle reports the wall paddle's own face, which
+// the outflow-only rule in boundaryRing() must leave alone.
+void wavemaker(inout float un, int i, vec2 pu, float fFu, out bool paddle){
+  paddle = false;        // the wall paddle's face, exempt from the outflow-only rule below
+  if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
+    un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker
+    // A paddle AT THE WALL (column 1, left edge open, u_waveD > 0) is the
+    // linear piston condition — the paddle's velocity imposed at its mean
+    // position — fed through the open edge's zero-gradient ghost, so there
+    // is no pocket of water behind it. The face velocity alone would not
+    // conserve volume: in a progressive wave u and η are in phase, so more
+    // goes in under the crest than comes out under the trough and the flume
+    // fills at ~⟨uη⟩. Imposing the paddle's VOLUME flux, a·ω·D·cos ωt over
+    // the column's live depth, integrates to zero over a cycle, which is
+    // what a real paddle's swept volume does.
+    // SIM.wallPaddle() decides; u_waveD is 0 for every other piston.
+    //
+    // Opt-in (SIM.paddle, SIM.flapOn): a train envelope hands the paddle's
+    // velocity in from the CPU, and a FLAP hinged at z_h makes it grow
+    // linearly from the hinge, u(z) = U·(z − z_h)/(z₀ − z_h), with U the
+    // velocity at the still-water level z₀. At the wall the flap's volume
+    // flux is its swept rate U·[(z₀−z_h)² − (z_b−z_h)²]/2(z₀−z_h), held over
+    // the live depth the same way the piston's is.
+    bool flap = u_flap.y > u_flap.x;
+    if (u_waveU.y > 0.5) un = u_waveU.x;
+    float shp = flap ? max(pu.y - u_flap.x, 0.0) / (u_flap.y - u_flap.x) : 1.0;
+    if (u_waveD > 0.0 && i == 1) {
+      paddle = true;
+      vec4 Tc1 = texelFetch(u_Tc, ivec2(1, 0), 0);
+      if (flap) {
+        float eta = max(Tc1.g, Tc1.r + 0.5 * u_waveD);
+        float b2 = (Tc1.r - u_flap.x) * (Tc1.r - u_flap.x);
+        float sw = (u_flap.y - u_flap.x) * (u_flap.y - u_flap.x) - b2;
+        float lv = (eta - u_flap.x) * (eta - u_flap.x) - b2;
+        un *= shp * sw / max(lv, 1e-6);
+      } else {
+        un *= u_waveD / max(Tc1.g - Tc1.r, 0.5 * u_waveD);
+      }
+    } else if (flap) {
+      un *= shp;
+    }
+  }
+}
+
+// The open-boundary ring: zero-gradient tangential copies, the exchange faces'
+// transport and Torricelli caps, and the outflow-only rules of plain open
+// edges. The comments are the reasons; they moved with the code.
+void boundaryRing(inout float un, inout float wn, int i, int j,
+                  vec4 tE, vec4 tW, vec4 tN, vec4 tS, float capBase, bool paddle){
+  float gMag = abs(u_g);
+  // Torricelli off the PINNED SURFACE, which is at or below the reservoir
+  // level, so the bound only ever tightens with the change of u_in.x's
+  // meaning. It is a resonance guard with metres of headroom (s2 runs an
+  // inlet plug of 2.3 m/s under a cap of 6.4), not a physical statement.
+  float capR = (u_tw.y > 0.5) ? sqrt(2.0 * gMag * max(u_tw.x, 0.05)) + 1.0 : capBase;
+  float capL = (u_in.z > 0.5) ? sqrt(2.0 * gMag * max(u_in.x, 0.05)) + 1.0 : capBase;
+  if (i == 0)          wn = tE.g;
+  if (i == 1 && u_in.z > 0.5 && u_in.w > 0.5) un = clamp(un, -capL, capL);
+  if (i == NXY.x - 1) { un = clamp(un, -min(capR, capBase), min(capR, capBase)); wn = tW.g; }
+  if (j == 0)          un = tN.r;
+  if (j == NXY.y - 1) { wn = clamp(wn, -capBase, capBase); un = tS.r; }
+  // A PLAIN open edge (no level control on it) is an outflow boundary: its
+  // ghost mirrors the interior fill, so any inward velocity on the exchange
+  // face draws water out of nothing, and nothing in the zero-gradient ghost
+  // pushes back once the flow there reverses. Measured on hammer, with the
+  // surface momentum sink gone (#72): the outlet shaft's recirculation turned
+  // the right edge inward and it fed 8–10 m²/s into the domain until the air
+  // chamber above the pipe was full. Inflow is the level controls' job.
+  // Not in plan view: there is no free surface, the plane is full by
+  // construction, and its wake legitimately crosses an open edge both ways.
+  // A scene may hold its TAILWATER face to outflow too (u_twOut): a level
+  // control otherwise passes inflow, and behind a short pool it fed a pipe
+  // jet's entrainment straight from the edge (contraction: −2 m/s coming in
+  // along the surface, a 0.17 m mound against the outlet wall).
+  if (u_g != 0.0) {
+    if (i == 1 && u_in.z < 0.5 && !paddle) un = min(un, 0.0);
+    if (i == NXY.x - 1 && (u_tw.y < 0.5 || u_twOut > 0.5)) un = max(un, 0.0);
+    if (j == 1)                          wn = min(wn, 0.0);
+    if (j == NXY.y - 1)                  wn = max(wn, 0.0);
+  }
+}
+
 void main(){
   NXY = ivec2(u_res);
   ivec2 c = ivec2(gl_FragCoord.xy);
@@ -416,26 +557,7 @@ void main(){
   //     TAILWATER sponge keeps the extension: there the bled air is an outlet
   //     loss, and it held h23's apron 0.19 m above its own tailwater.
   //   · Not on a plain open edge's inflow — see the boundary ring below.
-  float dryU = 1.0 - smoothstep(0.0, 0.02, fFu);
-  float dryW = 1.0 - smoothstep(0.0, 0.02, fFw);
-  float eU = 0.0, uX = 0.0;
-  bool inSponge = u_in.z > 0.5 && float(i) < 1.0 + u_spongeN.x;
-  // Only in the few cells over a column's main surface (FS_TCOL, lagged a
-  // few substeps, hence the margin): the water skips the fetches, and so does
-  // the open air, which in a scene like hammer is most of the domain.
-  vec4 TcX = texelFetch(u_Tc, ivec2(i, 0), 0);
-  float zj = float(j) * dx;
-  if (dryU > 0.0 && !inSponge && TcX.g > TcX.r && zj > TcX.r && zj < TcX.g + 4.0 * dx) {
-    float fSW = TF(ivec2(i-1,j-1)).r;
-    float fS2 = TF(ivec2(i,j-2)).r, fSW2 = TF(ivec2(i-1,j-2)).r;
-    float wU1 = smoothstep(0.3, 0.6, max(fS, fSW));      // u-face below is water
-    float wU2 = smoothstep(0.3, 0.6, max(fS2, fSW2)) * (1.0 - wU1);
-    eU = dryU * (wU1 + wU2);
-    uX = (wU1 * tS.r + wU2 * tSS.r) / max(wU1 + wU2, 1e-6);
-  }
-  un *= 1.0 - min(dt * 1.5 * dryU * (1.0 - eU), 1.0);
-  wn *= 1.0 - min(dt * 1.5 * dryW, 1.0);
-  un = mix(un, uX, eU);
+  voidBleed(un, wn, i, j, fFu, fFw, fS, tS, tSS);
 
   // --- transport-consistency cap. The VOF donor limiter cannot move mass
   //     faster than a quarter cell per substep (dx/4dt), but nothing above
@@ -455,66 +577,10 @@ void main(){
   // --- prescribed sources
   vec2 pu = vec2(float(i),       float(j) + 0.5) * dx;   // u-node position
   vec2 pw = vec2(float(i) + 0.5, float(j)      ) * dx;   // w-node position
-  if (u_src0.w > 0.5) {
-    if (distance(pu, u_src0.xy) < u_src0.z) un = u_sv0.x;
-    if (distance(pw, u_src0.xy) < u_src0.z) wn = u_sv0.y;
-  }
-  if (u_src1.w > 0.5) {
-    if (distance(pu, u_src1.xy) < u_src1.z) un = u_sv1.x;
-    if (distance(pw, u_src1.xy) < u_src1.z) wn = u_sv1.y;
-  }
-  if (u_in.z > 0.5 && u_in.w < 0.5 && i == 1) {
-    // The full plug, up to the delivered surface. It used to taper to zero
-    // over its top three cells, because a hard step at the waterline shed
-    // ripples while the surface was a drag boundary. With the surface
-    // stress-free that taper is a slow layer injected at the inlet that
-    // nothing takes out (ν_t vanishes at the surface): on a 1.0 m reach at
-    // Low the surface ran at 0.66 V two metres in, and at 0.97 V with the
-    // full plug; m2's inlet fluctuates no more than it did with the taper.
-    // It is not the whole story: at Medium a deep, fast inlet still sheds a
-    // slow surface layer, taper or not — an open problem, engineering notes
-    // "The surface is stress-free".
-    un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
-  }
-  bool paddle = false;   // the wall paddle's face, exempt from the outflow-only rule below
-  if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
-    un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker
-    // A paddle AT THE WALL (column 1, left edge open, u_waveD > 0) is the
-    // linear piston condition — the paddle's velocity imposed at its mean
-    // position — fed through the open edge's zero-gradient ghost, so there
-    // is no pocket of water behind it. The face velocity alone would not
-    // conserve volume: in a progressive wave u and η are in phase, so more
-    // goes in under the crest than comes out under the trough and the flume
-    // fills at ~⟨uη⟩. Imposing the paddle's VOLUME flux, a·ω·D·cos ωt over
-    // the column's live depth, integrates to zero over a cycle, which is
-    // what a real paddle's swept volume does.
-    // SIM.wallPaddle() decides; u_waveD is 0 for every other piston.
-    //
-    // Opt-in (SIM.paddle, SIM.flapOn): a train envelope hands the paddle's
-    // velocity in from the CPU, and a FLAP hinged at z_h makes it grow
-    // linearly from the hinge, u(z) = U·(z − z_h)/(z₀ − z_h), with U the
-    // velocity at the still-water level z₀. At the wall the flap's volume
-    // flux is its swept rate U·[(z₀−z_h)² − (z_b−z_h)²]/2(z₀−z_h), held over
-    // the live depth the same way the piston's is.
-    bool flap = u_flap.y > u_flap.x;
-    if (u_waveU.y > 0.5) un = u_waveU.x;
-    float shp = flap ? max(pu.y - u_flap.x, 0.0) / (u_flap.y - u_flap.x) : 1.0;
-    if (u_waveD > 0.0 && i == 1) {
-      paddle = true;
-      vec4 Tc1 = texelFetch(u_Tc, ivec2(1, 0), 0);
-      if (flap) {
-        float eta = max(Tc1.g, Tc1.r + 0.5 * u_waveD);
-        float b2 = (Tc1.r - u_flap.x) * (Tc1.r - u_flap.x);
-        float sw = (u_flap.y - u_flap.x) * (u_flap.y - u_flap.x) - b2;
-        float lv = (eta - u_flap.x) * (eta - u_flap.x) - b2;
-        un *= shp * sw / max(lv, 1e-6);
-      } else {
-        un *= u_waveD / max(Tc1.g - Tc1.r, 0.5 * u_waveD);
-      }
-    } else if (flap) {
-      un *= shp;
-    }
-  }
+  pointSources(un, wn, pu, pw);
+  inflowPlug(un, i, pu);
+  bool paddle;
+  wavemaker(un, i, pu, fFu, paddle);
 
   // --- open-boundary ring. The outermost cells see a clamped stencil, and
   //     with a pinned Dirichlet f their momentum update is junk that leaks
@@ -529,37 +595,7 @@ void main(){
   // sqrt(2gL). The transport cap alone leaves ~12 m/s of headroom, and the
   // one-cell Dirichlet can resonate with the pond slosh right up to it —
   // the drowned-jump scenes used to pump themselves apart at t ≈ 40 s.
-  float gMag = abs(u_g);
-  // Torricelli off the PINNED SURFACE, which is at or below the reservoir
-  // level, so the bound only ever tightens with the change of u_in.x's
-  // meaning. It is a resonance guard with metres of headroom (s2 runs an
-  // inlet plug of 2.3 m/s under a cap of 6.4), not a physical statement.
-  float capR = (u_tw.y > 0.5) ? sqrt(2.0 * gMag * max(u_tw.x, 0.05)) + 1.0 : capBase;
-  float capL = (u_in.z > 0.5) ? sqrt(2.0 * gMag * max(u_in.x, 0.05)) + 1.0 : capBase;
-  if (i == 0)          wn = tE.g;
-  if (i == 1 && u_in.z > 0.5 && u_in.w > 0.5) un = clamp(un, -capL, capL);
-  if (i == NXY.x - 1) { un = clamp(un, -min(capR, capBase), min(capR, capBase)); wn = tW.g; }
-  if (j == 0)          un = tN.r;
-  if (j == NXY.y - 1) { wn = clamp(wn, -capBase, capBase); un = tS.r; }
-  // A PLAIN open edge (no level control on it) is an outflow boundary: its
-  // ghost mirrors the interior fill, so any inward velocity on the exchange
-  // face draws water out of nothing, and nothing in the zero-gradient ghost
-  // pushes back once the flow there reverses. Measured on hammer, with the
-  // surface momentum sink gone (#72): the outlet shaft's recirculation turned
-  // the right edge inward and it fed 8–10 m²/s into the domain until the air
-  // chamber above the pipe was full. Inflow is the level controls' job.
-  // Not in plan view: there is no free surface, the plane is full by
-  // construction, and its wake legitimately crosses an open edge both ways.
-  // A scene may hold its TAILWATER face to outflow too (u_twOut): a level
-  // control otherwise passes inflow, and behind a short pool it fed a pipe
-  // jet's entrainment straight from the edge (contraction: −2 m/s coming in
-  // along the surface, a 0.17 m mound against the outlet wall).
-  if (u_g != 0.0) {
-    if (i == 1 && u_in.z < 0.5 && !paddle) un = min(un, 0.0);
-    if (i == NXY.x - 1 && (u_tw.y < 0.5 || u_twOut > 0.5)) un = max(un, 0.0);
-    if (j == 1)                          wn = min(wn, 0.0);
-    if (j == NXY.y - 1)                  wn = max(wn, 0.0);
-  }
+  boundaryRing(un, wn, i, j, tE, tW, tN, tS, capBase, paddle);
 
   // --- no flux through solids; outermost faces are outside the domain
   if (sC > 0.5 || sW > 0.5) un = 0.0;
@@ -680,23 +716,11 @@ float fluxZ(int i, int j, float lim4){
   return clamp(a*ff + cf, -lim4 * fp, lim4 * fm);
 }
 
-void main(){
-  NXY = ivec2(u_res);
-  ivec2 c = ivec2(gl_FragCoord.xy);
-  int i = c.x, j = c.y;
-  float dx = u_dx, dt = u_dt;
-  float x = (float(i) + 0.5) * dx, z = (float(j) + 0.5) * dx;
-  float gMag = abs(u_g);
-
-  // A solid cell has no transport of its own, but the accumulator must be
-  // PASSED THROUGH, not zeroed: writing vec4(0) here would erase the history
-  // of a cell the mask later reopens, and MRT has no way to leave an
-  // attachment untouched.
-  if (SO(c) > 0.5) { o = vec4(0.0); ACC_KEEP return; }
-
-  // --- ghost ring: zero-gradient outflow, or a Dirichlet level control
-  bool gL = (i == 0), gR = (i == NXY.x - 1), gB = (j == 0), gT = (j == NXY.y - 1);
-  if (gL || gR || gB || gT) {
+// The ghost ring: zero-gradient outflow, or a Dirichlet level control, and the
+// accumulator's share of the flux through the ring's inner face. Writes o (and
+// oA under ACCUM) itself; main() returns straight after.
+void ghostCell(ivec2 c, int i, int j, float z, bool gL, bool gR, bool gB, bool gT){
+  float dx = u_dx, dt = u_dt, gMag = abs(u_g);
     ivec2 s = c;
     if (gL) s.x = 1; if (gR) s.x = NXY.x - 2;
     if (gB) s.y = 1; if (gT) s.y = NXY.y - 2;
@@ -731,40 +755,12 @@ void main(){
     if (gB) Ag.g = runMean(Ag.g, fluxZ(i, j, donorCap()), u_Tacc, dt);
     oA = Ag;
 #endif
-    o = m; return;
-  }
+  o = m;
+}
 
-  // --- stencil (f in .r, dyes in .g/.b — one fetch serves both). The wider
-  //     f stencil the advection needs is fetched inside fluxX/fluxZ; what is
-  //     left here is what the dye transport and the divergence still use.
-  vec4 F0 = TF(c);
-  vec4 Fw = TF(ivec2(i-1,j  )), Fe = TF(ivec2(i+1,j  ));
-  vec4 Fs = TF(ivec2(i,  j-1)), Fn = TF(ivec2(i,  j+1));
-
-  float fC = F0.r;
-  float uW = TU(c).r, uE = TU(ivec2(i+1,j)).r;
-  float wS = TU(c).g, wN = TU(ivec2(i,j+1)).g;
-
-  // Donor-cell positivity limiter. A cell can only lose through four faces,
-  // so capping each outgoing flux at a quarter of the donor's contents
-  // guarantees f never goes negative — WITHOUT a clamp. That distinction is
-  // the whole ball game: clamping a negative f back to zero invents water,
-  // and at a few thousand substeps a second across every surface and spray
-  // cell in the domain it invents a *lot* of it. This version is exactly
-  // conservative because both neighbours of a face pick the same donor from
-  // the sign of the same flux, and therefore agree on the same limit — which
-  // is now literally the same call: this cell's FW is its west neighbour's
-  // FE, argument for argument.
-  float lim4 = donorCap();
-  float FW = fluxX(i-1, j, lim4), FE = fluxX(i, j, lim4);
-  float FS = fluxZ(i, j-1, lim4), FN = fluxZ(i, j, lim4);
-  // The conservative candidate, kept UNCLAMPED: everything below (the range
-  // cap, the sponges, the point sources) is a source term, and <S> is exactly
-  // what they add. Clamp first and the balance loses the term it is meant to
-  // report.
-  float fCons = fC - dt * ((FE - FW) + (FN - FS)) / dx;
-  float fNew  = min(fCons, 8.0);
-
+// The relaxation sponges at level-controlled edges (tailwater, then inflow).
+float levelSponges(float fNew, int i, float z, float gMag){
+  float dt = u_dt;
   // --- relaxation sponge at level-controlled edges. A one-cell Dirichlet is
   //     a hard impedance step: pond slosh reflects off it, and with the
   //     momentum update supplying the exchange velocity the reflection can
@@ -801,7 +797,12 @@ void main(){
                                 : (tgt > fNew ? 8.0 * s * s : 2.0 * s * s);
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
+  return fNew;
+}
 
+// The plan-view residue drain (a scene's residueDrain, default off).
+float residueDrain(float fNew, int i, int j, float uW, float uE, float wS, float wN){
+  float dt = u_dt;
   // --- residue drain (a plan-view scene's residueDrain, default off). With
   //     gravity into the screen nothing pulls spray down, so every filament
   //     and droplet the jet sheds drifts for ever (vane: a third of the wet
@@ -822,7 +823,13 @@ void main(){
       fNew *= 1.0 - min(dt * u_drain.x * slow, 1.0);
     }
   }
+  return fNew;
+}
 
+// The dye rides along (advective form); see the comment for the van Leer faces.
+vec2 dyeAdvect(int i, int j, vec4 F0, vec4 Fw, vec4 Fe, vec4 Fs, vec4 Fn,
+               float uW, float uE, float wS, float wN){
+  float dx = u_dx, dt = u_dt;
   // --- dye rides along (advective form). First-order upwind spread a
   //     two-cell streak into a grey wash within a couple of metres (its
   //     numerical diffusivity is ~u·dx/2, far above any real dye's), so while
@@ -845,7 +852,11 @@ void main(){
   vec2 dNew = dC - dt * ((uE*dEu - uW*dWu + wN*dNu - wS*dSu) / dx - dC*div);
   dNew *= 1.0 - dt * u_dyeDecay;
   dNew = clamp(dNew, 0.0, 1.0);
+  return dNew;
+}
 
+// Dye released into the water at the scene's seeds and under the Dye tool.
+vec2 dyeRelease(vec2 dNew, float fC, float x, float z){
   // --- dye seeds release continuously into whatever water is at them
   if (u_dyeSeed.x > 0.5 && fC > 0.3 &&
       (u_dyeSeed.y <= 0.0 || fract(u_time / u_dyeSeed.y) < 0.5)) {
@@ -865,14 +876,80 @@ void main(){
   if (u_dyeInj.w > 0.5 && fC > 0.3 && distance(vec2(x, z), u_dyeInj.xy) < u_dyeInj.z) {
     dNew.x = 1.0;
   }
+  return dNew;
+}
 
-  // --- point sources add volume and colour
+// Point sources add volume and colour.
+void sourceFill(inout float fNew, inout vec2 dNew, float x, float z){
   if (u_src0.w > 0.5 && distance(vec2(x,z), u_src0.xy) < u_src0.z) {
     fNew = max(fNew, 1.0); dNew = max(dNew, u_sv0.zw);
   }
   if (u_src1.w > 0.5 && distance(vec2(x,z), u_src1.xy) < u_src1.z) {
     fNew = max(fNew, 1.0); dNew = max(dNew, u_sv1.zw);
   }
+}
+
+void main(){
+  NXY = ivec2(u_res);
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  int i = c.x, j = c.y;
+  float dx = u_dx, dt = u_dt;
+  float x = (float(i) + 0.5) * dx, z = (float(j) + 0.5) * dx;
+  float gMag = abs(u_g);
+
+  // A solid cell has no transport of its own, but the accumulator must be
+  // PASSED THROUGH, not zeroed: writing vec4(0) here would erase the history
+  // of a cell the mask later reopens, and MRT has no way to leave an
+  // attachment untouched.
+  if (SO(c) > 0.5) { o = vec4(0.0); ACC_KEEP return; }
+
+  // --- ghost ring: zero-gradient outflow, or a Dirichlet level control
+  bool gL = (i == 0), gR = (i == NXY.x - 1), gB = (j == 0), gT = (j == NXY.y - 1);
+  if (gL || gR || gB || gT) {
+    ghostCell(c, i, j, z, gL, gR, gB, gT);
+    return;
+  }
+
+  // --- stencil (f in .r, dyes in .g/.b — one fetch serves both). The wider
+  //     f stencil the advection needs is fetched inside fluxX/fluxZ; what is
+  //     left here is what the dye transport and the divergence still use.
+  vec4 F0 = TF(c);
+  vec4 Fw = TF(ivec2(i-1,j  )), Fe = TF(ivec2(i+1,j  ));
+  vec4 Fs = TF(ivec2(i,  j-1)), Fn = TF(ivec2(i,  j+1));
+
+  float fC = F0.r;
+  float uW = TU(c).r, uE = TU(ivec2(i+1,j)).r;
+  float wS = TU(c).g, wN = TU(ivec2(i,j+1)).g;
+
+  // Donor-cell positivity limiter. A cell can only lose through four faces,
+  // so capping each outgoing flux at a quarter of the donor's contents
+  // guarantees f never goes negative — WITHOUT a clamp. That distinction is
+  // the whole ball game: clamping a negative f back to zero invents water,
+  // and at a few thousand substeps a second across every surface and spray
+  // cell in the domain it invents a *lot* of it. This version is exactly
+  // conservative because both neighbours of a face pick the same donor from
+  // the sign of the same flux, and therefore agree on the same limit — which
+  // is now literally the same call: this cell's FW is its west neighbour's
+  // FE, argument for argument.
+  float lim4 = donorCap();
+  float FW = fluxX(i-1, j, lim4), FE = fluxX(i, j, lim4);
+  float FS = fluxZ(i, j-1, lim4), FN = fluxZ(i, j, lim4);
+  // The conservative candidate, kept UNCLAMPED: everything below (the range
+  // cap, the sponges, the point sources) is a source term, and <S> is exactly
+  // what they add. Clamp first and the balance loses the term it is meant to
+  // report.
+  float fCons = fC - dt * ((FE - FW) + (FN - FS)) / dx;
+  float fNew  = min(fCons, 8.0);
+
+  fNew = levelSponges(fNew, i, z, gMag);
+
+  fNew = residueDrain(fNew, i, j, uW, uE, wS, wN);
+
+  vec2 dNew = dyeAdvect(i, j, F0, Fw, Fe, Fs, Fn, uW, uE, wS, wN);
+
+  dNew = dyeRelease(dNew, fC, x, z);
+
+  sourceFill(fNew, dNew, x, z);
 
   // A NaN / rounding guard behind the donor-side flux cap above, NOT an f
   // clamp: in a conserving run the cap keeps fNew inside [0, 8) already, so
@@ -1447,6 +1524,37 @@ vec3 fieldColour(float v, vec4 U){
   return col;
 }
 
+/** The ink and the pour's dye B, over the water. u_dyeOn: 1 = ink and dye B,
+ *  0.5 = dye B alone, 0 = neither (Average). */
+vec3 dyeLayer(vec3 c, vec4 F, vec2 g, float wet){
+  if (u_dyeOn > 0.25) {
+    float dA = u_dyeOn > 0.75 ? F.g : 0.0, dB = F.b;
+    // Seeded dye is INK: near-black, because every colouring is a bright
+    // ramp and the one colour none of them contains is black. Opacity rises
+    // steeply and saturates, 1 − e^(−5d), so a streak that has diffused to a
+    // tenth of its release strength is still a visible grey plume (≈ 0.35)
+    // rather than vanishing — the linear 0.85·d it replaced lost a plume
+    // the moment it had spread over a few cells.
+    float a = inkA(dA);
+    // Black is the one colour no ramp contains — except at their DARK ends:
+    // ink drifting into the slow, near-black purple of Speed vanished. So
+    // where the ground under it is dark, the plume's edge gets a pale rim
+    // (the ink's gradient over ±1.5 cells, on its outer side), and only there:
+    // on the bright colourings the rim is off and the ink is just ink.
+    float lum = dot(c, vec3(0.299, 0.587, 0.114));
+    float dark = 1.0 - smoothstep(0.16, 0.38, lum);
+    if (dark > 0.0 && dA > 0.004) {     // (dA is 0 with Dye off: no rim)
+      float gx = inkA(blF(g + vec2(1.5, 0.0)).g) - inkA(blF(g - vec2(1.5, 0.0)).g);
+      float gz = inkA(blF(g + vec2(0.0, 1.5)).g) - inkA(blF(g - vec2(0.0, 1.5)).g);
+      float edge = clamp(length(vec2(gx, gz)) * 1.4, 0.0, 1.0);
+      c = mix(c, vec3(0.78, 0.84, 0.92), edge * dark * (1.0 - a) * 0.75 * wet);
+    }
+    c = mix(c, vec3(0.02, 0.02, 0.035), a * wet);
+    c = mix(c, vec3(1.00, 0.66, 0.20), clamp(dB, 0.0, 1.0) * 0.85 * wet);
+  }
+  return c;
+}
+
 void main(){
   vec2 uv = vUv;
   vec2 g  = uv * u_res;                       // grid coords
@@ -1515,31 +1623,7 @@ void main(){
   // u_dyeOn: 1 = the ink (Dye tool and seeds) and the pour's dye B — what the
   // app always draws now; 0.5 = dye B alone (a caller that asks for no ink);
   // 0 = neither (Average).
-  if (u_dyeOn > 0.25) {
-    float dA = u_dyeOn > 0.75 ? F.g : 0.0, dB = F.b;
-    // Seeded dye is INK: near-black, because every colouring is a bright
-    // ramp and the one colour none of them contains is black. Opacity rises
-    // steeply and saturates, 1 − e^(−5d), so a streak that has diffused to a
-    // tenth of its release strength is still a visible grey plume (≈ 0.35)
-    // rather than vanishing — the linear 0.85·d it replaced lost a plume
-    // the moment it had spread over a few cells.
-    float a = inkA(dA);
-    // Black is the one colour no ramp contains — except at their DARK ends:
-    // ink drifting into the slow, near-black purple of Speed vanished. So
-    // where the ground under it is dark, the plume's edge gets a pale rim
-    // (the ink's gradient over ±1.5 cells, on its outer side), and only there:
-    // on the bright colourings the rim is off and the ink is just ink.
-    float lum = dot(c, vec3(0.299, 0.587, 0.114));
-    float dark = 1.0 - smoothstep(0.16, 0.38, lum);
-    if (dark > 0.0 && dA > 0.004) {     // (dA is 0 with Dye off: no rim)
-      float gx = inkA(blF(g + vec2(1.5, 0.0)).g) - inkA(blF(g - vec2(1.5, 0.0)).g);
-      float gz = inkA(blF(g + vec2(0.0, 1.5)).g) - inkA(blF(g - vec2(0.0, 1.5)).g);
-      float edge = clamp(length(vec2(gx, gz)) * 1.4, 0.0, 1.0);
-      c = mix(c, vec3(0.78, 0.84, 0.92), edge * dark * (1.0 - a) * 0.75 * wet);
-    }
-    c = mix(c, vec3(0.02, 0.02, 0.035), a * wet);
-    c = mix(c, vec3(1.00, 0.66, 0.20), clamp(dB, 0.0, 1.0) * 0.85 * wet);
-  }
+  c = dyeLayer(c, F, g, wet);
 
   // ---- free-surface line — drawn OVER the dye: ink in a nappe or a jet
   //      against the near-black canvas is black on black, and the line is

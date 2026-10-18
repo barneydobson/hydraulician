@@ -3293,7 +3293,8 @@ SUITES.avg = async (B) => {
                        nx, ny, gl.RGBA, gl.FLOAT, buf);   // storage would kill them
     };
     const grab = (avg, mode, lo, hi) => {
-      APP.SIM.render(APP.view, { mode, vmax: 4, lo, hi, pdt: 0, dye: false,
+      const fld = fieldFor(mode);
+      APP.SIM.render(APP.view, { mode, ramp: fld.ramp, mid: fld.mid, vmax: 4, lo, hi, pdt: 0, dye: false,
         particles: false, cursor: [-99, -99, 0], guide: [0,0,0,0],
         guideOn: false, avg });
       const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;

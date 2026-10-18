@@ -9,6 +9,12 @@
  * It reaches back into main.js for CONFIG, state, sim, loadScene, placeCV,
  * placeFlux, seedTracers, showToast, syncPanel, CV_NEXT and GINSP -- all from
  * inside functions.
+ *
+ * Defines: RIG
+ *
+ * Reads:   CV_NEXT, freeGaugeColour, GINSP, LEGEND, loadScene, placeCV,
+ *          placeFlux, SCENES, seedTracers, setAllGaugeFields, showToast, SIM,
+ *          sim, state, syncPanel
  */
 
 // ------------------------------------------------------- rig save / share

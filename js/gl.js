@@ -3,6 +3,10 @@
  * gl.js — tiny WebGL2 helpers (no dependencies).
  * Program compilation, float textures, framebuffers, ping-pong pairs,
  * a fullscreen-triangle draw and a bufferless POINTS draw for particles.
+ *
+ * Defines: GLH
+ *
+ * Reads:   none
  */
 const GLH = (() => {
 

@@ -127,8 +127,8 @@ const MUTANTS = [
 
   { id: "ynk-ema-not-bypassed", suite: "avg", file: "/js/overlay.js",
     why: "the averaged path re-runs the global normal-depth EMA, averaging an average",
-    find: "      if (AVG) S._ynK = k;",
-    replace: "      if (AVG) S._ynK = isFinite(S._ynK) ? S._ynK + EMA * (k - S._ynK) : k;",
+    find: "      if (AVG) est.ynK = k;",
+    replace: "      if (AVG) est.ynK = isFinite(est.ynK) ? est.ynK + EMA * (k - est.ynK) : k;",
     kills: "H2c",
     measured: "two successive 6% steps toward the clean value: k lands at "
             + "0.0696/0.0737 against a clean 0.1377" },
@@ -774,12 +774,14 @@ SUITES.geom = async (B) => {
     const out = {};
     APP.state.force = { solidId: "wall0", faceId: "side1", data: null, t0: 0 };
     APP.state.forceHover = { solidId: "wall0", faceId: "side1" };
-    APP.sim._ynK = 5;
+    OVERLAY.analyse(APP.sim, APP.SIM.columns(true));   // live call seeds the estimates
+    out.seeded = OVERLAY.estimates(APP.sim).hA !== null;
     const cur = APP.SIM.params().values.gap;
     const other = cur === 0.5 ? 0.4 : 0.5;
     APP.SIM.setParam("gap", other);
     out.force = APP.state.force; out.hover = APP.state.forceHover;
-    out.ynK = APP.sim._ynK;
+    out.ynK = OVERLAY.estimates(APP.sim).ynK;
+    out.hAcleared = OVERLAY.estimates(APP.sim).hA === null;
     let n = 0, seen = null;
     const off = APP.SIM.onGeometry((S) => { n++; seen = S; });
     APP.SIM.setParam("gap", cur);
@@ -797,7 +799,8 @@ SUITES.geom = async (B) => {
     hook.force === null && hook.hover === null,
     `force: ${JSON.stringify(hook.force)}, hover: ${JSON.stringify(hook.hover)}`);
   ok("geom setParam resets the overlay's running estimates",
-    Number.isNaN(hook.ynK), `_ynK: ${hook.ynK}`);
+    hook.seeded && hook.hAcleared && Number.isNaN(hook.ynK),
+    `seeded: ${hook.seeded}, hA cleared: ${hook.hAcleared}, ynK: ${hook.ynK}`);
   ok("geom SIM.onGeometry fires for setParam (live grid), not for a valve flip, and unsubscribes",
     hook.callsAfterParam === 1 && hook.calls === 1 && hook.keptOnValve &&
       hook.sameGrid && hook.afterOff === 1,
@@ -1336,7 +1339,7 @@ SUITES.physics = async (B) => {
     // against 8.86) and only levels off around t = 45.
     const t = __settle(40, 150000);
     // qRaw / dRaw, NOT q / d. analyse() carries its own 10% EMA over the
-    // column reduction (S._qA in js/overlay.js) to steady the on-screen
+    // column reduction (the qA estimate in js/overlay.js) to steady the on-screen
     // profile against roll waves. Called ONCE on the mean columns, that EMA is
     // still 90% full of the LIVE frames that came before it, so A.q would be a
     // blend of the average with the instant -- and would report a spread of
@@ -2892,14 +2895,14 @@ SUITES.avg = async (B) => {
     // H2c — the _ynK global normal-depth estimate must ignore the seed too.
     OVERLAY.resetEstimates(APP.sim);
     OVERLAY.analyse(APP.sim, D);                  // live call seeds _ynK from D
-    const kSeed = S._ynK;
+    const kSeed = OVERLAY.estimates(S).ynK;
     OVERLAY.analyse(APP.sim, C, { averaged: true });
-    const k1 = S._ynK;
+    const k1 = OVERLAY.estimates(S).ynK;
     OVERLAY.analyse(APP.sim, C, { averaged: true });
-    const k2 = S._ynK;
+    const k2 = OVERLAY.estimates(S).ynK;
     OVERLAY.resetEstimates(APP.sim);
     OVERLAY.analyse(APP.sim, C, { averaged: true }); // clean reference, no seed
-    const kClean = S._ynK;
+    const kClean = OVERLAY.estimates(S).ynK;
     const ynAtClean = Math.abs(k1 - kClean) < 1e-9 && Math.abs(k2 - kClean) < 1e-9;
     // The seed must actually differ from kClean by more than an EMA step
     // could close, or a false pass here would mean the test has no power.
@@ -3095,13 +3098,14 @@ SUITES.avg = async (B) => {
     __low(); APP.tick(300);
     const S = APP.sim;
     OVERLAY.analyse(S, APP.SIM.columns(true));    // seed the live EMAs
-    const seed1 = S._hA !== null && S._qA !== null;
+    const est = () => OVERLAY.estimates(S);
+    const seed1 = est().hA !== null && est().qA !== null;
     APP.avg.set(true);                            // Live -> Average
-    const clearedOn = S._hA === null && S._qA === null && !isFinite(S._ynK);
+    const clearedOn = est().hA === null && est().qA === null && !isFinite(est().ynK);
     OVERLAY.analyse(S, APP.SIM.columns(true));    // seed them again, under Average
-    const seed2 = S._hA !== null;
+    const seed2 = est().hA !== null;
     APP.avg.set(false);                           // Average -> Live
-    const clearedOff = S._hA === null && S._qA === null && !isFinite(S._ynK);
+    const clearedOff = est().hA === null && est().qA === null && !isFinite(est().ynK);
     return { seed1, clearedOn, seed2, clearedOff, on: APP.state.avg };
   })()`);
   ok("H5 the transition probe actually had estimates to clear",

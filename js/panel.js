@@ -1,21 +1,5 @@
 "use strict";
 /**
- * panel.js — the Controls panel: the CONTROLS spec, its builder and sync, the
- *    focus profile, and the panel's open/close.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: CONTROLS, ctl, buildPanel, syncPanel, focusedSections, applyPanelFocus,
- *          setPanel, togglePanel, refreshNote
- *
- * Reads:   bestTracerX, clearAllGauges, computeView, CONFIG, EX, fieldBlurb,
- *          fieldFor, FIELDS, GAUGE_QTY, gaugeFieldOf, GINSP, gNote, LEGEND, OVERLAY,
- *          PICKER, RIG, seedTracers, setAllGaugeFields, setAverage, showToast, sim,
- *          SIM, state, syncToolbar, UIMODE
- */
-/**
  * panel.js — the Controls panel: the CONTROLS spec, its builder and sync, the focus
  *   profile, and the panel's open/close.
  *

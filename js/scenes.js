@@ -44,6 +44,10 @@
  * there almost at once and only the fluctuation remains, so they keep a short
  * spin-up. The wave flume, dam break, plan view and sandbox have none by
  * design: watching them develop from t = 0 is the point.
+ *
+ * Defines: SCENES
+ *
+ * Reads:   GEOM, SIM, snap
  */
 const SCENES = (() => {
 

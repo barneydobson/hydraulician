@@ -1,37 +1,6 @@
 "use strict";
 /**
  * main.js — boot, the view transform, scenes, pointer tools, the frame loop,
- *    drawing the overlay and markers, the status bar, tips, Average,
- *    fullscreen, and window.APP.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: baseRect, computeView, zoomAt, VEX_FILL, VEX_MAX, autoVex, applyAutoVex,
- *          resetZoom, foldText, loadScene, syncTitle, switchScene, syncURL, POUR,
- *          dragTo, snap, pointerPx, pointerPos, pointers, stopDye, TOUCH_HOLD_MS,
- *          TOUCH_SLOP_PX, TAP_PX, cancelPending, commitPending, onDown, beginPress,
- *          tapRead, onMove, onUp, lastT, acc, probeTick, wasWarming, frame,
- *          tickFrame, drawOverlay, pxApart, GRAB_PX, grabPx, nearSegment, faceAtPx,
- *          flashOf, drawMarkers, drawSpout, updateStatus, exerciseTips, tipList,
- *          showTip, restartTips, cycleTips, boot, togglePause, setAverage,
- *          toggleValve, toggleFullscreen, stripEmbed, popOut
- *
- * Reads:   advanceTracers, buildPanel, buildToolbar, canvas, clearAllGauges,
- *          clearGaugeHistory, clearInstruments, collectStream, CONFIG, DOCK, EMBED,
- *          EX, familyOf, fieldFor, FIELDS, fitBar, forceScale, GAUGE_QTY,
- *          gaugeFieldOf, gaugeQty, gaugeSeries, GEOM, GINSP, gov, governFrame,
- *          governLearn, KEYMAP, KEYS, LEGEND, measuringAvg, MINI, octx, over,
- *          OVERLAY, PICKER, placeCV, placeFlux, placeGauge, placeRake, rangeFor,
- *          refreshGrade, refreshNote, removeFluxAt, removeGauge, requestStream, RIG,
- *          sampleCV, sampleFlux, sampleForce, sampleGauges, sampleInlet, sampleRakes,
- *          SCENES, scenesOffered, seedTracers, setPanel, Shaders, showToast, sim,
- *          SIM, START, state, statWin, syncPanel, syncToolbar, syncValveBtn,
- *          toastTimer, TOOL_KEYS, TOOLBAR, TOOLS, UIMODE, view, vmaxFor, wheelHint
- */
-/**
- * main.js — boot, the view transform, scenes, pointer tools, the frame loop,
  *   drawing the overlay and markers, the status bar, tips, Average,
  *   fullscreen, and window.APP.
  *

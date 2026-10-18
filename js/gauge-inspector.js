@@ -9,6 +9,11 @@
  * It reaches back into main.js for FIELDS, KEYS, canvas, dragWindow, frame,
  * showToast, state and syncPanel -- all from inside functions, which is what
  * makes the load order in index.html a free choice rather than a constraint.
+ *
+ * Defines: GINSP
+ *
+ * Reads:   dragWindow, GAUGE_QTY, gaugeFieldOf, gaugeQty, OVERLAY,
+ *          removeGauge, showToast, state, syncPanel, UIMODE
  */
 
 // -------------------------------------------------------- gauge inspector

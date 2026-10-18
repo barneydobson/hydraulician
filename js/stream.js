@@ -1,3 +1,10 @@
+/**
+ * stream.js — dependency record (checked by exercises/_runner/check_headers.py).
+ *
+ * Defines: STREAM
+ *
+ * Reads:   none
+ */
 /* =========================================================================
  * stream.js — STREAMLINES as contours of the stream function. No WebGL here:
  * SIM.streamRequest/streamPoll fetch the field, this turns it into line

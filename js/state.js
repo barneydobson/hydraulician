@@ -1,19 +1,6 @@
 "use strict";
 /**
  * state.js — the app's configuration and mutable state: CONFIG (budgets and
- *    defaults), `state`, EMBED, and the view handles (canvas, over, octx,
- *    view, sim) the other files assign in boot.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: CONFIG, state, EMBED, canvas, over, octx, view, sim
- *
- * Reads:   none
- */
-/**
- * state.js — the app's configuration and mutable state: CONFIG (budgets and
  *   defaults), `state`, EMBED, and the view handles (canvas, over, octx,
  *   view, sim) the other files assign in boot.
  *

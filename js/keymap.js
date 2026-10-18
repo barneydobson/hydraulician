@@ -1,3 +1,14 @@
+/**
+ * keymap.js — dependency record (checked by exercises/_runner/check_headers.py).
+ *
+ * Defines: KEYMAP
+ *
+ * Reads:   clearGaugeHistory, CV_NEXT, DOCK, EX, familyOf, fireTrain,
+ *          hasValves, KEYS, LEGEND, PICKER, resetZoom, scenesOffered,
+ *          setAverage, showToast, SIM, START, state, syncPanel, syncToolbar,
+ *          toggleFullscreen, togglePause, toggleValve, trainOffered, UIMODE,
+ *          view, zoomAt
+ */
 /* KEYMAP — every keyboard shortcut, described once.
  *
  * The keydown handler in main.js, the Keyboard sheet (KEYS.render) and the

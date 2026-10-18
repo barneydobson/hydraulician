@@ -7,6 +7,10 @@
  * sized to a cell budget, so changing resolution changes Δx but never the
  * physics you are looking at, and resizing the window only moves the
  * letterbox — the simulation carries on untouched.
+ *
+ * Defines: SIM
+ *
+ * Reads:   canvas, fireTrain, GEOM, GLH, RECON, Shaders, view
  */
 const SIM = (() => {
 

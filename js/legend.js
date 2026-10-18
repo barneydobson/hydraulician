@@ -1,20 +1,5 @@
 "use strict";
 /**
- * legend.js — the legend card (LEGEND) and the interface profile (UIMODE):
- *    what an exercise shows a student.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: LEGEND, UIMODE
- *
- * Reads:   buildToolbar, dragWindow, familyOf, fieldBlurb, fieldById, fieldFor,
- *          FIELDS, GAUGE_QTY, measuringAvg, onDown, rangeFor, RECON, setAverage,
- *          Shaders, showToast, sim, SIM, state, syncPanel, syncToolbar, TOOLS,
- *          vmaxFor
- */
-/**
  * legend.js — the legend card (LEGEND) and the interface profile (UIMODE): what an
  *   exercise shows a student.
  *

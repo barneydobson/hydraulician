@@ -1,26 +1,5 @@
 "use strict";
 /**
- * strip.js — the top strip: the tool register (TOOLS), icons, tooltips (TIP),
- *    the TOOLBAR spec and its builder, the strip's scene/valve/sandbox
- *    helpers, and the Keyboard sheet (KEYS, which renders from KEYMAP at call
- *    time).
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: TOOLS, TOOL_LETTER, TOOL_KEYS, ICONS, iconEl, TIP, scenesOffered,
- *          trainOffered, fireTrain, valveWarned, hasValves, valvesShown, trainLit,
- *          syncValveBtn, newArmed, newSandbox, TOOLBAR, toolItems, familyOf,
- *          toolItem, aboutHref, OPENERS, buildToolbar, showAllGroup, fitBar,
- *          syncToolbar, KEYS
- *
- * Reads:   applyAutoVex, canvas, clearAllGauges, clearGaugeHistory, EMBED, EX,
- *          KEYMAP, LEGEND, onDown, over, PICKER, popOut, setAverage, showToast, sim,
- *          SIM, START, state, switchScene, syncPanel, toggleFullscreen, togglePanel,
- *          togglePause, toggleValve, UIMODE
- */
-/**
  * strip.js — the top strip: the tool register (TOOLS), icons, tooltips (TIP), the
  *   TOOLBAR spec and its builder, the strip's scene/valve/sandbox helpers,
  *   and the Keyboard sheet (KEYS, which renders from KEYMAP at call time).

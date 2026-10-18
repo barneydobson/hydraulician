@@ -162,6 +162,10 @@
  * Standing rules every worksheet carries: Resolution Medium · wait out the
  * settle · median-of-the-wobble reads, never one frame · after changing q,
  * re-check any tailwater ≥ 1.3·d_c · keep the tab visible.
+ *
+ * Defines: EXERCISES, CARD_KEYS, CARD_KEYS_STAMPED, TAB_KEYS
+ *
+ * Reads:   none
  */
 const EXERCISES = [];
 

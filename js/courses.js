@@ -1,3 +1,10 @@
+/**
+ * courses.js — dependency record (checked by exercises/_runner/check_headers.py).
+ *
+ * Defines: COURSES, COURSE_KEYS
+ *
+ * Reads:   EXERCISES
+ */
 // COURSES — the course menus this build knows, and which one is active.
 //
 // A course is one module someone teaches with the app: a title and the

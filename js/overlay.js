@@ -7,6 +7,10 @@
  * the energy grade line, the surface-profile classification (M1, M2, S2 …),
  * gauge traces and the velocity rake. This is the part that turns a pretty
  * fluid into a hydraulics lesson.
+ *
+ * Defines: OVERLAY
+ *
+ * Reads:   GEOM, sim
  */
 const OVERLAY = (() => {
 
@@ -74,13 +78,21 @@ const OVERLAY = (() => {
    */
   const CLIFF = 2.5;                                 // cells per column
 
+  // The running estimates analyse() carries between frames — the per-column
+  // depth and discharge time averages (hA, qA) and the domain-wide normal-depth
+  // constant (ynK) — live here, keyed by the grid they describe, rather than
+  // on SIM's grid object. A rebuilt grid is a new key and starts clean.
+  const ESTIMATES = new WeakMap();
+
   function analyse(sim, col, opts) {
     const S = sim, g = Math.abs(S.p.g) || 9.81, nx = S.nx, dx = S.dx;
     // Average mode hands in mean columns. They have already been averaged over
     // the window, so the prefilters below must NOT run: sm() would smooth in
-    // space and _hA/_qA/_ynK would smooth in time a second time, which shows
+    // space and est.hA/qA/ynK would smooth in time a second time, which shows
     // up as a jump broadened by the filter rather than by the flow.
     const AVG = !!(opts && opts.averaged);
+    let est = ESTIMATES.get(S);
+    if (!est) ESTIMATES.set(S, est = { hA: null, qA: null, ynK: NaN });
     const out = { bed: [], d: [], q: [], surf: [], dc: [], dn: [], S0: [], V: [], Fr: [], hv: [] };
 
     const win = Math.max(5, Math.round(nx * 0.09));
@@ -231,11 +243,11 @@ const OVERLAY = (() => {
       // it survives. Doing this spatially instead needs a window wide enough
       // to swallow a roll wave, which is also wide enough to erase the short
       // reaches that matter most.
-      if (!S._hA || S._hA.length !== nx) { S._hA = new Float32Array(dS); S._qA = new Float32Array(qS); }
+      if (!est.hA || est.hA.length !== nx) { est.hA = new Float32Array(dS); est.qA = new Float32Array(qS); }
       for (let i = 0; i < nx; i++) {
-        S._hA[i] += 0.10 * (dS[i] - S._hA[i]);
-        S._qA[i] += 0.10 * (qS[i] - S._qA[i]);
-        dS[i] = S._hA[i]; qS[i] = S._qA[i];
+        est.hA[i] += 0.10 * (dS[i] - est.hA[i]);
+        est.qA[i] += 0.10 * (qS[i] - est.qA[i]);
+        dS[i] = est.hA[i]; qS[i] = est.qA[i];
       }
     }
     out.dRaw = []; out.qRaw = [];
@@ -331,15 +343,15 @@ const OVERLAY = (() => {
       // Average mode's candidates are already drawn from a mean field, so the
       // window's answer IS the estimate — EMA'ing it against whatever the
       // live path last left behind would blend two different flow states.
-      if (AVG) S._ynK = k;
-      else S._ynK = isFinite(S._ynK) ? S._ynK + EMA * (k - S._ynK) : k;
+      if (AVG) est.ynK = k;
+      else est.ynK = isFinite(est.ynK) ? est.ynK + EMA * (k - est.ynK) : k;
     }
     out.dn = new Array(nx).fill(NaN);
     let anyDn = 0, sumDn = 0;
-    if (isFinite(S._ynK)) {
+    if (isFinite(est.ynK)) {
       for (let i = 0; i < nx; i++) {
         if (out.S0[i] <= 2e-4) continue;
-        out.dn[i] = S._ynK / Math.pow(out.S0[i], 1 / 3);
+        out.dn[i] = est.ynK / Math.pow(out.S0[i], 1 / 3);
         anyDn++; sumDn += out.dn[i];
       }
     }
@@ -351,7 +363,7 @@ const OVERLAY = (() => {
   /** Forget the running estimates — the per-column depth/discharge time
    *  averages and the domain-wide normal-depth constant.
    *
-   *  `_ynK` is ONE number for the whole domain, EMA'd over time and only fed
+   *  `ynK` is ONE number for the whole domain, EMA'd over time and only fed
    *  by columns whose S_f sits in a sane band, so a redrawn rig inherits the
    *  old rig's normal depth for as long as the new one fails to produce
    *  candidates: a drowned gate on a 1-in-4 bed read "M1" that way, because
@@ -359,7 +371,15 @@ const OVERLAY = (() => {
    *  Anything that re-rasterises the walls calls this. */
   function resetEstimates(sim) {
     if (!sim) return;
-    sim._ynK = NaN; sim._hA = null; sim._qA = null;
+    ESTIMATES.delete(sim);
+  }
+
+  /** Read-only view of a grid's running estimates, for tests: `{ hA, qA, ynK }`
+   *  — the two per-column time averages (or null) and the normal-depth
+   *  constant (NaN when there is none). Never creates an entry. */
+  function estimates(sim) {
+    const e = sim && ESTIMATES.get(sim);
+    return e ? { hA: e.hA, qA: e.qA, ynK: e.ynK } : { hA: null, qA: null, ynK: NaN };
   }
 
   /** Locate hydraulic jumps: Fr crosses 1 downwards and the depth jumps up.
@@ -1794,7 +1814,7 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
-  return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
+  return { analyse, resetEstimates, estimates, classify, manning, findJumps, profileRuns,
            keyRow, flushKeys, drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawPinMark, drawRake,
            drawGradeLines, drawStreamlines, drawWind, drawRakeScale,
            ROW_IDS, DEFAULT_ROWS, setPrint, PRINT,

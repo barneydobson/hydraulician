@@ -1,18 +1,5 @@
 "use strict";
 /**
- * dock.js — floating furniture: toasts, the minimisable boxes (MINI), the
- *    docked side panel (DOCK), the start screen (START), and window dragging.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: toastTimer, showToast, hinted, wheelHint, MINI, DOCK, START, dragWindow
- *
- * Reads:   aboutHref, applyAutoVex, EX, fitBar, iconEl, KEYS, newSandbox, PICKER,
- *          setPanel, TIP
- */
-/**
  * dock.js — floating furniture: toasts, the minimisable boxes (MINI), the docked
  *   side panel (DOCK), the start screen (START), and window dragging.
  *

@@ -1,17 +1,5 @@
 "use strict";
 /**
- * governor.js — the frame-rate governor: how many substeps a frame may take,
- *    learned from the wall time they cost.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: statWin, gov, governFrame, governTarget, governLearn
- *
- * Reads:   CONFIG, state
- */
-/**
  * governor.js — the frame-rate governor: how many substeps a frame may take, learned
  *   from the wall time they cost.
  *

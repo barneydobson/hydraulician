@@ -1,3 +1,10 @@
+/**
+ * exercises-rigs.js — dependency record (checked by exercises/_runner/check_headers.py).
+ *
+ * Defines: EXERCISE_RIGS
+ *
+ * Reads:   none
+ */
 /* Generated rig payloads for the exercise picker. One entry per drawn-rig
    exercise: the RIG snapshot JSON its folder's rig.js produces. Every
    entry so far belongs to the original teaching pack, so "its folder" is

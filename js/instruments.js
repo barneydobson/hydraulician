@@ -1,24 +1,5 @@
 "use strict";
 /**
- * instruments.js — the instruments: gauges, rakes, flux sections, the control
- *    volume, force, orbit tracers, the streamline and inlet readbacks, and
- *    clearInstruments.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: sampleGauges, WHOLE_MAX, gaugeSeries, clearGaugeHistory, measuringAvg,
- *          sampleRakes, removeFluxAt, placeFlux, sampleFlux, placeCV, sampleCV,
- *          sampleForce, forceScale, FLUX_KEYS, CV_EDGES, emaFlux, refreshGrade,
- *          collectStream, requestStream, sampleInlet, bestTracerX, seedTracers,
- *          advanceTracers, placeGauge, freeGaugeColour, addGauge, removeGauge,
- *          clearAllGauges, clearInstruments, placeRake, CV_NEXT
- *
- * Reads:   CONFIG, gaugeFieldOf, GEOM, GINSP, grabPx, nearSegment, pxApart, sim, SIM,
- *          state, STREAM, syncPanel, view
- */
-/**
  * instruments.js — the instruments: gauges, rakes, flux sections, the control volume,
  *   force, orbit tracers, the streamline and inlet readbacks, and
  *   clearInstruments.

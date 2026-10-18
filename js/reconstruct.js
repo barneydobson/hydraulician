@@ -10,6 +10,10 @@
  * about two surviving digits of the variance the excursion band is drawn from.
  *
  * Second, the surface reconstruction (Tasks 2-4). See docs/averaging.md.
+ *
+ * Defines: RECON
+ *
+ * Reads:   none
  */
 const RECON = (() => {
 

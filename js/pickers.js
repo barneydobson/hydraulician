@@ -13,6 +13,14 @@
  * clearInstruments, syncURL, GINSP and RIG -- all from inside functions, so
  * index.html loads this BEFORE them (and must: main.js puts PICKER and EX on
  * window.APP at parse time).
+ *
+ * Defines: menuFlag, PICKER, EX
+ *
+ * Reads:   addGauge, canvas, clearInstruments, ctl, DOCK, EXERCISE_MENU,
+ *          EXERCISE_RIGS, EXERCISES, foldText, gaugeQty, GINSP, iconEl,
+ *          onDown, restartTips, RIG, SCENES, showToast, sim, state,
+ *          switchScene, syncPanel, syncTitle, syncURL, TIP, TOOLBAR, UIMODE,
+ *          view
  */
 
 /** One flag of the active course's menu (`EXERCISE_MENU`, which is null when no
@@ -1302,7 +1310,7 @@ const EX = (() => {
           t.appendChild(w);
         }
         r.appendChild(t);
-        const f = row.control ? fieldFor(row.control) : null;
+        const f = row.control ? controlRow(row.control) : null;
         if (f) r.appendChild(f);
         host.appendChild(r);
       });
@@ -1312,7 +1320,7 @@ const EX = (() => {
     /** The control, as a field. Numeric rows get a number box carrying the
      *  panel's own min/max/step, so a value typed here is a value the slider
      *  could have reached; a tickbox stays a tickbox and a menu a menu. */
-    function fieldFor(id) {
+    function controlRow(id) {
       const c = ctl(id);
       if (!c || !c.set) return null;
       const wrap = document.createElement("div");

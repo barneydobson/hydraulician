@@ -21,6 +21,10 @@
  * Velocity advection is 3rd-order upwind (low dissipation — jets stay crisp);
  * f advection is superbee-limited flux form plus an interFoam-style
  * compression flux (keeps the free surface ~2 cells thick).
+ *
+ * Defines: Shaders
+ *
+ * Reads:   none
  */
 const Shaders = (() => {
 

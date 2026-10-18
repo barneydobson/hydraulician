@@ -1,20 +1,5 @@
 "use strict";
 /**
- * fields.js — what the water is painted with (FIELDS) and what a gauge can
- *    record (GAUGE_QTY), the scene-scaled colour ranges, and the per-gauge
- *    quantity helpers.
- *
- * Classic script: its top-level names are globals shared with every other file,
- * so the lists below (checked by exercises/_runner/check_headers.py) are the
- * dependency record. Load order is index.html's.
- *
- * Defines: FIELDS, sceneNow, hmaxScene, pressureRange, momScene, fieldFor, fieldById,
- *          gNote, fieldBlurb, GAUGE_QTY, gaugeQty, gaugeFieldOf, setAllGaugeFields,
- *          rangeFor, vmaxFor
- *
- * Reads:   SIM, sim, state, UIMODE
- */
-/**
  * fields.js — what the water is painted with (FIELDS) and what a gauge can record
  *   (GAUGE_QTY), the scene-scaled colour ranges, and the per-gauge
  *   quantity helpers.

@@ -93,7 +93,7 @@ function sceneNow() { return state.scene || {}; }
 function hmaxScene() { const s = sceneNow(); return s.hmax || (s.g ? 2.0 : 1); }
 /** The Pressure field's default range, in kPa. A scene may state its own
  *  (`pRange: [lo, hi]`); otherwise under gravity it is the hydrostatic scale
- *  ρgH over the scene's pressure-head maximum, and in a plan view (|g| < 0.5,
+ *  ρgH over the scene's pressure-head maximum, and in a plan view (|g| < 0.1, SIM.planView,
  *  where hydrostatics is absent) the live field's own spread, fitted ONCE when
  *  the range is first asked for and held from then on like any other range.
  *  A plan view's pressure has no hydrostatic zero: a closed or level-fed
@@ -104,8 +104,11 @@ function hmaxScene() { const s = sceneNow(); return s.hmax || (s.g ? 2.0 : 1); }
 function pressureRange() {
   const s = sceneNow();
   if (Array.isArray(s.pRange)) return s.pRange.slice();
-  const g = s.g === undefined ? 9.81 : Math.abs(s.g);
-  if (g < 0.5) {
+  // The live sim knows whether this is a plan view (|g| < 0.1) and what g is;
+  // before one is built (or in a unit context) fall back to the scene's own.
+  const plan = sim ? SIM.planView() : s.g !== undefined && Math.abs(s.g) < 0.1;
+  const g = sim ? SIM.gMag() : (Math.abs(s.g) || 9.81);
+  if (plan) {
     const st = (sim && SIM.fieldStats) ? SIM.fieldStats(8, !!state.avg) : null;
     if (st && isFinite(st.lo) && isFinite(st.hi) && st.hi > st.lo) {
       const pad = 0.1 * (st.hi - st.lo);

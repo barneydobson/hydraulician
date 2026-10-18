@@ -29,8 +29,10 @@ const SIM = (() => {
     m >= MASK.SOLID_MIN || (!!valveClosed && m >= MASK.VALVE_MIN);
   /** A 0/1 flag held as a number (it is a uniform and a wire value). */
   const isOn = (v) => v > 0.5;
-  /** |g|, or 9.81 where the scene has none (plan view), so a head p/rho g stays finite. */
-  const gMag = () => Math.abs(S.p.g) || 9.81;
+  /** |g|, or 9.81 where the scene has none (plan view), so a head p/rho g stays
+   *  finite. With no grid built yet it is 9.81 too: every other module that
+   *  wants "the" gravity asks here rather than keeping a copy. */
+  const gMag = () => (S && Math.abs(S.p.g)) || 9.81;
   /** Plan view: no gravity, so no columns, no free surface, no depth. */
   const planView = () => Math.abs(S.p.g) < 0.1;
 
@@ -723,7 +725,7 @@ const SIM = (() => {
     }
     // texSubImage2D (GLH.upload), never texImage2D: these textures are FBO
     // colour attachments, and sub-image leaves their storage untouched.
-    for (const b of [S.F.a, S.F.b]) GLH.upload(gl, b.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, d, 4);
+    S.F.uploadBoth(S.nx, S.ny, gl.RGBA, gl.FLOAT, d, 4);
     // A fresh experiment restarts the closure's refresh cadence, so the same
     // reset followed by the same substeps is the same run — the F1 gate in
     // smoke.mjs compares two of them cell for cell.
@@ -751,7 +753,7 @@ const SIM = (() => {
         }
       }
     }
-    for (const b of [S.U.a, S.U.b]) GLH.upload(gl, b.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, vel, 4);
+    S.U.uploadBoth(S.nx, S.ny, gl.RGBA, gl.FLOAT, vel, 4);
     S.t = 0;
     // A wave train belongs to the run it was fired in: the clock restarts,
     // so does the paddle (the scene's own t0, if it fires one by itself).
@@ -1398,7 +1400,7 @@ const SIM = (() => {
    *  integral. Returns {k, L, kh, H_S, cp, cg}; k from ω² = gk tanh kh.
    *  On the grid the measured H falls short of it (WV-5's README). */
   function wavemakerHS(T, h, flap, l) {
-    const g = 9.81, om = 2 * Math.PI / T;
+    const g = gMag(), om = 2 * Math.PI / T;
     let k = Math.max(om * om / g, om / Math.sqrt(g * h));
     for (let n = 0; n < 40; n++) {
       const th = Math.tanh(k * h);

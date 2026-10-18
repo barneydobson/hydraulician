@@ -262,7 +262,7 @@ const CONTROLS = [
     fmt: (v) => v === 0 ? "off — the surface smears" : "cα " + v.toFixed(2),
     info: "The interFoam-style compression flux that keeps the free surface a couple of cells thick. Too high and thin jets bead up." },
   { id: "grav", type: "check", label: "Plan view (gravity off)",
-    get: () => SIM.planView(), set: (v) => sim.p.g = v ? 0 : (state.scene.g || 9.81),
+    get: () => SIM.planView(), set: (v) => sim.p.g = v ? 0 : (state.scene.g || SIM.gMag()),
     info: "Switches between the vertical profile and looking down on a horizontal plane." },
 
   { h: "Wavemaker" },

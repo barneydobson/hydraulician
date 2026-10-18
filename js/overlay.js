@@ -819,7 +819,7 @@ const OVERLAY = (() => {
       // no surface and the η row is suppressed, which is exactly where the
       // piezometric head is the only meaningful head to read.
       rows.push(["head h = z + p/ρg",
-        FMT.fix(mz - (sim.scene.tiltS0 || 0) * mx + probe.phead, 3) + " m", "h"]);
+        FMT.fix(probe.zp - (sim.scene.tiltS0 || 0) * mx + probe.phead, 3) + " m", "h"]);
       rows.push(["fill f", FMT.fix(probe.f, 3) + (probe.f > 1.002 ? "  pressurised" : ""), "f"]);
     }
     // Filter to what was asked for. A row with no id is never hidden -- if a
@@ -1702,7 +1702,10 @@ const OVERLAY = (() => {
       if (s.f > 0.5 && s.p > 0 && (!low || s.z < low.z)) low = s;
     }
     if (!low || !Number.isFinite(zf)) return null;
-    const eta = low.z + low.nz * 0.75 * sim.dx + low.p / g;
+    // The elevation the pressure belongs to is its cell's lower face (contract
+    // at the top of shaders.js): the cell the sample landed in, j·Δx.
+    const zc = Math.floor((low.z + low.nz * 0.75 * sim.dx) / sim.dx) * sim.dx;
+    const eta = zc + low.p / g;
     return eta > zf ? eta - zf : null;
   }
 

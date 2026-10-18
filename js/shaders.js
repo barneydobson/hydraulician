@@ -62,7 +62,12 @@ void main(){
   // Shared by the two simulation passes. Texture channel contract:
   //   u_U  RGBA32F   r = u at the WEST face of this cell
   //                  g = w at the SOUTH face of this cell
-  //                  b = p/ρ at the cell centre (m²/s², diagnostic)
+  //                  b = p/ρ, the pressure at the cell's LOWER face, z = j·Δx
+  //                      (m²/s², diagnostic). NOT the centre: the elevation a
+  //                      head is built on is j·Δx. MEASURED still-water rest,
+  //                      docs/numerics.md, "Where the stored pressure lives" (rms 2e-4 m vs 1.2e-2 m = Δx/2).
+  //                      Every consumer — FS_DISP 6/7, FS_HGL, hydraulicGrade,
+  //                      fieldStats, gauges, hover — follows this one rule.
   //                  a = ∇·u at the cell centre (diagnostic)
   //   u_F  RGBA32F   r = f (fill fraction / density)
   //                  g = dye A   b = dye B   a = spare
@@ -974,7 +979,9 @@ void main(){
   // (wet, h, 0, 0), so the refresh is an nx×1 readback and not two of the
   // whole field. The walk is the CPU one it replaced, cell for cell: the
   // lowest non-solid cell (a valve does not count) with f ≥ 0.25, and the
-  // pressure belongs to that cell's LOWER face, so z = j·Δx.
+  // pressure belongs to that cell's LOWER face, so z = j·Δx (the contract
+  // at the top of this file; measured in docs/numerics.md, "Where the stored
+  // pressure lives").
   const FS_HGL = `#version 300 es
 precision highp float;
 precision highp sampler2D;
@@ -1421,7 +1428,12 @@ void main(){
     // (h sags), a chute toe (h bulges), gate contractions, jump rollers.
     // A tilted-gravity scene draws a flat bed and carries S₀ in gravity, so the
     // elevation term is z − S₀x there.
-    float hp = pm.y - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
+    // The stored pressure belongs to the cell's LOWER face j·Δx (contract at
+    // the top of the file). blU is bilinear with each cell's value at its
+    // CENTRE, so the matching elevation is the sample height less Δx/2:
+    // linear in j, it interpolates j·Δx exactly. Using pm.y here put this
+    // field a half cell above the HGL line.
+    float hp = (pm.y - 0.5 * u_dx) - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
     water = turbo(nrm(hp));
   } else if (u_mode == 7) {
     // Energy head H = z + p/ρg + |u|²/2g — the piezometric head plus the
@@ -1432,7 +1444,7 @@ void main(){
     // No α here — that coefficient is what a depth-AVERAGED profile needs
     // because the point values differ; these are the point values.
     float g2 = max(abs(u_g), 1e-3);
-    float He = pm.y - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
+    float He = (pm.y - 0.5 * u_dx) - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
     water = turbo(nrm(He));
   } else if (u_mode == 8) {
     // Pressure p in kPa: ρ·P with ρ = 1000 kg/m³ and P (U.b) the kinematic

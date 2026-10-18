@@ -1330,6 +1330,31 @@ SUITES.physics = async (B) => {
   ok("PHYSICS still water stays still", rest.maxSpeed < 0.35,
     "max speed " + rest.maxSpeed.toFixed(3) + " m/s");
 
+  // One reference elevation for the stored pressure (docs/numerics.md, "Where
+  // the stored pressure lives"): in a still tank the coloured piezometric-head
+  // field (fieldStats(6) is the arithmetic FS_DISP mode 6 paints) and the
+  // drawn HGL (hydraulicGrade, the FS_HGL walk) are both the level, so they
+  // must agree to a small fraction of a cell. The pre-fix centre/lower-face
+  // split put them a half cell apart. The dyke holds TWO still pools, so the
+  // field's 1st and 99th percentiles are compared with the HGL's lowest and
+  // highest column (the 1% tails are whole pools, not outliers).
+  await B.goto(`http://localhost:${PORT}/?scene=dyke`);
+  const href = await B.evaluate(`(() => {
+    __low();
+    APP.sim.p.inflow.on = 0; APP.sim.p.tailwater.on = 0; APP.sim.p.source.on = 0;
+    APP.SIM.resetWater();
+    const t = __settle(APP.sim.t + 12, 120000);
+    const st = APP.SIM.fieldStats(6, false);
+    const hg = Array.from(APP.SIM.hydraulicGrade(null, false)).filter(Number.isFinite).sort((a, b) => a - b);
+    return { t, dx: APP.sim.dx, lo: st && st.lo, hi: st && st.hi, n: hg.length,
+             hgLo: hg[0], hgMed: hg[hg.length >> 1], hgHi: hg[hg.length - 1] };
+  })()`);
+  ok("PHYSICS still-water h field equals HGL",
+    href.n > 10 && href.lo !== null && Math.abs(href.lo - href.hgLo) < 0.1 * href.dx &&
+    Math.abs(href.hi - href.hgHi) < 0.1 * href.dx,
+    `field lo ${href.lo} hi ${href.hi}; HGL median ${href.hgMed} (range ${href.hgLo}..${href.hgHi}); ` +
+    `dx ${href.dx}; t ${href.t}`);
+
   // A flowing reach. Measured over the middle 60% only: the inlet sponge and
   // the brink are boundary treatments, not the reach, and including them
   // measures those instead.

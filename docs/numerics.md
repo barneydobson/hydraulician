@@ -441,6 +441,38 @@ classical Preissmann slot storage, and it is why the column reduction caps at
 `min(f, 1)`: `APP.volume()` sums that reduction's depth, so the mass-balance
 readout is geometric volume with the slot storage excluded.
 
+### Where the stored pressure lives
+
+`P` is stored at the cell, but it does not belong to the cell *centre*: it
+belongs to the cell's **lower face**, `z = j·Δx`. So the piezometric head
+`h = z + p/ρg` is `j·Δx + P/g`, never `(j + ½)·Δx + P/g`. The two differ by a
+uniform `Δx/2` — invisible on a colour ramp, but the coloured `h` field, the
+drawn hydraulic grade line and a gauge are all read against the same free
+surface, so they must agree.
+
+It was decided by measurement, not by argument, because the code had both
+conventions (the grade line used the lower face, the head fields and
+`fieldStats` the centre). `exercises/_runner/probe-pref.mjs` fills a sealed
+still tank, settles it, and reads `U.b` down columns of wet, fully submerged
+cells. The level η is *not* fitted (a fitted η absorbs the offset and the two
+conventions tie): it is each column's own water content, `Σ f·Δx` plus the
+solid below. Then `p/ρg + z_ref − η` is the residual for each convention.
+
+| Scene (Low) | Δx | settled | max \|u\|, \|w\| in the tank | rms residual, `z_ref = j·Δx` | rms residual, `z_ref = (j+½)·Δx` |
+| --- | --- | --- | --- | --- | --- |
+| dyke, 51 columns | 0.0248 m | 20 s | 0.0067, 0.0037 m/s | 2.0·10⁻⁴ m (0.008 Δx) | 1.22·10⁻² m (0.49 Δx) |
+| venturi, upstream tank, columns i = 4 to 24 | 0.0231 m | 20 s | not isolated (the tank shares the field with a duct) | 3 to 5·10⁻⁴ m | 1.15·10⁻² m (0.50 Δx) |
+
+The lower face wins by a factor of about 60 (the residual of the loser is
+Δx/2 to within a few per cent, the winner's is the size of the surface cell's
+own uncertainty). **Decision: lower face, everywhere.** The consumers are
+`FS_DISP` modes 6 and 7 (the bilinear field is interpolated between cell
+centres, so its elevation is the sample height less `Δx/2`, which interpolates
+`j·Δx` exactly), `FS_HGL`, `SIM.hydraulicGrade` (both branches),
+`SIM.fieldStats` modes 6 and 7, the gauges and the hover readout (both via the
+probe's `zp = j·Δx`), and the face-depth readout. The solver is untouched; this
+only fixes the elevation a stored pressure is *read* against.
+
 ### Why this is a slot
 
 In 1D sewer modelling the same problem is solved geometrically. When a conduit
@@ -558,7 +590,7 @@ stable and puts no bound on `Δt` at any roughness.
 and the stress-free extension, the transport-consistency cap, the ±80 rails,
 prescribed sources, the boundary ring, the outflow-only open edges and the
 no-flux condition at solids. On volume: the relaxation sponges,
-sources and the positivity clamp. They are applied after the split and are not
+sources and the NaN/rounding guard behind the donor-side flux cap. They are applied after the split and are not
 part of the PDE; each is documented where it appears below.
 
 The ordering is load-bearing in two places, and they pull against each other:

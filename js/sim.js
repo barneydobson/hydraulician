@@ -1044,7 +1044,7 @@ const SIM = (() => {
     // U.b is KINEMATIC pressure p/rho, so the head is that over g -- it must
     // not be divided by density a second time (docs/averaging.md §4.1).
     return { i, j, fbar: f, ubar: S.pxBuf[0] / d, wbar: S.pxBuf[1] / d,
-             pbar: S.pxBuf[3], phead: S.pxBuf[3] / g };
+             pbar: S.pxBuf[3], phead: S.pxBuf[3] / g, zp: j * S.dx };
   }
 
   // ------------------------------------------------------------------ step
@@ -1762,8 +1762,10 @@ const SIM = (() => {
    *  hydrostatic water that is simply the submergence below the local free
    *  surface, so it carries a unit vertical gradient everywhere wet and is not
    *  comparable between cells at different heights. The piezometric head is
-   *  h = z + p/ρg; add the elevation yourself (see the gauge sampler in
-   *  main.js). Renamed from `head` with rig format v2 — the old name kept
+   *  h = z + p/ρg; add the elevation yourself, and use `zp` — j·Δx, the
+   *  cell's lower face, which is the elevation the stored pressure belongs to
+   *  (contract at the top of shaders.js) — not the cursor's or the cell
+   *  centre's z (see the gauge sampler in instruments.js). Renamed from `head` with rig format v2 — the old name kept
    *  being read as piezometric, which it never was. */
   /** One readPixels serving every instrument: the (u, w, P) and (f) rects in
    *  the LIVE layout, from the live textures or — when `avg` is passed and a
@@ -1984,7 +1986,7 @@ const SIM = (() => {
       const f = S.pxBuf[2], d = Math.max(f, 1e-6);
       const u = S.pxBuf[0] / d, w = S.pxBuf[1] / d, p = S.pxBuf[3];
       const g = Math.abs(S.p.g) || 9.81;
-      return { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w),
+      return { i, j, f, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
                solid: S.mask[j * S.nx + i] };
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
@@ -1993,7 +1995,7 @@ const SIM = (() => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const g = Math.abs(S.p.g) || 9.81;
-    return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, speed: Math.hypot(u, w),
+    return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
              dye: S.pxBuf[1], solid: S.mask[j * S.nx + i] };
   }
 
@@ -2037,10 +2039,10 @@ const SIM = (() => {
         if (useAvg) {
           const f = A[o + 2], d = Math.max(f, 1e-6);
           const u = A[o] / d, w = A[o + 1] / d, p = A[o + 3];
-          out[k] = { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+          out[k] = { i, j, f, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w), solid };
         } else {
           const u = A[o], w = A[o + 1], p = A[o + 2];
-          out[k] = { i, j, f: B ? B[o] : null, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+          out[k] = { i, j, f: B ? B[o] : null, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w), solid };
         }
       });
     });
@@ -2084,7 +2086,9 @@ const SIM = (() => {
         if (!wet(i, j)) continue;
         const k = (j * S.nx + i) * 4;
         const u = U[k], w = U[k + 1], P = U[k + 2];
-        const x = (i + 0.5) * S.dx, z = (j + 0.5) * S.dx;
+        // z is the elevation the stored pressure belongs to: the cell's LOWER
+        // face (contract at the top of shaders.js), as FS_DISP and FS_HGL use.
+        const x = (i + 0.5) * S.dx, z = j * S.dx;
         let q = null;
         if (mode === 0 || mode === 1) q = P / g;
         else if (mode === 8) q = P;          // p in kPa = ρP/1000, ρ = 1000

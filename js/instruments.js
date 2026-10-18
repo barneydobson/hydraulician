@@ -55,7 +55,11 @@ function sampleGauges(A) {
     // bed and carries S₀ in gravity instead, so the elevation is z − S₀x. Without
     // that term m2's gauges read a flat grade line along a reach that loses
     // S₀·L = 0.20 m over 13.6 m, against a working depth of 0.35 m.
-    const z = gg.z - (sim.scene.tiltS0 || 0) * gg.x;
+    // The elevation the stored pressure belongs to is the cell's lower face
+    // (`pr.zp` = j·Δx, contract at the top of shaders.js), not the gauge's own
+    // z: h is constant through a hydrostatic cell, so z + p/ρg would sawtooth
+    // by up to Δx as a gauge sits at different heights within its cell.
+    const z = pr.zp - (sim.scene.tiltS0 || 0) * gg.x;
     // η = z_b + d is the surface itself, so unlike h it carries no
     // non-hydrostatic bias under an accelerating column.
     // H = h + |u|²/2g is the total (energy) head: the EGL, which the HGL h

@@ -199,6 +199,12 @@ const MUTANTS = [
 
 /** The GEOM catalogue — the same shape, against js/geom.js. */
 const GEOM_MUTANTS = [
+  { id: "poly-aliases-vertices",
+    why: "poly keeps the caller's vertex arrays instead of copying them — a later nudge of the input moves the solid, which no scene build notices until the next rebuild reuses the array",
+    find: "verts: verts.map(v => [v[0], v[1]]),",
+    replace: "verts: verts,",
+    kills: ["GA10b poly copies its vertices (mutating the input afterwards leaves the solid alone)"] },
+
   { id: "edge-normal-flipped",
     why: "the outward normal turned inward — every force changes sign and nothing looks broken until a free body diagram is drawn",
     find: "return [tz, -tx];",

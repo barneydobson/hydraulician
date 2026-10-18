@@ -163,6 +163,27 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
      JSON.stringify(p.faces));
 }
 
+// ---- GA10b-d: poly is a COPY with the faces mapped through ------------------
+// A caller (a scene's solids(), the rig loader) keeps and reuses its vertex
+// arrays; a solid that aliased them would move when the caller's rectangle
+// is nudged for the next scene build.
+{
+  const verts = [[0, 0], [2, 0], [2, 1], [0, 1]];
+  const faces = [{ id: "top", label: "Crest", e0: 2, e1: 2 }, { id: "bed", e0: 0, e1: 0 }];
+  const p = GEOM.poly(verts, faces, "box");
+  verts[0][0] = 99; verts.push([5, 5]); faces[0].id = "mutated";
+  ok("GA10b poly copies its vertices (mutating the input afterwards leaves the solid alone)",
+     p.verts.length === 4 && p.verts[0][0] === 0 && p.verts !== verts && p.verts[0] !== verts[0],
+     JSON.stringify(p.verts));
+  ok("GA10c poly maps its faces: ids, given label kept, missing label defaulted",
+     p.id === "box" && p.faces.length === 2 && p.faces[0].id === "top" &&
+     p.faces[0].label === "Crest" && p.faces[1].label === "bed",
+     JSON.stringify(p.faces));
+  ok("GA10d poly keeps each face's edge indices e0, e1",
+     p.faces[0].e0 === 2 && p.faces[0].e1 === 2 && p.faces[1].e0 === 0 && p.faces[1].e1 === 0,
+     JSON.stringify(p.faces));
+}
+
 // ---- GA11: faceForceFromSamples with a partially-filled sample --------------
 // Four samples on a vertical face (normal (-1,0)), ds = 0.5, at z = 0.25, 0.75,
 // 1.25, 1.75 under a surface at H = 2: p = g*(2-z) = g*[1.75, 1.25, 0.75, 0.25],

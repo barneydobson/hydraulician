@@ -39,6 +39,30 @@ register (empty) they are all appended to, and its header is the card schema;
 `exercises/` keeps only the shared tooling (`_runner/`) and an index of the
 courses.
 
+**Four descriptions, four jobs.** An exercise is described in four places that
+do not collapse into one register: the course's `exercises.js` is the
+machine-readable source, each folder's `README.md` is the human brief, the
+course's `INDEX.md` is abbreviated navigation, and for the original pack
+`courses/original/demo-programme.html` is the dated rev-1 document it was built
+from (history). Briefs carry the minimum needed to run the demo; statistics and
+methodology live in each folder's uncommitted `_archive/`. Coordinates in a
+recipe are exact (rounding them makes a new geometry; re-measure before
+shipping), and `spinup` values are measured settle times, not guesses.
+
+A course owns its exercises (`courses/<id>/exercises.js`,
+`courses/<id>/exercises/<ID>-<slug>/`, `courses/<id>/INDEX.md`, the menu in
+`course.js`), but they are still the one register: `?ex=` reaches every card
+wherever it lives and ids are unique across all of them. Nothing in the app may
+assume a brief is under `exercises/`: use the card's `home` (`pickers.js`
+`briefDir`). A course is upstream-shaped by construction: another lecturer's
+course is another folder beside it.
+
+**Hidden tools keep their digit.** A card whose task tells a student to draw
+something must say `ui: { build: true }` or name a build tool in `instruments`
+(`check_pack.py` fails the pack otherwise, because the alternative is a tool
+that is silently not there). Worksheets say "press 5", so a hidden tool's key
+explains itself rather than arming something else.
+
 Worked example throughout: **HS-1**, the dyke with a piezometer
 (`courses/cive40008/exercises/HS-1-dyke-piezometer/`), a lecturer demo on a
 scene written for it.

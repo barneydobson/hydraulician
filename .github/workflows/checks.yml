@@ -65,6 +65,9 @@ jobs:
       - name: check_headers.py — every js/*.js carries its header
         run: python3 test/check_headers.py js/*.js
 
+      - name: check_docs.py — the docs name only files and suites that exist
+        run: python3 test/check_docs.py
+
       - name: recon-test.mjs — RECON's closed-form answers
         run: node test/recon-test.mjs
 

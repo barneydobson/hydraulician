@@ -465,6 +465,14 @@ No convergence time is imposed — how long a window needs is set by the flow
 being measured, and several scene timescales are emergent. `T` on the legend
 card is the number to quote with any averaged reading.
 
+**One writer.** `setAverage` (`js/main.js`) is the single writer of the mode:
+the flag alone is not the mode, because the accumulators (about 22 MB apiece
+at Ultra, §10) have to be opened and released with it. No instrument carries
+smoothing of its own on top of the window: probe, gauges, rake, sections and
+control volume all read the one window. The velocity stored is the Favre mean,
+so `H`, `Fr`, `|u|` and `ρu|u|` are fields of the mean flow, and each field's
+`mean` string in `FIELDS` is what the legend prints to say so.
+
 ---
 
 ## 10 · Cost

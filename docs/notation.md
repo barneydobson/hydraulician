@@ -133,6 +133,10 @@ boundary between the two. Two consequences worth knowing:
   for $|u|$). The v1 names (`y`, `vy`, `"head"`, `"depth"`) are gone and v1
   links are rejected — this is a prototype, and old wire formats are not
   migrated.
+- **Serialized keys go through the version gate.** `RIG.migrate` (`js/rig.js`)
+  accepts exactly the current version and rejects anything else. Gauge-field
+  wire keys are any `GAUGE_QTY` id (`js/fields.js`), not just the four named
+  above. Any future key change bumps `V` in `js/rig.js`; old links just break.
 - `APP.probe().phead` is the **pressure** head $p/\rho g$ alone — no elevation
   term. Rig scripts build the piezometric head themselves as
   `z + probe().phead`. It was renamed from `head` at v2 precisely because the

@@ -1549,3 +1549,30 @@ now. Nothing here is a rule; the rules are in the sections above.
 - **Docs reader.** Off the Pages build the browser used to be handed raw
   markdown, which is not a document so much as its source code;
   `docs/view.html` renders it in the app's own styling.
+
+## Zero dependencies, classic scripts: what the rule does and does not forbid
+
+The rule is "no modules, no bundlers, no fetch, and no YAML front matter in
+`index.html`, `js/*` or `css/*`" (the Pages build copies them verbatim only
+because there is none). Those three are one rule wearing three hats: **the app
+boots with no server**. A browser refuses both `fetch` of a file beside it and
+an ES module under `file://`, and double-clicking `index.html` is a real way
+this gets used.
+
+What the rule does NOT forbid is more than one file. `<script src>` and
+`<link rel=stylesheet>` to relative paths both work under `file://`, which is
+why the app already loads about twenty classic scripts and one stylesheet, and
+why splitting a long file is never blocked by this rule. Only `fetch`, ES
+modules and a build step are. If you find yourself keeping something in one
+enormous file "because zero dependencies", check which of the three you are
+actually protecting; usually it is none of them (`main.js` was split into nine
+files on exactly that reasoning; the globals each file defines and reads are
+listed in its header and held to the code by `test/check_headers.py`).
+
+The rule binds the APP. The docs reader (`docs/view.html`) does fetch the
+markdown it renders, because nothing about running a simulation depends on it
+and it degrades to a message and two working links when it cannot. Any
+published page carrying `math` code fences must end with a `<script>` tag
+loading `docs/math.js`: stripped on github.com, live on the Pages build, where
+it rewrites the fences for MathJax (README.md and docs/numerics.md show the
+pattern).

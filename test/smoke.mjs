@@ -781,7 +781,7 @@ SUITES.geom = async (B) => {
     const other = cur === 0.5 ? 0.4 : 0.5;
     APP.SIM.setParam("gap", other);
     out.force = APP.state.force; out.hover = APP.state.forceHover;
-    out.ynK = OVERLAY.estimates(APP.sim).ynK;
+    out.ynKnan = Number.isNaN(OVERLAY.estimates(APP.sim).ynK);
     out.hAcleared = OVERLAY.estimates(APP.sim).hA === null;
     let n = 0, seen = null;
     const off = APP.SIM.onGeometry((S) => { n++; seen = S; });
@@ -800,8 +800,8 @@ SUITES.geom = async (B) => {
     hook.force === null && hook.hover === null,
     `force: ${JSON.stringify(hook.force)}, hover: ${JSON.stringify(hook.hover)}`);
   ok("geom setParam resets the overlay's running estimates",
-    hook.seeded && hook.hAcleared && Number.isNaN(hook.ynK),
-    `seeded: ${hook.seeded}, hA cleared: ${hook.hAcleared}, ynK: ${hook.ynK}`);
+    hook.seeded && hook.hAcleared && hook.ynKnan,
+    `seeded: ${hook.seeded}, hA cleared: ${hook.hAcleared}, ynK NaN: ${hook.ynKnan}`);
   ok("geom SIM.onGeometry fires for setParam (live grid), not for a valve flip, and unsubscribes",
     hook.callsAfterParam === 1 && hook.calls === 1 && hook.keptOnValve &&
       hook.sameGrid && hook.afterOff === 1,

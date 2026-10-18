@@ -694,7 +694,9 @@ async function main() {
         const cx = document.createElement("canvas").getContext("2d");
         const real = cx.fillText.bind(cx);
         cx.fillText = (t, x, y) => { labels.push(String(t)); return real(t, x, y); };
-        OVERLAY.drawGradeLines(cx, APP.view, A, APP.sim, h);
+        OVERLAY.flushKeys(document.createElement("canvas").getContext("2d"), APP.view);   // drop rows left queued
+        OVERLAY.drawGradeLines(cx, APP.view, A, APP.sim, h);   // queues the key rows ...
+        OVERLAY.flushKeys(cx, APP.view);                       // ... which one flush paints
         const before = APP.state.grade;
         document.getElementById("gradeBtn").click();
         return { settled, tReached, spinup, n: dev.length, median, dx, ratio: median / dx, labels,
@@ -2001,7 +2003,7 @@ async function main() {
     });
 
     await runCase("the keyboard sheet lists S only when scenes are offered", async () => {
-      const tab = await browser.open(INDEX + "?ex=HJ-1");
+      const tab = await browser.open(INDEX + "?ex=UF-1");
       const r = await tab.evaluate(`
         const kbds = () => [...document.querySelectorAll("#keysmenu kbd")].map((k) => k.textContent);
         return APP.EX.ready.then(() => {

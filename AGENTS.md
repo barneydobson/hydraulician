@@ -15,7 +15,7 @@ scene, `?ex=<id>` an exercise. Agent worktrees live in `.claude/worktrees/`
 
 | Path | What it is |
 | --- | --- |
-| `index.html`, `css/app.css` | markup and the classic script tags (about twenty), under 200 lines, the panel generated from `panel.js`; every CSS rule |
+| `index.html`, `css/app.css` | markup and the classic script tags, under 200 lines, the panel generated from `panel.js`; every CSS rule |
 | `js/gl.js`, `js/shaders.js` | `GLH` — programs, float textures, FBOs, ping-pong; `Shaders` — the GPU programs: per-substep `vel`, `vof`; per-frame columns, display, particles, averaging, streamlines |
 | `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
 | `js/reconstruct.js`, `js/overlay.js`, `js/stream.js` | `RECON` — numerics with no WebGL: running mean, Welford, surface reconstruction, inlet depth, column energy, compaction; `OVERLAY` — d_c, d_n, EGL, profile classes, jump boxes, gauge charts, rake; `STREAM` — streamlines as contours of ψ from a fenced face-flux readback |

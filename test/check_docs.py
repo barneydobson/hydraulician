@@ -13,8 +13,7 @@ that was wrong within a week. This gate asserts:
      no spaces and either contains a `/` or ends in a file extension the repo
      uses. Globs, placeholders (`<id>`, `*`, `{`), URLs, query strings and
      `plots/` output, a Jekyll page (`x.html` for an existing `x.md`) and
-     anything under an underscore-led folder (`_archive/`, which is
-     unpublished or untracked by design) and any path .gitignore names
+     any `_archive/` folder (unpublished or untracked by design) and any path .gitignore names
      (`.claude/worktrees/`) are ignored; a bare `name/` is a folder of that
      name anywhere in the tree. A token with a `/`
      resolves from the repo root (or from the document's own folder); a bare
@@ -108,7 +107,7 @@ def check_paths(doc):
             if not looks_like_path(tok):
                 continue
             parts = tok.rstrip("/").split("/")
-            if any(p.startswith("_") for p in parts):
+            if "_archive" in parts:
                 continue
             if tok.startswith("docs/_archive"):
                 continue

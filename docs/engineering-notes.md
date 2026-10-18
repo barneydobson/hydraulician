@@ -1561,7 +1561,7 @@ this gets used.
 
 What the rule does NOT forbid is more than one file. `<script src>` and
 `<link rel=stylesheet>` to relative paths both work under `file://`, which is
-why the app already loads about twenty classic scripts and one stylesheet, and
+why the app already loads a few dozen classic scripts and one stylesheet, and
 why splitting a long file is never blocked by this rule. Only `fetch`, ES
 modules and a build step are. If you find yourself keeping something in one
 enormous file "because zero dependencies", check which of the three you are

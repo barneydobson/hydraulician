@@ -291,6 +291,13 @@ FOLLOWS a mouse on a desktop, and a tablet has no other way to read the
 flow. So FF-1's "turn on Hover readout" is a desktop instruction; on an iPad
 a tap reads the same rows with the switch off.
 
+**Tablet layout.** On a coarse pointer the strip wraps onto a second row
+rather than shrink its buttons below 40 px or scroll (`fitBar` in
+`js/strip.js`, which also publishes the strip's height as `--bar-h` for the
+panel, toast and legend to hang from), and an upright tablet under 900 px
+wide (`MINW` in `js/dock.js`) gets the bottom sheet as a phone does instead
+of an overlaid side panel.
+
 **Rakes.** A rake reads the water around the point CLICKED: down to the
 first solid, up to the first solid or the end of the water. In open water
 that is bed → surface exactly as before; inside a pipe it is wall → wall.

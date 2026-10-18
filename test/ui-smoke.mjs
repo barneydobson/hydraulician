@@ -4,6 +4,7 @@
  *
  *     node test/ui-smoke.mjs            # from the repo root
  *     CHROME=/path/to/chrome node test/ui-smoke.mjs
+ *     node test/ui-smoke.mjs --only=file://   # only cases whose name contains this
  *
  * Four launches (1440, 760, 420 and 800 px wide), one tab per case. Each case
  * runs under runCase: a throw inside it is that case's failure, recorded by
@@ -55,6 +56,12 @@ function near(name, got, want, tol) {
   check(name, Math.abs(got - want) <= tol, "got " + got + ", want " + want + " ±" + tol);
 }
 
+// --only=<substring>: run just the cases whose name contains it (case-
+// sensitive). Skipped cases never run their body, so none of their tabs or
+// extra launches start.
+const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
+let ran = 0;
+
 // Tabs opened by the case now running; runCase checks and closes them.
 let caseTabs = null;
 /** launch() whose tabs are registered with the running case. */
@@ -68,6 +75,8 @@ async function launchTracked(opts) {
  *  run continues. Then the shared check — no uncaught page errors in any tab
  *  the case opened — and every tab is closed, so a throw cannot leak one. */
 async function runCase(name, fn) {
+  if (ONLY && !name.includes(ONLY)) return;
+  ran++;
   console.log("\n" + name);
   const tabs = caseTabs = [];
   try { await fn(); }

@@ -219,8 +219,11 @@ const MUTANTS = [
   { id: "col-wet-threshold", suite: "avg", file: "/js/shaders.js",
     why: "FS_COL's dry test is loosened, so interface cells RECON still counts as wet " +
          "(f in [0.25, 0.55)) get walked past as dry",
-    find: "if (f < 0.25) { dry++; if (dry > 2) break; continue; }",
-    replace: "if (f < 0.55) { dry++; if (dry > 2) break; continue; }",
+    // Anchored on the preceding line: the same test also appears in the second
+    // column loop (depth reduction), and an unanchored find matched twice. The
+    // first occurrence is the one String.replace has always patched.
+    find: "float f  = min(fr, 1.0);                       // geometric fill\n    if (f < 0.25) { dry++; if (dry > 2) break; continue; }",
+    replace: "float f  = min(fr, 1.0);                       // geometric fill\n    if (f < 0.55) { dry++; if (dry > 2) break; continue; }",
     kills: "RECON.bodyDepth matches FS_COL's own depth reduction",
     measured: "depth OK drops from 459/459 to 324/459; worst depth gap 1.66e-1 m against a " +
             "1e-5 m gate, four orders of magnitude over -- bed stays exact (7.2e-8 m) because " +
@@ -265,8 +268,8 @@ const MUTANTS = [
 
   { id: "rig-no-gauges-restore", suite: "rig", file: "/js/rig.js",
     why: "RIG.apply() stops restoring gauges from the snapshot",
-    find: "    (o.gauges || []).slice(0, 4).forEach((g) => {",
-    replace: "    ([]).slice(0, 4).forEach((g) => {",
+    find: "    (o.gauges || []).slice(0, CONFIG.maxGauges).forEach((g) => {",
+    replace: "    ([]).slice(0, CONFIG.maxGauges).forEach((g) => {",
     kills: "rig round-trips both gauges",
     measured: "before [[4.8,...],[9.6,...]] -> after []: both gauges vanish outright" },
 
@@ -3202,6 +3205,14 @@ function checkCatalogue() {
     if (!src.includes('ok("' + m.kills) && !src.includes("ok(`" + m.kills)) {
       bad.push(m.id + ": no ok(\"" + m.kills + "…\") in SUITES." + m.suite);
     }
+    // The pattern must occur EXACTLY ONCE in the file it patches (read from
+    // disk, CRLF normalised exactly as the serve-time patcher does): zero is
+    // a stale entry, two means String.replace would mutate only the first.
+    let text;
+    try { text = fs.readFileSync(path.join(ROOT, m.file), "utf8").replace(/\u000d\u000a/g, "\u000a"); }
+    catch (e) { bad.push(m.id + ": cannot read " + m.file); continue; }
+    const n = text.split(m.find).length - 1;
+    if (n !== 1) bad.push(m.id + ": find occurs " + n + " times in " + m.file + " (want exactly 1)");
   }
   if (bad.length) {
     console.error("mutant catalogue is stale:\n  " + bad.join("\n  "));
@@ -3211,6 +3222,10 @@ function checkCatalogue() {
 
 (async () => {
   checkCatalogue();
+  if (process.argv.includes("--check-catalogue")) {
+    console.log("mutant catalogue ok: " + MUTANTS.length + " mutants");
+    process.exit(0);
+  }
   let srv, B;
   const t0 = Date.now();
   try {

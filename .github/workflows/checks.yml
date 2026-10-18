@@ -3,6 +3,9 @@ name: Checks
 # The instant, browser-free gates from AGENTS.md's Testing table, plus a
 # no-GPU browser job. The GPU gates (smoke.mjs, ui-smoke.mjs in full) cannot
 # run on hosted runners; why, and what runs where: docs/testing.md.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]

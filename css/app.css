@@ -943,7 +943,11 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    an inline value beats every rule above and the part could not be restyled.
    Last of the #dock rules, so no later display value can win. */
 #dock .gone { display: none; }
-.exb { border-radius: 8px; padding: 5px 10px; white-space: nowrap; }
+/* The dock footer Reset: .btn-sm plus this. The font-size is restated AFTER the
+   touch media query above (which lists .exb at 16px): on main this rule came
+   later and won, so the button stayed 11px on tablets; as a bare .btn-sm base it
+   lost to the query and grew. */
+.btn-sm.exb { border-radius: 8px; padding: 5px 10px; white-space: nowrap; font-size: 11px; }
 .exlink {
   font: 10px ui-monospace, monospace; opacity: .5; margin-left: auto;
   color: inherit; text-decoration: none; user-select: text;

@@ -294,10 +294,10 @@ def main():
          allow=ALLOW)
 
     # `[x0, y0, x1, y1]` is the box form READMEs and docs use; z is vertical.
-    # (docs/superpowers/, docs/_archive/ and docs/design/ hold plans that quote the rule itself.)
+    # (docs/_archive/ and docs/design/ hold plans that quote the rule itself.)
     boxes = [p for p in walk(".md")
              if (rel(p) == "README.md" or rel(p).startswith("docs/"))
-             and not rel(p).startswith(("docs/superpowers/", "docs/_archive/", "docs/design/"))]
+             and not rel(p).startswith(("docs/_archive/", "docs/design/"))]
     scan(fails, checked, boxes, r"\[\s*x0\s*,\s*y0",
          "box written [x0, y0, ...] — the vertical coordinate is z: [x0, z0, x1, z1]")
 

@@ -913,7 +913,7 @@ def check_retirement_refs(c):
     text = (".md", ".js", ".mjs", ".py", ".html", ".yml", ".json", ".css")
     rows = []
     for rel in files:
-        if (rel.startswith(("courses/original/", "docs/_archive/", "docs/superpowers/",
+        if (rel.startswith(("courses/original/", "docs/_archive/",
                            "exercises/_code-changes/", ".superpowers/"))
                 or not rel.endswith(text)):
             continue

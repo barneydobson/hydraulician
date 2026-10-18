@@ -46,6 +46,10 @@ const OVERLAY = (() => {
     dim: "rgba(223,232,242,0.55)", grid: "rgba(223,232,242,0.13)",
     // the instrument glyphs main.js draws, named once beside the rest
     res: "#7fd4ff", tw: "#5fd08a", piston: "#ffb648", spout: "#7fd4ff",
+    pistonFill: "#c98a2e", pistonEdge: "#ffcf7a", ink: "#dfe8f2",
+    // the gauge-inspector chart (gauge-inspector.js)
+    chartBg: "rgba(6,10,16,0.55)", chartText: "rgba(223,232,242,0.45)", chartGrid: "rgba(255,255,255,0.07)",
+    chartCursor: "rgba(255,255,255,0.35)", chartLabelBg: "rgba(6,10,16,0.88)", chartLabelText: "#e8f0f8",
   };
 
   /** A filled triangular arrowhead: apex at (x, y), pointing along `angle`

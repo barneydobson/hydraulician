@@ -46,7 +46,7 @@ The suites are:
 Subsets worth knowing:
 
 - `--only=api,rig` is the fast subset (a couple of minutes).
-- `--perf` adds "API substep throughput did not regress" (best of 3 of 2000 h23 substeps within x1.10 of `test/golden/throughput-h23.json`). It is wall-clock bound and GPU-specific, so it is off by default; `--write-throughput` re-records the baseline (and implies `--perf`).
+- `--perf` adds "API substep throughput did not regress" (best of 3 of 2000 h23 substeps within x1.10 of `test/golden/throughput-h23.json`). It is wall-clock bound and GPU-specific, so it is off by default; `--write-throughput` re-records the baseline (and implies `--perf`). It is the only speed check. Every spin-up and averaging loop runs on simulated time through `__until` / `__settle`: a slow or busy machine takes longer but passes, and a loop gives up only when the simulated clock stalls for 30 s or after its 240 s backstop.
 - `--only=pack,scenes` boots every card and every scene.
 - `--only=profile` (about a minute) is the gate for anything that touches the
   stress-free surface or the mixing length; its mutants are `surface-sink` and
@@ -74,9 +74,9 @@ request. Its `instant` job runs the instant gates: `check_pack.py`,
 `check_notation.py`, `check_headers.py`, `check_docs.py`, `recon-test.mjs`,
 `geom-test.mjs`, `mutation-test.mjs` and `smoke.mjs --check-catalogue`. Its
 `no-gpu` job runs the browser checks that need no GPU and no physics budget
-(`smoke.mjs --only=docs`, `ui-smoke.mjs --only=file://`) under `SOFTWARE=1`;
-it is unproven on hosted runners and `continue-on-error` until it has run
-green there. `.github/workflows/pages.yml` deploys the Pages build only after
+(`smoke.mjs --only=docs`, `ui-smoke.mjs --only=file://`) under `SOFTWARE=1`,
+and it blocks like the instant job: it has run green on hosted runners.
+`.github/workflows/pages.yml` deploys the Pages build only after
 Checks has succeeded on `main`.
 
 The full `smoke.mjs` and `ui-smoke.mjs` are not in the workflow at all, not

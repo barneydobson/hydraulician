@@ -1,6 +1,7 @@
 /* CR-1 "The contraction rig" — paste into the dev console.
  *
- *   ?ex=CR-1 (&tab=streamlines / continuity / forces; or ?scene=contraction), Resolution: Medium (689 x 138, dx = 0.0247 m).
+ *   ?ex=CR-1 (&tab=streamlines / continuity / forces / energy; or
+ *   ?scene=contraction), Resolution: Medium (689 x 138, dx = 0.0247 m).
  *
  * Nothing to draw: the scene's two polygons ARE the rig, and the one slider
  * (geom0, `taperL`) redraws them. This is the lecturer's spot-check: it reads

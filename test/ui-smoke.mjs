@@ -29,6 +29,7 @@
  * the simulation is being drawn underneath the panel.
  */
 import { launch, findChrome } from "./cdp.mjs";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -652,11 +653,20 @@ async function main() {
         // Settled, at the scene's own measured spin-up — not part-way through
         // it. m1 starts 0.28 m deep and its inlet holds 0.49 m, so for the
         // first ~12 s the pool is filling and the surface runs 0.1-0.7 dx off
-        // the head (median, Low); settled it sits within 0.05 dx. Bounded on
-        // wall clock, so a software-rasterised Chrome fails with a reading
+        // the head (median, Low); settled it sits within 0.05 dx. Not a speed
+        // test: a busy machine just takes longer. It gives up only if the
+        // simulated clock stalls for 30 s or after 240 s in all (smoke.mjs's
+        // __until rule), so a software-rasterised Chrome fails with a reading
         // here instead of hanging the run.
         const t0 = Date.now(), spinup = APP.sim.scene.spinup;
-        while (APP.sim.t < spinup && Date.now() - t0 < 120000) APP.tick(400);
+        let last = APP.sim.t, moved = t0;
+        while (APP.sim.t < spinup) {
+          APP.tick(400);
+          const now = Date.now();
+          if (APP.sim.t > last) { last = APP.sim.t; moved = now; }
+          else if (now - moved > 30000) break;
+          if (now - t0 > 240000) break;
+        }
         const settled = APP.sim.t >= spinup, tReached = APP.sim.t;
         APP.frames(3);
         const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
@@ -1651,6 +1661,31 @@ async function main() {
       eq("two inspector windows", r.n, 2);
       check("click A then B puts B on top", r.secondOver);
       check("click A again puts A on top", r.firstOver);
+      await tab.close();
+    });
+
+    await runCase("inspector raise: many clicks stay below popups and menus", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // zTop only ever grew, so ~10 presses lifted a gauge window over the
+      // popups (z 30/31) and ~20 over the menus and toasts (z 40). Raising
+      // now renumbers the open windows 21..21+n-1.
+      const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "css", "app.css"), "utf8");
+      const above = [...css.matchAll(/z-index:\s*(\d+)/g)].map((m) => +m[1]).filter((v) => v > 21);
+      const lowestOver = Math.min(...above);
+      const r = await tab.evaluate(`
+        APP.placeGauge(2, 0.5); APP.placeGauge(6, 0.5);
+        APP.GINSP.show(0); APP.GINSP.show(1);
+        const w = [...document.querySelectorAll(".ginsp")];
+        const z = (el) => +el.style.zIndex;
+        const click = (el) => el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        for (let k = 0; k < 25; k++) { click(w[k % 2]); click(w[(k + 1) % 2]); }
+        click(w[0]);
+        return { n: w.length, zs: w.map(z), firstOver: z(w[0]) > z(w[1]) };
+      `);
+      eq("two inspector windows", r.n, 2);
+      check("the lowest popup/menu z-index was read from css/app.css", Number.isFinite(lowestOver) && lowestOver > 21, String(lowestOver));
+      check("every inspector z-index stays below the lowest popup/menu", Math.max(...r.zs) < lowestOver, r.zs.join(",") + " vs " + lowestOver);
+      check("the last-clicked window is on top", r.firstOver);
       await tab.close();
     });
 

@@ -102,18 +102,19 @@ const MINI = (() => {
  *  on the window edge: the exercise stays loaded, the screen goes back to
  *  being all water, and one click brings the brief back. */
 const DOCK = (() => {
-  // MINW: below this there is no width to give away, so the panel overlays.
-  // The panel's own width (--dock-w), the width below which it becomes a
+  // MINW (--dock-min): below this there is no width to give away, so the panel overlays.
+  // The dock's own width (--dock-w), the width below which it becomes a
   // bottom sheet (--phone-max: a 348 px panel would cover almost the whole
   // screen, so the water keeps the top, which on a phone is the only part tall
   // enough to read a flume in) and the sheet's height (--sheet-h) are written
   // once, in css/app.css, and read back by sync() — never restated here.
-  const MINW = 900;
   let shown = false, folded = false, id = "";
   const el = () => document.getElementById("dock");
   const body = () => el().querySelector(".dock-body");
   const foot = () => el().querySelector(".dock-foot");
 
+  // MINW is --dock-min, read back by sync() (0 = "wide enough" until then).
+  let MINW = 0;
   function narrow() { return innerWidth < MINW; }
   // A tablet held upright (768 × 1024, 820 × 1180) is under MINW too, and an
   // overlaid 348 px panel hid the right half of the flume AND of the strip
@@ -127,6 +128,7 @@ const DOCK = (() => {
     // Read once per sync (a resize or an open/close), never per frame.
     const cs = getComputedStyle(document.documentElement);
     const dockW = parseFloat(cs.getPropertyValue("--dock-w"));
+    MINW = parseFloat(cs.getPropertyValue("--dock-min")) || MINW;
     const sheeted = phone(parseFloat(cs.getPropertyValue("--phone-max")));
     const open = shown && !folded;
     el().classList.toggle("open", open);

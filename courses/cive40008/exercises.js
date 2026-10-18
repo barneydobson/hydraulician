@@ -113,7 +113,7 @@ COURSES.exercises("cive40008", [
   {
     id: "CR-1",
     title: "The contraction rig",
-    aim: "Two reservoirs joined by a pipe that narrows gently or suddenly — its streamlines, its continuity and the force on it.",
+    aim: "Two reservoirs joined by a pipe that narrows gently or suddenly — its streamlines, its continuity, the force on it and the energy it loses.",
     topic: "Volume conservation",
     folder: "CR-1-contraction-rig",
     scene: "contraction",

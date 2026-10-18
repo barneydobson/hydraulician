@@ -8,7 +8,7 @@
  * so the lists below (checked by test/check_headers.py) are the
  * dependency record. Load order is index.html's.
  *
- * Defines: TOOLS, TOOL_LETTER, TOOL_KEYS, ICONS, iconEl, TIP, scenesOffered,
+ * Defines: TOOLS, TOOL_KEYS, ICONS, iconEl, TIP, scenesOffered,
  *          trainOffered, fireTrain, valveWarned, hasValves, valvesShown, trainLit,
  *          syncValveBtn, newArmed, newSandbox, TOOLBAR, toolItems, familyOf,
  *          toolItem, aboutHref, OPENERS, buildToolbar, showAllGroup, fitBar, syncBarH,
@@ -44,14 +44,11 @@ const TOOLS = [
   // so it has no digit of its own either.
   ["force", "Pressure force", "Click a wall or gate face for its pressure diagram — click the same solid again to cycle faces, click open water to clear"],
   // THIRTEENTH, appended like Flux and Force so no digit moves. Its key is the
-  // letter D (TOOL_LETTER), which used to toggle the Dye view button this
+  // letter D (the KEYMAP row whose `for` names it), which used to toggle the Dye view button this
   // replaced: dye is no longer released automatically, the student puts it
   // where the question is.
   ["dye", "Dye", "Hold the pointer in the water to release black dye there — drag to move the release point, let go to stop"],
 ];
-
-/** Tools with a LETTER shortcut rather than a digit. */
-const TOOL_LETTER = { dye: "D" };
 
 /** The tools the number keys can reach. */
 const TOOL_KEYS = Math.min(9, TOOLS.length);
@@ -292,14 +289,14 @@ function newSandbox() {
  *  name (PICKER and EX light their own opener). */
 const TOOLBAR = [
   { cap: "SESSION", family: "session", items: [
-    { id: "homeBtn", icon: "home", label: "Start", key: "H",
+    { id: "homeBtn", icon: "home", label: "Start", key: KEYMAP.labelFor("homeBtn"),
       hint: "The exercise pack, the sandbox and the scenes",
       act: () => START.open() },
-    { id: "sceneBtn", icon: "scenes", label: "Scenes", key: "S",
+    { id: "sceneBtn", icon: "scenes", label: "Scenes", key: KEYMAP.labelFor("sceneBtn"),
       hint: "Ready-made flumes, tanks and pipe runs",
       when: () => scenesOffered(),
       act: (b) => PICKER.toggle(b) },
-    { id: "exBtn", icon: "ex", label: "Exercises", key: "E",
+    { id: "exBtn", icon: "ex", label: "Exercises", key: KEYMAP.labelFor("exBtn"),
       hint: "Set up one of the teaching demos",
       act: (b) => EX.toggle(b) },
     { id: "newBtn", icon: "fresh", label: "New sandbox", key: "",
@@ -311,10 +308,10 @@ const TOOLBAR = [
   // the rig rather than running it, so it lives here, not with the clock).
   { cap: "BUILD", family: "build", items:
     toolItems("wall", "erase", "valve", "spout", "pour").concat(
-      [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
+      [{ id: "undoBtn", icon: "undo", label: "Undo", key: KEYMAP.labelFor("undoBtn"),
          hint: "Take back the last thing you drew",
          act: () => SIM.undoSeg() },
-       { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
+       { id: "clearBtn", icon: "clear", label: "Clear drawing", key: KEYMAP.labelFor("clearBtn"),
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
   // MEASURE opens with READ: the empty hand. A press with it never draws or
@@ -333,18 +330,18 @@ const TOOLBAR = [
   // the P / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
   { cap: "VIEW", family: "view", items: [
-    { id: "legendBtn", icon: "legend", label: "Field & legend", key: "L",
+    { id: "legendBtn", icon: "legend", label: "Field & legend", key: KEYMAP.labelFor("legendBtn"),
       hint: "Which variable the colour shows, its range and its units",
       on: () => LEGEND.isOpen(), act: () => LEGEND.toggle() },
-    { id: "partBtn", icon: "particles", label: "Particles", key: "P",
+    { id: "partBtn", icon: "particles", label: "Particles", key: KEYMAP.labelFor("partBtn"),
       hint: "Massless tracers — the clearest way to see orbits and jets",
       on: () => state.particles,
       act: () => { state.particles = !state.particles; syncPanel(); } },
-    { id: "slineBtn", icon: "sline", label: "Streamlines", key: "T",
+    { id: "slineBtn", icon: "sline", label: "Streamlines", key: KEYMAP.labelFor("slineBtn"),
       hint: "Streamlines — equal discharge between neighbouring lines; of the mean flow under Average",
       on: () => state.sline,
       act: () => { state.sline = !state.sline; syncPanel(); } },
-    { id: "chanBtn", icon: "channel", label: "Open-channel overlay", key: "N",
+    { id: "chanBtn", icon: "channel", label: "Open-channel overlay", key: KEYMAP.labelFor("chanBtn"),
       hint: "Critical depth, normal depth and the energy grade line",
       on: () => state.channel,
       act: () => { state.channel = !state.channel; syncPanel(); } },
@@ -356,8 +353,8 @@ const TOOLBAR = [
     // wishes: the readout boxes are the instruments' numbers (fold them away to look
     // at the water, or to ask for a prediction first); the hover card is the
     // cursor's own probe, which a first lecture may not want at all.
-    { id: "readBtn", icon: "readouts", label: "Readouts", key: "I",
-      hint: "The instruments' number boxes — gauge cards, control volume, flux lines, rakes, force. They keep recording while hidden",
+    { id: "readBtn", icon: "readouts", label: "Readouts", key: KEYMAP.labelFor("readBtn"),
+      hint: "The instruments' readout boxes — gauge cards, control volume, flux lines, rakes, force. They keep recording while hidden",
       on: () => state.instReadouts,
       act: () => { state.instReadouts = !state.instReadouts; syncPanel(); } },
     { id: "hoverBtn", icon: "hover", label: "Hover readout", key: "",
@@ -370,23 +367,23 @@ const TOOLBAR = [
     // and the particle tracers all read the averaged flow while the window is
     // open (docs/averaging.md §3), because a screenshot that mixed a mean
     // field with live markers would carry two flow states at once.
-    { id: "avgBtn", icon: "average", label: "Average", key: "A",
+    { id: "avgBtn", icon: "average", label: "Average", key: KEYMAP.labelFor("avgBtn"),
       hint: "Time-average the flow — the field and every reading over one window",
       on: () => state.avg,
       act: () => setAverage(!state.avg) },
   ] },
   { cap: "RUN", family: "run", items: [
-    { id: "playBtn", icon: () => (state.paused ? "play" : "pause"), key: "space",
+    { id: "playBtn", icon: () => (state.paused ? "play" : "pause"), key: KEYMAP.labelFor("playBtn"),
       label: () => (state.paused ? "Run" : "Pause"),
       hint: "Stop the clock — gauge histories freeze with it",
       hot: () => state.paused, act: () => togglePause() },
-    { id: "resetBtn", icon: "reset", label: "Reset water", key: "R",
+    { id: "resetBtn", icon: "reset", label: "Reset water", key: KEYMAP.labelFor("resetBtn"),
       hint: "Reload the scene's water and clear the gauge histories",
       act: () => { SIM.resetWater(); clearGaugeHistory(); } },
     // Lit when the valves are OPEN, which is what the worded button meant.
     // The other way round would light on almost every boot: a scene without an
     // explicit `valveOpen` starts shut, valve drawn or not.
-    { id: "valveBtn", icon: "valve", label: "Valves", key: "V",
+    { id: "valveBtn", icon: "valve", label: "Valves", key: KEYMAP.labelFor("valveBtn"),
       hint: "Open or slam every valve you have drawn",
       // Only where there is a valve to work: the scene's own or one drawn.
       // Re-read every frame (tickFrame → syncValveBtn), so drawing the first
@@ -396,7 +393,7 @@ const TOOLBAR = [
     // Only where the paddle makes trains (wave.train > 0, WV-5): one press,
     // one train. Shares V with the valves — V fires the train where there is
     // no valve to work.
-    { id: "trainBtn", icon: "train", label: "Wave train", key: "V",
+    { id: "trainBtn", icon: "train", label: "Wave train", key: KEYMAP.labelFor("trainBtn"),
       hint: "Fire one wave train: the paddle ramps up, holds and stops",
       when: () => trainOffered() && !hasValves(),
       on: () => !!sim && SIM.paddle().running && sim.p.wave.train > 0, act: () => fireTrain() },
@@ -408,7 +405,7 @@ const TOOLBAR = [
       hint: "Every slider: flow, boundaries, hydraulics, view, rig",
       act: () => togglePanel() },
     { id: "fsBtn", icon: () => (document.fullscreenElement ? "unfullscreen" : "fullscreen"),
-      label: () => (document.fullscreenElement ? "Exit full screen" : "Full screen"), key: "F",
+      label: () => (document.fullscreenElement ? "Exit full screen" : "Full screen"), key: KEYMAP.labelFor("fsBtn"),
       hint: "The whole screen for the flume — inside a module page, the way out of the frame",
       on: () => !!document.fullscreenElement,
       // A frame with no `allow="fullscreen"` reports the capability as false
@@ -421,7 +418,7 @@ const TOOLBAR = [
       hint: "This exercise, and what you have drawn, in a full window",
       when: () => EMBED,
       act: () => popOut() },
-    { id: "keysBtn", icon: "keys", label: "Keyboard", key: "?",
+    { id: "keysBtn", icon: "keys", label: "Keyboard", key: KEYMAP.labelFor("keysBtn"),
       hint: "The shortcut sheet",
       act: (b) => KEYS.toggle(b) },
     { id: "aboutBtn", icon: "about", label: "About the solver",
@@ -455,7 +452,7 @@ function toolItem([id, label, tip]) {
   // `tool` is the item's own name for the thing it arms, and it is what a UI
   // profile names — an exercise says `measure: ["gauge"]`, not "Gauge".
   return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
-           key: n <= TOOL_KEYS ? String(n) : (TOOL_LETTER[id] || ""),
+           key: n <= TOOL_KEYS ? String(n) : KEYMAP.labelFor(id),
            on: () => state.tool === id,
            act: () => {
              // The Gauge button pressed while the Gauge tool is ALREADY in
@@ -502,7 +499,9 @@ function buildToolbar() {
       (it.always ? UIMODE.anyTool() : UIMODE.allows(group.family, it)) &&
       (!it.when || it.when()));
     if (!items.length) return;
-    if (host.children.length) {
+    // The rule only exists where captions do not (touch machines, see the
+    // pointer: coarse block in css/app.css); a desktop strip has captions.
+    if (host.children.length && matchMedia("(pointer: coarse)").matches) {
       const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
     }
     // A group is a captioned COLUMN: the caption names the family, the row

@@ -16,8 +16,11 @@
  * read this array, so a binding cannot be added to one and forgotten in the
  * other two.
  *
- * Row: { key, label?, what?, when?, repeat?, run(e) }
+ * Row: { key, for?, label?, what?, when?, repeat?, run(e) }
  *   key     the lowercased KeyboardEvent.key (" " for space, "?" , "[" …)
+ *   for     the strip items this key is the shortcut of (a TOOLBAR item id, or
+ *           a tool id such as "dye"): strip.js reads the hover card's key
+ *           text from here via KEYMAP.labelFor, so the key list is kept once
  *   label   what the sheet prints in the <kbd>; no label = not on the sheet
  *           (an alias row, like "=" beside "+")
  *   what    the sheet's description
@@ -49,12 +52,12 @@ const KEYMAP = [
     run: () => { state.brush = Math.max(0.015, state.brush / 1.3); } },
   { key: "]", repeat: true,
     run: () => { state.brush = Math.min(0.5, state.brush * 1.3); } },
-  { key: "z", label: "Z", what: "undo a stroke", run: () => SIM.undoSeg() },
-  { key: "c", label: "C", what: "clear the drawing", run: () => SIM.clearSegs() },
-  { key: "v", label: "V", what: "valves",
+  { key: "z", for: ["undoBtn"], label: "Z", what: "undo a stroke", run: () => SIM.undoSeg() },
+  { key: "c", for: ["clearBtn"], label: "C", what: "clear the drawing", run: () => SIM.clearSegs() },
+  { key: "v", for: ["valveBtn", "trainBtn"], label: "V", what: "valves",
     run: () => { if (trainOffered() && !hasValves()) fireTrain(); else toggleValve(); } },
-  { key: " ", label: "space", what: "pause", run: (e) => { e.preventDefault(); togglePause(); } },
-  { key: "r", label: "R", what: "reset the water",
+  { key: " ", for: ["playBtn"], label: "space", what: "pause", run: (e) => { e.preventDefault(); togglePause(); } },
+  { key: "r", for: ["resetBtn"], label: "R", what: "reset the water",
     run: () => { SIM.resetWater(); clearGaugeHistory(); } },
   { key: "g", label: "G", what: "cycle the field (the legend names it)",
     run: () => {
@@ -65,7 +68,7 @@ const KEYMAP = [
       state.mode = F[(i + 1) % F.length].mode;
       LEGEND.sync(); syncPanel();
     } },
-  { key: "l", label: "L", what: "the legend — which field, over what range, in what units",
+  { key: "l", for: ["legendBtn"], label: "L", what: "the legend — which field, over what range, in what units",
     run: () => LEGEND.toggle() },
   { key: "b", label: "B", what: "what the Control volume reads on each edge: Q / momentum / energy",
     run: () => {
@@ -74,9 +77,9 @@ const KEYMAP = [
       if (state.cvShow === "E" && UIMODE.hides("energy")) state.cvShow = "Q";
       syncPanel();
     } },
-  { key: "p", label: "P", what: "particles",
+  { key: "p", for: ["partBtn"], label: "P", what: "particles",
     run: () => { state.particles = !state.particles; syncPanel(); } },
-  { key: "d", label: "D", what: "the Dye tool — hold the pointer in the water to release dye",
+  { key: "d", for: ["dye"], label: "D", what: "the Dye tool — hold the pointer in the water to release dye",
     run: () => {
       // The same gate as a digit: a hidden tool's key says why rather than
       // arming it.
@@ -87,24 +90,24 @@ const KEYMAP = [
                   "The ⋯ button at the end of the strip brings every control back.");
       }
     } },
-  { key: "t", label: "T", what: "streamlines",
+  { key: "t", for: ["slineBtn"], label: "T", what: "streamlines",
     run: () => { state.sline = !state.sline; syncPanel(); } },
-  { key: "n", label: "N", what: "open-channel overlay",
+  { key: "n", for: ["chanBtn"], label: "N", what: "open-channel overlay",
     run: () => { state.channel = !state.channel; syncPanel(); } },
-  { key: "a", label: "A", what: "average the flow — the mean field, over one window",
+  { key: "a", for: ["avgBtn"], label: "A", what: "average the flow — the mean field, over one window",
     run: () => setAverage(!state.avg) },
-  { key: "i", label: "I", what: "the instruments' readout boxes — they keep recording while hidden",
+  { key: "i", for: ["readBtn"], label: "I", what: "the instruments' readout boxes — they keep recording while hidden",
     run: () => { state.instReadouts = !state.instReadouts; syncPanel(); } },
   { key: "m", label: "M", what: "ruler",
     run: () => { state.ruler = !state.ruler; syncPanel(); } },
   // requestFullscreen needs a user gesture; a keypress is one. A frame with no
   // allow="fullscreen" simply rejects — toggleFullscreen already swallows that.
-  { key: "f", label: "F", what: "full screen", run: () => toggleFullscreen() },
-  { key: "s", label: "S", what: "scenes", when: () => scenesOffered(),
+  { key: "f", for: ["fsBtn"], label: "F", what: "full screen", run: () => toggleFullscreen() },
+  { key: "s", for: ["sceneBtn"], label: "S", what: "scenes", when: () => scenesOffered(),
     run: () => PICKER.open(document.getElementById("sceneBtn")) },
-  { key: "e", label: "E", what: "exercises", run: () => EX.open(document.getElementById("exBtn")) },
-  { key: "h", label: "H", what: "the start screen", run: () => START.open() },
-  { key: "?", label: "?", what: "this sheet",
+  { key: "e", for: ["exBtn"], label: "E", what: "exercises", run: () => EX.open(document.getElementById("exBtn")) },
+  { key: "h", for: ["homeBtn"], label: "H", what: "the start screen", run: () => START.open() },
+  { key: "?", for: ["keysBtn"], label: "?", what: "this sheet",
     run: () => KEYS.toggle(document.getElementById("keysBtn")) },
   { key: "escape", label: "Esc", what: "close the open menu, then fold the side panel",
     run: () => { KEYS.close(); DOCK.fold(true); } },
@@ -132,6 +135,13 @@ KEYMAP.typing = function (e) {
 
 /** The row an event triggers, or null. Shift+/ is "?" on every layout the
  *  old handler accepted; rows whose `when()` is false are not found. */
+/** The sheet label of the key that is the shortcut of a strip item or tool
+ *  (its `for`), or "" when it has none. */
+KEYMAP.labelFor = function (id) {
+  const row = KEYMAP.find((r) => r.for && r.for.includes(id));
+  return row ? row.label : "";
+};
+
 KEYMAP.match = function (e) {
   let k = String(e.key).toLowerCase();
   if (k === "/" && e.shiftKey) k = "?";

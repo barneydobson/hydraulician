@@ -106,7 +106,8 @@ Gates exit non-zero on failure; the manual (suites, CI, ANGLE, `$CHROME`, mutati
 worksheets, `smoke.mjs` before pushing anything that touches `js/`,
 `mutation-test.mjs` after touching `js/reconstruct.js` or `js/geom.js`,
 `ui-smoke.mjs` after touching strip, panel, legend, dock or boot wiring. Browser
-gates need a real GPU, so CI runs only the instant ones; run GPU gates one at a time.
+gates need a real GPU, so CI runs the instant ones plus the two no-GPU browser checks
+(`--only=docs`, `--only=file://`); run GPU gates one at a time.
 
 Headless driving: the render loop stops on a hidden page, so use `APP.frames(n)`,
 `APP.tick(n)`, `APP.probe(x,z)` (`phead` is pressure head only). `APP.volume()`

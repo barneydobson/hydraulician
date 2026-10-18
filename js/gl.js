@@ -111,6 +111,11 @@ const GLH = (() => {
       get write() { return this.b; },
       get prev() { return this.b; },
       swap() { const t = this.a; this.a = this.b; this.b = t; this.parity ^= 1; },
+      /** The same texels into BOTH halves (an initial state the first step
+       *  may read from either side). Callers say "both", not which is .a. */
+      uploadBoth(w, h, format, type, data, align) {
+        for (const half of [this.read, this.write]) upload(gl, half.tex, w, h, format, type, data, align);
+      },
       /** Hand both halves back to the driver. A rebuild allocates a whole new
        *  pair, so the outgoing one has to be released or the driver keeps it
        *  for ever — see SIM.build's `release`. */

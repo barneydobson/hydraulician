@@ -8,7 +8,7 @@ A lecturer wants one exercise sitting inside a module page — a Blackboard
 Ultra document or a Canvas page — beside the brief, so a student meets the
 flume where the reading is, not behind a link. No grade passback, no LTI, no
 identity: the LMS stays the submission layer it already is
-(`exercises/demo-programme.html` assumes one Blackboard test per hour), and
+(`courses/original/demo-programme.html` assumes one Blackboard test per hour), and
 the app stays the instrument.
 
 Nothing stops this today. The Pages build is HTTPS and sends no

@@ -2267,7 +2267,11 @@ async function main() {
         for (const fx of [0.3, 0.5, 0.15, 0.7]) for (let k = 39; k > 0; k--) {
           const x = APP.sim.W * fx, z = APP.sim.H * k / 40, p = APP.probe(x, z);
           const px = [r.left + APP.view.X(x), r.top + APP.view.Y(z)];
-          if (p && p.f < 0.01 && document.elementFromPoint(px[0], px[1]) === cv) return px;
+          // clear of floating chrome by a finger-width, not by a hair: the exercise toast
+          // is still up here and its bottom edge sits a fraction of a pixel from this point
+          const clear = [[0, 0], [0, -24], [0, 24], [-24, 0], [24, 0]].every(
+            (d) => document.elementFromPoint(px[0] + d[0], px[1] + d[1]) === cv);
+          if (p && p.f < 0.01 && clear) return px;
         }
         return null;`);
       check("found dry ground on screen", !!dry);

@@ -3,13 +3,19 @@
  * reconstruct.js — RECON: the averaging numerics that must be exactly right,
  * kept free of WebGL so they can be unit-tested against closed-form answers.
  *
- * Two jobs. First, the running weighted-mean and Welford updates: the GLSL
- * accumulators implement the SAME formulae, and `test/recon-test.mjs` is what
- * pins them down. Raw sums were rejected because <eta^2> - <eta>^2 for a 5 mm
- * wobble on a 1 m datum is a ratio of 2.5e-5 against float32's 1.2e-7 eps —
- * about two surviving digits of the variance the excursion band is drawn from.
+ * Four jobs. Averaging: the running weighted-mean and Welford updates. The
+ * GLSL accumulators implement the SAME formulae, and `test/recon-test.mjs` is
+ * what pins them down. Raw sums were rejected because <eta^2> - <eta>^2 for a
+ * 5 mm wobble on a 1 m datum is a ratio of 2.5e-5 against float32's 1.2e-7 eps
+ * — about two surviving digits of the variance the excursion band is drawn
+ * from. Reconstruction: the free surface from the mean fill (see
+ * docs/averaging.md). Inlet depth: the subcritical/supercritical depth at a
+ * given reservoir energy and discharge. Column energy: the true velocity
+ * head, and its alpha, of a column of water.
  *
- * Second, the surface reconstruction (Tasks 2-4). See docs/averaging.md.
+ * Defines: RECON
+ *
+ * Reads:   none
  */
 const RECON = (() => {
 
@@ -146,8 +152,8 @@ const RECON = (() => {
    *  the same number — docs/averaging.md §7.3. */
   const aerationGap = (etaBar, bed, dBar) => etaBar - (bed + dBar);
 
-  /** Whole-grid reconstruction. One entry per column; `mask >= 192` is solid,
-   *  matching SIM's rasterised mask. `d2d` uses `bodyDepth`, NOT `columnDepth`:
+  /** Whole-grid reconstruction. One entry per column; `mask >= o.solidMin` (default 192,
+   *  SIM.MASK.SOLID_MIN) is solid, matching SIM's rasterised mask. `d2d` uses `bodyDepth`, NOT `columnDepth`:
    *  it exists to cross-check the GPU's own column reduction (`FS_COL` in
    *  js/shaders.js), which `continue`s past sub-threshold cells without
    *  accumulating depth. Using the unmasked integral here would make d2d
@@ -155,6 +161,9 @@ const RECON = (() => {
    *  bridging bug instead of checking against it. */
   function reconstruct(o) {
     const { fbar, pbar, mask, nx, ny, dx, c } = o;
+    // The solid cut of the mask (SIM.MASK.SOLID_MIN); smoke asserts the two agree,
+    // so this module can stay free of SIM.
+    const solidMin = o.solidMin === undefined ? 192 : o.solidMin;
     // Gravity, because compaction only means anything where the EOS is
     // one-sided. `g` is optional and defaults to the scene default; a caller
     // reading it off a live sim should pass `g: sim.p.g` so a zero-gravity
@@ -177,7 +186,7 @@ const RECON = (() => {
     for (let i = 0; i < nx; i++) {
       for (let j = 0; j < ny; j++) {
         const k = j * nx + i;
-        solid[j] = mask[k] >= 192 ? 1 : 0;
+        solid[j] = mask[k] >= solidMin ? 1 : 0;
         gcol[j] = solid[j] ? 0 : geomFill(fbar[k], pbar[k], c);
       }
       const b = bodies(gcol, solid, ny);

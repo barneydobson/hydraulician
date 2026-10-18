@@ -1,6 +1,6 @@
-# Syllabus
+# Syllabus — the original exercise pack
 
-The teaching pack, arranged as a syllabus: topics in the order we suggest
+The original teaching pack, arranged as a syllabus: topics in the order we suggest
 teaching them, and under each one the exercises that have been checked. 
 
 Hydraulician includes a variety of exercise types, colour-coded below:
@@ -15,6 +15,8 @@ checked or considered redundant — is the `original` course: the app's
 Exercises menu (press `E`) on the main site, or anywhere with
 `?course=original`, indexed in
 [courses/original/INDEX.md](../courses/original/INDEX.md).
+The CIVE40008 Year 1 course, with its own menu, is indexed in
+[courses/cive40008/INDEX.md](../courses/cive40008/INDEX.md).
 
 ## Contents
 

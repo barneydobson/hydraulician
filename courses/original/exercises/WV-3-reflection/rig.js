@@ -23,8 +23,8 @@
 // readPixels, so scanning many stations costs the same one sync per sample
 // as scanning one station would -- the same trick sim.js itself uses for
 // tracer advection. The per-station quantity extracted is EXACTLY what a
-// gauge reads: h = y_probe + p/(rho g) (see js/main.js sampleGauges,
-// `h: z + pr.phead`), just batched. Section 3 of the README separately
+// gauge reads: h = y_probe + p/(rho g) (see js/instruments.js sampleGauges,
+// `h: pr.zp + pr.phead`, zp = j*dx), just batched. Section 3 of the README separately
 // validates this against the literal on-screen gauge/chart a student uses.
 //
 // IMPORTANT (from WV-2's own README, "the spin-up trap", generalising to
@@ -292,7 +292,7 @@ window.WV3 = {
     const probeY = f.bed + 0.5 * f.h;   // depth field ignores y; head just needs to stay wet
     APP.state.gauges = [{ x, y: probeY, hist: [], colour: '#7fd4ff' }];
     APP.state.tool = 'gauge';
-    if (window.syncTools) window.syncTools();
+    syncToolbar();
     APP.state.paused = false;
     const nFrames = Math.min(850, Math.round(seconds * 60));
     APP.frames(nFrames, 1 / 60);

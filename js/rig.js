@@ -6,9 +6,14 @@
  * wire format, what a rig deliberately does NOT store, and the version gate.
  * Read the note on `V` before adding a key to the format.
  *
- * It reaches back into main.js for CONFIG, state, sim, loadScene, placeCV,
- * placeFlux, seedTracers, showToast, syncPanel, CV_NEXT and GINSP -- all from
- * inside functions.
+ * What it borrows from the other files is the machine-checked `Reads:` line
+ * below (test/check_headers.py), used only from inside functions.
+ *
+ * Defines: RIG
+ *
+ * Reads:   CONFIG, CV_NEXT, freeGaugeColour, GINSP, LEGEND, loadScene,
+ *          placeCV, placeFlux, SCENES, seedTracers, setAllGaugeFields,
+ *          showToast, sim, SIM, state, syncPanel
  */
 
 // ------------------------------------------------------- rig save / share
@@ -70,7 +75,7 @@ const RIG = (() => {
    *  the drawn one than any rasterisation decision. 1 µm is 0.04% of the
    *  finest cell, and JSON.stringify still prints 1.5 as "1.5". */
   const r4 = (v) => Math.round((+v || 0) * 1e6) / 1e6;
-  const b01 = (v) => (v > 0.5 ? 1 : 0);
+  const b01 = (v) => (SIM.isOn(v) ? 1 : 0);
   let note = "", msg = "", ui = null;
 
   // ------------------------------------------------------------- snapshot
@@ -189,8 +194,8 @@ const RIG = (() => {
     }
     // additive, optional — SIM.setParam itself is the single writer (clamps
     // to the scene's own declared range and ignores a key the current scene
-    // never declared), and rasterises on every call, which is redundant with
-    // the SIM.rasterise() a few lines down but harmless at apply time.
+    // never declared); it and the SIM.rasterise() a few lines down both notify
+    // the geometry hook, and the repeat is idempotent.
     if (o.params) Object.keys(o.params).forEach((k) => SIM.setParam(k, +o.params[k]));
     p.pour = null;
     SIM.rasterise();                         // one stamp for the whole rig
@@ -198,18 +203,18 @@ const RIG = (() => {
     // ---- instruments. Same objects the Gauge / Rake tools push.
     GINSP.closeAll();
     state.gauges.length = 0;
-    (o.gauges || []).slice(0, 4).forEach((g) => {
+    (o.gauges || []).slice(0, CONFIG.maxGauges).forEach((g) => {
       state.gauges.push( { x: +g[0], z: +g[1], hist: [], log: [], id: ++state.gaugeSeq,
-                          colour: CONFIG.gaugeColours[state.gauges.length % 4] });
+                          colour: freeGaugeColour() });
     });
     state.rakes.length = 0;
-    (o.rakes || []).slice(0, 2).forEach((x) => state.rakes.push({ x: +x, buf: null }));
+    (o.rakes || []).slice(0, CONFIG.maxRakes).forEach((x) => state.rakes.push({ x: +x, buf: null }));
     state.cv = null;
     if (Array.isArray(o.cv) && o.cv.length === 4) placeCV(+o.cv[0], +o.cv[1], +o.cv[2], +o.cv[3]);
     // loadScene above has already emptied state.flux; placeFlux re-seeds each
     // section with a null EMA, so they start accumulating against the geometry
     // that just loaded rather than carrying a previous rig's smoothing in.
-    (o.flux || []).slice(0, 4).forEach((L) => {
+    (o.flux || []).slice(0, CONFIG.maxFlux).forEach((L) => {
       if (Array.isArray(L) && L.length === 4) placeFlux(+L[0], +L[1], +L[2], +L[3]);
     });
     state.gaugeT = -1;

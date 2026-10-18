@@ -381,7 +381,7 @@ Two consequences worth knowing:
   rebuild — asking for more cells never costs your boundary configuration.
 
 Serialized, the edge states and control settings travel in the rig wire
-format (v2) through `RIG.migrate` in `js/main.js`; keys change only with a
+format (v2) through `RIG.migrate` in `js/rig.js`; keys change only with a
 version bump.
 
 ## 9. Uniform map

@@ -133,10 +133,29 @@ boundary between the two. Two consequences worth knowing:
   for $|u|$). The v1 names (`y`, `vy`, `"head"`, `"depth"`) are gone and v1
   links are rejected — this is a prototype, and old wire formats are not
   migrated.
+- **Serialized keys go through the version gate.** `RIG.migrate` (`js/rig.js`)
+  accepts exactly the current version and rejects anything else. Gauge-field
+  wire keys are any `GAUGE_QTY` id (`js/fields.js`), not just the four named
+  above. Any future key change bumps `V` in `js/rig.js`; old links just break.
 - `APP.probe().phead` is the **pressure** head $p/\rho g$ alone — no elevation
   term. Rig scripts build the piezometric head themselves as
   `z + probe().phead`. It was renamed from `head` at v2 precisely because the
   old name kept being read as piezometric.
+
+## Interface words
+
+The same discipline for the screen, in comments and internal names. Worksheet-facing
+and wire names (Controls row ids, rig keys, `state.*` fields a rig maps to) keep
+their old words.
+
+- **Controls panel** — `#panel`: the sheet of toggles, sliders and selects.
+- **dock** — `#dock`: the docked column that holds the loaded exercise. Never "side panel".
+- **readout boxes** — the instruments' numbers drawn on the water (gauge cards, control volume, flux lines, rakes, force); VIEW → Readouts; `OVERLAY.PRINT.readouts`.
+- **hover card** — the cursor readout that follows a mouse or pen, and its pinned tap copy.
+- **gauge quantity** — a `GAUGE_QTY` row: what a gauge records and plots. `g.field`, `state.gaugeField`, `ui.gaugeFields` and the `gaugeField` control id keep "field" as wire and worksheet names.
+- **field** — a colouring of the water: a `FIELDS` row (speed, pressure, …).
+- **strip** — the toolbar across the top (`TOOLBAR`).
+- **instrument** — a MEASURE tool: probe, gauge, rake, section, control volume.
 
 <!-- Pages build only: github.com strips this tag and renders the maths
      natively; on the Jekyll site math.js rewrites it for MathJax. -->

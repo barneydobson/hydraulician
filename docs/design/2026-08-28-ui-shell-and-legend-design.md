@@ -295,9 +295,9 @@ that can silently break:
 
 Existing gates that must stay green:
 
-- `node exercises/_runner/smoke.js --only=api,rig` — every field reachable,
+- `node test/smoke.mjs --only=api,rig` — every field reachable,
   rig round-trip unchanged (the format is deliberately untouched);
-- `python3 exercises/_runner/check_notation.py` — registry symbols and units
+- `python3 test/check_notation.py` — registry symbols and units
   match the register;
 - `python3 exercises/_runner/check_pack.py` — extended: any `ui` key names
   tools that exist, fields that exist and a valid panel level.
@@ -323,5 +323,5 @@ Existing gates that must stay green:
   knowing about anyway.
 - **The pack-wide focused panel is a behaviour change** for all forty
   exercises at once. It is the one change here that is not additive; the
-  escape hatch and `smoke.js`'s per-exercise pass are what make it
+  escape hatch and `smoke.mjs`'s per-exercise pass are what make it
   reversible in practice.

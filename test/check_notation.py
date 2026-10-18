@@ -12,20 +12,33 @@ morning of the demo. So the retired names are asserted GONE:
   1. retired API fields (.hRaw, .yc, .yn, ynGlobal, .y2p, .fy, probe().head)
   2. gauge objects carry `z:`, never `y:`
   3. the rig wire format is the current version, with z/vz and h/d keys
-  4. every gaugeField value in the register is a live key
+  4. every gaugeField value in the register is a live key (the ids of
+     GAUGE_QTY, read by evaluating the app -- see check_pack.py)
   5. displayed depth symbols in briefs are the d-family, not the y-family
-  6. coordinates quoted in briefs are `z = ...`, not `y = ...`
+  6. coordinates quoted in briefs are `z = ...`, not `y = ...`, and the
+     `[x0, y0, x1, y1]` box form in the README and docs is `[x0, z0, ...]`
+  7. zero-deps: index.html, js/*.js and css/*.css contain no `fetch(`, no
+     `type="module"`, no line starting `import `, and no YAML front matter
+     (a first line `---`), and every tracked .md with a ```math fence ends
+     with a <script> tag loading docs/math.js (AGENTS.md, "Zero dependencies")
+
+Under CI (the `CI` environment variable is set) a failing `git ls-files` is a
+failure: the filesystem fallback would silently scan a different set.
 
 Deliberately NOT flagged, because they are not this notation at all:
 GLSL swizzles (`.xy`, `U.g`) and screen-space pixel coordinates in the view
 transform, `y+` wall units, and chart reference lines like `y = 2x`.
 
-Usage:  python3 exercises/_runner/check_notation.py [-v]
+Usage:  python3 test/check_notation.py [-v]
 """
 import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "exercises", "_runner"))
+import check_pack  # the app evaluator: registers are read, never copied
 
 # The symbols this file is about do not survive a cp1252 console.
 for stream in (sys.stdout, sys.stderr):
@@ -34,7 +47,7 @@ for stream in (sys.stdout, sys.stderr):
     except AttributeError:                      # pre-3.7, or a redirected pipe
         pass
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Files whose job is to record what the app said ON A GIVEN DATE. Renaming
 # inside them would falsify the record, so they are out of scope for every
@@ -56,7 +69,13 @@ def _get_tracked_files():
         output = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True)
         return set(output.splitlines())
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
-        # git unavailable (e.g. repo is exported as tarball, or git not installed)
+        # git unavailable (e.g. repo is exported as tarball, or git not installed).
+        # On a developer machine the filesystem fallback is a courtesy; in CI
+        # it would scan a different set than the commit has and still go green.
+        if os.environ.get("CI"):
+            print("check_notation.py: `git ls-files` failed under CI -- refusing to "
+                  "fall back to a filesystem walk that scans a different file set.")
+            sys.exit(1)
         return None
 
 
@@ -202,7 +221,7 @@ def main():
         path = os.path.join(ROOT, *parts)
         if not os.path.isfile(path):
             continue
-        m = re.search(r"const V = (\d+);\s*//\s*format version", read(path))
+        m = re.search(r"const V = (\d+);", read(path))
         if m:
             where = "/".join(parts)
             break
@@ -213,14 +232,47 @@ def main():
         fails.append("%s  rig format version is v%s but the embedded rigs are v2"
                      % (where, m.group(1)))
 
+    # --- 7. zero-deps (run before 4: the gauge ids come from EVALUATING the app,
+    # and an `import` or front matter would make that fail with a node error
+    # instead of this rule's message) ----------------------------------------------------------
+    # The app boots with no server, so no fetch, no ES modules, no build step,
+    # and no YAML front matter (Jekyll would eat the file).
+    app = [p for p in walk(".html", ".js", ".css")
+           if rel(p) == "index.html" or rel(p).startswith(("js/", "css/"))]
+    scan(fails, checked, [p for p in app if p.endswith(".js") or p.endswith(".html")],
+         r"fetch\(", "zero-deps: fetch( -- the app must boot under file://")
+    scan(fails, checked, app, r"type\s*=\s*[\"']module[\"']", 'zero-deps: type="module"')
+    scan(fails, checked, app, r"^import\s", "zero-deps: a line starting `import `")
+    for p in app:
+        checked[0] += 1
+        if read(p).lstrip("﻿").startswith("---"):
+            fails.append("%s:1  zero-deps: YAML front matter (a first line ---)" % rel(p))
+    # A page with ```math fences must end with a <script> loading docs/math.js
+    # (stripped on github.com, live on the Pages build, where it rewrites the
+    # fences for MathJax). The src is relative to the page, so resolve it.
+    for p in walk(".md"):
+        txt = read(p)
+        if not re.search(r"^```math\b", txt, re.M):
+            continue
+        checked[0] += 1
+        tail = re.search(r"<script\b[^>]*\bsrc\s*=\s*[\"']([^\"']+)[\"'][^>]*>\s*</script>\s*\Z", txt)
+        target = tail and os.path.normpath(os.path.join(os.path.dirname(rel(p)), tail.group(1))).replace("\\", "/")
+        if target != "docs/math.js":
+            fails.append("%s  has math fences but does not end with a <script> tag "
+                         "loading docs/math.js" % rel(p))
+
+    zero_deps_failed = bool(fails)
+
     # --- 4. gauge field keys --------------------------------------------------
-    LIVE_FIELDS = {"h", "H", "d", "eta", "speed"}
+    LIVE_FIELDS = set() if zero_deps_failed else set(check_pack.loaded()["reg"]["gauge"])
+    if not LIVE_FIELDS and not zero_deps_failed:
+        fails.append("GAUGE_QTY came back empty after evaluating index.html's scripts")
     for reg_path in register_files():
         register = read(reg_path)
         checked[0] += 1
         for n, line in enumerate(register.splitlines(), 1):
             for val in re.findall(r'gaugeField:\s*"([^"]+)"', line):
-                if val not in LIVE_FIELDS:
+                if val not in LIVE_FIELDS and not zero_deps_failed:
                     fails.append('%s:%d  gaugeField: "%s" is not a live key %s'
                                  % (rel(reg_path), n, val, sorted(LIVE_FIELDS)))
 
@@ -240,6 +292,14 @@ def main():
     scan(fails, checked, prose, r"(?<![\w.\-])y\s*(?:=|≈)\s*[0-9]",
          "coordinate written as y — the vertical coordinate is z",
          allow=ALLOW)
+
+    # `[x0, y0, x1, y1]` is the box form READMEs and docs use; z is vertical.
+    # (docs/_archive/ and docs/design/ hold plans that quote the rule itself.)
+    boxes = [p for p in walk(".md")
+             if (rel(p) == "README.md" or rel(p).startswith("docs/"))
+             and not rel(p).startswith(("docs/_archive/", "docs/design/"))]
+    scan(fails, checked, boxes, r"\[\s*x0\s*,\s*y0",
+         "box written [x0, y0, ...] — the vertical coordinate is z: [x0, z0, x1, z1]")
 
     # -------------------------------------------------------------------------
     verbose = "-v" in sys.argv

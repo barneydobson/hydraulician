@@ -90,7 +90,7 @@ and creeps up by about 0.1 kPa a minute (37.14–37.37 at t = 11 s,
 differences on top — stagnation at the nose, low pressure along the sides
 and in the shed eddies (½ρU² = 0.4 kPa at 0.9 m/s). So the field's range is
 not a fixed number here: it is **fitted once, the first time Pressure is
-shown**, and held (`pressureRange` in js/main.js); press Fit on the legend
+shown**, and held (`pressureRange` in js/fields.js); press Fit on the legend
 after a long run to re-centre it. The card's Background says only the
 differences matter. The hover card and the gauges read p in kPa.
 

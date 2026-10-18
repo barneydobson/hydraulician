@@ -14,10 +14,13 @@ lives in this one folder so it can be deleted in one go. Other courses'
 exercises are indexed by their own course ([exercises/INDEX.md](../../exercises/INDEX.md)
 lists them).
 
-Each folder holds a short README brief (theory · your parameter · what to do ·
-instructor pooling), collect_plot.py for the Blackboard CSV, the
+Each folder holds its README (the lecturer's notes — derivation, worked
+answers, verification; the definition is the header of
+[`js/exercises.js`](../../js/exercises.js)), collect_plot.py for the Blackboard CSV, the
 simulated-class data and plot that prove it works, and rig.js where
-geometry/instruments are drawn. Each folder's full verification record and
+geometry/instruments are drawn. The pack's READMEs predate that definition
+and still read as student briefs; they are due for retirement with the pack.
+Each folder's full verification record and
 director report live beside it in `_archive/`, kept out of version control
 (.gitignore) on the maintainer's machine — archive weight, not source.
 Statuses and measured caveats: `_director-status.md`
@@ -56,10 +59,10 @@ a handful of numbered steps, and instructor pooling with a discussion point
 or two, with the long verification record moved verbatim to `_archive/`
 inside each folder — untracked, local to the maintainer's machine.
 
-**Standing rules (every worksheet carries them):** everyone on Resolution
-Medium (the picker sets this) · wait out the spin-up · median-of-the-wobble
-reads, never one frame · after changing q, re-check any tailwater ≥ 1.3·d_c ·
-pause-and-read promptly (the chart buffer keeps moving).
+**Standing rules (every worksheet carries them):** Resolution Medium ·
+wait out the settle · median-of-the-wobble reads, never one frame · after
+changing q, re-check any tailwater ≥ 1.3·d_c · keep the tab visible · read
+promptly (the chart buffer keeps moving).
 
 | ID (= `?ex=` id) | Demo | Folder | Runs on | Students submit |
 |----|------|--------|---------|-----------------|

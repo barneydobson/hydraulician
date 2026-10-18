@@ -1,33 +1,14 @@
 name: Checks
 
-# The five zero-dependency, browser-free gates from AGENTS.md's Testing
-# table, run on every push and pull request: two Python checkers that assert
-# the exercise pack and the notation agree with themselves, and three Node
-# suites (recon-test.mjs and geom-test.mjs, the closed-form answers for
-# js/reconstruct.js and js/geom.js; mutation-test.mjs, which proves
-# recon-test.mjs can actually fail). All five are instant-to-~10s, so they
-# gate every push rather than running on a schedule.
-#
-# The browser gates (smoke.js, ui-smoke.mjs) are NOT here, and there is no
-# `workflow_dispatch` job for them either — deliberately, not an oversight.
-# Both drive a real headless Chrome through an ANGLE GPU backend
-# (test/cdp.mjs and exercises/_runner/smoke.js's browser() now pick
-# d3d11/metal/gl by platform, see their angleArgs() comments), because the
-# software rasteriser renders a full-window WebGL canvas about 50x too
-# slowly for smoke.js's physics checks to settle before their wall-clock
-# budget runs out (measured locally: SwiftShader reaches sim t~9.5 of a
-# t=30 target in the 150s `__settle` allows; the GPU backend reaches t=30 in
-# ~6.5s). Standard GitHub-hosted runners, ubuntu-latest included, have no
-# GPU passthrough, so `--use-angle=gl` on one of them almost certainly falls
-# back to the same class of software rasteriser (Mesa's llvmpipe) that
-# already fails this budget under SwiftShader — untested here (this repo
-# cannot run GitHub Actions to check), but a job built on that assumption
-# would be red from day one and train everyone to ignore it. Run both
-# locally instead, where a real GPU is available:
-#   node exercises/_runner/smoke.js
-#   node test/ui-smoke.mjs
+# The instant, browser-free gates from AGENTS.md's Testing table, plus a
+# no-GPU browser job. The GPU gates (smoke.mjs, ui-smoke.mjs in full) cannot
+# run on hosted runners; why, and what runs where: docs/testing.md.
+permissions:
+  contents: read
+
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -80,7 +61,15 @@ jobs:
         run: python3 exercises/_runner/check_pack.py
 
       - name: check_notation.py — one notation everywhere
-        run: python3 exercises/_runner/check_notation.py
+        env:
+          CI: "1"
+        run: python3 test/check_notation.py
+
+      - name: check_headers.py — every js/*.js carries its header
+        run: python3 test/check_headers.py js/*.js
+
+      - name: check_docs.py — the docs name only files and suites that exist
+        run: python3 test/check_docs.py
 
       - name: recon-test.mjs — RECON's closed-form answers
         run: node test/recon-test.mjs
@@ -90,3 +79,26 @@ jobs:
 
       - name: mutation-test.mjs — proves recon-test.mjs can fail
         run: node test/mutation-test.mjs
+
+      - name: smoke.mjs --check-catalogue — the mutation catalogue is sound (no browser)
+        run: node test/smoke.mjs --check-catalogue
+
+  # Browser checks that need no GPU and no physics budget. UNPROVEN on hosted
+  # runners (the software rasteriser may be too slow or Chrome may not launch),
+  # so it does not block: make it required once it has run green there.
+  no-gpu:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      SOFTWARE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: smoke.mjs --only=docs — the docs reader renders the markdown
+        run: node test/smoke.mjs --only=docs
+
+      - name: ui-smoke.mjs --only=file:// — boots from file:// with no errors
+        run: node test/ui-smoke.mjs --only=file://

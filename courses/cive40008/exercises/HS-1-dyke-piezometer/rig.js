@@ -6,7 +6,7 @@
  * the lecturer's spot-check — it prints the levels and face forces the class
  * reads by hand, opens the valve, lets the slosh die and prints them again,
  * through the same entry points the strip uses:
- *   APP.probe(x, z).phead + z         = the gauge's h
+ *   APP.probe(x, z).zp + .phead      = the gauge's h (zp = j*dx)
  *   APP.faceForce(solidId, faceId)    = the Pressure force tool's F, N per m
  *   toggleValve()                     = the V key
  *   APP.tick(n)                       = n solver steps, flat out
@@ -22,7 +22,7 @@ window.HS1 = {
 
   /** h at four stations: left basin, culvert under the tap, piezometer, right basin */
   levels: function () {
-    var h = function (x, z) { var p = APP.probe(x, z); return +(p.phead + z).toFixed(3); };
+    var h = function (x, z) { var p = APP.probe(x, z); return +(p.zp + p.phead).toFixed(3); };
     return { t: +APP.sim.t.toFixed(1), left: h(1.2, 0.8), culvert: h(4.4, 0.8),
              piezo: h(4.40, 1.7), right: h(5.6, 0.8) };
   },

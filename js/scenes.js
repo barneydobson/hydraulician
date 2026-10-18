@@ -44,6 +44,10 @@
  * there almost at once and only the fluctuation remains, so they keep a short
  * spin-up. The wave flume, dam break, plan view and sandbox have none by
  * design: watching them develop from t = 0 is the point.
+ *
+ * Defines: SCENES
+ *
+ * Reads:   GEOM, SIM, snap
  */
 const SCENES = (() => {
 
@@ -716,7 +720,7 @@ const SCENES = (() => {
     // tilt: true for the same reason as m2 — but tilt has a consequence a
     // gauge-reading exercise has to respect: with the bed drawn flat, the
     // raw column/probe z does NOT carry the S₀·x the geometry represents —
-    // main.js's gauge readout and OVERLAY's S₀/S_f already add tiltS0·x
+    // js/instruments.js's gauge readout and OVERLAY's S₀/S_f already add tiltS0·x
     // back in, and any OTHER headless reader of `surf`/`z` on a tilted scene
     // must do the same or its "head fall" is off by S₀·L.
     //   MEASURED (Medium, Average mode): uniform at 0.268 m from x ≈ 4 to
@@ -747,7 +751,7 @@ const SCENES = (() => {
     // 1.6) with a roller where the water left its sponge — measured at
     // Medium, with the sponge at 0.24 m and at 1.5 m. Instead `qOfLevel`
     // works out what a reservoir at that level delivers to THIS channel,
-    // and the Reservoir level control writes it into Inflow q (main.js):
+    // and the Reservoir level control writes it into Inflow q (js/panel.js):
     // the brink holds critical depth at the lip, the M2 is integrated
     // upstream from it on the solver's own resistance (the log law, with the
     // wall function's z₀ ≈ Δx/4.5), and q is the discharge whose depth at the
@@ -1689,7 +1693,7 @@ const SCENES = (() => {
                "Lower the speed of sound c on the card and repeat: the wave takes longer to arrive and the pressure jump is smaller.",
                "The wave bounces off the reservoir and comes back as a low-pressure wave: the pressure at the valve rises and falls in a square wave."] };
     })(),
-    // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
+    // ===== Year 1: contraction (CR-1) =====
     // The shared contraction rig: two reservoirs held at fixed levels, a
     // 1.00 m pipe (x = 3.6 →) that contracts into a 0.50 m pipe discharging
     // into the right reservoir at x = 11.0. ONE slider, the contraction

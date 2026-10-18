@@ -1,17 +1,26 @@
+/**
+ * exercises-rigs.js — dependency record (checked by test/check_headers.py).
+ *
+ * Defines: EXERCISE_RIGS
+ *
+ * Reads:   none
+ */
 /* Generated rig payloads for the exercise picker. One entry per drawn-rig
    exercise: the RIG snapshot JSON its folder's rig.js produces. Every
-   entry so far belongs to the original teaching pack, so "its folder" is
+   entry belongs to the original teaching pack, so "its folder" is
    courses/original/exercises/<folder>/, and the "FOLDER/rig.js · ..."
-   headings below are relative to that. Keys are exercise ids (global), so
+   headings below are relative to that. One payload per key; keys are exercise ids (global), so
    this file is shared: any course's card may point its `rig` at one.
 
-   Hand an entry to APP.RIG.apply() (js/main.js) and the drawn geometry, the
+   Hand an entry to APP.RIG.apply() (js/rig.js) and the drawn geometry, the
    edge modes, the level controls, the spout/piston, every Hydraulics slider,
    the gauges/rakes and the display state come back exactly as the rig.js
    built them. Stored as OBJECTS, not as deflated #rig= codes, so they stay
-   human-diffable and a future format v2 can migrate them in place.
+   human-diffable. The format is v2 and is never migrated: RIG's version gate
+   (js/rig.js) accepts exactly v2, so a payload in any other version does not
+   load and must be re-captured.
 
-   NOT in a payload, by RIG's own design (RIGSHARE-report.md §2): the water
+   NOT in a payload, by RIG's own design (RIGSHARE-report.md): the water
    (apply() ends with resetWater, so the spin-up runs against this geometry),
    the view/zoom, and the Resolution — every capture below was taken at
    Medium and every one re-applies identically at Medium. A rig whose demo
@@ -20,7 +29,8 @@
    Captured and verified headless (exercises/_code-changes/RIGCAP-report.md):
    each payload was applied to a freshly booted page and compared against the
    rig.js-built original on an FNV-1a hash of sim.mask plus wall/valve cell
-   counts and 18 further state keys. All 26 round-trip byte-identical.
+   counts and 18 further state keys. `smoke.mjs --only=pack` applies every
+   card's payload to its scene.
 
    The DA exercises need no payload: DA-1's two tanks and DA-3's sloshing
    tank are scenes (fluid-tanks and slosh-tank in js/scenes.js).

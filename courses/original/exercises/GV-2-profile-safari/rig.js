@@ -85,7 +85,7 @@ window.CHAN = {
     if (o.cs !== undefined) R.C("cs").set(o.cs);
     R.C("channel").set(true);          // MUST be on: sandbox.chan is unset, so
     R.C("labels").set(true);           // the profile-label overlay defaults off
-    R.C("jumps").set(true);            // (main.js: state.channel = !!sc.chan)
+    R.C("jumps").set(true);            // (js/main.js: state.channel = !!sc.chan)
     R.C("mode").set(String(o.mode === undefined ? 3 : o.mode));
     syncPanel();
     return R.check();

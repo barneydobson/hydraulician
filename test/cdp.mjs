@@ -7,15 +7,20 @@
  * tab per test case, and evaluates expressions in it.
  *
  * `exercises/_runner/runner.py` does the same job for the exercise pack and is
- * Linux-bound; this is the cross-platform half, and it only has to be good
- * enough to drive the user interface.
+ * Linux-bound; this is the cross-platform half. Both browser gates use it:
+ * test/ui-smoke.mjs directly, and test/smoke.mjs through a dynamic
+ * `import()` (it is CommonJS, so it cannot use a static one).
+ *
+ * Environment: `$CHROME` names the browser binary; `$ANGLE` picks the ANGLE backend and
+ * `$SOFTWARE=1` asks for `--disable-gpu`.
  */
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-/** Where Chrome tends to be. `$CHROME` wins, so a bespoke install still runs. */
+/** Where Chrome tends to be. `$CHROME` wins,
+ *  so a bespoke install still runs. */
 const CANDIDATES = {
   win32: [
     "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -60,31 +65,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * overrides the browser binary. `$SOFTWARE=1` asks for the old
  * `--disable-gpu` behaviour, for a machine with no working GPU backend.
  *
- * Duplicated (not shared) in exercises/_runner/smoke.js's browser(): this
- * file is an ES module and smoke.js is CommonJS, and with no package.json
- * in this zero-dependency project neither can `import`/`require` a file
- * written for the other's module system without an extension trick or an
- * async interop shim — more moving parts than these ~10 lines are worth.
- * Keep the two copies in sync by hand if the policy ever changes.
+ * One copy only: smoke.mjs loads this module with a dynamic `import()`.
+ * `angle` (a `launch` option) beats `$ANGLE`, which beats the platform pick.
  */
-export function angleArgs() {
+export function angleArgs(angle) {
   if (process.env.SOFTWARE) return ["--disable-gpu"];
   const byPlatform = { win32: "d3d11", darwin: "metal", linux: "gl" };
-  const backend = process.env.ANGLE || byPlatform[process.platform] || "gl";
+  const backend = angle || process.env.ANGLE || byPlatform[process.platform] || "gl";
   return ["--use-angle=" + backend];
 }
 
-/** Launch headless Chrome and connect to its browser endpoint. */
-export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
-  const bin = findChrome();
+/** Default time a protocol call may take before it is abandoned. Overridable
+ *  per call: `send(m, p, { timeout })`, `evaluate(expr, { timeout })`. */
+export const SEND_TIMEOUT = 60000;
+/** An in-page loop (`__settle`, ui-smoke's spin-ups) may run for minutes inside
+ *  ONE `Runtime.evaluate`, so evaluate's own default is longer than send's. */
+export const EVALUATE_TIMEOUT = 150000;
+
+/** Launch Chrome and connect to its browser endpoint.
+ *  Options: `chrome` (binary; else `findChrome()`), `angle` (backend),
+ *  `headless` (default true), `args` (extra command-line flags), `port`
+ *  (default 0, learned from stderr), `width`, `height`. */
+export async function launch({ port = 0, width = 1440, height = 900,
+                               chrome, angle, headless = true, args: extra = [] } = {}) {
+  const bin = chrome || findChrome();
   if (!bin) throw new Error("no Chrome found — set $CHROME to a Chrome or Edge binary");
   const profile = mkdtempSync(join(tmpdir(), "hydra-ui-"));
   const args = [
-    "--headless=new", ...angleArgs(), "--disable-extensions",
+    ...(headless ? ["--headless=new"] : []), ...angleArgs(angle), "--disable-extensions",
     "--no-first-run", "--no-default-browser-check", "--disable-background-networking",
     "--user-data-dir=" + profile,
     "--window-size=" + width + "," + height,
     "--remote-debugging-port=" + port,
+    ...extra,
     "about:blank",
   ];
   const proc = spawn(bin, args, { stdio: ["ignore", "ignore", "pipe"] });
@@ -93,12 +106,22 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
   const url = await new Promise((resolve, reject) => {
     let buf = "";
     const t = setTimeout(() => reject(new Error("Chrome did not report a DevTools endpoint")), 30000);
-    proc.stderr.on("data", (d) => {
+    const onData = (d) => {
       buf += d.toString();
       const m = buf.match(/ws:\/\/[^\s]+/);
-      if (m) { clearTimeout(t); resolve(m[0]); }
-    });
+      if (m) {
+        clearTimeout(t);
+        proc.stderr.off("data", onData);
+        proc.stderr.resume();                  // keep draining, stop accumulating
+        resolve(m[0]);
+      }
+    };
+    proc.stderr.on("data", onData);
     proc.on("exit", (c) => { clearTimeout(t); reject(new Error("Chrome exited with " + c)); });
+  }).catch((e) => {                            // never leak the process or its profile
+    try { proc.kill(); } catch (_) { /* gone */ }
+    try { rmSync(profile, { recursive: true, force: true }); } catch (_) { /* held briefly */ }
+    throw e;
   });
 
   const ws = new WebSocket(url);
@@ -117,29 +140,39 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
     }
     listeners.forEach((fn) => fn(msg));
   };
-  function send(method, params, sessionId) {
+  function send(method, params, sessionId, timeout = SEND_TIMEOUT) {
     const id = nextId++;
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      ws.send(JSON.stringify({ id, method, params: params || {}, sessionId }));
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (pending.has(id)) { pending.delete(id); reject(new Error(method + " timed out")); }
-      }, 60000);
+      }, timeout);
+      pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v); },
+        reject: (e) => { clearTimeout(timer); reject(e); },
+      });
+      ws.send(JSON.stringify({ id, method, params: params || {}, sessionId }));
     });
   }
 
-  /** One tab, already navigated, with its uncaught exceptions collected. */
-  async function open(pageUrl, { ready, settleMs = 400 } = {}) {
+  /** One tab, already navigated, with its uncaught exceptions collected in
+   *  `errors` (and console.warn lines in `warnings`) (a live array: `errors.length = 0` clears it).
+   *  `raw: true` makes `evaluate` take an EXPRESSION as written, not the body
+   *  of a function that must `return` (ui-smoke's form); `ready` is then an
+   *  expression too. */
+  async function open(pageUrl, { ready, settleMs = 400, raw = false } = {}) {
     // No width/height here: headless Chrome refuses a target position unless
     // the target is a new window, and `--window-size` has already set it.
     const { targetId } = await send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
-    const errors = [];
+    const errors = [], warnings = [];
     const onEvent = (m) => {
       if (m.sessionId !== sessionId) return;
       if (m.method === "Runtime.exceptionThrown") {
         const d = m.params.exceptionDetails;
         errors.push((d.exception && (d.exception.description || d.exception.value)) || d.text);
+      }
+      if (m.method === "Runtime.consoleAPICalled" && m.params.type === "warning") {
+        warnings.push(m.params.args.map((a) => a.description || a.value).join(" "));
       }
       if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") {
         errors.push(m.params.args.map((a) => a.description || a.value).join(" "));
@@ -150,11 +183,11 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
     await send("Page.enable", {}, sessionId);
     await send("Page.navigate", { url: pageUrl }, sessionId);
 
-    async function evaluate(expr) {
+    async function evaluate(expr, { timeout = EVALUATE_TIMEOUT } = {}) {
       const r = await send("Runtime.evaluate", {
-        expression: "(() => { " + expr + " })()",
+        expression: raw ? expr : "(() => { " + expr + " })()",
         returnByValue: true, awaitPromise: true,
-      }, sessionId);
+      }, sessionId, timeout);
       if (r.exceptionDetails) {
         const d = r.exceptionDetails;
         throw new Error("evaluate threw: " +
@@ -177,11 +210,11 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
     await sleep(settleMs);       // a few frames, so the first sync has run
 
     return {
-      evaluate, errors,
+      evaluate, errors, warnings,
       /** Raw protocol, bound to this tab — device emulation and screenshots.
        *  Chrome will not open a window narrower than about 500 css px, so a
        *  true phone viewport can only be had through Emulation. */
-      send: (method, params) => send(method, params, sessionId),
+      send: (method, params, { timeout } = {}) => send(method, params, sessionId, timeout),
       close: async () => {
         listeners.delete(onEvent);
         await send("Target.closeTarget", { targetId });
@@ -191,6 +224,8 @@ export async function launch({ port = 0, width = 1440, height = 900 } = {}) {
 
   return {
     open,
+    /** Raw browser-level protocol (no tab). */
+    send: (method, params, { timeout, sessionId } = {}) => send(method, params, sessionId, timeout),
     close: async () => {
       try { ws.close(); } catch (_) { /* already gone */ }
       proc.kill();

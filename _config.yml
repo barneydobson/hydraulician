@@ -8,7 +8,8 @@
 # so Jekyll copies them through verbatim — keep them that way. Directories that
 # start with an underscore (exercises/_runner, exercises/_code-changes) are
 # repo-only and never published, as are underscore files
-# (courses/original/_director-status.md); the per-exercise _archive folders are not
+# (courses/original/_director-status.md) -- so docs/_archive/ (executed plans) is
+# unpublished while docs/design/ (the design specs) is published; the per-exercise _archive folders are not
 # even committed (.gitignore).
 #
 # The Pages build enables jekyll-readme-index (README.md serves as a folder's

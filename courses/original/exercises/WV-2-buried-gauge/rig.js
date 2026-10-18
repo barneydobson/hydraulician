@@ -37,7 +37,7 @@ const WV2 = {
       { x: f.gaugeX, y: f.surfY, hist: [], colour: '#ffb37f' },  // gauge 2: surface
     ];
     APP.state.tool = 'gauge';
-    if (window.syncTools) window.syncTools();
+    syncToolbar();
     return f;
   },
 

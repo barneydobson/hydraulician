@@ -180,7 +180,7 @@ control volume). Sampled at the instrument throttle, not per frame.
 1. **`s3` converted**: bed slabs and gate become solids; gate gains
    `params: [{key:"a", …}]` replacing the fixed `gate.a = 0.35`; its
    upstream face is named for the instrument. The scene's measured numbers
-   (bed0, S0, q, spinup) do not move; smoke.js must stay green on it.
+   (bed0, S0, q, spinup) do not move; smoke.mjs must stay green on it.
 2. **`hump` (new scene)**: the m1/m2 mild channel carrying a cosine hump
    mid-reach, `height` slider 0 → 0.45 m (past choking at this q). The
    crest is one curved face — the curved-surface pressure demo. Blurb/tips
@@ -196,7 +196,7 @@ control volume). Sampled at the instrument throttle, not per frame.
   hydrostatic closed form — synthetic still-water p field vs a vertical
   face must integrate to ½ρgH² and put the CoP at H/3, to numerical
   tolerance.
-- **`smoke.js`** additions: `APP.faceForce` on a still tank wall within a
+- **`smoke.mjs`** additions: `APP.faceForce` on a still tank wall within a
   few % of ½ρgH²; `setParam` rebuilds the mask and resets averaging;
   gate-into-flow conserves volume (no invented water); converted `s3` and
   new `hump` pass the existing per-scene physics gates; the v2 rig
@@ -220,5 +220,5 @@ control volume). Sampled at the instrument throttle, not per frame.
 
 Implementation planned with the writing-plans skill; tasks executed by
 Sonnet subagents with the relevant gates run between tasks
-(`geom-test` + `check_pack`/`check_notation` instantly; `smoke.js`
+(`geom-test` + `check_pack`/`check_notation` instantly; `smoke.mjs`
 subsets and `ui-smoke.mjs` at integration points).

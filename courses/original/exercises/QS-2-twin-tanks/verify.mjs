@@ -55,7 +55,7 @@ try {
   const clip = await page.evaluate(`const r=document.getElementById('view').getBoundingClientRect();
     const h=r.width*289/480; return {x:r.x,y:r.y+(r.height-h)/2,width:r.width,height:h,scale:480/r.width};`);
   const thumb = await page.send('Page.captureScreenshot', {format:'jpeg',quality:85,clip});
-  writeFileSync(new URL('../../docs/thumbs/QS-2.jpg', import.meta.url), Buffer.from(thumb.data,'base64'));
+  writeFileSync(new URL('../../thumbs/QS-2.jpg', import.meta.url), Buffer.from(thumb.data,'base64'));
   console.log('Maximum whole-domain mass drift:', Math.max(...rows.map(r=>Math.abs(r.massArea/rows[0].massArea-1))));
   if (page.errors.length) throw new Error(page.errors.join('\n'));
   console.log('PASS: calibration, held-out prediction, branch balance, conservation, exercise boot and rig reload.');

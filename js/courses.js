@@ -1,3 +1,10 @@
+/**
+ * courses.js — dependency record (checked by test/check_headers.py).
+ *
+ * Defines: COURSES, COURSE_KEYS
+ *
+ * Reads:   EXERCISES
+ */
 // COURSES — the course menus this build knows, and which one is active.
 //
 // A course is one module someone teaches with the app: a title and the
@@ -11,14 +18,17 @@
 //                                rig.js, thumbnails — one folder per card
 //   courses/<id>/INDEX.md       one row per card the course owns
 //
-// Nothing here knows a course id.
+// Nothing here knows a course id. This file holds no cards of its own: the
+// shared register is js/exercises.js, and each course's cards live in its
+// folder. The card schema, and the one definition of a folder's README
+// (lecturer notes, never a student's source), is the header of js/exercises.js.
 //
 // COURSE-OWNED EXERCISES. A course may keep its own cards instead of adding
 // them to the shared register (js/exercises.js). COURSES.exercises(id, list)
 // stamps each card with `course: id` and `home: "courses/<id>/exercises"`
 // (the folder its `folder` sits in) and appends it to the one EXERCISES list,
 // so `?ex=<ID>`, `?menu=all`, the picker and the brief link treat it exactly
-// like a shared card. Ids are global: a card whose id (or tab alias) is
+// like a shared card. Ids are global: a card whose id is
 // already in the register is refused with a console warning, recorded in
 // COURSES.rejected, and check_pack.py fails the pack over it.
 //
@@ -84,16 +94,14 @@ const COURSES = (() => {
       if (!reg) { console.warn("COURSES.exercises: js/exercises.js is not loaded; " + id + "'s cards are dropped"); return; }
       if (!id || !Array.isArray(list)) { console.warn("COURSES.exercises: needs an id and a list", id); return; }
       const taken = new Set();
-      reg.forEach((e) => { taken.add(e.id); (e.tabs || []).forEach((t) => { if (t.alias) taken.add(t.alias); }); });
+      reg.forEach((e) => taken.add(e.id));
       list.forEach((e) => {
-        const names = [e && e.id].concat(((e && e.tabs) || []).map((t) => t.alias).filter(Boolean));
-        const clash = names.find((n) => !n || taken.has(n));
-        if (!e || !e.id || clash !== undefined) {
-          console.warn("COURSES.exercises(" + id + "): " + (e && e.id ? "id " + clash + " is already in the register" : "a card has no id") + " — skipped");
-          rejected.push({ course: id, id: e && e.id, clash: clash });
+        if (!e || !e.id || taken.has(e.id)) {
+          console.warn("COURSES.exercises(" + id + "): " + (e && e.id ? "id " + e.id + " is already in the register" : "a card has no id") + " — skipped");
+          rejected.push({ course: id, id: e && e.id, clash: e && e.id });
           return;
         }
-        names.forEach((n) => taken.add(n));
+        taken.add(e.id);
         reg.push(Object.assign({}, e, { course: id, home: "courses/" + id + "/exercises" }));
       });
     },
@@ -110,3 +118,8 @@ const COURSES = (() => {
 // What the exercise menu reads. A getter, so courses registered after this
 // file (and a later COURSES.choose) are seen without any ordering dance.
 Object.defineProperty(window, "EXERCISE_MENU", { get: () => COURSES.active(), configurable: true });
+
+// The keys a course.js object may carry; check_pack.py rejects any other, so
+// a misspelt switch fails the pack instead of being silently ignored.
+const COURSE_KEYS = ["id", "title", "sections", "hosts", "briefLink", "showAllLink",
+  "compact", "collapsible"];

@@ -40,7 +40,7 @@
  *     land a cell either side. MOGATE.build() self-checks this (see
  *     `check().gate.aCells`) exactly the way WE-1 self-checks the crest.
  *   · PANEL q IS FROZEN, NOT LIVE, under head-driven inflow. sim.p.inflow.q
- *     is a plain JS field set only by the slider (js/main.js:162); nothing
+ *     is a plain JS field set only by the slider (js/panel.js, the Inflow q row); nothing
  *     writes it back from the solver. With "Head-driven inflow" ON the GPU
  *     ignores it (u_in.a carries the free-flag, not a value) and the panel
  *     note under "Inflow q" keeps showing whatever the slider was last set

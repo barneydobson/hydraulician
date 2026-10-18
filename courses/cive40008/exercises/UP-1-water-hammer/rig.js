@@ -8,8 +8,9 @@
  * head rise and the period, through the same entry points the strip uses:
  *   APP.placeGauge(x, z)              = a click with the Gauge tool
  *   APP.probe(x, z).phead + z         = p/rho g + z on the axis. NOT the gauge's h (that is zp + phead, zp = j*dx, a
- *                                       shift of up to dx = 0.096 m here): the README's heads are pressure heads p/rho g,
- *                                       which do not depend on the reference, so this script keeps the plain sum
+ *                                       shift of up to dx = 0.096 m here): this script keeps the plain sum because
+ *                                       report() uses differences (h - h0, rise, period) only, so a constant
+ *                                       reference per gauge cancels
  *   toggleValve()                     = the V key
  *   APP.tick(n)                       = n solver substeps, flat out
  *

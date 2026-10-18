@@ -1044,9 +1044,8 @@ SUITES.geom = async (B) => {
   // (code review finding on this branch's own commits). "drawn0"/"drawn1"/…
   // are assigned by POSITION in S.segs every time rasterise() runs — not a
   // stable identity — so draw A, draw B ("drawn1"), undo B, draw C
-  // elsewhere, and C becomes "drawn1" in B's place. Proven at the SIM level
-  // first: the SAME id "drawn1" samples a materially different stretch of
-  // geometry before and after. That is exactly why main.js's rasterise/
+  // elsewhere, and C becomes "drawn1" in B's place: the SAME id then names a
+  // different stretch of geometry. That is exactly why main.js's rasterise/
   // addSeg/undoSeg/clearSegs edit reaches the SIM.onGeometry
   // listener in js/main.js, which drops
   // state.force/state.forceHover on every edit — a selection held by a raw

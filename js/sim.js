@@ -901,8 +901,8 @@ const SIM = (() => {
    *  ∇ₕ·⟨F⟩ itself runs to 135 s⁻¹ here.
    *
    *  Cells where ⟨S⟩ is nonzero are the sponge, the Dirichlet bands, the point
-   *  sources AND every positivity-clamp event — the invented-water signature
-   *  the Conservation notes warn about — so `nSrc` is reported separately
+   *  sources AND every NaN/rounding-guard event — the rare cells where the donor-side
+   *  flux cap's guard fires — so `nSrc` is reported separately
    *  rather than silently folded into the exclusion. Solid cells are excluded
    *  too: they early-return in the shader and merely pass their accumulator
    *  through. */
@@ -935,7 +935,7 @@ const SIM = (() => {
         const a = Math.abs(r);
         if (Math.abs(A[k + 2]) > 1e-9) {
           // Source cell — the sponge, a Dirichlet band, a point source, or a
-          // positivity-clamp event. §5's identity holds HERE TOO because ⟨S⟩
+          // NaN/rounding-guard event. §5's identity holds HERE TOO because ⟨S⟩
           // carries the whole non-conservative difference; kept as its own
           // population (F4) with its own scale, since the drift in these
           // cells rides on ‖⟨S⟩‖ as well as ‖⟨F⟩‖/Δx.

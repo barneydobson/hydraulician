@@ -259,7 +259,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #panelAll:hover { background: rgba(77,195,255,0.20); }
 
 /* ------------------------------------------------------------- the legend */
-/* Seven colourings existed long before anything on screen said which one was
+/* Nine colourings existed long before anything on screen said which one was
    up, over what range, in what units — so a screenshot pasted into a
    worksheet carried no statement of what it showed. Top right, because the
    gauge cards stack bottom-right and the ruler owns the edges, immediately

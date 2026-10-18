@@ -125,6 +125,8 @@ smallest viscosities that stay stable. On the flat run at tanβ 0.15 (toe at
 | **card**: kappa 0.41, ca 0.2 | 0.173 | 0.147 | 0.115 | 0.106 | 0.66 | one clean circulation cell |
 | kappa 0.2, ca 0.2 | 0.166 | 0.128 | 0.117 | 0.098 | 0.70 | one cell, undertow twice as fast (0.3 m/s) |
 | kappa 0, ca 0.2, nu 1e-4 (WV-5's) | 0.211 | 0.170 | 0.135 | 0.141 | 0.64 | a row of small cells; the live surface full of chop |
+| **card now** (Oct 2026, #77): closure off, ca 0.2, nu 1e-5 | 0.196 | 0.154 | 0.164 | 0.157 | 0.84 | not re-measured; surface grid noise 2.2× the closure-on run |
+| closure off, ca 0.2, nu 1e-4 | 0.218 | 0.174 | 0.136 | 0.146 | 0.62 | not re-measured; noise 1.7× |
 
 Every setting loses about a third of the height over the first 6 m, so for
 this wave the loss is not the viscosity. It is a steep long wave
@@ -133,10 +135,23 @@ hands energy to higher ones as it goes (the crest sharpens, the trough
 flattens, a secondary crest appears) — measured as the first-harmonic
 amplitude, it falls the same way under every setting. The mixing length
 does not damp it measurably; what it does set is the mean flow (right-hand
-column), which is half of this card. So the card keeps the closure at its
-default and lowers only the interface compression (ca 0.2, as WV-5); the
-deep-water train of WV-5 is where the closure was the damper, and there it
-is off.
+column), which is half of this card.
+
+**The closure is now OFF here (Oct 2026, issue #77).** The mixing length is a
+channel parameterisation — a log layer over a bed — and a wave has thin
+boundary layers and no log layer, so the wave flumes no longer run it; the
+bed keeps its wall-function friction (C_f 0.01) and the cells the Smagorinsky
+term. Re-measured with the same harness (the closure-on row reproduces the
+card's old one to 0.007 m): the waves now arrive at the beach with most of
+their height (H at 6 m / 1 m 0.84 against 0.66), and the shoaling up the beach
+is no longer flattened (a solitary wave on 1 : 15 now follows Green's law at
+the finest grid, engineering notes). The price, measured as the mean
+|∂²η/∂x²| of the surface over x = 1–7 m during t = 16–20 s, is 2.2× the
+grid-scale surface noise, and the undertow picture below was measured with the
+closure on and has not been re-measured: with it off the earlier run saw the
+mean flow break into a row of small cells. Both are the surface treatment's
+problem rather than the closure's (the void faces copy the water's u, which
+makes a fast, noisy top layer — #77), and that is where the fix belongs.
 
 **Undertow.** Average, window 60 s (t = 30 → 90 s), tanβ 0.06, the
 Favre-mean horizontal velocity ū (negative = offshore):
@@ -181,12 +196,11 @@ the slider.** In the plunging band (tanβ ≈ 0.1–0.5) the front goes vertical
 and collapses onto the beach. It never throws a tongue forward over an air
 pocket. The engineering notes ("Plunging breakers are out of reach — and
 resolution is not the reason", re-diagnosed 2026-10-17) record why: the
-mixing-length closure puts an eddy viscosity of ~10⁻³ m²/s through the crest
-(independent of the grid, so refining does not help), and the stress-free
-treatment above the surface makes a fast surface layer that, with the
-closure off, breaks into cell-sized curls rather than a tongue. It is a
-property of the open-channel closure this solver is tuned for, not of the
-missing air pressure and not of resolution. Say so to the class: what they see in the middle band
+mixing-length closure put an eddy viscosity of ~10⁻³ m²/s through the crest
+(it is now off in this flume), and the stress-free treatment above the
+surface makes a fast surface layer that, with the closure off, breaks into
+cell-sized curls rather than a tongue. It is the surface treatment, not the
+missing air pressure and not resolution alone. Say so to the class: what they see in the middle band
 is closest to the *collapsing* breaker of the classification, the transition
 between plunging and surging — the card says "collapses rather than curling
 over". A larger stroke (H/h → 0.6) only makes the wave break as a bore before

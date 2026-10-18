@@ -2606,6 +2606,12 @@ const SCENES = (() => {
     // lowered (ca 0.2, as WV-5: it keeps a little more height near the
     // paddle). The undertow at the default: about 0.13–0.19 m/s offshore
     // along the bed 4–6 m from the paddle.
+    //   SUPERSEDED (Oct 2026, issue #77): the closure is OFF here now — it is
+    // a channel parameterisation and a wave has no log layer. Measured at
+    // tanβ 0.15, Medium, H at x = 1/4/6/8 m: 0.180/0.149/0.117/0.107 on,
+    // 0.196/0.154/0.164/0.157 off — the waves reach the beach — at 2.2× the
+    // grid-scale surface noise. The undertow above is the closure-on one and
+    // has not been re-measured (README, "Damping").
     //
     // The box is cropped to what the waves use, because the cost is cells ×
     // substeps: the gentlest slope (0.06) has its shoreline at 10 m and
@@ -2659,7 +2665,7 @@ const SCENES = (() => {
                "Iribarren ξ = tanβ/√(H₀/L₀): spilling below about 0.5, plunging 0.5–3.3, surging above 3.3.",
                "Gentle beach: the wave shoals, steepens, and its crest crumbles down the front — spilling, a long surf zone.",
                "Steep beach: the front never steepens enough to break; it surges up the slope and slides back, and much of the wave reflects.",
-               "A real plunging breaker throws a tongue of water over a trapped air tube. This model's turbulence closure damps the crest too much for that, so here the front collapses instead of curling."] };
+               "A real plunging breaker throws a tongue of water over a trapped air tube. This model's free surface cannot carry one, so here the front collapses instead of curling."] };
     })(),
 
     // ------------------------------------------- WV-5 · GROUP VELOCITY

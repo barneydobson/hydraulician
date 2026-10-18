@@ -764,7 +764,34 @@ itself ~2 cells thick. Consequences:
     crest elevation to the millimetre from h = 0.24 m to 0.07 m, where Green's
     law asks for +36%; the H/h = 0.45 wave stays within 0.40–0.43 m in every
     run. A plunger is the crest outrunning a wave that has grown; this one
-    never grows. Cause not isolated.
+    never grows. **Cause found (Oct 2026): the closure AND resolution, both
+    needed.** Re-measured with the crest elevation taken from the whole
+    fill field (Σ min(f, 1)Δx per column — the column reduction drops cells
+    under f = 0.25 and quantises a 5 cm crest), H/h = 0.2 on 1 : 15,
+    h = 0.25 m, the envelope max_t η − η₀ at local still depth h:
+
+    | run | h/Δx | h = 0.25 | 0.20 | 0.16 | 0.12 | 0.10 | 0.08 | 0.07 |
+    |---|---|---|---|---|---|---|---|---|
+    | Green's law, A ∝ h^-¼ | | 0.050 | 0.053 | 0.056 | 0.060 | 0.063 | 0.067 | 0.069 |
+    | Medium, closure on | 36 | 0.044 | 0.042 | 0.041 | 0.041 | 0.041 | 0.041 | 0.041 |
+    | Medium, off | 36 | 0.046 | 0.044 | 0.043 | 0.044 | 0.042 | 0.042 | 0.041 |
+    | High, on | 49 | 0.049 | 0.045 | 0.045 | 0.045 | 0.045 | 0.045 | 0.045 |
+    | High, off | 49 | 0.050 | 0.046 | 0.050 | 0.051 | 0.052 | 0.056 | 0.056 |
+    | Very high, on | 70 | 0.048 | 0.046 | 0.046 | 0.046 | 0.046 | 0.046 | 0.046 |
+    | Very high, off | 70 | 0.049 | 0.050 | 0.050 | 0.054 | 0.054 | 0.057 | 0.061 |
+    | Ultra, on | 99 | 0.047 | 0.048 | 0.048 | 0.048 | 0.048 | 0.048 | 0.048 |
+    | Ultra, off | 99 | 0.050 | 0.053 | 0.056 | 0.058 | 0.061 | 0.062 | 0.063 |
+
+    With the mixing length on the crest does not grow at ANY resolution: it
+    flattens to a constant (the ν_t is κy, a physical length, so refining
+    does not remove it). With it off the shoaling comes back as the grid
+    refines and at Ultra follows Green's law to within 3% down to
+    h = 0.12 m and 7% at 0.08 m. Medium, off, still does not shoal: at
+    36 cells of depth a 5 cm crest is 7 cells and the grid's own damping
+    eats the growth. So waves want the closure off AND ~70–100 cells of
+    depth for shoaling to show. Scratch harness: a solitary-wave scene built
+    on `beach` in the page (KdV seed η = A sech² k(x − x₀), u = cη/(h + η)),
+    envelope sampled every 20 substeps to t = 5.2 s.
   - *No effect* (overhang, front angle and crest speed within the
     run-to-run scatter): bulk viscosity 0, `C_s` 0, `C_f` 0, c 14 → 28, the
     void bleed off or ×10, gravity without the 5% fade, the transport cap off,
@@ -859,7 +886,9 @@ on a 0.5 m deep flume, T = 1.0–1.1 s (L = 1.5–1.8 m), a 0.05 m flap stroke
   every setting tried, kappa 0 included, lost about a third of the height
   over 6 m of flat bed — the steep long wave reshaping (first harmonic into
   higher ones), not viscosity — and kappa 0 broke the undertow (Average) into
-  a row of small cells. WV-4 keeps the closure; see its README.
+  a row of small cells. WV-4 kept the closure for that reason until issue #77
+  turned it off in every wave flume (its README, "Damping", has the
+  before/after: H at 6 m/1 m 0.66 → 0.84, at 2.2× the surface noise).
 
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from

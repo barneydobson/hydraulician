@@ -653,11 +653,20 @@ async function main() {
         // Settled, at the scene's own measured spin-up — not part-way through
         // it. m1 starts 0.28 m deep and its inlet holds 0.49 m, so for the
         // first ~12 s the pool is filling and the surface runs 0.1-0.7 dx off
-        // the head (median, Low); settled it sits within 0.05 dx. Bounded on
-        // wall clock, so a software-rasterised Chrome fails with a reading
+        // the head (median, Low); settled it sits within 0.05 dx. Not a speed
+        // test: a busy machine just takes longer. It gives up only if the
+        // simulated clock stalls for 30 s or after 240 s in all (smoke.mjs's
+        // __until rule), so a software-rasterised Chrome fails with a reading
         // here instead of hanging the run.
         const t0 = Date.now(), spinup = APP.sim.scene.spinup;
-        while (APP.sim.t < spinup && Date.now() - t0 < 120000) APP.tick(400);
+        let last = APP.sim.t, moved = t0;
+        while (APP.sim.t < spinup) {
+          APP.tick(400);
+          const now = Date.now();
+          if (APP.sim.t > last) { last = APP.sim.t; moved = now; }
+          else if (now - moved > 30000) break;
+          if (now - t0 > 240000) break;
+        }
         const settled = APP.sim.t >= spinup, tReached = APP.sim.t;
         APP.frames(3);
         const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));

@@ -339,20 +339,34 @@ const failures = [];
  *  obeys momentum) is resolution-independent — only the delivered roughness
  *  is not, and nothing here measures that.
  *
- *  `__settle(t, ms)` advances to `t` seconds of SIMULATED time but gives up
- *  after `ms` of wall clock, reporting what it reached. A test that reports
- *  "settled to 12 s of 25" is debuggable; one that hangs is not. */
+ *  `__until(done, step)` calls `step()` until `done()`, and `__settle(t)` is
+ *  `__until` ticking to `t` seconds of SIMULATED time. Neither is a speed
+ *  test: a slow or busy machine just takes longer. They give up only when
+ *  the simulated clock stops advancing for `STALL_MS` (a lost context, a
+ *  paused sim) or after `CAP_MS` in all, the backstop under the 10-minute
+ *  evaluate timeout (two loops share one evaluate at most), and report what
+ *  they reached: "settled to 12 s of 25" is debuggable; a hang is not.
+ *  Speed is measured only behind --perf. */
 const HELPERS = `
   window.__low = () => {
     const c = CONTROLS.find((x) => x.id === "budget");
     if (c && APP.state.budget !== "Low") { c.set("Low"); }
     return { nx: APP.sim.nx, ny: APP.sim.ny, dx: APP.sim.dx };
   };
-  window.__settle = (target, ms) => {
+  window.__until = (done, step, capMs) => {
+    const STALL_MS = 30000, CAP_MS = capMs || 240000;
     const t0 = Date.now();
-    while (APP.sim.t < target && Date.now() - t0 < ms) APP.tick(200);
+    let last = APP.sim.t, moved = t0;
+    while (!done()) {
+      step();
+      const now = Date.now();
+      if (APP.sim.t > last) { last = APP.sim.t; moved = now; }
+      else if (now - moved > STALL_MS) break;
+      if (now - t0 > CAP_MS) break;
+    }
     return APP.sim.t;
   };
+  window.__settle = (target) => __until(() => APP.sim.t >= target, () => APP.tick(200));
   window.__warm = (n) => {
     let A;
     for (let i = 0; i < (n || 20); i++) A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
@@ -906,7 +920,7 @@ SUITES.geom = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=s3`);
   const g = await B.evaluate(`(() => {
     __low();
-    const t = __settle(26, 120000);
+    const t = __settle(26);
     const b = APP.sim.scene.bedTop(1.2);
     const a = APP.SIM.params().values.gate_a;
     const level = APP.sim.p.inflow.level;
@@ -1343,7 +1357,7 @@ SUITES.physics = async (B) => {
   // carried one in the same measurement).
   const j = await B.evaluate(`(() => {
     __low();
-    const t = __settle(30, 120000);
+    const t = __settle(30);
     const acc = { n: 0, d1: 0, d2: 0, d2p: 0, Fr1: 0, dE: 0 }, frames = 40;
     let keys;
     for (let k = 0; k < frames; k++) {
@@ -1402,10 +1416,9 @@ SUITES.physics = async (B) => {
   // chasing this down).
   await B.goto(`http://localhost:${PORT}/?scene=hump`);
   const hump = await B.evaluate(`(() => {
-    const t0 = Date.now();
-    while (APP.sim.t < 15 && Date.now() - t0 < 150000) APP.frames(20, 2.0);
+    __until(() => APP.sim.t >= 15, () => APP.frames(20, 2.0));
     APP.SIM.avgStart();
-    while (APP.SIM.avgT() < 15 && Date.now() - t0 < 250000) APP.frames(20, 2.0);
+    __until(() => APP.SIM.avgT() >= 15, () => APP.frames(20, 2.0));
     const ff = APP.faceForce("hump", "crest", true);
     let wet = 0;
     for (const s of ff.samples) if (s.f * s.p > 0) wet++;
@@ -1471,10 +1484,9 @@ SUITES.physics = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=m1`);
   const bed = await B.evaluate(`(() => {
     __low();
-    const t0 = Date.now();
-    while (APP.sim.t < 30 && Date.now() - t0 < 150000) APP.frames(20, 2.0);
+    __until(() => APP.sim.t >= 30, () => APP.frames(20, 2.0));
     APP.SIM.avgStart();
-    while (APP.SIM.avgT() < 10 && Date.now() - t0 < 250000) APP.frames(20, 2.0);
+    __until(() => APP.SIM.avgT() >= 10, () => APP.frames(20, 2.0));
     const ff = APP.faceForce("wall0", "side1", true);
     let wet = 0;
     for (const s of ff.samples) if (s.f * s.p > 0) wet++;
@@ -1538,7 +1550,7 @@ SUITES.physics = async (B) => {
   const valve = await B.evaluate(`(() => {
     __low();
     APP.SIM.setValve(1);                       // shut
-    const t = __settle(10, 90000);
+    const t = __settle(10);
     const ff = APP.faceForce("valve0", "side1");
     let wet = 0;
     for (const s of ff.samples) if (s.f * s.p > 0) wet++;
@@ -1637,7 +1649,7 @@ SUITES.physics = async (B) => {
     // volume() then reads the fresh buffer. Without this the baseline is 0.
     APP.tick(1); APP.SIM.columns(true);
     const v0 = APP.volume();
-    __settle(APP.sim.t + 8, 90000);
+    __settle(APP.sim.t + 8);
     APP.SIM.columns(true);
     const v1 = APP.volume();
     let maxSpeed = 0, nan = 0;
@@ -1670,7 +1682,7 @@ SUITES.physics = async (B) => {
     __low();
     APP.sim.p.inflow.on = 0; APP.sim.p.tailwater.on = 0; APP.sim.p.source.on = 0;
     APP.SIM.resetWater();
-    const t = __settle(APP.sim.t + 12, 120000);
+    const t = __settle(APP.sim.t + 12);
     const st = APP.SIM.fieldStats(6, false);
     const hg = Array.from(APP.SIM.hydraulicGrade(null, false)).filter(Number.isFinite).sort((a, b) => a - b);
     return { t, dx: APP.sim.dx, lo: st && st.lo, hi: st && st.hi, n: hg.length,
@@ -1697,11 +1709,11 @@ SUITES.physics = async (B) => {
   const eflux = await B.evaluate(`(() => {
     __low();
     const S = APP.sim;
-    __settle(40, 120000);
+    __settle(40);
     APP.SIM.avgStart();
     APP.state.speed = 10;
-    const t1 = Date.now(), tgt = S.t + 15;
-    while (S.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const tgt = S.t + 15;
+    __until(() => S.t >= tgt, () => APP.frames(1));
     const g = Math.abs(S.p.g), tilt = S.scene.tiltS0 || 0, dx = S.dx;
     const hg = APP.SIM.hydraulicGrade(null, true);
     const x = 8, i = Math.floor(x / dx);
@@ -1730,7 +1742,7 @@ SUITES.physics = async (B) => {
     __low();
     // Settle to 40 s, not 30. m1's volume is still climbing at 30 (8.75 m2
     // against 8.86) and only levels off around t = 45.
-    const t = __settle(40, 150000);
+    const t = __settle(40);
     // qRaw / dRaw, NOT q / d. analyse() carries its own 10% EMA over the
     // column reduction (the qA estimate in js/overlay.js) to steady the on-screen
     // profile against roll waves. Called ONCE on the mean columns, that EMA is
@@ -1754,8 +1766,8 @@ SUITES.physics = async (B) => {
     // Then a real time average. SIM.avgColumns returns the mean columns in
     // SIM.columns' own layout, so analyse() takes them unchanged.
     APP.SIM.avgStart();
-    const t1 = Date.now(), tgt = APP.sim.t + 20;
-    while (APP.sim.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const tgt = APP.sim.t + 20;
+    __until(() => APP.sim.t >= tgt, () => APP.frames(1));
     const T = APP.SIM.avgT();
     const avg = stats(OVERLAY.analyse(APP.sim, APP.SIM.avgColumns(true).C));
     APP.SIM.avgStop();
@@ -1778,11 +1790,11 @@ SUITES.physics = async (B) => {
   // far too slow, while the default GPU-backed ANGLE backend reaches t = 30 on
   // this scene in about 7 s of wall clock. Measured on a Windows laptop, m1 at
   // Low, 828 x 64: ANGLE gets to t = 30 in 6.5 s; SwiftShader reaches roughly
-  // t = 9.5 in the full 150 s budget, about 50x slower. Raise the budget, or
-  // give this harness the GPU.
+  // t = 9.5 in 150 s, about 50x slower — slow enough that the overall cap in
+  // __until, not a stall, ends the run. Give this harness the GPU.
   ok("PHYSICS m1 settled to the time its readings are taken at", flow.t >= 39.5,
-    `reached t = ${flow.t.toFixed(1)} s of 40 — the wall-clock budget in ` +
-    `__settle ran out first, so every reading below is of an unsettled reach`);
+    `reached t = ${flow.t.toFixed(1)} s of 40 — __until stalled or hit its ` +
+    `cap first, so every reading below is of an unsettled reach`);
   ok("PHYSICS the averaging window actually opened", flow.T >= 19.5,
     `window T = ${flow.T.toFixed(2)} s of 20`);
   // MASS FLUX, IN THE MEAN. Both halves of that matter and the test used to
@@ -1908,15 +1920,14 @@ SUITES.physics = async (B) => {
   // and it asks for a real loss rather than a sign.
   const dis = await B.evaluate(`(() => {
     APP.loadScene("m3", false); __low();
-    const t0 = Date.now();
     // 60 s, not 30: since the stress-free surface (#72) m3 takes ~45 s to
     // settle, and at 30 s it is still draining — the box then exports more
     // energy than it receives, +2.2 kW/m measured, for the wrong reason.
-    while (APP.sim.t < 60 && Date.now() - t0 < 120000) APP.tick(200);
+    __settle(60);
     const W = APP.sim.W, H = APP.sim.H, Es = [];
     for (let k = 0; k < 24; k++) {
-      const t1 = Date.now(), tgt = APP.sim.t + 0.2;
-      while (APP.sim.t < tgt && Date.now() - t1 < 5000) APP.tick(20);
+      const tgt = APP.sim.t + 0.2;
+      __until(() => APP.sim.t >= tgt, () => APP.tick(20), 10000);
       Es.push(APP.SIM.boxFlux(0.20 * W, 0, 0.80 * W, H).total.E);
     }
     const mean = Es.reduce((a, b) => a + b, 0) / Es.length;
@@ -1979,8 +1990,7 @@ SUITES.physics = async (B) => {
   // lecture. Tightening it is welcome; a rise means something got worse.
   const voidf = await B.evaluate(`(() => {
     APP.loadScene("h23", false); __low();
-    const t0 = Date.now();
-    while (APP.sim.t < 20 && Date.now() - t0 < 90000) APP.tick(200);
+    __settle(20);
     const S = APP.sim, nx = S.nx, ny = S.ny, dx = S.dx;
     const gl = document.getElementById("view").getContext("webgl2");
     const F = new Float32Array(nx * ny * 4);
@@ -2039,11 +2049,11 @@ SUITES.profile = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=sa1`);
   const r = await B.evaluate(`(() => {
     const S = APP.sim;
-    const t = __settle(40, 120000);
+    const t = __settle(40);
     APP.SIM.avgStart();
     APP.state.speed = 10;
-    const t1 = Date.now(), tgt = S.t + 15;
-    while (S.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const tgt = S.t + 15;
+    __until(() => S.t >= tgt, () => APP.frames(1));
     const T = APP.SIM.avgT();
     const AC = APP.SIM.avgColumns(true).C;
     const hg = APP.SIM.hydraulicGrade(null, true);
@@ -2171,7 +2181,7 @@ SUITES.hydro = async (B) => {
     const w6 = width(g.xk, 18);
     APP.SIM.setParam("d_shaft", 3.0);
     APP.SIM.resetWater();
-    const t = __settle(65, 150000);
+    const t = __settle(65);
     // a free surface to sub-cell accuracy: the fill summed up the column from
     // well under the surface (the column reduction quantises to whole cells)
     const surf = (x) => {
@@ -2330,7 +2340,7 @@ SUITES.avg = async (B) => {
     // The window opens on the SETTLED flow, past the scene's measured spin-up
     // — see the growth gate below for why. __settle ticks in fixed chunks, so
     // where it stops is a substep count, not a wall-clock accident.
-    const spinup = APP.sim.scene.spinup, tOpen = __settle(spinup, 120000);
+    const spinup = APP.sim.scene.spinup, tOpen = __settle(spinup);
     APP.SIM.avgStart();
     // APP.tick(n) is EXACTLY n substeps, so T = n*dt is reproducible on every
     // machine. APP.frames() is NOT: the substep governor picks a
@@ -2763,7 +2773,7 @@ SUITES.avg = async (B) => {
     // clock stands here is set by the governor-paced APP.frames() tests
     // above, i.e. by wall-clock speed, so it has to be made true, not assumed.
     const tPre = (APP.state.scene.spinup || 0) + 0.25;
-    __settle(tPre, 120000);
+    __settle(tPre);
     if (S.t < tPre) return { preroll: S.t, tPre };
     const F = new Float32Array(n * 4);
     const sFu = new Float64Array(n), sF = new Float64Array(n), sU = new Float64Array(n);
@@ -3585,7 +3595,7 @@ SUITES.avg = async (B) => {
   // mean: pins the CPU path; the GPU half-cell offset of the live display is
   // a visual check (blU in FS_DISP).
   const mf = await B.evaluate(`(() => {
-    APP.loadScene("sa1", false); __low(); const tSet = __settle(40, 90000);   // settled, or rel below is weather
+    APP.loadScene("sa1", false); __low(); const tSet = __settle(40);   // settled, or rel below is weather
     const mom = APP.SIM.fieldStats(5, false);
     APP.avg.set(true);                     // the display field accumulates in the frame loop
     for (let n = 0; n < 60 && APP.SIM.avgT() < 8; n++) APP.frames(60);

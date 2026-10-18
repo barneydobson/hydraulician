@@ -2614,8 +2614,11 @@ const SCENES = (() => {
     // a channel parameterisation and a wave has no log layer. Measured at
     // tanβ 0.15, Medium, H at x = 1/4/6/8 m: 0.180/0.149/0.117/0.107 on,
     // 0.196/0.154/0.164/0.157 off — the waves reach the beach — at 2.2× the
-    // grid-scale surface noise. The undertow above is the closure-on one and
-    // has not been re-measured (README, "Damping").
+    // grid-scale surface noise at ν 1e-5; nu 1e-4 (WV-5's) cuts that to 1.7×
+    // and keeps the waves 15–35% taller at 6–8 m than the closure-on card.
+    // Undertow with these settings: still offshore along the bed at x = 4–8 m,
+    // −0.03 to −0.17 m/s against −0.10 to −0.19 (README, "Undertow"). High
+    // was 1.6× slower and no taller at the beach, so the card stays at Medium.
     //
     // The box is cropped to what the waves use, because the cost is cells ×
     // substeps: the gentlest slope (0.06) has its shoreline at 10 m and
@@ -2637,7 +2640,7 @@ const SCENES = (() => {
         // so this alone is 1.6× the speed. gd/c² = 2% compression at the bed;
         // measured, H along the flume and the run-up moved by under 5 mm
         // between c = 12, 16 and 26.
-        W: 11.5, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2,
+        W: 11.5, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2, nu: 1e-4,
         mode: 0, hmax: 0.75, vmax: 1.6,
         open: [1, 0, 0, 0],
         // Stroke amplitude 0.14 m: the wall paddle loses nothing to a pocket

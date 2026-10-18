@@ -125,8 +125,9 @@ smallest viscosities that stay stable. On the flat run at tanβ 0.15 (toe at
 | **card**: kappa 0.41, ca 0.2 | 0.173 | 0.147 | 0.115 | 0.106 | 0.66 | one clean circulation cell |
 | kappa 0.2, ca 0.2 | 0.166 | 0.128 | 0.117 | 0.098 | 0.70 | one cell, undertow twice as fast (0.3 m/s) |
 | kappa 0, ca 0.2, nu 1e-4 (WV-5's) | 0.211 | 0.170 | 0.135 | 0.141 | 0.64 | a row of small cells; the live surface full of chop |
-| **card now** (Oct 2026, #77): closure off, ca 0.2, nu 1e-5 | 0.196 | 0.154 | 0.164 | 0.157 | 0.84 | not re-measured; surface grid noise 2.2× the closure-on run |
-| closure off, ca 0.2, nu 1e-4 | 0.218 | 0.174 | 0.136 | 0.146 | 0.62 | not re-measured; noise 1.7× |
+| closure off, ca 0.2, nu 1e-5 (Oct 2026, #2) | 0.196 | 0.154 | 0.164 | 0.157 | 0.84 | surface grid noise 2.2× the closure-on run |
+| **card now**: closure off, ca 0.2, nu 1e-4 | 0.218 | 0.174 | 0.136 | 0.146 | 0.62 | offshore along the bed at every station (below); noise 1.7× |
+| the same at High (6.9 mm) | 0.206 | 0.149 | 0.139 | 0.132 | 0.64 | 1.6× slower; noise 1.4× — no better than Medium |
 
 Every setting loses about a third of the height over the first 6 m, so for
 this wave the loss is not the viscosity. It is a steep long wave
@@ -147,14 +148,19 @@ their height (H at 6 m / 1 m 0.84 against 0.66), and the shoaling up the beach
 is no longer flattened (a solitary wave on 1 : 15 now follows Green's law at
 the finest grid, engineering notes). The price, measured as the mean
 |∂²η/∂x²| of the surface over x = 1–7 m during t = 16–20 s, is 2.2× the
-grid-scale surface noise, and the undertow picture below was measured with the
-closure on and has not been re-measured: with it off the earlier run saw the
-mean flow break into a row of small cells. Both are the surface treatment's
-problem rather than the closure's (the void faces copy the water's u, which
-makes a fast, noisy top layer — #77), and that is where the fix belongs.
+grid-scale surface noise at ν = 1e-5. The card takes ν = 1e-4 (WV-5's): that
+cuts the noise to 1.7× and still brings the waves to 6–8 m 15–35% taller than
+the closure-on card. High resolution was tried and is not worth it here: 1.6×
+slower and no taller at the beach (this wave already has ~38 cells of depth
+at Medium; the resolution that brings shoaling back is for small waves). The
+remaining noise is the surface treatment's (the void faces copy the water's u,
+which makes a fast, noisy top layer — #2); the textbook surface conditions
+were tried and damp the wave instead (engineering notes).
 
 **Undertow.** Average, window 60 s (t = 30 → 90 s), tanβ 0.06, the
 Favre-mean horizontal velocity ū (negative = offshore):
+
+Measured with the closure ON (the old card):
 
 | x (m) | mean depth d̄ (m) | ū 1–4 cm above the bed (m/s) | ū near the mean surface (m/s) |
 |---|---|---|---|
@@ -170,9 +176,17 @@ concentrated between trough and crest (the Favre mean of the cells the
 crests fill). For a sense of scale, linear theory's mass flux gH²/8c ≈ 0.016
 m²/s returned over 0.36 m is about 0.05 m/s depth-averaged; the bed current
 here is stronger because the return is concentrated near the bed. With the
-mixing length at 0.2 it ran at −0.2 to −0.37 m/s, and with it off the mean
-flow broke into a row of small cells — the closure is what makes this
-picture.
+mixing length at 0.2 it ran at −0.2 to −0.37 m/s.
+
+**With the card's settings now** (closure off, ν 1e-4; same window, Medium;
+the closure-on run reproduces the table above to 0.01 m/s): ū 1–4 cm above
+the bed is −0.03 to −0.11 at x = 4 m, −0.04 to −0.10 at 5, −0.05 to −0.12 at
+6, −0.05 to −0.14 at 7 and −0.08 to −0.17 at 8 m. Still offshore at every
+station, so the return current is there — weaker near the paddle, as strong
+as before at the shoreline, and less uniform over those 3 cm. (An earlier run
+at ν = 1e-4 described the mean flow as "a row of small cells"; along the bed
+at these stations it does not change sign.) The mean surface velocity was not
+re-measured.
 
 **Froude.** The Froude colouring is |u|/√(gd) from the horizontal velocity
 and the column depth (engineering notes, "Is it the numerator?"). Sampled

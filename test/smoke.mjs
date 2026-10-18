@@ -1355,6 +1355,46 @@ SUITES.physics = async (B) => {
     `field lo ${href.lo} hi ${href.hi}; HGL median ${href.hgMed} (range ${href.hgLo}..${href.hgHi}); ` +
     `dx ${href.dx}; t ${href.t}`);
 
+  // The energy-flux terms follow the same rule (docs/numerics.md, "Where the
+  // stored pressure lives"). A STILL tank cannot show it (net E = g*eta*mdot,
+  // and mdot is 0, whatever elevation is used), so use a steady reach: sa1,
+  // averaged, uniform flow. E/(g*mdot) is the flux-weighted mean of
+  // z + P/g + |u|^2/2g; take the kinetic term out with the section's own
+  // flux-weighted mean u (Mx/mdot) and what is left is the piezometric head,
+  // which in this hydrostatic reach is the level, i.e. the drawn HGL
+  // (hydraulicGrade, j*dx + P/g) plus the S0*x of the tilted gravity. The
+  // remainder is (alpha - 1) V^2/2g ~ 0.003 m; the Delta x/2 bias it exists to
+  // catch is 0.0097 m at Low (MEASURED: new gap 0.10 dx (line) and 0.13 dx (box),
+  // old centre-referenced z gave 0.60 and 0.62 dx; the bound is 0.3 dx).
+  await B.goto(`http://localhost:${PORT}/?scene=sa1`);
+  const eflux = await B.evaluate(`(() => {
+    __low();
+    const S = APP.sim;
+    __settle(40, 120000);
+    APP.SIM.avgStart();
+    APP.state.speed = 10;
+    const t1 = Date.now(), tgt = S.t + 15;
+    while (S.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const g = Math.abs(S.p.g), tilt = S.scene.tiltS0 || 0, dx = S.dx;
+    const hg = APP.SIM.hydraulicGrade(null, true);
+    const x = 8, i = Math.floor(x / dx);
+    // line section, vertical, upward: n = (+1, 0)
+    const L = APP.SIM.lineFlux(x, dx, x, S.H - 2 * dx, true);
+    const lineHead = L.E / (g * L.mdot) - 0.5 * (L.Mx / L.mdot) ** 2 / g + tilt * x;
+    // control volume: left edge of a box, outward normal -x, so mdot < 0 there
+    const B = APP.SIM.boxFlux(x, dx, x + 1.0, S.H - 2 * dx, true);
+    const le = B.edges.left, xl = B.iL * dx;
+    const boxHead = le.E / (g * le.mdot) - 0.5 * (le.Mx / le.mdot) ** 2 / g + tilt * xl;
+    const il = B.iL;
+    return { dx, mdot: L.mdot, lineHead, hgl: hg[i], boxHead, boxMdot: le.mdot, hglBox: hg[il] };
+  })()`);
+  ok("PHYSICS section E per unit discharge agrees with the HGL (lineFlux)",
+    eflux.mdot > 0 && Math.abs(eflux.lineHead - eflux.hgl) < 0.3 * eflux.dx,
+    `section head ${eflux.lineHead} vs HGL ${eflux.hgl} (gap ${((eflux.lineHead - eflux.hgl) / eflux.dx).toFixed(3)} dx)`);
+  ok("PHYSICS control-volume inflow-edge E per unit discharge agrees with the HGL (boxFlux)",
+    eflux.boxMdot < 0 && Math.abs(eflux.boxHead - eflux.hglBox) < 0.3 * eflux.dx,
+    `edge head ${eflux.boxHead} vs HGL ${eflux.hglBox} (gap ${((eflux.boxHead - eflux.hglBox) / eflux.dx).toFixed(3)} dx)`);
+
   // A flowing reach. Measured over the middle 60% only: the inlet sponge and
   // the brink are boundary treatments, not the reach, and including them
   // measures those instead.

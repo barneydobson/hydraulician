@@ -2301,7 +2301,10 @@ const SIM = (() => {
       out.Mz += RHO * f * wv * un * ds;
       out.Fpx += RHO * f * P * nx * ds;
       out.Fpz += RHO * f * P * nz * ds;
-      out.E += RHO * f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv)) * ds;
+      // P is bilinear over cell centres, each value belonging to its cell's
+      // LOWER face (contract at the top of shaders.js), so the pressure read
+      // at z belongs at z - dx/2: the elevation of the E term only.
+      out.E += RHO * f * un * (gAbs * ((z - 0.5 * S.dx) - tilt * x) + P + 0.5 * (u * u + wv * wv)) * ds;
       out.wet += Math.min(f, 1) * ds;
       out.n++;
     }
@@ -2453,7 +2456,9 @@ const SIM = (() => {
         const P = 0.5 * (U[a + 2] + U[b + 2]);
         const wv = cen ? 0.5 * (U[a + 1] + U[b + 1])
                        : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
-        const un = u * n, z = (j + 0.5) * S.dx, x = i * S.dx;
+        // P is the mean of cells (i-1, j) and (i, j), each referenced to its
+        // LOWER face j*dx (contract at the top of shaders.js): z = j*dx.
+        const un = u * n, z = j * S.dx, x = i * S.dx;
         e.Q += Math.min(f, 1) * un;
         e.mdot += f * un;
         e.Mx += f * u * un;   e.Mz += f * wv * un;
@@ -2473,7 +2478,10 @@ const SIM = (() => {
         const P = 0.5 * (U[a + 2] + U[b + 2]);
         const u = cen ? 0.5 * (U[a] + U[b])
                       : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
-        const un = wv * n, z = j * S.dx, x = (i + 0.5) * S.dx;
+        // P is the mean of rows j-1 and j, referenced to (j-1)*dx and j*dx
+        // (contract at the top of shaders.js): it belongs at (j - 1/2)*dx.
+        // Only the elevation in E moves; Fpz and every other term keep P.
+        const un = wv * n, z = (j - 0.5) * S.dx, x = (i + 0.5) * S.dx;
         e.Q += Math.min(f, 1) * un;
         e.mdot += f * un;
         e.Mx += f * u * un;   e.Mz += f * wv * un;

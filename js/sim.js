@@ -1209,36 +1209,31 @@ const SIM = (() => {
     return (inf.q || 0) / Math.max(Math.min(surf, b[1]) - b[0], S.dx);
   }
 
-  /** Uniforms shared by the two simulation passes. */
+  /** Uniforms both simulation passes read (SIM_HEAD in shaders.js). What only
+   *  one of them reads is set by `velOnlyUniforms` / `vofOnlyUniforms`: a
+   *  uniform set on a program that never reads it is a lookup that returns
+   *  null, which GLH now reports. */
   function simUniforms(pr, h) {
     const p = S.p;
     gl.uniform2f(pr.u("u_res"), S.nx, S.ny);
     gl.uniform1f(pr.u("u_dx"), S.dx);
     gl.uniform1f(pr.u("u_dt"), h);
     gl.uniform1f(pr.u("u_g"), -Math.abs(p.g));
-    gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(p.g));
-    gl.uniform1f(pr.u("u_c"), p.c);
     gl.uniform1f(pr.u("u_c2"), p.c * p.c);
     gl.uniform1f(pr.u("u_valve"), p.valveClosed);
-    const { inB, twB } = bands();
+    const { inB } = bands();
     // u_in.x is the SURFACE the boundary pins, which is the delivered stage —
     // NOT the reservoir level, which is its energy line. See `inletStage`.
     const inSurf = inletStage().stage;
     gl.uniform4f(pr.u("u_in"), inSurf, inletVel(), p.inflow.on, p.inflow.free || 0);
     gl.uniform2f(pr.u("u_tw"), p.tailwater.level, p.tailwater.on);
     gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(inSurf, inB[1]));
-    gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
     // Sponge widths are physical (metres) so resolution changes keep the
     // same reservoir; default is ~10 cells.
     const sc = S.scene;
     gl.uniform2f(pr.u("u_spongeN"),
       sc.spongeIn ? Math.round(sc.spongeIn / S.dx) : 10,
       sc.spongeTw ? Math.round(sc.spongeTw / S.dx) : 10);
-    // A head-driven sponge supplies the pipe by its deficit, so the level it
-    // holds sits Q / (fill rate × width) under the setting; a scene may stiffen
-    // the fill (`spongeFill`, default 1 — every scene but contraction).
-    gl.uniform1f(pr.u("u_fillIn"), sc.spongeFill || 1);
-    gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
     gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
     gl.uniform4f(pr.u("u_src0"), s0.x, s0.z, s0.r, s0.on);
@@ -1250,6 +1245,25 @@ const SIM = (() => {
       gl.uniform4f(pr.u("u_src1"), 0, 0, 0, 0);
       gl.uniform4f(pr.u("u_sv1"), 0, 0, 0, 0);
     }
+  }
+
+  /** The velocity pass's own: the slope's gravity component and the slot
+   *  celerity (its bulk-viscosity term). */
+  function velOnlyUniforms(pr) {
+    gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(S.p.g));
+    gl.uniform1f(pr.u("u_c"), S.p.c);
+  }
+
+  /** The VOF pass's own: the tailwater band, the sponges' fill and the edges'
+   *  open modes (ghost ring and sponges live there). */
+  function vofOnlyUniforms(pr) {
+    const p = S.p, sc = S.scene, { twB } = bands();
+    gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
+    // A head-driven sponge supplies the pipe by its deficit, so the level it
+    // holds sits Q / (fill rate × width) under the setting; a scene may stiffen
+    // the fill (`spongeFill`, default 1 — every scene but contraction).
+    gl.uniform1f(pr.u("u_fillIn"), sc.spongeFill || 1);
+    gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
   }
 
   /** The open-channel columns the mixing length reads (FS_TCOL): where each
@@ -1404,6 +1418,7 @@ const SIM = (() => {
       GLH.bindTex(gl, prog.vel, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
                                  ["u_Wd", S.wallTex], ["u_Tc", S.tcolTex]]);
       simUniforms(prog.vel, h);
+      velOnlyUniforms(prog.vel);
       gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
       gl.uniform1f(prog.vel.u("u_nu"), p.nu);
       gl.uniform2f(prog.vel.u("u_nuOut"), p.outflowNu || 0,
@@ -1439,6 +1454,7 @@ const SIM = (() => {
            ["u_A", S.avg.T.read.tex]]
         : [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
       simUniforms(pv, h);
+      vofOnlyUniforms(pv);
       gl.uniform1f(pv.u("u_ca"), p.ca);
       gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
       dyeUniforms(pv);
@@ -1551,7 +1567,7 @@ const SIM = (() => {
     }
     const inj = S.dyeDraw !== false ? S.p.dyeInj : null;
     if (n || inj) S.dyeUsed = true;
-    gl.uniform4f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, S.dyeUsed ? 1 : 0, 0);
+    gl.uniform3f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, S.dyeUsed ? 1 : 0);
     gl.uniform4f(pr.u("u_dyeInj"), inj ? inj.x : 0, inj ? inj.z : 0, inj ? inj.r : 0, inj ? 1 : 0);
   }
   /** The Dye tool's release radius: a few cells, and never less than a
@@ -1562,18 +1578,18 @@ const SIM = (() => {
   }
 
   function advanceParticles(realDt, avg) {
-    // Under an open window the particles ride the FAVRE MEAN: u_U becomes the
-    // accumulator texture and the shader's u_avg branch divides <f u>/f-bar at
+    // Under an open window the particles ride the FAVRE MEAN: u_AF is the
+    // accumulator texture (bound to the live U otherwise, so the sampler is
+    // always valid) and the shader's u_avg branch divides <f u>/f-bar at
     // cell centres. A steady mean makes their paths the mean flow's
     // streamlines, which is what a tracer over a mean picture should draw.
     const useAvg = !!(avg && S.avg);
     gl.useProgram(prog.part);
-    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex],
-      ["u_U", useAvg ? S.avg.fld.read.tex : S.U.read.tex],
+    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex],
+      ["u_AF", useAvg ? S.avg.fld.read.tex : S.U.read.tex],
       ["u_F", S.F.read.tex], ["u_S", S.solid]]);
     gl.uniform1f(prog.part.u("u_avg"), useAvg ? 1 : 0);
     gl.uniform2f(prog.part.u("u_res"), S.nx, S.ny);
-    gl.uniform2f(prog.part.u("u_pres"), S.pn, S.pn);
     gl.uniform1f(prog.part.u("u_dx"), S.dx);
     gl.uniform1f(prog.part.u("u_pdt"), realDt);
     // Particle lifetime is per scene: a tracer has to outlive a wave period
@@ -1615,10 +1631,13 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_dx"), S.dx);
     gl.uniform1f(prog.draw.u("u_g"), -Math.abs(S.p.g));
     gl.uniform1f(prog.draw.u("u_tilt"), S.scene.tiltS0 || 0);
-    gl.uniform1f(prog.draw.u("u_c2"), S.p.c * S.p.c);
     gl.uniform1f(prog.draw.u("u_valve"), S.p.valveClosed);
-    gl.uniform1f(prog.draw.u("u_time"), S.t);
     gl.uniform1i(prog.draw.u("u_mode"), opts.mode);
+    // The active FIELDS row's ramp and midpoint (js/fields.js): the shader tests
+    // no mode number for its colours. An unknown ramp name paints magenta.
+    gl.uniform1i(prog.draw.u("u_ramp"), Shaders.RAMP_IDS.indexOf(opts.ramp));
+    gl.uniform1f(prog.draw.u("u_hasMid"), opts.mid === undefined ? 0 : 1);
+    gl.uniform1f(prog.draw.u("u_mid"), opts.mid === undefined ? 0 : opts.mid);
     gl.uniform1f(prog.draw.u("u_vmax"), opts.vmax);
     gl.uniform1f(prog.draw.u("u_lo"), opts.lo);
     gl.uniform1f(prog.draw.u("u_hi"), opts.hi);
@@ -1630,7 +1649,7 @@ const SIM = (() => {
     S.dyeDraw = !!opts.dye;
     const seeds = !!opts.dye && !!opts.dyeSeeds;
     if (S.dyeOn !== seeds) { S.dyeOn = seeds; S.seeds = null; }
-    gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
+    gl.uniform3f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2]);
     gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);
     gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
     rect.draw();
@@ -1746,12 +1765,12 @@ const SIM = (() => {
     GLH.bindTarget(gl, null, cw, ch);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(prog.tshadow);
-    GLH.bindTex(gl, prog.tshadow, [["u_T", trail.tex]]);
+    GLH.bindTex(gl, prog.tshadow, [["u_Trail", trail.tex]]);
     gl.uniform2f(prog.tshadow.u("u_px"), 1 / cw, 1 / ch);
     quad.draw();
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // it is premultiplied
     gl.useProgram(prog.tex);
-    GLH.bindTex(gl, prog.tex, [["u_T", trail.tex]]);
+    GLH.bindTex(gl, prog.tex, [["u_Trail", trail.tex]]);
     quad.draw();
 
     // …then the heads, once, straight to the screen at full strength. Drawn
@@ -1903,7 +1922,7 @@ const SIM = (() => {
       GLH.bindTex(gl, prog.hgl, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
       gl.uniform2f(prog.hgl.u("u_res"), nx, ny);
       gl.uniform1f(prog.hgl.u("u_dx"), dx);
-      gl.uniform1f(prog.hgl.u("u_g"), g);
+      gl.uniform1f(prog.hgl.u("u_gMag"), g);
       GLH.bindTarget(gl, S.hglFbo, nx, 1);
       quad.draw();
       gl.readPixels(0, 0, nx, 1, gl.RGBA, gl.FLOAT, S.hglBuf);
@@ -1988,7 +2007,8 @@ const SIM = (() => {
     }
     const A = !!(avg && S.avg);
     gl.useProgram(prog.sflux);
-    GLH.bindTex(gl, prog.sflux, [["u_U", A ? S.avg.fld.read.tex : S.U.read.tex],
+    GLH.bindTex(gl, prog.sflux, [["u_U", S.U.read.tex],
+                                 ["u_AF", A ? S.avg.fld.read.tex : S.U.read.tex],
                                  ["u_F", S.F.read.tex], ["u_S", S.solid]]);
     gl.uniform2f(prog.sflux.u("u_res"), nx, ny);
     gl.uniform1f(prog.sflux.u("u_avg"), A ? 1 : 0);

@@ -155,7 +155,7 @@ export async function launch({ port = 0, width = 1440, height = 900,
   }
 
   /** One tab, already navigated, with its uncaught exceptions collected in
-   *  `errors` (a live array: `errors.length = 0` clears it).
+   *  `errors` (and console.warn lines in `warnings`) (a live array: `errors.length = 0` clears it).
    *  `raw: true` makes `evaluate` take an EXPRESSION as written, not the body
    *  of a function that must `return` (ui-smoke's form); `ready` is then an
    *  expression too. */
@@ -164,12 +164,15 @@ export async function launch({ port = 0, width = 1440, height = 900,
     // the target is a new window, and `--window-size` has already set it.
     const { targetId } = await send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
-    const errors = [];
+    const errors = [], warnings = [];
     const onEvent = (m) => {
       if (m.sessionId !== sessionId) return;
       if (m.method === "Runtime.exceptionThrown") {
         const d = m.params.exceptionDetails;
         errors.push((d.exception && (d.exception.description || d.exception.value)) || d.text);
+      }
+      if (m.method === "Runtime.consoleAPICalled" && m.params.type === "warning") {
+        warnings.push(m.params.args.map((a) => a.description || a.value).join(" "));
       }
       if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") {
         errors.push(m.params.args.map((a) => a.description || a.value).join(" "));
@@ -207,7 +210,7 @@ export async function launch({ port = 0, width = 1440, height = 900,
     await sleep(settleMs);       // a few frames, so the first sync has run
 
     return {
-      evaluate, errors,
+      evaluate, errors, warnings,
       /** Raw protocol, bound to this tab — device emulation and screenshots.
        *  Chrome will not open a window narrower than about 500 css px, so a
        *  true phone viewport can only be had through Emulation. */

@@ -44,18 +44,16 @@ const LEGEND = (() => {
   });
   const menuIsOpen = menuPopup.isOpen, closeMenu = menuPopup.close, place = menuPopup.place;
 
-  /** A CSS gradient from the ramp the shader itself uses. */
+  /** A CSS gradient from the ramp the shader itself uses. The display pass ends
+   *  with c^DISPLAY_POW, so each stop here takes the same exponent: the bar's
+   *  colours are the water's. */
   function css(stops) {
     return "linear-gradient(to right," + stops.map((c, k) =>
-      "rgb(" + c.map((v) => Math.round(v * 255)).join(",") + ") " +
+      "rgb(" + c.map((v) => Math.round(255 * Math.pow(v, Shaders.DISPLAY_POW))).join(",") + ") " +
       (100 * k / (stops.length - 1)).toFixed(0) + "%").join(",") + ")";
   }
-  const RAMP_CSS = {
-    turbo: () => css(Shaders.RAMPS.turbo),
-    divg:  () => css(Shaders.RAMPS.divg),
-    // The Water view's own hue ramp, shallow → deep, as FS_DISP mixes it.
-    water: () => css([[0.24, 0.56, 0.78], [0.05, 0.20, 0.42]]),
-  };
+  const RAMP_CSS = {};
+  for (const k of Shaders.RAMP_IDS) RAMP_CSS[k] = () => css(Shaders.RAMPS[k]);
 
   function build() {
     document.getElementById("legPick").onclick = (e) => { e.stopPropagation(); toggleMenu(); };

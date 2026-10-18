@@ -24,15 +24,27 @@ const GLH = (() => {
 
   function createProgram(gl, vsSrc, fsSrc) {
     const p = gl.createProgram();
-    gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vsSrc));
-    gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fsSrc));
+    const vs = compile(gl, gl.VERTEX_SHADER, vsSrc), fs = compile(gl, gl.FRAGMENT_SHADER, fsSrc);
+    gl.attachShader(p, vs);
+    gl.attachShader(p, fs);
     gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
       throw new Error("Program link error: " + gl.getProgramInfoLog(p));
     }
-    const cache = {};                      // lazy uniform-location cache: prog.u("name")
+    // The program keeps what it linked; the shader objects are not needed again.
+    gl.detachShader(p, vs); gl.deleteShader(vs);
+    gl.detachShader(p, fs); gl.deleteShader(fs);
+    const warned = new Set();              // a missing name is reported once per program
+    const cache = Object.create(null);     // lazy uniform-location cache: prog.u("name")
     p.u = (name) => {
-      if (!(name in cache)) cache[name] = gl.getUniformLocation(p, name);
+      if (!(name in cache)) {
+        const loc = gl.getUniformLocation(p, name);
+        if (loc === null && !warned.has(name)) {
+          warned.add(name);
+          console.warn("uniform not found: " + name);
+        }
+        cache[name] = loc;
+      }
       return cache[name];
     };
     return p;

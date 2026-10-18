@@ -156,8 +156,8 @@ const MUTANTS = [
 
   { id: "disp-tent-live", suite: "avg", file: "/js/shaders.js",
     why: "the display pass's 3x3 tent average reads the LIVE fill under a mean field",
-    find: "      fs += w * fAt(ivec2(g) + ivec2(dx, dy)).r;",
-    replace: "      fs += w * texelFetch(u_F, CLg(ivec2(g) + ivec2(dx, dy)), 0).r;",
+    find: "      fs += w * fAt(ivec2(g) + ivec2(di, dj)).r;",
+    replace: "      fs += w * texelFetch(u_F, CL(ivec2(g) + ivec2(di, dj)), 0).r;",
     kills: "avg the water is painted where the MEAN fill is",
     measured: "the luminance centroid stops moving between the two renders: "
             + "409.7 -> 408.6 rows, a gap of 1.1 against a clean 115.0, on a "
@@ -240,8 +240,12 @@ const MUTANTS = [
 
   { id: "acol-weight-denominator", suite: "avg", file: "/js/shaders.js",
     why: "FS_ACOL's running-mean weight drops dt from its own denominator (h/T instead of h/(T+h))",
-    find: "vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)\n  float k = u_dt / max(u_T + u_dt, 1e-9);",
-    replace: "vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)\n  float k = u_dt / max(u_T, 1e-9);",
+    // The weight lives in COMMON's runMean now, shared with FS_ACC and the
+    // transport accumulator; the mutant spells the bug out inside FS_ACOL alone.
+    find: "  float dN = runMean(A.x, C.y, u_T, u_dt);\n  float qN = runMean(A.y, C.z, u_T, u_dt);\n"
+        + "  float eO = A.z;\n  float eN = runMean(eO, C.w, u_T, u_dt);",
+    replace: "  float k = u_dt / max(u_T, 1e-9);\n  float dN = A.x + k * (C.y - A.x);\n  float qN = A.y + k * (C.z - A.y);\n"
+           + "  float eO = A.z;\n  float eN = eO + k * (C.w - eO);",
     kills: "FS_ACOL's running mean matches RECON.accumStep",
     measured: "the recursion blows up (T never appears in its own denominator's history): " +
             "dD 1.17e4, dE 2.38e4 against a 5e-6 gate, and it collaterally breaks avgColumns() " +
@@ -399,6 +403,7 @@ async function browser() {
   // raw: evaluate() takes an expression as written, as it always did here.
   const tab = await chrome.open("about:blank", { raw: true, ready: "true", settleMs: 0 });
   const pageErrors = tab.errors;        // anything the page threw on its own
+  const pageWarnings = tab.warnings;    // console.warn lines (GLH: "uniform not found: ...")
 
   /** Evaluate in the page and return the value. Throws on a page exception,
    *  so a broken rename surfaces as a failed step and not a silent null.
@@ -444,7 +449,7 @@ async function browser() {
         : "\n      page threw nothing"));
   }
 
-  return { evaluate, goto, pageErrors, close: () => chrome.close() };
+  return { evaluate, goto, pageErrors, pageWarnings, close: () => chrome.close() };
 }
 
 // ------------------------------------------------------------------ suites
@@ -656,8 +661,8 @@ SUITES.api = async (B) => {
     const S = APP.SIM, gl = document.getElementById("view").getContext("webgl2");
     const GW = 32, GH = 16;
     const paint = (mode, avg) => {
-      const rg = rangeFor(fieldFor(mode).id);
-      S.render(view, { mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1], pdt: 0, dye: !avg, dyeSeeds: false,
+      const fld = fieldFor(mode), rg = rangeFor(fld.id);
+      S.render(view, { mode, ramp: fld.ramp, mid: fld.mid, vmax: vmaxFor(), lo: rg[0], hi: rg[1], pdt: 0, dye: !avg, dyeSeeds: false,
         particles: false, avg, cursor: [-99, -99, 0], guide: [0, 0, 0, 0], guideOn: false });
       const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
       const px = new Uint8Array(cw * ch * 4);
@@ -684,10 +689,25 @@ SUITES.api = async (B) => {
     }
     for (const m of modes) avg[m] = paint(m, true);
     S.avgStop();
-    return JSON.stringify({ canvas: [gl.drawingBufferWidth, gl.drawingBufferHeight], live, avg });
+    // A mode with no row paints magenta, never another field: look for a pixel
+    // that is magenta through the water's opacity (the body is solid water).
+    const probeMode = (m) => {
+      const fld = fieldFor(0), rg = rangeFor(fld.id);
+      S.render(view, { mode: m, ramp: "turbo", mid: undefined, vmax: vmaxFor(), lo: rg[0], hi: rg[1], pdt: 0, dye: false,
+        dyeSeeds: false, particles: false, avg: false, cursor: [-99, -99, 0], guide: [0, 0, 0, 0], guideOn: false });
+      const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight, px = new Uint8Array(cw * ch * 4);
+      gl.readPixels(0, 0, cw, ch, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      let n = 0;
+      for (let k = 0; k < px.length; k += 4) if (px[k] > 200 && px[k + 2] > 200 && px[k + 1] < 40) n++;
+      return n;
+    };
+    const magenta = { unknown: probeMode(99), known: probeMode(2) };
+    return JSON.stringify({ canvas: [gl.drawingBufferWidth, gl.drawingBufferHeight], live, avg, magenta });
   })()`);
   {
     const cur = JSON.parse(dispRaw);
+    ok("API an unknown u_mode paints magenta, a known one does not",
+      cur.magenta.unknown > 500 && cur.magenta.known === 0, JSON.stringify(cur.magenta));
     if (WRITE_GOLDEN) {
       const rows = (o) => "{\n" + Object.keys(o).map((k) => "    " + JSON.stringify(k) + ": " + JSON.stringify(o[k])).join(",\n") + "\n  }";
       fs.writeFileSync(dispGoldPath, "{\n  \"_renderer\": " + JSON.stringify(renderer) + ",\n  \"canvas\": "
@@ -714,6 +734,42 @@ SUITES.api = async (B) => {
       }
     }
   }
+
+  // ---- every program links and every uniform sim.js sets exists (Task 3.2).
+  // GLH.createProgram warns once per program for a null uniform lookup, which
+  // is what a renamed or dead uniform looks like at runtime (the write is a
+  // silent no-op). Drive every pass: live and Average, particles, streamlines.
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);
+  B.pageWarnings.length = 0;
+  await B.evaluate(`(() => {
+    __low();
+    state.particles = true; state.sline = true;
+    for (const avg of [false, true, false]) {
+      setAverage(avg);
+      for (const f of FIELDS) { state.mode = f.mode; APP.frames(3); }
+    }
+    return true;
+  })()`);
+  const missing = B.pageWarnings.filter((w) => w.includes("uniform not found"));
+  ok("API every program links and every uniform sim.js sets exists",
+    missing.length === 0, missing.join(" | "));
+  B.pageWarnings.length = 0;
+
+  // The driver does not always drop a declared-but-unread uniform (ANGLE kept
+  // several here), so the lookup above cannot find them all: read the sources
+  // too. A uniform a program declares and never reads is dead weight, and one
+  // sim.js still sets on it is a silent no-op that hides a rename.
+  const SH = (0, eval)(fs.readFileSync(path.join(ROOT, "js", "shaders.js"), "utf8") + "\n;Shaders");
+  const dead = [];
+  for (const k of Object.keys(SH).filter((n) => /^(FS|VS)_/.test(n))) {
+    const text = SH[k].replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    const declared = new Set();
+    for (const m of text.matchAll(/uniform\s+(?:highp\s+)?\w+\s+([^;]+);/g))
+      for (const n of m[1].split(",")) declared.add(n.trim().replace(/\[.*\]/, ""));
+    const body = text.replace(/uniform[^;]*;/g, "");
+    for (const n of declared) if (!new RegExp("\\b" + n + "\\b").test(body)) dead.push(k + "." + n);
+  }
+  ok("API no shader declares a uniform it never reads", dead.length === 0, dead.join(" "));
 };
 
 /** Geometry and force-on-a-face cases: polygon rasterisation, faceForce

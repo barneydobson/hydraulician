@@ -30,8 +30,65 @@
  */
 const Shaders = (() => {
 
+  // ---------------------------------------------------------------- prelude
+  /** The first lines of EVERY program, vertex and fragment: the version, the
+   *  precisions (sampler2D included — a vertex shader's default is lowp, and
+   *  the trail pass once had none at all), and the helpers that used to be
+   *  copied between passes with small differences.
+   *
+   *  It declares `u_res`, `u_S` and `u_valve` so that CL() and SO() are valid
+   *  everywhere; a program that never reads them lets the compiler drop them,
+   *  and sim.js sets them only where they are read.
+   *
+   *  CL   clamp a texel coordinate to the grid.
+   *  SO   the solid test: 1 for a wall, `u_valve` for a valve cell (so a valve
+   *       is solid only while closed), 0 for open. Clamped like every fetch.
+   *       Programs that mean something else — FS_HGL (a valve never counts),
+   *       FS_DISP's solAt (any valve or wall is drawn solid) and FS_PART's
+   *       respawn (see there) — say so where they test the mask directly.
+   *  runMean   one running weighted-mean step, A + k (x − A), k = dt/(T + dt):
+   *       the same formula as RECON.accumStep, on the CPU side of the tests.
+   *  hydroTarget   the hydrostatic fill 1 + g (L − z)/c² a level control pins.
+   *  bilin / bilinMix   bilinear interpolation of texels at integer centres
+   *       `g` (the caller shifts and clamps), and the four-corner blend alone
+   *       for readers that fetch through their own function (FS_DISP).
+   *  RAIL   the |velocity| rail (m/s) the NaN guard clips to.
+   *  FILL_EPS   the floor a mean fill is divided by. */
+  const COMMON = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+const float RAIL = 80.0;
+const float FILL_EPS = 1e-6;
+uniform vec2  u_res;           // NX, NY
+uniform sampler2D u_S;         // R8 mask: 0 open, 0.5 valve, 1 wall
+uniform float u_valve;         // 1 = valves closed (solid), 0 = open
+
+ivec2 CL(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
+float SO(ivec2 c){
+  float s = texelFetch(u_S, CL(c), 0).r;
+  return s > 0.75 ? 1.0 : (s > 0.25 ? u_valve : 0.0);
+}
+float runMean(float A, float x, float T, float dt){
+  float k = dt / max(T + dt, 1e-9);
+  return A + k * (x - A);
+}
+vec4 runMean(vec4 A, vec4 x, float T, float dt){
+  float k = dt / max(T + dt, 1e-9);
+  return A + k * (x - A);
+}
+float hydroTarget(float gMag, float L, float z, float c2){ return 1.0 + gMag * (L - z) / c2; }
+vec4 bilinMix(vec4 a, vec4 b, vec4 c, vec4 d, vec2 f){
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+vec4 bilin(sampler2D s, vec2 g){
+  ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
+  return bilinMix(texelFetch(s, i, 0),              texelFetch(s, i + ivec2(1,0), 0),
+                  texelFetch(s, i + ivec2(0,1), 0), texelFetch(s, i + ivec2(1,1), 0), f);
+}
+`;
+
   // ---------------------------------------------------------------- vertex
-  const VS_QUAD = `#version 300 es
+  const VS_QUAD = COMMON + `
 out vec2 vUv;
 void main(){
   vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
@@ -41,16 +98,13 @@ void main(){
 
   // Letterbox quad: the domain is a fixed physical rectangle, so the display
   // covers only the NDC rect that preserves its aspect.
-  const VS_RECT = `#version 300 es
+  const VS_RECT = COMMON + `
 uniform vec4 u_rect;          // x0, y0, x1, y1 in NDC
 out vec2 vUv;
+// Two triangles, (0,0) (1,0) (0,1) and (0,1) (1,0) (1,1): vertex id k takes
+// x from bit k of 0x32 (ids 1, 4, 5) and y from bit k of 0x2C (ids 2, 3, 5).
 vec2 corner(int id){
-  if (id == 0) return vec2(0.0, 0.0);
-  if (id == 1) return vec2(1.0, 0.0);
-  if (id == 2) return vec2(0.0, 1.0);
-  if (id == 3) return vec2(0.0, 1.0);
-  if (id == 4) return vec2(1.0, 0.0);
-  return vec2(1.0, 1.0);
+  return vec2(float((0x32 >> id) & 1), float((0x2C >> id) & 1));
 }
 void main(){
   vec2 q = corner(gl_VertexID);
@@ -72,24 +126,16 @@ void main(){
   //   u_F  RGBA32F   r = f (fill fraction / density)
   //                  g = dye A   b = dye B   a = spare
   //   u_S  R8        0 = open, 0.5 = valve, 1 = wall
-  const SIM_HEAD = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const SIM_HEAD = COMMON + `
 in vec2 vUv;
 // NB: the fragment output is declared by each pass, not here — the vof pass
 // needs a location-qualified pair (MRT) when ACCUM is on, and a name can only
 // be declared once.
 
-uniform sampler2D u_U, u_F, u_S;
-uniform vec2  u_res;          // NX, NY
+uniform sampler2D u_U, u_F;
 uniform float u_dx, u_dt;
 uniform float u_g;            // signed gravity (m/s², negative = down; 0 = plan view)
-uniform float u_gx;           // downstream gravity component: a scene with a
-                              // uniform mild slope draws its bed FLAT (grid-
-                              // aligned, so no rasterisation staircase to
-                              // excite waves) and tilts gravity by S0 instead
-uniform float u_c, u_c2;      // slot celerity and its square
-uniform float u_valve;        // 1 = valves closed (solid), 0 = open
+uniform float u_c2;           // slot celerity squared (pressure in vel, the level targets in vof)
 uniform vec4  u_in;           // left reservoir: PINNED SURFACE (m), velocity (m/s), on, free
                               //   .x is the stage the reservoir DELIVERS, not the
                               //   reservoir level: the level is an energy line and
@@ -102,22 +148,14 @@ uniform vec2  u_inBand;       // z-range the inflow control applies to (bed of t
                               // this the Dirichlet floods any cavity under a raised
                               // bed slab and the prescribed velocity pressurises it
                               // to the clamp — the steep-scene explosion.
-uniform vec2  u_twBand;       // same for the right tailwater column
 uniform vec2  u_spongeN;      // relaxation-sponge width in columns (inflow, tailwater)
-uniform float u_fillIn;       // head-driven inflow sponge: fill-rate multiplier (a scene's spongeFill, default 1)
-uniform vec4  u_openMode;     // L R B T : 0 wall, 1 open (zero-gradient), 2 outfall
 uniform vec4  u_src0, u_src1; // point sources: x, z, radius (m), on
 uniform vec4  u_sv0,  u_sv1;  // source velocity x, z and dye A, dye B
 uniform float u_time;
 
 ivec2 NXY;
-ivec2 CL(ivec2 c){ return clamp(c, ivec2(0), NXY - ivec2(1)); }
 vec4  TU(ivec2 c){ return texelFetch(u_U, CL(c), 0); }
 vec4  TF(ivec2 c){ return texelFetch(u_F, CL(c), 0); }
-float SO(ivec2 c){
-  float s = texelFetch(u_S, CL(c), 0).r;
-  return s > 0.75 ? 1.0 : (s > 0.25 ? u_valve : 0.0);
-}
 `;
 
   // ------------------------------------------------------- pass 1: velocity
@@ -126,6 +164,11 @@ float SO(ivec2 c){
   // makes the acoustic update stable without a Poisson solve.
   const FS_VEL = SIM_HEAD + `
 out vec4 o;
+uniform float u_gx;           // downstream gravity component: a scene with a
+                              // uniform mild slope draws its bed FLAT (grid-
+                              // aligned, so no rasterisation staircase to
+                              // excite waves) and tilts gravity by S0 instead
+uniform float u_c;            // slot celerity (the bulk-viscosity term)
 uniform float u_nu;      // background kinematic viscosity (m²/s)
 uniform float u_cs;      // Smagorinsky constant (0 = laminar)
 uniform float u_cf;      // bed friction coefficient
@@ -231,8 +274,8 @@ void main(){
   //     profile stays laminar-parabolic instead of turbulent-flat.
   float dudx = (tE.r - t0.r) / dx;
   float dwdz = (tN.g - t0.g) / dx;
-  float sxy  = 0.5 * ((tN.r - tS.r) + (tE.g - tW.g)) / (2.0 * dx);
-  float smag = sqrt(2.0*(dudx*dudx + dwdz*dwdz) + 4.0*sxy*sxy);
+  float sxz  = 0.5 * ((tN.r - tS.r) + (tE.g - tW.g)) / (2.0 * dx);
+  float smag = sqrt(2.0*(dudx*dudx + dwdz*dwdz) + 4.0*sxz*sxz);
   float nuT  = u_nu + (u_cs*dx)*(u_cs*dx)*smag;
   // --- outflow absorbing layer (a scene's outflowNu, default off). A
   //     pressure outlet — the tailwater's pinned hydrostatic f — passes
@@ -404,8 +447,8 @@ void main(){
   //     volume flux can actually follow; solid water keeps the wide NaN
   //     guard — pressurised cells (f ≈ 1) never bind the donor cap.
   float capBase = 0.20 * dx / dt;
-  float capU = mix(capBase, 80.0, smoothstep(0.05, 0.50, fFu));
-  float capW = mix(capBase, 80.0, smoothstep(0.05, 0.50, fFw));
+  float capU = mix(capBase, RAIL, smoothstep(0.05, 0.50, fFu));
+  float capW = mix(capBase, RAIL, smoothstep(0.05, 0.50, fFw));
   un = clamp(un, -capU, capU);
   wn = clamp(wn, -capW, capW);
 
@@ -528,8 +571,8 @@ void main(){
   // a scene that has silently died is worse than one that clips. Written as
   // an explicit range test rather than isnan() or a self-comparison, both of
   // which a fast-math shader compiler is entitled to fold away.
-  un = (un > -80.0 && un < 80.0) ? un : (un > 0.0 ? 80.0 : (un < 0.0 ? -80.0 : 0.0));
-  wn = (wn > -80.0 && wn < 80.0) ? wn : (wn > 0.0 ? 80.0 : (wn < 0.0 ? -80.0 : 0.0));
+  un = (un > -RAIL && un < RAIL) ? un : (un > 0.0 ? RAIL : (un < 0.0 ? -RAIL : 0.0));
+  wn = (wn > -RAIL && wn < RAIL) ? wn : (wn > 0.0 ? RAIL : (wn < 0.0 ? -RAIL : 0.0));
   o = vec4(un, wn, pC, dvC);
 }`;
 
@@ -550,6 +593,9 @@ uniform float u_Tacc;                  // window BEFORE this substep
 #else
 #define ACC_KEEP
 #endif
+uniform vec2  u_twBand;    // z-range the right tailwater column's control applies to (as u_inBand)
+uniform float u_fillIn;    // head-driven inflow sponge: fill-rate multiplier (a scene's spongeFill, default 1)
+uniform vec4  u_openMode;  // L R B T : 0 wall, 1 open (zero-gradient), 2 outfall
 uniform float u_ca;        // interface compression strength
 uniform float u_dyeDecay;  // 1/s
 // Dye SEEDS — where the dye is released, continuously, into the water that is
@@ -567,7 +613,7 @@ uniform float u_dyeDecay;  // 1/s
 // faces — once any dye A is in the water — 0 for first-order upwind.
 uniform vec4  u_seed[8];
 uniform vec2  u_seedP[8];
-uniform vec4  u_dyeSeed;
+uniform vec3  u_dyeSeed;
 // The Dye TOOL: x, z, radius (m) of the point the student is holding the
 // pointer on, w = 1 while it is held. Same release as a seed point — dye A
 // set to 1 in the wet cells inside the radius, every substep, never pulsed.
@@ -597,6 +643,10 @@ float faceVal(float fmm, float fm, float fp, float fpp, float a){
 // fluxX and fluxZ stay separate near-duplicates on purpose: the x and z
 // gradient stencils are genuinely asymmetric and unifying them would only
 // hide that behind a swizzle.
+// The donor cap: a quarter of the donor's contents per substep. Interior cells
+// and the ghost-ring accumulator both ask for it here.
+float donorCap(){ return 0.25 * u_dx / u_dt; }
+
 float fluxX(int i, int j, float lim4){
   float fm = TF(ivec2(i,j)).r, fp = TF(ivec2(i+1,j)).r;
   float a  = TU(ivec2(i+1,j)).r;
@@ -653,14 +703,14 @@ void main(){
     vec4 m = TF(s);
     if (gL) {
       if (u_in.z > 0.5) {                   // upstream reservoir
-        m.r = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2 : 0.0;
+        m.r = (z > u_inBand.x && z < u_in.x) ? hydroTarget(gMag, u_in.x, z, u_c2) : 0.0;
         m.g = 0.0;                          // inflow runs clear: dye comes from the seeds
         m.b = 0.0;
       } else if (u_openMode.x > 1.5) m = vec4(0.0);
     }
     if (gR) {
       if (u_tw.y > 0.5) {                   // downstream level control
-        m.r = (z > u_twBand.x && z < u_tw.x) ? 1.0 + gMag * (u_tw.x - z) / u_c2 : 0.0;
+        m.r = (z > u_twBand.x && z < u_tw.x) ? hydroTarget(gMag, u_tw.x, z, u_c2) : 0.0;
       } else if (u_openMode.y > 1.5) m = vec4(0.0);
     }
     // Outfall ghosts are held EMPTY, so ∇p spills the last interior column
@@ -677,10 +727,8 @@ void main(){
     // read back: interior cells start at (1,1), whose west face lives at
     // (0,1) and whose south face lives at (1,0).
     vec4 Ag = texelFetch(u_A, c, 0);
-    float lim4g = 0.25 * dx / dt;
-    float kg = dt / max(u_Tacc + dt, 1e-9);
-    if (gL) Ag.r = Ag.r + kg * (fluxX(i, j, lim4g) - Ag.r);
-    if (gB) Ag.g = Ag.g + kg * (fluxZ(i, j, lim4g) - Ag.g);
+    if (gL) Ag.r = runMean(Ag.r, fluxX(i, j, donorCap()), u_Tacc, dt);
+    if (gB) Ag.g = runMean(Ag.g, fluxZ(i, j, donorCap()), u_Tacc, dt);
     oA = Ag;
 #endif
     o = m; return;
@@ -707,7 +755,7 @@ void main(){
   // the sign of the same flux, and therefore agree on the same limit — which
   // is now literally the same call: this cell's FW is its west neighbour's
   // FE, argument for argument.
-  float lim4 = 0.25 * dx / dt;
+  float lim4 = donorCap();
   float FW = fluxX(i-1, j, lim4), FE = fluxX(i, j, lim4);
   float FS = fluxZ(i, j-1, lim4), FN = fluxZ(i, j, lim4);
   // The conservative candidate, kept UNCLAMPED: everything below (the range
@@ -734,7 +782,7 @@ void main(){
   // jump's surges instead of absorbing them.
   if (u_tw.y > 0.5 && u_spongeN.y > 0.5 && float(i) > u_res.x - 2.0 - u_spongeN.y) {
     float s = (float(i) - (u_res.x - 2.0 - u_spongeN.y)) / u_spongeN.y;
-    float tgt = (z > u_twBand.x && z < u_tw.x) ? 1.0 + gMag * (u_tw.x - z) / u_c2
+    float tgt = (z > u_twBand.x && z < u_tw.x) ? hydroTarget(gMag, u_tw.x, z, u_c2)
               : (z >= u_tw.x ? 0.0 : fNew);
     float rate = tgt > fNew ? 8.0 * s * s : 2.0 * s * s;
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
@@ -747,7 +795,7 @@ void main(){
   // period for ever), so it keeps the gentle quadratic ramp.
   if (u_in.z > 0.5 && u_spongeN.x > 0.5 && float(i) < 1.0 + u_spongeN.x) {
     float s = (1.0 + u_spongeN.x - float(i)) / u_spongeN.x;
-    float tgt = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2
+    float tgt = (z > u_inBand.x && z < u_in.x) ? hydroTarget(gMag, u_in.x, z, u_c2)
               : (z >= u_in.x ? 0.0 : fNew);
     float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * u_fillIn * s : 2.0 * s * s)
                                 : (tgt > fNew ? 8.0 * s * s : 2.0 * s * s);
@@ -844,11 +892,10 @@ void main(){
   // increment (fNew − fCons) by h instead would put an extra factor of time
   // in the balance — RECON test A6 pins this convention on the JS side.
   vec4 A = texelFetch(u_A, c, 0);
-  float k = dt / max(u_Tacc + dt, 1e-9);
   float Srate = (fNew - fCons) / dt;
-  oA = vec4(A.r + k * (FE - A.r),
-            A.g + k * (FN - A.g),
-            A.b + k * (Srate - A.b), 0.0);
+  oA = vec4(runMean(A.r, FE, u_Tacc, dt),
+            runMean(A.g, FN, u_Tacc, dt),
+            runMean(A.b, Srate, u_Tacc, dt), 0.0);
 #endif
 }`;
 
@@ -863,19 +910,10 @@ void main(){
   // One texel per grid column: bed level, depth, unit discharge, surface.
   // Everything the open-channel overlay needs (d_c, d_n, Fr, energy line)
   // is derived from these four numbers on the CPU.
-  const FS_COL = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_COL = COMMON + `
 out vec4 o;
-uniform sampler2D u_U, u_F, u_S;
-uniform vec2  u_res;
-uniform float u_dx, u_valve;
-
-ivec2 CLc(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
-float SO(ivec2 c){
-  float s = texelFetch(u_S, CLc(c), 0).r;
-  return s > 0.75 ? 1.0 : (s > 0.25 ? u_valve : 0.0);
-}
+uniform sampler2D u_U, u_F;
+uniform float u_dx;
 
 void main(){
   int i  = int(gl_FragCoord.x);
@@ -913,7 +951,7 @@ void main(){
     if (f < 0.25) { dry++; if (dry > 2) break; continue; }
     dry = 0;
     float uc = 0.5 * (texelFetch(u_U, ivec2(i,  j), 0).r
-                    + texelFetch(u_U, CLc(ivec2(i+1,j)), 0).r);
+                    + texelFetch(u_U, CL(ivec2(i+1,j)), 0).r);
     d += f * u_dx;
     q += fr * uc * u_dx;
     if (f > 0.5) top = (float(j) + 1.0) * u_dx;
@@ -933,19 +971,10 @@ void main(){
   // and a conduit running full to its soffit are all off — they keep the
   // Smagorinsky viscosity alone, which is why the pressurised scenes are
   // untouched by the closure.
-  const FS_TCOL = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_TCOL = COMMON + `
 out vec4 o;
-uniform sampler2D u_F, u_S;
-uniform vec2  u_res;
-uniform float u_dx, u_valve;
-
-ivec2 CLc(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
-float SO(ivec2 c){
-  float s = texelFetch(u_S, CLc(c), 0).r;
-  return s > 0.75 ? 1.0 : (s > 0.25 ? u_valve : 0.0);
-}
+uniform sampler2D u_F;
+uniform float u_dx;
 
 void main(){
   int i  = int(gl_FragCoord.x);
@@ -982,35 +1011,32 @@ void main(){
   // pressure belongs to that cell's LOWER face, so z = j·Δx (the contract
   // at the top of this file; measured in docs/numerics.md, "Where the stored
   // pressure lives").
-  const FS_HGL = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_HGL = COMMON + `
 out vec4 o;
-uniform sampler2D u_U, u_F, u_S;
-uniform vec2  u_res;
-uniform float u_dx, u_g;
+uniform sampler2D u_U, u_F;
+uniform float u_dx, u_gMag;    // |g|: positive here, unlike the signed u_g of the other passes
 
 void main(){
   int i  = int(gl_FragCoord.x);
   int NY = int(u_res.y);
   for (int j = 1; j < NY - 1; j++) {
+    // Walls only: a valve cell is NOT solid here, open or closed, which is why
+    // this does not go through SO() (the CPU walk it replaced counted the same).
     if (texelFetch(u_S, ivec2(i,j), 0).r > 0.75) continue;      // solid
     if (texelFetch(u_F, ivec2(i,j), 0).r < 0.25) continue;      // not water yet
-    o = vec4(1.0, float(j) * u_dx + texelFetch(u_U, ivec2(i,j), 0).b / u_g, 0.0, 0.0);
+    o = vec4(1.0, float(j) * u_dx + texelFetch(u_U, ivec2(i,j), 0).b / u_gMag, 0.0, 0.0);
     return;
   }
   o = vec4(0.0);                                                // dry column
 }`;
 
   // ------------------------------------------------------------- particles
-  const FS_PART = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_PART = COMMON + `
 out vec4 o;
-uniform sampler2D u_P, u_U, u_F, u_S;
-uniform vec2  u_res, u_pres;
-uniform float u_dx, u_pdt, u_plife, u_time, u_valve;
-uniform float u_avg;          // 1 = u_U is the Favre accumulator (<fu>, <fw>, fbar, Pbar)
+uniform sampler2D u_P, u_U, u_F;
+uniform sampler2D u_AF;       // the Favre display accumulator (<fu>, <fw>, fbar, Pbar), as in FS_DISP
+uniform float u_dx, u_pdt, u_plife, u_time;
+uniform float u_avg;          // 1 = ride the mean (u_AF); 0 = the live u_U
 
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
@@ -1021,21 +1047,12 @@ vec2 velAt(vec2 pos){
     // Mean state: both components live at cell CENTRES, and the stored
     // channels are fill-weighted — interpolate <fu>, <fw> and fbar first,
     // then divide, so the Favre mean is taken of the interpolated state.
-    vec2 pc = clamp(g - 0.5, lo, hi);
-    ivec2 ic = ivec2(pc); vec2 fc = pc - vec2(ic);
-    vec4 a = mix(mix(texelFetch(u_U, ic,            0), texelFetch(u_U, ic+ivec2(1,0), 0), fc.x),
-                 mix(texelFetch(u_U, ic+ivec2(0,1), 0), texelFetch(u_U, ic+ivec2(1,1), 0), fc.x), fc.y);
-    return a.rg / max(a.b, 1e-3);
+    vec4 a = bilin(u_AF, clamp(g - 0.5, lo, hi));
+    return a.rg / max(a.b, FILL_EPS);
   }
   vec2 pu = clamp(vec2(g.x,       g.y - 0.5), lo, hi);   // u lives on x-faces
   vec2 pw = clamp(vec2(g.x - 0.5, g.y      ), lo, hi);
-  ivec2 iu = ivec2(pu); vec2 fu = pu - vec2(iu);
-  ivec2 iw = ivec2(pw); vec2 fw = pw - vec2(iw);
-  float u = mix(mix(texelFetch(u_U, iu,             0).r, texelFetch(u_U, iu+ivec2(1,0), 0).r, fu.x),
-                mix(texelFetch(u_U, iu+ivec2(0,1),  0).r, texelFetch(u_U, iu+ivec2(1,1), 0).r, fu.x), fu.y);
-  float w = mix(mix(texelFetch(u_U, iw,             0).g, texelFetch(u_U, iw+ivec2(1,0), 0).g, fw.x),
-                mix(texelFetch(u_U, iw+ivec2(0,1),  0).g, texelFetch(u_U, iw+ivec2(1,1), 0).g, fw.x), fw.y);
-  return vec2(u, w);
+  return vec2(bilin(u_U, pu).r, bilin(u_U, pw).g);
 }
 
 void main(){
@@ -1047,11 +1064,10 @@ void main(){
   p.z  += u_pdt;
 
   ivec2 g = ivec2(clamp(p.xy / u_dx, vec2(0.0), u_res - vec2(1.0)));
-  float s = texelFetch(u_S, g, 0).r;
-  bool solid = s > 0.75 || (s > 0.25 && u_valve > 0.5);
+  bool solid = SO(g) > 0.5;
   // Wet against the field the particle is riding: the MEAN fill under an open
-  // window (u_U.b is fbar there), so tracers live in the painted mean body.
-  float fill = u_avg > 0.5 ? texelFetch(u_U, g, 0).b : texelFetch(u_F, g, 0).r;
+  // window (u_AF.b is fbar there), so tracers live in the painted mean body.
+  float fill = u_avg > 0.5 ? texelFetch(u_AF, g, 0).b : texelFetch(u_F, g, 0).r;
   bool wet   = fill > 0.35;
 
   if (p.z > u_plife || solid || !wet ||
@@ -1064,7 +1080,10 @@ void main(){
     for (int k = 0; k < 4; k++) {
       p.xy = vec2(hash(seed), hash(seed + 7.3)) * dom;
       ivec2 q = ivec2(clamp(p.xy / u_dx, vec2(0.0), u_res - vec2(1.0)));
-      float fq = u_avg > 0.5 ? texelFetch(u_U, q, 0).b : texelFetch(u_F, q, 0).r;
+      float fq = u_avg > 0.5 ? texelFetch(u_AF, q, 0).b : texelFetch(u_F, q, 0).r;
+      // Deliberately NOT SO(): a respawn wants open ground, and a valve cell —
+      // open or closed — is somewhere a particle should not be born (it would
+      // sit in the gate), so any mask value of 0.25 or more is refused.
       if (fq > 0.5 && texelFetch(u_S, q, 0).r < 0.25) break;
       seed += vec2(1.37, 2.71);
     }
@@ -1073,11 +1092,9 @@ void main(){
   o = p;
 }`;
 
-  const VS_PART = `#version 300 es
-precision highp float;
-precision highp sampler2D;
-uniform sampler2D u_P, u_Q, u_U;
-uniform vec2  u_pres, u_res;
+  const VS_PART = COMMON + `
+uniform sampler2D u_P, u_Q;
+uniform vec2  u_pres;
 uniform vec4  u_rect;
 uniform float u_dx, u_psize;
 uniform int   u_sub;          // dabs per particle per frame (tail pass > 1)
@@ -1110,8 +1127,7 @@ void main(){
   // scale on screen competing with whatever the legend was explaining, and it
   // washed out over the Water view, which is itself blue. Speed still reads —
   // it is in the LENGTH of the trail each particle leaves.
-  const FS_PART_DRAW = `#version 300 es
-precision highp float;
+  const FS_PART_DRAW = COMMON + `
 in float vFade;
 out vec4 o;
 uniform float u_amp;          // 1 = a head, drawn once; < 1 = a tail dab
@@ -1148,8 +1164,7 @@ void main(){
    *  The buffer is faded by a constant every frame and the particles are drawn
    *  into it additively, which is one texture and two draws rather than a
    *  history buffer per particle. */
-  const FS_FILL = `#version 300 es
-precision highp float;
+  const FS_FILL = COMMON + `
 out vec4 o;
 uniform vec4 u_col;
 void main(){ o = u_col; }`;
@@ -1158,28 +1173,25 @@ void main(){ o = u_col; }`;
   // laid down dark under the trail itself. A white trail added to the pale
   // or yellow-green colourings was white on near-white; with a dark edge
   // either side it is a line on every ground.
-  const FS_TRAIL_SHADOW = `#version 300 es
-precision highp float;
+  const FS_TRAIL_SHADOW = COMMON + `
 in vec2 vUv;
 out vec4 o;
-uniform sampler2D u_T;
+uniform sampler2D u_Trail;
 uniform vec2 u_px;            // one texel in uv
 void main(){
   float a = 0.0;
-  a = max(a, texture(u_T, vUv + vec2( 1.5, 0.0) * u_px).a);
-  a = max(a, texture(u_T, vUv + vec2(-1.5, 0.0) * u_px).a);
-  a = max(a, texture(u_T, vUv + vec2(0.0,  1.5) * u_px).a);
-  a = max(a, texture(u_T, vUv + vec2(0.0, -1.5) * u_px).a);
+  a = max(a, texture(u_Trail, vUv + vec2( 1.5, 0.0) * u_px).a);
+  a = max(a, texture(u_Trail, vUv + vec2(-1.5, 0.0) * u_px).a);
+  a = max(a, texture(u_Trail, vUv + vec2(0.0,  1.5) * u_px).a);
+  a = max(a, texture(u_Trail, vUv + vec2(0.0, -1.5) * u_px).a);
   o = vec4(0.02, 0.03, 0.05, min(1.0, a * 1.6) * 0.55);
 }`;
 
-  const FS_TEX = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_TEX = COMMON + `
 in vec2 vUv;
 out vec4 o;
-uniform sampler2D u_T;
-void main(){ o = texture(u_T, vUv); }`;
+uniform sampler2D u_Trail;
+void main(){ o = texture(u_Trail, vUv); }`;
 
   // ------------------------------------------------------------------ ramps
   /** The colour stops, in JS, because the legend has to paint the SAME bar the
@@ -1188,35 +1200,53 @@ void main(){ o = texture(u_T, vUv); }`;
    *
    *  `turbo` is sequential, for quantities with a floor (the heads, speed);
    *  `divg` is diverging and pale in the middle, for quantities with a
-   *  meaningful centre (Fr = 1, ω = 0, momentum = 0). */
+   *  meaningful centre (Fr = 1, ω = 0, momentum = 0); `water` is the Water
+   *  view's own two-stop hue, shallow → deep. A FIELDS row names its ramp and
+   *  its optional midpoint (js/fields.js) and nothing else says them: the
+   *  display pass is told by two uniforms (`u_ramp`, the index of the name in
+   *  RAMP_IDS; `u_hasMid` / `u_mid`), the legend by the same row. */
   const RAMPS = {
     turbo: [[0.19, 0.07, 0.23], [0.13, 0.56, 0.82], [0.20, 0.83, 0.48],
             [0.95, 0.78, 0.15], [0.85, 0.14, 0.10]],
     divg:  [[0.06, 0.24, 0.52], [0.25, 0.61, 0.85], [0.94, 0.95, 0.92],
             [0.97, 0.63, 0.25], [0.72, 0.10, 0.09]],
+    water: [[0.24, 0.56, 0.78], [0.05, 0.20, 0.42]],
   };
+  /** `u_ramp` is the position in this list. */
+  const RAMP_IDS = Object.keys(RAMPS);
+  /** The last operation of the display pass, c ← c^DISPLAY_POW; the legend's
+   *  bars apply the same exponent so a bar's colours are the water's. */
+  const DISPLAY_POW = 0.95;
   const glsl3 = (c) => "vec3(" + c.map((v) => v.toFixed(4)).join(",") + ")";
+  const rampBody = (stops) => stops.length === 2
+    ? "mix(" + stops.map(glsl3).join(",") + ", t)"
+    : "ramp(t," + stops.map(glsl3).join(",") + ")";
   const rampFn = (name, stops) =>
-    "vec3 " + name + "(float t){ return ramp(t," + stops.map(glsl3).join(",") + "); }";
+    "vec3 ramp_" + name + "(float t){ return " + rampBody(stops) + "; }";
+  const rampSwitch = "vec3 rampColour(int r, float t){\n" +
+    RAMP_IDS.map((k, n) => "  if (r == " + n + ") return ramp_" + k + "(t);").join("\n") +
+    "\n  return vec3(1.0, 0.0, 1.0);\n}";
 
   // ----------------------------------------------------------------- display
-  const FS_DISP = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_DISP = COMMON + `
 in vec2 vUv;
 out vec4 o;
 
-uniform sampler2D u_F, u_U, u_S, u_C;
-uniform vec2  u_res, u_canvas;
-uniform float u_dx, u_g, u_c2, u_valve, u_time;
+uniform sampler2D u_F, u_U, u_C;
+uniform vec2  u_canvas;
+uniform float u_dx, u_g;
 uniform float u_tilt;         // scene tiltS0: elevation is z − S₀x when set
 uniform int   u_mode;         // 0 water 1 pressure head 2 speed 3 Froude
                               // 4 vorticity 5 momentum flux
                               // 6 piezometric head 7 energy head 8 pressure
+                              // anything else paints magenta
+uniform int   u_ramp;         // the ramp: an index into RAMP_IDS (0 turbo, 1 divg, 2 water)
+uniform float u_hasMid;       // 1 = u_mid is the value that lands on the ramp's centre
+uniform float u_mid;
 uniform float u_vmax;         // speed scale: the particles and the Water sheen
 uniform float u_lo, u_hi;     // the CURRENT field's colour range, in its units
 uniform float u_dyeOn;
-uniform vec4  u_cursor;       // x, z (m), radius (m), tool tint
+uniform vec3  u_cursor;       // x, z (m), radius (m)
 uniform vec4  u_guide;        // preview line x0,z0,x1,z1 (m); w<0 = off
 uniform float u_guideOn;
 // ------------------------------------------------------- the averaging mode
@@ -1229,8 +1259,6 @@ uniform float u_guideOn;
 uniform sampler2D u_AF, u_AC;
 uniform float u_avg;          // 1 = paint the mean state
 
-ivec2 CLg(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
-
 /** THE two readers of the state, and the only ones. Every sampler read in
  *  this pass goes through them, because a half-applied Average is worse than
  *  no Average at all: the 3x3 tent average below drives the water's opacity
@@ -1239,7 +1267,7 @@ ivec2 CLg(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
  *  instantaneous spin under a mean-flow legend. Two ways to read the field is
  *  one way too many. */
 vec4 fAt(ivec2 c){
-  c = CLg(c);
+  c = CL(c);
   vec4 F = texelFetch(u_F, c, 0);
   // Only the FILL has a mean. The two dye channels are a live tracer with no
   // accumulator behind them - §4.1 stores four channels and dye is not among
@@ -1255,10 +1283,10 @@ vec4 fAt(ivec2 c){
  *  enters the mean momentum equation as -grad(p-bar) and cannot be recovered
  *  from f-bar with a nonlinear EOS (§4.1). */
 vec4 uAt(ivec2 c){
-  c = CLg(c);
+  c = CL(c);
   if (u_avg > 0.5) {
     vec4 A = texelFetch(u_AF, c, 0);
-    float fb = max(A.b, 1e-6);
+    float fb = max(A.b, FILL_EPS);
     return vec4(A.r / fb, A.g / fb, A.a, 0.0);
   }
   return texelFetch(u_U, c, 0);
@@ -1267,16 +1295,12 @@ vec4 uAt(ivec2 c){
 vec4 blF(vec2 g){
   g -= 0.5;
   ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
-  vec4 a = fAt(i),              b = fAt(i + ivec2(1,0));
-  vec4 c = fAt(i + ivec2(0,1)), d = fAt(i + ivec2(1,1));
-  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+  return bilinMix(fAt(i), fAt(i + ivec2(1,0)), fAt(i + ivec2(0,1)), fAt(i + ivec2(1,1)), f);
 }
 vec4 blUc(vec2 g){                // bilinear, every channel at cell centres
   g -= 0.5;
   ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
-  vec4 a = uAt(i),              b = uAt(i + ivec2(1,0));
-  vec4 c = uAt(i + ivec2(0,1)), d = uAt(i + ivec2(1,1));
-  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+  return bilinMix(uAt(i), uAt(i + ivec2(1,0)), uAt(i + ivec2(0,1)), uAt(i + ivec2(1,1)), f);
 }
 /** Live U is staggered (channel contract at u_U): r = u on the cell's WEST
  *  face, g = w on its SOUTH face, b/a at the centre. So u is interpolated
@@ -1290,10 +1314,12 @@ vec4 blU(vec2 g){
   U.g = blUc(g + vec2(0.0, 0.5)).g;   // w: z un-shifted, x shifted -0.5
   return U;
 }
+// Solid for DRAWING: a wall and a valve cell, open or closed, are both rock
+// (the valve's own colour is laid over it by valveAt). Not SO(), which counts
+// an open valve as passable.
 float solAt(vec2 g){
   ivec2 i = ivec2(clamp(g, vec2(0.0), u_res - vec2(1.0)));
-  float s = texelFetch(u_S, i, 0).r;
-  return s > 0.75 ? 1.0 : (s > 0.25 ? 1.0 : 0.0);
+  return texelFetch(u_S, i, 0).r > 0.25 ? 1.0 : 0.0;
 }
 float valveAt(vec2 g){
   ivec2 i = ivec2(clamp(g, vec2(0.0), u_res - vec2(1.0)));
@@ -1308,10 +1334,10 @@ vec3 ramp(float t, vec3 a, vec3 b, vec3 c, vec3 d, vec3 e){
   if (t < 3.0) return mix(c, d, t - 2.0);
   return mix(d, e, t - 3.0);
 }
-// Both bodies come from RAMPS above — the legend paints its bar from the same
-// five stops, so the key on screen and the water cannot drift apart.
-${rampFn("turbo", RAMPS.turbo)}
-${rampFn("divg", RAMPS.divg)}   // blue → pale → red, break at 0.5
+// Every body comes from RAMPS above — the legend paints its bar from the same
+// stops, so the key on screen and the water cannot drift apart.
+${RAMP_IDS.map((k) => rampFn(k, RAMPS[k])).join("\n")}
+${rampSwitch}
 
 // The colour range, in the FIELD's own units. Every mode maps through this
 // one pair rather than through a scale of its own, which is what lets the
@@ -1325,6 +1351,11 @@ float nrmMid(float v, float mid){
                  : 0.5 + 0.5 * clamp((v - mid) / max(u_hi - mid, 1e-6), 0.0, 1.0);
 }
 
+// The gravity every head here divides by. In a plan view (g = 0, no weight) a
+// head is p/0.001 and means nothing, so it reads as if g were 9.81 — as
+// SIM.probe does, so the colour and the hover card agree.
+float gEff(){ return u_g == 0.0 ? 9.81 : max(abs(u_g), 1e-3); }
+
 // Ink opacity of a dye concentration: steep, then saturating (see the dye block).
 float inkA(float d){ return 0.92 * (1.0 - exp(-5.0 * clamp(d, 0.0, 1.0))); }
 
@@ -1332,6 +1363,88 @@ float segDist(vec2 p, vec2 a, vec2 b){
   vec2 pa = p - a, ba = b - a;
   float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-9), 0.0, 1.0);
   return length(pa - ba * h);
+}
+
+/** The number each colouring paints, in the field's own units — what u_lo and
+ *  u_hi are ranges of. known is false for a mode this pass has no row for. */
+float fieldValue(vec2 g, vec2 pm, vec4 U, float f, float dep, out bool known){
+  known = true;
+  if (u_mode == 0) {
+    // Submergence straight from the pressure: p/ρg IS the depth below the local
+    // free surface. Reading it off the column reduction instead would break for
+    // anything stacked — a tank above a puddle, a pipe under a channel.
+    return U.b / gEff();
+  } else if (u_mode == 1) {
+    // pressure head p/ρg: submergence below the surface (m).
+    return U.b / gEff();
+  } else if (u_mode == 2) {
+    return length(U.rg);
+  } else if (u_mode == 3) {
+    // STREAMWISE velocity, not the 2D speed magnitude. A Froude number is
+    // u/√(gd) — the vertical component is not part of it, and including it
+    // paints vertical warm streaks down every plunging wave face: measured on
+    // a23's apron, |w| exceeds |u| in 30% of wet cells and |u,w| triples the
+    // cells that render supercritical (1.5% against 0.5%). Because the ramp
+    // below is diverging about Fr = 1, that reads as violent banding even
+    // where the reach is comfortably subcritical. The depth is per-column so
+    // it cannot cause this; measured column-to-column jitter is under 5%.
+    return abs(U.r) / sqrt(max(abs(u_g) * dep, 1e-4));
+  } else if (u_mode == 4) {
+    ivec2 gi = ivec2(clamp(g, vec2(1.0), u_res - vec2(2.0)));
+    float dwdx = uAt(gi + ivec2(1,0)).g - uAt(gi - ivec2(1,0)).g;
+    float dudz = uAt(gi + ivec2(0,1)).r - uAt(gi - ivec2(0,1)).r;
+    return (dwdx - dudz) / (2.0 * u_dx);
+  } else if (u_mode == 6) {
+    // Piezometric head h = z + p/ρg — the potential whose gradient drives the
+    // flow. Constant over the depth wherever the flow is hydrostatic, so the
+    // bands stand VERTICAL through a backwater or a uniform reach and bend
+    // exactly where vertical accelerations matter: weir crests and brinks
+    // (h sags), a chute toe (h bulges), gate contractions, jump rollers.
+    // A tilted-gravity scene draws a flat bed and carries S₀ in gravity, so the
+    // elevation term is z − S₀x there.
+    // The stored pressure belongs to the cell's LOWER face j·Δx (contract at
+    // the top of the file). blU is bilinear with each cell's value at its
+    // CENTRE, so the matching elevation is the sample height less Δx/2:
+    // linear in j, it interpolates j·Δx exactly. Using pm.y here put this
+    // field a half cell above the HGL line.
+    return (pm.y - 0.5 * u_dx) - u_tilt * pm.x + U.b / gEff();
+  } else if (u_mode == 7) {
+    // Energy head H = z + p/ρg + |u|²/2g — the piezometric head plus the
+    // velocity head, so it is the SAME picture as mode 6 with the kinetic
+    // term added back. Along a streamline it can only fall, which is what
+    // makes a drop between two stations a loss you can point at: friction
+    // down a reach, the roller of a jump, the separation in a diffuser.
+    // No α here — that coefficient is what a depth-AVERAGED profile needs
+    // because the point values differ; these are the point values.
+    float g2 = gEff();
+    return (pm.y - 0.5 * u_dx) - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
+  } else if (u_mode == 8) {
+    // Pressure p in kPa: ρ·P with ρ = 1000 kg/m³ and P (U.b) the kinematic
+    // pressure in m²/s², so kPa = P numerically. No division by g, so it
+    // reads the same in a plan view (g ≈ 0), where the heads cannot.
+    return U.b;
+  } else if (u_mode == 5) {
+    // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
+    // display pass runs once per FRAME, not once per substep — it is the two
+    // simulation passes that cost, and this adds nothing to them. Signed by
+    // the streamwise direction so a returning roller or an undertow reads
+    // opposite to the flow that drives it, which is the thing worth seeing:
+    // where the momentum actually goes in a jump or under a breaker.
+    float sp = length(U.rg);
+    return 1000.0 * f * U.r * sp;           // rho = 1000 kg/m3: kg/m/s^2
+  }
+  known = false;
+  return 0.0;
+}
+
+/** A value through the active field's ramp (u_ramp) and, when it has one, its
+ *  midpoint (u_hasMid, u_mid). Both come from the FIELDS row: no mode number is
+ *  tested for its colours here. The Water view adds the speed as brightness. */
+vec3 fieldColour(float v, vec4 U){
+  float t = u_hasMid > 0.5 ? nrmMid(v, u_mid) : nrm(v);
+  vec3 col = rampColour(u_ramp, t);
+  if (u_mode == 0) col += vec3(0.10, 0.14, 0.16) * clamp(length(U.rg) / max(u_vmax, 0.01), 0.0, 1.0);
+  return col;
 }
 
 void main(){
@@ -1349,10 +1462,10 @@ void main(){
   // its cells sit well below 1; smoothing lets that render as one translucent
   // ribbon instead of a cloud of half-full cells.
   float fs = 0.0;
-  for (int dy = -1; dy <= 1; dy++)
-    for (int dx = -1; dx <= 1; dx++) {
-      float w = (dx == 0 ? 2.0 : 1.0) * (dy == 0 ? 2.0 : 1.0);
-      fs += w * fAt(ivec2(g) + ivec2(dx, dy)).r;
+  for (int dj = -1; dj <= 1; dj++)
+    for (int di = -1; di <= 1; di++) {
+      float w = (di == 0 ? 2.0 : 1.0) * (dj == 0 ? 2.0 : 1.0);
+      fs += w * fAt(ivec2(g) + ivec2(di, dj)).r;
     }
   fs /= 16.0;
 
@@ -1385,83 +1498,9 @@ void main(){
   // ---- water body. Opacity follows how much water is actually there, so a
   //      stretched jet reads as thin and a pool reads as solid.
   float wet = smoothstep(0.05, 0.55, fs);
-  // Submergence straight from the pressure: p/ρg IS the depth below the local
-  // free surface. Reading it off the column reduction instead would break for
-  // anything stacked — a tank above a puddle, a pipe under a channel.
-  float sub = U.b / max(abs(u_g), 1e-3);
-  vec3 water;
-  if (u_mode == 0) {
-    vec3 shallow = vec3(0.24, 0.56, 0.78);
-    vec3 deep    = vec3(0.05, 0.20, 0.42);
-    water = mix(shallow, deep, nrm(sub));
-    water += vec3(0.10, 0.14, 0.16) * clamp(length(U.rg) / max(u_vmax, 0.01), 0.0, 1.0);
-  } else if (u_mode == 1) {
-    // pressure head p/ρg: submergence below the surface (m). In plan view
-    // (g = 0) it is divided by 9.81, as SIM.probe does, so the colour and the
-    // hover card agree instead of the colour reading p/0.001.
-    float head = U.b / (u_g == 0.0 ? 9.81 : abs(u_g));
-    water = turbo(nrm(head));
-  } else if (u_mode == 2) {
-    water = turbo(nrm(length(U.rg)));
-  } else if (u_mode == 3) {
-    // STREAMWISE velocity, not the 2D speed magnitude. A Froude number is
-    // u/√(gd) — the vertical component is not part of it, and including it
-    // paints vertical warm streaks down every plunging wave face: measured on
-    // a23's apron, |w| exceeds |u| in 30% of wet cells and |u,w| triples the
-    // cells that render supercritical (1.5% against 0.5%). Because the ramp
-    // below is diverging about Fr = 1, that reads as violent banding even
-    // where the reach is comfortably subcritical. The depth is per-column so
-    // it cannot cause this; measured column-to-column jitter is under 5%.
-    float fr = abs(U.r) / sqrt(max(abs(u_g) * dep, 1e-4));
-    water = divg(nrmMid(fr, 1.0));
-  } else if (u_mode == 4) {
-    ivec2 gi = ivec2(clamp(g, vec2(1.0), u_res - vec2(2.0)));
-    float dwdx = uAt(gi + ivec2(1,0)).g - uAt(gi - ivec2(1,0)).g;
-    float dudz = uAt(gi + ivec2(0,1)).r - uAt(gi - ivec2(0,1)).r;
-    float vort = (dwdx - dudz) / (2.0 * u_dx);
-    water = divg(nrmMid(vort, 0.0));
-  } else if (u_mode == 6) {
-    // Piezometric head h = z + p/ρg — the potential whose gradient drives the
-    // flow. Constant over the depth wherever the flow is hydrostatic, so the
-    // bands stand VERTICAL through a backwater or a uniform reach and bend
-    // exactly where vertical accelerations matter: weir crests and brinks
-    // (h sags), a chute toe (h bulges), gate contractions, jump rollers.
-    // A tilted-gravity scene draws a flat bed and carries S₀ in gravity, so the
-    // elevation term is z − S₀x there.
-    // The stored pressure belongs to the cell's LOWER face j·Δx (contract at
-    // the top of the file). blU is bilinear with each cell's value at its
-    // CENTRE, so the matching elevation is the sample height less Δx/2:
-    // linear in j, it interpolates j·Δx exactly. Using pm.y here put this
-    // field a half cell above the HGL line.
-    float hp = (pm.y - 0.5 * u_dx) - u_tilt * pm.x + U.b / max(abs(u_g), 1e-3);
-    water = turbo(nrm(hp));
-  } else if (u_mode == 7) {
-    // Energy head H = z + p/ρg + |u|²/2g — the piezometric head plus the
-    // velocity head, so it is the SAME picture as mode 6 with the kinetic
-    // term added back. Along a streamline it can only fall, which is what
-    // makes a drop between two stations a loss you can point at: friction
-    // down a reach, the roller of a jump, the separation in a diffuser.
-    // No α here — that coefficient is what a depth-AVERAGED profile needs
-    // because the point values differ; these are the point values.
-    float g2 = max(abs(u_g), 1e-3);
-    float He = (pm.y - 0.5 * u_dx) - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
-    water = turbo(nrm(He));
-  } else if (u_mode == 8) {
-    // Pressure p in kPa: ρ·P with ρ = 1000 kg/m³ and P (U.b) the kinematic
-    // pressure in m²/s², so kPa = P numerically. No division by g, so it
-    // reads the same in a plan view (g ≈ 0), where the heads cannot.
-    water = turbo(nrm(U.b));
-  } else {
-    // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
-    // display pass runs once per FRAME, not once per substep — it is the two
-    // simulation passes that cost, and this adds nothing to them. Signed by
-    // the streamwise direction so a returning roller or an undertow reads
-    // opposite to the flow that drives it, which is the thing worth seeing:
-    // where the momentum actually goes in a jump or under a breaker.
-    float sp = length(U.rg);
-    float mom = 1000.0 * f * U.r * sp;      // rho = 1000 kg/m3: kg/m/s^2
-    water = divg(nrmMid(mom, 0.0));
-  }
+  bool known;
+  float v = fieldValue(g, pm, U, f, dep, known);
+  vec3 water = known ? fieldColour(v, U) : vec3(1.0, 0.0, 1.0);   // an unknown mode is magenta, never another field
   c = mix(c, water, wet);
 
   // ---- pressurised marker: cells above the slot threshold get a sheen so
@@ -1527,7 +1566,7 @@ void main(){
              - smoothstep(u_cursor.z, u_cursor.z - px * 1.6, dc);
   c += vec3(0.55, 0.85, 1.0) * ring * 0.85;
 
-  o = vec4(pow(clamp(c, 0.0, 1.0), vec3(0.95)), 1.0);
+  o = vec4(pow(clamp(c, 0.0, 1.0), vec3(${DISPLAY_POW.toFixed(2)})), 1.0);
 }`;
 
   // ------------------------------------------------ averaging: Favre field
@@ -1540,15 +1579,10 @@ void main(){
    *
    *  The weight is h/(T+h) with T held on the CPU, so this is the same
    *  formula as RECON.accumStep and is tested there. */
-  const FS_ACC = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_ACC = COMMON + `
 out vec4 o;
 uniform sampler2D u_A, u_U, u_F;
-uniform vec2  u_res;
 uniform float u_T, u_dt;
-
-ivec2 CL(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
 
 void main(){
   ivec2 c = ivec2(gl_FragCoord.xy);
@@ -1558,8 +1592,7 @@ void main(){
   float uc = 0.5 * (U.r + texelFetch(u_U, CL(c + ivec2(1,0)), 0).r);
   float wc = 0.5 * (U.g + texelFetch(u_U, CL(c + ivec2(0,1)), 0).g);
   vec4 phi = vec4(f * uc, f * wc, f, U.b);
-  float k = u_dt / max(u_T + u_dt, 1e-9);
-  o = A + k * (phi - A);
+  o = runMean(A, phi, u_T, u_dt);
 }`;
 
   // ---------------------------------------------- averaging: column readings
@@ -1571,9 +1604,7 @@ void main(){
    *
    *  Welford rather than <eta^2> - <eta>^2: for a 5 mm wobble on a 1 m datum
    *  that subtraction keeps about two digits in float32. */
-  const FS_ACOL = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_ACOL = COMMON + `
 out vec4 o;
 uniform sampler2D u_A, u_C;
 uniform float u_T, u_dt;
@@ -1582,11 +1613,10 @@ void main(){
   ivec2 c = ivec2(int(gl_FragCoord.x), 0);
   vec4 A = texelFetch(u_A, c, 0);        // (dbar, qbar, etabar, M2)
   vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)
-  float k = u_dt / max(u_T + u_dt, 1e-9);
-  float dN = A.x + k * (C.y - A.x);
-  float qN = A.y + k * (C.z - A.y);
+  float dN = runMean(A.x, C.y, u_T, u_dt);
+  float qN = runMean(A.y, C.z, u_T, u_dt);
   float eO = A.z;
-  float eN = eO + k * (C.w - eO);
+  float eN = runMean(eO, C.w, u_T, u_dt);
   o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));
 }`;
 
@@ -1603,23 +1633,22 @@ void main(){
    *  per unit width: (f u) with the fill capped at 1 (pressurised water is
    *  still one volume of water), zero on any face touching a solid. Live, u
    *  already lives on that face and f is the two-cell mean; under Average
-   *  (u_avg) u_U is the Favre accumulator (<f u_c>, <f w_c>, fbar, Pbar),
+   *  (u_avg) u_AF is the Favre accumulator (<f u_c>, <f w_c>, fbar, Pbar),
    *  whose centred mean fluxes are averaged onto the face. */
-  const FS_SFLUX = `#version 300 es
-precision highp float;
-precision highp sampler2D;
+  const FS_SFLUX = COMMON + `
 out vec4 o;
-uniform sampler2D u_U, u_F, u_S;
-uniform vec2  u_res;
-uniform float u_avg, u_valve;
+uniform sampler2D u_U, u_F;
+uniform sampler2D u_AF;       // the Favre display accumulator, as in FS_DISP and FS_PART
+uniform float u_avg;
 
 bool inside(ivec2 c){ return c.x >= 0 && c.x < int(u_res.x); }
-bool solid(ivec2 c){
-  float s = texelFetch(u_S, c, 0).r;
-  return s > 0.75 || (s > 0.25 && u_valve > 0.5);
-}
-float fillAt(ivec2 c){ return u_avg > 0.5 ? texelFetch(u_U, c, 0).b : texelFetch(u_F, c, 0).r; }
-vec2 meanQ(ivec2 c){ vec4 A = texelFetch(u_U, c, 0); return A.rg / max(A.b, 1.0); }
+bool solid(ivec2 c){ return SO(c) > 0.5; }
+float fillAt(ivec2 c){ return u_avg > 0.5 ? texelFetch(u_AF, c, 0).b : texelFetch(u_F, c, 0).r; }
+// max(fbar, 1.0), NOT FILL_EPS: a flux, not a velocity. Dividing <f u> by a
+// fill below one would inflate it where the mean cell is mostly air, and the
+// stream function wants the volume flux there (fill capped at one), so the
+// guard is the fill's own ceiling and the floor of a velocity does not apply.
+vec2 meanQ(ivec2 c){ vec4 A = texelFetch(u_AF, c, 0); return A.rg / max(A.b, 1.0); }
 float qx(ivec2 c){
   if (!inside(c) || solid(c)) return 0.0;
   ivec2 l = c - ivec2(1, 0);
@@ -1644,5 +1673,6 @@ void main(){
 }`;
 
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_HGL, FS_PART, VS_PART,
-           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, FS_TRAIL_SHADOW, RAMPS, FS_ACC, FS_ACOL, FS_SFLUX };
+           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, FS_TRAIL_SHADOW, RAMPS, RAMP_IDS, DISPLAY_POW,
+           FS_ACC, FS_ACOL, FS_SFLUX, COMMON };
 })();

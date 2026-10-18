@@ -802,9 +802,9 @@ function tickFrame(realDt) {
   // The brush ring is a TOOL's footprint: none with the Read tool in hand, and
   // none under a finger, which hides it anyway.
   const cur = state.inside && state.tool && state.ptr !== "touch" ? state.cursor : [-99, -99];
-  const rg = rangeFor(fieldFor(state.mode).id);
+  const fld = fieldFor(state.mode), rg = rangeFor(fld.id);
   SIM.render(view, {
-    mode: state.mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1],
+    mode: state.mode, ramp: fld.ramp, mid: fld.mid, vmax: vmaxFor(), lo: rg[0], hi: rg[1],
     // The same simulated step the particles were advanced by, so the trail
     // fades over a fixed span of FLOW rather than of wall clock.
     pdt: Math.min(simAdvanced, 0.05),

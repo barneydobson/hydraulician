@@ -290,13 +290,16 @@ async function main() {
       // typing the numbers out again somewhere else.
       const ramp = await tab.evaluate(`
         const R = APP.ui.RAMPS;
-        const bad = Object.values(R).filter((r) =>
-          r.length !== 5 || r.some((c) => c.length !== 3 ||
-                                          c.some((v) => !(v >= 0 && v <= 1))));
+        const stops = { turbo: 5, divg: 5, water: 2 };
+        const bad = Object.keys(R).filter((k) => {
+          const r = R[k];
+          return r.length !== stops[k] || r.some((c) => c.length !== 3 ||
+                                          c.some((v) => !(v >= 0 && v <= 1)));
+        });
         return { keys: Object.keys(R).sort().join(","), bad: bad.length };
       `);
-      eq("both ramps are published", ramp.keys, "divg,turbo");
-      eq("as five rgb stops in 0-1", ramp.bad, 0);
+      eq("the three ramps are published", ramp.keys, "divg,turbo,water");
+      eq("as rgb stops in 0-1 (five, five and two)", ramp.bad, 0);
 
       // Every field must actually render: a shader that fails to compile
       // throws on the draw, and a mode with no mapping paints nothing.

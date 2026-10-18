@@ -104,10 +104,11 @@ function hmaxScene() { const s = sceneNow(); return s.hmax || (s.g ? 2.0 : 1); }
 function pressureRange() {
   const s = sceneNow();
   if (Array.isArray(s.pRange)) return s.pRange.slice();
-  // The live sim knows whether this is a plan view (|g| < 0.1) and what g is;
-  // before one is built (or in a unit context) fall back to the scene's own.
+  // The live sim knows whether this is a plan view (|g| < 0.1); before one is
+  // built (or in a unit context) fall back to the scene's own. SIM.gMag() is
+  // null-safe, so g needs no fallback here.
   const plan = sim ? SIM.planView() : s.g !== undefined && Math.abs(s.g) < 0.1;
-  const g = sim ? SIM.gMag() : (Math.abs(s.g) || 9.81);
+  const g = SIM.gMag();
   if (plan) {
     const st = (sim && SIM.fieldStats) ? SIM.fieldStats(8, !!state.avg) : null;
     if (st && isFinite(st.lo) && isFinite(st.hi) && st.hi > st.lo) {

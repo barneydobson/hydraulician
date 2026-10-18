@@ -63,7 +63,7 @@ import { fileURLToPath } from "node:url";
 import * as cdp from "./cdp.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PORT = 8731 + (process.pid % 200);          // out of the way of a dev server
+let PORT = 0;                                    // the OS picks a free port; serve() reads it back
 const KEEP = process.argv.includes("--keep");
 const WRITE_GOLDEN = process.argv.includes("--write-golden");
 const WRITE_THROUGHPUT = process.argv.includes("--write-throughput");
@@ -328,6 +328,7 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css
                ".png": "image/png", ".json": "application/json", ".md": "text/plain" };
 
 let passed = 0;
+let goldenSkipped = 0;       // goldens not compared because they were captured on another GPU
 const failures = [];
 
 /** Page-side helpers, injected once per navigation.
@@ -398,7 +399,7 @@ function serve() {
   });
   return new Promise((res, rej) => {
     srv.on("error", rej);
-    srv.listen(PORT, () => res(srv));
+    srv.listen(0, () => { PORT = srv.address().port; res(srv); });
   });
 }
 
@@ -645,6 +646,7 @@ SUITES.api = async (B) => {
       if (ratio > worst) { worst = ratio; where = at; }
     };
     if (want && wantR !== renderer) {
+      goldenSkipped++;
       console.log(`    golden skipped: captured on ${wantR}, running on ${renderer}`);
     } else {
     if (want) walk(want, fp, "golden");
@@ -723,6 +725,7 @@ SUITES.api = async (B) => {
       let want = null;
       try { want = JSON.parse(fs.readFileSync(dispGoldPath, "utf8")); } catch (_) { /* reported below */ }
       if (want && (want._renderer !== renderer || want.canvas.join() !== cur.canvas.join())) {
+        goldenSkipped++;
         console.log(`    golden skipped: captured on ${want._renderer} (${want.canvas.join("x")}), running on ${renderer} (${cur.canvas.join("x")})`);
       } else {
         let worst = 0, where = "";
@@ -3681,10 +3684,11 @@ function checkCatalogue() {
     process.exit(1);
   }
   if (failures.length) {
-    console.log(`\nsmoke FAILED — ${failures.length} problem(s), ${passed} passed, ${secs}s\n`);
+    console.log(`\nsmoke FAILED — ${failures.length} problem(s), ${passed} passed${goldenSkipped ? `, ${goldenSkipped} golden(s) skipped` : ""}, ${secs}s\n`);
     failures.forEach((f) => console.log("  ✗ " + f));
     process.exit(1);
   }
-  console.log(`\n${passed} assertions passed in ${secs}s`);
+  const skipNote = goldenSkipped ? `, ${goldenSkipped} golden(s) skipped (different GPU)` : "";
+  console.log(`\n${passed} assertions passed${skipNote} in ${secs}s`);
   process.exit(0);
 })();

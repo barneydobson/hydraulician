@@ -251,6 +251,13 @@ function run(label, suite, envVar, src, srcName, mutants) {
       stale.push(`${m.id}: pattern not found in ${srcName} —\n      ${m.find.split("\n")[0]}`);
       continue;
     }
+    // `find` must name ONE place: replace() would silently patch the first of
+    // several, and the mutant would then test whatever happens to come first.
+    const hits = src.split(m.find).length - 1;
+    if (hits !== 1) {
+      stale.push(`${m.id}: pattern occurs ${hits} times in ${srcName}, must be exactly once —\n      ${m.find.split("\n")[0]}`);
+      continue;
+    }
     const mutated = src.replace(m.find, m.replace);
     if (mutated === src) { stale.push(`${m.id}: substitution changed nothing`); continue; }
 

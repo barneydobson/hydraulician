@@ -264,7 +264,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    worksheet carried no statement of what it showed. Top right, because the
    gauge cards stack bottom-right and the ruler owns the edges, immediately
    left of the Controls panel. `--dock` is the width
-   the docked panel takes out of the viewport, so this is the same expression
+   the dock takes out of the viewport, so this is the same expression
    #bar uses and the legend tracks the panel opening and closing for free --
    including the phone case, where the panel becomes a bottom sheet and --dock
    goes to 0, leaving this at the right edge with no special case.

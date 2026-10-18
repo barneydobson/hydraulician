@@ -163,7 +163,7 @@ An entry in a course's `exercises.js`, appended to `EXERCISES` (declared in
 | field | applied? | holds |
 |---|---|---|
 | `rigParams` | yes | the plumbing without which the rig is not a rig: `budget` (Resolution) first, then the edges (`openL..openT`), then supplies and levels — *edges before level controls*, because ticking a level opens its own edge |
-| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `gaugeSpan` (`"window"`, the default, or `"all"`: the corner charts span the whole run from t = 0 — VC-2), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' number boxes, default on) and `hoverCard` (the hover card that follows a mouse, default on — FF-1 opens with it off; it does not govern the tap-to-read card, see *Reading the water by touch*), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
+| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `gaugeSpan` (`"window"`, the default, or `"all"`: the corner charts span the whole run from t = 0 — VC-2), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' readout boxes, default on) and `hoverCard` (the hover card that follows a mouse, default on — FF-1 opens with it off; it does not govern the tap-to-read card, see *Reading the water by touch*), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
 | `gauges` | yes | `[{x, z, field}]`, at most four: gauges the card arrives with ALREADY PLACED, each on its own quantity. The exception to "the picker places no instruments", for a card whose subject is a time series from t = 0 (VC-2's level curve). The card lists them under *Already set* |
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
 | `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule`. For a slider give a short `label` ("Speed of sound in water, c", "Wall shape", "Inflow Q") and **no** `rule`: a sentence under every slider made the Year 1 cards mostly slider, so what it does and its starting value go in `setup` |
@@ -204,7 +204,7 @@ top:
   `dye.seeds` run only if the scene says `dye: { on: true }` or the card sets
   viewParams `dyeSeeds: true` (Controls → Dye sources). The `V` valve button lives
   in RUN and is never hidden. `readBtn` (**Readouts**, key **I**) folds away
-  every instrument's number boxes — the gauges' corner cards, the Control
+  every instrument's readout boxes — the gauges' corner cards, the Control
   volume's budget and face numbers, the flux sections' readings and their
   balance, the rakes' q / u_max chips and the Pressure force values — while
   the instruments stay placed and keep recording; `hoverBtn` (**Hover

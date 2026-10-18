@@ -357,7 +357,7 @@ const TOOLBAR = [
     // at the water, or to ask for a prediction first); the hover card is the
     // cursor's own probe, which a first lecture may not want at all.
     { id: "readBtn", icon: "readouts", label: "Readouts", key: "I",
-      hint: "The instruments' number boxes — gauge cards, control volume, flux lines, rakes, force. They keep recording while hidden",
+      hint: "The instruments' readout boxes — gauge cards, control volume, flux lines, rakes, force. They keep recording while hidden",
       on: () => state.instReadouts,
       act: () => { state.instReadouts = !state.instReadouts; syncPanel(); } },
     { id: "hoverBtn", icon: "hover", label: "Hover readout", key: "",

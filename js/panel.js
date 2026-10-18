@@ -404,7 +404,7 @@ const CONTROLS = [
     info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction d₂/d₁ = ½(√(1+8Fr₁²) − 1)." },
   { id: "instReadouts", type: "check", label: "Instrument readouts",
     get: () => state.instReadouts, set: (v) => state.instReadouts = v,
-    info: "The number boxes the instruments draw on the water: the gauges' corner cards, the Control volume's budget and the numbers on its faces, each flux section's readings and the balance between two, the rakes' q and u_max, and the pressure-force values. Off folds them all away — the instruments stay where they are and keep measuring and recording, so the gauge histories, the inspector and the CSV are complete when they come back. I toggles it." },
+    info: "The readout boxes the instruments draw on the water: the gauges' corner cards, the Control volume's budget and the numbers on its faces, each flux section's readings and the balance between two, the rakes' q and u_max, and the pressure-force values. Off folds them all away — the instruments stay where they are and keep measuring and recording, so the gauge histories, the inspector and the CSV are complete when they come back. I toggles it." },
   { id: "hoverCard", type: "check", label: "Hover readout",
     get: () => state.hoverCard, set: (v) => state.hoverCard = v,
     info: "The card of numbers that follows the cursor over the water — position, and whatever the exercise lists of depth, level, velocity and pressure there." },

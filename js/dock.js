@@ -103,7 +103,7 @@ const MINI = (() => {
  *  being all water, and one click brings the brief back. */
 const DOCK = (() => {
   // MINW: below this there is no width to give away, so the panel overlays.
-  // The panel's own width (--dock-w), the width below which it becomes a
+  // The dock's own width (--dock-w), the width below which it becomes a
   // bottom sheet (--phone-max: a 348 px panel would cover almost the whole
   // screen, so the water keeps the top, which on a phone is the only part tall
   // enough to read a flume in) and the sheet's height (--sheet-h) are written

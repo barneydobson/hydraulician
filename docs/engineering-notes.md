@@ -586,8 +586,11 @@ stable and better at 0.44 m.
 Settle times fell with it — m2 from 85 s to 30 s, c13 from 95 s to 30 s — and
 the steep chutes run shallower against the same d_c (s1/s2 d_n 0.32 → ~0.20).
 The closure is a per-scene declaration, `mixingLength: true | false`
-(required: `js/scenes.js` throws on a scene without it), on only for channel
-flow; `p.mixingLength` at run time, the *Channel mixing length* switch in
+(required: `js/scenes.js` throws on a scene without it), meant for channel
+flow and off in the wave flumes (the shipped tanks, jets and pipes keep it
+until their cards are re-measured, mvreeuwijk#2: switching it off moved
+QS-1/B8's jet by 0.42 m in η and 45% in q, CR-1 0.24 m, VC-2 0.15 m, the
+hammer reservoirs 6–70 mm, against 0.0 on every channel card); `p.mixingLength` at run time, the *Channel mixing length* switch in
 Controls, and `hyd.ml` in a rig. It used to be on by default with a numeric
 `kappa` to opt out, and that is how the wave flumes came to be damped by a
 channel closure (issue #77).

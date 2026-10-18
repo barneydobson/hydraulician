@@ -106,9 +106,11 @@ to look fine for a minute and explode in an exercise.
   `smoke.js --only=profile` is the gate. **The mixing length is a channel
   closure and every scene declares it** (`mixingLength: true | false`, no
   default — `scenes.js` throws without it): on for channel flow, off for
-  waves, tanks, jets and pipes, which keep the wall function (`cf`) and
-  Smagorinsky (`cs`). A wave has no log layer; the closure damped the wave
-  flumes (issue #77).
+  waves, which keep the wall function (`cf`) and Smagorinsky (`cs`). A wave
+  has no log layer; the closure damped the wave flumes (issue #77). Tanks,
+  jets and pipes are not channel flow either but stay ON for now: their cards
+  print constants measured with it (QS-1's C_d, QS-2's discharge law), and
+  re-measuring them is the follow-up on mvreeuwijk#2.
 - **Geometry contracts:** wall segments have butt ends; slabs leaving the
   domain are extrapolated, not clamped; a scene's bed stays above `z = 0`;
   ground is solid all the way down; the closed outer ring is stamped last.

@@ -90,10 +90,14 @@ the bed, `docs/numerics.md` §1) is a CHANNEL parameterisation: it is what
 gives a developed open-channel flow its log-law profile and carries the bed's
 stress up the column, so `channel()` scenes, the sandbox, the spillway's pool
 and the gate-and-jump flume say `true`. Anything that is not a channel flow
-says `false`: waves (a wave has thin boundary layers and no log layer, and
-the closure's `ν_t` of ~10⁻³ m²/s in a crest damps it away — issue #77), tanks,
-jets (`l` takes `y` from a wall metres from the shear layer) and pipes (the
-closure never acts in a pressurised column anyway). With it off the bed still
+says `false`: waves above all (a wave has thin boundary layers and no log
+layer, and the closure's `ν_t` of ~10⁻³ m²/s in a crest damps it away — issue
+#77), and a free jet in a tank (`l` takes `y` from a wall metres from the
+shear layer: pipejet). The shipped tanks, jets and pipes still say `true`,
+each with a comment: their cards quote constants measured with the closure on
+(QS-1's C_d, QS-2's discharge law, VC-2's C), and switching it off moves them —
+re-measuring those cards is the follow-up on mvreeuwijk#2. A NEW scene of
+that kind should say `false`. With it off the bed still
 has its wall-function friction (`cf`) and the cells their Smagorinsky term
 (`cs`). If you are unsure, it is `false` unless the demo needs a channel's
 resistance — `n`, normal depth, a jump's tailwater. The Controls panel's

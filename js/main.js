@@ -758,7 +758,7 @@ const CONTROLS = [
   // a wave has no log layer, and the closure's ν_t damps it away (issue #77).
   { id: "ml", type: "check", label: "Channel mixing length",
     get: () => !!sim.p.mixingLength, set: (v) => sim.p.mixingLength = !!v,
-    info: "The depth-scale turbulence closure for CHANNEL flow: Prandtl's mixing length l = κy over the bed, which makes the velocity profile a log law and carries the bed's drag up to the surface. On in the open-channel scenes, off for waves, tanks, jets and pipes. A wave has no log layer: switched on in a wave flume it is an eddy viscosity a thousand times water's in the crest, and the waves die. The bed's wall-function drag (C_f) and the cell-scale term (C_s) act either way." },
+    info: "The depth-scale turbulence closure for CHANNEL flow: Prandtl's mixing length l = κy over the bed, which makes the velocity profile a log law and carries the bed's drag up to the surface. On in the open-channel scenes, off in the wave flumes. A wave has no log layer: switched on in a wave flume it is an eddy viscosity a thousand times water's in the crest, and the waves die. The bed's wall-function drag (C_f) and the cell-scale term (C_s) act either way." },
   { id: "bulk", label: "Wave damping", min: 0, max: 0.5, step: 0.005,
     get: () => sim.p.bulk, set: (v) => sim.p.bulk = v,
     fmt: (v) => v === 0 ? "none — surges ring forever" : v.toFixed(3),

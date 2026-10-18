@@ -337,7 +337,7 @@ const SCENES = (() => {
   const list = [
 
     { id: "two-tank", name: "Two tanks · parallel ducts", key: "QS-2 · per metre width", group: "Sandbox",
-      mixingLength: false,
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       blurb: "Two rectangular tanks exchange water through identical 15 m × 0.10 m ducts. Left starts high; the shallow right-hand charge keeps both outlets submerged.",
       W: 32, H: 4, c: 35, cf: 0.25, cs: 0.40, mode: 1, spinup: 0,
       hmax: 3.2, headMax: 3, vmax: 2,
@@ -506,7 +506,7 @@ const SCENES = (() => {
       const NU = [1e-6, 3e-2];
       const fluidTanks = {
         id: "fluid-tanks", name: "Two tanks, two fluids", key: "Froude and viscosity", group: "Similitude",
-        mixingLength: false,
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         blurb: "A 4 m tank and its half-scale copy, filled with water or with honey. In water the model drains in √½ of the prototype's time; in honey it does not.",
         W: 8.75, H: 4.0, c: 40, cf: 0.01, cs: 0.12, nu: NU[0], mode: 0, hmax: 3.0, headMax: 3.6, vmax: 7,
         open: [0, 0, 2, 0], valveOpen: 0, particles: 0, spinup: 0,
@@ -1132,7 +1132,7 @@ const SCENES = (() => {
     // took the basins to 4 mm/s by 60 s, 2e-3 to under 5 mm/s by 45 s with
     // the fill itself unchanged (culvert RMS 0.33 m/s at 12 s either way).
     { id: "dyke", name: "Dike with a piezometer", key: "Hydrostatics",
-      mixingLength: false,
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Hydrostatics",
       blurb: "Two reservoirs at different levels either side of a dike, joined by a culvert under it with a shut valve and a piezometer tube in its roof. Read the levels and the face forces, then press V and watch the water find one level.",
       W: 6.0, H: 4.6, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
@@ -1175,7 +1175,7 @@ const SCENES = (() => {
     // Joukowsky surge or the downsurge simply cavitates. 49 m of 3 m bore
     // under ~21 m of head, throttled by a nozzle to about 2.8 m/s.
     { id: "hammer", name: "Water hammer", key: "Joukowsky",
-      mixingLength: false,
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A reservoir feeding a full pipe through a nozzle. Slam the valve and the pressure wave runs back and forth at the slot celerity.",
       W: 60, H: 30, c: 70, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
@@ -1311,7 +1311,7 @@ const SCENES = (() => {
 
       return {
         id: "hydro", name: "Hydropower scheme · surge shaft", key: "Rigid-column surge",
-        mixingLength: false,
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Pressure & transients",
         blurb: "A reservoir, a level headrace, a surge shaft at the knee and a penstock down to a nozzle. Slam the valve and the headrace column runs up the shaft — a mass oscillation the shaft has to be tall enough to hold.",
         // cf = 0.05, not hammer's 0.004: MEASURED, the headrace HGL falls 0.09 m
@@ -1404,7 +1404,7 @@ const SCENES = (() => {
     // on the shut pipe excites the closed-pipe organ mode (period 4l/c ≈ 3 s)
     // and without the damping it rings for minutes.
     { id: "estab", name: "Flow establishment", key: "Rigid column",
-      mixingLength: false,
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A reservoir, a 23 m full pipe, a shut valve. Open it and the column takes seconds to come up to speed: inertia against a loss that grows as u².",
       W: 30, H: 8, c: 30, cf: 0.004, cs: 0.05, bulk: 0.30, nu: 1e-4,
@@ -1432,7 +1432,7 @@ const SCENES = (() => {
              "The reservoir concedes a few centimetres under draw — read the level off its ∇ marker while the pipe flows."] },
 
     { id: "venturi", name: "Venturi contraction", key: "Bernoulli",
-      mixingLength: false,
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A pressurised pipe with a throat. Head converts to velocity and back — the head map shows the drop and the imperfect recovery.",
       W: 10, H: 2.4, c: 60, cf: 0.006, cs: 0.06, bulk: 0.05,
@@ -1468,7 +1468,7 @@ const SCENES = (() => {
              "Raise the reservoir until the throat head reaches zero — incipient cavitation."] },
 
     { id: "dambreak", name: "Dam break", key: "Unsteady",
-      mixingLength: false,
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A column of water released instantly. The classic unsteady test: a negative wave runs upstream, a surge runs down.",
       W: 10, H: 2.2, c: 24, cf: 0.012, mode: 2, hmax: 1.9, vmax: 5,
@@ -1482,7 +1482,7 @@ const SCENES = (() => {
 
     // ------------------------------------------------------ jets and waves
     { id: "jet", name: "Orifice jet", key: "Torricelli", group: "Jets & waves",
-      mixingLength: false,
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       blurb: "A tank with a hole in its wall. Efflux velocity is √(2gh) and the free jet is a ballistic parabola — the vena contracta shows at the lip.",
       W: 6, H: 3.4, c: 26, cf: 0.004, cs: 0.10, mode: 2, vmax: 7, hmax: 2.6,
       // The tank starts brim-full at the lip but the orifice discharges faster
@@ -1636,7 +1636,7 @@ const SCENES = (() => {
       const zc = (par) => (par && par.crestZ !== undefined ? par.crestZ : ZC0);
       return {
         id: "pipeline", name: "Water hammer: reservoir, pipe, valve", key: "Speed of sound",
-        mixingLength: false,
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Pressure & transients",
         blurb: "A reservoir at constant level feeds a long straight pipe that discharges through a valve into a small overflowing tank. Shut the valve suddenly and a pressure wave runs up the pipe at the speed of sound c, reflects at the reservoir and returns.",
         W, H, c: 30, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
@@ -1758,7 +1758,7 @@ const SCENES = (() => {
       };
       return [{
         id: "contraction", name: "Contraction rig", key: "Taper ↔ step",
-        mixingLength: false,
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Pressure & transients",
         blurb: "Two reservoirs joined by a wide pipe that contracts into a narrow one. One slider takes the contraction from a long gentle taper to an abrupt step.",
         W, H: 3.4, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
@@ -1855,7 +1855,7 @@ const SCENES = (() => {
       const spoutV = (q) => -q / (2 * R * QIN_K);
       return {
         id: "fillleak", name: "Tank that fills and leaks", key: "S dh/dt = Q_in − Q_out",
-        mixingLength: false,
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Jets & waves",
         blurb: "A tank fed from the top and drained through a hole near the floor. The outflow grows with the depth of water over the hole, so the level settles where outflow equals inflow; shut the valve (V) and the level climbs at Q/S.",
         W: 4.0, H: 3.6, c: 26, cf: 0.004, cs: 0.10, nu: 1e-3,
@@ -2025,7 +2025,7 @@ const SCENES = (() => {
       const shape = (s) => (s === undefined ? 0.25 : s);
       return {
         id: "wall-shape", name: "Wall shape and the pressure force", key: "F_h = ½ρgd², whatever the shape",
-        mixingLength: false,
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Hydrostatics",
         blurb: "Still water, 1.60 m deep, against a wall whose shape you set: overhanging, vertical, sloped at 30° or 60°, or stepped. Click the wall with the Pressure force tool and compare F_h and F_v as the shape changes.",
         W, H: 2.4, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
@@ -2748,9 +2748,11 @@ const SCENES = (() => {
     // over a bed — and in a wave it is a ν_t of ~1e-3 m²/s that damps the
     // wave away. So every scene says which it is, and one that does not
     // stops the app here rather than inheriting whichever was the default.
+    // The shipped tanks, jets and pipes still say true, with a comment each:
+    // their cards quote constants measured with it (mvreeuwijk#2).
     if (typeof s.mixingLength !== "boolean")
       throw new Error("scene " + s.id + ": declare mixingLength: true (channel flow, " +
-        "a log layer over a bed) or false (waves, tanks, jets, pipes) — js/scenes.js, issue #77");
+        "a log layer over a bed) or false (waves, and anything else that is not channel flow) — js/scenes.js, issue #77");
     const full = Object.assign({}, base, s);
     full.inflow    = Object.assign({}, base.inflow, s.inflow || {});
     full.tailwater = Object.assign({}, base.tailwater, s.tailwater || {});

@@ -38,7 +38,7 @@
  *                             docs, pack, avg (default: all, in that order of
  *                             declaration); `api,rig` is the fast subset.
  *         --keep      leaves the browser open on failure for a look.
- *         --write-golden  (re)writes exercises/_runner/golden/instruments-h23.json
+ *         --write-golden  (re)writes test/golden/instruments-h23.json
  *                     instead of comparing against it; only ever on code known good.
  *         --mutate=<id>  patches one known bug into a served file and runs the
  *                     suite that owns it (the default --only). Exit 0 only if
@@ -560,14 +560,47 @@ SUITES.api = async (B) => {
     S.avgStop();
     return JSON.stringify({ live, avg });
   })()`);
-  const goldPath = path.join(ROOT, "exercises", "_runner", "golden", "instruments-h23.json");
+  const goldPath = path.join(ROOT, "test", "golden", "instruments-h23.json");
+  // The golden stores a FINGERPRINT of every numeric array (length, NaN count,
+  // sum, sum of squares, min, max, 16 evenly spaced samples, ends included)
+  // and scalars at full precision, so it is small enough to commit.
+  const fingerprint = (v) => {
+    if (Array.isArray(v) && v.every((x) => x === null || typeof x === "number")) {
+      const nums = v.filter((x) => x !== null);
+      const n = v.length, samples = [];
+      for (let k = 0; k < 16; k++) samples.push(n ? v[Math.round(k * (n - 1) / 15)] : null);
+      return { n, nan: n - nums.length, sum: nums.reduce((a, x) => a + x, 0),
+               sumsq: nums.reduce((a, x) => a + x * x, 0),
+               min: nums.length ? Math.min(...nums) : null,
+               max: nums.length ? Math.max(...nums) : null, samples };
+    }
+    if (Array.isArray(v)) return v.map(fingerprint);
+    if (v && typeof v === "object") {
+      const o = {}; for (const k of Object.keys(v)) o[k] = fingerprint(v[k]); return o;
+    }
+    return v;
+  };
+  // One line per object that holds no further objects; nested ones are indented.
+  const prim = (y) => y === null || typeof y !== "object";
+  const pretty = (v, ind) => {
+    const flat = (x) => prim(x) || (Array.isArray(x) ? x.every(prim)
+      : Object.values(x).every((y) => prim(y) || (Array.isArray(y) && y.every(prim))));
+    if (flat(v)) return JSON.stringify(v);
+    const pad = "  ".repeat(ind + 1), end = "\n" + "  ".repeat(ind);
+    if (Array.isArray(v)) return "[\n" + v.map((x) => pad + pretty(x, ind + 1)).join(",\n") + end + "]";
+    return "{\n" + Object.keys(v).map((k) => pad + JSON.stringify(k) + ": " + pretty(v[k], ind + 1)).join(",\n") + end + "}";
+  };
+  const fp = fingerprint(JSON.parse(gold));
   if (WRITE_GOLDEN) {
     fs.mkdirSync(path.dirname(goldPath), { recursive: true });
-    fs.writeFileSync(goldPath, gold + "\n");
+    fs.writeFileSync(goldPath, pretty(fp, 0) + "\n");
     console.log("\n    wrote " + goldPath);
   } else {
     let want = null;
     try { want = JSON.parse(fs.readFileSync(goldPath, "utf8")); } catch (_) { /* reported below */ }
+    // Agreement: 1e-6 relative, plus an absolute floor of 1e-9 so a value that
+    // is zero up to rounding (a cancelling sum) is not judged on its noise.
+    const REL = 1e-6, ABS = 1e-9;
     let worst = 0, where = "", count = 0, shape = "";
     const walk = (a, b, at) => {
       if (shape) return;
@@ -581,13 +614,13 @@ SUITES.api = async (B) => {
         if (a !== b) { shape = at + " (" + a + " vs " + b + ")"; }
         return;
       }
-      const rel = Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1e-12);
-      if (rel > worst) { worst = rel; where = at; }
+      const ratio = Math.abs(a - b) / (REL * Math.max(Math.abs(a), Math.abs(b)) + ABS);
+      if (ratio > worst) { worst = ratio; where = at; }
     };
-    if (want) walk(want, JSON.parse(gold), "golden");
+    if (want) walk(want, fp, "golden");
     ok("API refactor golden: instruments unchanged",
-      !!want && !shape && worst <= 1e-6,
-      want ? (shape ? "shape differs at " + shape : `worst relative ${worst.toExponential(2)} at ${where} of ${count} values`)
+      !!want && !shape && worst <= 1,
+      want ? (shape ? "shape differs at " + shape : `worst ${worst.toExponential(2)} x the tolerance (1e-6 rel + 1e-9 abs) at ${where} of ${count} values`)
            : "no golden at " + goldPath + " (run once with --write-golden)");
   }
 };

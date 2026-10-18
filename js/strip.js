@@ -499,7 +499,9 @@ function buildToolbar() {
       (it.always ? UIMODE.anyTool() : UIMODE.allows(group.family, it)) &&
       (!it.when || it.when()));
     if (!items.length) return;
-    if (host.children.length) {
+    // The rule only exists where captions do not (touch machines, see the
+    // pointer: coarse block in css/app.css); a desktop strip has captions.
+    if (host.children.length && matchMedia("(pointer: coarse)").matches) {
       const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
     }
     // A group is a captioned COLUMN: the caption names the family, the row

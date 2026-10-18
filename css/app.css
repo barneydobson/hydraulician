@@ -28,9 +28,12 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    The geometry constants are written HERE and nowhere else; js/dock.js reads
    them back with getComputedStyle once per sync:
      --dock-w     the docked column's width;
+     --dock-min   the window width below which the dock overlays the water
+                  instead of taking width from it;
      --phone-max  the window width below which the dock becomes a bottom sheet
-                  (a media query cannot read a variable, so the three
-                  `@media (max-width: 620px)` rules below repeat the number);
+                  (a media query cannot read a variable, so the two
+                  `@media (max-width: 620px)` rules below, each commented
+                  "= --phone-max", repeat the number);
      --sheet-h    the sheet's height (a calc on vh, so DOCK measures the sheet
                   itself rather than parsing the formula).
    --bar-h is the strip's measured height, kept by fitBar (js/strip.js) at
@@ -38,7 +41,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    the width the gauge corner cards take from the bottom right. */
 :root {
   --dock: 0px; --dockb: 0px; --gcw: 0px;
-  --dock-w: 348px; --phone-max: 620px; --sheet-h: min(58vh, 520px);
+  --dock-w: 348px; --dock-min: 900px; --phone-max: 620px; --sheet-h: min(58vh, 520px);
   --bar-h: 63px;
 }
 
@@ -184,7 +187,8 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 /* The hairline and the caption do the same job, so only one of them is ever
    shown. Captions are what a desktop strip has; touch machines drop them at
    every width (see the pointer: coarse block), so there the rule is shown
-   instead, and `.tsep` is display:none everywhere else. */
+   instead; strip.js builds `.tsep` only under a coarse pointer, and it is
+   display:none unless that block shows it. */
 .tsep { width: 1px; height: 32px; background: rgba(255,255,255,0.13);
         margin: 0 3px; flex: 0 0 auto; display: none; }
 

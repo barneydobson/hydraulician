@@ -3027,13 +3027,15 @@ let lastT = performance.now(), acc = 0, probeTick = 0;
 // that queued work and the readback frame that waited for it.
 const statWin = { wall: 0, sim: 0, n: 0, sub: 0 };
 // The governor's state: when the previous tickFrame started (measured here, so
-// APP.frames in a headless loop is governed by what it really costs too) and
-// the time-windowed mean interval between frames (ms) — see governFrame.
+// APP.frames in a headless loop is governed by what it really costs too —
+// see tickFrame for what a scripted frame is charged) and the time-windowed
+// mean interval between frames (ms) — see governFrame.
 const gov = { last: 0, W: 0, N: 0, ema: 0,
   win: { W: 0, N: 0, S: 0 },                     // this window's measured frames
   fit: { w: 0, n: 0, T: 0, nn: 0, nT: 0 },       // decayed sums for T = T0 + c n
   c: 0, T0: 0, T0floor: 0, warming: false,
-  raf: false };                                  // inside frame(), not APP.frames
+  raf: false,                                    // inside frame(), not APP.frames
+  end: 0 };                                      // when the last APP.frames frame returned
 document.addEventListener("visibilitychange", () => { gov.last = 0; });
 // Whether the previous frame was still warming up, so the end of spin-up can
 // be caught as an edge rather than as a state — see tickFrame.
@@ -3060,8 +3062,16 @@ function tickFrame(realDt) {
   // unmeasured. Long frames are otherwise REAL and must be counted — under a
   // heavy load a spin-up readback frame can take more than a second, and a
   // governor that ignored those frames saw only the fast ones and ran away.
+  // A scripted frame (APP.frames) is charged only what the previous scripted
+  // frame took, start to return. The gap since then is the caller's own work
+  // (smoke's hydro slam probes the surface between frames), and the gap since
+  // a rAF frame or boot is whatever the script did before — APP.tick, a
+  // settle — so the first scripted frame goes unmeasured. Charged with the
+  // seconds of its __settle, the slam's first frame cut nsubMax from ~400 to
+  // 2.7 and 150 frames meant to cover 15 s covered 0.7 s.
   const tNow = performance.now();
-  const wallMs = gov.last ? tNow - gov.last : 0;
+  const wallMs = !gov.raf ? (gov.end > gov.last ? gov.end - gov.last : 0)
+               : gov.last ? tNow - gov.last : 0;
   gov.last = tNow;
   const measured = wallMs > 0 && wallMs < 10000;
   computeView();
@@ -4657,7 +4667,9 @@ window.APP = {
   gaugeCSV: (list) => GINSP.csv(list),     // the CSV text, without downloading
   clearGaugeHistory,
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
-  frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
+  frames: (n, dt) => {
+    for (let k = 0; k < (n || 1); k++) { tickFrame(dt || 1 / 60); gov.end = performance.now(); }
+  },
   probe: (x, z) => SIM.probe(x, z),
   particlePos: (n) => SIM.particlePos(n),  // x, z pairs — headless only
   placeGauge, placeRake,                   // place, or remove one already there

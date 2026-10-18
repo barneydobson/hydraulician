@@ -123,6 +123,7 @@
 
 <script src="js/gl.js"></script>
 <script src="js/reconstruct.js"></script>
+<script src="js/format.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/scenes.js"></script>
 <script src="js/geom.js"></script>
@@ -150,7 +151,10 @@
      putting PICKER, EX, GINSP and RIG on window.APP, and that runs at parse
      time, so the bindings have to exist by then. Everything pointing the
      other way (these files reaching back for state, sim, syncPanel and the
-     rest) is inside a function body and resolves when called. -->
+     rest) is inside a function body and resolves when called. The exception is
+     POPUP.make, which pickers, strip and legend call while loading, so
+     popup.js goes first (format.js is up with the numerics, before overlay). -->
+<script src="js/popup.js"></script>
 <script src="js/pickers.js"></script>
 <script src="js/gauge-inspector.js"></script>
 <script src="js/rig.js"></script>

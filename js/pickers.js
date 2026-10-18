@@ -8,17 +8,17 @@
  * between what it applies and what it leaves for the student IS the design.
  *
  * What they borrow from the other files is the machine-checked `Reads:` line
- * below (exercises/_runner/check_headers.py), used only from inside functions,
- * so index.html loads this BEFORE them (and must: main.js puts PICKER and EX on
- * window.APP at parse time).
+ * below (exercises/_runner/check_headers.py), used only from inside functions
+ * — except POPUP.make, which runs while this file loads, so popup.js comes
+ * first — so index.html loads this BEFORE them (and must: main.js puts PICKER
+ * and EX on window.APP at parse time).
  *
  * Defines: menuFlag, PICKER, EX
  *
- * Reads:   addGauge, canvas, clearInstruments, CONFIG, ctl, DOCK,
- *          EXERCISE_MENU, EXERCISE_RIGS, EXERCISES, foldText, gaugeQty,
- *          GINSP, iconEl, onDown, restartTips, RIG, SCENES, showToast, sim,
- *          state, switchScene, syncPanel, syncTitle, syncURL, TIP, TOOLBAR,
- *          UIMODE, view
+ * Reads:   addGauge, clearInstruments, CONFIG, ctl, DOCK, EXERCISE_MENU,
+ *          EXERCISE_RIGS, EXERCISES, FMT, foldText, gaugeQty, GINSP, iconEl,
+ *          POPUP, restartTips, RIG, SCENES, showToast, sim, state, switchScene,
+ *          syncPanel, syncTitle, syncURL, TIP, TOOLBAR, UI, UIMODE, view
  */
 
 /** One flag of the active course's menu (`EXERCISE_MENU`, which is null when no
@@ -44,11 +44,21 @@ function menuFlag(name) { return EXERCISE_MENU ? EXERCISE_MENU[name] : undefined
  *  at Rig → Share link, and offering "Discard and load" / "Cancel". A second
  *  click on the same row is also a confirmation. */
 const PICKER = (() => {
-  let el = null, anchor = null, pending = null, hi = -1;
+  let el = null, pending = null;
 
   const menu = () => (el || (el = document.getElementById("scenemenu")));
-  const isOpen = () => !!(el && el.classList.contains("open"));
   const titleEl = () => document.getElementById("title");
+  // Open / close / Esc / arrows / click-away are POPUP's (js/popup.js); the
+  // strip button and the title chip both light while it is up.
+  const popup = POPUP.make({
+    el: menu, render,
+    opener: [["sceneBtn", "active"], [titleEl, "open"]],
+    fallback: titleEl,
+    modal: true, space: true,
+    onOpen: () => { pending = null; },
+    onClose: () => { pending = null; },
+  });
+  const { isOpen, place, open, close, toggle, key, clickAway } = popup;
 
   /** Registry order, grouped by the registry's own `group` field. */
   function grouped() {
@@ -95,34 +105,18 @@ const PICKER = (() => {
         b.appendChild(nm); b.appendChild(ky); b.appendChild(bl);
         b.onclick = () => choose(s.id);
         m.appendChild(b);
-        if (pending === s.id) m.appendChild(warning(s));
+        if (pending === s.id) warning(s);
       });
     });
   }
 
   /** The inline "this drops your drawing" step. */
   function warning(s) {
-    const n = sim && sim.segs ? sim.segs.length : 0, gn = state.gauges.length;
-    const w = document.createElement("div");
-    w.className = "smwarn";
-    const p = document.createElement("div");
-    const b1 = document.createElement("b"); b1.textContent = "Loading drops your drawing.";
-    p.appendChild(b1);
-    p.appendChild(document.createTextNode(
-      " " + s.name + " starts clean, so the " + n + " segment" + (n === 1 ? "" : "s") +
-      " you have drawn" + (gn ? " and " + gn + " gauge" + (gn === 1 ? "" : "s") : "") +
+    POPUP.warning(menu(), " " + s.name + " starts clean, so " + POPUP.drawnWork() +
       " will be gone. Save it first with Controls → Rig → ⇪ Share link " +
-      "(or ⤓ Export JSON): the link rebuilds this rig exactly."));
-    const r = document.createElement("div"); r.className = "r";
-    const go = document.createElement("button");
-    go.className = "btn-sm go"; go.textContent = "Discard and load";
-    go.onclick = (e) => { e.stopPropagation(); load(s.id); };
-    const no = document.createElement("button");
-    no.className = "btn-sm no"; no.textContent = "Cancel";
-    no.onclick = (e) => { e.stopPropagation(); pending = null; render(); place(); };
-    r.appendChild(go); r.appendChild(no);
-    w.appendChild(p); w.appendChild(r);
-    return w;
+      "(or ⤓ Export JSON): the link rebuilds this rig exactly.", [
+      { label: "Discard and load", cls: "go", run: () => load(s.id) },
+      { label: "Cancel", cls: "no", run: () => { pending = null; render(); place(); } }]);
   }
 
   /** A row was clicked. The current scene is a no-op — nobody should be able to
@@ -139,74 +133,10 @@ const PICKER = (() => {
   }
   function load(id) { pending = null; close(); switchScene(id); }
 
-  /** Under the element that opened it, right-aligned to it, clamped on screen. */
-  function place() {
-    const m = menu();
-    const a = anchor && anchor.isConnected ? anchor : titleEl();
-    const r = a.getBoundingClientRect();
-    const w = m.offsetWidth, h = m.offsetHeight;
-    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + "px";
-    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
-  }
-
-  function open(a) {
-    EX.close();                 // the two menus are alternatives, not a stack
-    anchor = a || titleEl();
-    pending = null; hi = -1;
-    render();
-    menu().classList.add("open");
-    place();
-    titleEl().classList.add("open");
-    const btn = document.getElementById("sceneBtn");
-    if (btn) btn.classList.add("active");
-    const on = menu().querySelector(".smi.on");
-    if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
-  }
-  function close() {
-    if (el) el.classList.remove("open");
-    pending = null; hi = -1;
-    titleEl().classList.remove("open");
-    const btn = document.getElementById("sceneBtn");
-    if (btn) btn.classList.remove("active");
-  }
-  function toggle(a) { if (isOpen()) close(); else open(a); }
   /** Keep an open menu honest when the scene changes under it. */
   function refresh() { if (isOpen()) { render(); place(); } }
 
-  /** Every key while the menu is open comes here, so none of them reach the
-   *  global shortcuts — C (clear drawing) with a menu open would be a
-   *  spectacular way to lose a rig. */
-  function key(e) {
-    const list = [...menu().querySelectorAll(".smi")];
-    if (e.key === "Escape") { e.preventDefault(); close(); return; }
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (!list.length) return;
-      const d = e.key === "ArrowDown" ? 1 : list.length - 1;
-      hi = hi < 0 ? (e.key === "ArrowDown" ? 0 : list.length - 1) : (hi + d) % list.length;
-      list.forEach((b, i) => b.classList.toggle("hi", i === hi));
-      if (list[hi].scrollIntoView) list[hi].scrollIntoView({ block: "nearest" });
-      return;
-    }
-    if (e.key === "Enter" || e.key === " ") {
-      const act = document.activeElement;
-      const b = (hi >= 0 && list[hi]) ||
-        (act && act.classList && act.classList.contains("smi") ? act : null);
-      if (b) { e.preventDefault(); choose(b.dataset.id); }
-    }
-  }
-
-  /** Click-away. In capture, so a dismissing click on the canvas dismisses
-   *  ONLY — it does not also start drawing a wall. */
-  function onDown(e) {
-    if (!isOpen()) return;
-    if (menu().contains(e.target)) return;
-    if (anchor && anchor.contains && anchor.contains(e.target)) return;  // its own toggle
-    close();
-    if (e.target === canvas) { e.preventDefault(); e.stopPropagation(); }
-  }
-
-  return { open, close, toggle, isOpen, refresh, key, onDown, render,
+  return { open, close, toggle, isOpen, refresh, key, clickAway, render,
            choose, place, get pending() { return pending; } };
 })();
 
@@ -240,7 +170,7 @@ const PICKER = (() => {
  *  takes — so an exercise pick is exactly a fresh `?scene=` boot plus the
  *  settings, and the drawn-work warning is the same one, in the same words. */
 const EX = (() => {
-  let el = null, anchor = null, pending = null, hi = -1, filter = "";
+  let el = null, pending = null, filter = "";
   let cur = null;              // the exercise the card is showing
   let digit = null;            // the digit applied to it (null = none entered)
   const memo = {};             // exercise id -> digit, sticky for the session
@@ -445,15 +375,7 @@ const EX = (() => {
       if (o) return o[1];
     }
     if (c && c.type === "check") return v ? "on" : "off";
-    return fmtVal(v);
-  }
-  /** Two decimals at least, so a rule that lands on 1.00 does not print "1"
-   *  next to a slider reading 1.000; more where the rule itself is finer. */
-  function fmtVal(v) {
-    if (typeof v !== "number") return String(v);
-    const s = String(+v.toFixed(4));
-    const dp = (s.split(".")[1] || "").length;
-    return v.toFixed(Math.max(2, Math.min(4, dp)));
+    return FMT.val(v);
   }
   /** The panel row a value has to be set on, named the way the panel looks:
    *  "Inflow q slider", "Tailwater control tickbox". Only the first value gets
@@ -598,7 +520,8 @@ const EX = (() => {
   }
 
   /** Load an exercise: scene, rig, settings, digit, countdown, card. */
-  function pick(id, opts) {
+  function pick(id, opts) { return UI.batch(() => pickNow(id, opts)); }
+  function pickNow(id, opts) {
     const o = opts || {};
     const r = resolve(id, o.tab);
     if (!r) return false;
@@ -662,10 +585,13 @@ const EX = (() => {
       // Applying a rig may be asynchronous (RIG decodes deflated codes), so
       // the settings land a microtask later. `EX.ready` is the handle for
       // anything that must wait — headless tests, mostly.
+      // The batch outlives this call until the rig has landed and `done` has
+      // run, so the whole pick still builds the strip and syncs the panel once.
+      const release = UI.hold();
       ready = applyRig(rig).then(done, (err) => {
         note = "rig did not load (" + (err && err.message || err) + ") — draw it from the README";
         done();
-      });
+      }).finally(release);
       return true;
     }
     if (needsRig(ex)) note = "no rig pack in this build";
@@ -736,7 +662,33 @@ const EX = (() => {
 
   // ----------------------------------------------------------------- menu
   const menu = () => (el || (el = document.getElementById("exmenu")));
-  const isOpen = () => !!(el && el.classList.contains("open"));
+  // Open / close / Esc / arrows / click-away are POPUP's (js/popup.js). The
+  // compact menu hangs below its opener and scrolls inside rather than riding
+  // up over the strip (place), and shows an item's description as the
+  // highlight moves (onHighlight).
+  const popup = POPUP.make({
+    el: menu, render,
+    opener: "exBtn",
+    modal: true, enterFirst: true,
+    place: (m, a) => {
+      const r = a.getBoundingClientRect();
+      // Compact: hang below the anchor and scroll inside rather than ride up
+      // over the strip — unless that leaves less than 240 px.
+      const room = innerHeight - (r.bottom + 8) - 8;
+      // `#exmenu.compact` caps its height at the window (css/app.css); this
+      // narrows the cap when the menu hangs below its opener.
+      if (compact() && room >= 240) m.style.setProperty("--menu-room", room + "px");
+      else m.style.removeProperty("--menu-room");
+      const w = m.offsetWidth, h = m.offsetHeight;
+      m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
+      m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
+    },
+    onOpen: () => { pending = null; openSec = null; },   // reopen on the current exercise's section
+    shown: () => { const f = menu().querySelector(".smf"); if (f) f.focus(); },
+    onClose: () => { hideDesc(); pending = null; },
+    onHighlight: showDesc,
+  });
+  const { isOpen, place, open, close, toggle, key, clickAway } = popup;
 
   /** The course menu, if one is active (see COURSES / `?course=` in
    *  js/courses.js): `{ id, title, sections: [{ title, ids: [...] }] }` plus
@@ -856,7 +808,7 @@ const EX = (() => {
     a.textContent = showAll
       ? "← back to " + (EXERCISE_MENU.title || "the course menu")
       : "show all " + all().length + " exercises in the register →";
-    a.onclick = (ev) => { ev.stopPropagation(); showAll = !showAll; hi = -1; render(); place(); };
+    a.onclick = (ev) => { ev.stopPropagation(); showAll = !showAll; render(); place(); };
     return a;
   }
 
@@ -887,7 +839,7 @@ const EX = (() => {
     const f = document.createElement("input");
     f.className = "smf"; f.type = "search"; f.value = filter;
     f.placeholder = "filter — id, title, topic, scene";
-    f.oninput = () => { filter = f.value; hi = -1; const s = f.selectionStart; render(); place();
+    f.oninput = () => { filter = f.value; const s = f.selectionStart; render(); place();
                         const g = menu().querySelector(".smf"); if (g) { g.focus(); g.setSelectionRange(s, s); } };
     f.onkeydown = (e) => key(e);
     m.appendChild(f);
@@ -916,7 +868,7 @@ const EX = (() => {
         const n = document.createElement("i"); n.textContent = " " + list.length;
         h.appendChild(n);
         h.setAttribute("role", "button");
-        h.onclick = (ev) => { ev.stopPropagation(); openSec = open ? "" : g; hi = -1; render(); place(); };
+        h.onclick = (ev) => { ev.stopPropagation(); openSec = open ? "" : g; render(); place(); };
       } else h.textContent = g;
       m.appendChild(h);
       if (!open) return;
@@ -962,7 +914,7 @@ const EX = (() => {
         }
         b.onclick = () => choose(e.ref || e.id);
         m.appendChild(b);
-        if (pending === (e.ref || e.id)) m.appendChild(warning(e));
+        if (pending === (e.ref || e.id)) warning(e);
       });
     });
     const s1 = scopeLink(); if (s1) m.appendChild(s1);
@@ -971,27 +923,10 @@ const EX = (() => {
   /** The scene menu's warning, in the same words and the same amber block —
    *  an exercise pick reloads the scene, so it costs a drawing just the same. */
   function warning(e) {
-    const n = sim && sim.segs ? sim.segs.length : 0, gn = state.gauges.length;
-    const w = document.createElement("div");
-    w.className = "smwarn";
-    const p = document.createElement("div");
-    const b1 = document.createElement("b"); b1.textContent = "Loading drops your drawing.";
-    p.appendChild(b1);
-    p.appendChild(document.createTextNode(
-      " " + e.id + " sets up " + e.scene + " from scratch, so the " + n + " segment" +
-      (n === 1 ? "" : "s") + " you have drawn" +
-      (gn ? " and " + gn + " gauge" + (gn === 1 ? "" : "s") : "") +
-      " will be gone. Save it first with Controls → Rig → ⇪ Share link."));
-    const r = document.createElement("div"); r.className = "r";
-    const go = document.createElement("button");
-    go.className = "btn-sm go"; go.textContent = "Discard and set up";
-    go.onclick = (ev) => { ev.stopPropagation(); load(e.id); };
-    const no = document.createElement("button");
-    no.className = "btn-sm no"; no.textContent = "Cancel";
-    no.onclick = (ev) => { ev.stopPropagation(); pending = null; render(); place(); };
-    r.appendChild(go); r.appendChild(no);
-    w.appendChild(p); w.appendChild(r);
-    return w;
+    POPUP.warning(menu(), " " + e.id + " sets up " + e.scene + " from scratch, so " +
+      POPUP.drawnWork() + " will be gone. Save it first with Controls → Rig → ⇪ Share link.", [
+      { label: "Discard and set up", cls: "go", run: () => load(e.id) },
+      { label: "Cancel", cls: "no", run: () => { pending = null; render(); place(); } }]);
   }
 
   function choose(id) {
@@ -1011,75 +946,7 @@ const EX = (() => {
   }
   function load(id) { pending = null; close(); pick(id); }
 
-  function place() {
-    const m = menu();
-    const a = anchor && anchor.isConnected ? anchor : document.getElementById("exBtn");
-    const r = a.getBoundingClientRect();
-    // Compact: hang below the anchor and scroll inside rather than ride up
-    // over the strip — unless that leaves less than 240 px.
-    const room = innerHeight - (r.bottom + 8) - 8;
-    // `#exmenu.compact` caps its height at the window (css/app.css); this
-    // narrows the cap when the menu hangs below its opener.
-    if (compact() && room >= 240) m.style.setProperty("--menu-room", room + "px");
-    else m.style.removeProperty("--menu-room");
-    const w = m.offsetWidth, h = m.offsetHeight;
-    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
-    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
-  }
-  function open(a) {
-    PICKER.close();
-    anchor = a || document.getElementById("exBtn");
-    pending = null; hi = -1; openSec = null;   // reopen on the current exercise's section
-    render();
-    menu().classList.add("open");
-    place();
-    const btn = document.getElementById("exBtn");
-    if (btn) btn.classList.add("active");
-    const f = menu().querySelector(".smf");
-    if (f) f.focus();
-    const on = menu().querySelector(".smi.on");
-    if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
-  }
-  function close() {
-    if (el) el.classList.remove("open");
-    hideDesc();
-    pending = null; hi = -1;
-    const btn = document.getElementById("exBtn");
-    if (btn) btn.classList.remove("active");
-  }
-  function toggle(a) { if (isOpen()) close(); else open(a); }
   function refresh() { if (isOpen()) { render(); place(); } }
-
-  /** The menu owns the keyboard while it is open (the filter box has focus,
-   *  so the global shortcuts would not fire anyway — but arrows and Enter
-   *  have to work from inside it). */
-  function key(e) {
-    const list = [...menu().querySelectorAll(".smi")];
-    if (e.key === "Escape") { e.preventDefault(); close(); return; }
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (!list.length) return;
-      const d = e.key === "ArrowDown" ? 1 : list.length - 1;
-      hi = hi < 0 ? (e.key === "ArrowDown" ? 0 : list.length - 1) : (hi + d) % list.length;
-      list.forEach((b, i) => b.classList.toggle("hi", i === hi));
-      if (list[hi].scrollIntoView) list[hi].scrollIntoView({ block: "nearest" });
-      showDesc(list[hi]);
-      return;
-    }
-    if (e.key === "Enter") {
-      const act = document.activeElement;
-      const b = (hi >= 0 && list[hi]) ||
-        (act && act.classList && act.classList.contains("smi") ? act : null) || list[0];
-      if (b) { e.preventDefault(); choose(b.dataset.id); }
-    }
-  }
-  function onDown(e) {
-    if (!isOpen()) return;
-    if (menu().contains(e.target)) return;
-    if (anchor && anchor.contains && anchor.contains(e.target)) return;
-    close();
-    if (e.target === canvas) { e.preventDefault(); e.stopPropagation(); }
-  }
 
   // ----------------------------------------------------------------- card
   /** The brief, rendered into the DOCK (see the DOCK module) rather than into
@@ -1315,7 +1182,7 @@ const EX = (() => {
         el.oninput = () => {
           const v = +el.value;
           if (isFinite(v)) { c.set(v); syncPanel(); }
-          if (out) out.textContent = round4(v) + " " + unitOf(c);
+          if (out) out.textContent = FMT.round4(v) + " " + unitOf(c);
         };
       } else {
         el = document.createElement("input");
@@ -1372,20 +1239,14 @@ const EX = (() => {
           const B = own || c;
           el.min = B.min; el.max = B.max; el.step = B.step;
           if (!(Math.abs(+el.value - v) < 1e-9)) el.value = v;
-          if (out) out.textContent = round4(v) + " " + unitOf(c);
+          if (out) out.textContent = FMT.round4(v) + " " + unitOf(c);
         }
         else {
           const shown = el.value === "" ? NaN : +el.value;
-          if (!(Math.abs(shown - v) < 1e-9)) el.value = round4(v);
+          if (!(Math.abs(shown - v) < 1e-9)) el.value = FMT.round4(v);
         }
       });
     }
-    /** The panel prints 3 decimals; a field showing 0.4500000000000001 is the
-     *  same bug the rule values were rounded for. */
-    function round4(v) {
-      return typeof v === "number" ? String(Math.round(v * 1e4) / 1e4) : String(v);
-    }
-
     /** The tab bar of a tabbed entry: one button per tab; a click swaps the
      *  steps and the interface profile and leaves the bench alone (setTab). */
     function tabBar() {
@@ -1502,10 +1363,10 @@ const EX = (() => {
       if (!box || !DOCK.isOpen() || !cur) return;
       const s = box.querySelector(".exsettle");
       if (cur.settle && settleTo && sim.t < settleTo) {
-        s.textContent = "settling — " + Math.max(0, settleTo - sim.t).toFixed(0) + " s";
+        FMT.put(s, "settling — " + Math.max(0, settleTo - sim.t).toFixed(0) + " s");
         gone(s, false);
       } else {
-        s.textContent = ""; gone(s, true);
+        FMT.put(s, ""); gone(s, true);
       }
     }
     return { show, hide, shown, refresh, tick, syncValues, get el() { return box; } };
@@ -1538,7 +1399,7 @@ const EX = (() => {
     syncPanel();
   }
 
-  return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
+  return { open, close, toggle, isOpen, refresh, key, clickAway, render, place, choose,
            pick, reset, clear, setDigit, setTab, all, byId, listed, course, resolve, plain, rich,
            groupsFor: grouped, rules,
            studentControls,

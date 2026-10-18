@@ -10,7 +10,7 @@
  *
  * Defines: OVERLAY
  *
- * Reads:   CV_EDGES, GEOM, sim
+ * Reads:   CV_EDGES, FMT, GEOM, sim
  */
 const OVERLAY = (() => {
 
@@ -31,14 +31,35 @@ const OVERLAY = (() => {
   // are then guaranteed consistent with whatever the solver is really doing.
   const EMA = 0.06;                       // temporal smoothing of the estimate
 
+  /** The one canvas type stack (the overlay used two: with and without
+   *  SFMono-Regular; the first, more common, one won). `mono(px, weight)`
+   *  is the whole font string. */
+  const FONT = {
+    stack: "ui-monospace, SFMono-Regular, monospace",
+    mono: (px, weight) => (weight ? weight + " " : "") + px + "px " + FONT.stack,
+  };
+  const TAU = 2 * Math.PI;
+
   const C = {
     dc: "#ffb648", dn: "#5fd08a", egl: "#cfe3f5", hgl: "#ff9de2", surf: "#7fd4ff",
     sline: "rgba(245,250,255,0.9)", slineHalo: "rgba(8,14,22,0.55)",
     dim: "rgba(223,232,242,0.55)", grid: "rgba(223,232,242,0.13)",
+    // the instrument glyphs main.js draws, named once beside the rest
+    res: "#7fd4ff", tw: "#5fd08a", piston: "#ffb648", spout: "#7fd4ff",
   };
 
-  const fmt = (v, d) => (Math.abs(v) >= 1000 || (v !== 0 && Math.abs(v) < 0.01)
-    ? v.toExponential(1) : v.toFixed(d === undefined ? 2 : d));
+  /** A filled triangular arrowhead: apex at (x, y), pointing along `angle`
+   *  (screen radians), `len` back to a base of half-width `half` (default
+   *  len / 2). The caller has set fillStyle. */
+  function arrowHead(ctx, x, y, angle, len, half) {
+    const ux = Math.cos(angle), uy = Math.sin(angle), h = half === undefined ? len / 2 : half;
+    const bx = x - ux * len, by = y - uy * len, px = -uy, py = ux;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(bx + px * h, by + py * h);
+    ctx.lineTo(bx - px * h, by - py * h);
+    ctx.closePath(); ctx.fill();
+  }
 
   /** Manning n from its definition, given a measured friction slope. */
   function manning(d, V, Sf) {
@@ -499,7 +520,7 @@ const OVERLAY = (() => {
 
   function chip(ctx, x, y, text, colour, align) {
     ctx.save();
-    ctx.font = "600 11px ui-monospace, SFMono-Regular, monospace";
+    ctx.font = FONT.mono(11, 600);
     const w = ctx.measureText(text).width + 12;
     const px = align === "right" ? x - w : x;
     ctx.fillStyle = "rgba(10,14,20,0.82)";
@@ -522,7 +543,7 @@ const OVERLAY = (() => {
     const B = V.vis || V;
     const ly = B.y + 16;
     ctx.save();
-    ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
+    ctx.font = FONT.mono(11);
     ctx.textBaseline = "middle";
     rows.forEach((r, k) => {
       ctx.strokeStyle = r.colour; ctx.lineWidth = 1.6; ctx.setLineDash(r.dash);
@@ -571,7 +592,7 @@ const OVERLAY = (() => {
       const x = V.X((mid + 0.5) * sim.dx);
       const y = Math.max(B.y + 14, V.Y(A.surf[mid]) - 26);
       ctx.save();
-      ctx.font = "700 13px ui-monospace, SFMono-Regular, monospace";
+      ctx.font = FONT.mono(13, 700);
       const w = ctx.measureText(r.cls).width + 14;
       ctx.fillStyle = "rgba(10,14,20,0.85)";
       ctx.strokeStyle = "rgba(255,217,138,0.45)";
@@ -601,13 +622,13 @@ const OVERLAY = (() => {
       const err = 100 * (J.d2 - J.d2p) / Math.max(J.d2p, 1e-6);
       const rows = [
         "HYDRAULIC JUMP",
-        "Fr₁ " + fmt(J.Fr1, 2) + "   d₁ " + fmt(J.d1, 3) + " m",
-        "d₂ " + fmt(J.d2, 3) + " m   (momentum: " + fmt(J.d2p, 3) +
-          ", " + (err >= 0 ? "+" : "") + fmt(err, 0) + "%)",
-        "ΔE " + fmt(J.dE, 3) + " m lost in the roller",
+        "Fr₁ " + FMT.fix(J.Fr1, 2) + "   d₁ " + FMT.fix(J.d1, 3) + " m",
+        "d₂ " + FMT.fix(J.d2, 3) + " m   (momentum: " + FMT.fix(J.d2p, 3) +
+          ", " + (err >= 0 ? "+" : "") + FMT.fix(err, 0) + "%)",
+        "ΔE " + FMT.fix(J.dE, 3) + " m lost in the roller",
       ];
       ctx.save();
-      ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
+      ctx.font = FONT.mono(11);
       let w = 0;
       rows.forEach((t) => { w = Math.max(w, ctx.measureText(t).width); });
       w += 20;
@@ -620,7 +641,7 @@ const OVERLAY = (() => {
       ctx.textBaseline = "middle";
       rows.forEach((t, n) => {
         ctx.fillStyle = n === 0 ? "#ff9a63" : "#e8f0f8";
-        ctx.font = (n === 0 ? "700 " : "") + "11px ui-monospace, SFMono-Regular, monospace";
+        ctx.font = FONT.mono(11, n === 0 ? 700 : undefined);
         ctx.fillText(t, px + 10, py + 13 + n * 15);
       });
       ctx.restore();
@@ -768,38 +789,38 @@ const OVERLAY = (() => {
     const cls = wet && A.ok[i] && !press && PRINT.critical && keep.indexOf("profile") >= 0
       ? classify(d, dn, dc, S0) : "";
     const rows = [];
-    rows.push(["x, z", fmt(mx, 2) + ", " + fmt(mz, 2) + " m", "pos"]);
+    rows.push(["x, z", FMT.fix(mx, 2) + ", " + FMT.fix(mz, 2) + " m", "pos"]);
     if (wet) {
-      rows.push(["depth d", fmt(d, 3) + " m", "d"]);
-      if (!press) rows.push(["level η", fmt(A.bed[i] + d, 3) + " m above datum", "eta"]);
-      rows.push(["q, whole depth", fmt(A.q[i], 3) + " m²/s", "q"]);
-      rows.push(["V = q/d, depth mean", fmt(A.V[i], 2) + " m/s", "V"]);
+      rows.push(["depth d", FMT.fix(d, 3) + " m", "d"]);
+      if (!press) rows.push(["level η", FMT.fix(A.bed[i] + d, 3) + " m above datum", "eta"]);
+      rows.push(["q, whole depth", FMT.fix(A.q[i], 3) + " m²/s", "q"]);
+      rows.push(["V = q/d, depth mean", FMT.fix(A.V[i], 2) + " m/s", "V"]);
     }
     if (wet && !press) {
-      rows.push(["Fr", fmt(A.Fr[i], 2) + (PRINT.critical
+      rows.push(["Fr", FMT.fix(A.Fr[i], 2) + (PRINT.critical
         ? (A.Fr[i] > 1 ? "  supercritical" : "  subcritical")
         : (A.Fr[i] > 1 ? "  fast, shallow" : "  slow, deep")), "Fr"]);
-      rows.push(["d_c", fmt(dc, 3) + " m", "dc"]);
-      if (isFinite(dn)) rows.push(["d_n", fmt(dn, 3) + " m  (measured)", "dn"]);
-      rows.push(["S₀", (S0 >= 0 ? "1 : " + fmt(1 / Math.max(S0, 1e-9), 0) : "adverse"), "S0"]);
+      rows.push(["d_c", FMT.fix(dc, 3) + " m", "dc"]);
+      if (isFinite(dn)) rows.push(["d_n", FMT.fix(dn, 3) + " m  (measured)", "dn"]);
+      rows.push(["S₀", (S0 >= 0 ? "1 : " + FMT.fix(1 / Math.max(S0, 1e-9), 0) : "adverse"), "S0"]);
       // n is only computed where the classification is trustworthy, so a
       // guard-band station prints the slope alone rather than "n = NaN".
-      if (A.Sf[i] > 0) rows.push(["S_f", "1 : " + fmt(1 / A.Sf[i], 0) +
-        (isFinite(A.n[i]) ? "   n = " + fmt(A.n[i], 3) : ""), "Sf"]);
+      if (A.Sf[i] > 0) rows.push(["S_f", "1 : " + FMT.fix(1 / A.Sf[i], 0) +
+        (isFinite(A.n[i]) ? "   n = " + FMT.fix(A.n[i], 3) : ""), "Sf"]);
     }
     if (probe) {
-      rows.push(["u, w at cursor", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s", "uw"]);
+      rows.push(["u, w at cursor", FMT.fix(probe.u, 2) + ", " + FMT.fix(probe.w, 2) + " m/s", "uw"]);
       // probe.p is the kinematic pressure P = p/ρ; with ρ = 1000 kg/m³ its
       // value in m²/s² is p in kPa.
-      rows.push(["pressure p", fmt(probe.p, 2) + " kPa", "p"]);
-      rows.push(["pressure head p/ρg", fmt(probe.phead, 3) + " m", "phead"]);
+      rows.push(["pressure p", FMT.fix(probe.p, 2) + " kPa", "p"]);
+      rows.push(["pressure head p/ρg", FMT.fix(probe.phead, 3) + " m", "phead"]);
       // h = z + p/ρg. Shown in BOTH regimes: in hydrostatic open-channel flow
       // it equals the level η above, but inside a pressurised conduit there is
       // no surface and the η row is suppressed, which is exactly where the
       // piezometric head is the only meaningful head to read.
       rows.push(["head h = z + p/ρg",
-        fmt(mz - (sim.scene.tiltS0 || 0) * mx + probe.phead, 3) + " m", "h"]);
-      rows.push(["fill f", fmt(probe.f, 3) + (probe.f > 1.002 ? "  pressurised" : ""), "f"]);
+        FMT.fix(mz - (sim.scene.tiltS0 || 0) * mx + probe.phead, 3) + " m", "h"]);
+      rows.push(["fill f", FMT.fix(probe.f, 3) + (probe.f > 1.002 ? "  pressurised" : ""), "f"]);
     }
     // Filter to what was asked for. A row with no id is never hidden -- if a
     // future row forgets its tag it keeps showing, which is the safe way round.
@@ -809,7 +830,7 @@ const OVERLAY = (() => {
 
     const B = V.vis || V;
     ctx.save();
-    ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
+    ctx.font = FONT.mono(11);
     let w = 0;
     rows.forEach((r) => { w = Math.max(w, ctx.measureText(r[0] + "  " + r[1]).width); });
     w += 22;
@@ -824,9 +845,9 @@ const OVERLAY = (() => {
     let y = py + 12;
     if (cls) {
       ctx.fillStyle = "#ffd98a";
-      ctx.font = "700 14px ui-monospace, SFMono-Regular, monospace";
+      ctx.font = FONT.mono(14, 700);
       ctx.fillText(cls + " profile", px + 11, y + 2);
-      ctx.font = "11px ui-monospace, SFMono-Regular, monospace";
+      ctx.font = FONT.mono(11);
       y += 22;
     }
     rows.forEach((r) => {
@@ -916,17 +937,16 @@ const OVERLAY = (() => {
   /** Screen px per m/s for the rakes: the scene's speed `uRef` maps to the
    *  rake's nominal length (13% of the view, at most 110 px). Passed in as
    *  px per m/s already (main.js), so every rake and the bar share it. */
+  function rakePxPerMps(V, uRef) { return Math.min(V.w * 0.13, 110) / uRef; }
   function rakePx(V, pxPerMps) {
-    return pxPerMps > 0 ? pxPerMps : Math.min(V.w * 0.13, 110) / 4;
+    return pxPerMps > 0 ? pxPerMps : rakePxPerMps(V, 4);
   }
   /** The rakes' one scale bar, bottom-left above the streamline key: a 1-2-5
    *  number of m/s that spans 30–80 px, drawn once whatever the rake count. */
   function drawRakeScale(ctx, V, pxPerMps) {
     const s = rakePx(V, pxPerMps);
     const want = 50 / s;
-    const mag = Math.pow(10, Math.floor(Math.log10(want)));
-    const u = [1, 2, 5, 10].map((m) => m * mag)
-      .reduce((a, b) => Math.abs(b * s - 50) < Math.abs(a * s - 50) ? b : a);
+    const u = FMT.nice(want);
     const L = u * s, B = V.vis || V;
     const x = B.x + 12, y = B.y + B.h - 58;
     ctx.save();
@@ -1000,9 +1020,9 @@ const OVERLAY = (() => {
     ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1; ctx.stroke();
 
     rchip(ctx, x0 + 6, V.Y(surf) - 32,
-      "q = ∫u dy = " + fmt(q, 3) + " m²/s", "#7fd4ff");
+      "q = ∫u dy = " + FMT.fix(q, 3) + " m²/s", "#7fd4ff");
     rchip(ctx, x0 + 6, V.Y(surf) - 14,
-      "u_max " + fmt(umax, 2) + "  V " + fmt(Vbar, 2) + "  ratio " + fmt(umax / Math.max(Vbar, 1e-3), 2),
+      "u_max " + FMT.fix(umax, 2) + "  V " + FMT.fix(Vbar, 2) + "  ratio " + FMT.fix(umax / Math.max(Vbar, 1e-3), 2),
       "#ffd98a");
     ctx.restore();
   }
@@ -1013,10 +1033,10 @@ const OVERLAY = (() => {
       const x = V.X(gg.x), y = V.Y(gg.z);
       ctx.save();
       ctx.strokeStyle = gg.colour; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, 6, 0, 6.2832); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.stroke();
       ctx.fillStyle = gg.colour;
-      ctx.beginPath(); ctx.arc(x, y, 2, 0, 6.2832); ctx.fill();
-      ctx.font = "700 10px ui-monospace, monospace";
+      ctx.beginPath(); ctx.arc(x, y, 2, 0, TAU); ctx.fill();
+      ctx.font = FONT.mono(10, 700);
       ctx.fillText(String(k + 1), x + 9, y - 6);
       ctx.restore();
     });
@@ -1058,20 +1078,20 @@ const OVERLAY = (() => {
         ctx.beginPath();
         hist.forEach((s, n) => { const a = px(s.t), b = py(val(s)); n ? ctx.lineTo(a, b) : ctx.moveTo(a, b); });
         ctx.strokeStyle = gg.colour; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.font = "10px ui-monospace, monospace";
+        ctx.font = FONT.mono(10);
         ctx.fillStyle = C.dim;
         // Below the card's × (a DOM button in the top-right corner).
-        ctx.fillText(fmt(hi, 2), x + W - 44, y + 32);
-        ctx.fillText(fmt(lo, 2), x + W - 44, y + H - 12);
+        ctx.fillText(FMT.fix(hi, 2), x + W - 44, y + 32);
+        ctx.fillText(FMT.fix(lo, 2), x + W - 44, y + H - 12);
         ctx.fillStyle = "#e8f0f8";
-        ctx.font = "700 11px ui-monospace, monospace";
-        ctx.fillText(String(k + 1) + "  " + label + " " + fmt(val(hist[hist.length - 1]), 3) + " " + unit,
+        ctx.font = FONT.mono(11, 700);
+        ctx.fillText(String(k + 1) + "  " + label + " " + FMT.fix(val(hist[hist.length - 1]), 3) + " " + unit,
           x + 10, y + 14);
         // The whole run says so, with its time axis at the foot: "t = 0" at
         // the left edge and the clock at the right, so a student reads the
         // approach to steady state against time rather than a bare curve.
         if (Q.whole) {
-          ctx.font = "9.5px ui-monospace, monospace";
+          ctx.font = FONT.mono(9.5);
           ctx.fillStyle = C.dim;
           ctx.fillText("t = " + Math.round(t0) + " s", x + 10, y + H - 4);
           ctx.textAlign = "right";
@@ -1115,13 +1135,9 @@ const OVERLAY = (() => {
       const xc = V.X(xa + (k + 0.5) * span / n);
       const xt = xc - dir * len / 2, xh = xc + dir * len / 2;
       ctx.beginPath(); ctx.moveTo(xt, y); ctx.lineTo(xh - dir * head * 0.6, y); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(xh, y);
-      ctx.lineTo(xh - dir * head, y - head * 0.55);
-      ctx.lineTo(xh - dir * head, y + head * 0.55);
-      ctx.closePath(); ctx.fill();
+      arrowHead(ctx, xh, y, dir > 0 ? 0 : Math.PI, head, head * 0.55);
     }
-    ctx.font = "12px ui-monospace, SFMono-Regular, monospace";
+    ctx.font = FONT.mono(12);
     ctx.textBaseline = "bottom"; ctx.textAlign = "center";
     ctx.fillText("wind  τ = " + tau.toFixed(Math.abs(tau) < 1 ? 2 : 1) + " N/m²",
                  V.X(0.5 * (xa + xb)), y - 10);
@@ -1135,13 +1151,11 @@ const OVERLAY = (() => {
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1;
     ctx.strokeRect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1);
-    ctx.font = "10px ui-monospace, monospace";
+    ctx.font = FONT.mono(10);
     ctx.fillStyle = C.dim;
     // 1-2-5 rounding of roughly a sixth of the visible width
     const target = sim.W * (B.w / V.w) / 6;
-    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(target, 1e-3))));
-    const bar = [1, 2, 5, 10].map((m) => m * mag)
-      .reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a);
+    const bar = FMT.nice(target, undefined, 1e-3);
     const bw = bar * V.w / sim.W;
     const bx = B.x + B.w - bw - 14, by = B.y + B.h - 14;
     ctx.strokeStyle = "rgba(223,232,242,0.75)"; ctx.lineWidth = 1.5;
@@ -1238,16 +1252,11 @@ const OVERLAY = (() => {
         const ax = cx - hx, ay = cy - hy, bx = cx + hx, by = cy + hy;
         ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-        // The head, built on the arrow's own axis rather than on x.
-        const px = -hy / (L / 2), py = hx / (L / 2);   // unit perpendicular
-        ctx.beginPath();
-        ctx.moveTo(bx + hx / (L / 2) * 9, by + hy / (L / 2) * 9);
-        ctx.lineTo(bx + px * 5, by + py * 5);
-        ctx.lineTo(bx - px * 5, by - py * 5);
-        ctx.closePath(); ctx.fill();
+        // The head, built on the arrow's own axis rather than on x: apex 9 px
+        // beyond the shaft's end, base 10 px across at the end.
+        arrowHead(ctx, bx + hx / (L / 2) * 9, by + hy / (L / 2) * 9, Math.atan2(hy, hx), 9, 5);
       }
-      const fN = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
-      drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN);
+      drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd);
     } else {
       rchip(ctx, x0, y0 - 12, "control volume · settling…", col);
     }
@@ -1270,16 +1279,10 @@ const OVERLAY = (() => {
     Q: { label: "Q", through: true,
          at: (e) => e.Q, fmt: (v) => v.toFixed(3) },
     M: { label: "momentum + pressure", through: false,
-         at: (e) => e.Mx + e.Fpx, fmt: (v) => fmtBig(v, "N/m") },
+         at: (e) => e.Mx + e.Fpx, fmt: (v) => FMT.big(v, "N/m") },
     E: { label: "ρgQH", through: true,
-         at: (e) => e.E, fmt: (v) => fmtBig(v, "W/m") },
+         at: (e) => e.E, fmt: (v) => FMT.big(v, "W/m") },
   };
-  /** Watts per metre run to thousands once a reach is doing any work at all. */
-  function fmtBig(v, unit) {
-    const a = Math.abs(v);
-    if (a >= 1000) return (v / 1000).toFixed(a >= 10000 ? 0 : 2) + " k" + unit;
-    return (a >= 100 ? v.toFixed(0) : v.toFixed(1)) + " " + unit;
-  }
 
   /** Which way a through-quantity actually crosses this face, as the reader
    *  sees it: the arrow points the way the water goes, so "into the box" and
@@ -1315,12 +1318,12 @@ const OVERLAY = (() => {
    *  see; a table of four rows makes them map it back onto the picture
    *  themselves. Outward-positive throughout, so a sign is a direction: what
    *  leaves is positive wherever it leaves from. */
-  function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
+  function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd) {
     const F = cv.flux;
     // A card that withholds energy never labels the faces with it, whatever
     // B was last left on.
     const q = (show === "E" && !PRINT.energy) ? CV_Q.Q : (CV_Q[show] || CV_Q.Q);
-    ctx.font = "10px ui-monospace, monospace";
+    ctx.font = FONT.mono(10);
     if (F && PRINT.readouts) {
       const e = F.edges;
       const mid = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
@@ -1371,11 +1374,11 @@ const OVERLAY = (() => {
         (dVdt === null ? " m²/s"
           : "  dV/dt " + (dVdt >= 0 ? "+" : "") + dVdt.toFixed(3) + " m²/s" +
             (Q.inn > 1e-9 ? "  (net + dV/dt: " + (100 * Math.abs(net + dVdt) / Q.inn).toFixed(1) + "%, should be 0)" : "")),
-      "force    on what is inside:  →  " + fN(fx) + " ±" + fN(sd) + " N/m    ↑ " + fN(fz) + " N/m",
+      "force    on what is inside:  →  " + FMT.N(fx) + " ±" + FMT.N(sd) + " N/m    ↑ " + FMT.N(fz) + " N/m",
     ];
     if (PRINT.energy) lines.push(
-      "energy   in " + fmtBig(E.inn, "W/m") + "   out " + fmtBig(E.out, "W/m") +
-        "   lost " + fmtBig(E.inn - E.out, "W/m"));
+      "energy   in " + FMT.big(E.inn, "W/m") + "   out " + FMT.big(E.out, "W/m") +
+        "   lost " + FMT.big(E.inn - E.out, "W/m"));
     const tall = (y1 - y0) > 3 * 15 + 24;
     const top = tall ? y0 + 18 : y0 - 12 - lines.length * 15;
     lines.forEach((t, k) => rchip(ctx, x1 - 6, top + k * 15, t, col, "right"));
@@ -1430,11 +1433,7 @@ const OVERLAY = (() => {
       ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(mx - hx, my - hy); ctx.lineTo(mx + hx, my + hy); ctx.stroke();
       ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.moveTo(mx + hx * 1.6, my + hy * 1.6);
-      ctx.lineTo(mx + hx + lx * 5, my + hy + ly * 5);
-      ctx.lineTo(mx + hx - lx * 5, my + hy - ly * 5);
-      ctx.closePath(); ctx.fill();
+      arrowHead(ctx, mx + hx * 1.6, my + hy * 1.6, Math.atan2(hy, hx), Math.hypot(hx, hy) * 0.6, 5);
 
       // All four, together. A section is a whole reading, not one number at a
       // time: continuity, the momentum it carries, the pressure the water
@@ -1446,7 +1445,7 @@ const OVERLAY = (() => {
         "    M      " + vec(e.Mx, e.Mz, "N/m"),
         "    F      " + vec(e.Fpx, e.Fpz, "N/m"),
       ];
-      if (PRINT.energy) rows.push("    ρgQH   " + fmtBig(e.E, "W/m"));
+      if (PRINT.energy) rows.push("    ρgQH   " + FMT.big(e.E, "W/m"));
       const side = dir > 0 ? 1 : -1;
       const cx = mx + hx * 1.9 * 1 + side * 8, cy = my - 22;
       rows.forEach((t, i) => rchip(ctx, cx, cy + i * 15, t, col,
@@ -1479,11 +1478,11 @@ const OVERLAY = (() => {
           "sections " + (lines.length - 1) + " → " + lines.length,
           "water     " + Math.abs(a.Q).toFixed(3) + " → " + Math.abs(b.Q).toFixed(3) +
             " m²/s   (" + (100 * dQ / inQ).toFixed(1) + "%, should be 0)",
-          "momentum  " + fmtBig(a.Mx, "N/m") + " → " + fmtBig(b.Mx, "N/m"),
-          "pressure  " + fmtBig(a.Fpx, "N/m") + " → " + fmtBig(b.Fpx, "N/m"),
+          "momentum  " + FMT.big(a.Mx, "N/m") + " → " + FMT.big(b.Mx, "N/m"),
+          "pressure  " + FMT.big(a.Fpx, "N/m") + " → " + FMT.big(b.Fpx, "N/m"),
           "force on what is between them:  " + vec(fx, fz, "N/m"),
         ];
-        if (PRINT.energy) rows.push("energy    lost " + fmtBig(dE, "W/m"));
+        if (PRINT.energy) rows.push("energy    lost " + FMT.big(dE, "W/m"));
         const x = Math.min(V.X(A.x0), V.X(A.x1), V.X(B.x0), V.X(B.x1));
         const y = Math.max(V.Y(A.z0), V.Y(A.z1), V.Y(B.z0), V.Y(B.z1));
         rows.forEach((t, i) => rchip(ctx, x + 6, y - 12 - (rows.length - 1 - i) * 15, t, col));
@@ -1603,14 +1602,7 @@ const OVERLAY = (() => {
         if (Lpx < 3) continue;
         ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
         // The head, built on the arrow's OWN axis — same idiom as drawCV's.
-        const ux = (bx - ax) / Lpx, uy = (by - ay) / Lpx;
-        const px = -uy, py = ux;
-        const hs = Math.min(4.5, Lpx * 0.5);
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.lineTo(bx - ux * hs + px * hs * 0.5, by - uy * hs + py * hs * 0.5);
-        ctx.lineTo(bx - ux * hs - px * hs * 0.5, by - uy * hs - py * hs * 0.5);
-        ctx.closePath(); ctx.fill();
+        arrowHead(ctx, bx, by, Math.atan2(by - ay, bx - ax), Math.min(4.5, Lpx * 0.5));
       }
 
       // The scale in the units the scene can mean. In plan view (|g| < 0.1:
@@ -1627,8 +1619,7 @@ const OVERLAY = (() => {
         at = [lo[0] + 6, lo[1] + 14];
         const pxPerKPa = pxPerHead / g;
         const want = 12 / Math.max(pxPerKPa, 1e-12);
-        const mag = Math.pow(10, Math.floor(Math.log10(want)));
-        const stepK = [1, 2, 5, 10].map((m) => m * mag).find((v) => v >= want) || 10 * mag;
+        const stepK = FMT.niceUp(want);
         scaleTxt = "scale: " + String(+stepK.toPrecision(1)) + " kPa = " + (stepK * pxPerKPa).toFixed(0) + " px";
       } else {
         scaleTxt = "scale: 1 m head = " + pxPerHead.toFixed(0) + " px";
@@ -1648,16 +1639,9 @@ const OVERLAY = (() => {
           const bx = cx + hx, by = cy + hy;
           ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
           ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.stroke();
-          const px = -hy / L, py = hx / L;           // unit perpendicular
-          ctx.beginPath();
-          ctx.moveTo(bx + hx / L * 9, by + hy / L * 9);
-          ctx.lineTo(bx + px * 5, by + py * 5);
-          ctx.lineTo(bx - px * 5, by - py * 5);
-          ctx.closePath(); ctx.fill();
+          arrowHead(ctx, bx + hx / L * 9, by + hy / L * 9, Math.atan2(hy, hx), 9, 5);
         }
-        const fKN = (v) => Math.abs(v) >= 1000
-          ? (v / 1000).toFixed(1) + " kN/m" : v.toFixed(0) + " N/m";
-        rchip(ctx, cx + 8, cy - 18, "F = " + fKN(D.F), col);
+        rchip(ctx, cx + 8, cy - 18, "F = " + FMT.kN(D.F), col);
         const refs = (sim.scene && sim.scene.forceRef) || [];
         const ref = refs.indexOf(D.solidId + ":" + D.faceId) >= 0 ? faceDepth(sim, D, g) : null;
         if (!ref) rchip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m", ["F_h ", "F_v "]), col);
@@ -1666,9 +1650,9 @@ const OVERLAY = (() => {
           // the components on their own rows and ½ρg·d² beside F_h, d being
           // the wetted height of THIS face.
           const half = 0.5 * 1000 * g * ref * ref;
-          rchip(ctx, cx + 8, cy, "F_h " + (D.Fx >= 0 ? "→ " : "← ") + fKN(Math.abs(D.Fx)) +
-               "   ½ρgd² = " + fKN(half) + "  (d = " + ref.toFixed(2) + " m)", col);
-          rchip(ctx, cx + 8, cy + 18, "F_v " + (D.Fz >= 0 ? "↑ " : "↓ ") + fKN(Math.abs(D.Fz)), col);
+          rchip(ctx, cx + 8, cy, "F_h " + (D.Fx >= 0 ? "→ " : "← ") + FMT.kN(Math.abs(D.Fx)) +
+               "   ½ρgd² = " + FMT.kN(half) + "  (d = " + ref.toFixed(2) + " m)", col);
+          rchip(ctx, cx + 8, cy + 18, "F_v " + (D.Fz >= 0 ? "↑ " : "↓ ") + FMT.kN(Math.abs(D.Fz)), col);
         }
       }
     }
@@ -1730,13 +1714,9 @@ const OVERLAY = (() => {
     // come adrift from the unit it belonged to. `labels` ([x, z] prefixes,
     // e.g. ["F_h ", "F_v "]) names the two components.
     const big = Math.max(Math.abs(vx), Math.abs(vz)) >= 1000;
-    const d = (v) => {
-      const a = Math.abs(v) / (big ? 1000 : 1);
-      return big || a < 100 ? a.toFixed(a >= 10 ? 1 : 2) : a.toFixed(0);
-    };
     const L = labels || ["", ""];
-    return L[0] + (vx >= 0 ? "→ " : "← ") + d(vx) +
-           "   " + L[1] + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
+    return L[0] + (vx >= 0 ? "→ " : "← ") + FMT.vecPart(vx, big) +
+           "   " + L[1] + (vz >= 0 ? "↑ " : "↓ ") + FMT.vecPart(vz, big) +
            " " + (big ? "k" : "") + unit;
   }
 
@@ -1753,14 +1733,12 @@ const OVERLAY = (() => {
     // 1-2-5 major step aiming at ~90 px between labels; minors at a fifth.
     const pick = (span, px) => {
       const t = span * 90 / Math.max(px, 1);
-      const mag = Math.pow(10, Math.floor(Math.log10(Math.max(t, 1e-4))));
-      return [1, 2, 5, 10].map((m) => m * mag)
-        .reduce((a, b) => Math.abs(b - t) < Math.abs(a - t) ? b : a);
+      return FMT.nice(t, undefined, 1e-4);
     };
     const sx = pick(x1 - x0, B.w), sy = pick(z1 - z0, B.h);
     const dec = (s) => (s < 0.995 ? (s < 0.0995 ? 2 : 1) : 0);
     ctx.save();
-    ctx.font = "10px ui-monospace, SFMono-Regular, monospace";
+    ctx.font = FONT.mono(10);
     ctx.lineWidth = 1;
 
     // Bottom edge — x. Integer-stepped in minor units so the loop cannot
@@ -1805,8 +1783,8 @@ const OVERLAY = (() => {
 
   return { analyse, resetEstimates, estimates, classify, manning, findJumps, profileRuns,
            keyRow, flushKeys, drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawPinMark, drawRake,
-           drawGradeLines, drawStreamlines, drawWind, drawRakeScale,
+           drawGradeLines, drawStreamlines, drawWind, drawRakeScale, arrowHead, rakePxPerMps, FONT, TAU, C,
            ROW_IDS, DEFAULT_ROWS, setPrint, PRINT,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
-           drawMeasure, drawCV, drawFlux, drawForce, drawForceHover, measureText, chip, fmt };
+           drawMeasure, drawCV, drawFlux, drawForce, drawForceHover, measureText, chip };
 })();

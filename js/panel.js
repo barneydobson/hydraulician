@@ -7,14 +7,54 @@
  * so the lists below (checked by exercises/_runner/check_headers.py) are the
  * dependency record. Load order is index.html's.
  *
- * Defines: CONTROLS, ctl, buildPanel, syncPanel, focusedSections, applyPanelFocus,
+ * Defines: UI, CONTROLS, ctl, buildPanel, syncPanel, focusedSections, applyPanelFocus,
  *          setPanel, togglePanel, refreshNote
  *
- * Reads:   bestTracerX, clearAllGauges, computeView, CONFIG, EX, fieldBlurb,
- *          fieldFor, FIELDS, GAUGE_QTY, gaugeFieldOf, GINSP, gNote, LEGEND,
- *          OVERLAY, PICKER, RIG, seedTracers, setAllGaugeFields, setAverage,
- *          showToast, sim, SIM, state, syncToolbar, UIMODE, VEX_MAX
+ * Reads:   bestTracerX, buildToolbar, clearAllGauges, computeView, CONFIG, EX,
+ *          fieldBlurb, fieldFor, FIELDS, GAUGE_QTY, gaugeFieldOf, GINSP, gNote,
+ *          LEGEND, OVERLAY, PICKER, RIG, seedTracers, setAllGaugeFields,
+ *          setAverage, showToast, sim, SIM, state, syncToolbar, UIMODE, VEX_MAX
  */
+// ------------------------------------------------------------------- batch
+/** One user action often reaches syncPanel and buildToolbar from several
+ *  places (a scene switch, a rig, a UI profile, the card). `UI.batch(fn)`
+ *  runs fn with both held back and then calls each ONCE, in the order the old
+ *  code ended in (strip, then panel) — and still does if fn throws. Batches
+ *  nest: only the outermost flushes. `UI.hold()` is the same for work that
+ *  finishes later (a rig decoding): it returns the function that releases it.
+ *  `UI.count` is how many times each really ran, for the tests. */
+const UI = (() => {
+  let depth = 0, panel = false, bar = false;
+  const count = { panel: 0, bar: 0 };
+  /** Called first by syncPanel / buildToolbar: true means "held, I will run
+   *  at the flush". */
+  function defer(what) {
+    if (!depth) return false;
+    if (what === "panel") panel = true; else bar = true;
+    return true;
+  }
+  function flush() {
+    const b = bar, p = panel;
+    bar = panel = false;
+    if (b) buildToolbar();
+    if (p) syncPanel();
+  }
+  function hold() {
+    depth++;
+    let open = true;
+    return () => {
+      if (!open) return;
+      open = false;
+      if (--depth === 0) flush();
+    };
+  }
+  function batch(fn) {
+    const release = hold();
+    try { return fn(); } finally { release(); }
+  }
+  return { batch, hold, defer, count };
+})();
+
 // ------------------------------------------------------------------- panel
 const CONTROLS = [
   { h: "Scene" },
@@ -540,6 +580,8 @@ function buildPanel() {
 }
 
 function syncPanel() {
+  if (UI.defer("panel")) return;
+  UI.count.panel++;
   // The brief carries live controls of its own (the student's own values), so
   // they follow the same sync as the panel's rows — move the Inflow q slider
   // and the field in the brief moves with it.

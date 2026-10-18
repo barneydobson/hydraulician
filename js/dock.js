@@ -9,7 +9,7 @@
  *
  * Defines: toastTimer, showToast, hinted, wheelHint, MINI, DOCK, START, dragWindow
  *
- * Reads:   aboutHref, applyAutoVex, EX, fitBar, iconEl, KEYS, newSandbox, PICKER,
+ * Reads:   aboutHref, applyAutoVex, EX, fitBar, iconEl, newSandbox, PICKER, POPUP,
  *          setPanel, TIP
  */
 // ------------------------------------------------------------------ toasts
@@ -293,7 +293,7 @@ const START = (() => {
   function open() {
     build(); renderList();
     el().classList.add("open");
-    PICKER.close(); EX.close(); KEYS.close();
+    POPUP.closeAll();
     const b = document.getElementById("homeBtn");
     if (b) b.classList.add("active");
     const f = document.getElementById("startfilter");

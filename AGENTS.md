@@ -27,7 +27,9 @@ shallow water); this one resolves the depth.
 | `js/main.js` | boot, the view transform, scenes (`loadScene`, `syncURL`), pointer tools, the frame loop, `drawOverlay`/markers, the status bar, tips, Average, `window.APP` — the part of the old file that is left once the eight below were taken out |
 | `js/state.js` | `CONFIG`, `state`, `EMBED`, and the mutable view handles (`canvas`, `over`, `octx`, `view`, `sim`) |
 | `js/fields.js` | `FIELDS` (the nine colourings), `GAUGE_QTY` (what a gauge records), the scene-scaled ranges |
-| `js/panel.js` | `CONTROLS` (the panel spec), `ctl(id)`, `buildPanel`, `syncPanel`, the focus profile |
+| `js/format.js` | `FMT` — every number-to-text rule (legend ranges, overlay readouts, 1-2-5 steps), `FMT.put` writes only on change |
+| `js/popup.js` | `POPUP` — the one popup behaviour (open/close, Esc, click-away, arrows, one resize listener) behind the scene menu, exercise menu, keyboard sheet and legend field menu |
+| `js/panel.js` | `CONTROLS` (the panel spec), `ctl(id)`, `buildPanel`, `syncPanel`, the focus profile, `UI.batch` (one strip build and one panel sync per user action) |
 | `js/strip.js` | `TOOLS`, icons, `TIP`, the `TOOLBAR` spec and its builder, `KEYS` |
 | `js/legend.js` | `LEGEND` (the colour key), `UIMODE` (the exercise interface profile) |
 | `js/dock.js` | toasts, `MINI`, `DOCK` (the docked side panel), `START` (the start screen), `dragWindow` |

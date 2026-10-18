@@ -14,10 +14,10 @@
  *          toolItem, aboutHref, OPENERS, buildToolbar, showAllGroup, fitBar, syncBarH,
  *          syncToolbar, KEYS
  *
- * Reads:   applyAutoVex, canvas, clearAllGauges, clearGaugeHistory, EMBED, EX,
- *          KEYMAP, LEGEND, onDown, over, PICKER, popOut, setAverage, showToast, SIM,
- *          sim, START, state, switchScene, syncPanel, toggleFullscreen, togglePanel,
- *          togglePause, toggleValve, UIMODE
+ * Reads:   applyAutoVex, clearAllGauges, clearGaugeHistory, EMBED, EX, KEYMAP,
+ *          LEGEND, over, PICKER, popOut, POPUP, setAverage, showToast, SIM, sim,
+ *          START, state, switchScene, syncPanel, toggleFullscreen, togglePanel,
+ *          togglePause, toggleValve, UI, UIMODE
  */
 // ------------------------------------------------------------------ tools
 const TOOLS = [
@@ -485,6 +485,8 @@ function aboutHref() {
 const OPENERS = /^(homeBtn|sceneBtn|exBtn|panelBtn|fsBtn|popBtn|keysBtn|aboutBtn)$/;
 
 function buildToolbar() {
+  if (UI.defer("bar")) return;
+  UI.count.bar++;
   const host = document.getElementById("groups");
   host.textContent = "";
   TOOLBAR.forEach((group) => {
@@ -658,7 +660,7 @@ function syncToolbar() {
  *  six lines of chrome sitting on the water for the 99% of a session that
  *  nobody is looking up a shortcut. */
 const KEYS = (() => {
-  let el = null, anchor = null;
+  let el = null;
   // The pointer lines are not keys; the keys come from KEYMAP at open time.
   const POINTER = [
     ["left-drag", "draw with the current tool"],
@@ -672,7 +674,6 @@ const KEYS = (() => {
   const lines = () => POINTER.concat(
     KEYMAP.filter((r) => r.label && (!r.when || r.when())).map((r) => [r.label, r.what]));
   const menu = () => (el || (el = document.getElementById("keysmenu")));
-  const isOpen = () => !!(el && el.classList.contains("open"));
   function render() {
     const m = menu();
     m.textContent = "";
@@ -690,34 +691,10 @@ const KEYS = (() => {
       m.appendChild(r);
     });
   }
-  function place() {
-    const m = menu();
-    const a = anchor && anchor.isConnected ? anchor : document.getElementById("keysBtn");
-    if (!a) return;
-    const r = a.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
-    m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + "px";
-    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
-  }
-  function open(a) {
-    PICKER.close(); EX.close();
-    anchor = a || document.getElementById("keysBtn");
-    render(); menu().classList.add("open"); place();
-    const b = document.getElementById("keysBtn");
-    if (b) b.classList.add("active");
-  }
-  function close() {
-    if (el) el.classList.remove("open");
-    const b = document.getElementById("keysBtn");
-    if (b) b.classList.remove("active");
-  }
-  function toggle(a) { if (isOpen()) close(); else open(a); }
-  function onDown(e) {
-    if (!isOpen()) return;
-    if (menu().contains(e.target)) return;
-    if (anchor && anchor.contains && anchor.contains(e.target)) return;
-    close();
-    if (e.target === canvas) { e.preventDefault(); e.stopPropagation(); }
-  }
-  return { open, close, toggle, isOpen, place, onDown };
+  // Open / close / Esc / click-away are POPUP's (js/popup.js); only Esc is
+  // this sheet's own key, so every other shortcut still fires behind it.
+  const { open, close, toggle, isOpen, place, clickAway } =
+    POPUP.make({ el: menu, render, opener: "keysBtn" });
+  return { open, close, toggle, isOpen, place, clickAway };
 })();
 

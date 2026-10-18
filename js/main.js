@@ -20,17 +20,16 @@
  *
  * Reads:   advanceTracers, buildPanel, buildToolbar, canvas, clearAllGauges,
  *          clearGaugeHistory, clearInstruments, collectStream, CONFIG, DOCK,
- *          EMBED, EX, familyOf, fieldFor, FIELDS, fitBar, forceScale,
+ *          EMBED, EX, familyOf, fieldFor, FIELDS, fitBar, FMT, forceScale,
  *          GAUGE_QTY, gaugeFieldOf, gaugeQty, gaugeSeries, GEOM, GINSP, gov,
- *          governFrame, governLearn, KEYMAP, KEYS, LEGEND, measuringAvg,
- *          MINI, octx, over, OVERLAY, PICKER, placeCV, placeFlux,
- *          placeGauge, placeRake, rangeFor, refreshGrade, refreshNote,
- *          removeFluxAt, removeGauge, requestStream, RIG, sampleCV,
- *          sampleFlux, sampleForce, sampleGauges, sampleInlet, sampleRakes,
- *          SCENES, scenesOffered, seedTracers, setPanel, Shaders, showToast,
- *          sim, SIM, START, state, statWin, syncBarH, syncPanel, syncToolbar,
- *          syncValveBtn, toastTimer, TOOL_KEYS, TOOLBAR, TOOLS, UIMODE,
- *          VEX_FIT_MAX, VEX_MAX, view, vmaxFor, wheelHint
+ *          governFrame, governLearn, KEYMAP, KEYS, LEGEND, measuringAvg, MINI,
+ *          octx, over, OVERLAY, PICKER, placeCV, placeFlux, placeGauge, placeRake,
+ *          POPUP, rangeFor, refreshGrade, refreshNote, removeFluxAt, removeGauge,
+ *          requestStream, RIG, sampleCV, sampleFlux, sampleForce, sampleGauges,
+ *          sampleInlet, sampleRakes, SCENES, scenesOffered, seedTracers, setPanel,
+ *          Shaders, showToast, sim, SIM, START, state, statWin, syncBarH,
+ *          syncPanel, syncToolbar, syncValveBtn, toastTimer, TOOL_KEYS, TOOLBAR,
+ *          TOOLS, UI, UIMODE, VEX_FIT_MAX, VEX_MAX, view, vmaxFor, wheelHint
  */
 // --------------------------------------------------------------- geometry
 /** Letterbox rect of the whole domain at zoom 1 — the zoomed view scales
@@ -733,10 +732,10 @@ function tickFrame(realDt) {
     simAdvanced = SIM.step(want);
     state.nsub = want;
     if (warming) {
-      document.getElementById("hint").innerHTML = exWarm > 0
+      FMT.putHTML(document.getElementById("hint"), exWarm > 0
         ? EX.settleHint()
         : "establishing steady flow… <b>" + sim.t.toFixed(1) + " / " +
-          state.scene.spinup.toFixed(0) + " s</b>";
+          state.scene.spinup.toFixed(0) + " s</b>");
       MINI.keep("hint");
       // A minimised tips pill still shows the countdown — reading a number
       // before the flow has settled is the classic worksheet mistake.
@@ -879,7 +878,7 @@ function drawOverlay(A) {
   // the colour ranges; the bar at the bottom left says what it is.
   if (state.rakes.some((rk) => rk.buf)) {
     const uRef = Math.max(0.05, rangeFor("speed")[1]);
-    const pxPerMps = Math.min(view.w * 0.13, 110) / uRef;
+    const pxPerMps = OVERLAY.rakePxPerMps(view, uRef);
     state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A, pxPerMps); });
     OVERLAY.drawRakeScale(ctx, view, pxPerMps);
   }
@@ -1057,10 +1056,10 @@ function drawMarkers(ctx) {
           + (p.inflow.free > 0.5 ? " · head-driven"
              : st.choked ? " · energy line · over-drawn"
              : drawn > 0.005 ? " · energy line" : ""),
-      "#7fd4ff", "res");
+      OVERLAY.C.res, "res");
   }
   if (p.tailwater.on > 0.5) {
-    level("R", p.tailwater.level, "tailwater " + p.tailwater.level.toFixed(2) + " m", "#5fd08a", "tw");
+    level("R", p.tailwater.level, "tailwater " + p.tailwater.level.toFixed(2) + " m", OVERLAY.C.tw, "tw");
   }
   const wall = SIM.wallPaddle();
   if (wall) {
@@ -1096,7 +1095,7 @@ function drawMarkers(ctx) {
     ctx.beginPath(); ctx.moveTo(face, yTop);
     if (flap) {
       ctx.lineTo(faceBot, V.Y(zh)); ctx.stroke();
-      ctx.beginPath(); ctx.arc(faceBot, V.Y(zh), 3.5, 0, 2 * Math.PI); ctx.stroke();   // the hinge
+      ctx.beginPath(); ctx.arc(faceBot, V.Y(zh), 3.5, 0, OVERLAY.TAU); ctx.stroke();   // the hinge
     } else { ctx.lineTo(face, yBot); ctx.stroke(); }
     // the push/pull arrow: its length is the paddle's speed now
     const u = pd.U / Math.max(p.wave.amp * om, 1e-6), ym = yTop + 34, L = 24 * u;
@@ -1109,13 +1108,13 @@ function drawMarkers(ctx) {
       ctx.moveTo(b, ym); ctx.lineTo(b + s * 5, ym + 4);
       ctx.stroke();
     }
-    OVERLAY.chip(ctx, face + 6, yTop + 12, flap ? "hinged flap" : "wave paddle", "#ffb648");
+    OVERLAY.chip(ctx, face + 6, yTop + 12, flap ? "hinged flap" : "wave paddle", OVERLAY.C.piston);
     ctx.restore();
   } else if (p.wave.on > 0.5) {
     const x = V.X(p.wave.x), f = flashOf("piston");
     ctx.save();
     ctx.globalAlpha = 0.5 + 0.5 * f;
-    ctx.strokeStyle = "#ffb648"; ctx.lineWidth = 1.4 + 2 * f;
+    ctx.strokeStyle = OVERLAY.C.piston; ctx.lineWidth = 1.4 + 2 * f;
     ctx.setLineDash([5, 5]);
     ctx.beginPath(); ctx.moveTo(x, V.Y(0)); ctx.lineTo(x, V.Y(sim.H)); ctx.stroke();
     ctx.setLineDash([]);
@@ -1127,7 +1126,7 @@ function drawMarkers(ctx) {
     ctx.moveTo(x + 14, ym); ctx.lineTo(x + 8, ym - 4);
     ctx.moveTo(x + 14, ym); ctx.lineTo(x + 8, ym + 4);
     ctx.stroke();
-    OVERLAY.chip(ctx, x + 8, ym - 16, "piston", "#ffb648");
+    OVERLAY.chip(ctx, x + 8, ym - 16, "piston", OVERLAY.C.piston);
     ctx.restore();
   }
   // open edges: outward chevrons
@@ -1166,9 +1165,9 @@ function drawSpout(ctx) {
   const fl = flashOf("spout");
   ctx.save();
   ctx.globalAlpha = Math.min(1, (s.on > 0.5 ? 0.9 : 0.35) + 0.4 * fl);
-  ctx.strokeStyle = "#7fd4ff"; ctx.lineWidth = 1.6 + 2 * fl;
+  ctx.strokeStyle = OVERLAY.C.spout; ctx.lineWidth = 1.6 + 2 * fl;
   ctx.setLineDash([4, 3]);
-  ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, OVERLAY.TAU); ctx.stroke();
   ctx.setLineDash([]);
   const sp = Math.hypot(s.vx, s.vz);
   if (sp > 0.05) {
@@ -1181,7 +1180,7 @@ function drawSpout(ctx) {
     ctx.lineTo(x + ax * L - (ax * 6 + ay * 4), y + ay * L - (ay * 6 - ax * 4));
     ctx.stroke();
   }
-  if (state.tool === "spout") OVERLAY.chip(ctx, x + r + 6, y - r - 6, "spout", "#7fd4ff");
+  if (state.tool === "spout") OVERLAY.chip(ctx, x + r + 6, y - r - 6, "spout", OVERLAY.C.spout);
   ctx.restore();
 }
 
@@ -1313,19 +1312,14 @@ function boot() {
     e.preventDefault(); e.stopPropagation();          // not the global Space = pause
     chipMenu(title);
   });
-  window.addEventListener("pointerdown", PICKER.onDown, true);
-  addEventListener("resize", () => { if (PICKER.isOpen()) PICKER.place(); });
 
   // The exercise menu (see EX). Three ways in: the strip's Exercises icon, the
   // panel's Exercise row and the E key; `?ex=<id>` boots straight into one,
   // and the start screen's list is a fourth door onto the same `pick`.
-  window.addEventListener("pointerdown", EX.onDown, true);
-  addEventListener("resize", () => { if (EX.isOpen()) EX.place(); });
-
-  window.addEventListener("pointerdown", KEYS.onDown, true);
-  window.addEventListener("pointerdown", LEGEND.onDown, true);
-  addEventListener("resize", () => { if (KEYS.isOpen()) KEYS.place(); });
-  addEventListener("resize", () => { if (LEGEND.menuIsOpen()) LEGEND.place(); });
+  // Click-away (in capture, so a dismissing click on the canvas dismisses
+  // only) and the one resize listener for all four menus: the scene and
+  // exercise menus, the keyboard sheet and the legend's field menu.
+  POPUP.init();
 
   // The dock's two handles. Wired here rather than when a brief is first
   // built, so folding works whatever ends up in the dock.
@@ -1443,12 +1437,10 @@ function boot() {
       if (e.key === "Escape") { e.preventDefault(); START.close(); }
       return;
     }
-    // An open menu owns the keyboard: Esc/arrows/Enter are its own, and every
-    // other shortcut is swallowed rather than fired behind it.
-    if (PICKER.isOpen()) { PICKER.key(e); return; }
-    if (EX.isOpen()) { EX.key(e); return; }
-    if (KEYS.isOpen() && e.key === "Escape") { e.preventDefault(); KEYS.close(); return; }
-    if (LEGEND.menuIsOpen() && e.key === "Escape") { e.preventDefault(); LEGEND.closeMenu(); return; }
+    // An open menu owns the keyboard. The scene and exercise menus take Esc,
+    // arrows and Enter and swallow every other shortcut; the keyboard sheet and
+    // the legend's field menu take Esc only (see POPUP).
+    if (POPUP.key(e)) return;
     const row = KEYMAP.match(e);
     if (!row) return;
     // A held key must not flicker a toggle; only brush size and zoom repeat.
@@ -1552,7 +1544,7 @@ window.APP = {
   // The chrome, for headless work: test/ui-smoke.mjs drives the strip, the
   // dock and the start screen through here rather than by synthesising
   // clicks at pixel positions.
-  ui: { TOOLBAR, DOCK, START, KEYS, fitBar, syncBarH, syncToolbar, FIELDS, rangeFor,
+  ui: { UI, TOOLBAR, DOCK, START, KEYS, fitBar, syncBarH, syncToolbar, FIELDS, rangeFor,
         RAMPS: Shaders.RAMPS, GAUGE_QTY },
   pickExercise: (id, d) => EX.pick(id, d === undefined ? undefined : { digit: d }),
   LEGEND,                                  // the colour key and field picker

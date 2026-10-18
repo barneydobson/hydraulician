@@ -2011,6 +2011,70 @@ async function main() {
       await tab.close();
     });
 
+    // ------------------------------------------------------- shared popup
+    await runCase("an exercise pick builds the toolbar once and syncs the panel once", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      // A card with a rig (so the pick lands a microtask later) and one
+      // without; the counters are UI.count, bumped only when the work really
+      // runs, so a deferred call that is merged away does not count.
+      const r = await tab.evaluate(`
+        const ids = APP.EX.all().filter((e) => !(e.gauges && e.gauges.length));
+        const withRig = ids.find((e) => APP.EX.hasRig(e)), plain = ids.find((e) => !APP.EX.needsRig(e));
+        const one = async (e) => {
+          if (!e) return null;
+          const c0 = Object.assign({}, APP.ui.UI.count);
+          APP.pickExercise(e.id);
+          await APP.EX.ready;
+          return { id: e.id, bar: APP.ui.UI.count.bar - c0.bar, panel: APP.ui.UI.count.panel - c0.panel };
+        };
+        return one(withRig).then(async (a) => ({ a, b: await one(plain) }));
+      `);
+      check("a rig card was found to pick", !!r.a);
+      if (r.a) {
+        eq("the strip is built once (rig card " + r.a.id + ")", r.a.bar, 1);
+        eq("the panel is synced once (rig card " + r.a.id + ")", r.a.panel, 1);
+      }
+      if (r.b) {
+        eq("the strip is built once (card " + r.b.id + ")", r.b.bar, 1);
+        eq("the panel is synced once (card " + r.b.id + ")", r.b.panel, 1);
+      }
+      await tab.close();
+    });
+
+    await runCase("every menu closes on Escape and on click-away", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const menus = {
+          scenes:    { m: "scenemenu", open: () => APP.PICKER.open() },
+          exercises: { m: "exmenu",    open: () => APP.EX.open() },
+          keys:      { m: "keysmenu",  open: () => APP.ui.KEYS.open() },
+          fields:    { m: "legmenu",   open: () => document.getElementById("legPick").click() },
+        };
+        const isOpen = (k) => document.getElementById(menus[k].m).classList.contains("open");
+        const out = {};
+        for (const k of Object.keys(menus)) {
+          menus[k].open();
+          const opened = isOpen(k);
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          const esc = !isOpen(k);
+          menus[k].open();
+          document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+          out[k] = { opened, esc, away: !isOpen(k) };
+        }
+        // Opening one closes the others: they are alternatives, not a stack.
+        APP.PICKER.open(); APP.ui.KEYS.open();
+        out.exclusive = !isOpen("scenes") && isOpen("keys");
+        return out;
+      `);
+      for (const k of ["scenes", "exercises", "keys", "fields"]) {
+        check(k + " menu opens", r[k].opened);
+        check(k + " menu closes on Escape", r[k].esc);
+        check(k + " menu closes on click-away", r[k].away);
+      }
+      check("opening one menu closes the others", r.exclusive);
+      await tab.close();
+    });
+
     // ------------------------------------------------------- touch parity
     await runCase("Escape closes the field menu", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");

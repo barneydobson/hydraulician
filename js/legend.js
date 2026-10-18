@@ -10,9 +10,9 @@
  * Defines: LEGEND, UIMODE
  *
  * Reads:   buildToolbar, dragWindow, familyOf, fieldBlurb, fieldById, fieldFor,
- *          FIELDS, GAUGE_QTY, measuringAvg, onDown, rangeFor, RECON, setAverage,
- *          Shaders, showToast, SIM, sim, state, syncPanel, syncToolbar, TOOLS,
- *          vmaxFor
+ *          FIELDS, FMT, GAUGE_QTY, measuringAvg, POPUP, rangeFor, RECON,
+ *          setAverage, Shaders, showToast, SIM, sim, state, syncPanel,
+ *          syncToolbar, TOOLS, UI, vmaxFor
  */
 /** The colour key — and the field picker, because they are the same question.
  *
@@ -27,9 +27,22 @@
  *  legend arriving with it, and its bar is painted from `Shaders.RAMPS` — the
  *  same five stops the water is painted with. */
 const LEGEND = (() => {
-  let open = true, menuOpen = false;
+  let open = true;
   const el = () => document.getElementById("legend");
   const menu = () => document.getElementById("legmenu");
+  // The field menu: Esc and click-away are POPUP's, like the other three
+  // (js/popup.js). It lights the picker button itself and hangs left-aligned
+  // under it; only Esc is its own key, as before.
+  const menuPopup = POPUP.make({
+    el: menu, render: renderMenu,
+    opener: [["legPick", "open"]],
+    place: (m, a) => {
+      const r = a.getBoundingClientRect();
+      m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.left)) + "px";
+      m.style.top = Math.max(8, Math.min(innerHeight - m.offsetHeight - 8, r.bottom + 6)) + "px";
+    },
+  });
+  const menuIsOpen = menuPopup.isOpen, closeMenu = menuPopup.close, place = menuPopup.place;
 
   /** A CSS gradient from the ramp the shader itself uses. */
   function css(stops) {
@@ -142,8 +155,8 @@ const LEGEND = (() => {
     document.getElementById("legName").textContent = f.name;
     document.getElementById("legSym").textContent = f.sym;
     document.getElementById("legUnit").textContent = f.unit;
-    document.getElementById("legLo").textContent = fmtNum(r[0]);
-    document.getElementById("legHi").textContent = fmtNum(r[1]);
+    document.getElementById("legLo").textContent = FMT.num(r[0]);
+    document.getElementById("legHi").textContent = FMT.num(r[1]);
     const bars = document.getElementById("legBars");
     bars.textContent = "";
     if (f.id === "water") {
@@ -152,7 +165,7 @@ const LEGEND = (() => {
       // CHANNEL of the colour carries it, which is the part nothing said.
       bars.appendChild(row(RAMP_CSS.water(), "depth below surface", "hue"));
       bars.appendChild(row("linear-gradient(to right, rgba(255,255,255,0.05), rgba(255,255,255,0.55))",
-                           "speed, 0 – " + fmtNum(vmaxFor()) + " m/s", "brightness"));
+                           "speed, 0 – " + FMT.num(vmaxFor()) + " m/s", "brightness"));
     } else {
       // The numbers are on the foot row, where they can be typed into; the
       // caption carries the symbol so the bar is not an anonymous smear.
@@ -166,13 +179,12 @@ const LEGEND = (() => {
     // to be told, or H̃ gets read as a time-averaged energy head.
     el().classList.toggle("avg", !!state.avg);
     const what = document.getElementById("legAvgWhat");
-    if (what) put(what, state.avg ? (f.mean || "") : "");
-    if (menuOpen) renderMenu();
+    if (what) FMT.put(what, state.avg ? (f.mean || "") : "");
+    if (menuIsOpen()) renderMenu();
   }
 
   /** Only when it moved. At 60 fps an unconditional textContent write is a
    *  layout every frame for a number that changes in the second decimal. */
-  function put(el, text) { if (el && el.textContent !== text) el.textContent = text; }
 
   let probeTick2 = 0, hov = null;      // the cursor probe's own 1-in-3 throttle
   /** The Average block's live half: the elapsed window, and what the mean
@@ -189,9 +201,9 @@ const LEGEND = (() => {
   function avgTick(avgCols) {
     const t = document.getElementById("legAvgT");
     if (!t) return;
-    put(t, "T = " + SIM.avgT().toFixed(2) + " s");
+    FMT.put(t, "T = " + SIM.avgT().toFixed(2) + " s");
     const r = document.getElementById("legAvgRead");
-    if (!state.inside || !avgCols) { put(r, "— hover the water for the averaged column"); return; }
+    if (!state.inside || !avgCols) { FMT.put(r, "— hover the water for the averaged column"); return; }
     const C = avgCols.C;
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(state.cursor[0] / sim.dx)));
     const dBar = C[i * 4 + 1];
@@ -205,7 +217,7 @@ const LEGEND = (() => {
     // student should not need the notation register to read it. The doc keeps
     // the accurate names (docs/averaging.md §7.3).
     const p = hov;
-    put(r, "fill " + (p ? p.fbar.toFixed(2) : "—") +
+    FMT.put(r, "fill " + (p ? p.fbar.toFixed(2) : "—") +
            "  depth " + dBar.toFixed(3) + " m" +
            "  gap " + (da < 0 ? "−" : "+") + (Math.abs(da) * 1000).toFixed(0) + " mm" +
            "  spread " + (avgCols.sigma[i] * 1000).toFixed(0) + " mm");
@@ -221,16 +233,6 @@ const LEGEND = (() => {
     cap.appendChild(a); cap.appendChild(c);
     d.appendChild(bar); d.appendChild(cap);
     return d;
-  }
-
-  /** Three figures that read, without exponent soup on a 0.0004 range. */
-  function fmtNum(v) {
-    if (!isFinite(v)) return "—";
-    const a = Math.abs(v);
-    return a >= 100 ? v.toFixed(0)
-         : a >= 1 ? v.toFixed(2)
-         : a >= 0.01 ? v.toFixed(3)
-         : v === 0 ? "0" : v.toExponential(1);
   }
 
   function renderMenu() {
@@ -250,32 +252,7 @@ const LEGEND = (() => {
     });
     place();
   }
-  /** Put the open menu under its button; also called on resize. */
-  function place() {
-    const m = menu(), pick = document.getElementById("legPick");
-    if (!m || !pick) return;
-    const a = pick.getBoundingClientRect();
-    m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, a.left)) + "px";
-    m.style.top = Math.max(8, Math.min(innerHeight - m.offsetHeight - 8, a.bottom + 6)) + "px";
-  }
-  function toggleMenu() { if (menuOpen) closeMenu(); else openMenu(); }
-  function openMenu() {
-    menuOpen = true; menu().classList.add("open");
-    document.getElementById("legPick").classList.add("open");
-    renderMenu();
-  }
-  function closeMenu() {
-    menuOpen = false;
-    if (menu()) menu().classList.remove("open");
-    const p = document.getElementById("legPick");
-    if (p) p.classList.remove("open");
-  }
-  function onDown(e) {
-    if (!menuOpen) return;
-    if (menu().contains(e.target)) return;
-    if (document.getElementById("legPick").contains(e.target)) return;
-    closeMenu();
-  }
+  function toggleMenu() { menuPopup.toggle(document.getElementById("legPick")); }
 
   function setOpen(v) {
     open = v;
@@ -284,9 +261,9 @@ const LEGEND = (() => {
     sync();
     syncToolbar();
   }
-  return { build, sync, fit, onDown, avgTick, place, closeMenu,
+  return { build, sync, fit, avgTick, place, closeMenu,
            isOpen: () => open,
-           menuIsOpen: () => menuOpen,
+           menuIsOpen,
            open: () => setOpen(true),
            close: () => setOpen(false),
            toggle: () => setOpen(!open) };
@@ -371,7 +348,8 @@ const UIMODE = (() => {
            Object.keys(u.readouts || {}).some((k) => u.readouts[k] === false);
   }
 
-  function apply(profile) {
+  function apply(profile) { UI.batch(() => applyNow(profile)); }
+  function applyNow(profile) {
     state.ui = Object.assign(full(), profile || {});
     // The tool in hand must be one the strip offers. Before this the default
     // Wall stayed armed under a card that hides BUILD, so the first touch on

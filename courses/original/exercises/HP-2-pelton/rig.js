@@ -34,7 +34,7 @@
  *   APP.probe(x,y) -> {u,v,p,phead}     .phead is p/(rho g) ONLY -- PRESSURE
  *     head, not full piezometric head (LL-1v's rule, CHANGES-NEEDED.md).
  *     Piezometric head = probe(x,y).phead + y. The on-screen GAUGE tool adds
- *     the +y for you (js/main.js sampleGauges: h: gg.z + pr.phead) -- read
+ *     the +y for you (js/instruments.js sampleGauges: h: zp + phead, zp = j*dx) -- read
  *     GAUGES for any head comparison, or add +y by hand if hovering raw.
  *
  * MEASURED FACTS (Medium, sandbox W=9 H=5, 414x230, dx=0.021739 m,

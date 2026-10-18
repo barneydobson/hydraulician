@@ -651,7 +651,7 @@ const OVERLAY = (() => {
   /** THE HOVER CARD'S ROWS, as a register -- the one place they are named.
    *
    *  An exercise profile names these ids to choose what its student reads
-   *  (js/main.js, UIMODE.rows), and check_pack.py validates a profile's list
+   *  (js/legend.js, UIMODE.rows), and check_pack.py validates a profile's list
    *  against ROW_IDS so a typo fails the pack instead of quietly hiding a row.
    *  Adding a row means adding an id here and tagging the push below; the two
    *  are checked against each other by the layout gate.
@@ -723,7 +723,7 @@ const OVERLAY = (() => {
 
   /** Streamlines: contour segments of ψ (STREAM.contours), in metres, plus a
    *  one-line key quoting the discharge each tube carries. `L` is
-   *  {seg, dpsi, avg} as main.js refreshStream keeps it. */
+   *  {seg, dpsi, avg} as js/instruments.js requestStream keeps it. */
   function drawStreamlines(ctx, V, L) {
     if (!L || !L.seg) return;
     const s = L.seg;
@@ -984,7 +984,7 @@ const OVERLAY = (() => {
     rk.qE = rk.qE === undefined ? qNow : rk.qE + 0.10 * (qNow - rk.qE);
     const q = rk.qE;
     // ONE scale for every rake in the scene: `pxPerMps`, from the scene's
-    // held speed range (main.js rakeScale), so two rakes compare side by side
+    // held speed range (main.js drawOverlay, from rangeFor("speed")), so two rakes compare side by side
     // and still water draws a nearly flat line; the scale bar (drawRakeScale)
     // says what a length means. A section faster than the range is clipped at
     // 1.6× the nominal length rather than run across the view.
@@ -1060,7 +1060,7 @@ const OVERLAY = (() => {
       rects.push({ k, x, y, w: W, h: H });
       const Q = pick(gg), label = Q.label, unit = Q.unit, val = Q.get;
       // `series`: what to plot — the scrolling window, or the whole run from
-      // t = 0 (main.js gaugeSeries); the card's look is the same either way.
+      // t = 0 (js/instruments.js gaugeSeries); the card's look is the same either way.
       const hist = Q.series || gg.hist;
       ctx.save();
       ctx.fillStyle = "rgba(12,17,26,0.80)";
@@ -1540,7 +1540,7 @@ const OVERLAY = (() => {
       // function comment).
       //
       // And it is HELD, not refitted: `force.scale` is the SCENE's scale
-      // (main.js `forceScale`), {headMax} set from the largest head on any
+      // (js/instruments.js `forceScale`), {headMax} set from the largest head on any
       // wall at the first pick and shared by every face picked after it, so
       // the diagram neither breathes with the frame nor resizes as you click
       // from face to face — a bigger triangle is a bigger force, anywhere in

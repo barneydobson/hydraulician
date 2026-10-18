@@ -9,7 +9,7 @@
    exercise: the RIG snapshot JSON its folder's rig.js produces. Every
    entry belongs to the original teaching pack, so "its folder" is
    courses/original/exercises/<folder>/, and the "FOLDER/rig.js · ..."
-   headings below are relative to that. There are 18 payloads, one per key. Keys are exercise ids (global), so
+   headings below are relative to that. One payload per key; keys are exercise ids (global), so
    this file is shared: any course's card may point its `rig` at one.
 
    Hand an entry to APP.RIG.apply() (js/rig.js) and the drawn geometry, the

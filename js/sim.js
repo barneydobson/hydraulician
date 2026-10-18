@@ -365,7 +365,7 @@ const SIM = (() => {
     // the mean was accumulated through are no longer the walls on screen, and
     // §9 of docs/averaging.md lists a geometry edit as a reset condition. This
     // is the choke point for every path that moves a wall — the drawing tools
-    // here, and the boundary-open toggles in main.js — so one reset covers
+    // here, and the boundary-open toggles in js/panel.js — so one reset covers
     // them all. A no-op during build(), which nulls S.avg before it calls
     // this, so it can neither double-start nor fight build()'s own wasAvg
     // restore.
@@ -1414,7 +1414,7 @@ const SIM = (() => {
 
   /** Fire one wave train (wave.train > 0). Every press is a fresh
    *  experiment: the flume is reset to still water and t = 0 (resetWater,
-   *  which also clears the gauges' history through main.js's t-went-back
+   *  which also clears the gauges' history through js/instruments.js's t-went-back
    *  check), then the train starts at t = 0. A lecturer could not see how to
    *  run WV-5 a second time: the old rule refused a press while the paddle
    *  was still moving, and a second train fired after the first ran into its
@@ -2009,7 +2009,7 @@ const SIM = (() => {
    *  pixel-pack buffer and drops a fence; `streamPoll` checks the fence with
    *  a zero timeout on a later frame and only copies the bytes out once the
    *  GPU says they are there. One request in flight at a time; the caller
-   *  (main.js refreshStream) sets the rate.
+   *  (js/instruments.js requestStream) sets the rate.
    *
    *  Live: from U and F. Average: from the Favre accumulator. The request
    *  remembers which, and the S it was made against, so a result that lands

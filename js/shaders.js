@@ -1391,8 +1391,8 @@ vec4 blUc(vec2 g){                // bilinear, every channel at cell centres
 vec4 blU(vec2 g){
   vec4 U = blUc(g);
   if (u_avg > 0.5) return U;
-  U.r = blUc(g + vec2(0.5, 0.0)).r;   // u: x un-shifted, z shifted -0.5
-  U.g = blUc(g + vec2(0.0, 0.5)).g;   // w: z un-shifted, x shifted -0.5
+  U.r = blUc(g + vec2(0.5, 0.0)).r;   // u: lookup at (g.x, g.z - 0.5) in cell-centre units
+  U.g = blUc(g + vec2(0.0, 0.5)).g;   // w: lookup at (g.x - 0.5, g.z)
   return U;
 }
 // Solid for DRAWING: a wall and a valve cell, open or closed, are both rock

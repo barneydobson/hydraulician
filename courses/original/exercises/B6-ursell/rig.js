@@ -38,7 +38,7 @@
     return { bed: col[i * 4], depth: col[i * 4 + 1], surf: col[i * 4] + col[i * 4 + 1] };
   }
 
-  // Raise the gauge ring-buffer cap (default 900, js/main.js CONFIG.histMax)
+  // Raise the gauge ring-buffer cap (default 900, js/state.js CONFIG.histMax)
   // for the duration of this recording session — a runtime tweak to OUR OWN
   // live tab, not a file edit, so a long-period recording window doesn't
   // silently lose its early samples.

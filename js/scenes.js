@@ -716,7 +716,7 @@ const SCENES = (() => {
     // tilt: true for the same reason as m2 — but tilt has a consequence a
     // gauge-reading exercise has to respect: with the bed drawn flat, the
     // raw column/probe z does NOT carry the S₀·x the geometry represents —
-    // main.js's gauge readout and OVERLAY's S₀/S_f already add tiltS0·x
+    // js/instruments.js's gauge readout and OVERLAY's S₀/S_f already add tiltS0·x
     // back in, and any OTHER headless reader of `surf`/`z` on a tilted scene
     // must do the same or its "head fall" is off by S₀·L.
     //   MEASURED (Medium, Average mode): uniform at 0.268 m from x ≈ 4 to
@@ -747,7 +747,7 @@ const SCENES = (() => {
     // 1.6) with a roller where the water left its sponge — measured at
     // Medium, with the sponge at 0.24 m and at 1.5 m. Instead `qOfLevel`
     // works out what a reservoir at that level delivers to THIS channel,
-    // and the Reservoir level control writes it into Inflow q (main.js):
+    // and the Reservoir level control writes it into Inflow q (js/panel.js):
     // the brink holds critical depth at the lip, the M2 is integrated
     // upstream from it on the solver's own resistance (the log law, with the
     // wall function's z₀ ≈ Δx/4.5), and q is the discharge whose depth at the

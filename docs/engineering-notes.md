@@ -879,7 +879,7 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 
 `state.speed` is what the user ASKS for (simulated seconds per wall second);
 each frame wants `speed · Δt_wall / Δt_sim` substeps and runs at most
-`state.nsubMax`. The governor (`governFrame` in main.js) sets that cap. Spin-up
+`state.nsubMax`. The governor (`governFrame` in js/governor.js) sets that cap. Spin-up
 (`warming`) asks for the cap every frame, i.e. as fast as the governor allows.
 
 **What was wrong (Oct 2026).** The old governor was AIMD on the CPU time
@@ -1395,7 +1395,7 @@ having settled before anything calls into it.
   that nobody watches. A per-face scale was tried next and was wrong too: it
   resized the diagram every time you clicked from one face to the next, so
   the upstream face and the downstream face of the same dyke could not be
-  compared by eye. `forceScale()` in main.js now reads every named face of
+  compared by eye. `forceScale()` in js/instruments.js now reads every named face of
   every solid once, at the first pick, and stores `{headMax}` on
   `state.forceScale`; every selection shares it, so the same pixels per
   metre draw every face and a bigger triangle is a bigger force anywhere in

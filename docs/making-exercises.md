@@ -188,7 +188,7 @@ parameter, and the line is simply left out.
 
 ### The `ui` profile
 
-`UIMODE` (`js/main.js`) derives a profile from the card and merges `ui` on
+`UIMODE` (`js/legend.js`) derives a profile from the card and merges `ui` on
 top:
 
 - `instruments` narrows MEASURE to the tools it names; a card naming no
@@ -258,7 +258,7 @@ and the 5 key never clears). Every sample records every quantity — `p` (pressu
 Pa, shown in kPa), `phead` (p/ρg), `u`, `w`, `speed` (|u|), `eta` (η),
 `d`, `h` (piezometric head) and `H` (total head) — from the one batched
 probe, so switching shows the whole history and the CSV (`⤓ CSV`) always has
-every column at full precision. The register is `GAUGE_QTY` in `js/main.js`.
+every column at full precision. The register is `GAUGE_QTY` in `js/fields.js`.
 Controls → **Gauges plot** (`viewParams.gaugeField`) sets every gauge at
 once and the quantity new gauges start on, which is what old worksheets
 ("set Gauges plot to Depth") and rigs mean by it. A gauge's own choice is

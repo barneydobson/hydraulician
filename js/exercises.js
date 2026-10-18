@@ -134,7 +134,7 @@
  *            switching tabs swaps the steps and the profile, never the bench.
  *            Addressed as ID#key (`?ex=ID&tab=key`).
  *   ui       the UI PROFILE: what of the interface this exercise wants in
- *            front of a student (UIMODE in js/main.js). Families are `build`,
+ *            front of a student (UIMODE in js/legend.js). Families are `build`,
  *            `measure` and `view` — each `true`, `false`, or the list of tool
  *            ids that survive — plus `fields` (which colourings the legend
  *            offers), `legend` (`false` closes the legend), `panel` ("full" /

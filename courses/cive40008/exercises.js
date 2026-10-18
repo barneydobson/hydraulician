@@ -546,7 +546,7 @@ COURSES.exercises("cive40008", [
     // here (Oct 2026) because in this plan view p/ρg divides by g = 0 and
     // shows nothing worth reading; the plain Pressure does not divide by g.
     // Its level is arbitrary in a plan view (~37 kPa, creeping), so its
-    // range is fitted the first time it is shown (pressureRange in main.js).
+    // range is fitted the first time it is shown (pressureRange in js/fields.js).
     ui: { measure: ["gauge", "dye"], view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
           fields: ["speed", "p"], panel: "focused", controls: ["speed", "geom0"],
           gaugeFields: ["speed", "u", "w", "p"], hide: ["energy", "critical"],

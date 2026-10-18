@@ -38,8 +38,12 @@
  *                             docs, pack, avg (default: all, in that order of
  *                             declaration); `api,rig` is the fast subset.
  *         --keep      leaves the browser open on failure for a look.
- *         --write-golden  (re)writes test/golden/instruments-h23.json
+ *         --write-golden  (re)writes test/golden/instruments-h23.json and
+ *                     test/golden/display-h23.json (a 32x16 readback of every field)
  *                     instead of comparing against it; only ever on code known good.
+ *                     Goldens are GPU-specific: each records the WebGL renderer and is
+ *                     compared only on the same one ("golden skipped: ..." otherwise).
+ *         --write-golden-meta  rewrites only the renderer recorded in the instrument golden.
  *         --mutate=<id>  patches one known bug into a served file and runs the
  *                     suite that owns it (the default --only). Exit 0 only if
  *                     an assertion named by the mutant's `kills` text FAILED;
@@ -58,6 +62,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8731 + (process.pid % 200);          // out of the way of a dev server
 const KEEP = process.argv.includes("--keep");
 const WRITE_GOLDEN = process.argv.includes("--write-golden");
+// Rewrites ONLY the GPU identity stored in the instrument golden, keeping its values.
+const WRITE_GOLDEN_META = process.argv.includes("--write-golden-meta");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
   .replace("--only=", "").split(",").filter(Boolean);
 
@@ -529,6 +535,11 @@ SUITES.api = async (B) => {
   // the refactor, compared at 1e-6 relative after. APP.tick(n) is exactly n
   // substeps, so the run does not depend on how fast the machine is.
   await B.goto(`http://localhost:${PORT}/?scene=h23`);
+  const renderer = await B.evaluate(`(() => {
+    const gl = document.getElementById("view").getContext("webgl2");
+    const x = gl.getExtension("WEBGL_debug_renderer_info");
+    return String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+  })()`);
   const gold = await B.evaluate(`(() => {
     __low(); APP.tick(4000);
     const S = APP.SIM, box = [4.0, 0.10, 5.2, 0.60];
@@ -591,13 +602,18 @@ SUITES.api = async (B) => {
     return "{\n" + Object.keys(v).map((k) => pad + JSON.stringify(k) + ": " + pretty(v[k], ind + 1)).join(",\n") + end + "}";
   };
   const fp = fingerprint(JSON.parse(gold));
-  if (WRITE_GOLDEN) {
+  if (WRITE_GOLDEN || WRITE_GOLDEN_META) {
+    // The metadata comes first, so a reader sees whose numbers these are.
+    let body = fp;
+    if (WRITE_GOLDEN_META) { body = JSON.parse(fs.readFileSync(goldPath, "utf8")); delete body._renderer; }
     fs.mkdirSync(path.dirname(goldPath), { recursive: true });
-    fs.writeFileSync(goldPath, pretty(fp, 0) + "\n");
+    fs.writeFileSync(goldPath, pretty({ _renderer: renderer, ...body }, 0) + "\n");
     console.log("\n    wrote " + goldPath);
   } else {
     let want = null;
     try { want = JSON.parse(fs.readFileSync(goldPath, "utf8")); } catch (_) { /* reported below */ }
+    const wantR = want && want._renderer;
+    if (want) delete want._renderer;
     // Agreement: 1e-6 relative, plus an absolute floor of 1e-9 so a value that
     // is zero up to rounding (a cancelling sum) is not judged on its noise.
     const REL = 1e-6, ABS = 1e-9;
@@ -617,11 +633,86 @@ SUITES.api = async (B) => {
       const ratio = Math.abs(a - b) / (REL * Math.max(Math.abs(a), Math.abs(b)) + ABS);
       if (ratio > worst) { worst = ratio; where = at; }
     };
+    if (want && wantR !== renderer) {
+      console.log(`    golden skipped: captured on ${wantR}, running on ${renderer}`);
+    } else {
     if (want) walk(want, fp, "golden");
     ok("API refactor golden: instruments unchanged",
       !!want && !shape && worst <= 1,
       want ? (shape ? "shape differs at " + shape : `worst ${worst.toExponential(2)} x the tolerance (1e-6 rel + 1e-9 abs) at ${where} of ${count} values`)
            : "no golden at " + goldPath + " (run once with --write-golden)");
+    }
+  }
+
+  // ---- display golden (Task 3.2): the nine fields, painted. The instrument
+  // golden covers the CPU readbacks and never touches FS_DISP, so a shader
+  // refactor needs its own: render each field of the same settled scene (live,
+  // then under Average) into the canvas and compare a 32x16 block average of
+  // the drawing buffer (read in the same task as the draw, since the buffer is
+  // not preserved). Tolerance 2/255 per channel.
+  const dispGoldPath = path.join(ROOT, "test", "golden", "display-h23.json");
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);      // a fresh page: the state must not depend on the golden above
+  const dispRaw = await B.evaluate(`(() => {
+    const S = APP.SIM, gl = document.getElementById("view").getContext("webgl2");
+    const GW = 32, GH = 16;
+    const paint = (mode, avg) => {
+      const rg = rangeFor(fieldFor(mode).id);
+      S.render(view, { mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1], pdt: 0, dye: !avg, dyeSeeds: false,
+        particles: false, avg, cursor: [-99, -99, 0], guide: [0, 0, 0, 0], guideOn: false });
+      const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
+      const px = new Uint8Array(cw * ch * 4);
+      gl.readPixels(0, 0, cw, ch, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const out = [];
+      for (let by = 0; by < GH; by++) for (let bx = 0; bx < GW; bx++) {
+        const x0 = Math.floor(bx * cw / GW), x1 = Math.floor((bx + 1) * cw / GW);
+        const y0 = Math.floor(by * ch / GH), y1 = Math.floor((by + 1) * ch / GH);
+        const s = [0, 0, 0]; let n = 0;
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+          const o = (y * cw + x) * 4; s[0] += px[o]; s[1] += px[o + 1]; s[2] += px[o + 2]; n++;
+        }
+        out.push(Math.round(s[0] / n), Math.round(s[1] / n), Math.round(s[2] / n));
+      }
+      return out;
+    };
+    __low(); APP.tick(4000);
+    const modes = FIELDS.map((f) => f.mode), live = {}, avg = {};
+    for (const m of modes) live[m] = paint(m, false);
+    S.avgStart();
+    for (let k = 0; k < 40; k++) {
+      APP.tick(20); S.columns(true);
+      S.avgStepField(20 * S.dt()); S.avgStepColumns(20 * S.dt());
+    }
+    for (const m of modes) avg[m] = paint(m, true);
+    S.avgStop();
+    return JSON.stringify({ canvas: [gl.drawingBufferWidth, gl.drawingBufferHeight], live, avg });
+  })()`);
+  {
+    const cur = JSON.parse(dispRaw);
+    if (WRITE_GOLDEN) {
+      const rows = (o) => "{\n" + Object.keys(o).map((k) => "    " + JSON.stringify(k) + ": " + JSON.stringify(o[k])).join(",\n") + "\n  }";
+      fs.writeFileSync(dispGoldPath, "{\n  \"_renderer\": " + JSON.stringify(renderer) + ",\n  \"canvas\": "
+        + JSON.stringify(cur.canvas) + ",\n  \"live\": " + rows(cur.live) + ",\n  \"avg\": " + rows(cur.avg) + "\n}\n");
+      console.log("\n    wrote " + dispGoldPath);
+    } else {
+      let want = null;
+      try { want = JSON.parse(fs.readFileSync(dispGoldPath, "utf8")); } catch (_) { /* reported below */ }
+      if (want && (want._renderer !== renderer || want.canvas.join() !== cur.canvas.join())) {
+        console.log(`    golden skipped: captured on ${want._renderer} (${want.canvas.join("x")}), running on ${renderer} (${cur.canvas.join("x")})`);
+      } else {
+        let worst = 0, where = "";
+        if (want) for (const part of ["live", "avg"]) for (const m of Object.keys(cur[part])) {
+          const a = want[part][m] || [], b = cur[part][m];
+          if (a.length !== b.length) { worst = 999; where = part + " mode " + m + " length"; continue; }
+          for (let i = 0; i < b.length; i++) {
+            const d = Math.abs(a[i] - b[i]);
+            if (d > worst) { worst = d; where = part + " mode " + m + " block " + Math.floor(i / 3) + " ch " + (i % 3); }
+          }
+        }
+        ok("API display golden: the nine fields paint as before (live and Average)",
+          !!want && worst <= 2,
+          want ? `worst ${worst}/255 at ${where}` : "no golden at " + dispGoldPath + " (run once with --write-golden)");
+      }
+    }
   }
 };
 

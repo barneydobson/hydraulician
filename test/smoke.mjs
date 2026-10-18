@@ -3168,20 +3168,20 @@ SUITES.avg = async (B) => {
   // mean: pins the CPU path; the GPU half-cell offset of the live display is
   // a visual check (blU in FS_DISP).
   const mf = await B.evaluate(`(() => {
-    APP.loadScene("sa1", false); __low(); APP.tick(900);
+    APP.loadScene("sa1", false); __low(); const tSet = __settle(40, 90000);   // settled, or rel below is weather
     const mom = APP.SIM.fieldStats(5, false);
-    APP.SIM.avgStart();
-    for (let n = 0; n < 60 && APP.SIM.avgT() < 20; n++) APP.tick(100);
+    APP.avg.set(true);                     // the display field accumulates in the frame loop
+    for (let n = 0; n < 60 && APP.SIM.avgT() < 8; n++) APP.frames(60);
     const T = APP.SIM.avgT();
     const mean = APP.SIM.fieldStats(2, true), live = APP.SIM.fieldStats(2, false);
-    APP.SIM.avgStop();
-    return { momHi: mom.hi, T, meanHi: mean.hi, liveHi: live.hi,
+    APP.avg.set(false);
+    return { momHi: mom.hi, tSet, T, meanHi: mean.hi, liveHi: live.hi,
              rel: Math.abs(mean.hi - live.hi) / Math.max(live.hi, 1e-9) };
   })()`);
   ok("display Fit of Momentum flux is in kg/m/s²",
      mf.momHi >= 100, JSON.stringify(mf));
   ok("live and mean Speed agree on a steady reach",
-     mf.T >= 20 && mf.rel < 0.10, JSON.stringify(mf));
+     mf.tSet >= 39.5 && mf.T >= 8 && mf.rel < 0.10, JSON.stringify(mf));
 };
 
 

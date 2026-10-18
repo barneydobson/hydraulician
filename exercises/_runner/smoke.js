@@ -3155,6 +3155,27 @@ SUITES.avg = async (B) => {
      ft.refN > 100 && ft.relLive > 0.02, JSON.stringify(ft));
   ok("avg Fit reads the MEAN field, not the instant behind it",
      ft.relRef < 1e-5 && ft.gotN === ft.refN, JSON.stringify(ft));
+
+  // Task 2.4. Momentum flux is labelled rho u|u| in kg/m/s^2, so the Fit of a
+  // settled reach has to be in those units (~500 on sa1; the kinematic value
+  // was ~0.5). And a steady reach must read the same speed live and as a
+  // mean: pins the CPU path; the GPU half-cell offset of the live display is
+  // a visual check (blU in FS_DISP).
+  const mf = await B.evaluate(`(() => {
+    APP.loadScene("sa1", false); __low(); APP.tick(900);
+    const mom = APP.SIM.fieldStats(5, false);
+    APP.SIM.avgStart();
+    for (let n = 0; n < 60 && APP.SIM.avgT() < 20; n++) APP.tick(100);
+    const T = APP.SIM.avgT();
+    const mean = APP.SIM.fieldStats(2, true), live = APP.SIM.fieldStats(2, false);
+    APP.SIM.avgStop();
+    return { momHi: mom.hi, T, meanHi: mean.hi, liveHi: live.hi,
+             rel: Math.abs(mean.hi - live.hi) / Math.max(live.hi, 1e-9) };
+  })()`);
+  ok("display Fit of Momentum flux is in kg/m/s²",
+     mf.momHi >= 100, JSON.stringify(mf));
+  ok("live and mean Speed agree on a steady reach",
+     mf.T >= 20 && mf.rel < 0.10, JSON.stringify(mf));
 };
 
 

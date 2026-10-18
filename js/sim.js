@@ -2090,7 +2090,7 @@ const SIM = (() => {
         else if (mode === 7) q = z - tilt * x + P / g + (u * u + w * w) / (2 * g);
         else if (mode === 2) q = Math.hypot(u, w);
         else if (mode === 3) q = Math.abs(u) / Math.sqrt(Math.max(g * col[i * 4 + 1], 1e-4));
-        else if (mode === 5) q = F[k] * u * Math.hypot(u, w);
+        else if (mode === 5) q = 1000 * F[k] * u * Math.hypot(u, w);   // ρ = 1000: kg/m/s²
         else if (mode === 4 && i > 0 && j > 0 && i < S.nx - 1 && j < S.ny - 1) {
           // Vorticity is a stencil, not a cell: ∂w/∂x − ∂u/∂z, as FS_DISP does it.
           const dwdx = U[(j * S.nx + i + 1) * 4 + 1] - U[(j * S.nx + i - 1) * 4 + 1];

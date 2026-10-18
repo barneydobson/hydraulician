@@ -477,7 +477,7 @@ function pressureRange() {
   return [0, +(g * (s.headMax || 3)).toFixed(1)];
 }
 /** The momentum-flux scale, as the display pass has always computed it. */
-function momScene() { return 0.5 * Math.pow(sceneNow().vmax || 4, 2); }
+function momScene() { return 1000 * 0.5 * Math.pow(sceneNow().vmax || 4, 2); }   // ρ = 1000: kg/m/s²
 
 /** The registry entry for a shader mode integer. */
 function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }

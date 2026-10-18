@@ -852,8 +852,9 @@ uniform sampler2D u_U, u_F, u_S;
 uniform vec2  u_res;
 uniform float u_dx, u_valve;
 
+ivec2 CLc(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
 float SO(ivec2 c){
-  float s = texelFetch(u_S, c, 0).r;
+  float s = texelFetch(u_S, CLc(c), 0).r;
   return s > 0.75 ? 1.0 : (s > 0.25 ? u_valve : 0.0);
 }
 
@@ -893,7 +894,7 @@ void main(){
     if (f < 0.25) { dry++; if (dry > 2) break; continue; }
     dry = 0;
     float uc = 0.5 * (texelFetch(u_U, ivec2(i,  j), 0).r
-                    + texelFetch(u_U, ivec2(i+1,j), 0).r);
+                    + texelFetch(u_U, CLc(ivec2(i+1,j)), 0).r);
     d += f * u_dx;
     q += fr * uc * u_dx;
     if (f > 0.5) top = (float(j) + 1.0) * u_dx;
@@ -921,8 +922,9 @@ uniform sampler2D u_F, u_S;
 uniform vec2  u_res;
 uniform float u_dx, u_valve;
 
+ivec2 CLc(ivec2 c){ return clamp(c, ivec2(0), ivec2(u_res) - ivec2(1)); }
 float SO(ivec2 c){
-  float s = texelFetch(u_S, c, 0).r;
+  float s = texelFetch(u_S, CLc(c), 0).r;
   return s > 0.75 ? 1.0 : (s > 0.25 ? u_valve : 0.0);
 }
 
@@ -1250,12 +1252,24 @@ vec4 blF(vec2 g){
   vec4 c = fAt(i + ivec2(0,1)), d = fAt(i + ivec2(1,1));
   return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
 }
-vec4 blU(vec2 g){
+vec4 blUc(vec2 g){                // bilinear, every channel at cell centres
   g -= 0.5;
   ivec2 i = ivec2(floor(g)); vec2 f = g - vec2(i);
   vec4 a = uAt(i),              b = uAt(i + ivec2(1,0));
   vec4 c = uAt(i + ivec2(0,1)), d = uAt(i + ivec2(1,1));
   return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+}
+/** Live U is staggered (channel contract at u_U): r = u on the cell's WEST
+ *  face, g = w on its SOUTH face, b/a at the centre. So u is interpolated
+ *  with a half-cell shift in z only and w with a half-cell shift in x only
+ *  (the same sampling FS_PART's velAt does). The Average field is collocated
+ *  at centres (uAt), so it keeps the centred blend. */
+vec4 blU(vec2 g){
+  vec4 U = blUc(g);
+  if (u_avg > 0.5) return U;
+  U.r = blUc(g + vec2(0.5, 0.0)).r;   // u: x un-shifted, z shifted -0.5
+  U.g = blUc(g + vec2(0.0, 0.5)).g;   // w: z un-shifted, x shifted -0.5
+  return U;
 }
 float solAt(vec2 g){
   ivec2 i = ivec2(clamp(g, vec2(0.0), u_res - vec2(1.0)));
@@ -1421,7 +1435,7 @@ void main(){
     // opposite to the flow that drives it, which is the thing worth seeing:
     // where the momentum actually goes in a jump or under a breaker.
     float sp = length(U.rg);
-    float mom = f * U.r * sp;
+    float mom = 1000.0 * f * U.r * sp;      // rho = 1000 kg/m3: kg/m/s^2
     water = divg(nrmMid(mom, 0.0));
   }
   c = mix(c, water, wet);

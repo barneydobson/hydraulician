@@ -124,7 +124,12 @@ const state = {
 
 /** `?embed=1`: the app is sitting in an LMS iframe (docs/embedding.md). Read
  *  once — an opt-in by URL, not `window !== top`, so a plain tab can test it. */
-const EMBED = new URLSearchParams(location.search).has("embed");
+// On for `?embed=1` and the bare `?embed` (empty value); off for `?embed=0`,
+// `?embed=false` and any other explicit value.
+const EMBED = (() => {
+  const v = new URLSearchParams(location.search).get("embed");
+  return v === "" || v === "1";
+})();
 
 let canvas, over, octx, view, sim;
 
@@ -481,6 +486,10 @@ function momScene() { return 1000 * 0.5 * Math.pow(sceneNow().vmax || 4, 2); }  
 
 /** The registry entry for a shader mode integer. */
 function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }
+/** The registry entry for a field id, or the first field when the id is unknown. */
+function fieldById(id) { return FIELDS.find((f) => f.id === id) || FIELDS[0]; }
+/** Gravity magnitude for the notes below; g = 0 (plan view) falls back to 9.81. */
+function gNote() { return Math.abs(sim.p.g) || 9.81; }
 
 /** The field's one-line description, as THIS exercise wants it said. A card
  *  can replace a description that names concepts its lecture has not met
@@ -552,7 +561,7 @@ function setAllGaugeFields(id) {
  *  let alone between two students' screenshots, which is the whole reason for
  *  printing a scale at all. */
 function rangeFor(id) {
-  const f = FIELDS.find((q) => q.id === id) || FIELDS[0];
+  const f = fieldById(id);
   if (!state.range[id]) state.range[id] = f.def();
   return state.range[id];
 }
@@ -656,11 +665,11 @@ const CONTROLS = [
       const D = state.deliv;
       if (sim.p.inflow.free > 0.5) {
         return "head-driven  ·  q → " + (D ? D.q.toFixed(3) : "—") + " m²/s delivered" +
-               (D ? "   d_c = " + Math.pow(D.q * D.q / 9.81, 1 / 3).toFixed(3) + " m" : "");
+               (D ? "   d_c = " + Math.pow(D.q * D.q / gNote(), 1 / 3).toFixed(3) + " m" : "");
       }
       const st = SIM.inletStage();
       return v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
-             "   d_c = " + Math.pow(v * v / 9.81, 1 / 3).toFixed(3) + " m" +
+             "   d_c = " + Math.pow(v * v / gNote(), 1 / 3).toFixed(3) + " m" +
              (st.choked ? "  ·  MORE THAN THE RESERVOIR CAN PASS (q_max = "
                           + st.qmax.toFixed(3) + " m²/s) — held at critical" : "");
     },
@@ -743,8 +752,8 @@ const CONTROLS = [
     // hold P = c²(f−1) fixed makes the slider change the celerity and nothing
     // else — the geometric volume min(f,1) is untouched.
     set: (v) => { const o = sim.p.c; if (v !== o && v > 0) SIM.rescaleFill((o * o) / (v * v)); sim.p.c = v; },
-    fmt: (v) => v.toFixed(0) + " m/s   (Δh from Δv: " + (v / 9.81).toFixed(1)
-      + " m per m/s · ≤" + (100 * 9.81 * sim.H / (v * v)).toFixed(0) + "% compression)",
+    fmt: (v) => v.toFixed(0) + " m/s   (Δh from Δv: " + (v / gNote()).toFixed(1)
+      + " m per m/s · ≤" + (100 * gNote() * sim.H / (v * v)).toFixed(0) + "% compression)",
     info: "The Preissmann-slot stiffness. Pressure waves travel at this speed, so it sets the water-hammer surge ΔH = cΔv/g. Lower c = bigger time step = faster run, but the water is held up by compression f − 1 = gd/c², so it also makes the fluid squashier — keep c well above √(gd)." },
   { id: "cf", label: "Bed roughness C_f", min: 0, max: 0.25, step: 0.002,
     get: () => sim.p.cf, set: (v) => sim.p.cf = v,
@@ -1681,7 +1690,13 @@ const LEGEND = (() => {
       b.onclick = () => { state.mode = f.mode; closeMenu(); sync(); syncPanel(); };
       m.appendChild(b);
     });
-    const a = document.getElementById("legPick").getBoundingClientRect();
+    place();
+  }
+  /** Put the open menu under its button; also called on resize. */
+  function place() {
+    const m = menu(), pick = document.getElementById("legPick");
+    if (!m || !pick) return;
+    const a = pick.getBoundingClientRect();
     m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, a.left)) + "px";
     m.style.top = Math.max(8, Math.min(innerHeight - m.offsetHeight - 8, a.bottom + 6)) + "px";
   }
@@ -1711,8 +1726,9 @@ const LEGEND = (() => {
     sync();
     syncToolbar();
   }
-  return { build, sync, fit, onDown, avgTick,
+  return { build, sync, fit, onDown, avgTick, place, closeMenu,
            isOpen: () => open,
+           menuIsOpen: () => menuOpen,
            open: () => setOpen(true),
            close: () => setOpen(false),
            toggle: () => setOpen(!open) };
@@ -1810,8 +1826,7 @@ const UIMODE = (() => {
     // one the profile does offer.
     if (Array.isArray(state.ui.fields) && state.ui.fields.length &&
         state.ui.fields.indexOf(fieldFor(state.mode).id) < 0) {
-      const f = FIELDS.find((q) => q.id === state.ui.fields[0]);
-      if (f) state.mode = f.mode;
+      state.mode = fieldById(state.ui.fields[0]).mode;
     }
     buildToolbar();
     LEGEND.sync();
@@ -1931,13 +1946,18 @@ function fireTrain() {
 
 /** Is there a valve on the bench — one the scene declares, or a drawn one
  *  (segment kind 128)? The strip shows the Valves button only then. */
+const valveWarned = new Set();           // scene ids already warned about, once each
 function hasValves() {
   if (!sim || !sim.scene) return false;
   if (sim.segs && sim.segs.some((s) => (s[5] | 0) === 128)) return true;
   const sc = sim.scene;
   if (!sc.valves) return false;
   try { return sc.valves(sc.W, sc.H, SIM.params().values || {}).length > 0; }
-  catch (_) { return true; }               // a scene that cannot say keeps its button
+  catch (err) {                            // a scene that cannot say keeps its button
+    const id = sc.id || sc.name || "?";
+    if (!valveWarned.has(id)) { valveWarned.add(id); console.warn("scene " + id + ": valves() threw", err); }
+    return true;
+  }
 }
 /** Rebuild the strip when the answer changes — cheap to ask, rare to change. */
 let valvesShown = null, trainLit = false;
@@ -2632,6 +2652,21 @@ const START = (() => {
   return { open, close, toggle, isOpen, renderList };
 })();
 
+/** Pour feel, in one place (behaviour of the right-drag / Pour tool). */
+const POUR = {
+  gain: 0.35,   // drag speed -> jet speed: a hand flick is a gentle jet, not a firehose
+  vMax: 6,      // m/s cap on either component, so a fast flick cannot blow the CFL limit
+  vDown: -2,    // m/s initial downward w under gravity, so the stream falls rather than hangs
+  rBrush: 4,    // pour radius in brush units: wide enough to be a stream, not a pinprick
+  dt: 1 / 60,   // assumed frame interval for the drag speed (pointer events carry no solver dt)
+};
+
+/** A drag end, 45-degree-snapped about its start when Shift is held. */
+function dragTo(d, x, z, e) {
+  if (e.shiftKey) { const s = snap(d.x0, d.z0, x, z); d.x1 = s[0]; d.z1 = s[1]; }
+  else { d.x1 = x; d.z1 = z; }
+}
+
 function snap(x0, z0, x1, z1) {
   const dx = x1 - x0, dz = z1 - z0;
   const a = Math.round(Math.atan2(dz, dx) / (Math.PI / 4)) * (Math.PI / 4);
@@ -2739,7 +2774,7 @@ function beginPress(ev) {
   // phone. Right-drag still works regardless of the tool in your hand; a pen's
   // barrel button also reports button 2 and must not pour.
   if ((ev.button === 2 && ev.mouse) || state.tool === "pour") {
-    state.pour = { x, z, r: state.brush * 4, vx: 0, vz: sim.p.g > 0.5 ? -2.0 : 0, lx: x, lz: z };
+    state.pour = { x, z, r: state.brush * POUR.rBrush, vx: 0, vz: sim.p.g > 0.5 ? POUR.vDown : 0, lx: x, lz: z };
     sim.p.pour = state.pour;
     return;
   }
@@ -2915,33 +2950,28 @@ function onMove(e) {
     return;
   }
   if (state.pour) {
-    const dt = 1 / 60;
-    state.pour.vx = Math.max(-6, Math.min(6, (x - state.pour.lx) / dt * 0.35));
-    state.pour.vz = Math.max(-6, Math.min(6, (z - state.pour.lz) / dt * 0.35 + (sim.p.g > 0.5 ? -2 : 0)));
+    const dt = POUR.dt, cl = (v) => Math.max(-POUR.vMax, Math.min(POUR.vMax, v));
+    state.pour.vx = cl((x - state.pour.lx) / dt * POUR.gain);
+    state.pour.vz = cl((z - state.pour.lz) / dt * POUR.gain + (sim.p.g > 0.5 ? POUR.vDown : 0));
     state.pour.x = x; state.pour.z = z;
     state.pour.lx = x; state.pour.lz = z;
-    state.pour.r = state.brush * 4;
+    state.pour.r = state.brush * POUR.rBrush;
     return;
   }
   if (state.measDrag) {
-    const d = state.measDrag;
-    if (e.shiftKey) { const s = snap(d.x0, d.z0, x, z); d.x1 = s[0]; d.z1 = s[1]; }
-    else { d.x1 = x; d.z1 = z; }
+    dragTo(state.measDrag, x, z, e);
     return;
   }
   if (state.fluxDrag) {
-    const d = state.fluxDrag;
-    if (e.shiftKey) { const s = snap(d.x0, d.z0, x, z); d.x1 = s[0]; d.z1 = s[1]; }
-    else { d.x1 = x; d.z1 = z; }
+    dragTo(state.fluxDrag, x, z, e);
     return;
   }
   if (state.cvDrag) {
-    state.cvDrag.x1 = x; state.cvDrag.z1 = z;
+    dragTo(state.cvDrag, x, z, e);
     return;
   }
   if (state.drag) {
-    if (e.shiftKey) { const s = snap(state.drag.x0, state.drag.z0, x, z); state.drag.x1 = s[0]; state.drag.z1 = s[1]; }
-    else { state.drag.x1 = x; state.drag.z1 = z; }
+    dragTo(state.drag, x, z, e);
   }
 }
 
@@ -4391,6 +4421,7 @@ function boot() {
   window.addEventListener("pointerdown", KEYS.onDown, true);
   window.addEventListener("pointerdown", LEGEND.onDown, true);
   addEventListener("resize", () => { if (KEYS.isOpen()) KEYS.place(); });
+  addEventListener("resize", () => { if (LEGEND.menuIsOpen()) LEGEND.place(); });
 
   // The side panel's two handles. Wired here rather than when a brief is first
   // built, so folding works whatever ends up in the panel.
@@ -4513,6 +4544,7 @@ function boot() {
     if (PICKER.isOpen()) { PICKER.key(e); return; }
     if (EX.isOpen()) { EX.key(e); return; }
     if (KEYS.isOpen() && e.key === "Escape") { e.preventDefault(); KEYS.close(); return; }
+    if (LEGEND.menuIsOpen() && e.key === "Escape") { e.preventDefault(); LEGEND.closeMenu(); return; }
     const row = KEYMAP.match(e);
     if (!row) return;
     // A held key must not flicker a toggle; only brush size and zoom repeat.

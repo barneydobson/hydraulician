@@ -959,8 +959,9 @@ const EX = (() => {
         if (needsRig(e)) {
           const t = document.createElement("span");
           t.className = "rigtag";
-          t.textContent = hasRig(e) ? "rig ✓" : "rig: draw it";
-          t.style.color = hasRig(e) ? "#5fd08a" : "#ffb648";
+          const has = hasRig(e);
+          t.textContent = has ? "rig ✓" : "rig: draw it";
+          t.style.color = has ? "#5fd08a" : "#ffb648";
           b.appendChild(t);
         }
         const idc = document.createElement("span"); idc.className = "eid"; idc.textContent = e.id;

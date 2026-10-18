@@ -1929,6 +1929,34 @@ async function main() {
     });
 
     // ------------------------------------------------------- touch parity
+    await runCase("Escape closes the field menu", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const pick = document.getElementById("legPick");
+        pick.click();
+        const m = document.getElementById("legmenu");
+        const opened = m.classList.contains("open");
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        return { opened, closed: !m.classList.contains("open"),
+                 legendStill: document.getElementById("legend").classList.contains("open") };
+      `);
+      check("the menu opens from the legend's field button", r.opened);
+      check("Escape closes it", r.closed);
+      check("and leaves the legend itself up", r.legendStill);
+      await tab.close();
+    });
+
+    await runCase("?embed=0 is not embedded", async () => {
+      const bits = {};
+      for (const [q, want] of [["embed=0", false], ["embed", true], ["embed=1", true]]) {
+        const tab = await browser.open(INDEX + "?scene=sandbox&" + q);
+        bits[q] = await tab.evaluate("return APP.embed;");
+        eq(q + " -> APP.embed", bits[q], want);
+        await tab.close();
+      }
+    });
+
     await runCase("everything reachable without a keyboard or a second button", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");
       const r = await tab.evaluate(`

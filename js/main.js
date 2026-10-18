@@ -749,11 +749,16 @@ const CONTROLS = [
   { id: "cf", label: "Bed roughness C_f", min: 0, max: 0.25, step: 0.002,
     get: () => sim.p.cf, set: (v) => sim.p.cf = v,
     fmt: (v) => v.toFixed(3) + (v === 0 ? "   frictionless" : ""),
-    info: "Wall-function drag in the cells touching a solid — the bed's roughness, and in an open channel the whole of its resistance: the mixing length carries the bed's drag up the column, and the free surface carries none. Controls normal depth, and therefore whether a slope is mild or steep. At Medium resolution 0.02 delivers a Manning n of about 0.024 and 0.25 about 0.031. Hover the channel to read the n it is actually delivering." },
+    info: "Wall-function drag in the cells touching a solid — the bed's roughness, and in an open channel the whole of its resistance: the channel mixing length carries the bed's drag up the column, and the free surface carries none. In a wave flume it is the bed friction and nothing more. Controls normal depth, and therefore whether a slope is mild or steep. At Medium resolution 0.02 delivers a Manning n of about 0.024 and 0.25 about 0.031. Hover the channel to read the n it is actually delivering." },
   { id: "cs", label: "Eddy viscosity C_s", min: 0, max: 0.4, step: 0.005,
     get: () => sim.p.cs, set: (v) => sim.p.cs = v,
     fmt: (v) => v === 0 ? "laminar" : "Smagorinsky " + v.toFixed(2),
-    info: "Subgrid mixing at the cell scale (Smagorinsky). In open-channel water the depth-scale mixing length does the work — it is what makes the velocity profile a log law, fastest at the surface — so this matters for jets, pipes and the plan view, and hardly at all in a channel." },
+    info: "Subgrid mixing at the cell scale (Smagorinsky). With the channel mixing length on, that does the work in open-channel water — it is what makes the velocity profile a log law, fastest at the surface — so this matters for jets, pipes, waves and the plan view, and hardly at all in a channel." },
+  // On only where a scene declares channel flow (scenes.js, mixingLength):
+  // a wave has no log layer, and the closure's ν_t damps it away (issue #77).
+  { id: "ml", type: "check", label: "Channel mixing length",
+    get: () => !!sim.p.mixingLength, set: (v) => sim.p.mixingLength = !!v,
+    info: "The depth-scale turbulence closure for CHANNEL flow: Prandtl's mixing length l = κy over the bed, which makes the velocity profile a log law and carries the bed's drag up to the surface. On in the open-channel scenes, off for waves, tanks, jets and pipes. A wave has no log layer: switched on in a wave flume it is an eddy viscosity a thousand times water's in the crest, and the waves die. The bed's wall-function drag (C_f) and the cell-scale term (C_s) act either way." },
   { id: "bulk", label: "Wave damping", min: 0, max: 0.5, step: 0.005,
     get: () => sim.p.bulk, set: (v) => sim.p.bulk = v,
     fmt: (v) => v === 0 ? "none — surges ring forever" : v.toFixed(3),

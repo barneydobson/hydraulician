@@ -103,7 +103,12 @@ to look fine for a minute and explode in an exercise.
   (its slow top layer is never shed). The mixing length acts on the
   VORTICITY in conservative form: on the strain it kills the deep flume's
   waves, and as `ν_t∇²u` it puts the maximum back at mid-depth.
-  `smoke.js --only=profile` is the gate.
+  `smoke.js --only=profile` is the gate. **The mixing length is a channel
+  closure and every scene declares it** (`mixingLength: true | false`, no
+  default — `scenes.js` throws without it): on for channel flow, off for
+  waves, tanks, jets and pipes, which keep the wall function (`cf`) and
+  Smagorinsky (`cs`). A wave has no log layer; the closure damped the wave
+  flumes (issue #77).
 - **Geometry contracts:** wall segments have butt ends; slabs leaving the
   domain are extrapolated, not clamped; a scene's bed stays above `z = 0`;
   ground is solid all the way down; the closed outer ring is stamped last.

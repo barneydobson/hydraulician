@@ -406,7 +406,7 @@ Where each piece of the above enters the GPU passes; all are set in
 | `u_cf` | wall-function coefficient | vel drag |
 | `u_Wd` (texture) | distance to the nearest solid, at cell corners | vel mixing length |
 | `u_Tc` (texture) | per column: bed, surface, open-channel flag (`FS_TCOL`) | vel mixing length, surface extension |
-| `u_kappa` | von Kármán's κ (0 = closure off) | vel mixing length |
+| `u_kappa` | von Kármán's κ when the scene declares `mixingLength`, else 0 (closure off) | vel mixing length |
 | `u_wave` | amplitude, ω, on, piston column | vel wavemaker |
 | `u_waveD` | the wall paddle's still depth (0 = not at the wall) | vel wavemaker |
 | `u_waveU` | the paddle's velocity from `SIM.paddle` (train envelope / flap), on | vel wavemaker |

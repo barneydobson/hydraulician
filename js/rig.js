@@ -96,7 +96,9 @@ const RIG = (() => {
       wave: { on: b01(p.wave.on), amp: r4(p.wave.amp),
               period: r4(p.wave.period), x: r4(p.wave.x) },
       hyd: { c: r4(p.c), cf: r4(p.cf), cs: r4(p.cs), bulk: r4(p.bulk),
-             ca: r4(p.ca), nu: r4(p.nu), slip: b01(p.slip), g: r4(p.g) },
+             ca: r4(p.ca), nu: r4(p.nu), slip: b01(p.slip), g: r4(p.g),
+             // Additive, optional (see V): absent, the scene's declaration stands.
+             ml: b01(p.mixingLength) },
       dye: { line: r4(p.dyeLine), decay: r4(p.dyeDecay) },
       gauges: state.gauges.map((g) => [r4(g.x), r4(g.z)]),
       rakes: state.rakes.map((k) => r4(k.x)),
@@ -179,6 +181,7 @@ const RIG = (() => {
       ["c", "cf", "cs", "bulk", "ca", "nu", "slip", "g"].forEach((k) => {
         if (o.hyd[k] !== undefined) p[k] = +o.hyd[k];
       });
+      if (o.hyd.ml !== undefined) p.mixingLength = !!b01(o.hyd.ml);
     }
     if (o.dye) {
       if (o.dye.line !== undefined) p.dyeLine = +o.dye.line;

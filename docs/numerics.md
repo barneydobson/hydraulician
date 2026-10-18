@@ -136,7 +136,11 @@ Driest or dynamic model would; the near-wall stress is carried by step 5.
 `κu*d/6 ≈ 4·10⁻³` m²/s, about a hundred times what Smagorinsky gives at any
 plausible shear (carrying the bed stress would take `|S|` ≈ 70 s⁻¹). In a
 column that is an open channel (water standing on a bed, under air) the solver
-adds Prandtl's mixing length:
+adds Prandtl's mixing length — in the scenes that DECLARE channel flow
+(`mixingLength: true`), and nowhere else. A wave is not a channel flow: its
+boundary layers are thin and it has no log layer, and the closure's `ν_t`
+damps it (issue #77), so the wave flumes, tanks, jets and pipes run without
+it, on the wall function and the Smagorinsky term alone:
 
 ```math
 \nu_t = l^{2}\,|\omega|,

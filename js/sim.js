@@ -97,9 +97,9 @@ const SIM = (() => {
     if (!gl.getExtension("EXT_color_buffer_float")) {
       throw new Error("EXT_color_buffer_float is required (float render targets).");
     }
-    quad = GLH.makeQuad(gl);
-    rect = GLH.makeRect(gl);
-    points = GLH.makePoints(gl);
+    quad = GLH.makeDraw(gl, gl.TRIANGLES, 3);     // fullscreen triangle
+    rect = GLH.makeDraw(gl, gl.TRIANGLES, 6);     // a letterboxed rect
+    points = GLH.makeDraw(gl, gl.POINTS, 0);      // particles: draw(n)
     prog.vel  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VEL);
     prog.vof  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF);
     // The same source with ACCUM defined — a separate program, not a uniform
@@ -353,13 +353,13 @@ const SIM = (() => {
       // kind 0 (eraser) registers nothing — there is no surface to click.
     });
 
-    gl.bindTexture(gl.TEXTURE_2D, S.solid);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
+    GLH.upload(gl, S.solid, S.nx, S.ny, gl.RED, gl.UNSIGNED_BYTE, m, 1);
     wallDistance();
+    S.tauV = undefined;                // windTau / paddleBed read what was just rebuilt
+    S.padBed = undefined;
     S.tcolDirty = true;                // the closure's columns are stale too
 
-    S.bandKey = null;                  // invalidate the cached control bands
+    S.bandLv = null;                   // invalidate the cached control bands
 
     // Any change to the mask invalidates the window being averaged: the walls
     // the mean was accumulated through are no longer the walls on screen, and
@@ -457,9 +457,7 @@ const SIM = (() => {
       pass(nx);
       for (let i = 0; i < nx; i++) out[j * nx + i] = Math.min(Math.sqrt(d[i]), 1e4) * S.dx;
     }
-    gl.bindTexture(gl.TEXTURE_2D, S.wallTex);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, out);
+    GLH.upload(gl, S.wallTex, nx, ny, gl.RED, gl.FLOAT, out, 4);
   }
 
   /** Add a drawn edge. kind: MASK.WALL, MASK.VALVE, or MASK.OPEN (the eraser). */
@@ -651,8 +649,10 @@ const SIM = (() => {
       // -- caches and their keys
       colFresh: false,              // did the LAST columns() call pull its buffer back
       tcolDirty: true,              // the closure's columns need a rebuild
-      bandKey: null, inBand: null, twBand: null,   // control bands (bands())
-      stageKey: null, stage: null,  // the inlet stage solve (inletStage())
+      bandLv: null, inBand: null, twBand: null,    // control bands (bands()): [inflow, tailwater] level
+      stageK: null, stage: null,    // the inlet stage solve (inletStage()): its input tuple
+      tauV: undefined,              // windTau(), cached; rasterise() clears it
+      padBed: undefined,            // paddleBed(): {x, z}, cached; rasterise() clears it
       wetT: -Infinity, wetFr: 1,    // the water's share of the domain (wetFraction())
       trailSet: 0,                  // the Particle trail slider, s; 0 = fitted
       // -- dye
@@ -721,10 +721,9 @@ const SIM = (() => {
         d[k] = Math.max(0, water((i + 0.5) * S.dx, (j + 0.5) * S.dx, P, par) || 0);
       }
     }
-    for (const b of [S.F.a, S.F.b]) {
-      gl.bindTexture(gl.TEXTURE_2D, b.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, d);
-    }
+    // texSubImage2D (GLH.upload), never texImage2D: these textures are FBO
+    // colour attachments, and sub-image leaves their storage untouched.
+    for (const b of [S.F.a, S.F.b]) GLH.upload(gl, b.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, d, 4);
     // A fresh experiment restarts the closure's refresh cadence, so the same
     // reset followed by the same substeps is the same run — the F1 gate in
     // smoke.mjs compares two of them cell for cell.
@@ -752,19 +751,16 @@ const SIM = (() => {
         }
       }
     }
-    for (const b of [S.U.a, S.U.b]) {
-      gl.bindTexture(gl.TEXTURE_2D, b.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, vel);
-    }
+    for (const b of [S.U.a, S.U.b]) GLH.upload(gl, b.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, vel, 4);
     S.t = 0;
     // A wave train belongs to the run it was fired in: the clock restarts,
     // so does the paddle (the scene's own t0, if it fires one by itself).
     if (S.p.wave) S.p.wave.t0 = S.scene.wave ? S.scene.wave.t0 : undefined;
-    // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex, whose
-    // storage the loop above just RESPECIFIED — the same hazard rescaleFill
-    // sidesteps with texSubImage2D. Rebuild rather than gamble on those
-    // attachments surviving. It also gives R the window reset the averaging
-    // mode wants: a reloaded scene shares nothing with the run being averaged.
+    // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex; the
+    // uploads above are sub-image writes, so those attachments are intact. The
+    // window is restarted all the same, for the reset the averaging mode wants:
+    // a reloaded scene shares nothing with the run being averaged (f(0) is
+    // snapshotted again from the new water).
     if (S.avg) { avgStop(); avgStart(); }
   }
 
@@ -788,8 +784,7 @@ const SIM = (() => {
   function disposeAvg(a) {
     if (!a) return;
     if (a.T) a.T.dispose();
-    if (a.fboA) gl.deleteFramebuffer(a.fboA);
-    if (a.fboB) gl.deleteFramebuffer(a.fboB);
+    if (a.coupled) a.coupled.dispose();
     if (a.fld) a.fld.dispose();
     if (a.col) a.col.dispose();
     // The two CPU snapshots are plain arrays, so they go with the dropped
@@ -806,15 +801,12 @@ const SIM = (() => {
     const F = gl.RGBA32F, RGBA = gl.RGBA, FL = gl.FLOAT;
     const T = GLH.createDoubleBuffer(gl, S.nx, S.ny, F, RGBA, FL, null);
     // The vof pass writes f and the accumulator together, so both halves of
-    // each ping-pong need a framebuffer that carries both attachments — and
-    // the two ping-pongs must stay in phase, which is what `fA` is for.
-    // Selecting on `S.F.write === S.F.b` would be a tautology (the double
-    // buffer's `write` getter simply RETURNS `b`), so after the first swap it
-    // would keep picking fboA and write f and the accumulator into mismatched
-    // textures — silent corruption of exactly what this exists to detect.
-    // Identity of the attached texture is the only honest test.
-    const fboA = GLH.createFBO2(gl, S.F.b.tex, T.b.tex);
-    const fboB = GLH.createFBO2(gl, S.F.a.tex, T.a.tex);
+    // each ping-pong need a framebuffer that carries both attachments, and the
+    // two ping-pongs must stay in phase. GLH.createCoupled owns that: one MRT
+    // framebuffer per phase, chosen by S.F.parity, both buffers swapped as one
+    // (see its comment for why the old `S.F.write === S.F.b` test was a
+    // tautology). S.F may be mid-run when the window opens; T is fresh.
+    const coupled = GLH.createCoupled(gl, S.F, T);
     // The Favre display accumulator (§4.1) — its own ping-pong, because it is
     // a plain single-attachment target updated once per FRAME by prog.acc,
     // not once per substep by the vof pass's MRT. `tf` is its own clock for
@@ -827,7 +819,7 @@ const SIM = (() => {
     // separate sample (FS_COL's output, not the raw field), so it gets a
     // separate window. Do not fold it into `tf` — see the module note above.
     const col = GLH.createDoubleBuffer(gl, S.nx, 1, F, RGBA, FL, null);
-    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0,
+    S.avg = { T, coupled, f0buf: null, t: 0, fld, tf: 0,
               col, tc: 0, bedbuf: null, buf: null, out: null };
     snapshotF0();
     snapshotBed();
@@ -843,8 +835,7 @@ const SIM = (() => {
    *  wants f(0) on the GPU it is one texSubImage2D from here. */
   function snapshotF0() {
     const buf = new Float32Array(S.nx * S.ny * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.F.read.fbo, 0, 0, S.nx, S.ny, buf);
     S.avg.f0buf = buf;
   }
 
@@ -919,10 +910,8 @@ const SIM = (() => {
     if (!S.avg || !(S.avg.t > 0)) return { max: 0, mean: 0, n: 0, nSrc: 0, Fmax: 0 };
     const n = S.nx * S.ny;
     const A = new Float32Array(n * 4), fT = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.T.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, A);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, fT);
+    GLH.read(gl, S.avg.T.read.fbo, 0, 0, S.nx, S.ny, A);
+    GLH.read(gl, S.F.read.fbo, 0, 0, S.nx, S.ny, fT);
     const f0 = S.avg.f0buf;
     const closed = isOn(S.p.valveClosed);
     const T = S.avg.t, nx = S.nx;
@@ -993,8 +982,7 @@ const SIM = (() => {
    *  leaves the equations looking like themselves in the heavy-fluid limit. */
   function avgField() {
     const n = S.nx * S.ny, buf = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.avg.fld.read.fbo, 0, 0, S.nx, S.ny, buf);
     const fbar = new Float32Array(n), pbar = new Float32Array(n);
     const ubar = new Float32Array(n), wbar = new Float32Array(n);
     for (let k = 0; k < n; k++) {
@@ -1064,8 +1052,7 @@ const SIM = (() => {
                     A.out = { C: new Float32Array(S.nx * 4),
                               sigma: new Float32Array(S.nx) }; }
       const buf = A.buf, C = A.out.C, sigma = A.out.sigma, bed = A.bedbuf;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, A.col.read.fbo);
-      gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, A.col.read.fbo, 0, 0, S.nx, 1, buf);
       for (let i = 0; i < S.nx; i++) {
         C[i * 4]     = bed[i];                   // bed, from the window snapshot
         C[i * 4 + 1] = buf[i * 4];               // d̄
@@ -1085,8 +1072,7 @@ const SIM = (() => {
     if (!S.avg) return null;
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    GLH.read(gl, S.avg.fld.read.fbo, i, j, 1, 1, S.pxBuf);
     const [u, w, f, p] = favre(S.pxBuf, 0);
     const g = gMag();
     // U.b is KINEMATIC pressure p/rho, so the head is that over g -- it must
@@ -1140,11 +1126,12 @@ const SIM = (() => {
 
   function bands() {
     const p = S.p;
-    const key = p.inflow.level + ":" + p.tailwater.level;
-    if (S.bandKey !== key) {
-      S.bandKey = key;
-      S.inBand = columnBand(1, p.inflow.level);
-      S.twBand = columnBand(S.nx - 2, p.tailwater.level);
+    // Keyed on the two levels themselves: compared as numbers, no string built.
+    const lv = S.bandLv, a = p.inflow.level, b = p.tailwater.level;
+    if (!lv || lv[0] !== a || lv[1] !== b) {
+      S.bandLv = [a, b];
+      S.inBand = columnBand(1, a);
+      S.twBand = columnBand(S.nx - 2, b);
     }
     return { inB: S.inBand, twB: S.twBand };
   }
@@ -1176,13 +1163,14 @@ const SIM = (() => {
    *  - A scene that pins `inflow.v` has said what it wants directly; q is not
    *    the control.
    *
-   *  Cached on the same key as `bands()`, because `simUniforms` runs twice a
-   *  substep and the root solve, while cheap, has no business running there. */
+   *  Cached on its input tuple (compared as numbers, as `bands()` does):
+   *  `inletVel` and `stepUniforms` both ask, and the root solve, while
+   *  cheap, has no business running more than when an input moves. */
   function inletStage() {
-    const inf = S.p.inflow, b = bands().inB;
-    const key = inf.level + ":" + inf.q + ":" + inf.free + ":" + inf.v + ":" + b[0] + ":" + b[1];
-    if (S.stageKey === key) return S.stage;
-    S.stageKey = key;
+    const inf = S.p.inflow, b = bands().inB, k = S.stageK;
+    if (k && k[0] === inf.level && k[1] === inf.q && k[2] === inf.free && k[3] === inf.v
+        && k[4] === b[0] && k[5] === b[1]) return S.stage;
+    S.stageK = [inf.level, inf.q, inf.free, inf.v, b[0], b[1]];
     const out = { stage: inf.level, choked: false, qmax: Infinity, dc: 0, Emin: 0 };
     const solved = !isOn(inf.free) && inf.v === undefined && b[1] >= inf.level - 1e-4;
     if (solved) {
@@ -1209,11 +1197,20 @@ const SIM = (() => {
     return (inf.q || 0) / Math.max(Math.min(surf, b[1]) - b[0], S.dx);
   }
 
-  /** Uniforms both simulation passes read (SIM_HEAD in shaders.js). What only
-   *  one of them reads is set by `velOnlyUniforms` / `vofOnlyUniforms`: a
-   *  uniform set on a program that never reads it is a lookup that returns
-   *  null, which GLH now reports. */
-  function simUniforms(pr, h) {
+  // Uniforms are program state: a value set on a program stays until it is set
+  // again, whichever other programs run in between (turbColumns' TCOL, the
+  // Average accumulators, the particle pass). So what does not change inside
+  // one step() call is set ONCE per call, after `useProgram` on the program it
+  // belongs to (`stepUniforms`, `velOnlyUniforms`, `vofOnlyUniforms`), and
+  // only what moves with the substep clock is set every substep
+  // (`substepUniforms`, the paddle velocity, `u_Tacc`, the dye). The params
+  // are not touched by anything between two substeps of one call.
+
+  /** Per STEP: the uniforms both simulation passes read (SIM_HEAD in
+   *  shaders.js). What only one of them reads is set by `velOnlyUniforms` /
+   *  `vofOnlyUniforms`: a uniform set on a program that never reads it is a
+   *  lookup that returns null, which GLH reports. `pr` must be current. */
+  function stepUniforms(pr, h) {
     const p = S.p;
     gl.uniform2f(pr.u("u_res"), S.nx, S.ny);
     gl.uniform1f(pr.u("u_dx"), S.dx);
@@ -1234,7 +1231,6 @@ const SIM = (() => {
     gl.uniform2f(pr.u("u_spongeN"),
       sc.spongeIn ? Math.round(sc.spongeIn / S.dx) : 10,
       sc.spongeTw ? Math.round(sc.spongeTw / S.dx) : 10);
-    gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
     gl.uniform4f(pr.u("u_src0"), s0.x, s0.z, s0.r, s0.on);
     gl.uniform4f(pr.u("u_sv0"), s0.vx, s0.vz, 0, 0);   // spout runs clear
@@ -1247,15 +1243,43 @@ const SIM = (() => {
     }
   }
 
-  /** The velocity pass's own: the slope's gravity component and the slot
-   *  celerity (its bulk-viscosity term). */
-  function velOnlyUniforms(pr) {
-    gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(S.p.g));
-    gl.uniform1f(pr.u("u_c"), S.p.c);
+  /** Per SUBSTEP, both passes: the simulated clock. */
+  function substepUniforms(pr) {
+    gl.uniform1f(pr.u("u_time"), S.t);
   }
 
-  /** The VOF pass's own: the tailwater band, the sponges' fill and the edges'
-   *  open modes (ghost ring and sponges live there). */
+  /** Per STEP, the velocity pass's own: the slope's gravity component, the slot
+   *  celerity (its bulk-viscosity term), the closure and friction constants,
+   *  the wind, and the wavemaker's fixed part (the paddle's velocity is per
+   *  substep: see step()). */
+  function velOnlyUniforms(pr) {
+    const p = S.p;
+    gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(p.g));
+    gl.uniform1f(pr.u("u_c"), p.c);
+    gl.uniform1f(pr.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
+    gl.uniform1f(pr.u("u_nu"), p.nu);
+    gl.uniform2f(pr.u("u_nuOut"), p.outflowNu || 0,
+      p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);
+    gl.uniform1f(pr.u("u_twOut"), p.twOutflowOnly ? 1 : 0);
+    gl.uniform1f(pr.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
+    gl.uniform1f(pr.u("u_cs"), p.cs);
+    gl.uniform1f(pr.u("u_cf"), p.cf);
+    gl.uniform1f(pr.u("u_slip"), p.slip);
+    gl.uniform1f(pr.u("u_bulk"), p.bulk);
+    gl.uniform4f(pr.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
+      p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
+    gl.uniform1f(pr.u("u_waveD"), wallPaddle() ? p.wave.d : 0);
+    // The flap (opt-in): its hinge and still-water level. y = 0 keeps the old
+    // expression in the shader.
+    if (flapOn()) {
+      const zb = paddleBed();
+      gl.uniform2f(pr.u("u_flap"), zb - Math.max(0, p.wave.hinge || 0), zb + p.wave.d);
+    } else gl.uniform2f(pr.u("u_flap"), 0, 0);
+  }
+
+  /** Per STEP, the VOF pass's own: the tailwater band, the sponges' fill, the
+   *  edges' open modes (ghost ring and sponges live there), the compression and
+   *  dye-decay constants and the residue drain. */
   function vofOnlyUniforms(pr) {
     const p = S.p, sc = S.scene, { twB } = bands();
     gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
@@ -1264,6 +1288,10 @@ const SIM = (() => {
     // the fill (`spongeFill`, default 1 — every scene but contraction).
     gl.uniform1f(pr.u("u_fillIn"), sc.spongeFill || 1);
     gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
+    gl.uniform1f(pr.u("u_ca"), p.ca);
+    gl.uniform1f(pr.u("u_dyeDecay"), p.dyeDecay);
+    const rd = p.residueDrain && planView() ? p.residueDrain : null;
+    gl.uniform2f(pr.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
   }
 
   /** The open-channel columns the mixing length reads (FS_TCOL): where each
@@ -1286,9 +1314,15 @@ const SIM = (() => {
    *  carried by rigs like any other param); every other scene reads 0, and
    *  the vel pass then skips the term altogether. */
   function windTau() {
-    const decl = (S.scene.params || []).some((d) => d.key === "tau");
-    const v = decl ? S.params.tau : 0;
-    return Number.isFinite(v) ? v : 0;
+    // Cached: the scan is over the scene's declared params, which change only
+    // with the scene (a new S) or through setParam -> rasterise(), which
+    // clears `S.tauV`.
+    if (S.tauV === undefined) {
+      const decl = (S.scene.params || []).some((d) => d.key === "tau");
+      const v = decl ? S.params.tau : 0;
+      S.tauV = Number.isFinite(v) ? v : 0;
+    }
+    return S.tauV;
   }
 
   /** Is the piston a paddle AT THE LEFT WALL? Only when it sits in column 1,
@@ -1403,13 +1437,32 @@ const SIM = (() => {
   /** The bed under the paddle's column, from the mask (the first non-solid
    *  cell up from the bottom) — the flap's hinge is measured from it. */
   function paddleBed() {
-    const i = Math.max(1, Math.round(S.p.wave.x / S.dx));
-    for (let j = 0; j < S.ny; j++) if (!isSolid(S.mask[j * S.nx + i], false)) return j * S.dx;
-    return 0;
+    // Cached per rasterise (it clears `S.padBed`) and per paddle column.
+    const i = Math.max(1, Math.round(S.p.wave.x / S.dx)), c = S.padBed;
+    if (c && c.i === i) return c.z;
+    let z = 0;
+    for (let j = 0; j < S.ny; j++) if (!isSolid(S.mask[j * S.nx + i], false)) { z = j * S.dx; break; }
+    S.padBed = { i, z };
+    return z;
   }
 
   function step(nsub) {
     const p = S.p, h = dt();
+    const useAcc = !!S.avg;
+    const pv = useAcc ? prog.vofA : prog.vof;
+    // Everything that cannot change inside this call, once, each on its own
+    // program (useProgram first: uniforms go to the CURRENT program). What
+    // runs between two substeps (turbColumns' TCOL) is a different program and
+    // touches none of these.
+    gl.useProgram(prog.vel);
+    stepUniforms(prog.vel, h);
+    velOnlyUniforms(prog.vel);
+    gl.useProgram(pv);
+    stepUniforms(pv, h);
+    vofOnlyUniforms(pv);
+    // The paddle's velocity is per substep only when something shapes it (a
+    // flap or a train envelope); the plain piston takes u_time instead.
+    const shaped = flapOn() || p.wave.train > 0;
     for (let n = 0; n < nsub; n++) {
       if (S.tcolDirty || S.nsteps % TCOL_EVERY === 0) { turbColumns(); S.tcolDirty = false; }
       S.nsteps++;
@@ -1417,63 +1470,36 @@ const SIM = (() => {
       gl.useProgram(prog.vel);
       GLH.bindTex(gl, prog.vel, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
                                  ["u_Wd", S.wallTex], ["u_Tc", S.tcolTex]]);
-      simUniforms(prog.vel, h);
-      velOnlyUniforms(prog.vel);
-      gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
-      gl.uniform1f(prog.vel.u("u_nu"), p.nu);
-      gl.uniform2f(prog.vel.u("u_nuOut"), p.outflowNu || 0,
-        p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);
-      gl.uniform1f(prog.vel.u("u_twOut"), p.twOutflowOnly ? 1 : 0);
-      gl.uniform1f(prog.vel.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
-      gl.uniform1f(prog.vel.u("u_cs"), p.cs);
-      gl.uniform1f(prog.vel.u("u_cf"), p.cf);
-      gl.uniform1f(prog.vel.u("u_slip"), p.slip);
-      gl.uniform1f(prog.vel.u("u_bulk"), p.bulk);
-      gl.uniform4f(prog.vel.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
-        p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
-      gl.uniform1f(prog.vel.u("u_waveD"), wallPaddle() ? p.wave.d : 0);
+      substepUniforms(prog.vel);
       // The flap and the train envelope (both opt-in): the CPU hands the
-      // paddle's velocity for this substep, and the flap's hinge and
-      // still-water level. y = 0 keeps the old expression in the shader.
-      const flap = flapOn(), shaped = flap || p.wave.train > 0;
+      // paddle's velocity for this substep. y = 0 keeps the old expression
+      // in the shader.
       gl.uniform2f(prog.vel.u("u_waveU"), shaped ? paddle(S.t).U : 0, shaped ? 1 : 0);
-      if (flap) {
-        const zb = paddleBed();
-        gl.uniform2f(prog.vel.u("u_flap"), zb - Math.max(0, p.wave.hinge || 0), zb + p.wave.d);
-      } else gl.uniform2f(prog.vel.u("u_flap"), 0, 0);
       GLH.bindTarget(gl, S.U.write.fbo, S.nx, S.ny);
       quad.draw();
       S.U.swap();
 
       // --- volume: conservative limited advection of f (+ dye)
-      const useAcc = !!S.avg;
-      const pv = useAcc ? prog.vofA : prog.vof;
       gl.useProgram(pv);
       GLH.bindTex(gl, pv, useAcc
         ? [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
            ["u_A", S.avg.T.read.tex]]
         : [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
-      simUniforms(pv, h);
-      vofOnlyUniforms(pv);
-      gl.uniform1f(pv.u("u_ca"), p.ca);
-      gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
+      substepUniforms(pv);
       dyeUniforms(pv);
-      const rd = p.residueDrain && planView() ? p.residueDrain : null;
-      gl.uniform2f(pv.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
       if (useAcc) {
         // T BEFORE this substep — the running-mean weight is h/(T+h).
         gl.uniform1f(pv.u("u_Tacc"), S.avg.t);
-        // The MRT fbo whose attachments are the two WRITE halves. Compared by
-        // texture identity, not by `S.F.write === S.F.b`: see avgStart.
-        GLH.bindTarget(gl, S.F.write.tex === S.avg.fA ? S.avg.fboA : S.avg.fboB,
-          S.nx, S.ny);
+        // The MRT fbo whose attachments are the two WRITE halves, by phase:
+        // see GLH.createCoupled.
+        GLH.bindTarget(gl, S.avg.coupled.fbo(), S.nx, S.ny);
       } else {
         GLH.bindTarget(gl, S.F.write.fbo, S.nx, S.ny);
       }
       quad.draw();
-      S.F.swap();
       // Both ping-pongs advance together or they fall out of phase.
-      if (useAcc) { S.avg.T.swap(); S.avg.t += h; }
+      if (useAcc) { S.avg.coupled.swap(); S.avg.t += h; }
+      else S.F.swap();
 
       S.t += h;
     }
@@ -1497,7 +1523,7 @@ const SIM = (() => {
     S.colFresh = force || colTick-- <= 0;
     if (S.colFresh) {
       colTick = readEvery - 1;
-      gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, S.colBuf);
+      GLH.read(gl, S.colFbo, 0, 0, S.nx, 1, S.colBuf);
     }
     return S.colBuf;
   }
@@ -1742,7 +1768,7 @@ const SIM = (() => {
     gl.useProgram(prog.pdraw);
     // u_Q is the other half of the ping-pong: where each particle was before
     // the last advance, so the tail can fill in the whole step.
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.prev.tex]]);
     gl.uniform1i(prog.pdraw.u("u_sub"), TAIL_SUB);
     gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
@@ -1780,10 +1806,11 @@ const SIM = (() => {
     // (FS_PART_DRAW), which is what keeps it visible on the pale colourings.
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(prog.pdraw);
-    // Re-bind: the composite above pointed texture unit 0 at the trail, and
-    // `u_P` still names unit 0 — without this the heads read the trail as
-    // their own positions and land nowhere.
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    // Re-bind: texture units are context state, not program state. The
+    // composite above bound the trail to unit 0, and `u_P` still names unit 0
+    // (bindTex numbers units by position) — without this the heads read the
+    // trail as their own positions and land nowhere.
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.prev.tex]]);
     gl.uniform1i(prog.pdraw.u("u_sub"), 1);
     gl.uniform1f(prog.pdraw.u("u_psize"), tail + 3.0);
     gl.uniform1f(prog.pdraw.u("u_amp"), 1.0);
@@ -1803,16 +1830,16 @@ const SIM = (() => {
     if (!(k > 0) || k === 1) return;
     const n = S.nx * S.ny;
     const buf = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.F.read.fbo, 0, 0, S.nx, S.ny, buf);
     for (let i = 0; i < n; i++) {
       const f = buf[i * 4];
       if (f > 1) buf[i * 4] = 1 + (f - 1) * k;
     }
-    // texSubImage2D, not texImage2D: this texture is an FBO colour attachment
-    // and respecifying its storage would invalidate it.
-    gl.bindTexture(gl.TEXTURE_2D, S.F.read.tex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    // texSubImage2D (via GLH.upload), not texImage2D: this texture is an FBO
+    // colour attachment. Respecifying it at the SAME size is allowed to keep
+    // the attachment, but the sub-image write never touches the storage, so
+    // nothing here has to rely on that.
+    GLH.upload(gl, S.F.read.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf, 4);
     // Same shape as the reset in rasterise(), for the same reason: this
     // REWRITES f under an open window. f(0) is snapshotted on the CPU, so the
     // endpoint term (f(T) - f(0))/T would absorb the whole rescale increment
@@ -1844,8 +1871,7 @@ const SIM = (() => {
    *  under `avg` they read zero. */
   function readState(i0, j0, w, h, Ubuf, Fbuf, avg) {
     if (avg && S.avg) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
+      GLH.read(gl, S.avg.fld.read.fbo, i0, j0, w, h, Ubuf);
       for (let k = 0; k < w * h; k++) {
         const v = favre(Ubuf, k);
         Fbuf[k * 4] = v[2]; Fbuf[k * 4 + 1] = 0; Fbuf[k * 4 + 2] = 0; Fbuf[k * 4 + 3] = 0;
@@ -1853,10 +1879,8 @@ const SIM = (() => {
       }
       return true;
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Fbuf);
+    GLH.read(gl, S.U.read.fbo, i0, j0, w, h, Ubuf);
+    GLH.read(gl, S.F.read.fbo, i0, j0, w, h, Fbuf);
     return false;
   }
 
@@ -1925,7 +1949,7 @@ const SIM = (() => {
       gl.uniform1f(prog.hgl.u("u_gMag"), g);
       GLH.bindTarget(gl, S.hglFbo, nx, 1);
       quad.draw();
-      gl.readPixels(0, 0, nx, 1, gl.RGBA, gl.FLOAT, S.hglBuf);
+      GLH.read(gl, S.hglFbo, 0, 0, nx, 1, S.hglBuf);
       for (let i = 0; i < nx; i++) {
         h[i] = isOn(S.hglBuf[i * 4]) ? S.hglBuf[i * 4 + 1] : NaN;
         hv[i] = NaN;
@@ -1937,8 +1961,7 @@ const SIM = (() => {
     // The averaged field stores (f*u, f*w, f, P) — the pressure in the 4th
     // channel, not the live field's 3rd; reading the wrong one gives a
     // plausible-looking line made of velocity.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-    gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.avg.fld.read.fbo, 0, 0, nx, ny, buf);
     // Reused column scratch for the energy moments — one allocation, not nx.
     const cf = S.ceF && S.ceF.length >= ny ? S.ceF : (S.ceF = new Float64Array(ny));
     const cu = S.ceU && S.ceU.length >= ny ? S.ceU : (S.ceU = new Float64Array(ny));
@@ -2048,18 +2071,15 @@ const SIM = (() => {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
     if (avg && S.avg) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+      GLH.read(gl, S.avg.fld.read.fbo, i, j, 1, 1, S.pxBuf);
       const [u, w, f, p] = favre(S.pxBuf, 0);
       const g = gMag();
       return { i, j, f, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
                solid: S.mask[j * S.nx + i] };
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    GLH.read(gl, S.U.read.fbo, i, j, 1, 1, S.pxBuf);
     const u = S.pxBuf[0], w = S.pxBuf[1], p = S.pxBuf[2];
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    GLH.read(gl, S.F.read.fbo, i, j, 1, 1, S.pxBuf);
     const g = gMag();
     return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
              dye: S.pxBuf[1], solid: S.mask[j * S.nx + i] };
@@ -2092,13 +2112,11 @@ const SIM = (() => {
     rows.forEach((r, j) => {
       const n = r.i1 - r.i0 + 1;
       const A = new Float32Array(4 * n);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, useAvg ? S.avg.fld.read.fbo : S.U.read.fbo);
-      gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, A);
+      GLH.read(gl, useAvg ? S.avg.fld.read.fbo : S.U.read.fbo, r.i0, j, n, 1, A);
       let B = null;
       if (!useAvg && !noFill) {
         B = new Float32Array(4 * n);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-        gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, B);
+        GLH.read(gl, S.F.read.fbo, r.i0, j, n, 1, B);
       }
       r.k.forEach((k) => {
         const i = cell[k][0], o = 4 * (i - r.i0), solid = S.mask[j * S.nx + i];
@@ -2183,8 +2201,7 @@ const SIM = (() => {
   function particlePos(n) {
     const w = Math.max(1, Math.min(S.pn, n || 16));
     const buf = new Float32Array(w * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.P.read.fbo);
-    gl.readPixels(0, 0, w, 1, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.P.read.fbo, 0, 0, w, 1, buf);
     const out = [];
     for (let k = 0; k < w; k++) out.push(buf[k * 4], buf[k * 4 + 1]);
     return out;
@@ -2203,20 +2220,17 @@ const SIM = (() => {
     let f = null;
     if (fOut) f = fOut instanceof Float32Array && fOut.length >= S.ny ? fOut : new Float32Array(S.ny);
     if (avg && S.avg) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.avg.fld.read.fbo, i, 0, 1, S.ny, buf);
       for (let k = 0; k < S.ny; k++) {
         const v = favre(buf, k);
         if (f) f[k] = v[2];
         buf[k * 4] = v[0]; buf[k * 4 + 1] = v[1]; buf[k * 4 + 2] = v[3];
       }
     } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.U.read.fbo, i, 0, 1, S.ny, buf);
       if (f) {
         const F = new Float32Array(S.ny * 4);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-        gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, F);
+        GLH.read(gl, S.F.read.fbo, i, 0, 1, S.ny, F);
         for (let k = 0; k < S.ny; k++) f[k] = F[k * 4];
       }
     }
@@ -2233,15 +2247,13 @@ const SIM = (() => {
     const buf = out && out.length >= w * S.ny * 4 ? out : new Float32Array(w * S.ny * 4);
     const on = !!(avg && S.avg);
     if (on) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.avg.fld.read.fbo, a, 0, w, S.ny, buf);
       for (let k = 0; k < w * S.ny; k++) {
         const v = favre(buf, k);
         buf[k * 4] = v[0]; buf[k * 4 + 1] = v[1];
       }
     } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.U.read.fbo, a, 0, w, S.ny, buf);
     }
     return { i0: a, w, ny: S.ny, dx: S.dx, buf, centred: on };
   }

@@ -560,14 +560,18 @@ void main(){
   voidBleed(un, wn, i, j, fFu, fFw, fS, tS, tSS);
 
   // --- transport-consistency cap. The VOF donor limiter cannot move mass
-  //     faster than a quarter cell per substep (dx/4dt), but nothing above
+  //     faster than a quarter cell per substep (donorCap = 0.25 dx/dt), but nothing above
   //     stops the *velocity* in a spray cell from integrating past that —
   //     gravity keeps pumping while the mass stays put, the two fields
   //     decouple, and the runaway ends at the ±80 rail where it drags water
   //     out of any pinned Dirichlet ghost it touches (the tailwater-scene
   //     explosion). So in partial-fill cells, hold the speed at what the
-  //     volume flux can actually follow; solid water keeps the wide NaN
-  //     guard — pressurised cells (f ≈ 1) never bind the donor cap.
+  //     volume flux can actually follow: 0.20 dx/dt, a fifth of a cell per
+  //     substep. That sits UNDER the donor cap's 0.25 on purpose — at the cap
+  //     itself a cell would already be limited every substep, so the margin
+  //     keeps the velocity strictly inside what the flux can carry. Solid water
+  //     keeps the wide NaN guard — pressurised cells (f ≈ 1) never bind the
+  //     donor cap.
   float capBase = 0.20 * dx / dt;
   float capU = mix(capBase, RAIL, smoothstep(0.05, 0.50, fFu));
   float capW = mix(capBase, RAIL, smoothstep(0.05, 0.50, fFw));

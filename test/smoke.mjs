@@ -2438,11 +2438,12 @@ SUITES.avg = async (B) => {
   ok("F1 the ACCUM variant does not perturb the solution",
      s.bad === 0, JSON.stringify(s));
 
-  // The MRT selector must compare TEXTURE IDENTITY, not `S.F.write === S.F.b`
-  // — that is a tautology (the double buffer's getter returns b), so a wrong
-  // selector keeps picking the same framebuffer and, after the first swap,
-  // writes f and the accumulator into mismatched textures. It only shows up
-  // once the ping-pong has flipped, so read back after an ODD substep count.
+  // The MRT selector (GLH.createCoupled, chosen by the double buffer's
+  // parity) must follow the ping-pong, not `S.F.write === S.F.b` — that is a
+  // tautology (the double buffer's getter returns b), so a wrong selector
+  // keeps picking the same framebuffer and, after the first swap, writes f and
+  // the accumulator into mismatched textures. It only shows up once the
+  // ping-pong has flipped, so read back after an ODD substep count.
   const p = await B.evaluate(`(() => {
     const gl = document.querySelector("canvas").getContext("webgl2");
     APP.SIM.avgStart();
@@ -2458,7 +2459,7 @@ SUITES.avg = async (B) => {
     const tex = [A.T.a.tex, A.T.b.tex, A.fld.a.tex, A.fld.b.tex,
                  A.col.a.tex, A.col.b.tex];
     const fbo = [A.T.a.fbo, A.T.b.fbo, A.fld.a.fbo, A.fld.b.fbo,
-                 A.col.a.fbo, A.col.b.fbo, A.fboA, A.fboB];
+                 A.col.a.fbo, A.col.b.fbo, ...A.coupled.fbos];
     const live = () => tex.filter((t) => gl.isTexture(t)).length
                      + fbo.filter((f) => gl.isFramebuffer(f)).length;
     const nObj = tex.length + fbo.length, liveBefore = live();
@@ -2481,6 +2482,29 @@ SUITES.avg = async (B) => {
      JSON.stringify(p));
   ok("avgColumns is unreachable once the window is closed",
      p.reachable === false, JSON.stringify(p));
+
+  // A window opened in EITHER phase of the f ping-pong (the accumulator's own
+  // buffers are fresh, f's may be mid-flip): GLH.createCoupled indexes its
+  // framebuffers by the phase it finds, so the mean must close its balance
+  // whichever parity the run was in when the window opened.
+  const ph = await B.evaluate(`(() => {
+    const gl = document.querySelector("canvas").getContext("webgl2");
+    const out = [];
+    for (const want of [1, 0]) {
+      while (APP.sim.F.parity !== want) APP.tick(1);
+      APP.SIM.avgStart();
+      APP.tick(301);                              // odd: ends in the other phase
+      const res = APP.SIM.transportResidual();
+      out.push({ want, max: res.max, n: res.n, Fmax: res.Fmax, T: APP.SIM.avgT(),
+                 flipped: APP.sim.F.parity !== want });
+      APP.SIM.avgStop();
+    }
+    return { out, dt: APP.SIM.dt(), dx: APP.sim.dx, err: gl.getError() };
+  })()`);
+  ok("avg window opens in either phase of the f ping-pong and closes its balance",
+     ph.err === 0 && ph.out.every((o) => o.flipped && o.T > 0 && o.n > 100
+       && o.max < avgBound(o.Fmax, o.T, ph.dt, ph.dx)),
+     JSON.stringify(ph));
 
   // R must restart the window — and it also respecifies the f textures the MRT
   // framebuffers attach, so this is the invalid-framebuffer case too.

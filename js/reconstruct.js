@@ -3,13 +3,15 @@
  * reconstruct.js — RECON: the averaging numerics that must be exactly right,
  * kept free of WebGL so they can be unit-tested against closed-form answers.
  *
- * Two jobs. First, the running weighted-mean and Welford updates: the GLSL
- * accumulators implement the SAME formulae, and `test/recon-test.mjs` is what
- * pins them down. Raw sums were rejected because <eta^2> - <eta>^2 for a 5 mm
- * wobble on a 1 m datum is a ratio of 2.5e-5 against float32's 1.2e-7 eps —
- * about two surviving digits of the variance the excursion band is drawn from.
- *
- * Second, the surface reconstruction (Tasks 2-4). See docs/averaging.md.
+ * Four jobs. Averaging: the running weighted-mean and Welford updates. The
+ * GLSL accumulators implement the SAME formulae, and `test/recon-test.mjs` is
+ * what pins them down. Raw sums were rejected because <eta^2> - <eta>^2 for a
+ * 5 mm wobble on a 1 m datum is a ratio of 2.5e-5 against float32's 1.2e-7 eps
+ * — about two surviving digits of the variance the excursion band is drawn
+ * from. Reconstruction: the free surface from the mean fill (see
+ * docs/averaging.md). Inlet depth: the subcritical/supercritical depth at a
+ * given reservoir energy and discharge. Column energy: the true velocity
+ * head, and its alpha, of a column of water.
  *
  * Defines: RECON
  *

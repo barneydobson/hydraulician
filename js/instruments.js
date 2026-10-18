@@ -129,9 +129,6 @@ function sampleRakes() {
   });
 }
 
-/** Place (or move) the force control volume. Corners are normalised and the
- *  running force estimate starts afresh — a moved box is a new measurement,
- *  and blending it with the old one would print a number no box ever read. */
 /** Take away the section under the pointer, if there is one. Named rather
  *  than inlined because a click and a drag are different gestures on this
  *  tool: removal happens on the way DOWN, placement on the way up. */
@@ -143,12 +140,12 @@ function removeFluxAt(x, z) {
   return true;
 }
 
-/** Put a section down. Four is the ceiling for the same reason gauges stop at
- *  four: past that nobody can tell them apart, and the questions these answer
+/** Put a section down. `CONFIG.maxFlux` is the ceiling for the same reason gauges stop
+ *  at `CONFIG.maxGauges`: past that nobody can tell them apart, and the questions these answer
  *  need two. The oldest gives way, so the pair you are looking at is the pair
  *  you drew last. */
 function placeFlux(x0, z0, x1, z1) {
-  if (state.flux.length >= 4) state.flux.shift();
+  if (state.flux.length >= CONFIG.maxFlux) state.flux.shift();
   state.flux.push({ x0, z0, x1, z1, ema: null, t0: sim.t });
   syncPanel();
 }
@@ -173,6 +170,9 @@ function sampleFlux() {
   });
 }
 
+/** Place (or move) the force control volume. Corners are normalised and the
+ *  running force estimate starts afresh — a moved box is a new measurement,
+ *  and blending it with the old one would print a number no box ever read. */
 function placeCV(x0, z0, x1, z1) {
   state.cv = {
     x0: Math.min(x0, x1), z0: Math.min(z0, z1),
@@ -422,16 +422,6 @@ function sampleInlet(A) {
 }
 
 // ------------------------------------------------------------- orbit tracers
-/** A column of massless tracers that remember where they have been.
- *
- *  A single dot going round a 30 mm circle is invisible; the PATH is the whole
- *  point, which is why the GPU particle cloud never showed orbital motion no
- *  matter how long you stared at it. These are deliberately few (one vertical
- *  rake), advected on the CPU from a single strip readback — probing them one
- *  at a time would be a pipeline stall each — and drawn as fading polylines.
- *
- *  Seeded from just under the trough down to just above the bed, so the
- *  shrinking of the orbits with depth is read straight off the picture. */
 /** Deepest wet column — a sane default place to hang a tracer rake, since
  *  a fixed fraction of the domain lands on dry ground in half the scenes. */
 function bestTracerX() {
@@ -443,6 +433,16 @@ function bestTracerX() {
   return bi < 0 ? sim.W * 0.5 : (bi + 0.5) * sim.dx;
 }
 
+/** A column of massless tracers that remember where they have been.
+ *
+ *  A single dot going round a 30 mm circle is invisible; the PATH is the whole
+ *  point, which is why the GPU particle cloud never showed orbital motion no
+ *  matter how long you stared at it. These are deliberately few (one vertical
+ *  rake), advected on the CPU from a single strip readback — probing them one
+ *  at a time would be a pipeline stall each — and drawn as fading polylines.
+ *
+ *  Seeded from just under the trough down to just above the bed, so the
+ *  shrinking of the orbits with depth is read straight off the picture. */
 function seedTracers(x) {
   const col = SIM.columns(true);
   const i = Math.max(0, Math.min(sim.nx - 1, Math.round(x / sim.dx)));
@@ -517,10 +517,10 @@ function freeGaugeColour() {
   return CONFIG.gaugeColours.find((c) => used.indexOf(c) < 0) || CONFIG.gaugeColours[0];
 }
 
-/** Always add a gauge (the oldest goes at the cap of four); `field` defaults
+/** Always add a gauge (the oldest goes at `CONFIG.maxGauges`); `field` defaults
  *  to the session's. placeGauge is the click, which toggles. */
 function addGauge(x, z, field) {
-  if (state.gauges.length >= 4) state.gauges.shift();
+  if (state.gauges.length >= CONFIG.maxGauges) state.gauges.shift();
   const g = { x, z, hist: [], log: [], id: ++state.gaugeSeq,
               field: field || gaugeFieldOf(null),     // starts on the session default
               colour: freeGaugeColour() };
@@ -582,7 +582,7 @@ function clearInstruments({ all } = {}) {
 function placeRake(x, z) {
   const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < grabPx());
   if (hit >= 0) { state.rakes.splice(hit, 1); syncPanel(); return; }
-  if (state.rakes.length >= 2) state.rakes.shift();
+  if (state.rakes.length >= CONFIG.maxRakes) state.rakes.shift();
   state.rakes.push({ x, z: Number.isFinite(z) ? z : undefined, buf: null });
   syncPanel();
 }

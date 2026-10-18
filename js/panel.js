@@ -11,9 +11,9 @@
  *          setPanel, togglePanel, refreshNote
  *
  * Reads:   bestTracerX, clearAllGauges, computeView, CONFIG, EX, fieldBlurb,
- *          fieldFor, FIELDS, GAUGE_QTY, gaugeFieldOf, GINSP, gNote, LEGEND, OVERLAY,
- *          PICKER, RIG, seedTracers, setAllGaugeFields, setAverage, showToast, SIM,
- *          sim, state, syncToolbar, UIMODE
+ *          fieldFor, FIELDS, GAUGE_QTY, gaugeFieldOf, GINSP, gNote, LEGEND,
+ *          OVERLAY, PICKER, RIG, seedTracers, setAllGaugeFields, setAverage,
+ *          showToast, sim, SIM, state, syncToolbar, UIMODE, VEX_MAX
  */
 // ------------------------------------------------------------------- panel
 const CONTROLS = [
@@ -272,7 +272,7 @@ const CONTROLS = [
     info: "How much history each tracer keeps. About two or three wave periods shows the loops clearly; much longer and the mean drift smears them into streaks." },
 
   { h: "View" },
-  { id: "vex", label: "Vertical exaggeration", min: 1, max: 12, step: 0.1,
+  { id: "vex", label: "Vertical exaggeration", min: 1, max: VEX_MAX, step: 0.1,
     get: () => state.vex, set: (v) => { state.vex = v; state.vexAuto = false; computeView(); },
     fmt: (v) => (v < 1.05 ? "true scale (1 : 1)" : "× " + v.toFixed(1) + " vertical") +
                 (state.vexAuto ? "  ·  fitted to the window" : ""),

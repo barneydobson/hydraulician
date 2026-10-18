@@ -17,9 +17,11 @@
  * finite-speed pressure waves (water hammer) and an automatic transition
  * between free-surface and pressurised flow in the same equations.
  *
- * PASSES per substep: `vel` then `vof`. Both are single fullscreen draws.
+ * PASSES. Per substep: `vel` then `vof`, both single fullscreen draws. Per
+ * frame: `col` (the column reduction and its open-channel and grade-line
+ * variants), `part` (particle trails) and `disp` (the display).
  * Velocity advection is 3rd-order upwind (low dissipation — jets stay crisp);
- * f advection is superbee-limited flux form plus an interFoam-style
+ * f advection is van Leer-limited flux form plus an interFoam-style
  * compression flux (keeps the free surface ~2 cells thick).
  *
  * Defines: Shaders
@@ -335,8 +337,10 @@ void main(){
   //     jet within a metre of leaving its nozzle. Instead let the velocity
   //     advect and diffuse out into the void — a cheap standing-in for the
   //     usual free-surface velocity extrapolation — and only bleed it away
-  //     slowly, so still air stays still. Nothing forces a void (gravity and
-  //     ∇p are both gated on f), so this cannot run away.
+  //     slowly, so still air stays still. Under gravity nothing forces a void
+  //     (gravity and ∇p are both gated on f), so this cannot run away; with
+  //     gravity off (a plan view) the EOS carries a negative pressure below
+  //     f = 1 and the argument does not hold.
   //
   //     ...except for u directly above the water. There the bled air used to
   //     hold slow fluid, and the wobbling surface kept refilling its
@@ -817,6 +821,12 @@ void main(){
     fNew = max(fNew, 1.0); dNew = max(dNew, u_sv1.zw);
   }
 
+  // A NaN / rounding guard behind the donor-side flux cap above, NOT an f
+  // clamp: in a conserving run the cap keeps fNew inside [0, 8) already, so
+  // this never fires. It only catches NaN (which fails both tests and becomes
+  // 0) and a stray roundoff overshoot. A real clamp here would invent water
+  // wherever the flux cap had not yet done its job (see Conservation in
+  // docs/engineering-notes.md).
   fNew = (fNew > 0.0 && fNew < 8.0) ? fNew : (fNew >= 8.0 ? 8.0 : 0.0);
   o = vec4(fNew, dNew, 0.0);
 #ifdef ACCUM
@@ -1166,10 +1176,8 @@ void main(){ o = texture(u_T, vUv); }`;
 
   // ------------------------------------------------------------------ ramps
   /** The colour stops, in JS, because the legend has to paint the SAME bar the
-   *  water is painted with. They used to be `vec3` literals inside FS_DISP,
-   *  which meant the only way to draw a matching key was to type the numbers
-   *  out again somewhere else and hope. Interpolated into the shader source
-   *  below, so there is one array and two consumers.
+   *  water is painted with. Interpolated into the shader source below, so
+   *  there is one array and two consumers.
    *
    *  `turbo` is sequential, for quantities with a floor (the heads, speed);
    *  `divg` is diverging and pale in the middle, for quantities with a
@@ -1205,8 +1213,8 @@ uniform vec4  u_cursor;       // x, z (m), radius (m), tool tint
 uniform vec4  u_guide;        // preview line x0,z0,x1,z1 (m); w<0 = off
 uniform float u_guideOn;
 // ------------------------------------------------------- the averaging mode
-// docs/averaging.md §6. Average does not add seven more colourings: it
-// redirects the INPUTS of the seven that already exist, so a field stays
+// docs/averaging.md §6. Average does not add nine more colourings: it
+// redirects the INPUTS of the nine that already exist, so a field stays
 // described once. u_AF is the Favre display accumulator (<f u_c>, <f w_c>,
 // f-bar, P-bar) and u_AC the column accumulator (<d>, <q>, <eta>, M2). Both
 // are bound to the LIVE textures whenever no window is open, so the samplers

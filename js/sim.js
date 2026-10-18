@@ -540,11 +540,9 @@ const SIM = (() => {
     // before release(old) frees the outgoing accumulator.
     const wasAvg = !!(S && S.avg);
     const aspect = scene.W / scene.H;
-    // The hard cap is the driver's texture limit, not a number picked here.
-    // A fixed 1400 silently swallowed the top resolutions on exactly the
-    // scenes that need them: m2 is 16 m × 0.95 m, so at Ultra it asks for
-    // nx ≈ 3400 and used to get 1400 — the flumes would have ignored two
-    // whole steps of the slider.
+    // The hard cap is the driver's texture limit, not a number picked here:
+    // m2 is 16 m × 0.95 m, so at Ultra it asks for nx ≈ 3400, and a fixed
+    // cap (1400 was one) would ignore two whole steps of the slider.
     const lim = Math.min(8192, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096);
     let nx = Math.round(Math.sqrt(budget * aspect));
     nx = Math.max(96, Math.min(lim, nx));
@@ -1551,7 +1549,7 @@ const SIM = (() => {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(prog.draw);
-    // Average paints the same seven branches from the mean state, so the two
+    // Average paints the same nine branches from the mean state, so the two
     // accumulator textures go in beside the live ones and `u_avg` picks. With
     // no window open they are BOUND TO THE LIVE TEXTURES rather than left
     // dangling: an unbound sampler2D reads unit 0, which is whatever the last
@@ -2208,47 +2206,6 @@ const SIM = (() => {
     return [u, w];
   }
 
-  /** Momentum-theorem force on whatever solid a box encloses, in N per metre
-   *  of width: F = −∮ ρf·[u(u·n) + P·n] dA over the four faces, minus the
-   *  weight of the enclosed water in z. The faces sit ON grid lines, so the
-   *  MAC staggering hands over the exact normal velocity (u on x-faces, w on
-   *  z-faces); f and P (= p/ρ, in U.b — hydrostatic P = g·depth, so ρ·f·P is
-   *  the physical pressure) are averaged across the face. A face segment with
-   *  a solid on either side is skipped: the fluid boundary continues along
-   *  the solid surface there, and the traction on that surface is exactly
-   *  the force being solved for. The whole box comes back in one readPixels
-   *  per texture; the caller owns any time-averaging — the instantaneous
-   *  integral carries every splash that crosses a face. `mdot` (net outflow,
-   *  kg/s per m) is the closure check: it should time-average to ~0, and a
-   *  box that includes the spout's footprint fails it loudly, because the
-   *  spout is a source — mass and momentum appear inside the box and the
-   *  budget is not a force any more. */
-  /** The full control-volume budget, edge by edge, in ONE readback.
-   *
-   *  `boxForce` answers "what force does this box feel"; this answers the
-   *  three questions a control-volume analysis actually asks — does mass
-   *  balance, where does the momentum go, and how much energy is lost — with
-   *  the answer split across the four faces, because which face a flux
-   *  crosses is half of what a student is being asked to see.
-   *
-   *  Everything is OUTWARD-positive and per metre of width. Air contributes
-   *  nothing, and not by a threshold: every term carries the fill fraction, so
-   *  an empty cell adds zero and a half-full one adds half. `Q` uses
-   *  min(f, 1) — the geometric water volume — because f > 1 is water that has
-   *  been compressed, not extra volume of it; the mass-carrying terms use f
-   *  itself, which IS the density in this model.
-   *
-   *  `M` (the momentum the fluid carries through the face) and `Fp` (the
-   *  pressure the surroundings apply to it) are kept apart rather than summed.
-   *  Distinguishing them is the whole content of a control-volume question,
-   *  and their sum is `boxForce`'s answer — which the layout gate checks, so
-   *  the two can never quietly disagree.
-   *
-   *  Energy is per unit time: ρ f uₙ (gz + P + ½|u|²) — the Bernoulli sum, so
-   *  the total over the four faces is the rate of energy LOSS through the box.
-   *  A tilted-gravity scene carries its slope in gravity rather than in the
-   *  bed, so the elevation term is z − S₀x there, exactly as the head views
-   *  and the overlay compute it. */
   /** What crosses one SECTION: the same integrand as a control-volume face,
    *  over a line you drew rather than over a box.
    *
@@ -2436,6 +2393,32 @@ const SIM = (() => {
                               len: pts[pts.length - 1].s + ds / 2 });
   }
 
+  /** The full control-volume budget, edge by edge, in ONE readback.
+   *
+   *  `boxForce` answers "what force does this box feel"; this answers the
+   *  three questions a control-volume analysis actually asks — does mass
+   *  balance, where does the momentum go, and how much energy is lost — with
+   *  the answer split across the four faces, because which face a flux
+   *  crosses is half of what a student is being asked to see.
+   *
+   *  Everything is OUTWARD-positive and per metre of width. Air contributes
+   *  nothing, and not by a threshold: every term carries the fill fraction, so
+   *  an empty cell adds zero and a half-full one adds half. `Q` uses
+   *  min(f, 1) — the geometric water volume — because f > 1 is water that has
+   *  been compressed, not extra volume of it; the mass-carrying terms use f
+   *  itself, which IS the density in this model.
+   *
+   *  `M` (the momentum the fluid carries through the face) and `Fp` (the
+   *  pressure the surroundings apply to it) are kept apart rather than summed.
+   *  Distinguishing them is the whole content of a control-volume question,
+   *  and their sum is `boxForce`'s answer — which the layout gate checks, so
+   *  the two can never quietly disagree.
+   *
+   *  Energy is per unit time: ρ f uₙ (gz + P + ½|u|²) — the Bernoulli sum, so
+   *  the total over the four faces is the rate of energy LOSS through the box.
+   *  A tilted-gravity scene carries its slope in gravity rather than in the
+   *  bed, so the elevation term is z − S₀x there, exactly as the head views
+   *  and the overlay compute it. */
   function boxFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
     const closed = S.p.valveClosed > 0.5;
@@ -2517,6 +2500,21 @@ const SIM = (() => {
              iL, iR, jB, jT };
   }
 
+  /** Momentum-theorem force on whatever solid a box encloses, in N per metre
+   *  of width: F = −∮ ρf·[u(u·n) + P·n] dA over the four faces, minus the
+   *  weight of the enclosed water in z. The faces sit ON grid lines, so the
+   *  MAC staggering hands over the exact normal velocity (u on x-faces, w on
+   *  z-faces); f and P (= p/ρ, in U.b — hydrostatic P = g·depth, so ρ·f·P is
+   *  the physical pressure) are averaged across the face. A face segment with
+   *  a solid on either side is skipped: the fluid boundary continues along
+   *  the solid surface there, and the traction on that surface is exactly
+   *  the force being solved for. The whole box comes back in one readPixels
+   *  per texture; the caller owns any time-averaging — the instantaneous
+   *  integral carries every splash that crosses a face. `mdot` (net outflow,
+   *  kg/s per m) is the closure check: it should time-average to ~0, and a
+   *  box that includes the spout's footprint fails it loudly, because the
+   *  spout is a source — mass and momentum appear inside the box and the
+   *  budget is not a force any more. */
   function boxForce(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
     const closed = S.p.valveClosed > 0.5;

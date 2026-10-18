@@ -10,7 +10,7 @@
  *
  * Defines: OVERLAY
  *
- * Reads:   GEOM, sim
+ * Reads:   CV_EDGES, GEOM, sim
  */
 const OVERLAY = (() => {
 
@@ -627,7 +627,6 @@ const OVERLAY = (() => {
     });
   }
 
-  /** Profile label + hydraulics numbers at the cursor column. */
   /** THE HOVER CARD'S ROWS, as a register -- the one place they are named.
    *
    *  An exercise profile names these ids to choose what its student reads
@@ -645,10 +644,8 @@ const OVERLAY = (() => {
    *
    *  `profile` is the card's TITLE — the gradually-varied-flow class ("H2
    *  profile") — and it is a row id like any other so that a profile's
-   *  `rows` list governs it too. It used to be drawn whenever the column could
-   *  be classified, whatever the list said, which put "H2 profile" on every
-   *  Year 1 card that hovered over a channel. In the default set, so a card
-   *  without a list is unchanged.
+   *  `rows` list governs it too. In the default set, so a card without a
+   *  list is unchanged.
    */
   const ROW_IDS = ["profile", "pos", "d", "eta", "q", "V", "Fr", "dc", "dn", "S0", "Sf",
                    "uw", "p", "phead", "h", "f"];
@@ -657,13 +654,6 @@ const OVERLAY = (() => {
   // colouring names `p` instead of `phead`.
   const DEFAULT_ROWS = ROW_IDS.filter((r) => r !== "f" && r !== "p");
 
-  /** `show` is the set of row ids the caller wants, or null for the default.
-   *  Every row below carries a stable id as its third element, so an exercise
-   *  can name exactly the quantities its student should be reading and no
-   *  others -- a slope-area exercise wants d, S_f and n, and a card offering
-   *  fourteen numbers is a card nobody reads carefully. The ids are the
-   *  contract: they are validated against ROW_IDS by check_pack.py, so a typo
-   *  in a profile fails the pack rather than silently hiding a row. */
   /** THE TWO GRADE LINES, on their own switch.
    *
    *  The channel overlay already draws the energy line, but only across
@@ -749,6 +739,13 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** Profile label + hydraulics numbers at the cursor column. `show` is the set of row ids the caller wants, or null for the default.
+   *  Every row below carries a stable id as its third element, so an exercise
+   *  can name exactly the quantities its student should be reading and no
+   *  others -- a slope-area exercise wants d, S_f and n, and a card offering
+   *  fourteen numbers is a card nobody reads carefully. The ids are the
+   *  contract: they are validated against ROW_IDS by check_pack.py, so a typo
+   *  in a profile fails the pack rather than silently hiding a row. */
   function drawCursorReadout(ctx, V, A, sim, mx, mz, probe, show) {
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(mx / sim.dx)));
     const d = A.d[i], dc = A.dc[i], dn = A.dn[i], S0 = A.S0[i];
@@ -879,10 +876,6 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
-  /** Vertical velocity rake: u(y) drawn against the water column it sits in.
-   *  The profile is also INTEGRATED over the column — q = ∫u dy — so the rake
-   *  is a flow measurement, not just a shape: the discharge it reports can be
-   *  checked against the hover readout's flux-based q at the same station. */
   /** The span a rake reads, [lo, hi] in metres. Open water (the clicked point
    *  lies in the column the analysis measured, with no solid between bed and
    *  surface) is A.bed → A.surf, bit-for-bit the old rake, so every worksheet
@@ -945,6 +938,10 @@ const OVERLAY = (() => {
     chip(ctx, x + L + 8, y, "rake: " + String(+u.toPrecision(2)) + " m/s", "#e8f0f8");
   }
 
+  /** Vertical velocity rake: u(y) drawn against the water column it sits in.
+   *  The profile is also INTEGRATED over the column — q = ∫u dy — so the rake
+   *  is a flow measurement, not just a shape: the discharge it reports can be
+   *  checked against the hover readout's flux-based q at the same station. */
   function drawRake(ctx, V, sim, rk, A, pxPerMps) {
     const { i, buf } = rk;
     const x0 = V.X((i + 0.5) * sim.dx);
@@ -967,10 +964,8 @@ const OVERLAY = (() => {
     rk.qE = rk.qE === undefined ? qNow : rk.qE + 0.10 * (qNow - rk.qE);
     const q = rk.qE;
     // ONE scale for every rake in the scene: `pxPerMps`, from the scene's
-    // held speed range (main.js rakeScale). Each rake used to scale to its own
-    // maximum, so a rake in still water blew its noise up to a full-width
-    // erratic profile and two rakes could not be compared side by side. Now
-    // still water draws a nearly flat line, and the scale bar (drawRakeScale)
+    // held speed range (main.js rakeScale), so two rakes compare side by side
+    // and still water draws a nearly flat line; the scale bar (drawRakeScale)
     // says what a length means. A section faster than the range is clipped at
     // 1.6× the nominal length rather than run across the view.
     const scale = rakePx(V, pxPerMps);
@@ -1034,15 +1029,10 @@ const OVERLAY = (() => {
    *  the DOM can hang an affordance on a card without duplicating the layout
    *  arithmetic. Drawing is unchanged — the stack breaks at the same place. */
   /*  `pick(gauge)` returns `{label, unit, get(sample)}` — what THIS gauge
-   *  plots, since each gauge carries its own quantity. A string in its place
-   *  is the old one-quantity-for-all call (`field, label, unit`). */
-  function drawGaugeCharts(ctx, V, gauges, pick, label0, unit0) {
+   *  plots, since each gauge carries its own quantity. */
+  function drawGaugeCharts(ctx, V, gauges, pick) {
     const rects = [];
     if (!gauges.length) return rects;
-    if (typeof pick !== "function") {
-      const f0 = pick;
-      pick = () => ({ label: label0, unit: unit0, get: (s) => s[f0] });
-    }
     const W = Math.min(330, V.pxW * 0.32), H = 82, pad = 10;
     let y = V.pxH - pad - H;
     for (let k = gauges.length - 1; k >= 0; k--) {
@@ -1229,9 +1219,8 @@ const OVERLAY = (() => {
       }
       const fx = cv.ema.fx, fz = cv.ema.fz;
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-      // The arrow is the FORCE, both components. It used to be drawn from fx
-      // alone, so a box on a weir crest or an apron — where the vertical
-      // component is the whole point — showed an arrow that flatly ignored it.
+      // The arrow is the FORCE, both components: on a weir crest or an apron
+      // the vertical component is the whole point.
       //
       // The two components are scaled by the same number of newtons per pixel,
       // or the arrow would report an angle the force does not have. That one
@@ -1265,14 +1254,6 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
-  /** The per-edge budget, written ON the edges it crosses, and the three
-   *  totals under the box.
-   *
-   *  Numbers at the edges rather than in a table because WHICH face a flux
-   *  crosses is half of what a control-volume question is asking a student to
-   *  see; a table of four rows makes them map it back onto the picture
-   *  themselves. Outward-positive throughout, so a sign is a direction: what
-   *  leaves is positive wherever it leaves from. */
   /** What a face can be labelled with.
    *
    *  `through` quantities (volume, energy) cross the face, so the honest way
@@ -1286,11 +1267,11 @@ const OVERLAY = (() => {
    *  energy in the register and stays that way (the E–d diagram is a named
    *  teaching object), and `ρgQH` says exactly what the quantity is. */
   const CV_Q = {
-    Q: { label: "Q", unit: "m²/s", through: true, dp: 3,
+    Q: { label: "Q", through: true,
          at: (e) => e.Q, fmt: (v) => v.toFixed(3) },
-    M: { label: "momentum + pressure", unit: "N/m", through: false, dp: 1,
+    M: { label: "momentum + pressure", through: false,
          at: (e) => e.Mx + e.Fpx, fmt: (v) => fmtBig(v, "N/m") },
-    E: { label: "ρgQH", unit: "W/m", through: true, dp: 0,
+    E: { label: "ρgQH", through: true,
          at: (e) => e.E, fmt: (v) => fmtBig(v, "W/m") },
   };
   /** Watts per metre run to thousands once a reach is doing any work at all. */
@@ -1326,6 +1307,14 @@ const OVERLAY = (() => {
     return (n * stv - st * sv) / den;
   }
 
+  /** The per-edge budget, written ON the edges it crosses, and the three
+   *  totals under the box.
+   *
+   *  Numbers at the edges rather than in a table because WHICH face a flux
+   *  crosses is half of what a control-volume question is asking a student to
+   *  see; a table of four rows makes them map it back onto the picture
+   *  themselves. Outward-positive throughout, so a sign is a direction: what
+   *  leaves is positive wherever it leaves from. */
   function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
     const F = cv.flux;
     // A card that withholds energy never labels the faces with it, whatever
@@ -1362,7 +1351,7 @@ const OVERLAY = (() => {
     // outward normal" is the same statement and teaches nobody anything.
     const gross = (pick) => {
       let inn = 0, out = 0;
-      ["left", "right", "bed", "top"].forEach((k) => {
+      CV_EDGES.forEach((k) => {
         const v = pick(F.edges[k]);
         if (v < 0) inn -= v; else out += v;
       });
@@ -1404,7 +1393,7 @@ const OVERLAY = (() => {
    *  the water is going through it, and the number beside it is a magnitude.
    *  Which side of the line counts as positive is the tool's business, not the
    *  reader's. */
-  function drawFlux(ctx, V, lines, show, drag) {
+  function drawFlux(ctx, V, lines, drag) {
     const col = "#8ce1b0";
     ctx.save();
     if (drag) {

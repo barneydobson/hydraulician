@@ -46,18 +46,15 @@ function wheelHint() {
  *  machine. */
 const MINI = (() => {
   const items = {};
-  /** opts: { corner: "corner"|"cornerL"|"inline", pill: {css}, label }
-   *  "inline" prepends the button as the box's FIRST flex child — the bar's
-   *  right end wraps under the title box on a narrow window, so the left end
-   *  is the only spot nothing can cover. */
+  /** opts: { pill: {css}, label } — the button sits in the box's top-right
+   *  corner. */
   function add(id, el, opts) {
     const o = opts || {};
     const btn = document.createElement("button");
-    btn.className = "minbtn" + (o.corner === "inline" ? "" : " " + (o.corner || "corner"));
+    btn.className = "minbtn corner";
     btn.title = "Minimise"; btn.textContent = "–";
     btn.onclick = (e) => { e.stopPropagation(); btn.blur(); set(id, true); };
-    if (o.corner === "inline") el.insertBefore(btn, el.firstChild);
-    else el.appendChild(btn);
+    el.appendChild(btn);
     const pill = document.createElement("div");
     pill.className = "minpill glass";
     pill.textContent = o.label || "▸";
@@ -74,12 +71,6 @@ const MINI = (() => {
     it.el.style.display = min ? "none" : "";
     it.pill.classList.toggle("show", min);
   }
-  function isMin(id) { return !!(items[id] && items[id].min); }
-  /** A live element to anchor a menu on: the box, or its pill when minimised. */
-  function anchor(id) {
-    const it = items[id];
-    return it && it.min ? it.pill : (it ? it.el : null);
-  }
   /** Let a pill carry a live word or two (the settle countdown, mostly).
    *  Called per frame, so it only touches the DOM on an actual change. */
   function pillText(id, txt) {
@@ -95,7 +86,7 @@ const MINI = (() => {
     const it = items[id];
     if (it && it.btn.parentNode !== it.el) it.el.appendChild(it.btn);
   }
-  return { add, set, isMin, anchor, pillText, keep };
+  return { add, pillText, keep };
 })();
 
 // ============================================================= side panel
@@ -116,7 +107,7 @@ const DOCK = (() => {
   // it becomes a bottom sheet instead — the water keeps the top of the screen,
   // which on a phone is the only part tall enough to read a flume in.
   const W = 348, MINW = 900, PHONE = 620;
-  let shown = false, folded = false, kind = "Exercise", id = "";
+  let shown = false, folded = false, id = "";
   const el = () => document.getElementById("dock");
   const body = () => el().querySelector(".dock-body");
   const foot = () => el().querySelector(".dock-foot");
@@ -147,23 +138,20 @@ const DOCK = (() => {
     fitBar();                    // the panel takes its width out of the strip
     applyAutoVex();              // …and out of what "fills the window" means
     el().querySelector(".dock-h .eid").textContent = id;
-    el().querySelector(".dock-h .kind").textContent = kind;
     const fold = document.getElementById("dockfold");
     const tab = document.getElementById("docktab");
     fold.classList.toggle("show", open);
     tab.classList.toggle("show", shown && folded);
     tab.querySelector(".eid").textContent = id;
     // The tab is the only thing a folded student sees: "Exercise" doesn't
-    // say there is a brief behind it, so name the action instead of the kind.
-    tab.querySelector(".kind").textContent =
-      kind === "Exercise" ? "open instructions" : "open " + kind.toLowerCase();
+    // say there is a brief behind it, so name the action instead.
+    tab.querySelector(".kind").textContent = "open instructions";
   }
-  /** Show the panel with a header. `onClose` is what the × does — the caller
-   *  owns what closing MEANS (an exercise stays loaded; only its brief goes). */
-  function show(k, i) { kind = k || "Exercise"; id = i || ""; shown = true; folded = false; sync(); }
+  /** Show the panel, headed "Exercise" and the card's id. */
+  function show(i) { id = i || ""; shown = true; folded = false; sync(); }
   /** Rename what is in the panel without touching whether it is open — a
    *  content refresh must not undo a fold. */
-  function label(k, i) { kind = k || kind; id = i === undefined ? id : i; sync(); }
+  function label(i) { id = i === undefined ? id : i; sync(); }
   function hide() { shown = false; folded = false; sync(); }
   function fold(v) { folded = v === undefined ? !folded : !!v; sync(); }
   function isShown() { return shown; }
@@ -220,7 +208,7 @@ const START = (() => {
   }
 
   /** The pack as the exercise menu groups it — the course menu when this
-   *  deployment ships one (js/menu.js), otherwise the register by `topic` —
+   *  deployment ships one (js/courses.js), otherwise the register by `topic` —
    *  so the two never disagree. */
   function grouped() { return EX.groupsFor(filter); }
 
@@ -313,9 +301,9 @@ const START = (() => {
   return { open, close, toggle, isOpen, renderList };
 })();
 
-/** Header-drag for a floating window, shared by the gauge inspector and the
- *  exercise card so the two behave and clamp identically: never off the left
- *  or top, never further right than its own width, and never past the bottom
+/** Header-drag for a floating window, shared by the gauge inspector, the
+ *  exercise card and the legend so they behave and clamp identically: never
+ *  off the left or top, never further right than its own width, and never past the bottom
  *  by more than its header. `onPlace` gets the new position so the window can
  *  remember where it was put. */
 function dragWindow(el, handle, onPlace) {

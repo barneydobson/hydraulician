@@ -16,7 +16,7 @@
  */
 /** The colour key — and the field picker, because they are the same question.
  *
- *  The seven colourings existed long before anything on screen said which one
+ *  The nine colourings existed long before anything on screen said which one
  *  was up, over what range, or in what units; a screenshot pasted into a
  *  worksheet therefore carried no statement of what it showed. Worse, the
  *  default Water view is a TWO-variable encoding — hue from submergence,
@@ -404,11 +404,6 @@ const UIMODE = (() => {
     return FIELDS.filter((f) => u.fields.indexOf(f.id) >= 0);
   }
 
-  /** Is this on-canvas readout wanted? Gauge cards, the hovering cursor
-   *  readout and the status line have no toggle of their own; the profile
-   *  labels, jump boxes and channel overlay stay with `viewParams`, which
-   *  already sets them — two ways to say the same thing is how they come to
-   *  disagree. */
   /** Which rows the hover card should print: the ids an exercise named, or
    *  null for OVERLAY's own default set. A profile writes them under readouts,
    *  beside the three whole-panel switches, because they answer the same
@@ -424,6 +419,11 @@ const UIMODE = (() => {
     return u.readouts.rows;
   }
 
+  /** Is this on-canvas readout wanted? Gauge cards, the hovering cursor
+   *  readout and the status line have no toggle of their own; the profile
+   *  labels, jump boxes and channel overlay stay with `viewParams`, which
+   *  already sets them — two ways to say the same thing is how they come to
+   *  disagree. */
   function shows(what) {
     const u = state.ui;
     if (!u || u.lifted || !u.readouts) return true;

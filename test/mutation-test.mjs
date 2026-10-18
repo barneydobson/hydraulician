@@ -18,8 +18,9 @@
 // Two catalogues: RECON (js/reconstruct.js against test/recon-test.mjs) and
 // GEOM (js/geom.js against test/geom-test.mjs). Each suite is first run
 // UNMUTATED — a suite that is already red would "kill" every mutant for free.
-// A `kills` entry must match the start of a `FAIL <name>` line, never any other
-// text in the output (a name quoted in a failure's detail would also match).
+// A `kills` entry is the FULL name on a `FAIL <name>` line, never any other
+// text in the output (a name quoted in a failure's detail would also match,
+// and a short prefix such as "A2" would also match "A20").
 
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -46,7 +47,7 @@ const GEOM_SUITE = fileURLToPath(new URL("./geom-test.mjs", import.meta.url));
 const source = readFileSync(SRC, "utf8").replace(/\r\n/g, "\n");
 const geomSource = readFileSync(GEOM_FILE, "utf8").replace(/\r\n/g, "\n");
 
-/** `find` → `replace` on js/reconstruct.js. `kills` are substrings of the
+/** `find` → `replace` on js/reconstruct.js. `kills` are the full
  *  assertion names that MUST appear among the failures — naming them is what
  *  turns "the suite noticed something" into "this guard works". */
 const MUTANTS = [
@@ -54,31 +55,31 @@ const MUTANTS = [
     why: "the running mean returns the sample and discards the window",
     find: "return mean + k * (phi - mean);",
     replace: "return phi;",
-    kills: ["A2", "A6"] },
+    kills: ["A2 dt-weighted mean is 3, not 2", "A6 source rate averages to 5, not 14 or 6"] },
 
   { id: "accum-fixed-weight",
     why: "a constant weight instead of dt/(T+dt) — the frame-count average A2 exists for",
     find: "const k = dt / Math.max(T + dt, 1e-30);",
     replace: "const k = 0.5;",
-    kills: ["A2", "A6"] },
+    kills: ["A2 dt-weighted mean is 3, not 2", "A6 source rate averages to 5, not 14 or 6"] },
 
   { id: "welford-drops-dt",
     why: "the second moment stops being time-weighted. G1 uses dt = 1 throughout so it CANNOT see this; C2 and C5 use dt = 0.01 and can",
     find: "return M2 + dt * (phi - meanOld) * (phi - meanNew);",
     replace: "return M2 + (phi - meanOld) * (phi - meanNew);",
-    kills: ["C2", "C5"] },
+    kills: ["C2 Welford sigma over the sampled surface is a/sqrt(2)", "C5 the band and Welford routes agree at the sinusoid's 2.7936, not 3.2897"] },
 
   { id: "sigma-drops-window",
     why: "variance not divided by the window — the raw-sums bug Welford was chosen to avoid",
     find: "return T > 0 ? Math.sqrt(Math.max(0, M2 / T)) : 0;",
     replace: "return T > 0 ? Math.sqrt(Math.max(0, M2)) : 0;",
-    kills: ["G1 Welford sigma", "C2"] },
+    kills: ["G1 Welford sigma to 3 digits", "C2 Welford sigma over the sampled surface is a/sqrt(2)"] },
 
   { id: "geomfill-no-compaction",
     why: "the slot-storage subtraction deleted — 7.9 mm on 1 m at c = 25, 77 mm at c = 8. This survived the entire B group until B5 was written for it",
     find: "const g = fbar - pbar / Math.max(c * c, 1e-12);",
     replace: "const g = fbar;",
-    kills: ["B5"] },
+    kills: ["B5 compaction subtracts the diagnostic pressure, not just a clamp"] },
 
   { id: "columndepth-exclusive-end",
     why: "the body's last cell dropped from the integral",
@@ -86,81 +87,81 @@ const MUTANTS = [
     replace: "for (let j = j0; j < j1; j++) d += gcol[j];",
     // NOT C1: its exceedance profile is already zero at the top cell, so a
     // dropped end changes nothing there. The harness caught that claim.
-    kills: ["D1 pool depth", "D4 smeared jet"] },
+    kills: ["D1 pool depth excludes the nappe", "D4 smeared jet keeps its mean thickness"] },
 
   { id: "bodydepth-unmasked",
     why: "bodyDepth stops masking sub-threshold cells, so it no longer matches FS_COL's `continue`",
     find: "for (let j = j0; j <= j1; j++) if (gcol[j] >= WET) d += gcol[j];",
     replace: "for (let j = j0; j <= j1; j++) d += gcol[j];",
-    kills: ["D6 bodyDepth masks"] },
+    kills: ["D6 bodyDepth masks the sub-threshold cell, as FS_COL does"] },
 
   { id: "wet-threshold-drift",
     why: "WET diverges from FS_COL's 0.25 — the actual regression an implementer made, to force a broken test green",
     find: "const WET = 0.25;",
     replace: "const WET = 0.15;",
-    kills: ["D4 sub-threshold fill"] },
+    kills: ["D4 sub-threshold fill is not selected as a connected body"] },
 
   { id: "dry-break-too-eager",
     why: "one dry cell ends a body, where FS_COL bridges two",
     find: "const DRY_BREAK = 3;",
     replace: "const DRY_BREAK = 1;",
-    kills: ["D6 the gap is bridged"] },
+    kills: ["D6 the gap is bridged into one body"] },
 
   { id: "walk-non-strict",
     why: "the walk's dry test loses its strictness, splitting a body FS_COL keeps whole at exactly WET",
     find: "if (gcol[j] < WET) { if (++dry >= DRY_BREAK) break; continue; }",
     replace: "if (gcol[j] <= WET) { if (++dry >= DRY_BREAK) break; continue; }",
-    kills: ["D7"] },
+    kills: ["D7 a run at exactly WET does not split the body"] },
 
   { id: "band-inverted",
     why: "eta05 and eta95 swapped — the upside-down excursion band that does not look wrong",
     find: "return { eta95: crossing(gcol, j0, j1, dx, 0.05),\n             eta05: crossing(gcol, j0, j1, dx, 0.95) };",
     replace: "return { eta95: crossing(gcol, j0, j1, dx, 0.95),\n             eta05: crossing(gcol, j0, j1, dx, 0.05) };",
     // C4 was removed as implied by C3; C3's signed offsets are what notice.
-    kills: ["C3 eta95", "C3 eta05"] },
+    kills: ["C3 eta95 = eta0 + 0.98769a", "C3 eta05 = eta0 - 0.98769a"] },
 
   { id: "reconstruct-transposed",
     why: "row-major index transposed — invisible on a square grid, catastrophic on the real 3400-column ones",
     find: "const k = j * nx + i;",
     replace: "const k = i * ny + j;",
-    kills: ["C8 depth lands in the column"] },
+    kills: ["C8 depth lands in the column it was written to, not its transpose"] },
 
   { id: "reconstruct-ignores-solid",
     why: "the solid mask stops being honoured, so a wall holds water",
     find: "solid[j] = mask[k] >= 192 ? 1 : 0;",
     replace: "solid[j] = 0;",
-    kills: ["C8 a cell with mask >= 192"] },
+    kills: ["C8 a cell with mask >= 192 is solid even when its fill says water"] },
 
   { id: "reconstruct-unmasked-depth",
     why: "d2d built from the unmasked integral, so the 2D/1D cross-check would measure its own bug rather than check against it",
     find: "d2d[i] = b.length ? bodyDepth(gcol, b[0].j0, b[0].j1, dx) : 0;",
     replace: "d2d[i] = b.length ? columnDepth(gcol, b[0].j0, b[0].j1, dx) : 0;",
-    kills: ["C8 depth lands in the column"] },
+    kills: ["C8 depth lands in the column it was written to, not its transpose"] },
 
   { id: "reconstruct-bed-offset",
     why: "the bed reported one row too high — bed was never asserted beyond its length",
     find: "bed[i] = b.length ? b[0].j0 * dx : 0;",
     replace: "bed[i] = b.length ? (b[0].j0 + 1) * dx : 0;",
-    kills: ["E bed is the first wet row"] },
+    kills: ["E bed is the first wet row of the lowest body"] },
 
   { id: "no-zero-gravity-refusal",
     why: "the g = 0 refusal removed, so a two-sided EOS gets a plausible answer instead of an error",
     find: "if (!(Math.abs(g) > 0)) {",
     replace: "if (false) {",
-    kills: ["E4 reconstruct refuses"] },
+    kills: ["E4 reconstruct refuses g = 0"] },
 
   // --- the specific-energy inlet and the energy line's velocity head
   { id: "inlet-pins-the-surface",
     why: "the OLD boundary, restored: the level becomes the surface and the velocity head is added on top. This is the bug the whole change exists to remove, and it looks entirely reasonable in a diff",
     find: "    if (!(q > 0)) { out.d = E; return out; }",
     replace: "    out.d = E; return out;",
-    kills: ["H1", "H3"] },
+    kills: ["H1 subcritical root solves E = d + q^2/2gd^2", "H3 the delivered depth falls as q rises"] },
 
   { id: "inlet-wrong-root",
     why: "the branch argument ignored, so every caller is handed the subcritical root — a chute that silently enters on the wrong side of critical. Written first as a deleted `if`, which only made the module fail to parse: a mutant has to change BEHAVIOUR, and the gate said so",
     find: '    if (branch === "super") { lo = q / Math.sqrt(2 * g * E); hi = dc; }',
     replace: '    if (false) { lo = q / Math.sqrt(2 * g * E); hi = dc; }',
-    kills: ["H2 supercritical root also solves it", "H2 the roots straddle"] },
+    kills: ["H2 supercritical root also solves it", "H2 the roots straddle d_c"] },
 
   { id: "inlet-choke-ignored",
     why: "a reservoir that cannot pass the demanded q reports a depth anyway. s2 ships q = 1.2 against a head that can pass 0.651, so this is the case that actually occurs",
@@ -175,7 +176,7 @@ const MUTANTS = [
     // NOT H6: at E = 1.5 d_c the bracket's lower end IS the root, so bisection
     // still lands on d_c however E_min is written. H7 is the assertion that
     // actually depends on the 1.5, and it was written because this survived.
-    kills: ["H5 and reports the E_min it needed", "H7"] },
+    kills: ["H5 and reports the E_min it needed", "H7 E between d_c and 1.5 d_c is choked"] },
 
   { id: "energy-head-drops-w",
     why: "the vertical velocity left out of the kinetic energy — invisible in a parallel reach and most of the head at a brink, which is exactly where the line was sagging",
@@ -187,7 +188,7 @@ const MUTANTS = [
     why: "the OLD energy line, restored: the velocity head built from the mean velocity, so alpha is 1 by construction. It agrees with the new one on every uniform profile, which is why K2 has to exist",
     find: "    const hv = Math.abs(q) > 1e-30 ? ke / (g * q) : 0;",
     replace: "    const hv = V * V / (2 * g);",
-    kills: ["K2 two-layer profile", "K3"] },
+    kills: ["K2 two-layer profile has alpha = 1.75", "K3 w is in the kinetic energy"] },
 
   { id: "energy-head-clamps-the-flux",
     why: "the mass flux takes the CLAMPED fill, discarding the compressible part in a pressurised cell — the same split FS_COL's comment warns about",
@@ -202,19 +203,19 @@ const GEOM_MUTANTS = [
     why: "the outward normal turned inward — every force changes sign and nothing looks broken until a free body diagram is drawn",
     find: "return [tz, -tx];",
     replace: "return [-tz, tx];",
-    kills: ["GA2"] },
+    kills: ["GA2 every edge normal on rect(0,0,2,1) points away from its centre"] },
 
   { id: "force-fill-uncapped",
     why: "fc = min(f, 1) written as the raw fill, so an over-full (pressurised) sample counts its compressible excess in the force; at f < 1 it also loses nothing, which is why only a case with f > 1 or a weighted partial sum sees it",
     find: "const fc = Math.min(s.f, 1);",
     replace: "const fc = s.f;",
-    kills: ["GA11 an over-full sample is capped"] },
+    kills: ["GA11 an over-full sample is capped at fc = 1"] },
 
   { id: "sample-count-no-floor",
     why: "the at-least-2-samples floor dropped, so a short edge is reduced to its midpoint",
     find: "const nk = Math.max(2, Math.ceil(L / ds));",
     replace: "const nk = Math.ceil(L / ds);",
-    kills: ["GA6 faceSamples count is floored"] },
+    kills: ["GA6 faceSamples count is floored at 2 when ds exceeds the edge length"] },
 ];
 
 // ------------------------------------------------------------------ harness
@@ -262,7 +263,7 @@ function run(label, suite, envVar, src, srcName, mutants) {
       continue;
     }
     const names = failedNames(r.out);
-    const missed = m.kills.filter((k) => !names.some((n) => n.startsWith(k)));
+    const missed = m.kills.filter((k) => !names.includes(k));
     if (missed.length) {
       survived.push(`${m.id} — the suite failed, but not on the guard this targets.\n`
                   + `      expected among the failures: ${missed.join(", ")}\n`

@@ -8,7 +8,7 @@
  * so the lists below (checked by exercises/_runner/check_headers.py) are the
  * dependency record. Load order is index.html's.
  *
- * Defines: CONFIG, state, EMBED, canvas, over, octx, view, sim
+ * Defines: CONFIG, VEX_FIT_MAX, VEX_MAX, state, EMBED, canvas, over, octx, view, sim
  *
  * Reads:   none
  */
@@ -42,7 +42,15 @@ const CONFIG = {
   logMax: 20000,
   tracerPath: 260,            // points of orbit history kept per tracer
   gaugeColours: ["#7fd4ff", "#ffb648", "#5fd08a", "#ff8fa3"],
+  // Instrument ceilings: past these nobody can tell the marks apart, and the
+  // questions they answer need two. The oldest gives way (one per gauge colour).
+  maxGauges: 4, maxFlux: 4, maxRakes: 2,
 };
+
+// Vertical exaggeration has two ceilings: the FITTED one (autoVex never goes
+// past it — beyond about ×8 the water stops looking like water) and the HAND
+// one (the slider's max and the letterbox drag's clamp).
+const VEX_FIT_MAX = 8, VEX_MAX = 12;
 
 const state = {
   scene: null, budget: CONFIG.defaultBudget,

@@ -1510,3 +1510,42 @@ Respawns land in the water (four tries for a wet, open cell), and the drawn
 count is a DENSITY — 2.5·10⁻³ per screen pixel of water, water share from the
 column reduction (plan view taken as full), 300–2600 — so a shallow flume is
 not a white mat and a full plan-view box is not sparse.
+
+## Interface and instrument history
+
+Stories that explain how a piece of the interface got to be the way it is,
+moved out of `js/` comments so the code keeps only the reason it is that way
+now. Nothing here is a rule; the rules are in the sections above.
+
+- **`familyOf` reads `TOOLBAR`.** The digit-key handler used to recompute a
+  tool's family positionally: `TOOLS.slice(0, 4)` plus `TOOLS[TOOLS.length - 1]`
+  meant "the four drawing tools, and Pour" on the day it was written. Then Flux
+  was appended eleventh and the expression silently changed its mind, calling
+  Flux a build tool and Pour a measuring one. Nothing broke, because neither
+  has a digit (`TOOL_KEYS` caps at 9), but a field is described once.
+- **Pour has its own tool.** The first version keyed pouring on
+  `pointerType === "touch" && e.shiftKey`, which was unreachable on every
+  device it named (no second button, no Shift on a touch screen), so half of
+  "draw an edge, pour water" was impossible on a phone.
+- **The strip's Build family.** Undo used to be the Z key and nothing else, so
+  on a touch screen a mis-drawn stroke could not be taken back; Clear used to
+  sit with the clock although it edits the rig rather than running it.
+- **The Force arrow carries both components.** It was drawn from `fx` alone, so
+  a box on a weir crest or an apron, where the vertical component is the whole
+  point, showed an arrow that flatly ignored it.
+- **The hover card's `profile` row.** The class title ("H2 profile") used to be
+  drawn whenever the column could be classified, whatever the card's `rows`
+  list said, which put it on every Year 1 card that hovered over a channel. It
+  is now a row id like any other.
+- **One rake scale.** Each rake used to scale to its own maximum, so a rake in
+  still water blew its noise up to a full-width erratic profile and two rakes
+  could not be compared. The scene's held speed range now sets one scale.
+- **Resolution cap.** A fixed 1400-column cap silently swallowed the top
+  resolutions on the scenes that need them (m2 asks for nx ≈ 3400 at Ultra);
+  the cap is now the driver's texture limit.
+- **Ramps in JS.** The colour stops used to be `vec3` literals inside the
+  display shader, so the only way to draw a matching legend key was to type the
+  numbers out again somewhere else. They are now `Shaders.RAMPS`.
+- **Docs reader.** Off the Pages build the browser used to be handed raw
+  markdown, which is not a document so much as its source code;
+  `docs/view.html` renders it in the app's own styling.

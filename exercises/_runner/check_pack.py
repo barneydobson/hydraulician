@@ -177,7 +177,12 @@ def cards():
 def _load():
     extra = None
     if "--extra" in sys.argv:
-        extra = os.path.abspath(sys.argv[sys.argv.index("--extra") + 1])
+        k = sys.argv.index("--extra")
+        if k + 1 >= len(sys.argv) or sys.argv[k + 1].startswith("--"):
+            print("check_pack: --extra needs a course file, e.g. "
+                  "--extra courses/<id>/exercises.js", file=sys.stderr)
+            sys.exit(2)
+        extra = os.path.abspath(sys.argv[k + 1])
     fd, loader_path = tempfile.mkstemp(suffix=".js")
     fd2, cfg_path = tempfile.mkstemp(suffix=".json")
     try:

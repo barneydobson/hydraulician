@@ -205,7 +205,7 @@ const MUTANTS = [
     find: "  OVERLAY.resetEstimates(sim);\n  LEGEND.sync(); syncPanel(); syncToolbar();",
     replace: "  LEGEND.sync(); syncPanel(); syncToolbar();",
     kills: "avg both Live/Average transitions drop the overlay's temporal estimates",
-    measured: "_hA survives both directions, so each mode inherits the other's EMA" },
+    measured: "OVERLAY's estimates (hA) survive both directions, so each mode inherits the other's EMA" },
 
   { id: "setvalve-no-reset", suite: "avg", file: "/js/sim.js",
     why: "a valve toggle changes the solid set with no reset, so frozen cells resume mid-window",
@@ -2254,8 +2254,9 @@ SUITES.avg = async (B) => {
   // The collocation trap the shader was built around (Task 6 brief): u lives
   // on the west face, so a shader that weighted f by the face value alone —
   // instead of centring first — would put a directional bias into every
-  // mean. avgField()'s wet/finite/fmax checks above do not exercise this at
-  // all (they only touch the f/P channels), so this is a dedicated check
+  // mean. avgField()'s wet/finite/fmax checks above cannot tell the two
+  // apart (the wet and fmax checks read f/P; the finite check reads ubar too,
+  // but a west-face u is just as finite), so this is a dedicated check
   // that ubar sits on the CENTRED velocity, not the west face.
   //
   // Comparison, not an absolute, so it survives the flow's own unsteadiness.
@@ -2826,14 +2827,14 @@ SUITES.avg = async (B) => {
      ag.worst < 8 * ag.dx, JSON.stringify(ag));
 
   // The channel overlay (Task 8): OVERLAY.analyse() already filters three
-  // ways — a spatial prefilter, a temporal EMA (_hA/_qA) and an EMA on the
-  // global normal-depth estimate (_ynK). Handing it mean columns and letting
+  // ways — a spatial prefilter, a temporal EMA (OVERLAY.estimates(S).hA/.qA) and an EMA on the
+  // global normal-depth estimate (OVERLAY.estimates(S).ynK). Handing it mean columns and letting
   // those run would average an already-averaged field a second time, which
   // shows up as a jump broadened by the filter rather than by the flow.
   //
   // Feeding the SAME column buffer to the SAME call twice, with a reset
-  // right before both calls, does NOT distinguish "bypassed" from "filtered\n// but converged": resetEstimates() nulls _hA, so the first call
-  // initialises _hA to a bit-exact copy of the smoothed input, and that same
+  // right before both calls, does NOT distinguish "bypassed" from "filtered\n// but converged": resetEstimates() nulls estimates().hA, so the first call
+  // initialises estimates().hA to a bit-exact copy of the smoothed input, and that same
   // call's own EMA step is then `x += 0.10*(x-x) = 0` — the filter reaches
   // its fixed point in ONE call whenever the input never changes. A second
   // call with the identical input can never move, whether or not the EMA is
@@ -2843,7 +2844,7 @@ SUITES.avg = async (B) => {
   // that already converged (docs/averaging.md §4.3 documents the bypass
   // this suite is pinning).
   //
-  // So instead: seed the shared _hA/_qA state with a column buffer D that
+  // So instead: seed the shared estimates().hA/.qA state with a column buffer D that
   // is CLEARLY different from the averaged buffer C (a just-reset, still
   // near-empty channel vs. the settled averaged profile), then check —
   //   H2a: the averaged path on C ignores that seed entirely. Both calls
@@ -2854,7 +2855,7 @@ SUITES.avg = async (B) => {
   //        reached via two different histories (no history vs. seeded with
   //        C), must give two DIFFERENT outputs — proof the live EMA is
   //        actually carrying state between calls, which is what "the\n//        bypass is real" requires the live path to keep doing.
-  //   H2c: the fourth filter — the global d_n estimate `_ynK` — gets the
+  //   H2c: the fourth filter — the global d_n estimate `OVERLAY.estimates(S).ynK` — gets the
   //        same treatment. Seed it via a live call on D (D's median
   //        candidate measured at 0.0653 m against C's 0.1544 m — a factor
   //        of 2.4, comfortably outside anything a single 6% EMA step could
@@ -2874,7 +2875,7 @@ SUITES.avg = async (B) => {
 
     // H2a — averaged path must ignore stale filter state.
     OVERLAY.resetEstimates(APP.sim);
-    OVERLAY.analyse(APP.sim, D);                  // live call seeds _hA/_qA from D
+    OVERLAY.analyse(APP.sim, D);                  // live call seeds estimates().hA/.qA from D
     const A1 = OVERLAY.analyse(APP.sim, C, { averaged: true });
     const A2 = OVERLAY.analyse(APP.sim, C, { averaged: true });
     let same = true, atC = true;
@@ -2892,9 +2893,9 @@ SUITES.avg = async (B) => {
     let moved = false;
     for (let i = 0; i < nx; i++) if (Math.abs(isolated[i] - withHistory[i]) > 1e-9) { moved = true; break; }
 
-    // H2c — the _ynK global normal-depth estimate must ignore the seed too.
+    // H2c — the estimates().ynK global normal-depth estimate must ignore the seed too.
     OVERLAY.resetEstimates(APP.sim);
-    OVERLAY.analyse(APP.sim, D);                  // live call seeds _ynK from D
+    OVERLAY.analyse(APP.sim, D);                  // live call seeds estimates().ynK from D
     const kSeed = OVERLAY.estimates(S).ynK;
     OVERLAY.analyse(APP.sim, C, { averaged: true });
     const k1 = OVERLAY.estimates(S).ynK;
@@ -2917,7 +2918,7 @@ SUITES.avg = async (B) => {
      h.moved, JSON.stringify(h));
   ok("H2c the seed differs enough from kClean for the check below to have power",
      h.seedDistinct, JSON.stringify(h));
-  ok("H2c the averaged _ynK estimate ignores stale filter state too",
+  ok("H2c the averaged ynK estimate ignores stale filter state too",
      h.ynAtClean, JSON.stringify(h));
 
   // ================================================== the display path (Task 9)

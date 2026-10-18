@@ -6,9 +6,10 @@
  * independent modules; the block below moved verbatim. What the module is and
  * why it is DOM rather than more canvas is documented on it.
  *
- * It reaches back into main.js for FIELDS, KEYS, canvas, dragWindow, frame,
- * showToast, state and syncPanel -- all from inside functions, which is what
- * makes the load order in index.html a free choice rather than a constraint.
+ * What it borrows from the other files is the machine-checked `Reads:` line
+ * below (exercises/_runner/check_headers.py), used only from inside functions,
+ * which is what makes the load order in index.html a free choice rather than
+ * a constraint.
  *
  * Defines: GINSP
  *
@@ -26,7 +27,7 @@
  *  canvas because the things it needs (drag, wheel-zoom over a small target,
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
-  // What a gauge records is GAUGE_QTY in main.js — the gauges' own register,
+  // What a gauge records is GAUGE_QTY in fields.js — the gauges' own register,
   // a different one from the FIELDS the water is painted with, and named apart
   // from it for that reason. Every sample carries every quantity in it; what
   // a gauge PLOTS is its own `field` (gaugeFieldOf), and what the window
@@ -89,7 +90,7 @@ const GINSP = (() => {
         'and loading a scene clear it.</div>';
     host.appendChild(el);
     const o = { g, el, t0: 0, t1: 1, fit: true,
-                hover: null, drag: null, cv: el.querySelector(".ginsp-c") };
+                hover: null, cv: el.querySelector(".ginsp-c") };
     open.push(o);
 
     const p = posMemo[g.id] ||
@@ -223,7 +224,7 @@ const GINSP = (() => {
     const F = gaugeQty(o.field);
     Object.keys(o.vb).forEach((f) => {
       const V = o.vb[f];
-      // A sample logged before a quantity existed (stale main.js next to a
+      // A sample logged before a quantity existed (stale script next to a
       // fresh this) has no such key; throwing here kills the frame loop.
       const v = shown(V.q, last);
       V.b.textContent = (Number.isFinite(v) ? v.toFixed(3) : "—") + " " + V.q.unit;

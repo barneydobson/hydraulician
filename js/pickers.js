@@ -7,20 +7,18 @@
  * and each documents itself below -- EX at length, because the line it draws
  * between what it applies and what it leaves for the student IS the design.
  *
- * They reach back into the files split out of main.js (state.js, panel.js,
- * strip.js, dock.js, instruments.js ...) and main.js itself for state, sim,
- * showToast, syncPanel, switchScene, loadScene, CONFIG, UIMODE, DOCK, TIP, ctl,
- * clearInstruments, syncURL, GINSP and RIG -- all from inside functions, so
- * index.html loads this BEFORE them (and must: main.js puts PICKER and EX on
+ * What they borrow from the other files is the machine-checked `Reads:` line
+ * below (exercises/_runner/check_headers.py), used only from inside functions,
+ * so index.html loads this BEFORE them (and must: main.js puts PICKER and EX on
  * window.APP at parse time).
  *
  * Defines: menuFlag, PICKER, EX
  *
- * Reads:   addGauge, canvas, clearInstruments, ctl, DOCK, EXERCISE_MENU,
- *          EXERCISE_RIGS, EXERCISES, foldText, gaugeQty, GINSP, iconEl,
- *          onDown, restartTips, RIG, SCENES, showToast, sim, state,
- *          switchScene, syncPanel, syncTitle, syncURL, TIP, TOOLBAR, UIMODE,
- *          view
+ * Reads:   addGauge, canvas, clearInstruments, CONFIG, ctl, DOCK,
+ *          EXERCISE_MENU, EXERCISE_RIGS, EXERCISES, foldText, gaugeQty,
+ *          GINSP, iconEl, onDown, restartTips, RIG, SCENES, showToast, sim,
+ *          state, switchScene, syncPanel, syncTitle, syncURL, TIP, TOOLBAR,
+ *          UIMODE, view
  */
 
 /** One flag of the active course's menu (`EXERCISE_MENU`, which is null when no
@@ -213,8 +211,8 @@ const PICKER = (() => {
 })();
 
 // ------------------------------------------------------- exercise picker
-/** The teaching pack, in the UI. Forty demos live in `exercises/` (a
- *  course's own cards in `courses/<id>/exercises/`), and each
+/** The teaching pack, in the UI. The exercises of the active course
+ *  live in `courses/<id>/exercises/`, and each
  *  one is a scene PLUS a set of panel settings PLUS (often) a drawn rig, so
  *  far described only in prose in its README. In a lecture hall that is
  *  unusable: this turns "HJ-1" into a set-up simulation and a card telling you
@@ -382,8 +380,6 @@ const EX = (() => {
     v.base = ex; v.tabKey = t.key; v.tabLabel = t.label; v.ref = ex.id + "#" + t.key;
     return v;
   }
-  /** The rig pack is consumed defensively: absent file, absent key and a
-   *  payload in any of the shapes RIG understands all end somewhere sane. */
   /** Some rigs come in variants the digit chooses between — B8's three
    *  different orifice lips — so the key is a
    *  per-digit `rigTable` where one exists. With no digit yet, the d = 0 rig
@@ -396,6 +392,8 @@ const EX = (() => {
     }
     return ex.rig;
   }
+  /** The rig pack is consumed defensively: absent file, absent key and a
+   *  payload in any of the shapes RIG understands all end somewhere sane. */
   function rigFor(ex, d) {
     if (!ex || !ex.rig) return null;
     if (typeof EXERCISE_RIGS === "undefined" || !EXERCISE_RIGS) return null;
@@ -423,20 +421,6 @@ const EX = (() => {
   function rules(ex) {
     if (!ex || !ex.digit) return [];
     return [ex.digit].concat(ex.digit.also || []);
-  }
-  function ruleValue(r, d) {
-    const n = r.mod || (r.table ? r.table.length : 0);
-    const dd = n ? ((d % n) + n) % n : d;
-    let v = (r.table && r.table.length) ? r.table[dd % r.table.length]
-                                        : (r.base || 0) + (r.step || 0) * dd;
-    if (typeof v === "number") {
-      if (r.min !== undefined) v = Math.max(r.min, v);
-      if (r.max !== undefined) v = Math.min(r.max, v);
-      // 0.42 + 0.03·3 is 0.5100000000000001 in binary, and that is what the
-      // panel would print. The rules are quoted to at most 3 decimals.
-      v = Math.round(v * 1e4) / 1e4;
-    }
-    return v;
   }
   function ruleLabel(r) {
     if (r.label) return r.label;
@@ -482,27 +466,6 @@ const EX = (() => {
     if (c.type === "select") return label + " menu";
     return label + (c.min !== undefined ? " slider" : "");
   }
-  /** "q = 0.51 m²/s (Inflow q slider) · tailwater 0.538 m" — the rules
-   *  evaluated at a digit. No longer printed on the card (the card prints the
-   *  RULES and the student does the arithmetic); kept for scripts and tests. */
-  function digitSummary(ex, d) {
-    return rules(ex).map((r, i) => {
-      const w = (i === 0 && r.control) ? ctlWhere(r.control) : "";
-      return ruleLabel(r) + " = " + fmtVal(ruleValue(r, d)) + (r.unit ? " " + r.unit : "") +
-             (w ? " (" + w + ")" : "");
-    }).join("  ·  ");
-  }
-  /** The card's personalised rules as sentences to act on, values NOT filled
-   *  in: "q (m²/s): q = 0.42 + 0.03·d · Inflow q slider". The tables the
-   *  longer rules lean on stay in the brief, where the lecturer put them. */
-  function ruleLines(ex) {
-    return rules(ex).map((r, i) => {
-      const w = (i === 0 && r.control) ? ctlWhere(r.control) : "";
-      return ruleLabel(r) + (r.unit ? " (" + r.unit + ")" : "") + ": " +
-             (r.rule || "see the brief") + (w ? "  ·  " + w : "");
-    });
-  }
-
   // ------------------------------------------------------------- applying
   function setControl(id, v) {
     const c = ctl(id);
@@ -617,7 +580,7 @@ const EX = (() => {
    *  subject is a time series from t = 0 (VC-2's level curve), where where to
    *  measure is not the question and a gauge dropped late misses the point. */
   function placeCardGauges(ex) {
-    (ex.gauges || []).slice(0, 4).forEach((g) => {
+    (ex.gauges || []).slice(0, CONFIG.maxGauges).forEach((g) => {
       addGauge(+g.x, +g.z, g.field && gaugeQty(g.field) ? g.field : undefined);
     });
   }
@@ -1141,7 +1104,6 @@ const EX = (() => {
         '<div class="extitle"></div>' +
         '<div class="extabs" role="tablist"></div>' +
         '<div class="exrules"></div>' +
-        '<div class="exline exyours"></div>' +
         '<div class="exd"><label>student number ends in</label>' +
           '<input type="number" min="0" max="9" step="1" inputmode="numeric" ' +
                  'aria-label="The last digit of your student number">' +
@@ -1183,7 +1145,7 @@ const EX = (() => {
     }
     function show() {
       build();
-      DOCK.show("Exercise", cur ? cur.id : "");
+      DOCK.show(cur ? cur.id : "");
       refresh();
       // A digit already in hand applies to the new exercise too; an empty
       // field means "not yet personalised", which is a legitimate state.
@@ -1194,7 +1156,7 @@ const EX = (() => {
     function refresh() {
       if (!box || !cur) return;
       // Relabel only — a refresh must not unfold a panel somebody folded away.
-      DOCK.label("Exercise", cur.id);
+      DOCK.label(cur.id);
       const t = box.querySelector(".extitle");
       // A tabbed entry is titled as the whole exercise; the tab bar says
       // which of its questions is on.
@@ -1212,10 +1174,6 @@ const EX = (() => {
       // doing the arithmetic is the student's own first step. (An input that
       // computed "your numbers" here was removed on lecturer feedback.)
       buildYours();
-      // The sentence form is kept only for a pack with no rules at all to
-      // show; anything with rules now renders them as rows above.
-      line(box.querySelector(".exyours"), "Yours (d = last digit of your student number):",
-           yourRows(cur).length ? "" : ruleLines(cur).join("\n"));
       // The one thing a digit still DOES is pick which captured drawing loads
       // (B8's re-entrant lip is a different rig, not a different number), so the
       // input survives only on those cards.
@@ -1577,7 +1535,7 @@ const EX = (() => {
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
            pick, reset, clear, setDigit, setTab, all, byId, listed, course, resolve, plain, rich,
-           groupsFor: grouped, rules, ruleValue, digitSummary,
+           groupsFor: grouped, rules,
            studentControls,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,

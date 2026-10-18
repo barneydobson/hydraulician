@@ -306,10 +306,9 @@ const TOOLBAR = [
       hint: "A blank flume — clears what is drawn and starts over",
       act: () => newSandbox() },
   ] },
-  // BUILD: the four drawing tools, Pour beside them, Undo — which was the Z
-  // key and nothing else, so on a touch screen a mis-drawn stroke could not be
-  // taken back at all — and Clear, which used to sit with the clock although
-  // it edits the rig rather than running it.
+  // BUILD: the four drawing tools, Pour beside them, Undo (a button, so a
+  // mis-drawn stroke can be taken back on a touch screen) and Clear (it edits
+  // the rig rather than running it, so it lives here, not with the clock).
   { cap: "BUILD", family: "build", items:
     toolItems("wall", "erase", "valve", "spout", "pour").concat(
       [{ id: "undoBtn", icon: "undo", label: "Undo", key: "Z",
@@ -431,8 +430,6 @@ const TOOLBAR = [
   ] },
 ];
 
-/** A drawing / instrument tool as a strip item. Its shortcut is its position
- *  in TOOLS, which is exactly what the number keys do. */
 /** Strip items for the named tools, in the order given. The strip's ORDER is
  *  not the TOOLS order: TOOLS is the digit order, which is fixed by every
  *  worksheet ever printed, so a new tool is appended there and placed here. */
@@ -443,18 +440,16 @@ function toolItems(...ids) {
 /** Which strip family a tool belongs to — asked by the digit keys, so that a
  *  hidden tool's key can say WHICH family is off.
  *
- *  The TOOLBAR spec above is the single authority, and this reads it. The key
- *  handler used to recompute the answer positionally — `TOOLS.slice(0, 4)`
- *  plus `TOOLS[TOOLS.length - 1]` — which meant "the four drawing tools, and
- *  Pour" on the day it was written. Then Flux was appended eleventh and the
- *  expression silently changed its mind: it began calling Flux a build tool
- *  and Pour a measuring one. Nothing broke, because neither has a digit
- *  (TOOL_KEYS caps at 9) — but a field is described once, and this is where. */
+ *  The TOOLBAR spec above is the single authority, and this reads it: a
+ *  field is described once (the story of the positional guess it replaced is
+ *  in docs/engineering-notes.md, "Interface and instrument history"). */
 function familyOf(toolId) {
   const g = TOOLBAR.find((grp) => (grp.items || []).some((it) => it.tool === toolId));
   return g ? g.family : "measure";
 }
 
+/** A drawing / instrument tool as a strip item. Its shortcut is its position
+ *  in TOOLS, which is exactly what the number keys do. */
 function toolItem([id, label, tip]) {
   const n = TOOLS.findIndex((t) => t[0] === id) + 1;
   // `tool` is the item's own name for the thing it arms, and it is what a UI
@@ -478,9 +473,8 @@ function toolItem([id, label, tip]) {
  *  NOT publish the .md source, so the reader below has nothing to fetch there
  *  — the themed page is the right answer.
  *
- *  Everywhere else the browser used to be handed raw markdown, which is not a
- *  document so much as its source code. `docs/view.html` renders it in the
- *  app's own clothes instead. */
+ *  Everywhere else `docs/view.html` renders the markdown in the app's own
+ *  clothes rather than handing the browser its raw source. */
 function aboutHref() {
   return /\.github\.io$/i.test(location.hostname)
     ? "docs/numerics.html"

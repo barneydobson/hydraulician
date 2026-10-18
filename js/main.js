@@ -8,7 +8,7 @@
  * so the lists below (checked by exercises/_runner/check_headers.py) are the
  * dependency record. Load order is index.html's.
  *
- * Defines: baseRect, computeView, zoomAt, VEX_FILL, VEX_MAX, autoVex, applyAutoVex,
+ * Defines: baseRect, computeView, zoomAt, VEX_FILL, autoVex, applyAutoVex,
  *          resetZoom, foldText, loadScene, syncTitle, switchScene, syncURL, POUR,
  *          dragTo, snap, pointerPx, pointerPos, pointers, stopDye, TOUCH_HOLD_MS,
  *          TOUCH_SLOP_PX, TAP_PX, cancelPending, commitPending, onDown, beginPress,
@@ -19,27 +19,24 @@
  *          toggleValve, toggleFullscreen, stripEmbed, popOut
  *
  * Reads:   advanceTracers, buildPanel, buildToolbar, canvas, clearAllGauges,
- *          clearGaugeHistory, clearInstruments, collectStream, CONFIG, DOCK, EMBED,
- *          EX, familyOf, fieldFor, FIELDS, fitBar, forceScale, GAUGE_QTY,
- *          gaugeFieldOf, gaugeQty, gaugeSeries, GEOM, GINSP, gov, governFrame,
- *          governLearn, KEYMAP, KEYS, LEGEND, measuringAvg, MINI, octx, over,
- *          OVERLAY, PICKER, placeCV, placeFlux, placeGauge, placeRake, rangeFor,
- *          refreshGrade, refreshNote, removeFluxAt, removeGauge, requestStream, RIG,
- *          sampleCV, sampleFlux, sampleForce, sampleGauges, sampleInlet, sampleRakes,
- *          SCENES, scenesOffered, seedTracers, setPanel, Shaders, showToast, SIM,
- *          sim, START, state, statWin, syncPanel, syncToolbar, syncValveBtn,
- *          toastTimer, TOOL_KEYS, TOOLBAR, TOOLS, UIMODE, view, vmaxFor, wheelHint
+ *          clearGaugeHistory, clearInstruments, collectStream, CONFIG, DOCK,
+ *          EMBED, EX, familyOf, fieldFor, FIELDS, fitBar, forceScale,
+ *          GAUGE_QTY, gaugeFieldOf, gaugeQty, gaugeSeries, GEOM, GINSP, gov,
+ *          governFrame, governLearn, KEYMAP, KEYS, LEGEND, measuringAvg,
+ *          MINI, octx, over, OVERLAY, PICKER, placeCV, placeFlux,
+ *          placeGauge, placeRake, rangeFor, refreshGrade, refreshNote,
+ *          removeFluxAt, removeGauge, requestStream, RIG, sampleCV,
+ *          sampleFlux, sampleForce, sampleGauges, sampleInlet, sampleRakes,
+ *          SCENES, scenesOffered, seedTracers, setPanel, Shaders, showToast,
+ *          sim, SIM, START, state, statWin, syncPanel, syncToolbar,
+ *          syncValveBtn, toastTimer, TOOL_KEYS, TOOLBAR, TOOLS, UIMODE,
+ *          VEX_FIT_MAX, VEX_MAX, view, vmaxFor, wheelHint
  */
 // --------------------------------------------------------------- geometry
 /** Letterbox rect of the whole domain at zoom 1 — the zoomed view scales
  *  this rect about the pan centre, so the GPU just draws a bigger rect and
- *  the screen clips it. */
-/** `state.vex` is VERTICAL EXAGGERATION — the drawn rect is stretched
- *  vertically by this factor. A 12 m × 1.5 m flume has an aspect of 8, so in
- *  a normal window it letterboxes to a strip a couple of hundred pixels tall
- *  and a 0.1 m wave is a few pixels. Every hydraulics long-section is drawn
- *  exaggerated for exactly this reason; the scale bar and the ∇ markers stay
- *  honest because they follow the same rect. */
+ *  the screen clips it. Stretched vertically by `state.vex`, the vertical
+ *  exaggeration (see `autoVex`). */
 function baseRect() {
   const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
   // A wrapped (two-row) touch strip claims the top of the canvas — fitBar.
@@ -109,14 +106,14 @@ function zoomAt(px, py, factor) {
  *  past about ×8 the water stops looking like water. The remaining margin is
  *  deliberate: the empty band above and below the domain is the drag handle
  *  for this very number. */
-const VEX_FILL = 0.62, VEX_MAX = 8;
+const VEX_FILL = 0.62;
 function autoVex() {
   if (!canvas || !sim || !(sim.W > 0) || !(sim.H > 0)) return 1;
   const cw = canvas.clientWidth || 900;
   const ch0 = canvas.clientHeight || 600, ch = ch0 - Math.min(state.barTop || 0, ch0 * 0.4);
   // From baseRect: a width-limited rect is `cw · H · vex / W` tall.
   const v = VEX_FILL * ch * sim.W / (cw * sim.H);
-  return Math.max(1, Math.min(VEX_MAX, v));
+  return Math.max(1, Math.min(VEX_FIT_MAX, v));
 }
 
 /** Apply it, unless the reader has taken the number over by hand. */
@@ -393,11 +390,9 @@ function beginPress(ev) {
     }
   }
   // Pouring: a right-drag with a MOUSE, or the Pour tool. The tool exists
-  // because a touch screen has no second button and no Shift — the old
-  // `pointerType === "touch" && e.shiftKey` was unreachable on every device it
-  // named, which made half of "draw an edge, pour water" impossible on a
-  // phone. Right-drag still works regardless of the tool in your hand; a pen's
-  // barrel button also reports button 2 and must not pour.
+  // because a touch screen has no second button and no Shift. Right-drag
+  // works whatever tool is in hand; a pen's barrel button also reports
+  // button 2 and must not pour.
   if ((ev.button === 2 && ev.mouse) || state.tool === "pour") {
     state.pour = { x, z, r: state.brush * POUR.rBrush, vx: 0, vz: sim.p.g > 0.5 ? POUR.vDown : 0, lx: x, lz: z };
     sim.p.pour = state.pour;
@@ -526,7 +521,7 @@ function onMove(e) {
     state.vexAuto = false;            // dragging the band claims the number
     const r0 = Math.max(Math.abs(d.py - d.mid), 8);
     const r1 = Math.max(Math.abs(py - d.mid), 8);
-    state.vex = Math.max(1, Math.min(12, d.vex * (r1 / r0)));
+    state.vex = Math.max(1, Math.min(VEX_MAX, d.vex * (r1 / r0)));
     computeView();
     return;
   }
@@ -685,7 +680,7 @@ function frame(now) {
 function tickFrame(realDt) {
   // The real interval since the previous frame started, unclamped: `realDt`
   // is capped at 100 ms for the sim's sake and is fixed at 1/60 under
-  // APP.frames, and neither is what a frame actually cost. A gap longer than
+  // APP.frames, and neither is what a frame actually cost.
   // A hidden tab stops requestAnimationFrame, so the gap across one is not a
   // frame: `visibilitychange` zeroes `gov.last` and that frame goes
   // unmeasured. Long frames are otherwise REAL and must be counted — under a
@@ -905,7 +900,7 @@ function drawOverlay(A) {
                                 z1: Math.max(state.cvDrag.z0, state.cvDrag.z1) });
   } else if (state.cv) OVERLAY.drawCV(ctx, view, state.cv, state.cvShow);
   if (state.flux.length || state.fluxDrag) {
-    OVERLAY.drawFlux(ctx, view, state.flux, state.cvShow, state.fluxDrag);
+    OVERLAY.drawFlux(ctx, view, state.flux, state.fluxDrag);
   }
   if (state.force && state.force.data) OVERLAY.drawForce(ctx, view, sim, state.force, state.forceSize);
   // The hover pick, faint — drawn UNDER the selected face's full-strength
@@ -1276,8 +1271,8 @@ function boot() {
   // A rig that is redrawn is a different domain, so the classification's
   // running estimates must not survive the redraw — a stale domain-wide d_n
   // is what made a drowned gate on a 1-in-4 bed read "M1". Every path that
-  // re-rasterises the walls goes through one of these; a resolution change or
-  // a scene load builds a fresh grid and starts clean anyway.
+  // re-rasterises the walls fires SIM.onGeometry (below); a resolution change
+  // or a scene load builds a fresh grid and starts clean anyway.
   //
   // The Force selection has to drop here too: a drawn wrapper's id is its
   // POSITION in S.segs at the moment rasterise() runs ("drawn0", "drawn1",
@@ -1289,10 +1284,8 @@ function boot() {
   // edit (the same choke point averaging already resets through) is the
   // one answer that is right regardless of which id moved.
   // One listener on SIM.onGeometry, fired at the end of every rasterise()
-  // (draw, undo, clear, a Geometry param, the boundary toggles) — so no edit
-  // can skip it, which the old outside wrapper of SIM.rasterise/addSeg/
-  // undoSeg/clearSegs could not promise (setParam called the module-local
-  // rasterise). Not fired by build() or a valve flip: the Force pick survives
+  // (draw, undo, clear, a Geometry param, the boundary toggles), so no edit
+  // can skip it. Not fired by build() or a valve flip: the Force pick survives
   // a resolution change and a V press (water-hammer cards).
   SIM.onGeometry((S) => {
     OVERLAY.resetEstimates(S);
@@ -1311,8 +1304,8 @@ function boot() {
 
   // The scene menu (see PICKER). Four ways in: the scene chip at the end of
   // the strip, the strip's Scenes icon, the panel's Scene row, and the S key.
-  // Under a course menu with `scenes: false` the chip names the exercise and
-  // opens the EXERCISE menu instead.
+  // While an exercise is loaded (scenesOffered() false) the chip names the
+  // exercise and opens the EXERCISE menu instead.
   const title = document.getElementById("title");
   const chipMenu = (el) => (scenesOffered() ? PICKER.toggle(el) : EX.toggle(el));
   title.onclick = (e) => chipMenu(e.currentTarget);
@@ -1476,7 +1469,7 @@ function togglePause() {
  *  is not the mode: the accumulators have to be opened or released with it,
  *  and the overlay's temporal estimates have to be dropped in BOTH directions
  *  (docs/averaging.md §4.3). Average bypasses the live depth/discharge
- *  prefilters and the `_ynK` EMA, so a mode that inherited the other's state
+ *  prefilters and the `OVERLAY.estimates(S).ynK` EMA, so a mode that inherited the other's state
  *  would be reading one window through the other's filter.
  *
  *  Nothing here is serialised: the rig wire format is v2 and stays v2. A
@@ -1594,7 +1587,8 @@ window.APP = {
          probe: (x, z) => SIM.avgProbe(x, z),
          // Two full-field readbacks, ~1.2 s. Never on the frame path.
          residual: () => SIM.transportResidual() },
-  /** Total water volume per unit width (m²) — the mass-balance check. */
+  /** Total water volume per unit width (m²) — total water volume. NOT a mass check
+   *  where water stands over a solid (docs/making-exercises.md). */
   volume: () => {
     const c = SIM.columns(); let v = 0;
     for (let i = 0; i < sim.nx; i++) v += c[i * 4 + 1] * sim.dx;

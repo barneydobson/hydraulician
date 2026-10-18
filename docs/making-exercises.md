@@ -639,7 +639,13 @@ test/ui-smoke.mjs` proves the profile leaves the strip and legend as agreed.
 
 The render loop stops on a hidden tab, so headless work drives the solver
 directly: `APP.tick(n)` steps, `APP.frames(n)` also fills gauge history,
-`APP.probe(x, z)` returns `u, w, p, phead, f, speed` (so `h = zp + phead`, `zp = j·Δx` the pressure's reference elevation, which `probe` also returns),
+`APP.probe(x, z)` returns `i, j, f, u, w, p, phead, zp, speed, dye, solid`
+(the live cell; `APP.avg.probe` returns the same set from the averaging
+window, without `dye`), where `zp = j·Δx` is the pressure's reference
+elevation. A gauge's head is `h = zp + phead − tiltS0·x`, the last term
+nonzero only in the tilted-gravity scenes that set `tiltS0` (see
+`js/instruments.js` and `js/overlay.js`), so on an untilted scene
+`h = zp + phead`,
 `APP.faceForce(solidId, faceId)` returns `{F, Fx, Fz, cop, wetLen}` in N per
 metre, `APP.volume()` the water area the column reduction can see, and
 `toggleValve()` the V key.

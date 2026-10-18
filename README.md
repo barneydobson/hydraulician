@@ -6,7 +6,7 @@
 channel with the mouse and watch free-surface Navier–Stokes run through it.
 
 **Try it:** open this repository's GitHub Pages site (`https://<owner>.github.io/hydraulician/`, or [`index.html`](index.html) locally) — runs in the
-browser, nothing to install (live once the repository is public).
+browser, nothing to install.
 
 **Contents** — [Summary](#summary) · [Syllabus](#syllabus) ·
 [Method](#method) · [Developer](#developer) ·
@@ -35,10 +35,11 @@ been checked are arranged on a teaching syllabus, ordered from hydrostatics
 through the conservation laws to unsteady pipe flow and similitude:
 
 **→ [docs/syllabus.md](docs/syllabus.md)** (rendered at `docs/syllabus.html` on the Pages site)
-([docs/syllabus.md](docs/syllabus.md))
 
-The full pack — including exercises not yet checked — is in the app (press
-**`E`**; on this site it is the default course, `original`) and indexed in
+The full pack — including exercises not yet checked — is the `original`
+course in the app (press **`E`**; it is the default on barneydobson.github.io,
+and on mvreeuwijk.github.io the default is `cive40008`; `?course=<id>` picks
+one anywhere else) and is indexed in
 [`courses/original/`](courses/original/INDEX.md); each exercise has a written
 brief in its folder there. Every exercise belongs to a course, each in its
 own folder under `courses/` ([exercises/INDEX.md](exercises/INDEX.md) lists
@@ -134,19 +135,7 @@ Opening `index.html` from the file system works too. URL parameters:
 `?scene=<id>` boots a scene, `?ex=<ID>` boots a set-up exercise. In the app,
 `S` opens the scene list and `E` the exercises.
 
-The file map:
-
-| file | what lives there |
-|---|---|
-| `index.html` | markup, all the CSS, the classic `<script>` tags |
-| `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong pairs, bufferless draws |
-| `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col`, `part`, `disp` |
-| `js/scenes.js` | `SCENES` — `channel()` builds a prismatic GVF reach, `drop()` an approach → chute → apron |
-| `js/sim.js` | `SIM` — grid allocation, wall rasterisation, the substep loop, control bands, readbacks |
-| `js/overlay.js` | `OVERLAY` — the 2D canvas: d_c, d_n, EGL, profile classification, jump detection, gauges, rake |
-| `js/main.js` | boot, the panel spec, pointer tools, view transform, frame loop, `window.APP` |
-| `js/exercises.js` | `EXERCISES` — the 40 teaching demos the `E` menu and `?ex=` read |
-| `js/exercises-rigs.js` | the drawn rigs (RIG-A duct, RIG-B channel, RIG-C tanks, RIG-D chamber) those demos load |
+The file map, with what each file is for, is in [`AGENTS.md`](AGENTS.md).
 
 **No build step or module system.** Everything is a
 classic script so that double-clicking `index.html` on a `file://` URL still
@@ -165,8 +154,10 @@ earlier positivity clamp invented enough water to triple the discharge along
 a flume while the depth sat perfectly steady.
 
 **Adding a scene.** Scenes are plain data in `js/scenes.js` — a physical
-domain `W × H`, a wall segment list (`[x0,y0,x1,y1,th]` centrelines with butt
-ends), boundary flags, and live parameters. `channel(...)` builds a prismatic
+domain `W × H`, solids (`solids()`, polygons with named faces; new scenes
+prefer these), a `walls()` list of `[x0,z0,x1,z1,th]` centreline segments
+with butt ends kept as a shim for the older scenes, boundary flags, and live
+parameters. `channel(...)` builds a prismatic
 reach from (S₀, C_f, q) plus a control and `drop(...)` builds an approach →
 chute → apron, so most new scenes are a call to one of those plus a few drawn
 segments. Copy the nearest neighbour and read its comments; the ones about
@@ -176,11 +167,13 @@ bearing.
 **Adding an exercise.** Every card belongs to a course: append an entry to
 the list in its course's `courses/<id>/exercises.js` (the card schema is the
 header of `js/exercises.js`, the register they are all appended to). Each is
-an object with an `id` (that is the `?ex=` id), `title`, `topic`,
-`folder`, `scene`, optional `rig` + `rigParams`, `viewParams`, a `digit` block
-that turns the student's last digit into a personalised parameter, `task`,
-`submit`, `settle` and `notes`. `HJ-1` (in `courses/original/exercises.js`)
-is a good template. Then write the brief in
+an object with an `id` (that is the `?ex=` id) and the keys the app reads:
+`title`, `aim`, `topic`, `folder`, `scene`, `rig`, `rigParams`, `viewParams`,
+`studentParams`, `digit`, `rigTable`, `instruments`, `digitNote`, `setup`,
+`start`, `task`, `steps`, `background`, `note`, `settle`, `rigWhy`,
+`secondScene`, `ui`, `gauges`, `tabs` and `tips`. The header says what each
+one is for and what `check_pack.py` enforces; a tab takes the `TAB_KEYS` it
+lists. `HJ-1` (in `courses/original/exercises.js`) is a good template. Then write the brief in
 `courses/<id>/exercises/<folder>/README.md`, add the row to
 `courses/<id>/INDEX.md` and list the id in a section of the course's
 `course.js` — the id must match in all of them (see
@@ -189,17 +182,19 @@ earns a row on the [syllabus](docs/syllabus.md) under its topic.
 
 **Testing headless.** `exercises/_runner/runner.py` (stdlib only) drives a
 real Chrome over CDP: `launch`, `eval`, `pump --sim-seconds`, `shot`, `bench`,
-`status`, `close`. See [`exercises/_runner/HOWTO.md`](exercises/_runner/HOWTO.md)
-for the worked example and the concurrency rules. Inside the page, `APP.frames(n)`,
+`status`, `close`. It is Linux-bound (it reads `/proc`); see
+[`exercises/_runner/HOWTO.md`](exercises/_runner/HOWTO.md) for the macOS shims,
+the worked example and the concurrency rules. `smoke.js` and `test/cdp.mjs`
+carry their own portable CDP client. Inside the page, `APP.frames(n)`,
 `APP.tick(n)`, `APP.probe(x,z)`, `APP.volume()` and `APP.zoomAt(...)` exist for
 scripted runs — the render loop stops when the tab is hidden, so drive it
 through those rather than waiting on wall-clock time.
 
 **Where things live.** The original teaching pack and its standing rules are
 in [`courses/original/INDEX.md`](courses/original/INDEX.md); per-demo status
-and measured caveats in `courses/original/_director-status.md`; open
-proposals — demos that need a change, and UI changes that have been costed
-but not made — in
+and measured caveats in `courses/original/_director-status.md`; the pack's
+history — the proposals its director recorded while it was built, a record
+rather than a list of open work — in
 [`courses/original/CHANGES-NEEDED.md`](courses/original/CHANGES-NEEDED.md);
 and the reports
 for changes already made (the exercise picker, the gauge inspector and CSV,
@@ -230,10 +225,18 @@ Water enters at the top left by default; everything else is drawn.
 | **wheel** / **middle-drag** | zoom about the cursor · pan (**0** resets, **+** / **−** step) |
 | **1**–**9** | wall · erase · valve · spout · gauge · rake · tracers · measure · control volume |
 | **[** **]** | brush size |
-| **Z** / **C** | undo edge / clear drawing |
+| **Z** / **C** | undo the last stroke / clear the drawing |
 | **V** | open / slam every valve |
-| **space** / **R** | pause / reload the scene's water |
-| **G** / **P** / **D** / **T** / **N** / **M** | cycle the field · particles · the Dye tool (hold in the water to release dye) · streamlines · channel overlay · ruler |
+| **space** / **R** | pause / reset the scene's water (and clear the gauge histories) |
+| **G** / **P** / **N** | cycle the field · particles · channel overlay |
+| **L** | the legend — which field, over what range, in what units |
+| **B** | cycle what the Control volume reads on each edge: Q / momentum / energy |
+| **A** | average the flow — the mean field over one window |
+| **I** | show / hide the instruments' readout boxes (they keep recording while hidden) |
+| **F** | full screen |
+| **T** | streamlines |
+| **D** | the Dye tool (hold in the water to release dye) |
+| **M** | ruler |
 | **S** / **E** | scene list · exercise list |
 | **H** / **?** | start screen · keyboard shortcuts |
 

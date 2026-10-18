@@ -181,7 +181,8 @@
  * js/courses.js) points here: lecturer notes — derivation, worked answers,
  * verification; a student is never sent there for an equation or a procedure;
  * the one exception is the draw-it-yourself fallback when the rig pack is
- * absent.
+ * absent. The original pack's READMEs predate this definition and still read
+ * as student briefs; they are due for retirement with the pack.
  *
  * Standing rules every worksheet carries (courses/original/INDEX.md repeats
  * them verbatim): Resolution Medium · wait out the settle · median-of-the-

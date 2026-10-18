@@ -62,11 +62,6 @@ HISTORICAL = ("_code-changes", "_archive", "CHANGES-NEEDED.md",
 REGISTER = ("docs/notation.md",)
 
 
-# Files allowed to keep the y-family box form `[x0,y0,...]` until Task 5.2
-# rewrites them. TODO(5.2): remove this list there; the rule then covers README.
-README_BOX_TODO = ("README.md",)
-
-
 def _get_tracked_files():
     """Get the set of files tracked by git. Falls back to None if unavailable."""
     try:
@@ -298,11 +293,10 @@ def main():
          allow=ALLOW)
 
     # `[x0, y0, x1, y1]` is the box form READMEs and docs use; z is vertical.
-    # TODO(5.2): README.md still has it and is allowlisted (README_BOX_TODO).
     # (docs/superpowers/, docs/_archive/ and docs/design/ hold plans that quote the rule itself.)
     boxes = [p for p in walk(".md")
              if (rel(p) == "README.md" or rel(p).startswith("docs/"))
-             and rel(p) not in README_BOX_TODO and not rel(p).startswith(("docs/superpowers/", "docs/_archive/", "docs/design/"))]
+             and not rel(p).startswith(("docs/superpowers/", "docs/_archive/", "docs/design/"))]
     scan(fails, checked, boxes, r"\[\s*x0\s*,\s*y0",
          "box written [x0, y0, ...] — the vertical coordinate is z: [x0, z0, x1, z1]")
 

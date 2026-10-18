@@ -18,7 +18,9 @@ Each folder holds its README (the lecturer's notes — derivation, worked
 answers, verification; the definition is the header of
 [`js/exercises.js`](../../js/exercises.js)), collect_plot.py for the Blackboard CSV, the
 simulated-class data and plot that prove it works, and rig.js where
-geometry/instruments are drawn. Each folder's full verification record and
+geometry/instruments are drawn. The pack's READMEs predate that definition
+and still read as student briefs; they are due for retirement with the pack.
+Each folder's full verification record and
 director report live beside it in `_archive/`, kept out of version control
 (.gitignore) on the maintainer's machine — archive weight, not source.
 Statuses and measured caveats: `_director-status.md`

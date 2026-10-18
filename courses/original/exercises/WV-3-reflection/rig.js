@@ -292,7 +292,7 @@ window.WV3 = {
     const probeY = f.bed + 0.5 * f.h;   // depth field ignores y; head just needs to stay wet
     APP.state.gauges = [{ x, y: probeY, hist: [], colour: '#7fd4ff' }];
     APP.state.tool = 'gauge';
-    if (window.syncTools) window.syncTools();
+    syncToolbar();
     APP.state.paused = false;
     const nFrames = Math.min(850, Math.round(seconds * 60));
     APP.frames(nFrames, 1 / 60);

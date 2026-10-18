@@ -1296,9 +1296,6 @@ function boot() {
   buildToolbar();
   // …then the legend, which lights the strip's own Field button.
   LEGEND.build();
-  // Public alias: worksheet rig scripts (WV-2, WV-3) call `window.syncTools()`
-  // after arming a tool. main.js itself calls syncToolbar() directly.
-  window.syncTools = syncToolbar;
 
   // The scene menu (see PICKER). Four ways in: the scene chip at the end of
   // the strip, the strip's Scenes icon, the panel's Scene row, and the S key.

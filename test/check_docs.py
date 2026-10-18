@@ -9,7 +9,7 @@ commands, and both rotted before: a table row for a file that had moved, a
 that was wrong within a week. This gate asserts:
 
   1. every path written in backticks in AGENTS.md, README.md, every tracked
-     docs/*.md (not docs/_archive) and every courses/*/INDEX.md exists, and so
+     docs/**/*.md (not docs/_archive) and every courses/*/INDEX.md exists, and so
      does the target of every Markdown link `[text](path)` there (relative
      paths only; URLs and bare #anchors are ignored, a trailing #anchor or
      ?query is stripped first). A token counts as a path when it has
@@ -162,16 +162,24 @@ def check_links(doc):
 
 
 def tracked_docs():
-    """AGENTS.md, README.md, tracked docs/*.md (minus _archive), course INDEX.md files."""
+    """AGENTS.md, README.md, tracked docs/**/*.md (minus _archive), course INDEX.md files.
+
+    Under CI a failing `git ls-files` is a failure, as in check_notation.py:
+    the gate would otherwise shrink to two files and still go green. Off CI
+    the filesystem is walked instead, which may include untracked drafts."""
+    import glob
     import subprocess
     try:
         out = subprocess.run(["git", "ls-files", "docs/*.md", "courses/*/INDEX.md"], cwd=ROOT,
                              capture_output=True, text=True, check=True).stdout.split()
     except (OSError, subprocess.CalledProcessError):
-        out = []
-    docs = ["AGENTS.md", "README.md"] + sorted(
-        d for d in out if "_archive" not in d.split("/") and d.count("/") == (1 if d.startswith("docs/") else 2))
-    return docs
+        if os.environ.get("CI"):
+            print("check_docs.py: `git ls-files` failed under CI -- refusing to fall back "
+                  "to a filesystem walk that checks a different set.")
+            sys.exit(1)
+        out = [os.path.relpath(f, ROOT).replace("\\", "/") for pat in ("docs/**/*.md", "courses/*/INDEX.md")
+               for f in glob.glob(os.path.join(ROOT, pat), recursive=True)]
+    return ["AGENTS.md", "README.md"] + sorted(d for d in out if "_archive" not in d.split("/"))
 
 
 def suites():

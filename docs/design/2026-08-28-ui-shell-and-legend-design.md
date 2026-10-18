@@ -97,7 +97,7 @@ One registry in `main.js` replaces all three:
 
 Consumers: the legend card, the Controls panel's Field select, the `G` key,
 and the `SIM.render` call. Symbols and units come from
-[docs/notation.md](../../notation.md), so `check_notation.py` can police
+[docs/notation.md](../notation.md), so `check_notation.py` can police
 them the way it polices everything else.
 
 Two supporting changes fall out of it.
@@ -247,14 +247,14 @@ field ids in `FIELDS`, `panel` must be one of the three levels.
 
 | File | What changes |
 |---|---|
-| [index.html](../../../index.html) | legend markup and CSS; group-caption CSS; the ⋯ button and the panel's focus switch |
-| [js/main.js](../../../js/main.js) | `FIELDS` registry; `TOOLBAR` regrouped and captioned; `LEGEND` module; `UIMODE` module; `state.range`; `state.ui`; `L` key; panel Field select reads the registry; panel sections respect the profile |
-| [js/shaders.js](../../../js/shaders.js) | ramp control points as JS data; `u_lo` / `u_hi` |
-| [js/sim.js](../../../js/sim.js) | pass `lo` / `hi` through `render`; new `fieldStats(mode)` one-shot readback for Fit |
-| [js/overlay.js](../../../js/overlay.js) | untouched |
-| [js/exercises.js](../../../js/exercises.js) | optional `ui` key; no existing entry has to change |
-| [exercises/_runner/check_pack.py](../../../exercises/_runner/check_pack.py) | validate any `ui` key it finds |
-| [test/ui-smoke.mjs](../../../test/ui-smoke.mjs) | the cases below |
+| [index.html](../../index.html) | legend markup and CSS; group-caption CSS; the ⋯ button and the panel's focus switch |
+| [js/main.js](../../js/main.js) | `FIELDS` registry; `TOOLBAR` regrouped and captioned; `LEGEND` module; `UIMODE` module; `state.range`; `state.ui`; `L` key; panel Field select reads the registry; panel sections respect the profile |
+| [js/shaders.js](../../js/shaders.js) | ramp control points as JS data; `u_lo` / `u_hi` |
+| [js/sim.js](../../js/sim.js) | pass `lo` / `hi` through `render`; new `fieldStats(mode)` one-shot readback for Fit |
+| [js/overlay.js](../../js/overlay.js) | untouched |
+| [js/exercises.js](../../js/exercises.js) | optional `ui` key; no existing entry has to change |
+| [exercises/_runner/check_pack.py](../../exercises/_runner/check_pack.py) | validate any `ui` key it finds |
+| [test/ui-smoke.mjs](../../test/ui-smoke.mjs) | the cases below |
 
 `GINSP`'s closure-local `FIELDS` (a list of gauge *series*, not view fields)
 is renamed `SERIES` so the module-scope name is unambiguous.

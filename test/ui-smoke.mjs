@@ -2397,6 +2397,10 @@ async function main() {
     await browser.close();
   }
 
+  if (ONLY && ran === 0) {
+    console.error("\nno case matches --only=" + ONLY);
+    process.exit(1);
+  }
   console.log("\n" + passed + " passed, " + failed + " failed");
   if (failed) {
     console.log("\nfailures:");

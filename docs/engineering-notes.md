@@ -760,6 +760,39 @@ itself ~2 cells thick. Consequences:
     surface layer's speed to the void rather than to the dynamics. The face
     on top of every part-full cell also free-falls: it reads w ≈ −0.26 m/s
     over a still pond.
+  - *The textbook surface conditions were tried (Oct 2026) and make it
+    worse.* The MAC/VOF surface-cell conditions, each in a few lines of
+    FS_VEL using faces already in the stencil:
+    - continuity in the cell below a void w-face sets that face,
+      `w_top = w_bot − Δz ∂u/∂x`;
+    - zero tangential stress sets the void u,
+      `u = u_below − Δz ∂w/∂x` (`∂u/∂z + ∂w/∂x = 0`, the opposite sign
+      to the zero-vorticity variant above).
+
+    Measured on the H/h = 0.2 solitary wave at High with the closure off
+    (crest at h = 0.25 → 0.07 m; u at top / mid under the crest):
+
+    | surface treatment | crest | u top / mid (m/s) |
+    |---|---|---|
+    | copy of u (shipped) | 0.050 → 0.056, grows | — |
+    | both conditions | 0.050 → 0.049, flat | 0.13 / 0.27 |
+    | continuity on w only | 0.050 → 0.050, flat | 0.18 / 0.26 |
+    | stress-free u only | erratic, to 0.095 | **2.5** / 0.19 |
+
+    Both conditions together stay flat at every resolution: Very high
+    0.047, Ultra 0.048, against the copy's 0.061 and 0.063 at h = 0.07.
+
+    So continuity on w damps the wave as much as the mixing length did, and
+    puts a slow layer on top. The stress-free u on its own is unstable,
+    because its `∂w/∂x` is read from void w-faces that are bled or
+    free-falling. Not kept.
+
+    My reading, not demonstrated: the interior here is weakly compressible
+    and never divergence-free, so continuity hands the surface cell's
+    acoustic noise to the void w, where the VOF flux and the advection
+    stencil pick it up. A proper fix would need the void filled by an
+    extrapolation that respects the interior's own divergence, not a
+    textbook incompressible condition.
   - *The crest does not shoal.* A small solitary wave (H/h = 0.2) keeps its
     crest elevation to the millimetre from h = 0.24 m to 0.07 m, where Green's
     law asks for +36%; the H/h = 0.45 wave stays within 0.40–0.43 m in every

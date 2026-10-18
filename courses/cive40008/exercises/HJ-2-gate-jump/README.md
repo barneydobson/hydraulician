@@ -25,8 +25,10 @@ twice with the Control volume:
 The card offers what the class has met by L6: the Water (default), Speed and
 Froude number colourings (Froude in plain words — above 1 fast and shallow,
 below 1 slow and deep; kept on the lecturer's decision), the Control volume,
-the Pressure force tool, a Flux line for q and a Gauge reading depth. No
-heads, no grade lines, no jump box. (Ported from the 10 Sep build of the lab
+the Pressure force tool, a Flux line for q and a Gauge reading depth. The
+Momentum tab has no heads, no grade lines and no jump box; the Energy tab
+(L7) adds the grade lines (EGL, HGL), the energy head and the box's energy
+rows. (Ported from the 10 Sep build of the lab
 demo; titled "Pressure and force on a sluice gate" until the lecturer agreed
 the momentum-balance aim, Oct 2026.)
 

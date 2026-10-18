@@ -690,8 +690,10 @@ COURSES.exercises("cive40008", [
   // The lecturer's sequence is kept: water only in the reservoir at t = 0,
   // the weir at 0.5 m (lecturer, 2026-10-17; slider 0–0.6 m for finer
   // control): the jump forms near the weir by ~20 s and creeps to the gate's
-  // foot by ~40 s; 0.46 m holds it partway; 0.6 m drowns the gate. Vocabulary is L6's: no heads, no grade
-  // lines, no jump box; Froude is kept on the lecturer's own decision, in
+  // foot by ~40 s; 0.46 m holds it partway; 0.6 m drowns the gate. Two tabs:
+  // Momentum keeps L6's vocabulary (no heads, no grade lines, no jump box);
+  // Energy (L7) adds the grade lines, the energy head and the box's energy
+  // rows. Froude is kept on the lecturer's own decision, in
   // plain words. The crest → jump map and the balance numbers are measured
   // (README, instructor section).
   {

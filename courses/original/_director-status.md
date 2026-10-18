@@ -1,3 +1,5 @@
+Historical; paths are as of 2026-10-17, before the move to courses/original/.
+
 # Director status — demo-programme verification
 
 Working through exercises/demo-programme.html: 30 core demos + 10 backups.

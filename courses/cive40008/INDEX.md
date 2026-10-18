@@ -38,7 +38,7 @@ are played with, and shown in class.
 | CR-1 | The contraction rig: tabs Streamlines (L4, was FF-5), Continuity (L5, was VC-1), Forces (L6, was MM-2), Energy (L7) | CR-1-contraction-rig/ | contraction, contraction length slider | — (students play; class demo) |
 | VC-2 | Storage = in − out (tank that fills and leaks) | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (students play; class demo) |
 | MM-1 | The force of a jet on an inclined plate | MM-1-jet-inclined-plate/ | vane, plate angle slider | — (students play; class demo) |
-| HJ-2 | Momentum balance: sluice gate and hydraulic jump | HJ-2-gate-jump/ | gatejump, weir crest slider | — (students play; class demo) |
+| HJ-2 | Momentum balance: sluice gate and hydraulic jump; tabs Momentum (L6), Energy (L7) | HJ-2-gate-jump/ | gatejump, weir crest slider | — (students play; class demo) |
 | WV-4 | How waves break on beaches | WV-4-breakers/ | beach (wall paddle), beach slope slider on the card | — (student-run preview) |
 | WV-5 | Group velocity: waves travel slower than their crests | WV-5-group-velocity/ | wavetrain (hinged flap, one wave train per press of V), period and stroke on the card, two η gauges placed | — (showcase) |
 

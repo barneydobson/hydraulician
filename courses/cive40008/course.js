@@ -17,7 +17,7 @@ COURSES.add({
     { title: "Statics",               ids: ["HS-1", "PF-2"] },
     { title: "Fluid dynamics",        ids: ["FF-2", "FF-3", "FF-4", "CR-1",
                                             "VC-2", "MM-1", "HJ-2"] },
-    { title: "Energy conservation",   ids: [] },
+    { title: "Energy conservation",   ids: ["HJ-2#energy"] },
     { title: "Pipes",                 ids: [] },
     { title: "Free-surface flows",    ids: [] },
     { title: "Showcase",              ids: ["WV-4", "WV-5"] },

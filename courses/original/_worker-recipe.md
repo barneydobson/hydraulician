@@ -1,3 +1,5 @@
+Historical; paths are as of 2026-10-17, before the move to courses/original/.
+
 # Worker recipe — demo verification & packaging (read fully before starting)
 
 You are one of up to three agents packaging classroom demos for the hydraulician

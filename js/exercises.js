@@ -17,9 +17,8 @@
  * answers and verification. HS-1 is the model for a concise standalone card.
  *
  * Every number on a card is the SHIPPED value from the demo's own README —
- * remeasured constants, not the ones a programme sheet promised (the
- * original pack's history of amended rules is in
- * courses/original/CHANGES-NEEDED.md §2b).
+ * remeasured constants, not the ones a programme sheet promised: each value
+ * is the one the demo's README measured.
  *
  * THE LINE THIS FILE DRAWS — read before adding a value
  * ----------------------------------------------------

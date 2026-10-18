@@ -35,7 +35,7 @@ are played with, and shown in class.
 | FF-2 | The velocity field, and turbulence (spillway) | FF-2-spillway/ | spillway, bucket lip angle slider | — (students play; class demo) |
 | FF-3 | Steady and unsteady flow (flow past a body) | FF-3-flow-past-body/ | body, body shape slider | — (students play; class demo) |
 | FF-4 | Boundary layers: at a wall, in a jet (pipe jet) | FF-4-pipe-jet/ | pipejet | — (students play; class demo) |
-| CR-1 | The contraction rig: tabs Streamlines (L4, was FF-5), Continuity (L5, was VC-1), Forces (L6, was MM-2), Energy (L7) | CR-1-contraction-rig/ | contraction, contraction length slider | — (students play; class demo) |
+| CR-1 | The contraction rig: tabs Streamlines (L4), Continuity (L5), Forces (L6), Energy (L7) | CR-1-contraction-rig/ | contraction, contraction length slider | — (students play; class demo) |
 | VC-2 | Storage = in − out (tank that fills and leaks) | VC-2-fill-and-leak/ | fillleak, inflow Q slider | — (students play; class demo) |
 | MM-1 | The force of a jet on an inclined plate | MM-1-jet-inclined-plate/ | vane, plate angle slider | — (students play; class demo) |
 | HJ-2 | Momentum balance: sluice gate and hydraulic jump; tabs Momentum (L6), Energy (L7) | HJ-2-gate-jump/ | gatejump, weir crest slider | — (students play; class demo) |

@@ -191,7 +191,7 @@ const EX = (() => {
     return (e.home || "exercises") + "/" + e.folder;
   }
   /** An exercise by id. A plain id returns the register entry itself; a TAB
-   *  reference — "CR-1#forces", or a tab's `alias` such as "MM-2" — returns
+   *  reference — "CR-1#forces" — returns
    *  that tab's view (see `view`), which is what a course menu lists. */
   function byId(id) {
     const s = String(id == null ? "" : id);
@@ -267,7 +267,7 @@ const EX = (() => {
   // ------------------------------------------------------------------ tabs
   /** CARD TABS. One scene asked several questions — the contraction rig
    *  (CR-1) is streamlines in L4, continuity in L5 and forces in L6 — is ONE
-   *  entry with `tabs: [{ key, label, alias?, title?, aim?, steps,
+   *  entry with `tabs: [{ key, label, title?, aim?, steps,
    *  background?, ui?, instruments?, viewParams?, studentParams?, note? }]`.
    *  A tab's own fields replace the entry's (`viewParams` and `ui` are merged
    *  over the entry's, shallowly); the scene, the rig, `rigParams` and
@@ -275,9 +275,7 @@ const EX = (() => {
    *  the scene or restart the flow — it swaps the steps and the interface
    *  profile, nothing else.
    *
-   *  Addressed as "ID#key" (`?ex=ID&tab=key`, a course menu id), or by a
-   *  tab's `alias` — the id the question had before it became a tab, so an
-   *  old `?ex=MM-2` link still opens the Forces tab. */
+   *  Addressed as "ID#key" (`?ex=ID&tab=key`, a course menu id). */
   function parseRef(ref) {
     const s = String(ref == null ? "" : ref), k = s.indexOf("#");
     return k < 0 ? [s, null] : [s.slice(0, k), s.slice(k + 1) || null];
@@ -285,18 +283,14 @@ const EX = (() => {
   function resolve(ref, tab) {
     let [id, t] = parseRef(ref);
     if (tab) t = tab;
-    let ex = all().find((e) => e.id === id) || null;
-    if (!ex) {
-      ex = all().find((e) => (e.tabs || []).some((x) => x.alias === id)) || null;
-      if (ex && !t) t = ex.tabs.find((x) => x.alias === id).key;
-    }
+    const ex = all().find((e) => e.id === id) || null;
     if (!ex) return null;
     if (ex.tabs && ex.tabs.length) {
       if (!ex.tabs.some((x) => x.key === t)) t = ex.tabs[0].key;
     } else t = null;
     return { ex, tab: t };
   }
-  const TAB_OWN = ["key", "label", "alias"];
+  const TAB_OWN = ["key", "label"];
   /** The entry as one of its tabs sees it: what the card, the UI profile and
    *  the menu read. An entry without tabs is returned as it is. */
   function view(ex, key) {

@@ -44,8 +44,7 @@
  *                     a green run is MUTANT SURVIVED, a run red only elsewhere
  *                     is MUTANT KILLED THE WRONG ASSERTION, both exit 1.
  *                     --only must include the mutant's suite (else exit 2).
- *         $CHROME names the browser (see test/cdp.mjs, which also reads the
- *         deprecated $CHROME_PATH), $ANGLE the backend, $SOFTWARE=1 --disable-gpu.
+ *         $CHROME names the browser (see test/cdp.mjs), $ANGLE the backend, $SOFTWARE=1 --disable-gpu.
  */
 import http from "node:http";
 import fs from "node:fs";

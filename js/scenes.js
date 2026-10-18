@@ -1679,7 +1679,7 @@ const SCENES = (() => {
                "Lower the speed of sound c on the card and repeat: the wave takes longer to arrive and the pressure jump is smaller.",
                "The wave bounces off the reservoir and comes back as a low-pressure wave: the pressure at the valve rises and falls in a square wave."] };
     })(),
-    // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
+    // ===== Year 1: contraction (CR-1) =====
     // The shared contraction rig: two reservoirs held at fixed levels, a
     // 1.00 m pipe (x = 3.6 →) that contracts into a 0.50 m pipe discharging
     // into the right reservoir at x = 11.0. ONE slider, the contraction

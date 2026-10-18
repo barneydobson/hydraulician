@@ -1,4 +1,4 @@
-/* CR-1 "The contraction rig" (its tabs Streamlines, Continuity, Forces were FF-5, VC-1 and MM-2) — paste into the dev console.
+/* CR-1 "The contraction rig" — paste into the dev console.
  *
  *   ?ex=CR-1 (&tab=streamlines / continuity / forces; or ?scene=contraction), Resolution: Medium (746 x 127, dx = 0.0228 m).
  *

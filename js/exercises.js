@@ -127,14 +127,12 @@
  *            strings.
  *   tabs     optional: one scene asking several questions (CR-1 is streamlines,
  *            continuity and forces, in three tabs). A list of objects with the
- *            TAB_KEYS: `key` (unique) and `label` name the tab; `alias` is the
- *            id the question had before it became a tab, so an old `?ex=` link
- *            still opens it. `title`, `topic`, `aim`, `steps`, `background`,
+ *            TAB_KEYS: `key` (unique) and `label` name the tab. `title`, `topic`, `aim`, `steps`, `background`,
  *            `tips`, `instruments` and `studentParams` replace the entry's own;
  *            `ui` and `viewParams` are merged over the entry's, shallowly. The
  *            scene, the rig, `rigParams` and `settle` are the entry's alone:
  *            switching tabs swaps the steps and the profile, never the bench.
- *            Addressed as ID#key, or by its alias.
+ *            Addressed as ID#key (`?ex=ID&tab=key`).
  *   ui       the UI PROFILE: what of the interface this exercise wants in
  *            front of a student (UIMODE in js/main.js). Families are `build`,
  *            `measure` and `view` — each `true`, `false`, or the list of tool
@@ -207,7 +205,7 @@ const CARD_KEYS = ["id", "title", "aim", "topic", "folder", "scene", "rig", "rig
   "start", "task", "steps", "background", "note", "settle", "rigWhy", "secondScene", "ui",
   "gauges", "tabs", "tips"];
 const CARD_KEYS_STAMPED = ["course", "home"];
-/* What one entry of a card's `tabs` may carry: `key`, `label` and `alias`
+/* What one entry of a card's `tabs` may carry: `key` and `label`
  * name the tab; the rest are the fields a tab overrides (see EX.view). */
-const TAB_KEYS = ["key", "label", "alias", "title", "topic", "aim", "steps", "background",
+const TAB_KEYS = ["key", "label", "title", "topic", "aim", "steps", "background",
   "ui", "viewParams", "instruments", "studentParams", "tips"];

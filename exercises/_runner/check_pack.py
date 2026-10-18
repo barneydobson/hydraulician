@@ -38,7 +38,7 @@ The checks, in the order the code runs them (one function per check):
      task, start or setup tells the student to draw, cut, erase or otherwise
      build something
  10. TABS (one entry, several questions — CR-1): every tab has a unique key
-     and a label, an alias collides with no id, and checks 8, 9 and 12 run on
+     and a label, and checks 8, 9 and 12 run on
      each tab's VIEW (the entry with the tab merged over it, as EX.view does
      in js/pickers.js), reported as "CR-1#forces"
  11. the short card layout: `steps` holds at most five, and the inline
@@ -304,7 +304,7 @@ def paras(v):
 
 # The card's inline markup (EX.rich in js/pickers.js): {tool:id} {btn:id} {key:K}.
 MARK = re.compile(r"\{(tool|btn|key):([^}\s]+)\}")
-TAB_OWN = ("key", "label", "alias")
+TAB_OWN = ("key", "label")
 
 
 def tab_view(e, t):
@@ -419,13 +419,11 @@ def check_ids(c):
                       % (r.get("id") or "?", r.get("course"), r.get("clash")))
     seen_ids = {}
     for e in c.ex:
-        names = [e.get("id")] + [t.get("alias") for t in (e.get("tabs") or [])
-                                 if isinstance(t, dict) and t.get("alias")]
-        for n in names:
-            where = e.get("course") or "js/exercises.js"
-            if n in seen_ids and n == e.get("id"):
-                c.bad(n, "id is registered twice (%s and %s)" % (seen_ids[n], where))
-            seen_ids.setdefault(n, where)
+        n = e.get("id")
+        where = e.get("course") or "js/exercises.js"
+        if n in seen_ids:
+            c.bad(n, "id is registered twice (%s and %s)" % (seen_ids[n], where))
+        seen_ids.setdefault(n, where)
     # A course's exercises.js registers under its own folder's id only.
     for rel, added in (c.data.get("added") or {}).items():
         m = re.match(r"^courses/([^/]+)/exercises\.js$", rel)
@@ -716,8 +714,6 @@ def check_ui_profile(c):
 
 # 10. tabs: the structure first; checks 8, 9 and 12 run on every tab's view.
 def check_tabs(c):
-    all_ids = {e.get("id") for e in c.ex}
-    aliases = set()
     for e in c.ex:
         tabs = e.get("tabs")
         if tabs is None:
@@ -735,15 +731,6 @@ def check_tabs(c):
         for t in tabs:
             if not isinstance(t, dict) or not t.get("label"):
                 c.bad(i, "tab %r has no label" % (t.get("key") if isinstance(t, dict) else t))
-            a = isinstance(t, dict) and t.get("alias")
-            if a:
-                if a in all_ids or a in aliases:
-                    c.bad(i, "tab alias %r collides with another id or alias" % a)
-                aliases.add(a)
-    index_ids = set().union(*c.indexes().values())
-    if aliases & index_ids:
-        c.fail.append("      INDEX.md has rows for tab aliases (they are not cards): %s"
-                      % ", ".join(sorted(aliases & index_ids)))
 
 
 # 11. the short layout, and the inline markup it uses.
@@ -830,7 +817,6 @@ def check_courses(c):
     html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
     ids_ok = {e.get("id") for e in ex}
     tabs_ok = {(e.get("id"), t.get("key")) for e in ex for t in (e.get("tabs") or [])}
-    aliases = {t.get("alias") for e in ex for t in (e.get("tabs") or []) if t.get("alias")}
     for d in course_dirs():
         for name in ("course.js", "exercises.js"):
             if os.path.isfile(os.path.join(ROOT, "courses", d, name)):
@@ -862,7 +848,7 @@ def check_courses(c):
                 base, _, tab = ref.partition("#")
                 if tab and (base, tab) not in tabs_ok:
                     c.fail.append("course %s lists %s: no such tab" % (cid, ref))
-                elif not tab and base not in ids_ok and base not in aliases:
+                elif not tab and base not in ids_ok:
                     c.fail.append("course %s lists %s: not in the register" % (cid, ref))
     extra_course = {e.get("course") for e in ex if e.get("id") in c.extra_ids}
     for cid in sorted({e.get("course") for e in c.prose() if e.get("course")} - seen - extra_course):
@@ -870,15 +856,13 @@ def check_courses(c):
                       "course.js registering it" % (cid, cid))
     # Every card a course owns is in its own menu. A card left out boots from
     # ?ex= but is in no menu on the course's site -- silent.
-    alias_of = {t.get("alias"): e.get("id") for e in ex
-                for t in (e.get("tabs") or []) if t.get("alias")}
     for co in c.data.get("courses") or []:
         cid = co.get("id")
         listed = set()
         for sec in co.get("sections") or []:
             for ref in sec.get("ids") or []:
                 base = ref.partition("#")[0]
-                listed.add(alias_of.get(base, base))
+                listed.add(base)
         for e in c.prose():
             if e.get("course") == cid:
                 c.checked += 1

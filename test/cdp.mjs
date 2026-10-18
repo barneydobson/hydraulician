@@ -11,8 +11,7 @@
  * test/ui-smoke.mjs directly, and test/smoke.mjs through a dynamic
  * `import()` (it is CommonJS, so it cannot use a static one).
  *
- * Environment: `$CHROME` names the browser binary (`$CHROME_PATH` is a
- * deprecated alias, still honoured); `$ANGLE` picks the ANGLE backend and
+ * Environment: `$CHROME` names the browser binary; `$ANGLE` picks the ANGLE backend and
  * `$SOFTWARE=1` asks for `--disable-gpu`.
  */
 import { spawn } from "node:child_process";
@@ -20,7 +19,7 @@ import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-/** Where Chrome tends to be. `$CHROME` wins (then the deprecated `$CHROME_PATH`),
+/** Where Chrome tends to be. `$CHROME` wins,
  *  so a bespoke install still runs. */
 const CANDIDATES = {
   win32: [
@@ -39,7 +38,6 @@ const CANDIDATES = {
 
 export function findChrome() {
   if (process.env.CHROME) return process.env.CHROME;
-  if (process.env.CHROME_PATH) return process.env.CHROME_PATH;     // deprecated alias
   for (const p of CANDIDATES[process.platform] || []) if (existsSync(p)) return p;
   return null;
 }

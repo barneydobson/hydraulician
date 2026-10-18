@@ -405,10 +405,10 @@ in L5, forces in L6 and energy in L7, so it is ONE entry, CR-1, with four tabs:
   rigParams: { budget: "Medium" }, settle: 25, studentParams: [...],
   ui: { panel: "focused", hide: ["energy", "critical"] },
   tabs: [
-    { key: "streamlines", label: "Streamlines", alias: "FF-5", topic: "…",
+    { key: "streamlines", label: "Streamlines", topic: "…",
       title: "…", aim: "…", viewParams: {...}, ui: {...}, steps: [...], background: [...] },
-    { key: "continuity", label: "Continuity", alias: "VC-1", instruments: [...], … },
-    { key: "forces", label: "Forces", alias: "MM-2", … },
+    { key: "continuity", label: "Continuity", instruments: [...], … },
+    { key: "forces", label: "Forces", … },
     { key: "energy", label: "Energy", ui: { hide: ["critical"], … }, tips: [...], … } ] }
 ```
 
@@ -423,11 +423,10 @@ carry on. The card shows a tab bar under its title.
 
 Addressing: `?ex=CR-1&tab=forces` opens a tab directly (the address bar
 follows the tab), `"CR-1#forces"` is the same in a course menu or
-`APP.pickExercise`, and a tab's `alias` — the id the question had before it
-became a tab — still works as `?ex=MM-2`. A tab without `title` is called
+`APP.pickExercise`. A tab without `title` is called
 "<entry title> · <label>" in menus; one with `topic` is listed under that
-topic in the register view. `check_pack.py` checks the tab keys and labels,
-that an alias collides with no id, and runs every per-card check on each
+topic in the register view. `check_pack.py` checks the tab keys and labels
+and runs every per-card check on each
 tab's merged view (reported as `CR-1#forces`).
 
 ### The Pressure field
@@ -531,7 +530,7 @@ reach it wherever it is registered — the brief link is
 `<home>/<folder>/README.md`, or `<home>/<folder>/` on the Pages build, where
 Jekyll renders the README as the folder's page (`courses/` is not
 underscore-prefixed, so it is published). **Ids are
-global**: a card whose id or tab alias is already in the register is refused
+global**: a card whose id is already in the register is refused
 with a console warning and `check_pack.py` fails the pack. A course's menu may
 list another course's cards beside its own (the original pack's menu still
 lists HS-1, which moved to CIVE40008). Scenes stay in `js/scenes.js`, shared. Moving a card
@@ -627,8 +626,8 @@ panel or readout row that does not exist, a gauge quantity outside
 concept other than `energy` / `critical`, or a `fieldText` key that is not a
 field; a card's `gauges` entry is malformed; a drawing task hides BUILD; a
 card has more than five `steps`, or its inline markup names a tool or button
-that does not exist; a tab has no key or label, repeats a key, or its alias
-collides with an id (every check above runs on each tab's merged view); or a
+that does not exist; a tab has no key or label, or repeats a key
+(every check above runs on each tab's merged view); or a
 folder or INDEX row has no card. `check_notation.py` then greps the brief for
 retired names (the y-family, old gauge keys). Both are instant and run in CI.
 

@@ -231,7 +231,7 @@ function switchScene(id) {
   state.hoverCard = true;
   state.tracerN = 9;
   // Live, as a fresh boot is. Average used to survive a switch, so a class
-  // that had averaged FF-5 opened VC-2 — an unsteady fill — on Average. An
+  // that had averaged CR-1 opened VC-2 — an unsteady fill — on Average. An
   // exercise that wants it says `avg: true` in viewParams (none does).
   if (state.avg) setAverage(false);
   UIMODE.reset();                     // a new scene is a whole interface again
@@ -1348,8 +1348,7 @@ function boot() {
   // included, so it runs INSTEAD of `?scene=` (which has already loaded, and
   // is what you are left on if the id is unknown to this build).
   const exId = q.get("ex");
-  // `&tab=<key>` opens a tabbed card on that tab (CR-1's "forces"); an old
-  // id that became a tab (`?ex=MM-2`) is resolved by EX itself.
+  // `&tab=<key>` opens a tabbed card on that tab (CR-1's "forces").
   if (exId && !EX.pick(exId, q.get("tab") ? { tab: q.get("tab") } : undefined)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
   // Embedded, the brief lives on the page around the frame; the card starts

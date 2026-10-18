@@ -1156,7 +1156,7 @@ points and need a stopping rule at every boundary.
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
 - **Average used to survive a scene switch.** `switchScene` reset the view
-  toggles but not `state.avg`, so a class that switched FF-5 to Average
+  toggles but not `state.avg`, so a class that switched CR-1 to Average
   opened VC-2 — an unsteady fill — still averaging, its level curve smeared
   into a window mean. It now calls `setAverage(false)` (the single writer:
   the flag alone would leave the accumulators open) before loading.

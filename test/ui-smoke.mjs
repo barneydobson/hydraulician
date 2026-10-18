@@ -864,18 +864,19 @@ async function main() {
     });
     // ------------------------------------- tabs, the short layout, inline icons
     await runCase("a tabbed card swaps its steps and interface, not the bench; steps draw the strip's own icons", async () => {
-      // ?ex=MM-2 is an ALIAS: the id the Forces question had before the
-      // contraction rig became one exercise with three tabs.
-      const tab = await browser.open(INDEX + "?ex=MM-2",
+      // &tab=<key> is the one way to a tab from the address bar.
+      const tab = await browser.open(INDEX + "?ex=CR-1&tab=forces",
         DOCK_READY);
       const r = await tab.evaluate(`
         return APP.EX.ready.then(() => {
           const c0 = APP.EX.current.ref, url0 = location.search, mode0 = APP.state.mode;
+          const title0 = APP.EX.current.title;
+          const on0 = [...document.querySelectorAll('#dock .extab.on')].map((b) => b.textContent).join(",");
           APP.tick(60);
           const t0 = APP.sim.t;
           document.querySelector('#dock .extab[data-tab="streamlines"]').click();
           const ico = [...document.querySelectorAll('#dock .exsteps .exico')];
-          return { c0, url0, mode0, c1: APP.EX.current.ref, url1: location.search,
+          return { c0, url0, mode0, title0, on0, c1: APP.EX.current.ref, url1: location.search,
             t0, t1: APP.sim.t, scene: APP.sim.scene.id,
             fields: APP.UIMODE.fields().map((f) => f.id).join(","),
             measure: APP.state.ui.measure,
@@ -891,7 +892,10 @@ async function main() {
             task: getComputedStyle(document.querySelector('#dock .extask')).display };
         });
       `);
-      eq("an old id opens its tab", r.c0, "CR-1#forces");
+      eq("?ex=CR-1&tab=forces opens the Forces tab", r.c0, "CR-1#forces");
+      check("the strip's title names the exercise and the tab",
+            /contraction rig/i.test(r.title0) && /force/i.test(r.title0), r.title0);
+      eq("the tab bar marks Forces", r.on0, "Forces");
       check("and the address bar names the entry and the tab",
             /ex=CR-1/.test(r.url0) && /tab=forces/.test(r.url0), r.url0);
       eq("the Forces tab opens on Pressure", r.mode0, 8);
@@ -909,6 +913,34 @@ async function main() {
       check("Background is there, and closed", r.bgShown && !r.bgOpen, JSON.stringify(r));
       check("the short layout drops Start and Do", r.start === "none" && r.task === "none",
             r.start + " " + r.task);
+      await tab.close();
+    });
+    await runCase("a tabbed card boots on ?ex=HJ-2&tab=energy", async () => {
+      const tab = await browser.open(INDEX + "?ex=HJ-2&tab=energy", DOCK_READY);
+      const r = await tab.evaluate(`
+        return APP.EX.ready.then(() => ({
+          ref: APP.EX.current.ref, title: APP.EX.current.title, url: location.search,
+          on: [...document.querySelectorAll('#dock .extab.on')].map((b) => b.textContent).join(",") }));
+      `);
+      eq("HJ-2 opens on its Energy tab", r.ref, "HJ-2#energy");
+      eq("with the Energy tab's title", r.title, "Energy: sluice gate and hydraulic jump");
+      eq("the tab bar marks Energy", r.on, "Energy");
+      check("and the address bar names both", /ex=HJ-2/.test(r.url) && /tab=energy/.test(r.url), r.url);
+      await tab.close();
+    });
+    await runCase("a tabbed card's retired id (?ex=MM-2) is an unknown exercise", async () => {
+      const tab = await browser.open(INDEX + "?ex=MM-2");
+      const r = await tab.evaluate(`
+        return new Promise((res) => setTimeout(() => res({
+          shown: document.getElementById("toast").classList.contains("show"),
+          title: document.getElementById("toastTitle").textContent,
+          sub: document.getElementById("toastSub").textContent,
+          cur: (APP.EX.current && (APP.EX.current.ref || APP.EX.current.id)) || null }), 400));
+      `);
+      check("the toast is up", r.shown, JSON.stringify(r));
+      eq("it says Unknown exercise", r.title, "Unknown exercise");
+      check("and names the id", r.sub.indexOf("MM-2") >= 0, r.sub);
+      check("CR-1 is not opened", !r.cur || String(r.cur).indexOf("CR-1") < 0, String(r.cur));
       await tab.close();
     });
     await runCase("a gauge can be removed one by one or all at once; the strip shows only what the bench can use", async () => {

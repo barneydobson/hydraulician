@@ -28,7 +28,7 @@
 // stamps each card with `course: id` and `home: "courses/<id>/exercises"`
 // (the folder its `folder` sits in) and appends it to the one EXERCISES list,
 // so `?ex=<ID>`, `?menu=all`, the picker and the brief link treat it exactly
-// like a shared card. Ids are global: a card whose id (or tab alias) is
+// like a shared card. Ids are global: a card whose id is
 // already in the register is refused with a console warning, recorded in
 // COURSES.rejected, and check_pack.py fails the pack over it.
 //
@@ -94,16 +94,14 @@ const COURSES = (() => {
       if (!reg) { console.warn("COURSES.exercises: js/exercises.js is not loaded; " + id + "'s cards are dropped"); return; }
       if (!id || !Array.isArray(list)) { console.warn("COURSES.exercises: needs an id and a list", id); return; }
       const taken = new Set();
-      reg.forEach((e) => { taken.add(e.id); (e.tabs || []).forEach((t) => { if (t.alias) taken.add(t.alias); }); });
+      reg.forEach((e) => taken.add(e.id));
       list.forEach((e) => {
-        const names = [e && e.id].concat(((e && e.tabs) || []).map((t) => t.alias).filter(Boolean));
-        const clash = names.find((n) => !n || taken.has(n));
-        if (!e || !e.id || clash !== undefined) {
-          console.warn("COURSES.exercises(" + id + "): " + (e && e.id ? "id " + clash + " is already in the register" : "a card has no id") + " — skipped");
-          rejected.push({ course: id, id: e && e.id, clash: clash });
+        if (!e || !e.id || taken.has(e.id)) {
+          console.warn("COURSES.exercises(" + id + "): " + (e && e.id ? "id " + e.id + " is already in the register" : "a card has no id") + " — skipped");
+          rejected.push({ course: id, id: e && e.id, clash: e && e.id });
           return;
         }
-        names.forEach((n) => taken.add(n));
+        taken.add(e.id);
         reg.push(Object.assign({}, e, { course: id, home: "courses/" + id + "/exercises" }));
       });
     },

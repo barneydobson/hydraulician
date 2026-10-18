@@ -98,7 +98,6 @@ for the exercise pack and is Linux-bound (macOS shims are in
 | Variable | Effect |
 | --- | --- |
 | `$CHROME` | the browser binary (else the platform's usual Chrome / Chromium / Edge path) |
-| `$CHROME_PATH` | deprecated alias of `$CHROME`, still honoured |
 | `$ANGLE` | overrides the ANGLE backend |
 | `$SOFTWARE=1` | `--disable-gpu`, the old software behaviour, for a machine with no working GPU backend |
 

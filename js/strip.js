@@ -213,7 +213,7 @@ function scenesOffered() {
  *  strip's Wave train button shows only then, and V fires it where there is
  *  no valve to work. */
 function trainOffered() {
-  return !!sim && !!sim.p && sim.p.wave.on > 0.5 && sim.p.wave.train > 0;
+  return !!sim && !!sim.p && SIM.isOn(sim.p.wave.on) && sim.p.wave.train > 0;
 }
 function fireTrain() {
   if (SIM.fireTrain()) {
@@ -230,7 +230,7 @@ function fireTrain() {
 const valveWarned = new Set();           // scene ids already warned about, once each
 function hasValves() {
   if (!sim || !sim.scene) return false;
-  if (sim.segs && sim.segs.some((s) => (s[5] | 0) === 128)) return true;
+  if (sim.segs && sim.segs.some((s) => (s[5] | 0) === SIM.MASK.VALVE)) return true;
   const sc = sim.scene;
   if (!sc.valves) return false;
   try { return sc.valves(sc.W, sc.H, SIM.params().values || {}).length > 0; }
@@ -392,7 +392,7 @@ const TOOLBAR = [
       // Re-read every frame (tickFrame → syncValveBtn), so drawing the first
       // valve puts the button up and erasing the last takes it away.
       when: () => hasValves(),
-      on: () => !!sim && sim.p.valveClosed < 0.5, act: () => toggleValve() },
+      on: () => !!sim && !SIM.isOn(sim.p.valveClosed), act: () => toggleValve() },
     // Only where the paddle makes trains (wave.train > 0, WV-5): one press,
     // one train. Shares V with the valves — V fires the train where there is
     // no valve to work.

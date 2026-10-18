@@ -152,8 +152,8 @@ const RECON = (() => {
    *  the same number — docs/averaging.md §7.3. */
   const aerationGap = (etaBar, bed, dBar) => etaBar - (bed + dBar);
 
-  /** Whole-grid reconstruction. One entry per column; `mask >= 192` is solid,
-   *  matching SIM's rasterised mask. `d2d` uses `bodyDepth`, NOT `columnDepth`:
+  /** Whole-grid reconstruction. One entry per column; `mask >= o.solidMin` (default 192,
+   *  SIM.MASK.SOLID_MIN) is solid, matching SIM's rasterised mask. `d2d` uses `bodyDepth`, NOT `columnDepth`:
    *  it exists to cross-check the GPU's own column reduction (`FS_COL` in
    *  js/shaders.js), which `continue`s past sub-threshold cells without
    *  accumulating depth. Using the unmasked integral here would make d2d
@@ -161,6 +161,9 @@ const RECON = (() => {
    *  bridging bug instead of checking against it. */
   function reconstruct(o) {
     const { fbar, pbar, mask, nx, ny, dx, c } = o;
+    // The solid cut of the mask (SIM.MASK.SOLID_MIN); smoke asserts the two agree,
+    // so this module can stay free of SIM.
+    const solidMin = o.solidMin === undefined ? 192 : o.solidMin;
     // Gravity, because compaction only means anything where the EOS is
     // one-sided. `g` is optional and defaults to the scene default; a caller
     // reading it off a live sim should pass `g: sim.p.g` so a zero-gravity
@@ -183,7 +186,7 @@ const RECON = (() => {
     for (let i = 0; i < nx; i++) {
       for (let j = 0; j < ny; j++) {
         const k = j * nx + i;
-        solid[j] = mask[k] >= 192 ? 1 : 0;
+        solid[j] = mask[k] >= solidMin ? 1 : 0;
         gcol[j] = solid[j] ? 0 : geomFill(fbar[k], pbar[k], c);
       }
       const b = bodies(gcol, solid, ny);

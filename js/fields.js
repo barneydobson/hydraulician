@@ -9,7 +9,7 @@
  * dependency record. Load order is index.html's.
  *
  * Defines: FIELDS, sceneNow, hmaxScene, pressureRange, momScene, fieldFor, fieldById,
- *          gNote, fieldBlurb, GAUGE_QTY, gaugeQty, gaugeFieldOf, setAllGaugeFields,
+ *          fieldBlurb, GAUGE_QTY, gaugeQty, gaugeFieldOf, setAllGaugeFields,
  *          rangeFor, vmaxFor
  *
  * Reads:   SIM, sim, state, UIMODE
@@ -123,8 +123,6 @@ function momScene() { return 1000 * 0.5 * Math.pow(sceneNow().vmax || 4, 2); }  
 function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }
 /** The registry entry for a field id, or the first field when the id is unknown. */
 function fieldById(id) { return FIELDS.find((f) => f.id === id) || FIELDS[0]; }
-/** Gravity magnitude for the notes below; g = 0 (plan view) falls back to 9.81. */
-function gNote() { return Math.abs(sim.p.g) || 9.81; }
 
 /** The field's one-line description, as THIS exercise wants it said. A card
  *  can replace a description that names concepts its lecture has not met

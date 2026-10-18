@@ -392,7 +392,7 @@ function beginPress(ev) {
   // works whatever tool is in hand; a pen's barrel button also reports
   // button 2 and must not pour.
   if ((ev.button === 2 && ev.mouse) || state.tool === "pour") {
-    state.pour = { x, z, r: state.brush * POUR.rBrush, vx: 0, vz: sim.p.g > 0.5 ? POUR.vDown : 0, lx: x, lz: z };
+    state.pour = { x, z, r: state.brush * POUR.rBrush, vx: 0, vz: SIM.planView() ? 0 : POUR.vDown, lx: x, lz: z };
     sim.p.pour = state.pour;
     return;
   }
@@ -570,7 +570,7 @@ function onMove(e) {
   if (state.pour) {
     const dt = POUR.dt, cl = (v) => Math.max(-POUR.vMax, Math.min(POUR.vMax, v));
     state.pour.vx = cl((x - state.pour.lx) / dt * POUR.gain);
-    state.pour.vz = cl((z - state.pour.lz) / dt * POUR.gain + (sim.p.g > 0.5 ? POUR.vDown : 0));
+    state.pour.vz = cl((z - state.pour.lz) / dt * POUR.gain + (SIM.planView() ? 0 : POUR.vDown));
     state.pour.x = x; state.pour.z = z;
     state.pour.lx = x; state.pour.lz = z;
     state.pour.r = state.brush * POUR.rBrush;
@@ -646,7 +646,7 @@ function onUp(e) {
   }
   if (state.drag) {
     const d = state.drag;
-    const kind = state.tool === "erase" ? 0 : state.tool === "valve" ? 128 : 255;
+    const kind = state.tool === "erase" ? SIM.MASK.OPEN : state.tool === "valve" ? SIM.MASK.VALVE : SIM.MASK.WALL;
     const th = state.tool === "erase" ? state.brush * 2.2 : state.brush;
     if (Math.hypot(d.x1 - d.x0, d.z1 - d.z0) < sim.dx) {
       SIM.addSeg(d.x0, d.z0, d.x0 + sim.dx * 0.5, d.z0, th, kind);   // a dot
@@ -864,7 +864,7 @@ function drawOverlay(A) {
   ctx.beginPath();
   ctx.rect(view.vis.x, view.vis.y, view.vis.w, view.vis.h);
   ctx.clip();
-  if (state.channel && sim.p.g > 0.5) {
+  if (state.channel && !SIM.planView()) {
     OVERLAY.drawChannel(ctx, view, A, sim, state.grade);
     if (state.labels) OVERLAY.drawProfileLabels(ctx, view, A, sim);
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
@@ -1039,7 +1039,7 @@ function drawMarkers(ctx) {
       label, colour, side === "R" ? "right" : undefined);
     ctx.restore();
   };
-  if (p.inflow.on > 0.5) {
+  if (SIM.isOn(p.inflow.on)) {
     // The marker rides the reservoir level, which is its ENERGY line — so
     // under prescribed q it stands a velocity head ABOVE the water arriving
     // at the inlet, and that gap is the point rather than a mismatch. It is
@@ -1053,12 +1053,12 @@ function drawMarkers(ctx) {
       UIMODE.hides("energy")
         ? "reservoir level " + p.inflow.level.toFixed(2) + " m"
         : "reservoir " + p.inflow.level.toFixed(2) + " m"
-          + (p.inflow.free > 0.5 ? " · head-driven"
+          + (SIM.isOn(p.inflow.free) ? " · head-driven"
              : st.choked ? " · energy line · over-drawn"
              : drawn > 0.005 ? " · energy line" : ""),
       OVERLAY.C.res, "res");
   }
-  if (p.tailwater.on > 0.5) {
+  if (SIM.isOn(p.tailwater.on)) {
     level("R", p.tailwater.level, "tailwater " + p.tailwater.level.toFixed(2) + " m", OVERLAY.C.tw, "tw");
   }
   const wall = SIM.wallPaddle();
@@ -1110,7 +1110,7 @@ function drawMarkers(ctx) {
     }
     OVERLAY.chip(ctx, face + 6, yTop + 12, flap ? "hinged flap" : "wave paddle", OVERLAY.C.piston);
     ctx.restore();
-  } else if (p.wave.on > 0.5) {
+  } else if (SIM.isOn(p.wave.on)) {
     const x = V.X(p.wave.x), f = flashOf("piston");
     ctx.save();
     ctx.globalAlpha = 0.5 + 0.5 * f;
@@ -1139,7 +1139,7 @@ function drawMarkers(ctx) {
   ctx.save();
   ctx.strokeStyle = "#dfe8f2"; ctx.lineCap = "round";
   for (const [key, on, pos, dx, dy] of sides) {
-    if (!(on > 0.5)) continue;
+    if (!SIM.isOn(on)) continue;
     if (key === "openL" && wall) continue;             // that edge IS the paddle
     const f = flashOf(key);
     ctx.globalAlpha = (on > 1.5 ? 0.55 : 0.30) + 0.5 * f;   // outfalls read stronger
@@ -1159,12 +1159,12 @@ function drawMarkers(ctx) {
 /** Nozzle marker for the movable source. */
 function drawSpout(ctx) {
   const s = sim.p.source;
-  if (!(s.on > 0.5) && state.tool !== "spout") return;
+  if (!SIM.isOn(s.on) && state.tool !== "spout") return;
   const x = view.X(s.x), y = view.Y(s.z);
   const r = Math.max(5, s.r / sim.W * view.w);
   const fl = flashOf("spout");
   ctx.save();
-  ctx.globalAlpha = Math.min(1, (s.on > 0.5 ? 0.9 : 0.35) + 0.4 * fl);
+  ctx.globalAlpha = Math.min(1, (SIM.isOn(s.on) ? 0.9 : 0.35) + 0.4 * fl);
   ctx.strokeStyle = OVERLAY.C.spout; ctx.lineWidth = 1.6 + 2 * fl;
   ctx.setLineDash([4, 3]);
   ctx.beginPath(); ctx.arc(x, y, r, 0, OVERLAY.TAU); ctx.stroke();
@@ -1485,10 +1485,10 @@ function toggleValve() {
   // valve texel as solid or open, which is a geometry edit as far as the
   // averaging window is concerned. Writing sim.p.valveClosed here directly
   // would skip that reset — see the comment on setValve.
-  SIM.setValve(sim.p.valveClosed <= 0.5);
+  SIM.setValve(!SIM.isOn(sim.p.valveClosed));
   syncToolbar();
-  showToast(sim.p.valveClosed > 0.5 ? "Valve closed" : "Valve open",
-    sim.p.valveClosed > 0.5
+  showToast(SIM.isOn(sim.p.valveClosed) ? "Valve closed" : "Valve open",
+    SIM.isOn(sim.p.valveClosed)
       ? "Watch the gauges: a pressure wave runs up the pipe at c, and the pressure head jumps by c·Δv/g."
       : "Flow re-established.");
 }

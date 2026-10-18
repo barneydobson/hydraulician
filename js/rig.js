@@ -75,7 +75,7 @@ const RIG = (() => {
    *  the drawn one than any rasterisation decision. 1 µm is 0.04% of the
    *  finest cell, and JSON.stringify still prints 1.5 as "1.5". */
   const r4 = (v) => Math.round((+v || 0) * 1e6) / 1e6;
-  const b01 = (v) => (v > 0.5 ? 1 : 0);
+  const b01 = (v) => (SIM.isOn(v) ? 1 : 0);
   let note = "", msg = "", ui = null;
 
   // ------------------------------------------------------------- snapshot

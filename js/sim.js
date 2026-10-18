@@ -16,6 +16,35 @@ const SIM = (() => {
 
   const CFL = 0.45;          // acoustic Courant number for the staggered update
   const UREF = 6.0;          // headroom for advective velocity in the dt estimate
+
+  // ------------------------------------------------------- shared vocabulary
+  /** The solid mask's one vocabulary. The mask is a Uint8Array of 0 (open),
+   *  128 (valve: solid only while closed) and 255 (wall); the shaders read the
+   *  same byte as a normalised R8 texel and cut at the same two thresholds
+   *  (SO() in shaders.js), RECON.reconstruct takes SOLID_MIN as `o.solidMin`,
+   *  and overlay.js asks `SIM.isSolid`. One place says where the cuts are. */
+  const MASK = { OPEN: 0, VALVE: 128, WALL: 255, VALVE_MIN: 64, SOLID_MIN: 192 };
+  /** Is a mask byte solid right now? A valve texel counts only while shut. */
+  const isSolid = (m, valveClosed) =>
+    m >= MASK.SOLID_MIN || (!!valveClosed && m >= MASK.VALVE_MIN);
+  /** A 0/1 flag held as a number (it is a uniform and a wire value). */
+  const isOn = (v) => v > 0.5;
+  /** |g|, or 9.81 where the scene has none (plan view), so a head p/rho g stays finite. */
+  const gMag = () => Math.abs(S.p.g) || 9.81;
+  /** Plan view: no gravity, so no columns, no free surface, no depth. */
+  const planView = () => Math.abs(S.p.g) < 0.1;
+
+  /** The Favre unpack of the averaging accumulator's texel `k` (see
+   *  docs/averaging.md section 4.1): it stores (f u_c, f w_c, f, P), so the
+   *  velocity is the momentum over f-bar. Returns [u, w, f, p] in a scratch
+   *  array that the NEXT call overwrites: read it before calling again, and
+   *  when writing back into the buffer you read from, read first. */
+  const FV = [0, 0, 0, 0];
+  function favre(buf, k) {
+    const o = k * 4, f = buf[o + 2], d = Math.max(f, 1e-6);
+    FV[0] = buf[o] / d; FV[1] = buf[o + 1] / d; FV[2] = f; FV[3] = buf[o + 3];
+    return FV;
+  }
   const KAPPA = 0.41;        // von Kármán: the mixing length is κy (FS_VEL's lmix)
   // Substeps between refreshes of the closure's columns. The column walk is
   // serial down each column, so the pass is latency-bound (~0.08 ms on m2,
@@ -264,7 +293,7 @@ const SIM = (() => {
     const sc = S.scene;
     const par = S.params || {};
     S.solids = sc.solids ? sc.solids(sc.W, sc.H, S.p, par) : [];
-    if (S.solids.length) S.solids.forEach((so) => stampPoly(m, so, 255));
+    if (S.solids.length) S.solids.forEach((so) => stampPoly(m, so, MASK.WALL));
     // The shim: a scene still on walls() rasterises exactly as it always
     // has — same stampSeg, same capsule, same measured geometry. Kept in
     // wallSegs/valveSegs (rather than called and stamped inline) only so the
@@ -276,17 +305,17 @@ const SIM = (() => {
     // every scene that takes (W, H) only.
     const wallSegs = sc.walls ? sc.walls(sc.W, sc.H, par) || [] : [];
     const valveSegs = sc.valves ? sc.valves(sc.W, sc.H, par) : [];
-    wallSegs.forEach((s) => stampSeg(m, s, 255));
-    valveSegs.forEach((s) => stampSeg(m, s, 128));
+    wallSegs.forEach((s) => stampSeg(m, s, MASK.WALL));
+    valveSegs.forEach((s) => stampSeg(m, s, MASK.VALVE));
     S.segs.forEach((s) => stampSeg(m, s, s[5]));
     const [oL, oR, oB, oT] = S.p ? S.p.open : sc.open;
     for (let j = 0; j < S.ny; j++) {
-      if (!oL) m[j * S.nx] = 255;
-      if (!oR) m[j * S.nx + S.nx - 1] = 255;
+      if (!oL) m[j * S.nx] = MASK.WALL;
+      if (!oR) m[j * S.nx + S.nx - 1] = MASK.WALL;
     }
     for (let i = 0; i < S.nx; i++) {
-      if (!oB) m[i] = 255;
-      if (!oT) m[(S.ny - 1) * S.nx + i] = 255;
+      if (!oB) m[i] = MASK.WALL;
+      if (!oT) m[(S.ny - 1) * S.nx + i] = MASK.WALL;
     }
 
     // Registration-only pick solids: from here down `m` is never touched
@@ -319,8 +348,8 @@ const SIM = (() => {
     valveSegs.forEach((s, i) => register("valve" + i, s, { valve: true }));
     let drawnI = 0, drawnValveI = 0;
     S.segs.forEach((s) => {
-      if (s[5] === 255) register("drawn" + (drawnI++), s);
-      else if (s[5] === 128) register("drawnvalve" + (drawnValveI++), s, { valve: true });
+      if (s[5] === MASK.WALL) register("drawn" + (drawnI++), s);
+      else if (s[5] === MASK.VALVE) register("drawnvalve" + (drawnValveI++), s, { valve: true });
       // kind 0 (eraser) registers nothing — there is no surface to click.
     });
 
@@ -382,11 +411,10 @@ const SIM = (() => {
     // Far beyond any real squared distance (nx² + ny² < 1.4e8) yet small
     // enough that q² is not lost to rounding in the parabola intersections.
     const INF = 1e12;
-    const shut = S.p ? S.p.valveClosed : 1;
+    const shut = isOn(S.p ? S.p.valveClosed : 1);
     const solid = (i, j) => {
       if (i < 0 || j < 0) return false;
-      const v = m[j * nx + i];
-      return v >= 192 || (v >= 64 && shut > 0.5);
+      return isSolid(m[j * nx + i], shut);
     };
     const n = Math.max(nx, ny);
     if (!S.wdG || S.wdG.length !== nx * ny || S.wdF.length !== n) {
@@ -434,7 +462,7 @@ const SIM = (() => {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, out);
   }
 
-  /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */
+  /** Add a drawn edge. kind: MASK.WALL, MASK.VALVE, or MASK.OPEN (the eraser). */
   function addSeg(x0, z0, x1, z1, th, kind) {
     S.segs.push([x0, z0, x1, z1, th, kind]);
     rasterise();
@@ -597,12 +625,42 @@ const SIM = (() => {
       ? Object.fromEntries(scene.params.map((d) => [d.key, d.value]))
       : {});
     const old = S;                  // everything CPU-side has been read off it
+    // Every field the grid will ever carry, declared here with its initial
+    // value so that `S` has one shape and a reader can find what a name means.
+    // The textures are null until allocated just below, after the outgoing
+    // grid has been released (its VRAM goes back before ours is taken).
     S = {
-      scene, nx, ny, dx, segs,
+      // -- the grid: the domain, its discretisation, the drawing and the live parameters
+      scene, nx, ny, dx, segs, params, p,
       W: nx * dx, H: ny * dx,
       mask: new Uint8Array(nx * ny),
-      t: 0, frames: 0,
-      p, params,
+      solids: [],                   // registered pick surfaces, rebuilt by rasterise()
+      t: 0, frames: 0, nsteps: 0,   // simulated seconds, frames drawn, substeps taken
+      // -- live textures and framebuffers (GPU state)
+      U: null, F: null, P: null, pn: 128,
+      solid: null, wallTex: null,
+      colTex: null, colFbo: null, tcolTex: null, tcolFbo: null, hglTex: null, hglFbo: null,
+      // -- closure scratch: the wall-distance transform's buffers (wallDistance, hydraulicGrade)
+      wdG: null, wdF: null, wdD: null, wdZ: null, wdV: null, wallD: null,
+      ceF: null, ceU: null, ceW: null,
+      // -- readback scratch, reused so a frame's instruments allocate nothing
+      pxBuf: new Float32Array(4), colBuf: new Float32Array(nx * 4), hglBuf: new Float32Array(nx * 4),
+      cvU: null, cvF: null,         // control volume, faceForce
+      lnU: null, lnF: null,         // lineFlux
+      avgFieldScratch: null,        // the averaged field's raw read, hydraulicGrade
+      // -- caches and their keys
+      colFresh: false,              // did the LAST columns() call pull its buffer back
+      tcolDirty: true,              // the closure's columns need a rebuild
+      bandKey: null, inBand: null, twBand: null,   // control bands (bands())
+      stageKey: null, stage: null,  // the inlet stage solve (inletStage())
+      wetT: -Infinity, wetFr: 1,    // the water's share of the domain (wetFraction())
+      trailSet: 0,                  // the Particle trail slider, s; 0 = fitted
+      // -- dye
+      dyeOn: false, dyeDraw: true,  // seeds wanted / dye drawn at all
+      dyeUsed: false,               // any ink since the last reset (selects the dye face scheme)
+      seeds: null, seedT: 0,        // the fixed dye sources and when they were drawn
+      // -- averaging: allocated on demand by avgStart()
+      avg: null,
     };
     release(old);                   // free BEFORE allocating: lower peak VRAM
 
@@ -618,14 +676,11 @@ const SIM = (() => {
     S.tcolTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
     S.tcolFbo = GLH.createFBO(gl, S.tcolTex);
     S.wallTex = GLH.createTexture(gl, nx, ny, gl.R32F, gl.RED, FL, null);
-    S.nsteps = 0;
     // The live hydraulic grade line (FS_HGL), one texel per column.
     S.hglTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
     S.hglFbo = GLH.createFBO(gl, S.hglTex);
-    S.hglBuf = new Float32Array(nx * 4);
 
-    const pn = 128;
-    S.pn = pn;
+    const pn = S.pn;
     const pd = new Float32Array(pn * pn * 4);
     for (let k = 0; k < pn * pn; k++) {
       pd[k * 4] = Math.random() * S.W;
@@ -635,15 +690,11 @@ const SIM = (() => {
     }
     S.P = GLH.createDoubleBuffer(gl, pn, pn, F, RGBA, FL, pd);
 
-    S.colBuf = new Float32Array(nx * 4);
-    // Whether the LAST columns() call actually pulled its buffer back, or
-    // handed out the one from up to two frames ago. avgColumns() rides this:
-    // its readback is the same nx x 1 pipeline sync, so refreshing on the same
-    // frames costs nothing extra and refreshing on the others would double the
-    // stall this throttle exists to avoid.
-    S.colFresh = false;
-    S.pxBuf = new Float32Array(4);
-    S.avg = null;                   // transport accumulator, allocated on demand
+    // `S.colFresh`: whether the LAST columns() call actually pulled its buffer
+    // back, or handed out the one from up to two frames ago. avgColumns()
+    // rides this: its readback is the same nx x 1 pipeline sync, so refreshing
+    // on the same frames costs nothing extra and refreshing on the others
+    // would double the stall this throttle exists to avoid.
 
     rasterise(false);               // a rebuild is not an edit: no onGeometry
     resetWater();
@@ -658,7 +709,7 @@ const SIM = (() => {
     // slider (hydro) rather than to a constant reads it here. NaN when the
     // control is off, so a scene cannot mistake 0 for a level.
     const P = { g: Math.abs(S.p.g), c: S.p.c,
-                level: S.p.inflow.on > 0.5 ? S.p.inflow.level : NaN };
+                level: isOn(S.p.inflow.on) ? S.p.inflow.level : NaN };
     const water = S.scene.water;
     // The live params go with the call: a parametric scene fills the pipe
     // its solids() actually drew, not the default one. Scenes taking
@@ -873,15 +924,14 @@ const SIM = (() => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
     gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, fT);
     const f0 = S.avg.f0buf;
-    // 255 = wall, 128 = valve (solid only while closed), 0 = open.
-    const solidLo = S.p.valveClosed > 0.5 ? 64 : 192;
+    const closed = isOn(S.p.valveClosed);
     const T = S.avg.t, nx = S.nx;
     let max = 0, sum = 0, cnt = 0, nSrc = 0, Fmax = 0;
     let maxSrc = 0, sumSrc = 0, Smax = 0;
     for (let j = 1; j < S.ny - 1; j++) {
       for (let i = 1; i < nx - 1; i++) {
         const k = (j * nx + i) * 4;
-        if (S.mask[j * nx + i] >= solidLo) continue;
+        if (isSolid(S.mask[j * nx + i], closed)) continue;
         // The scale of the drift, over every interior fluid cell — source
         // cells included, because their face means still feed a source-free
         // neighbour's divergence.
@@ -948,10 +998,8 @@ const SIM = (() => {
     const fbar = new Float32Array(n), pbar = new Float32Array(n);
     const ubar = new Float32Array(n), wbar = new Float32Array(n);
     for (let k = 0; k < n; k++) {
-      const f = buf[k * 4 + 2];
-      fbar[k] = f; pbar[k] = buf[k * 4 + 3];
-      const d = Math.max(f, 1e-6);
-      ubar[k] = buf[k * 4] / d; wbar[k] = buf[k * 4 + 1] / d;
+      const v = favre(buf, k);
+      ubar[k] = v[0]; wbar[k] = v[1]; fbar[k] = v[2]; pbar[k] = v[3];
     }
     return { fbar, pbar, ubar, wbar };
   }
@@ -1039,12 +1087,12 @@ const SIM = (() => {
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
-    const f = S.pxBuf[2], d = Math.max(f, 1e-6);
-    const g = Math.abs(S.p.g) || 9.81;
+    const [u, w, f, p] = favre(S.pxBuf, 0);
+    const g = gMag();
     // U.b is KINEMATIC pressure p/rho, so the head is that over g -- it must
     // not be divided by density a second time (docs/averaging.md §4.1).
-    return { i, j, fbar: f, ubar: S.pxBuf[0] / d, wbar: S.pxBuf[1] / d,
-             pbar: S.pxBuf[3], phead: S.pxBuf[3] / g, zp: j * S.dx };
+    return { i, j, fbar: f, ubar: u, wbar: w,
+             pbar: p, phead: p / g, zp: j * S.dx };
   }
 
   // ------------------------------------------------------------------ step
@@ -1072,7 +1120,7 @@ const SIM = (() => {
     const runs = [];
     let a = -1;
     for (let j = 1; j < S.ny - 1; j++) {
-      const open = S.mask[j * S.nx + i] < 64;
+      const open = S.mask[j * S.nx + i] < MASK.VALVE_MIN;
       if (open && a < 0) a = j;
       if (a >= 0 && (!open || j === S.ny - 2)) {
         runs.push([a, open ? j : j - 1]);
@@ -1136,9 +1184,9 @@ const SIM = (() => {
     if (S.stageKey === key) return S.stage;
     S.stageKey = key;
     const out = { stage: inf.level, choked: false, qmax: Infinity, dc: 0, Emin: 0 };
-    const solved = !(inf.free > 0.5) && inf.v === undefined && b[1] >= inf.level - 1e-4;
+    const solved = !isOn(inf.free) && inf.v === undefined && b[1] >= inf.level - 1e-4;
     if (solved) {
-      const g = Math.abs(S.p.g) || 9.81;
+      const g = gMag();
       const r = RECON.inletDepth(inf.level - b[0], inf.q || 0, g,
                                  inf.branch === "super" ? "super" : "sub");
       out.stage = b[0] + r.d;
@@ -1236,7 +1284,7 @@ const SIM = (() => {
    *  but WV-4's `beach`; the overlay asks the same question to draw it. */
   function wallPaddle() {
     const p = S.p;
-    return p.wave.on > 0.5 && p.wave.d > 0 && p.open[0] === 1 && p.inflow.on < 0.5
+    return isOn(p.wave.on) && p.wave.d > 0 && p.open[0] === 1 && !isOn(p.inflow.on)
       && Math.round(p.wave.x / S.dx) <= 1;
   }
 
@@ -1326,7 +1374,7 @@ const SIM = (() => {
    *  rest in still water. Returns true when a train starts. */
   function fireTrain() {
     const w = S.p.wave;
-    if (!(w.train > 0) || !(w.on > 0.5)) return false;
+    if (!(w.train > 0) || !isOn(w.on)) return false;
     resetWater();
     S.p.wave.t0 = S.t;
     return true;
@@ -1335,14 +1383,14 @@ const SIM = (() => {
   /** Is the paddle a flap? (wave.flap, with the still depth it needs.) */
   function flapOn() {
     const w = S.p.wave;
-    return w.flap > 0.5 && w.d > 0;
+    return isOn(w.flap) && w.d > 0;
   }
 
   /** The bed under the paddle's column, from the mask (the first non-solid
    *  cell up from the bottom) — the flap's hinge is measured from it. */
   function paddleBed() {
     const i = Math.max(1, Math.round(S.p.wave.x / S.dx));
-    for (let j = 0; j < S.ny; j++) if (S.mask[j * S.nx + i] < 192) return j * S.dx;
+    for (let j = 0; j < S.ny; j++) if (!isSolid(S.mask[j * S.nx + i], false)) return j * S.dx;
     return 0;
   }
 
@@ -1394,7 +1442,7 @@ const SIM = (() => {
       gl.uniform1f(pv.u("u_ca"), p.ca);
       gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
       dyeUniforms(pv);
-      const rd = p.residueDrain && Math.abs(p.g) < 0.1 ? p.residueDrain : null;
+      const rd = p.residueDrain && planView() ? p.residueDrain : null;
       gl.uniform2f(pv.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
       if (useAcc) {
         // T BEFORE this substep — the running-mean weight is h/(T+h).
@@ -1627,8 +1675,8 @@ const SIM = (() => {
   /** The water's share of the domain, from the last column reduction, about
    *  once a second. Plan view (no gravity) has no columns: taken as full. */
   function wetFraction() {
-    if (Math.abs(S.p.g) < 0.1 || !S.colBuf) return 1;
-    if (S.wetT === undefined || S.t < S.wetT || S.t - S.wetT > 1) {
+    if (planView() || !S.colBuf) return 1;
+    if (S.t < S.wetT || S.t - S.wetT > 1) {
       let a = 0;
       for (let i = 0; i < S.nx; i++) a += Math.max(0, S.colBuf[i * 4 + 1]);
       S.wetFr = Math.min(1, Math.max(0.08, a / (S.nx * S.H)));
@@ -1780,9 +1828,9 @@ const SIM = (() => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
       gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
       for (let k = 0; k < w * h; k++) {
-        const f = Ubuf[k * 4 + 2], d = Math.max(f, 1e-6);
-        Fbuf[k * 4] = f; Fbuf[k * 4 + 1] = 0; Fbuf[k * 4 + 2] = 0; Fbuf[k * 4 + 3] = 0;
-        Ubuf[k * 4] /= d; Ubuf[k * 4 + 1] /= d; Ubuf[k * 4 + 2] = Ubuf[k * 4 + 3];
+        const v = favre(Ubuf, k);
+        Fbuf[k * 4] = v[2]; Fbuf[k * 4 + 1] = 0; Fbuf[k * 4 + 2] = 0; Fbuf[k * 4 + 3] = 0;
+        Ubuf[k * 4] = v[0]; Ubuf[k * 4 + 1] = v[1]; Ubuf[k * 4 + 2] = v[3];
       }
       return true;
     }
@@ -1847,7 +1895,7 @@ const SIM = (() => {
   function hydraulicGrade(out, avg) {
     const nx = S.nx, ny = S.ny, dx = S.dx;
     const h = out && out.length >= nx ? out : new Float32Array(nx);
-    const g = Math.abs(S.p.g) || 9.81;
+    const g = gMag();
     const hv = out && out.hv && out.hv.length >= nx ? out.hv : new Float32Array(nx);
     h.hv = hv;
     if (!(avg && S.avg)) {
@@ -1860,13 +1908,13 @@ const SIM = (() => {
       quad.draw();
       gl.readPixels(0, 0, nx, 1, gl.RGBA, gl.FLOAT, S.hglBuf);
       for (let i = 0; i < nx; i++) {
-        h[i] = S.hglBuf[i * 4] > 0.5 ? S.hglBuf[i * 4 + 1] : NaN;
+        h[i] = isOn(S.hglBuf[i * 4]) ? S.hglBuf[i * 4 + 1] : NaN;
         hv[i] = NaN;
       }
       return h;
     }
-    const buf = S.gradeBuf && S.gradeBuf.length >= nx * ny * 4
-      ? S.gradeBuf : (S.gradeBuf = new Float32Array(nx * ny * 4));
+    const buf = S.avgFieldScratch && S.avgFieldScratch.length >= nx * ny * 4
+      ? S.avgFieldScratch : (S.avgFieldScratch = new Float32Array(nx * ny * 4));
     // The averaged field stores (f*u, f*w, f, P) — the pressure in the 4th
     // channel, not the live field's 3rd; reading the wrong one gives a
     // plausible-looking line made of velocity.
@@ -1880,7 +1928,7 @@ const SIM = (() => {
       h[i] = NaN; hv[i] = NaN;
       for (let j = 1; j < ny - 1; j++) {
         const k = j * nx + i;
-        if (S.mask[k] >= 192) continue;                      // solid
+        if (isSolid(S.mask[k], false)) continue;             // solid
         if (buf[k * 4 + 2] < 0.25) continue;                 // not water yet
         // j * dx, NOT the cell centre. MEASURED: with (j + 0.5) * dx the
         // whole line sat a uniform 0.00964 m above the free surface on m1
@@ -1898,13 +1946,12 @@ const SIM = (() => {
       cf.fill(0, 0, ny); cu.fill(0, 0, ny); cw.fill(0, 0, ny);
       for (let j = 1; j < ny - 1; j++) {
         const k = j * nx + i;
-        if (S.mask[k] >= 192) continue;
-        const f = buf[k * 4 + 2];
-        if (f < 0.25) continue;
-        const fi = Math.max(f, 1e-6);
-        cf[j] = f;
-        cu[j] = buf[k * 4] / fi;
-        cw[j] = buf[k * 4 + 1] / fi;
+        if (isSolid(S.mask[k], false)) continue;
+        const v = favre(buf, k);
+        if (v[2] < 0.25) continue;
+        cf[j] = v[2];
+        cu[j] = v[0];
+        cw[j] = v[1];
       }
       hv[i] = RECON.columnEnergy(cf, cu, cw, dx, g).hv;
     }
@@ -1983,9 +2030,8 @@ const SIM = (() => {
     if (avg && S.avg) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
       gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
-      const f = S.pxBuf[2], d = Math.max(f, 1e-6);
-      const u = S.pxBuf[0] / d, w = S.pxBuf[1] / d, p = S.pxBuf[3];
-      const g = Math.abs(S.p.g) || 9.81;
+      const [u, w, f, p] = favre(S.pxBuf, 0);
+      const g = gMag();
       return { i, j, f, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
                solid: S.mask[j * S.nx + i] };
     }
@@ -1994,7 +2040,7 @@ const SIM = (() => {
     const u = S.pxBuf[0], w = S.pxBuf[1], p = S.pxBuf[2];
     gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
-    const g = Math.abs(S.p.g) || 9.81;
+    const g = gMag();
     return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
              dye: S.pxBuf[1], solid: S.mask[j * S.nx + i] };
   }
@@ -2011,7 +2057,7 @@ const SIM = (() => {
    *  texture's read (the gauges never use f): `f` is then null, and a row
    *  costs ONE read. */
   function probeMany(pts, avg, noFill) {
-    const g = Math.abs(S.p.g) || 9.81;
+    const g = gMag();
     const cell = pts.map(([x, z]) => [
       Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx))),
       Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)))]);
@@ -2037,8 +2083,7 @@ const SIM = (() => {
       r.k.forEach((k) => {
         const i = cell[k][0], o = 4 * (i - r.i0), solid = S.mask[j * S.nx + i];
         if (useAvg) {
-          const f = A[o + 2], d = Math.max(f, 1e-6);
-          const u = A[o] / d, w = A[o + 1] / d, p = A[o + 3];
+          const [u, w, f, p] = favre(A, o / 4);
           out[k] = { i, j, f, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w), solid };
         } else {
           const u = A[o], w = A[o + 1], p = A[o + 2];
@@ -2075,12 +2120,12 @@ const SIM = (() => {
     // speaks: (u, w, P) in U and f in F.r, with u the Favre mean <f u_c>/f-bar.
     const A = avg && S.avg;
     readState(0, 0, S.nx, S.ny, U, F, A);
-    const g = Math.abs(S.p.g) || 9.81, tilt = S.scene.tiltS0 || 0;
+    const g = gMag(), tilt = S.scene.tiltS0 || 0;
     // The Froude number needs a depth, and under Average it is the mean
     // column's <d> - the same number FS_DISP divides by (docs/averaging.md §6).
     const col = A ? avgColumns(true).C : columns();
     const v = [];
-    const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && S.mask[j * S.nx + i] < 192;
+    const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && !isSolid(S.mask[j * S.nx + i], false);
     for (let j = 0; j < S.ny; j++) {
       for (let i = 0; i < S.nx; i++) {
         if (!wet(i, j)) continue;
@@ -2141,9 +2186,9 @@ const SIM = (() => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
       gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
       for (let k = 0; k < S.ny; k++) {
-        const d = Math.max(buf[k * 4 + 2], 1e-6);
-        if (f) f[k] = buf[k * 4 + 2];
-        buf[k * 4] /= d; buf[k * 4 + 1] /= d; buf[k * 4 + 2] = buf[k * 4 + 3];
+        const v = favre(buf, k);
+        if (f) f[k] = v[2];
+        buf[k * 4] = v[0]; buf[k * 4 + 1] = v[1]; buf[k * 4 + 2] = v[3];
       }
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
@@ -2171,8 +2216,8 @@ const SIM = (() => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
       gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
       for (let k = 0; k < w * S.ny; k++) {
-        const d = Math.max(buf[k * 4 + 2], 1e-6);
-        buf[k * 4] /= d; buf[k * 4 + 1] /= d;
+        const v = favre(buf, k);
+        buf[k * 4] = v[0]; buf[k * 4 + 1] = v[1];
       }
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
@@ -2231,7 +2276,7 @@ const SIM = (() => {
    *  water that has been compressed rather than more of it. */
   function lineFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
-    const closed = S.p.valveClosed > 0.5;
+    const closed = isOn(S.p.valveClosed);
     const dx = x1 - x0, dz = z1 - z0;
     const len = Math.hypot(dx, dz);
     const out = { Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0,
@@ -2274,7 +2319,7 @@ const SIM = (() => {
       const ci = Math.min(S.nx - 1, Math.max(0, Math.floor(x / S.dx)));
       const cj = Math.min(S.ny - 1, Math.max(0, Math.floor(z / S.dx)));
       const m = S.mask[cj * S.nx + ci];
-      if (m > 192 || (closed && m > 64)) continue;      // a section through rock
+      if (isSolid(m, closed)) continue;                 // a section through rock
       // u lives on x-faces and w on z-faces, so each is offset half a cell —
       // unless the mean state is being read, where both are cell-centred.
       const gx = x / S.dx, gz = z / S.dx;
@@ -2329,8 +2374,8 @@ const SIM = (() => {
    *
    *  Two things zero a sample, and they are different questions. First, the
    *  offset sample point itself can land ON rock — the valve-aware test
-   *  `boxForce`'s own `sol()` uses (`m > 192`, or `m > 64` while the valve
-   *  is shut, since a shut valve's texel reads as a lighter solid than a
+   *  `boxForce`'s own `sol()` uses (`SIM.isSolid`: `m >= 192`, or `m >= 64` while
+   *  the valve is shut, since a shut valve's texel reads as a lighter solid than a
    *  wall). Second, and new: `rasterise()`'s wrappers are REGISTRATION-only
    *  — they say where a surface WOULD be, drawn from the same seg the mask
    *  was stamped from, but the mask is what says where a surface actually
@@ -2349,11 +2394,8 @@ const SIM = (() => {
     if (!so) return null;
     const pts = GEOM.faceSamples(so, faceId, S.dx);
     if (!pts || !pts.length) return null;
-    const closed = S.p.valveClosed > 0.5;
-    const sol = (i, j) => {
-      const m = S.mask[j * S.nx + i];
-      return m > 192 || (closed && m > 64);
-    };
+    const closed = isOn(S.p.valveClosed);
+    const sol = (i, j) => isSolid(S.mask[j * S.nx + i], closed);
     // Bounding box of the offset sample points, one readback, with a cell
     // of margin the way lineFlux and boxForce both keep.
     const off = 0.75 * S.dx;
@@ -2395,7 +2437,7 @@ const SIM = (() => {
       if (!inside) { q.p = 0; q.f = 0; }
     }
     const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
-    const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);
+    const r = GEOM.faceForceFromSamples(pts, ds, 1000, gMag());
     return Object.assign(r, { samples: pts, solidId, faceId,
                               len: pts[pts.length - 1].s + ds / 2 });
   }
@@ -2426,28 +2468,42 @@ const SIM = (() => {
    *  A tilted-gravity scene carries its slope in gravity rather than in the
    *  bed, so the elevation term is z − S₀x there, exactly as the head views
    *  and the overlay compute it. */
-  function boxFlux(x0, z0, x1, z1, avg) {
-    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
-    const closed = S.p.valveClosed > 0.5;
+  function boxFlux(x0, z0, x1, z1, avg) { return boxBudget(x0, z0, x1, z1, avg).res; }
+
+  /** The box both integrals share: the grid-snapped corners (kept off the
+   *  domain's ghost ring), ONE readback of the rect one cell wider than the box
+   *  on its low sides (readState), and the valve-aware solid test. `cen` says
+   *  whether the state is cell-centred (the mean) or staggered (live). */
+  function boxSetup(x0, z0, x1, z1, avg) {
+    const closed = isOn(S.p.valveClosed);
     let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
     let jB = Math.round(Math.min(z0, z1) / S.dx), jT = Math.round(Math.max(z0, z1) / S.dx);
     iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
     jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
-    const w = iR - iL + 2, h = jT - jB + 2;
+    const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL-1..iR] x [jB-1..jT]
     const need = w * h * 4;
     if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
     const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
-    const U = S.cvU, F = S.cvF;
-    const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
-    const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
-    const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
-    const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
+    return { iL, iR, jB, jT, w, h, cen, U: S.cvU, F: S.cvF,
+             k: (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4,
+             sol: (i, j) => isSolid(S.mask[j * S.nx + i], closed) };
+  }
 
-    // x-faces: u lives ON the face, so the normal velocity needs no averaging
-    // — except from the mean state, whose velocities are cell-centred: there
-    // the face value is the mean of the two adjacent centres.
+  /** Walk the four faces of a box and hand each open one to `visit(key, n, u, wv,
+   *  f, P, z, x)`: the outward sign `n`, the velocity (u, wv) AT the face, the
+   *  fill f and pressure P averaged across it, and the face's elevation z and
+   *  position x (the elevation the stored P belongs to, so `visit` may build a
+   *  head from it). Faces with a solid on either side are skipped: the fluid
+   *  boundary continues along the solid there, and the traction on that surface
+   *  is the force being solved for. `key` is "left"/"right" for the x-faces
+   *  (j runs up, bottom to top) and "bed"/"top" for the z-faces.
+   *
+   *  x-faces: u lives ON the face, so the normal velocity needs no averaging,
+   *  except from the mean state, whose velocities are cell-centred: there the
+   *  face value is the mean of the two adjacent centres. z-faces likewise for w. */
+  function faceLoops(box, visit) {
+    const { iL, iR, jB, jT, cen, U, F, k, sol } = box;
     for (const [i, n, key] of [[iL, -1, "left"], [iR, 1, "right"]]) {
-      const e = out[key];
       for (let j = jB; j < jT; j++) {
         if (sol(i - 1, j) || sol(i, j)) continue;
         const a = k(i - 1, j), b = k(i, j);
@@ -2458,18 +2514,10 @@ const SIM = (() => {
                        : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
         // P is the mean of cells (i-1, j) and (i, j), each referenced to its
         // LOWER face j*dx (contract at the top of shaders.js): z = j*dx.
-        const un = u * n, z = j * S.dx, x = i * S.dx;
-        e.Q += Math.min(f, 1) * un;
-        e.mdot += f * un;
-        e.Mx += f * u * un;   e.Mz += f * wv * un;
-        e.Fpx += f * P * n;
-        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
-        e.wet += Math.min(f, 1);
+        visit(key, n, u, wv, f, P, j * S.dx, i * S.dx);
       }
     }
-    // z-faces: w lives ON the face (same centred-mean exception as above).
     for (const [j, n, key] of [[jB, -1, "bed"], [jT, 1, "top"]]) {
-      const e = out[key];
       for (let i = iL; i < iR; i++) {
         if (sol(i, j - 1) || sol(i, j)) continue;
         const a = k(i, j - 1), b = k(i, j);
@@ -2481,17 +2529,32 @@ const SIM = (() => {
         // P is the mean of rows j-1 and j, referenced to (j-1)*dx and j*dx
         // (contract at the top of shaders.js): it belongs at (j - 1/2)*dx.
         // Only the elevation in E moves; Fpz and every other term keep P.
-        const un = wv * n, z = (j - 0.5) * S.dx, x = (i + 0.5) * S.dx;
-        e.Q += Math.min(f, 1) * un;
-        e.mdot += f * un;
-        e.Mx += f * u * un;   e.Mz += f * wv * un;
-        e.Fpz += f * P * n;
-        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
-        e.wet += Math.min(f, 1);
+        visit(key, n, u, wv, f, P, (j - 0.5) * S.dx, (i + 0.5) * S.dx);
       }
     }
+  }
 
-    // …to physical units, and the totals.
+  /** boxFlux's work, with the readback box kept for the caller that needs the
+   *  enclosed water too (boxForce). */
+  function boxBudget(x0, z0, x1, z1, avg) {
+    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
+    const box = boxSetup(x0, z0, x1, z1, avg);
+    const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
+    const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
+
+    faceLoops(box, (key, n, u, wv, f, P, z, x) => {
+      const e = out[key];
+      const xFace = key === "left" || key === "right";
+      const un = xFace ? u * n : wv * n;
+      e.Q += Math.min(f, 1) * un;
+      e.mdot += f * un;
+      e.Mx += f * u * un;   e.Mz += f * wv * un;
+      if (xFace) e.Fpx += f * P * n; else e.Fpz += f * P * n;
+      e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
+      e.wet += Math.min(f, 1);
+    });
+
+    // ...to physical units, and the totals.
     const tot = edge();
     let inQ = 0;
     for (const key of ["left", "right", "bed", "top"]) {
@@ -2507,9 +2570,10 @@ const SIM = (() => {
     // The force on what is inside is minus the flux of momentum out plus the
     // pressure on the faces — the same sum `boxForce` reports, less the weight
     // term, which is not a face quantity and is added by the caller if wanted.
-    return { edges: out, total: tot, inQ,
-             fx: -(tot.Mx + tot.Fpx), fz: -(tot.Mz + tot.Fpz),
-             iL, iR, jB, jT };
+    return { res: { edges: out, total: tot, inQ,
+                    fx: -(tot.Mx + tot.Fpx), fz: -(tot.Mz + tot.Fpz),
+                    iL: box.iL, iR: box.iR, jB: box.jB, jT: box.jT },
+             box };
   }
 
   /** Momentum-theorem force on whatever solid a box encloses, in N per metre
@@ -2529,64 +2593,24 @@ const SIM = (() => {
    *  budget is not a force any more. */
   function boxForce(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
-    const closed = S.p.valveClosed > 0.5;
-    let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
-    let jB = Math.round(Math.min(z0, z1) / S.dx), jT = Math.round(Math.max(z0, z1) / S.dx);
-    iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
-    jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
-    const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL−1..iR] × [jB−1..jT]
-    const need = w * h * 4;
-    if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
-    const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
-    const U = S.cvU, F = S.cvF;
-    const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
-    const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
-
-    let dFx = 0, dFz = 0, mdot = 0;                  // Σ f[u(u·n) + P n]·ds, Σ f(u·n)·ds
-    for (const [i, nx_] of [[iL, -1], [iR, 1]]) {    // x-faces: u is ON the face
-      for (let j = jB; j < jT; j++) {
-        if (sol(i - 1, j) || sol(i, j)) continue;
-        const a = k(i - 1, j), b = k(i, j);
-        const u = cen ? 0.5 * (U[a] + U[b]) : U[b];  // face value; centred means average
-        const f = 0.5 * (F[a] + F[b]);
-        const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const w = cen ? 0.5 * (U[a + 1] + U[b + 1])
-                      : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
-        const un = u * nx_;
-        dFx += f * (u * un + P * nx_);
-        dFz += f * (w * un);
-        mdot += f * un;
-      }
-    }
-    for (const [j, nz_] of [[jB, -1], [jT, 1]]) {    // z-faces: w is ON the face
-      for (let i = iL; i < iR; i++) {
-        if (sol(i, j - 1) || sol(i, j)) continue;
-        const a = k(i, j - 1), b = k(i, j);
-        const w = cen ? 0.5 * (U[a + 1] + U[b + 1]) : U[b + 1];
-        const f = 0.5 * (F[a] + F[b]);
-        const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const u = cen ? 0.5 * (U[a] + U[b])
-                      : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
-        const wn = w * nz_;
-        dFx += f * (u * wn);
-        dFz += f * (w * wn + P * nz_);
-        mdot += f * wn;
-      }
-    }
+    // The same four-face walk as boxFlux: F = -(momentum flux out + pressure on
+    // the faces), here less the weight of the enclosed water as well.
+    const { res, box } = boxBudget(x0, z0, x1, z1, avg);
+    const { iL, iR, jB, jT, F, k, sol } = box;
     let m = 0, vol = 0;                              // enclosed water, for the z-budget
     for (let j = jB; j < jT; j++) {
       for (let i = iL; i < iR; i++) if (!sol(i, j)) { m += F[k(i, j)]; vol += Math.min(F[k(i, j)], 1); }
     }
     m *= RHO * S.dx * S.dx;
     // `vol` counts a full cell once, as the faces' Q does (min(f, 1)), so its
-    // rate of change balances Q: Σf would add the EOS compression of every
-    // column a rising level loads (gh/c², ~3% in a 2 m tank) to the storage.
-    return { fx: -RHO * dFx * S.dx, fz: -RHO * dFz * S.dx - gAbs * m,
-             mdot: RHO * mdot * S.dx, mass: m, vol: vol * S.dx * S.dx, iL, iR, jB, jT };
+    // rate of change balances Q: sum f would add the EOS compression of every
+    // column a rising level loads (gh/c^2, ~3% in a 2 m tank) to the storage.
+    return { fx: res.fx, fz: res.fz - gAbs * m,
+             mdot: res.total.mdot, mass: m, vol: vol * S.dx * S.dx, iL, iR, jB, jT };
   }
 
   const get = () => S;
-  return { init, build, rasterise, onGeometry, addSeg, undoSeg, clearSegs, resetWater,
+  return { MASK, isSolid, isOn, gMag, planView, init, build, rasterise, onGeometry, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, probeMany, rake, patch, patchVel,
            fieldStats, particlePos, particleTrail, dyeInjRadius,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,

@@ -66,7 +66,7 @@ function sampleGauges(A) {
     // sits a velocity head below. Two gauges in the SAME moving reach differ
     // by the friction loss between them; a still column (reservoir, shaft) has
     // |u| ≈ 0, so there H = h = η.
-    const g = Math.abs(sim.p.g) || 9.81;
+    const g = SIM.gMag();
     // EVERY quantity in GAUGE_QTY, on every sample, whatever the gauge is
     // plotting: the probe returns all of them from the one batched read, so
     // switching a gauge's quantity later shows its whole history, and the
@@ -262,7 +262,7 @@ function sampleForce() {
     Object.assign({}, s, { p: prev[i].p + (s.p - prev[i].p) * a,
                             f: prev[i].f + (s.f - prev[i].f) * a }));
   const ds = samples.length > 1 ? samples[1].s - samples[0].s : sim.dx;
-  const g = Math.abs(sim.p.g) || 9.81;
+  const g = SIM.gMag();
   f.data = Object.assign(GEOM.faceForceFromSamples(samples, ds, 1000, g),
                           { samples, solidId: r.solidId, faceId: r.faceId, len: r.len });
 }
@@ -279,7 +279,7 @@ function sampleForce() {
  *  faceForce readbacks, once per scene, never on the frame path. */
 function forceScale() {
   if (state.forceScale) return state.forceScale;
-  const g = Math.abs(sim.p.g) || 9.81;
+  const g = SIM.gMag();
   let headMax = 0;
   (sim.solids || []).forEach((so) => (so.faces || []).forEach((fc) => {
     const r = SIM.faceForce(so.id, fc.id, false);
@@ -348,7 +348,7 @@ function refreshGrade() {
   // A channel scene always wants it: the energy line the overlay measures S_f,
   // n and d_n off is built on the HGL (see OVERLAY.analyse), not on the VOF
   // surface, which in a steady reach sits in whole-cell terraces.
-  const chan = state.channel && sim.p.g > 0.5;
+  const chan = state.channel && !SIM.planView();
   if (!state.grade && !avg && !chan) { state.gradeBuf = null; state.gradeTick = 0; return; }
   if (avg !== state.gradeAvg) { state.gradeAvg = avg; state.gradeTick = 0; }
   if (--state.gradeTick > 0 && state.gradeBuf) return;
@@ -410,7 +410,7 @@ function requestStream() {
  *  just clear of the sponge — the first columns the boundary treatment is no
  *  longer nudging — so the panel can print them alongside the settings. */
 function sampleInlet(A) {
-  if (!(sim.p.inflow.on > 0.5)) { state.deliv = null; return; }
+  if (!SIM.isOn(sim.p.inflow.on)) { state.deliv = null; return; }
   const sp = state.scene.spongeIn ? Math.round(state.scene.spongeIn / sim.dx) : 10;
   const i0 = Math.max(2, Math.min(sim.nx - 12, sp + 2)), i1 = Math.min(sim.nx - 2, i0 + 9);
   let q = 0, s = 0, n = 0;

@@ -128,7 +128,7 @@ const MUTANTS = [
 
   { id: "reconstruct-ignores-solid",
     why: "the solid mask stops being honoured, so a wall holds water",
-    find: "solid[j] = mask[k] >= 192 ? 1 : 0;",
+    find: "solid[j] = mask[k] >= solidMin ? 1 : 0;",
     replace: "solid[j] = 0;",
     kills: ["C8 a cell with mask >= 192 is solid even when its fill says water"] },
 

@@ -514,6 +514,15 @@ SUITES.api = async (B) => {
   ok("API gauge record values are finite", r.recFinite);
   ok("API gauge objects carry z", r.gaugeZ === 0.30);
 
+  // The mask vocabulary is one object, and RECON's default solid cut (it cannot
+  // read SIM) must be the same number.
+  const mk = await B.evaluate(`({ m: SIM.MASK, a: SIM.isSolid(192, false), b: SIM.isSolid(191, false),
+    c: SIM.isSolid(128, false), d: SIM.isSolid(128, true), e: SIM.isSolid(63, true),
+    f: SIM.isSolid(64, true) })`);
+  ok("API SIM.MASK is the vocabulary RECON's default solidMin (192) agrees with",
+    mk.m.SOLID_MIN === 192 && mk.m.VALVE_MIN === 64 && mk.m.OPEN === 0 && mk.m.VALVE === 128 &&
+    mk.m.WALL === 255 && mk.a && !mk.b && !mk.c && mk.d && !mk.e && mk.f, JSON.stringify(mk));
+
   // ---- refactor golden (Task 3.1): every instrument read of one settled,
   // averaging h23, so a change to how sim.js unpacks, masks or loops cannot
   // move a number unseen. Written once by `--write-golden` on the code before

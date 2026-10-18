@@ -129,7 +129,7 @@ const LEGEND = (() => {
       // the midpoint of whatever the reading happened to be.
       const m = Math.max(f.mid - s.lo, s.hi - f.mid, 1e-6);
       state.range[f.id] = [f.mid - m, f.mid + m];
-    } else if (f.floating && sim && Math.abs(sim.p.g) < 0.5) {
+    } else if (f.floating && sim && SIM.planView()) {
       // No zero worth anchoring to (a plan view's pressure sits on an
       // arbitrary reference): fit the spread itself.
       state.range[f.id] = [s.lo, Math.max(s.hi, s.lo + 1e-3)];

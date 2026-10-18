@@ -11,7 +11,7 @@
  *          setPanel, togglePanel, refreshNote
  *
  * Reads:   bestTracerX, buildToolbar, clearAllGauges, computeView, CONFIG, EX,
- *          fieldBlurb, fieldFor, FIELDS, GAUGE_QTY, gaugeFieldOf, GINSP, gNote,
+ *          fieldBlurb, fieldFor, FIELDS, GAUGE_QTY, gaugeFieldOf, GINSP,
  *          LEGEND, OVERLAY, PICKER, RIG, seedTracers, setAllGaugeFields,
  *          setAverage, showToast, sim, SIM, state, syncToolbar, UIMODE, VEX_MAX
  */
@@ -102,13 +102,13 @@ const CONTROLS = [
     fmt: (v) => "×" + v.toFixed(2) + " real time",
     info: "How much simulated time passes per second of wall clock. Water hammer wants slow motion; backwater curves want fast. The scale is logarithmic — ×1 sits near two-thirds of the travel and the top decade (×3 to ×10) is for skipping waits, machine permitting: the note under the slider prints asked against achieved, and a heavy scene simply tops out at what the frame budget allows." },
   { id: "inflowOn", place: "res", type: "check", label: "Upstream reservoir",
-    get: () => sim.p.inflow.on > 0.5,
+    get: () => SIM.isOn(sim.p.inflow.on),
     set: (v) => {
       sim.p.inflow.on = v ? 1 : 0;
       if (v) {           // make the control self-evident: open its edge, pick sane defaults
         if (sim.p.open[0] < 1) { sim.p.open[0] = 1; sim.p.autoL = 1; SIM.rasterise(); }
         if (sim.p.inflow.level <= 0.01) sim.p.inflow.level = 0.55 * sim.H;
-        if (!(sim.p.inflow.q > 0) && !(sim.p.inflow.free > 0.5) && sim.p.inflow.v === undefined) {
+        if (!(sim.p.inflow.q > 0) && !SIM.isOn(sim.p.inflow.free) && sim.p.inflow.v === undefined) {
           sim.p.inflow.q = 0.25;
         }
       } else if (sim.p.autoL) {
@@ -127,7 +127,7 @@ const CONTROLS = [
     // hand afterwards still holds until the level moves again.
     set: (v) => {
       sim.p.inflow.level = v;
-      if (sim.scene.qOfLevel && !(sim.p.inflow.free > 0.5)) sim.p.inflow.q = sim.scene.qOfLevel(v);
+      if (sim.scene.qOfLevel && !SIM.isOn(sim.p.inflow.free)) sim.p.inflow.q = sim.scene.qOfLevel(v);
     },
     fmt: (v) => {
       const b = SIM.bands(), D = state.deliv, st = SIM.inletStage();
@@ -150,22 +150,22 @@ const CONTROLS = [
       // writes it back from the solver — so print what the inlet is actually
       // delivering instead, and take d_c from that.
       const D = state.deliv;
-      if (sim.p.inflow.free > 0.5) {
+      if (SIM.isOn(sim.p.inflow.free)) {
         return "head-driven  ·  q → " + (D ? D.q.toFixed(3) : "—") + " m²/s delivered" +
-               (D ? "   d_c = " + Math.pow(D.q * D.q / gNote(), 1 / 3).toFixed(3) + " m" : "");
+               (D ? "   d_c = " + Math.pow(D.q * D.q / SIM.gMag(), 1 / 3).toFixed(3) + " m" : "");
       }
       const st = SIM.inletStage();
       return v.toFixed(3) + " m²/s per m width  →  " + SIM.inletVel().toFixed(2) + " m/s" +
-             "   d_c = " + Math.pow(v * v / gNote(), 1 / 3).toFixed(3) + " m" +
+             "   d_c = " + Math.pow(v * v / SIM.gMag(), 1 / 3).toFixed(3) + " m" +
              (st.choked ? "  ·  MORE THAN THE RESERVOIR CAN PASS (q_max = "
                           + st.qmax.toFixed(3) + " m²/s) — held at critical" : "");
     },
     info: "Unit discharge entering the domain, converted to an inlet velocity using the depth the reservoir DELIVERS at that discharge. Critical depth d_c = (q²/g)^⅓ follows directly from it. A reservoir has a ceiling: q_max = √(g(2E/3)³) on the head E it stands above the inlet bed, and asking for more than that is asking for energy the reservoir does not have — the note says so and the inlet holds critical depth, which is what a real crest does. Raise the reservoir level to pass more. Under head-driven inflow this slider is inert and the note prints the measured delivered discharge instead." },
   { id: "inFree", place: "res", type: "check", label: "Head-driven inflow",
-    get: () => (sim.p.inflow.free || 0) > 0.5, set: (v) => sim.p.inflow.free = v ? 1 : 0,
+    get: () => SIM.isOn(sim.p.inflow.free || 0), set: (v) => sim.p.inflow.free = v ? 1 : 0,
     info: "Pins only the reservoir level and lets the head difference drive the discharge — how the water-hammer and venturi scenes feed themselves. Off = the inflow q is prescribed directly." },
   { id: "twOn", place: "tw", type: "check", label: "Tailwater control",
-    get: () => sim.p.tailwater.on > 0.5,
+    get: () => SIM.isOn(sim.p.tailwater.on),
     set: (v) => {
       sim.p.tailwater.on = v ? 1 : 0;
       if (v) {
@@ -185,7 +185,7 @@ const CONTROLS = [
     },
     info: "Held level on the right boundary, measured from the domain floor (the datum), NOT from the local bed." },
   { id: "spoutOn", place: "spout", type: "check", label: "Top-left spout",
-    get: () => sim.p.source.on > 0.5, set: (v) => sim.p.source.on = v ? 1 : 0,
+    get: () => SIM.isOn(sim.p.source.on), set: (v) => sim.p.source.on = v ? 1 : 0,
     info: "The free-falling inflow in the top-left corner." },
   { id: "spoutR", place: "spout", label: "Spout size", min: 0.02, max: 0.4, step: 0.005,
     get: () => sim.p.source.r, set: (v) => sim.p.source.r = v,
@@ -239,8 +239,8 @@ const CONTROLS = [
     // hold P = c²(f−1) fixed makes the slider change the celerity and nothing
     // else — the geometric volume min(f,1) is untouched.
     set: (v) => { const o = sim.p.c; if (v !== o && v > 0) SIM.rescaleFill((o * o) / (v * v)); sim.p.c = v; },
-    fmt: (v) => v.toFixed(0) + " m/s   (Δh from Δv: " + (v / gNote()).toFixed(1)
-      + " m per m/s · ≤" + (100 * gNote() * sim.H / (v * v)).toFixed(0) + "% compression)",
+    fmt: (v) => v.toFixed(0) + " m/s   (Δh from Δv: " + (v / SIM.gMag()).toFixed(1)
+      + " m per m/s · ≤" + (100 * SIM.gMag() * sim.H / (v * v)).toFixed(0) + "% compression)",
     info: "The Preissmann-slot stiffness. Pressure waves travel at this speed, so it sets the water-hammer surge ΔH = cΔv/g. Lower c = bigger time step = faster run, but the water is held up by compression f − 1 = gd/c², so it also makes the fluid squashier — keep c well above √(gd)." },
   { id: "cf", label: "Bed roughness C_f", min: 0, max: 0.25, step: 0.002,
     get: () => sim.p.cf, set: (v) => sim.p.cf = v,
@@ -255,19 +255,19 @@ const CONTROLS = [
     fmt: (v) => v === 0 ? "none — surges ring forever" : v.toFixed(3),
     info: "Artificial bulk viscosity. Attenuates pressure waves; set it to zero to see an undamped water-hammer oscillation." },
   { id: "slip", type: "check", label: "Free-slip walls",
-    get: () => sim.p.slip > 0.5, set: (v) => sim.p.slip = v ? 1 : 0,
+    get: () => SIM.isOn(sim.p.slip), set: (v) => sim.p.slip = v ? 1 : 0,
     info: "Off = no-slip, which is what builds a boundary layer and a real velocity profile." },
   { id: "ca", label: "Interface sharpening", min: 0, max: 1.5, step: 0.05,
     get: () => sim.p.ca, set: (v) => sim.p.ca = v,
     fmt: (v) => v === 0 ? "off — the surface smears" : "cα " + v.toFixed(2),
     info: "The interFoam-style compression flux that keeps the free surface a couple of cells thick. Too high and thin jets bead up." },
   { id: "grav", type: "check", label: "Plan view (gravity off)",
-    get: () => sim.p.g < 0.5, set: (v) => sim.p.g = v ? 0 : (state.scene.g || 9.81),
+    get: () => SIM.planView(), set: (v) => sim.p.g = v ? 0 : (state.scene.g || 9.81),
     info: "Switches between the vertical profile and looking down on a horizontal plane." },
 
   { h: "Wavemaker" },
   { id: "waveOn", place: "piston", type: "check", label: "Piston on",
-    get: () => sim.p.wave.on > 0.5, set: (v) => sim.p.wave.on = v ? 1 : 0,
+    get: () => SIM.isOn(sim.p.wave.on), set: (v) => sim.p.wave.on = v ? 1 : 0,
     info: "An oscillating column of prescribed velocity — the wave flume's paddle. Works in any scene with standing water." },
   { id: "waveA", place: "piston", label: "Amplitude", min: 0.005, max: 0.3, step: 0.005,
     get: () => sim.p.wave.amp, set: (v) => sim.p.wave.amp = v,
@@ -281,7 +281,7 @@ const CONTROLS = [
   // The flap and the train are the two opt-in halves of SIM.paddle; neither
   // is in the rig wire format (v2), so a saved rig carries the scene's own.
   { id: "waveFlap", place: "piston", type: "check", label: "Hinged flap",
-    get: () => sim.p.wave.flap > 0.5, set: (v) => sim.p.wave.flap = v ? 1 : 0,
+    get: () => SIM.isOn(sim.p.wave.flap), set: (v) => sim.p.wave.flap = v ? 1 : 0,
     info: "A paddle hinged at the bed instead of a piston: it moves the water most at the surface and not at all at the hinge, which is how a deep-water wave moves. Needs a scene that declares its still depth (the wall paddles)." },
   { id: "waveN", place: "piston", label: "Wave train", min: 0, max: 20, step: 1,
     get: () => sim.p.wave.train || 0, set: (v) => { sim.p.wave.train = Math.round(v); sim.p.wave.t0 = undefined; },

@@ -10,7 +10,7 @@
  *
  * Defines: OVERLAY
  *
- * Reads:   CV_EDGES, FMT, GEOM, sim
+ * Reads:   CV_EDGES, FMT, GEOM, SIM, sim
  */
 const OVERLAY = (() => {
 
@@ -106,7 +106,7 @@ const OVERLAY = (() => {
   const ESTIMATES = new WeakMap();
 
   function analyse(sim, col, opts) {
-    const S = sim, g = Math.abs(S.p.g) || 9.81, nx = S.nx, dx = S.dx;
+    const S = sim, g = SIM.gMag(), nx = S.nx, dx = S.dx;
     // Average mode hands in mean columns. They have already been averaged over
     // the window, so the prefilters below must NOT run: sm() would smooth in
     // space and est.hA/qA/ynK would smooth in time a second time, which shows
@@ -124,7 +124,7 @@ const OVERLAY = (() => {
     // metre above m2's lip as S1.
     const standing = (i) => {
       const jb = Math.round(col[i * 4] / dx);
-      return jb >= 1 && S.mask[(jb - 1) * nx + i] >= 64;
+      return jb >= 1 && SIM.isSolid(S.mask[(jb - 1) * nx + i], true);
     };
     const bd = new Float32Array(nx), use = new Float32Array(nx);
     for (let i = 0; i < nx - 1; i++) {
@@ -407,7 +407,7 @@ const OVERLAY = (() => {
    *  Reports the measured conjugate pair alongside the momentum prediction
    *  d₂/d₁ = ½(√(1+8Fr₁²) − 1), so the two can be compared on screen. */
   function findJumps(A, sim) {
-    const nx = sim.nx, dx = sim.dx, g = Math.abs(sim.p.g) || 9.81;
+    const nx = sim.nx, dx = sim.dx, g = SIM.gMag();
     const win = Math.max(3, Math.round(0.20 / dx));       // averaging half-window
     const reach = Math.round(Math.min(2.5, sim.W * 0.25) / dx);
     const mean = (arr, a, b) => {
@@ -560,7 +560,7 @@ const OVERLAY = (() => {
    *  their key rows go through keyRow. */
   function drawChannel(ctx, V, A, sim, grade) {
     const nx = sim.nx, step = Math.max(1, Math.round(nx / 900));
-    const g = Math.abs(sim.p.g) || 9.81;
+    const g = SIM.gMag();
     const pc = [], pn = [], pe = [];
     for (let i = 0; i < nx; i += step) {
       const x = V.X((i + 0.5) * sim.dx);
@@ -703,7 +703,7 @@ const OVERLAY = (() => {
   function drawGradeLines(ctx, V, A, sim, hgl) {
     if (!hgl) return;
     const nx = sim.nx, step = Math.max(1, Math.round(nx / 900));
-    const g = Math.abs(sim.p.g) || 9.81;
+    const g = SIM.gMag();
     const ph = [], pe = [];
     for (let i = 0; i < nx; i += step) {
       const x = V.X((i + 0.5) * sim.dx), h = hgl[i];
@@ -781,7 +781,7 @@ const OVERLAY = (() => {
     // submerged cell carries hydrostatic f > 1 — so the test is a water body
     // that reaches its lid AND a cell that is genuinely over-full.
     const js = Math.round(A.surf[i] / sim.dx);
-    const capped = js > 0 && js < sim.ny && sim.mask[js * sim.nx + i] >= 64;
+    const capped = js > 0 && js < sim.ny && SIM.isSolid(sim.mask[js * sim.nx + i], true);
     const press = !!probe && probe.f > 1.002 && capped;
     const keep = show || DEFAULT_ROWS;
     // The class is a title, not a row, but it is governed like one (`profile`
@@ -908,7 +908,7 @@ const OVERLAY = (() => {
     const i = rk.i, nx = sim.nx, ny = sim.ny, dx = sim.dx;
     const bed = A.bed[i], surf = A.surf[i];
     if (!Number.isFinite(rk.z)) { rk.needF = false; return [bed, surf]; }
-    const solid = (j) => sim.mask[j * nx + i] >= 192;
+    const solid = (j) => SIM.isSolid(sim.mask[j * nx + i], false);
     let jc = Math.max(0, Math.min(ny - 1, Math.floor(rk.z / dx)));
     if (solid(jc)) { rk.needF = false; return [bed, surf]; }   // clicked into a wall
     let jb = jc;
@@ -1525,7 +1525,7 @@ const OVERLAY = (() => {
     });
     ctx.stroke();
 
-    const g = Math.abs(sim.p.g) || 9.81;
+    const g = SIM.gMag();
     let maxHead = 0;
     const heads = samples.map((s) => {
       const h = Math.max(0, Math.min(s.f, 1) * s.p) / g;
@@ -1612,7 +1612,7 @@ const OVERLAY = (() => {
       // the step is the 1-2-5 number of kPa that spans at least ~12 px. It
       // is a number about a reading, so it folds away with the readouts.
       let scaleTxt, at = [P[0][0] + 6, P[0][1] - 12];
-      if (Math.abs(sim.p.g) < 0.1) {
+      if (SIM.planView()) {
         // …and at the face's LOWER end on screen: at its top end it sat on
         // the Control volume's budget, which MM-1 draws round the same plate.
         const lo = P[0][1] >= P[n - 1][1] ? P[0] : P[n - 1];

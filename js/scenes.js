@@ -318,7 +318,13 @@ const SCENES = (() => {
     const TH = 2.0, off = (TH / 2) * Math.sqrt(1 + S * S);
     return {
       group: "Jets & waves", mixingLength: false,   // waves: no channel shear to model
-      W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+      // ν = 1e-4 m²/s with the closure off, as WV-4 and WV-5 (mvreeuwijk#2):
+      // at water's 1e-5 the short waves fill with grid-scale noise. Measured on
+      // wavedeep at the B4 station (x = 5.84 m), the paddle-frequency w 2 cells
+      // under the surface over w 1.5 cells above the bed: 7 at ν 1e-5 (the bed
+      // motion is noise), 259 at 1e-4 (≈ linear theory there), 66 at 3e-4; the
+      // closure on gave 134, and a wave half as tall.
+      W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8, nu: 1e-4,
       mode: 0, hmax: lev * 1.5, vmax: o.vmax || 1.4,
       open: [0, 0, 0, 0],
       wave: { amp: o.amp, period: o.period, on: 1, x: 0.30 },
@@ -1521,20 +1527,20 @@ const SCENES = (() => {
     // H/h now climbs 0.46 → 0.49 → 0.60 → 0.81 → 1.49 and breaks at x = 4.0.
     // The surf zone is 0.7 m: small, but real, and five times what the
     // original 1 : 3.4 beach managed. (All of the above with the closure ON.)
-    //   Re-measured Oct 2026 with the closure off (mvreeuwijk#2), H crest to
-    // trough over 4 periods after 20 s, Medium: H/h 0.54 at x = 1.0 (flat),
-    // 0.56 / 0.63 / 0.72 at x = 1.6 / 2.2 / 2.8, then it saturates — 0.73 at
-    // 3.4 and the wave is breaking — against 0.52 / 0.56 / 0.61 / 0.75 / 1.01
-    // with the closure on (where the crest overshot before collapsing). So it
-    // now breaks from x ≈ 3 m at about the textbook H/h. The 1 : 20 result
-    // and the 63%-per-wavelength figure are closure-on and not re-measured.
+    //   Re-measured Oct 2026 with the closure off and ν = 1e-4 (the flume
+    // default now, mvreeuwijk#2), H crest to trough over 4 periods after
+    // 20 s, Medium: H/h 0.55 at x = 1.0 (flat), 0.59 / 0.71 / 0.86 at x =
+    // 2.2 / 2.8 / 3.4 and 1.04 at 4.0 as it breaks, against 0.52 / 0.61 /
+    // 0.75 / 1.01 / 1.34 with the closure on. It still breaks at x ≈ 3.5–4 m.
+    // The 1 : 20 result and the 63%-per-wavelength figure are closure-on and
+    // not re-measured.
     flume({
       id: "wave", name: "Wave flume · shoaling & breaking", key: "Spilling, ξ ≈ 0.4",
       W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 1.2, slope: 0.10,
       amp: 0.18, period: 1.5, particles: 1, spinup: 25,
       view: { zoom: 2.2, cx: 3.2, cy: 0.42, vex: 2.2 },
       blurb: "Waves running onto a 1-in-10 beach. They steepen as the water shallows until the height is comparable with the depth, and then they break.",
-      tips: ["Watch H/h climb up the slope: measured 0.54 on the flat, 0.63 at x = 2.2 m, 0.72 at 2.8 m, and from there the wave is breaking.",
+      tips: ["Watch H/h climb up the slope: measured 0.55 on the flat, 0.59 at x = 2.2 m, 0.71 at 2.8 m, 0.86 at 3.4 m, then breaking at x ≈ 3.5–4 m.",
              "A wave breaks when its height reaches roughly 0.78 of the local depth. That is the whole of the breaking criterion.",
              "Iribarren ξ = tanβ/√(H₀/L₀) ≈ 0.4 — the <b>spilling</b> band, where the crest crumbles down the face.",
              "A GENTLER beach does not work here, and that is honest: the grid damps these short waves, so over a long, gentle beach they lose their height before they can break.",
@@ -1558,8 +1564,9 @@ const SCENES = (() => {
       W: 12, H: 1.5, lev: 1.00, bed: 0.26, xb: 8.2, slope: 0.297,
       tracerX: 5.84, spinup: 20, view: { zoom: 1.9, cx: 5.84, cy: 0.66, vex: 1.6 },
       // Full-length tank on purpose. Halving it to W = 6 (to fill the view,
-      // since a 1.26 m wave died within ~3 m with the closure on — off, H is
-      // 0.25 / 0.12 / 0.09 m at x = 1 / 2 / 4 m against 0.20 / 0.06 / 0.04) backfired: the same stroke in a
+      // since a 1.26 m wave died within ~3 m with the closure on — off at
+      // ν 1e-4, H is 0.30 / 0.16 / 0.11 m at x = 1 / 2 / 4 m against 0.20 /
+      // 0.06 / 0.04) backfired: the same stroke in a
       // short tank with the beach only 3 m away builds a standing wave —
       // H reached 0.49 m at x = 1 — and the vertical profile stopped being
       // monotonic, so the orbit decay fell from 250× to 16×. The orbits are
@@ -1581,7 +1588,7 @@ const SCENES = (() => {
       tips: ["The trails are flat back-and-forth ellipses, the SAME size top to bottom — that is what 'shallow water' means.",
              "Because every depth moves alike, one depth-averaged velocity describes the flow. That is the assumption every shallow-water model is built on.",
              "Contrast the <b>deep-water</b> flume, where the motion has died out entirely before you reach the bed.",
-             "Long waves barely damp: measured H 0.068 m at 2 m and 0.067 m at 3 m along the flat bed, and still 0.055 m at 9 m, high up the beach.",
+             "Long waves barely damp: measured H 0.059 m at 2 m and 0.057 m at 3 m along the flat bed, and still 0.046 m at 9 m, high up the beach.",
              "This is the tsunami and tidal end of the spectrum. Press <b>0</b> to zoom out."] }),
 
     { id: "plan", name: "Plan view — jet & wake", key: "Gravity off", group: "Jets & waves",

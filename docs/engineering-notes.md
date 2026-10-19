@@ -716,12 +716,14 @@ itself ~2 cells thick. Consequences:
   deep-water flume (L = 1.26 m) loses H = 0.36 → 0.07 m over 3 m, so its
   orbits must be read near the paddle. Long waves are nearly free: the
   shallow-water flume holds 0.123 → 0.121 m over 5 m and then *shoals* to
-  0.152 m on the beach. (Closure on. Re-measured Oct 2026 with it off, at
-  each scene's default stroke, H crest to trough over 4 periods after 20 s:
-  the deep flume 0.25 / 0.12 / 0.09 m at x = 1 / 2 / 4 m against 0.20 /
-  0.06 / 0.04 with it on — the closure was most of that loss; the shallow
-  flume 0.068 / 0.067 m at 2 / 3 m against 0.072 / 0.068 — no difference for
-  a long wave.)
+  0.152 m on the beach. (Closure on. Re-measured Oct 2026 with it off and the
+  flumes' ν = 1e-4, at each scene's default stroke, H crest to trough over 4
+  periods after 20 s: the deep flume 0.30 / 0.16 / 0.11 m at x = 1 / 2 / 4 m
+  against 0.20 / 0.06 / 0.04 with it on — the closure was most of that loss;
+  the shallow flume 0.059 / 0.057 m at 2 / 3 m against 0.072 / 0.068. At
+  ν = 1e-5 with the closure off the deep flume filled with grid noise: the
+  paddle-frequency w at the B4 station fell to 7× its bed value, against
+  259× at ν 1e-4, so ν 1e-4 is part of switching the closure off.)
 - Do not "fix" that by shrinking the tank. Halving the deep flume to W = 6
   improved Δx but put the beach 3 m from the paddle: the reflection built a
   standing wave (H = 0.49 m at x = 1) and the orbit decay collapsed from 244×

@@ -97,6 +97,7 @@ z, P)` is the hydrostatic fill helper. The fields a new scene usually sets:
   blurb: "...", tips: ["...", "..."],    // the scene menu and the tip strip
   W: 6.0, H: 5.1,                        // metres; the grid is sized to a cell budget
   c: 25, cf: 0.01, cs: 0.16, nu: 2e-3,   // celerity, wall friction, Smagorinsky, eddy viscosity
+  mixingLength: false,                   // REQUIRED: the channel closure, on or off (below)
   mode: 0,                               // the field it boots on
   hmax: 4.2, headMax: 3.3, vmax: 4,      // legend ranges for the water, p/ρg and speed fields
   valveOpen: 0, particles: 1,            // scene valves start shut; tracers on
@@ -106,6 +107,30 @@ z, P)` is the hydrostatic fill helper. The fields a new scene usually sets:
   water: (x, z, P) => (z <= 1.00 ? 0 : x < 5.00 ? still(4.00, z, P) : still(3.10, z, P)),
   spinup: 0 }                            // MEASURED settle time, or 0 when watching from t=0 is the point
 ```
+
+**The turbulence closure is yours to declare.** Every scene states
+`mixingLength: true` or `false`, and `js/scenes.js` refuses to load one that
+does not — there is no default to inherit. The mixing length (`l = κy` over
+the bed, `docs/numerics.md` §1) is a CHANNEL parameterisation: it is what
+gives a developed open-channel flow its log-law profile and carries the bed's
+stress up the column, so `channel()` scenes, the sandbox, the spillway's pool
+and the gate-and-jump flume say `true`. Anything that is not a channel flow
+says `false`: waves above all (a wave has thin boundary layers and no log
+layer, and the closure's `ν_t` of ~10⁻³ m²/s in a crest damps it away — issue
+#77), and a free jet in a tank (`l` takes `y` from a wall metres from the
+shear layer: pipejet). A wave flume without the closure wants ν = 1e-4 m²/s:
+at water's 1e-5 its short waves fill with grid noise. The shipped tanks, jets
+and pipes, the deep flume and the sloshing tank still say `true`, each with a
+comment: their cards quote numbers measured with the closure on (QS-1's C_d,
+QS-2's discharge law, VC-2's C, B4's orbits, DA-3's periods), and switching it
+off moves them —
+re-measuring those cards is the follow-up on mvreeuwijk#2. A NEW scene of
+that kind should say `false`. With it off the bed still
+has its wall-function friction (`cf`) and the cells their Smagorinsky term
+(`cs`). If you are unsure, it is `false` unless the demo needs a channel's
+resistance — `n`, normal depth, a jump's tailwater. The Controls panel's
+*Channel mixing length* switch is the same flag, so it can be tried both ways
+by hand, and a saved rig carries it (`hyd.ml`).
 
 **Geometry as polygons.** Prefer `solids()` returning `GEOM.rect` /
 `GEOM.slab` / `GEOM.poly` over `walls()` segments: a polygon carries named
@@ -675,7 +700,7 @@ candidate viscosity — the table in its README is that run.
 ## 8. Checklist
 
 1. Scene written (or rig captured), booted with `?scene=`, geometry and
-   water as intended, `spinup` measured.
+   water as intended, `mixingLength` declared, `spinup` measured.
 2. Card written: self-contained like HS-1, with the start state, station
    locations, action and final readings; data/formulas and digit rule where
    needed. No student instruction refers to the README. Applied versus

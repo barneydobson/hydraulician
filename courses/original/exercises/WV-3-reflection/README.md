@@ -3,7 +3,8 @@
 Every student slides one wave gauge along a flume that ends in a steep, smooth
 1:1.4 slope, reading the biggest (antinode) and smallest (node) swing the
 reflected wave leaves behind in its partial standing pattern. `K_refl` from
-those two numbers lands high — measured 0.66–0.90 across the class's periods —
+those two numbers lands high — measured 0.51–0.85 across the class's periods,
+most of them 0.77–0.85 —
 and that IS the textbook sea-wall figure, measured rather than assumed. A short
 second run on the gentle 1:10 beach, same water and same paddle, gives a low
 one by exactly the same method: the class has measured, not been told, why
@@ -64,6 +65,25 @@ as `series = spilling`. Its flat run is only x = 0.65–1.15 m, so step the gaug
 by 0.1 m across that — and the swing barely changing from one end to the other
 IS the result.
 
+> Re-measured Oct 2026 with the mixing-length closure off in the wave flumes
+> (mvreeuwijk/hydraulician#2); the closure-off values are at the flumes' new
+> default ν = 1e-4 m²/s (at 1e-5 the short waves fill with grid noise).
+> `K_refl` on `wavesurge` (DFT envelope scan, 33 stations, 10 periods) went
+> 0.66 / 0.76 / 0.83–0.90 / 0.85 / 0.85 to 0.51 / 0.77 / 0.80 / 0.85 / 0.82 at
+> T = 1.8 / 2.4 / 3.0 / 3.6 / 4.2 s, so the old monotone rise is gone: 1.8 s
+> is the lowest (a_min 0.013 m of a_max 0.041 m) and the rest sit together at
+> 0.77–0.85. Closure-on reruns (ν = 1e-5) gave 0.87 at 3.0 s and 0.60 at
+> 1.8 s, within the old scatter; an earlier closure-off pass at ν = 1e-5 gave
+> 0.47 / 0.66 / 0.97 / 0.93 / 0.81, with deeper nodes than ν = 1e-4 leaves
+> (a_min 0.001–0.002 m at 3.0 and 3.6 s, now 0.008 and 0.004 m). On `wave`
+> (two-probe) the closure-on rerun gave 0.18 / 0.02 / 0.15 and the closure-off
+> run at ν = 1e-4 gives 0.10 / 0.11 / 0.04 at T = 1.1 / 1.5 / 2.1 s; the old
+> 0.34 / 0.07 / 0.04 was not reproduced at 1.1 s — two-probe K on this 0.9 m
+> flat run moves by ±0.1 with probe-amplitude mismatches of a few percent, so
+> read it as "inside, or just under, the 0.05–0.2 beach band". At 3.0, 2.4 and
+> 4.2 s the 0.75-depth probe goes dry at the deepest troughs (wet margin 0),
+> which clips the troughs at the antinodes slightly.
+
 ## For the instructor — pooling the class
 
 Collect one row per student (`student,digit,series,T_s,Krefl`, with `series`
@@ -82,15 +102,24 @@ own band.
 
 ### Discussion points
 
-- **Expect the submitted numbers to run low on `wavesurge`** — nearer 0.4–0.6
-  than the 0.85 this folder's own scans measure. A ~15 s peak-to-peak read
+- **Expect the submitted numbers to run low on `wavesurge`** — (closure-on
+  value, not re-measured: nearer 0.4–0.6 than the 0.85 this folder's own scans
+  measured.) A ~15 s peak-to-peak read
   cannot resolve the tiny true signal at a node against the ripple sitting on
   top of it, so `a_min` comes out roughly twice too big and drags `K_refl`
-  down. The contrast survives easily: even the worst eyeball reading clears
-  every spilling point.
+  down; with the closure off at ν = 1e-4 the true node is `a_min` ≈ 0.004–0.009 m
+  at 3.0–4.2 s, so the eyeball shortfall is smaller but still there. The
+  contrast survives: the scans give 0.51–0.85 on `wavesurge` against 0.04–0.11
+  on `wave`, and a ~0.4 eyeball reading still clears every spilling point.
 - **The standing pattern is a free check on WV-1.** Leave gauges at two
   neighbouring nodes and measure the gap with **Measure** (`8`): it should be
-  `L/2` from `σ² = gk tanh kh`, and here it is, to 1.7% across four periods. A
+  `L/2` from `σ² = gk tanh kh`, and here it is — to within the 0.2 m station step
+  at 3.0 and 3.6 s (2.8 and 3.4 m against 2.70 and 3.27 m). At 4.2 s the envelope
+  names only two nodes, 4.2 m apart against 3.83 m; at 2.4 s three nodes give 2.0,
+  1.0 and 1.2 m against 2.13 m, and at 1.8 s five nodes 0.4–1.6 m apart against
+  1.54 m, so the envelope is too ragged to trust there (and at 3.6 s one extra
+  node near x = 1.8 m is spurious). The old "1.7% across four periods" was a
+  closure-on figure and is not reproduced. A
   standing wave carries the dispersion relation in its own geometry.
 
 The full verification record — the probe-height and measuring-zone

@@ -592,11 +592,14 @@ const SIM = (() => {
       source: Object.assign({}, scene.source),
       dyeLine: scene.dyeLine, dyeDecay: 0.02,
       valveClosed: scene.valveOpen ? 0 : 1,
-      // Optional per-scene von Kármán constant for the mixing-length closure;
-      // undefined keeps KAPPA. A free jet in a deep tank sets 0: the closure's
-      // l = κy takes y from the nearest WALL, metres away from a free shear
-      // layer, and its ν_t smeared the jet into a laminar blob (pipejet).
-      kappa: scene.kappa,
+      // The depth-scale mixing length (FS_VEL's lmix), on or off as the scene
+      // declares (scenes.js refuses a scene that does not). Meant for channel
+      // flow: a log layer over a bed (the shipped tanks, jets and pipes keep
+      // it for now, mvreeuwijk#2). Off for waves — its ν_t of ~1e-3
+      // m²/s in a crest damped them away (issue #77) — and for a free jet,
+      // whose l = κy took y from a wall metres away (pipejet). The wall
+      // function (cf) and the Smagorinsky term (cs) act either way.
+      mixingLength: scene.mixingLength,
       // Optional outflow absorbing layer: extra viscosity (m²/s) ramped up
       // over the last `outflowLen` metres before the right edge (FS_VEL).
       // 0 / undefined is off. No shipped scene uses it at present (FF-4 moved
@@ -1258,7 +1261,7 @@ const SIM = (() => {
     const p = S.p;
     gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(p.g));
     gl.uniform1f(pr.u("u_c"), p.c);
-    gl.uniform1f(pr.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
+    gl.uniform1f(pr.u("u_kappa"), p.mixingLength ? KAPPA : 0);
     gl.uniform1f(pr.u("u_nu"), p.nu);
     gl.uniform2f(pr.u("u_nuOut"), p.outflowNu || 0,
       p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);

@@ -3,8 +3,10 @@
 Every student drops a column of orbit tracers into the deep-water flume,
 zooms in until the trails stop being invisible, and reads off how much
 smaller the loop is near the bed than at the surface. The vertical motion
-dies out almost completely well above the bed — the verified figure for this
-flume is about 200× — while the horizontal motion never fully vanishes,
+dies out almost completely well above the bed — re-measured Oct 2026 at
+T = 1.60 s (stroke 0.30), the surface's vertical swing is 40–50× the bed's
+against 53× from linear theory at the tracer heights (an earlier "about 200×"
+did not reproduce) — while the horizontal motion never fully vanishes,
 because a particle sitting on the floor can still slide sideways but cannot
 sink into it.
 

@@ -1125,6 +1125,34 @@ SUITES.geom = async (B) => {
     hook.callsAfterParam === 1 && hook.calls === 1 && hook.keptOnValve &&
       hook.sameGrid && hook.afterOff === 1,
     JSON.stringify(hook));
+
+  // Cells a solid VACATES must come back as water, not void (issue #5). The
+  // vof pass writes f = 0 into every solid cell, so before the fill in
+  // rasterise() a body morphed smaller left black holes at p = 0 inside
+  // ~37 kPa of plan-view water, which the one-sided EOS can never close.
+  // FF-3's body going ellipse -> square frees the ellipse's long nose and
+  // tail. Every freed cell must hold water at once, and still after 100
+  // substeps (a void would also be visible as a cell that drains).
+  await B.goto(`http://localhost:${PORT}/?scene=body`);
+  const vac = await B.evaluate(`(() => {
+    const S = APP.sim;
+    APP.SIM.setParam("shape", 0);
+    APP.tick(100);
+    const before = S.mask.slice();
+    APP.SIM.setParam("shape", 1);
+    const pts = [];
+    for (let k = 0; k < before.length; k++) {
+      if (before[k] >= APP.SIM.MASK.SOLID_MIN && S.mask[k] < APP.SIM.MASK.SOLID_MIN)
+        pts.push([((k % S.nx) + 0.5) * S.dx, (Math.floor(k / S.nx) + 0.5) * S.dx]);
+    }
+    const minF = (ps) => APP.SIM.probeMany(ps).reduce((m, p) => Math.min(m, p.f), Infinity);
+    const f0 = minF(pts);
+    APP.tick(100);
+    return { freed: pts.length, f0, f1: minF(pts) };
+  })()`);
+  ok("geom cells a morphing body vacates are refilled with water, not left void",
+    vac.freed > 0 && vac.f0 > 0.9 && vac.f1 > 0.9,
+    `${vac.freed} cells freed; min f ${vac.f0.toFixed(3)} at once, ${vac.f1.toFixed(3)} after 100 substeps`);
 };
 
 

@@ -17,7 +17,10 @@ COURSES.add({
     { title: "Statics",               ids: ["HS-1", "PF-2"] },
     { title: "Fluid dynamics",        ids: ["FF-2", "FF-3", "FF-4", "CR-1",
                                             "VC-2", "MM-1", "HJ-2"] },
-    { title: "Energy conservation",   ids: ["HJ-2#energy"] },
+    // Empty for now: CR-1's and HJ-2's Energy tabs are on their cards, so
+    // listing a tab here would put the same exercise in the menu twice (a
+    // Canvas link reaches a tab directly with ?ex=HJ-2&tab=energy).
+    { title: "Energy conservation",   ids: [] },
     { title: "Pipes",                 ids: [] },
     { title: "Free-surface flows",    ids: [] },
     { title: "Showcase",              ids: ["WV-4", "WV-5"] },

@@ -317,14 +317,13 @@ const SCENES = (() => {
     const W = o.W, H = o.H, lev = o.lev, bed = o.bed, xb = o.xb, S = o.slope;
     const TH = 2.0, off = (TH / 2) * Math.sqrt(1 + S * S);
     return {
-      group: "Jets & waves", mixingLength: false,   // waves: no channel shear to model
-      // ν = 1e-4 m²/s with the closure off, as WV-4 and WV-5 (mvreeuwijk#2):
-      // at water's 1e-5 the short waves fill with grid-scale noise. Measured on
-      // wavedeep at the B4 station (x = 5.84 m), the paddle-frequency w 2 cells
-      // under the surface over w 1.5 cells above the bed: 7 at ν 1e-5 (the bed
-      // motion is noise), 259 at 1e-4 (≈ linear theory there), 66 at 3e-4; the
-      // closure on gave 134, and a wave half as tall.
-      W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8, nu: 1e-4,
+      group: "Jets & waves",
+      // Waves: no channel shear to model, so the closure is off, with ν =
+      // 1e-4 m²/s as WV-4 and WV-5 (mvreeuwijk#2) — at water's 1e-5 the short
+      // waves fill with grid-scale noise once the closure is off. A flume may
+      // pass both back (wavedeep does, below).
+      mixingLength: o.mixingLength === undefined ? false : o.mixingLength,
+      W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8, nu: o.nu || 1e-4,
       mode: 0, hmax: lev * 1.5, vmax: o.vmax || 1.4,
       open: [0, 0, 0, 0],
       wave: { amp: o.amp, period: o.period, on: 1, x: 0.30 },
@@ -1562,6 +1561,15 @@ const SCENES = (() => {
     flume({
       id: "wavedeep", name: "Wave flume · deep-water orbits", key: "h/L = 0.59",
       W: 12, H: 1.5, lev: 1.00, bed: 0.26, xb: 8.2, slope: 0.297,
+      // The closure stays ON here, at water's ν, for now (mvreeuwijk#2). Off
+      // (at ν 1e-4) the train carries further — H 0.30 / 0.16 / 0.11 m at
+      // x = 1 / 2 / 4 m against 0.20 / 0.06 / 0.04 — but this closed tank then
+      // builds an unsteady mean current of 0.1–0.5 m/s at the orbit station,
+      // whose trails become streaks, and the short digit periods of B4 / WV-1
+      // (T ≤ 1.05 s) still die before x = 5.84 m. Turning it off needs the
+      // flume redesigned (an absorbing far end as WV-5's, a station nearer the
+      // paddle), which is the follow-up.
+      mixingLength: true, nu: 1e-5,
       tracerX: 5.84, spinup: 20, view: { zoom: 1.9, cx: 5.84, cy: 0.66, vex: 1.6 },
       // Full-length tank on purpose. Halving it to W = 6 (to fill the view,
       // since a 1.26 m wave died within ~3 m with the closure on — off at

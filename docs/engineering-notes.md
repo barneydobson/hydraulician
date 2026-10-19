@@ -721,9 +721,14 @@ itself ~2 cells thick. Consequences:
   periods after 20 s: the deep flume 0.30 / 0.16 / 0.11 m at x = 1 / 2 / 4 m
   against 0.20 / 0.06 / 0.04 with it on — the closure was most of that loss;
   the shallow flume 0.059 / 0.057 m at 2 / 3 m against 0.072 / 0.068. At
-  ν = 1e-5 with the closure off the deep flume filled with grid noise: the
-  paddle-frequency w at the B4 station fell to 7× its bed value, against
-  259× at ν 1e-4, so ν 1e-4 is part of switching the closure off.)
+  ν = 1e-5 with the closure off the deep flume filled with grid noise, so
+  ν 1e-4 is part of switching the closure off. But the DEEP flume keeps the
+  closure (and ν 1e-5) for now: off, this closed tank builds an unsteady mean
+  current of 0.1–0.5 m/s at the B4 orbit station — the tracer trails become
+  streaks, the surface/bed ratio scatters 15–150× between 10 s windows — and
+  at T ≤ 1.05 s the wave dies before x = 5.84 m, which breaks B4 and WV-1's
+  short rows. It needs an absorbing far end (as WV-5) and a nearer station;
+  mvreeuwijk#2.)
 - Do not "fix" that by shrinking the tank. Halving the deep flume to W = 6
   improved Δx but put the beach 3 m from the paddle: the reflection built a
   standing wave (H = 0.49 m at x = 1) and the orbit decay collapsed from 244×

@@ -1,7 +1,7 @@
 # QS-2 · Two tanks and two parallel mains
 
 This note checks the original circular-tank problem. The implemented
-[revised 2D exercise](../exercises/QS-2-twin-tanks/README.md) uses larger
+[revised 2D exercise](../courses/original/exercises/QS-2-twin-tanks/README.md) uses larger
 rectangular tanks, identical straight ducts, and a measured 2D resistance.
 
 ## Problem and reference solution

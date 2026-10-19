@@ -25,11 +25,16 @@ shallow water); this one resolves the depth.
 | `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
 | `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
 | `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
-| `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards, digit rules, the settings a pick applies) |
+| `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards — the short layout, inline strip icons, tabs —, digit rules, the settings a pick applies) |
+| `js/stream.js` | `STREAM` — streamlines as contours of the stream function ψ, built on the CPU from a fenced face-flux readback; of the mean flow under Average |
 | `js/gauge-inspector.js` | `GINSP` — a draggable window per gauge: identity, live values, the full history chart, CSV export |
 | `js/rig.js` | `RIG` — rig save / load / share, the wire format and its version gate |
-| `js/exercises.js` | the exercise register the picker reads (machine-readable source of the pack) |
+| `js/exercises.js` | declares `EXERCISES`, the register the picker reads — empty here; every course's `exercises.js` appends to it — and its header is the card schema |
 | `js/exercises-rigs.js` | drawn rigs + applied settings per exercise, as rig-format JSON |
+| `js/courses.js` | `COURSES` — the course registry; `?course=<id>` picks one (remembered for the visit), else a course whose `hosts` names the page's hostname; exposed as `EXERCISE_MENU`. `COURSES.exercises(id, [...])` appends a course's own cards to `EXERCISES`, stamped `course` and `home` |
+| `courses/<id>/` | one course each: `course.js` (`COURSES.add({id, title, sections, hosts?})`), its own cards in `exercises.js`, their briefs in `exercises/<ID>-<slug>/` and `INDEX.md`; one script tag per file in `index.html`; `check_pack.py` holds every course to the same rules |
+| `courses/original/` | the original teaching pack — its cards, menu by topic (still listing HS-1, now CIVE40008's), the default on `barneydobson.github.io` — plus its history (`demo-programme.html`, `feasibility-sheet.html`, `CHANGES-NEEDED.md`, `_director-status.md`, `_worker-recipe.md`). Due to be retired: delete the folder and its two script tags |
+| `courses/cive40008/` | CIVE40008 Year 1 (default on `mvreeuwijk.github.io`); owns HS-1 too, which `original`'s menu still lists |
 | `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
 | `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
 | `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
@@ -39,8 +44,9 @@ shallow water); this one resolves the depth.
 | `docs/embedding.md` | putting one exercise inside a Blackboard or Canvas page: the iframe tag, what `?embed=1` changes, the per-LMS clicks, sizes, and the confirmed-placements table |
 | `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
 | `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
-| `exercises/` | one folder per exercise: `README.md` brief, `rig.js` headless script, `collect_plot.py` |
-| `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker |
+| `exercises/` | shared tooling only, plus `INDEX.md` pointing at each course's index; no exercise folders (they are under `courses/<id>/exercises/`: `README.md` brief, `rig.js` headless script, `collect_plot.py`) |
+| `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker, `check_notation.py`, `smoke.js` |
+| `exercises/_code-changes/` | reports and screenshots from app changes (picker, gauges, rig share, card fixes) |
 | `test/` | `ui-smoke.mjs` layout gate, `recon-test.mjs` (RECON's unit tests, no browser) and `cdp.mjs`, its portable headless-Chrome client |
 | `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
 
@@ -111,7 +117,7 @@ to look fine for a minute and explode in an exercise.
   changes. An exercise may narrow the interface (`UIMODE`), but never lock
   it: the `⋯` on the strip and at the head of the panel puts everything back
   in one click, which is what keeps that acceptance test true.
-- **A field is described once.** The seven colourings live in `FIELDS` in
+- **A field is described once.** The nine colourings live in `FIELDS` in
   `main.js` — mode integer, name, symbol, unit, ramp and default range — and
   the legend, the Controls select and the `G` key all read it. The ramp
   colours themselves are `Shaders.RAMPS`, interpolated into the display
@@ -199,7 +205,9 @@ hand: `node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds`.
 Each catalogue entry carries what was measured when the control was performed.
 
 Both checkers read the register the way it should be read: `check_pack.py`
-hands `js/exercises.js` to `node` and gets `EXERCISES` back as JSON, so a
+runs `js/exercises.js` (the empty register), `js/courses.js` and every
+course's `course.js` / `exercises.js` in `node` as script tags would (one shared global scope) and
+gets `EXERCISES` back as JSON, so a
 nested `ui` profile parses instead of being truncated at the first `}`; and
 `check_notation.py` walks `git ls-files`, so an untracked scratch file cannot
 fail a commit gate. Neither is a new dependency — Node is already required by
@@ -224,11 +232,14 @@ readback; and `APP.pickExercise()` lands its rig a microtask later, so
 
 ## The exercise pack
 
-Described in four places with different jobs that do **not** collapse into
-one register: `js/exercises.js` is the machine-readable source, each folder's
-`README.md` is the human brief, `INDEX.md` is abbreviated navigation, and
-`demo-programme.html` is the dated rev-1 document the pack was built from —
-history. Briefs carry the minimum needed to run the demo; statistics and
+Every exercise belongs to a course (`courses/<id>/`); the original pack is
+`courses/original/`. An exercise is described in four places with different
+jobs that do **not** collapse into one register: the course's `exercises.js`
+is the machine-readable source (schema: the header of `js/exercises.js`),
+each folder's `README.md` is the human brief, the course's `INDEX.md` is
+abbreviated navigation, and — for the original pack —
+`courses/original/demo-programme.html` is the dated rev-1 document it was
+built from — history. Briefs carry the minimum needed to run the demo; statistics and
 methodology live in each folder's uncommitted `_archive/`. Coordinates in a
 recipe are exact — rounding them makes a new geometry; re-measure before
 shipping. `spinup` values are measured settle times, not guesses. **Adding
@@ -236,6 +247,14 @@ one, end to end** — which of these files it touches, in what order, and what
 each gate will ask of it — is
 [docs/making-exercises.md](docs/making-exercises.md); read it before
 writing a card or a scene.
+
+A **course** owns its exercises: the same pieces, in its folder
+(`courses/<id>/exercises.js`, `courses/<id>/exercises/<ID>-<slug>/`,
+`courses/<id>/INDEX.md`, the menu in `course.js`). They are still the one
+register — `?ex=` reaches every card wherever it lives, and ids are unique
+across all of them — and nothing in the app may assume a brief is under
+`exercises/`: use the card's `home` (pickers.js `briefDir`). A course is upstream-shaped by construction:
+another lecturer's course is another folder beside it.
 
 An entry may also carry a **`ui` profile** — which strip families and
 instruments it wants in front of a student, how focused the Controls panel
@@ -251,6 +270,18 @@ that is silently not there. Hidden tools keep their digit: worksheets say
 
 ## Gotchas worth knowing on day one
 
+- **Tablets are a first-class target** (a lecturer runs exercises on an
+  iPad). The neutral tool is **Read** (`state.tool === null`): a press with
+  it never draws — a tap pins the readout card, a drag pans when zoomed —
+  and every exercise arrives with it in hand; only the sandbox door arms
+  Wall. A finger's press is held ~90 ms (`TOUCH_HOLD_MS`) so a pinch never
+  places, pins or dyes anything. On a coarse pointer the strip wraps onto a
+  second row rather than shrinking below 40 px or scrolling (`fitBar`,
+  `--barb`, `state.barTop`), and an upright tablet under 900 px gets the
+  bottom sheet, not an overlaid side panel. `ui-smoke.mjs` drives a real
+  emulated iPad (touch events, dpr 2); details in
+  [docs/making-exercises.md](docs/making-exercises.md) → *Reading the water
+  by touch*.
 - A dev browser may serve stale JS from `http.server`; force with
   `fetch(url, {cache:"reload"})` then `location.reload()`.
 - Resolution changes Δx, not the physics: the domain is a fixed physical

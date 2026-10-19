@@ -160,7 +160,8 @@ Three standing rules, all measured:
   donor limiter refills it, then reverses — tail columns run dry and report
   *negative* `q` while the reach behind them floods. The full post-mortem is
   in [engineering-notes.md](engineering-notes.md#guard-rails-each-bought-with-an-explosion).
-  No shipped scene uses mode 2; the sandbox floor drains fine on mode 1.
+  Shipped use of mode 2: `pipejet` (FF-4), whose reservoir spills over an
+  end-wall crest onto an outfall brink. The sandbox floor drains fine on mode 1.
 - **Under gravity an open edge lets water out, never in.** Zero-gradient
   mirrors the interior, so on its own it passes inflow as readily as outflow,
   and once the surface stopped being dragged s2, s3, hammer and jet each drew
@@ -303,6 +304,35 @@ applied on the exchange face of a level-controlled edge. The transport cap
 alone leaves ~12 m/s of headroom, and the Dirichlet can resonate with pond
 slosh right up to it.
 
+**Four per-scene options, all default-off** (each bought on one scene;
+the comments at those scenes have the measurements):
+
+- `spongeFill` multiplies a head-driven inflow sponge's fill rate. That
+  sponge supplies the pipe by its deficit, so the level it holds sits about
+  Q / (fill rate × width) under the setting; contraction runs it at 4.
+- `twOutflowOnly` holds the tailwater's exchange face to outflow, like a
+  plain open edge. A level control otherwise passes inflow too, and behind a
+  short pool it fed a pipe jet's entrainment straight from the edge — a
+  current running in along the surface and a mound against the outlet wall
+  (contraction).
+- `outflowNu` / `outflowLen` add an **absorbing layer**: a viscosity ramped
+  up quadratically over the last `outflowLen` metres before the right edge,
+  to `outflowNu` m²/s at the edge. A tailwater is a pressure outlet and
+  passes whatever velocity reaches it, so a tank-sized 2-D eddy parked on
+  the edge made it an inlet over part of its height (pipejet). `SIM.dt`
+  holds the layer to a diffusion number of 0.14 — at 0.20, alongside the
+  acoustic Courant number, it ran away. For full, lidded domains only: on a
+  free surface (contraction) it ran to the ±80 rail.
+- `residueDrain: { rate, speed }` — **plan view only** (gated on
+  |g| < 0.1): water slower than `speed` m/s (ramped from half of it) with no
+  pressurised cell (f > 1.003) within two cells leaves the plane at `rate`
+  1/s, as if it fell through the floor. With gravity into the screen nothing
+  else removes the spray a jet sheds, and on vane a third of the wet cells
+  were drifting relics after 20 s; with `{ rate: 2, speed: 1 }` it is 5%,
+  while the jet and sheets (fast) and the stagnation point (pressurised) are
+  untouched and F_n moved by under 1%. A source term in the vof pass, so the
+  averaging balance books it; mass is deliberately not conserved.
+
 The panel's "delivered level" readout is measured just clear of the sponge —
 the first columns the boundary treatment no longer touches — and sits below
 the slider by however much head the sponge is giving up.
@@ -319,7 +349,14 @@ are source terms the averaging balance accounts for, not boundary exchange:
 - **The piston wavemaker** (`u_wave`): at its column, in wet cells, the vel
   pass prescribes `u = a\,\omega\cos(\omega t)`. It is a paddle standing in
   the water, not an edge condition — the wave scenes run with all four edges
-  closed.
+  closed. At the LEFT WALL (`wave.x = 0`, left edge open, `wave.d` the still
+  depth; `SIM.wallPaddle()`) it becomes the wall paddle of WV-4 and WV-5: the
+  open edge's ghost feeds the face and the paddle's volume flux is imposed
+  over the live depth. Two opt-in keys shape it (engineering notes, "Two
+  wavemakers"): `wave.flap` makes the velocity grow linearly from a hinge on
+  (or `wave.hinge` below) the bed, and `wave.train` fires one ramped train of
+  N periods per `SIM.fireTrain()` (V), which first resets the water to rest
+  (t = 0) — the paddle is a still wall between trains.
 
 ## 8. Who owns an edge
 
@@ -361,12 +398,19 @@ Where each piece of the above enters the GPU passes; all are set in
 | `u_tw` | tailwater: level, on | vel clamp, vof ghost + sponge |
 | `u_inBand`, `u_twBand` | the control band z-range from `columnBand` | vel plug, vof ghost + sponge |
 | `u_spongeN` | sponge widths in columns (from metres per scene) | vof sponges |
+| `u_fillIn` | head-driven inflow sponge's fill multiplier (`spongeFill`, default 1) | vof inflow sponge |
+| `u_twOut` | 1 = tailwater exchange face passes outflow only (`twOutflowOnly`) | vel outflow clamp |
+| `u_nuOut` | absorbing layer: extra ν at the right edge, width in columns (`outflowNu`, `outflowLen`) | vel viscosity |
+| `u_drain` | residue drain: rate (1/s), speed (m/s) (`residueDrain`, plan view only) | vof source term |
 | `u_slip` | 0 no-slip / 1 free-slip | vel mirror ghost |
 | `u_cf` | wall-function coefficient | vel drag |
 | `u_Wd` (texture) | distance to the nearest solid, at cell corners | vel mixing length |
 | `u_Tc` (texture) | per column: bed, surface, open-channel flag (`FS_TCOL`) | vel mixing length, surface extension |
 | `u_kappa` | von Kármán's κ (0 = closure off) | vel mixing length |
 | `u_wave` | amplitude, ω, on, piston column | vel wavemaker |
+| `u_waveD` | the wall paddle's still depth (0 = not at the wall) | vel wavemaker |
+| `u_waveU` | the paddle's velocity from `SIM.paddle` (train envelope / flap), on | vel wavemaker |
+| `u_flap` | the flap's hinge z and still-water z (y ≤ x = piston) | vel wavemaker |
 | `u_src0`, `u_src1`, `u_sv0`, `u_sv1` | point sources: position, radius, on; velocity + dye | both passes |
 
 <!-- Pages build only: github.com strips this tag and renders the math fences

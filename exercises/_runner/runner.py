@@ -44,13 +44,13 @@ import socket
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import zlib
 
-STATE_DIR = os.environ.get("HYDRA_RUNNER_STATE") or (
-    "/tmp/claude-1000/-home-barney-Documents-GitHub-hydraulician/"
-    "8bfccd4e-e396-4491-8058-3d8106adf14a/scratchpad/runner")
+STATE_DIR = os.environ.get("HYDRA_RUNNER_STATE") or os.path.join(
+    tempfile.gettempdir(), "hydraulician-runner")
 DEFAULT_URL = "http://localhost:8124/index.html"
 CHROME_CANDIDATES = ["google-chrome", "google-chrome-stable", "chromium",
                      "chromium-browser", "chrome"]

@@ -18,18 +18,39 @@ const SIM = (() => {
   // nearly a whole vel pass): every 8 substeps it cost hammer 20%. A length
   // scale lagging 32 substeps (6 ms on m2, 26 on hammer) is still current.
   const TCOL_EVERY = 32;
-  // How long a particle's trail lives, in SIMULATED seconds. About a second of
-  // flow: long enough to read a path, short enough that a jet does not fill
-  // the screen with a solid wash.
-  // Long enough that a streak reads as a PATH — thin and drawn out, tapering
-  // behind the head — rather than as a dot with a smudge after it.
-  const TRAIL_TAU = 1.5;
+  // How long a particle's trail lives, in SIMULATED seconds — fitted to the
+  // scene rather than fixed. A fixed 1.5 s was a speck in a slow plan-view
+  // stream (0.9 m/s across a 6 m box) and a smear down a fast pipe; what
+  // reads as a PATH is a trail that is a set fraction of what is on screen.
+  // So τ = TRAIL_FRAC × (visible width) / (typical speed), the typical speed
+  // being half the scene's speed scale (its Speed legend's top), clamped to
+  // [TRAIL_MIN, TRAIL_MAX]. A scene may state its own (`particleTrail`, s);
+  // the panel's Particle trail slider overrides both until the next scene.
+  const TRAIL_FRAC = 0.2, TRAIL_MIN = 0.6, TRAIL_MAX = 8;
+  function trailTau(view, vmax) {
+    if (S.trailSet > 0) return S.trailSet;
+    if (S.scene.particleTrail > 0) return S.scene.particleTrail;
+    const n = view && view.ndc, span = n ? Math.max(2, n[2] - n[0]) : 2;
+    const wVis = S.W * 2 / span, u = 0.5 * Math.max(vmax || S.scene.vmax || 1, 0.05);
+    return Math.min(TRAIL_MAX, Math.max(TRAIL_MIN, TRAIL_FRAC * wVis / u));
+  }
+  let lastTau = 1.5;
+  /** The trail time in use (s of flow); with an argument, set it for this
+   *  scene (a rebuild for a new scene clears it). */
+  function particleTrail(v) {
+    if (v !== undefined && S) S.trailSet = +v;
+    return S && S.trailSet > 0 ? S.trailSet : lastTau;
+  }
   // How many of the 128 × 128 particles are actually DRAWN. All of them are
   // advected — the update is one fullscreen pass either way — but drawing all
   // 16384 with a trail each fills a flume with white and shows nothing at all.
-  // A few thousand distinct paths is what reads as flow visualisation; the
-  // count follows the width so a big window gets more of them, not fatter ones.
-  const TRAIL_N = (pxW) => Math.round(Math.max(500, Math.min(2200, pxW * 1.1)));
+  // A fixed DENSITY over the water on screen, not a fixed count: respawns
+  // land in the water (FS_PART), so a count sized for a full plan-view box
+  // crowded a shallow flume, whose water is a strip of the rect, into a white
+  // mat. `wetFrac` is the water's share of the domain (column reduction).
+  const TRAIL_RHO = 2.5e-3;    // drawn particles per screen pixel of water
+  const TRAIL_N = (view, wetFrac) =>
+    Math.round(Math.max(300, Math.min(2600, TRAIL_RHO * wetFrac * (view.vis ? view.vis.w * view.vis.h : view.w * view.h))));
 
   let gl, quad, rect, points, prog = {};
   let S = null;              // the live grid
@@ -56,6 +77,7 @@ const SIM = (() => {
     prog.col  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_COL);
     prog.tcol = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TCOL);
     prog.hgl  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_HGL);
+    prog.sflux = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_SFLUX);   // streamlines
     prog.part = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_PART);
     // The Favre display accumulator (§4.1 of docs/averaging.md) — a separate
     // pass from prog.vofA's transport accumulator, and a separate program
@@ -69,6 +91,7 @@ const SIM = (() => {
     prog.pdraw = GLH.createProgram(gl, Shaders.VS_PART, Shaders.FS_PART_DRAW);
     prog.fill = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_FILL);
     prog.tex  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TEX);
+    prog.tshadow = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_TRAIL_SHADOW);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     return gl;
@@ -516,11 +539,29 @@ const SIM = (() => {
       source: Object.assign({}, scene.source),
       dyeLine: scene.dyeLine, dyeDecay: 0.02,
       valveClosed: scene.valveOpen ? 0 : 1,
+      // Optional per-scene von Kármán constant for the mixing-length closure;
+      // undefined keeps KAPPA. A free jet in a deep tank sets 0: the closure's
+      // l = κy takes y from the nearest WALL, metres away from a free shear
+      // layer, and its ν_t smeared the jet into a laminar blob (pipejet).
+      kappa: scene.kappa,
+      // Optional outflow absorbing layer: extra viscosity (m²/s) ramped up
+      // over the last `outflowLen` metres before the right edge (FS_VEL).
+      // 0 / undefined is off. No shipped scene uses it at present (FF-4 moved
+      // to a free-surface reservoir); kept for full, lidded domains.
+      outflowNu: scene.outflowNu || 0, outflowLen: scene.outflowLen || 0,
+      // Optional: the tailwater's exchange face passes outflow only, like a
+      // plain open edge (FS_VEL). 0 / undefined is off — contraction only.
+      twOutflowOnly: scene.twOutflowOnly ? 1 : 0,
+      // Optional residue drain, PLAN VIEW ONLY (FS_VOF): slow, thin water with
+      // no pressurised water near it leaves the plane at `rate` 1/s, as if it
+      // fell through the floor. { rate, speed } or undefined = off — every
+      // scene but vane. Gated on |g| < 0.1 in step() as well.
+      residueDrain: scene.residueDrain ? Object.assign({}, scene.residueDrain) : null,
     };
     if (prev) {
       p.open = prev.open.slice();
       for (const k of ["inflow", "tailwater", "wave", "source"]) p[k] = Object.assign({}, prev[k]);
-      p.pour = null;
+      p.pour = null; p.dyeInj = null;
     }
     // A resolution rebuild keeps live param values the same way it keeps
     // p above — losing a slider position because you asked for more cells
@@ -612,6 +653,7 @@ const SIM = (() => {
     // reset followed by the same substeps is the same run — the F1 gate in
     // smoke.js compares two of them cell for cell.
     S.nsteps = 0; S.tcolDirty = true;
+    S.dyeUsed = false;              // no ink in the water: back to the cheap upwind dye faces
     const vel = new Float32Array(n * 4);
     // An initial velocity field, when the scene can say what its steady flow
     // looks like. On the staggered faces the U texture uses — `r` = u at the
@@ -639,6 +681,9 @@ const SIM = (() => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, vel);
     }
     S.t = 0;
+    // A wave train belongs to the run it was fired in: the clock restarts,
+    // so does the paddle (the scene's own t0, if it fires one by itself).
+    if (S.p.wave) S.p.wave.t0 = S.scene.wave ? S.scene.wave.t0 : undefined;
     // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex, whose
     // storage the loop above just RESPECIFIED — the same hazard rescaleFill
     // sidesteps with texSubImage2D. Rebuild rather than gamble on those
@@ -983,7 +1028,12 @@ const SIM = (() => {
     const acoustic = CFL * S.dx / (p.c + UREF);
     const nuMax = p.nu + (p.cs * S.dx) * (p.cs * S.dx) * 400;
     const viscous = 0.20 * S.dx * S.dx / Math.max(nuMax, 1e-9);
-    return Math.min(acoustic, viscous);
+    // The outflow absorbing layer's ν gets a tighter diffusion number: at
+    // 0.20 it coexists with the acoustic Courant 0.45 only up to a point —
+    // pipejet's layer at ν = 0.7 (diffusion number 0.20) ran to the ±80 rail
+    // within 20 s, while 0.14 (ν = 0.5 at the acoustic Δt) ran clean.
+    const layer = p.outflowNu ? 0.14 * S.dx * S.dx / (p.nu + p.outflowNu) : Infinity;
+    return Math.min(acoustic, viscous, layer);
   }
 
   /** The z-range a level control (inflow / tailwater) is allowed to touch:
@@ -1111,6 +1161,10 @@ const SIM = (() => {
     gl.uniform2f(pr.u("u_spongeN"),
       sc.spongeIn ? Math.round(sc.spongeIn / S.dx) : 10,
       sc.spongeTw ? Math.round(sc.spongeTw / S.dx) : 10);
+    // A head-driven sponge supplies the pipe by its deficit, so the level it
+    // holds sits Q / (fill rate × width) under the setting; a scene may stiffen
+    // the fill (`spongeFill`, default 1 — every scene but contraction).
+    gl.uniform1f(pr.u("u_fillIn"), sc.spongeFill || 1);
     gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
     gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
@@ -1140,6 +1194,133 @@ const SIM = (() => {
     quad.draw();
   }
 
+  /** The wind shear stress on the free surface, τ in N/m² (positive blows
+   *  +x). A scene opts in by declaring a param with key "tau" (one slider,
+   *  carried by rigs like any other param); every other scene reads 0, and
+   *  the vel pass then skips the term altogether. */
+  function windTau() {
+    const decl = (S.scene.params || []).some((d) => d.key === "tau");
+    const v = decl ? S.params.tau : 0;
+    return Number.isFinite(v) ? v : 0;
+  }
+
+  /** Is the piston a paddle AT THE LEFT WALL? Only when it sits in column 1,
+   *  the left edge is a plain open edge (its zero-gradient ghost is what
+   *  feeds the paddle face) and the scene declares the still depth `wave.d`
+   *  the volume flux is scaled by (shaders.js, FS_VEL). Off for every scene
+   *  but WV-4's `beach`; the overlay asks the same question to draw it. */
+  function wallPaddle() {
+    const p = S.p;
+    return p.wave.on > 0.5 && p.wave.d > 0 && p.open[0] === 1 && p.inflow.on < 0.5
+      && Math.round(p.wave.x / S.dx) <= 1;
+  }
+
+  // ------------------------------------------------------- the wavemaker
+  // Two opt-in additions to the `wave` group, both off unless a scene (or the
+  // Controls panel) asks — every other scene's paddle is the old expression,
+  // bit for bit (FS_VEL takes the u_waveU branch only when one is on):
+  //
+  //   wave.flap = 1        a FLAP hinged `wave.hinge` metres below the bed
+  //                        (0 = on the bed) instead of a piston: the velocity
+  //                        through the paddle grows linearly from the hinge,
+  //                        u(z) = U·(z − z_h)/(z₀ − z_h), U the velocity at the
+  //                        still-water level z₀ = bed + wave.d. `amp` is the
+  //                        stroke amplitude AT z₀. Needs wave.d.
+  //   wave.train = N       an ENVELOPE: one train of N periods, a cosine ramp
+  //                        of `wave.ramp` periods (default 1.5) up and down,
+  //                        fired by fireTrain() (the strip's Wave train
+  //                        button, the V key); the paddle stands still before
+  //                        and after. 0 / undefined = run continuously.
+  //
+  // The paddle's displacement is X(τ) = a·E(τ)·sin ωτ and the velocity
+  // imposed is its exact derivative a·(E·ω·cos ωτ + E′·sin ωτ), so a train
+  // ends with the paddle back where it started and puts in no net volume.
+
+  /** The train envelope E(τ) and its derivative over a train of `n` periods
+   *  of period T with `r`-period cosine ramps. 0 outside [0, nT]. */
+  function envelope(tau, n, r, T) {
+    const D = n * T, R = Math.min(r * T, D / 2);
+    if (!(tau > 0) || tau >= D) return [0, 0];
+    if (R <= 0) return [1, 0];
+    const k = Math.PI / R;
+    if (tau < R) return [0.5 * (1 - Math.cos(k * tau)), 0.5 * k * Math.sin(k * tau)];
+    if (tau > D - R) {
+      const s = D - tau;
+      return [0.5 * (1 - Math.cos(k * s)), -0.5 * k * Math.sin(k * s)];
+    }
+    return [1, 0];
+  }
+
+  /** The paddle at time t: U, the velocity it imposes (at the still-water
+   *  level, for a flap), X its displacement, E the envelope (1 when running
+   *  continuously). The overlay draws X; the vel pass gets U. */
+  function paddle(t) {
+    const w = S.p.wave, T = Math.max(w.period, 0.05), om = 2 * Math.PI / T;
+    if (t === undefined) t = S.t;
+    if (!(w.train > 0)) {
+      return { U: w.amp * om * Math.cos(om * t), X: w.amp * Math.sin(om * t), E: 1, running: true };
+    }
+    if (!Number.isFinite(w.t0)) return { U: 0, X: 0, E: 0, running: false };
+    const tau = t - w.t0, [E, dE] = envelope(tau, w.train, w.ramp === undefined ? 1.5 : w.ramp, T);
+    const s = Math.sin(om * tau), c = Math.cos(om * tau);
+    return { U: w.amp * (E * om * c + dE * s), X: w.amp * E * s, E,
+             running: tau >= 0 && tau < w.train * T };
+  }
+
+  /** Linear wavemaker theory (Biésel 1951; Dean & Dalrymple ch. 6), no GL:
+   *  the height H of the progressive wave a paddle of stroke S = 2a makes in
+   *  still water of depth h, for a piston or a flap hinged l below the bed.
+   *  With the paddle's displacement profile f(z), 1 at the still-water level,
+   *      H/S = 4k·sinh kh ∫ f(z) cosh k(h+z) dz / (sinh 2kh + 2kh),
+   *  which is 2(cosh 2kh − 1)/(sinh 2kh + 2kh) for the piston and, for the
+   *  flap, puts [(kh sinh kh − cosh kh + 1)/k² + l·sinh kh/k]/(h + l) in the
+   *  integral. Returns {k, L, kh, H_S, cp, cg}; k from ω² = gk tanh kh.
+   *  On the grid the measured H falls short of it (WV-5's README). */
+  function wavemakerHS(T, h, flap, l) {
+    const g = 9.81, om = 2 * Math.PI / T;
+    let k = Math.max(om * om / g, om / Math.sqrt(g * h));
+    for (let n = 0; n < 40; n++) {
+      const th = Math.tanh(k * h);
+      k -= (g * k * th - om * om) / (g * th + g * k * h * (1 - th * th));
+    }
+    const kh = k * h, sh = Math.sinh(kh), den = Math.sinh(2 * kh) + 2 * kh;
+    const I = flap ? ((kh * sh - Math.cosh(kh) + 1) / (k * k) + (l || 0) * sh / k) / (h + (l || 0))
+                   : sh / k;
+    const cp = om / k;
+    return { k, L: 2 * Math.PI / k, kh, H_S: 4 * k * sh * I / den,
+             cp, cg: 0.5 * cp * (1 + 2 * kh / Math.sinh(2 * kh)) };
+  }
+
+  /** Fire one wave train (wave.train > 0). Every press is a fresh
+   *  experiment: the flume is reset to still water and t = 0 (resetWater,
+   *  which also clears the gauges' history through main.js's t-went-back
+   *  check), then the train starts at t = 0. A lecturer could not see how to
+   *  run WV-5 a second time: the old rule refused a press while the paddle
+   *  was still moving, and a second train fired after the first ran into its
+   *  leftovers. A reset also means the paddle never jerks — it restarts from
+   *  rest in still water. Returns true when a train starts. */
+  function fireTrain() {
+    const w = S.p.wave;
+    if (!(w.train > 0) || !(w.on > 0.5)) return false;
+    resetWater();
+    S.p.wave.t0 = S.t;
+    return true;
+  }
+
+  /** Is the paddle a flap? (wave.flap, with the still depth it needs.) */
+  function flapOn() {
+    const w = S.p.wave;
+    return w.flap > 0.5 && w.d > 0;
+  }
+
+  /** The bed under the paddle's column, from the mask (the first non-solid
+   *  cell up from the bottom) — the flap's hinge is measured from it. */
+  function paddleBed() {
+    const i = Math.max(1, Math.round(S.p.wave.x / S.dx));
+    for (let j = 0; j < S.ny; j++) if (S.mask[j * S.nx + i] < 192) return j * S.dx;
+    return 0;
+  }
+
   function step(nsub) {
     const p = S.p, h = dt();
     for (let n = 0; n < nsub; n++) {
@@ -1152,12 +1333,26 @@ const SIM = (() => {
       simUniforms(prog.vel, h);
       gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
       gl.uniform1f(prog.vel.u("u_nu"), p.nu);
+      gl.uniform2f(prog.vel.u("u_nuOut"), p.outflowNu || 0,
+        p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);
+      gl.uniform1f(prog.vel.u("u_twOut"), p.twOutflowOnly ? 1 : 0);
+      gl.uniform1f(prog.vel.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
       gl.uniform1f(prog.vel.u("u_cs"), p.cs);
       gl.uniform1f(prog.vel.u("u_cf"), p.cf);
       gl.uniform1f(prog.vel.u("u_slip"), p.slip);
       gl.uniform1f(prog.vel.u("u_bulk"), p.bulk);
       gl.uniform4f(prog.vel.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
         p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
+      gl.uniform1f(prog.vel.u("u_waveD"), wallPaddle() ? p.wave.d : 0);
+      // The flap and the train envelope (both opt-in): the CPU hands the
+      // paddle's velocity for this substep, and the flap's hinge and
+      // still-water level. y = 0 keeps the old expression in the shader.
+      const flap = flapOn(), shaped = flap || p.wave.train > 0;
+      gl.uniform2f(prog.vel.u("u_waveU"), shaped ? paddle(S.t).U : 0, shaped ? 1 : 0);
+      if (flap) {
+        const zb = paddleBed();
+        gl.uniform2f(prog.vel.u("u_flap"), zb - Math.max(0, p.wave.hinge || 0), zb + p.wave.d);
+      } else gl.uniform2f(prog.vel.u("u_flap"), 0, 0);
       GLH.bindTarget(gl, S.U.write.fbo, S.nx, S.ny);
       quad.draw();
       S.U.swap();
@@ -1173,7 +1368,9 @@ const SIM = (() => {
       simUniforms(pv, h);
       gl.uniform1f(pv.u("u_ca"), p.ca);
       gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
-      gl.uniform2f(pv.u("u_dyeLine"), p.dyeLine, p.dyeLine > 0 ? 1 : 0);
+      dyeUniforms(pv);
+      const rd = p.residueDrain && Math.abs(p.g) < 0.1 ? p.residueDrain : null;
+      gl.uniform2f(pv.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
       if (useAcc) {
         // T BEFORE this substep — the running-mean weight is h/(T+h).
         gl.uniform1f(pv.u("u_Tacc"), S.avg.t);
@@ -1216,6 +1413,81 @@ const SIM = (() => {
     return S.colBuf;
   }
 
+  // ---------------------------------------------------------------- dye seeds
+  /** Where the dye is released: a scene's own `dye.seeds` (an array, or a
+   *  function of its params — the seed moves with the geometry), each
+   *  [x0, z0, x1, z1, ports?, radius?] in metres; ports 0/absent is a
+   *  continuous line, n > 0 that many point releases along it; radius
+   *  defaults to one cell. A scene that declares none gets one: a vertical
+   *  line of six ports just inside an upstream inflow, over the depth the
+   *  column reduction last saw there, or a point at a running spout. The
+   *  scene's `dyeLine` (or the panel's) pulses the release; 0 is continuous.
+   *  Refreshed about twice a second, because the default follows the water. */
+  function dyeSeeds() {
+    const sc = S.scene, p = S.p, out = [];
+    const decl = sc.dye && sc.dye.seeds;
+    const list = typeof decl === "function" ? decl(S.params) : decl;
+    if (list && list.length) {
+      for (const d of list) {
+        const pt = d.length < 4;
+        out.push([d[0], d[1], pt ? d[0] : d[2], pt ? d[1] : d[3],
+                  pt ? 1 : (d[4] || 0), d[5] || (pt ? 2 : 0.75) * S.dx]);
+      }
+      return out;
+    }
+    if (p.inflow && p.inflow.on) {
+      // Clear of the inflow's own sponge where the scene has a short one,
+      // never further in than a tenth of the domain.
+      const x = Math.min(0.1 * S.W, (sc.spongeIn || 6 * S.dx) + 3 * S.dx);
+      const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
+      const cb = S.colBuf;
+      let z0 = 0, z1 = S.H;
+      if (cb && cb[i * 4 + 1] > 4 * S.dx) {
+        z0 = cb[i * 4] + 0.12 * cb[i * 4 + 1];
+        z1 = cb[i * 4] + 0.88 * cb[i * 4 + 1];
+      }
+      out.push([x, z0, x, z1, 6, 0.75 * S.dx]);
+    } else if (p.source && p.source.on) {
+      out.push([p.source.x, p.source.z, p.source.x, p.source.z, 1, 0.6 * p.source.r]);
+    }
+    return out;
+  }
+  const SEED_A = new Float32Array(32), SEED_P = new Float32Array(16);
+  /** The dye uniforms for one vof substep. Two sources of dye A:
+   *  - the SEEDS (above) — a scene's fixed release, off unless the scene or
+   *    the card asks for it (`dye.on`, `dyeLine`, the Dye sources control):
+   *    `S.dyeOn`, set from render's `opts.dyeSeeds`;
+   *  - the INJECTOR — `p.dyeInj = {x, z, r}`, the Dye tool held down at a
+   *    point (main.js), released every substep while it is set.
+   *  Both stand down when the dye is not drawn (`S.dyeDraw`: Average, which
+   *  has no accumulator for it). The van Leer dye faces run once any dye A
+   *  has gone in since the last reset, so a run with no ink in it costs what
+   *  it always did. */
+  function dyeUniforms(pr) {
+    const on = !!S.dyeOn && S.dyeDraw !== false;
+    if (on && (!S.seeds || S.t < S.seedT || S.t - S.seedT > 0.5)) {
+      S.seeds = dyeSeeds().slice(0, 8); S.seedT = S.t;
+      S.seeds.forEach((d, k) => {
+        SEED_A.set(d.slice(0, 4), k * 4); SEED_P[k * 2] = d[4]; SEED_P[k * 2 + 1] = d[5];
+      });
+    }
+    const n = on && S.seeds ? S.seeds.length : 0;
+    if (n) {
+      gl.uniform4fv(pr.u("u_seed[0]"), SEED_A);
+      gl.uniform2fv(pr.u("u_seedP[0]"), SEED_P);
+    }
+    const inj = S.dyeDraw !== false ? S.p.dyeInj : null;
+    if (n || inj) S.dyeUsed = true;
+    gl.uniform4f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, S.dyeUsed ? 1 : 0, 0);
+    gl.uniform4f(pr.u("u_dyeInj"), inj ? inj.x : 0, inj ? inj.z : 0, inj ? inj.r : 0, inj ? 1 : 0);
+  }
+  /** The Dye tool's release radius: a few cells, and never less than a
+   *  sliver of the domain, so a coarse grid and a fine one both lay a streak
+   *  of about the same width on screen. */
+  function dyeInjRadius() {
+    return Math.max(3 * S.dx, 0.008 * Math.max(S.W, S.H));
+  }
+
   function advanceParticles(realDt, avg) {
     // Under an open window the particles ride the FAVRE MEAN: u_U becomes the
     // accumulator texture and the shader's u_avg branch divides <f u>/f-bar at
@@ -1234,7 +1506,9 @@ const SIM = (() => {
     // Particle lifetime is per scene: a tracer has to outlive a wave period
     // or it respawns before it has drawn a single orbit, which is the whole
     // point of the long-wave flume (T = 4 s against the 6 s default).
-    gl.uniform1f(prog.part.u("u_plife"), S.scene.plife || 6.0);
+    // …and has to outlive its own trail, or the trail is cut short by the
+    // respawn and the slow scenes the fitted τ exists for lose it again.
+    gl.uniform1f(prog.part.u("u_plife"), Math.max(S.scene.plife || 6.0, 2.5 * lastTau));
     gl.uniform1f(prog.part.u("u_time"), S.t);
     gl.uniform1f(prog.part.u("u_valve"), S.p.valveClosed);
     GLH.bindTarget(gl, S.P.write.fbo, S.pn, S.pn);
@@ -1275,7 +1549,14 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_vmax"), opts.vmax);
     gl.uniform1f(prog.draw.u("u_lo"), opts.lo);
     gl.uniform1f(prog.draw.u("u_hi"), opts.hi);
-    gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : 0);
+    gl.uniform1f(prog.draw.u("u_dyeOn"), opts.dye ? 1 : (opts.avg ? 0 : 0.5));
+    // What is DRAWN is also what may be RELEASED: under Average (no
+    // accumulator, docs/averaging.md) neither the seeds nor the Dye tool put
+    // anything in. The seeds also need `opts.dyeSeeds` — a scene's fixed
+    // sources are off unless something asked for them.
+    S.dyeDraw = !!opts.dye;
+    const seeds = !!opts.dye && !!opts.dyeSeeds;
+    if (S.dyeOn !== seeds) { S.dyeOn = seeds; S.seeds = null; }
     gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
     gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);
     gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
@@ -1318,7 +1599,21 @@ const SIM = (() => {
     return moved;
   }
 
+  /** The water's share of the domain, from the last column reduction, about
+   *  once a second. Plan view (no gravity) has no columns: taken as full. */
+  function wetFraction() {
+    if (Math.abs(S.p.g) < 0.1 || !S.colBuf) return 1;
+    if (S.wetT === undefined || S.t < S.wetT || S.t - S.wetT > 1) {
+      let a = 0;
+      for (let i = 0; i < S.nx; i++) a += Math.max(0, S.colBuf[i * 4 + 1]);
+      S.wetFr = Math.min(1, Math.max(0.08, a / (S.nx * S.H)));
+      S.wetT = S.t;
+    }
+    return S.wetFr;
+  }
+  const TAIL_SUB = 6;           // dabs per particle per frame along its step
   function drawParticles(view, opts, cw, ch) {
+    lastTau = trailTau(view, opts.vmax);
     const clear = trailFor(cw, ch, view);
     GLH.bindTarget(gl, trail.fbo, cw, ch);
     if (clear) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
@@ -1330,7 +1625,7 @@ const SIM = (() => {
       // tail is a fixed span of FLOW — about a second of it — however fast or
       // slow the frame rate happens to be. Skipped entirely while the clock
       // is stopped, so a paused picture keeps its trails frozen.
-      const k = Math.exp(-Math.max(opts.pdt, 0) / TRAIL_TAU);
+      const k = Math.exp(-Math.max(opts.pdt, 0) / lastTau);
       gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
       gl.useProgram(prog.fill);
       gl.uniform4f(prog.fill.u("u_col"), k, k, k, k);
@@ -1347,9 +1642,16 @@ const SIM = (() => {
       gl.blendEquation(gl.FUNC_ADD);
     }
 
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    // ONE, ONE: the dab is premultiplied, so it adds its own amplitude.
+    // SRC_ALPHA here SQUARED it — a 0.3 dab laid down 0.09, about 23 counts
+    // of 255, which the fade took back within a few frames: the trails were
+    // there, at a brightness nobody could see.
+    gl.blendFunc(gl.ONE, gl.ONE);
     gl.useProgram(prog.pdraw);
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
+    // u_Q is the other half of the ping-pong: where each particle was before
+    // the last advance, so the tail can fill in the whole step.
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    gl.uniform1i(prog.pdraw.u("u_sub"), TAIL_SUB);
     gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
     gl.uniform4f(prog.pdraw.u("u_rect"), view.ndc[0], view.ndc[1], view.ndc[2], view.ndc[3]);
@@ -1357,14 +1659,23 @@ const SIM = (() => {
     // Big enough to see. The old 1.5-3 px dot disappeared over a pale field
     // and read as sensor noise over a dark one.
     // Fine. The streak's LENGTH is the reading; its width is only noise.
-    const n = Math.min(S.pn * S.pn, TRAIL_N(view.pxW));
+    const n = Math.min(S.pn * S.pn, TRAIL_N(view, wetFraction()));
     const tail = Math.max(2.0, view.pxW / 620);
     gl.uniform1f(prog.pdraw.u("u_psize"), tail);
-    gl.uniform1f(prog.pdraw.u("u_amp"), 0.30);
-    points.draw(n);
+    // Six dabs a frame where there was one, so each is dimmer: the same ink
+    // per length of trail where the step is long, and a solid line where the
+    // old single dab left a dotted one.
+    gl.uniform1f(prog.pdraw.u("u_amp"), 0.12);
+    points.draw(n * TAIL_SUB);
 
-    // The tail, composited under everything that follows.
+    // The tail, composited under everything that follows: first its dark
+    // shadow (FS_TRAIL_SHADOW), then the trail itself.
     GLH.bindTarget(gl, null, cw, ch);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(prog.tshadow);
+    GLH.bindTex(gl, prog.tshadow, [["u_T", trail.tex]]);
+    gl.uniform2f(prog.tshadow.u("u_px"), 1 / cw, 1 / ch);
+    quad.draw();
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // it is premultiplied
     gl.useProgram(prog.tex);
     GLH.bindTex(gl, prog.tex, [["u_T", trail.tex]]);
@@ -1373,13 +1684,16 @@ const SIM = (() => {
     // …then the heads, once, straight to the screen at full strength. Drawn
     // outside the trail buffer on purpose: inside it they would fade with
     // everything else and there would be no particle, only a smear.
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    // Alpha-blended, not added: a head is a white core in a dark ring
+    // (FS_PART_DRAW), which is what keeps it visible on the pale colourings.
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(prog.pdraw);
     // Re-bind: the composite above pointed texture unit 0 at the trail, and
     // `u_P` still names unit 0 — without this the heads read the trail as
     // their own positions and land nowhere.
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex]]);
-    gl.uniform1f(prog.pdraw.u("u_psize"), tail + 1.6);
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    gl.uniform1i(prog.pdraw.u("u_sub"), 1);
+    gl.uniform1f(prog.pdraw.u("u_psize"), tail + 3.0);
     gl.uniform1f(prog.pdraw.u("u_amp"), 1.0);
     points.draw(n);
     gl.disable(gl.BLEND);
@@ -1570,6 +1884,72 @@ const SIM = (() => {
     return h;
   }
 
+  /** STREAMLINES: the face fluxes of the whole field, read back WITHOUT a
+   *  pipeline stall. Every other full-field reader here (fieldStats,
+   *  avgField, the averaged hydraulicGrade) calls readPixels into client
+   *  memory, which blocks until the GPU has finished every queued substep.
+   *  This one first packs the fluxes into a half-width texture (FS_SFLUX —
+   *  two cells per texel, a quarter of the bytes of U + F), reads that into a
+   *  pixel-pack buffer and drops a fence; `streamPoll` checks the fence with
+   *  a zero timeout on a later frame and only copies the bytes out once the
+   *  GPU says they are there. One request in flight at a time; the caller
+   *  (main.js refreshStream) sets the rate.
+   *
+   *  Live: from U and F. Average: from the Favre accumulator. The request
+   *  remembers which, and the S it was made against, so a result that lands
+   *  after a rebuild is dropped rather than drawn on the wrong grid. Consumed
+   *  by STREAM.psi (js/stream.js). */
+  let SF = null;
+  function streamRequest(avg) {
+    if (SF && SF.sync) return false;
+    const nx = S.nx, ny = S.ny, w2 = (nx + 1) >> 1, bytes = w2 * ny * 16;
+    if (!SF || SF.forS !== S) {
+      if (SF) { gl.deleteBuffer(SF.pbo); gl.deleteFramebuffer(SF.fbo); gl.deleteTexture(SF.tex); }
+      const tex = GLH.createTexture(gl, w2, ny, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
+      SF = { forS: S, w2, tex, fbo: GLH.createFBO(gl, tex), pbo: gl.createBuffer(),
+             buf: new Float32Array(w2 * ny * 4), sync: null };
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    }
+    const A = !!(avg && S.avg);
+    gl.useProgram(prog.sflux);
+    GLH.bindTex(gl, prog.sflux, [["u_U", A ? S.avg.fld.read.tex : S.U.read.tex],
+                                 ["u_F", S.F.read.tex], ["u_S", S.solid]]);
+    gl.uniform2f(prog.sflux.u("u_res"), nx, ny);
+    gl.uniform1f(prog.sflux.u("u_avg"), A ? 1 : 0);
+    gl.uniform1f(prog.sflux.u("u_valve"), S.p.valveClosed);
+    GLH.bindTarget(gl, SF.fbo, SF.w2, ny);
+    quad.draw();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+    gl.readPixels(0, 0, SF.w2, ny, gl.RGBA, gl.FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    SF.sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
+    SF.avg = A; SF.t = S.t;
+    return true;
+  }
+  /** The finished request, or null while the GPU is still on it. WebGL only
+   *  updates a fence between tasks, so this is at least one frame later. The
+   *  copy-out does not wait for the sim's queued work, but it is one round
+   *  trip to the browser's GPU process (the price of a 1×1 probe); `ms`
+   *  reports it — see engineering-notes, "Streamlines are contours of ψ". */
+  function streamPoll() {
+    if (!SF || !SF.sync) return null;
+    const t0 = performance.now();
+    const st = gl.clientWaitSync(SF.sync, 0, 0);
+    const t1 = performance.now();
+    if (st === gl.TIMEOUT_EXPIRED) return null;
+    gl.deleteSync(SF.sync); SF.sync = null;
+    if (st === gl.WAIT_FAILED || SF.forS !== S) return null;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, SF.pbo);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, SF.buf);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    return { avg: SF.avg, t: SF.t, nx: S.nx, ny: S.ny, dx: S.dx, w2: SF.w2, D: SF.buf,
+             ms: { wait: t1 - t0, copy: performance.now() - t1 } };
+  }
+  function streamPending() { return !!(SF && SF.sync); }
+
   function probe(x, z, avg) {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
@@ -1589,7 +1969,57 @@ const SIM = (() => {
     gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
     const g = Math.abs(S.p.g) || 9.81;
     return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, speed: Math.hypot(u, w),
-             solid: S.mask[j * S.nx + i] };
+             dye: S.pxBuf[1], solid: S.mask[j * S.nx + i] };
+  }
+
+  /** `probe` for several points at once, returning the same objects in the
+   *  same order. Points are grouped by grid row and each row's x-span is read
+   *  with ONE readPixels per texture, instead of one per point per texture.
+   *
+   *  Why: a readPixels is a synchronous round trip to Chrome's GPU process and
+   *  costs a fixed few milliseconds whatever its size (measured 4.7 ms per
+   *  1×1 read under ANGLE/D3D11). Three gauges probed one by one were six of
+   *  them, ~45 ms a frame (UP-1). Three gauges on one row are now one or two
+   *  reads. Values are bit-identical to `probe`. `noFill` skips the fill
+   *  texture's read (the gauges never use f): `f` is then null, and a row
+   *  costs ONE read. */
+  function probeMany(pts, avg, noFill) {
+    const g = Math.abs(S.p.g) || 9.81;
+    const cell = pts.map(([x, z]) => [
+      Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx))),
+      Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)))]);
+    const rows = new Map();
+    cell.forEach(([i, j], k) => {
+      const r = rows.get(j);
+      if (r) { r.i0 = Math.min(r.i0, i); r.i1 = Math.max(r.i1, i); r.k.push(k); }
+      else rows.set(j, { i0: i, i1: i, k: [k] });
+    });
+    const out = new Array(pts.length);
+    const useAvg = !!(avg && S.avg);
+    rows.forEach((r, j) => {
+      const n = r.i1 - r.i0 + 1;
+      const A = new Float32Array(4 * n);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, useAvg ? S.avg.fld.read.fbo : S.U.read.fbo);
+      gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, A);
+      let B = null;
+      if (!useAvg && !noFill) {
+        B = new Float32Array(4 * n);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+        gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, B);
+      }
+      r.k.forEach((k) => {
+        const i = cell[k][0], o = 4 * (i - r.i0), solid = S.mask[j * S.nx + i];
+        if (useAvg) {
+          const f = A[o + 2], d = Math.max(f, 1e-6);
+          const u = A[o] / d, w = A[o + 1] / d, p = A[o + 3];
+          out[k] = { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+        } else {
+          const u = A[o], w = A[o + 1], p = A[o + 2];
+          out[k] = { i, j, f: B ? B[o] : null, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+        }
+      });
+    });
+    return out;
   }
 
   /** The 1st and 99th percentile of a display field over WET cells, for the
@@ -1632,6 +2062,7 @@ const SIM = (() => {
         const x = (i + 0.5) * S.dx, z = (j + 0.5) * S.dx;
         let q = null;
         if (mode === 0 || mode === 1) q = P / g;
+        else if (mode === 8) q = P;          // p in kPa = ρP/1000, ρ = 1000
         else if (mode === 6) q = z - tilt * x + P / g;
         else if (mode === 7) q = z - tilt * x + P / g + (u * u + w * w) / (2 * g);
         else if (mode === 2) q = Math.hypot(u, w);
@@ -1668,21 +2099,34 @@ const SIM = (() => {
   /** A whole column of velocity — the vertical rake. Returns u(z) at cell
    *  centres; under `avg` the column comes from the Favre accumulator,
    *  unpacked to the same (u, w, P) layout. */
-  function rake(x, out, avg) {
+  /*  `fOut` (optional, a Float32Array of ny, or `true`) also returns the
+   *  column's fill f — what a rake inside a conduit needs to find where the
+   *  water in it ends. Under Average f̄ comes free with the mean; live it costs
+   *  one more 1×ny read, so a rake only asks when it needs it. */
+  function rake(x, out, avg, fOut) {
     const i = Math.max(1, Math.min(S.nx - 2, Math.floor(x / S.dx)));
     const buf = out && out.length >= S.ny * 4 ? out : new Float32Array(S.ny * 4);
+    let f = null;
+    if (fOut) f = fOut instanceof Float32Array && fOut.length >= S.ny ? fOut : new Float32Array(S.ny);
     if (avg && S.avg) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
       gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
       for (let k = 0; k < S.ny; k++) {
         const d = Math.max(buf[k * 4 + 2], 1e-6);
+        if (f) f[k] = buf[k * 4 + 2];
         buf[k * 4] /= d; buf[k * 4 + 1] /= d; buf[k * 4 + 2] = buf[k * 4 + 3];
       }
     } else {
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
       gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      if (f) {
+        const F = new Float32Array(S.ny * 4);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
+        gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, F);
+        for (let k = 0; k < S.ny; k++) f[k] = F[k * 4];
+      }
     }
-    return { i, buf };
+    return { i, buf, f };
   }
 
   /** A rectangular strip of the velocity field, pulled back in ONE readPixels
@@ -1946,9 +2390,18 @@ const SIM = (() => {
       // wrapper says the solid is. If that texel is not solid, the wrapper
       // is describing a surface the mask does not have (an erased hole) or
       // no longer has (an open valve) — zero the sample.
-      const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * 0.5 * S.dx) / S.dx)));
-      const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * 0.5 * S.dx) / S.dx)));
-      if (!sol(ix, jx)) { q.p = 0; q.f = 0; }
+      // A sloped face rasterises as a cell staircase, so half a cell in
+      // can still be a water cell between two stair-steps: on PF-2's 30°
+      // wall that zeroed 6 samples in 154 and read F_h 4% low. So the check
+      // looks 0.5, 1.0 and 1.5 Δx in and the surface exists if ANY is solid
+      // — still far short of an erase stroke or an open valve's thickness.
+      let inside = false;
+      for (const dd of [0.5, 1.0, 1.5]) {
+        const ix = Math.max(0, Math.min(S.nx - 1, Math.floor((q.x - q.nx * dd * S.dx) / S.dx)));
+        const jx = Math.max(0, Math.min(S.ny - 1, Math.floor((q.z - q.nz * dd * S.dx) / S.dx)));
+        if (sol(ix, jx)) { inside = true; break; }
+      }
+      if (!inside) { q.p = 0; q.f = 0; }
     }
     const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
     const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);
@@ -2083,22 +2536,26 @@ const SIM = (() => {
         mdot += f * wn;
       }
     }
-    let m = 0;                                       // enclosed water, for the z-budget
+    let m = 0, vol = 0;                              // enclosed water, for the z-budget
     for (let j = jB; j < jT; j++) {
-      for (let i = iL; i < iR; i++) if (!sol(i, j)) m += F[k(i, j)];
+      for (let i = iL; i < iR; i++) if (!sol(i, j)) { m += F[k(i, j)]; vol += Math.min(F[k(i, j)], 1); }
     }
     m *= RHO * S.dx * S.dx;
+    // `vol` counts a full cell once, as the faces' Q does (min(f, 1)), so its
+    // rate of change balances Q: Σf would add the EOS compression of every
+    // column a rising level loads (gh/c², ~3% in a 2 m tank) to the storage.
     return { fx: -RHO * dFx * S.dx, fz: -RHO * dFz * S.dx - gAbs * m,
-             mdot: RHO * mdot * S.dx, mass: m, iL, iR, jB, jT };
+             mdot: RHO * mdot * S.dx, mass: m, vol: vol * S.dx * S.dx, iL, iR, jB, jT };
   }
 
   const get = () => S;
   return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
-           step, columns, advanceParticles, render, probe, rake, patch, patchVel,
-           fieldStats, particlePos,
+           step, columns, advanceParticles, render, probe, probeMany, rake, patch, patchVel,
+           fieldStats, particlePos, particleTrail, dyeInjRadius,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,
-           hydraulicGrade,
-           setValve, setParam, params,
+           hydraulicGrade, streamRequest, streamPoll, streamPending,
+           setValve, setParam, params, windTau, wallPaddle,
+           paddle, fireTrain, flapOn, paddleBed, envelope, wavemakerHS,
            avgStart, avgStop, avgReset, avgActive, avgT, transportResidual,
            avgStepField, avgField, avgStepColumns, avgColumns, avgProbe,
            stamp: (seg, v) => { stampSeg(S.mask, seg, v); } };

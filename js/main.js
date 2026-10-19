@@ -10,7 +10,21 @@ const CONFIG = {
   // (m2, c13) is a genuinely long wait before the scene settles.
   budgets: { Low: 45000, Medium: 95000, High: 175000, "Very high": 350000, Ultra: 700000 },
   defaultBudget: "Medium",
-  frameBudgetMs: 15,          // sim time we are willing to spend per frame
+  // The frame-rate governor (see `governFrame` and the engineering notes,
+  // "Frame pacing"). It regulates the SMOOTHED wall-clock frame interval, not
+  // the CPU time of one frame: WebGL is asynchronous, so a frame's own timing
+  // measures either the enqueue (~1 ms) or, on a readback frame, the whole
+  // queue the previous frames left behind. Running: ~33 fps, the slowest the
+  // interface still feels live, which buys the most substeps per frame.
+  // Spin-up: ~5 fps, near flat out — nobody is reading the numbers yet, and
+  // throughput only grows with the batch (the per-frame cost is amortised).
+  frameTargetMs: 30,
+  warmFrameTargetMs: 200,
+  // ...but never steer slower than this outside spin-up, whatever the share
+  // rule in governTarget asks for: much below ~7 fps a drag stops feeling
+  // attached. (100 ms was tried: on hammer, whose particles make the render
+  // heavy, it left the sim a third of the frame — 31% of flat out.)
+  frameCeilMs: 150,
   histMax: 900,               // samples the CORNER card plots — its look is fixed
   // The deep store behind the inspector. Sampling is one point per rendered
   // frame, so ~60 per simulated second at speed 1: 20 000 is ~5.5 minutes of
@@ -22,8 +36,13 @@ const CONFIG = {
 
 const state = {
   scene: null, budget: CONFIG.defaultBudget,
-  tool: "wall", brush: 0.055,
-  mode: 0, range: {}, particles: false, dye: true, channel: true, labels: true, jumps: true,
+  // The pointer tool in hand. NULL is the neutral "Read" tool: a press never
+  // draws, it pins the readout card where it lands (state.pin). Only the
+  // sandbox door arms Wall (newSandbox, a `?scene=sandbox` boot): everywhere
+  // else building waits until Wall, Erase, Valve or Pour is CHOSEN — a
+  // lecturer on an iPad touched an exercise to read it and found blocks.
+  tool: null, brush: 0.055,
+  mode: 0, range: {}, particles: false, dyeSeeds: false, channel: true, labels: true, jumps: true,
   ui: null,                   // the resolved UI profile; UIMODE.full() when absent
   // The legend sits top right, immediately left of the Controls panel, until
   // somebody drags it; then the position is theirs for the session and stops
@@ -34,7 +53,22 @@ const state = {
   // by default: most scenes are free-surface, where the HGL lies on the water
   // line and adds nothing.
   grade: false, gradeBuf: null, gradeTick: 0, gradeAvg: false,
+  // Streamlines: contours of the stream function at equal Δψ (js/stream.js),
+  // refreshed a few times a second off an ASYNC readback (collectStream / requestStream).
+  // `slineN` is roughly how many tubes span the flow; `slineDpsi` is the
+  // spacing actually in use, HELD between refreshes so the lines do not
+  // breathe as the range jitters, and re-picked only when it drifts far off.
+  sline: false, slineN: 12, slineBuf: null, slineGrid: null,
+  slineDpsi: 0, slineAt: 0, slineT: -1,
   ruler: true,                // metre ticks on the view edges — a workspace preference
+  // The instruments' on-canvas readout BOXES — gauge corner cards, the
+  // Control volume's budget and face numbers, flux-section and rake chips,
+  // the pressure-force values — folded away together (VIEW → Readouts, I).
+  // The instruments keep measuring and recording while they are hidden.
+  instReadouts: true,
+  // The card that follows the cursor over the water (VIEW → Hover readout).
+  // A profile's `readouts.cursor: false` still withholds it outright.
+  hoverCard: true,
   measure: null, measDrag: null,   // the tape measure: {x0,z0,x1,z1} in metres
   cv: null, cvDrag: null,          // the control volume: box + EMA budget
   flux: [], fluxDrag: null,        // sections: what crosses each one, EMA'd
@@ -66,11 +100,19 @@ const state = {
   // accumulators and reset the overlay's EMAs in BOTH directions.
   avg: false,
   gauges: [], rakes: [], gaugeField: "h", tracers: null, tracerN: 9,
+  gaugeSpan: "window",        // the corner charts: "window" (scrolling) or "all" (t = 0 → now)
   gaugeT: -1,                 // sim time of the last gauge sample — see sampleGauges
   gaugeSeq: 0,                // ever-increasing gauge id, for inspector identity
   deliv: null,                // measured inlet discharge / level, for the panel
   cursor: [0, 0], inside: false, hover: null,
-  drag: null, pour: null,
+  // The pinned readout: the touch screen's hover. A tap (or a click) with no
+  // tool in hand puts the readout card at {x, z} and leaves it there until
+  // the next tap elsewhere, or a tap on dry ground / outside the domain.
+  // `ptr` is the pointer type of the last canvas event — the floating hover
+  // card follows a mouse or pen, never a finger (it would sit under it).
+  pin: null, pinProbe: null, pinTick: 0, ptr: "mouse", pending: null, press: null,
+  barTop: 0,                  // px a wrapped touch strip takes off the top of the view (fitBar)
+  drag: null, pour: null, dyeInj: null,
   zoom: 1, vex: 1, panC: null, panDrag: null, pinch: null, spoutDrag: false, vexDrag: null,
   // The exaggeration is fitted to the window until somebody sets it by hand —
   // then it is theirs, and a resize stops moving it (see autoVex).
@@ -98,10 +140,12 @@ let canvas, over, octx, view, sim;
  *  honest because they follow the same rect. */
 function baseRect() {
   const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
+  // A wrapped (two-row) touch strip claims the top of the canvas — fitBar.
+  const top = Math.min(state.barTop || 0, ch * 0.4);
   const ar = sim.W / (sim.H * state.vex);
   let w = cw, h = cw / ar;
-  if (h > ch) { h = ch; w = ch * ar; }
-  return { cw, ch, w, h, bx: (cw - w) / 2, by: (ch - h) / 2 };
+  if (h > ch - top) { h = ch - top; w = h * ar; }
+  return { cw, ch, w, h, bx: (cw - w) / 2, by: top + (ch - top - h) / 2 };
 }
 
 function computeView() {
@@ -166,7 +210,8 @@ function zoomAt(px, py, factor) {
 const VEX_FILL = 0.62, VEX_MAX = 8;
 function autoVex() {
   if (!canvas || !sim || !(sim.W > 0) || !(sim.H > 0)) return 1;
-  const cw = canvas.clientWidth || 900, ch = canvas.clientHeight || 600;
+  const cw = canvas.clientWidth || 900;
+  const ch0 = canvas.clientHeight || 600, ch = ch0 - Math.min(state.barTop || 0, ch0 * 0.4);
   // From baseRect: a width-limited rect is `cw · H · vex / W` tall.
   const v = VEX_FILL * ch * sim.W / (cw * sim.H);
   return Math.max(1, Math.min(VEX_MAX, v));
@@ -208,6 +253,12 @@ function loadScene(id, keepDrawing) {
   // A scene whose whole subject is the particle motion should not open with
   // the particles switched off and a tip asking you to find the key.
   if (sc.particles !== undefined) state.particles = !!sc.particles;
+  // Nothing is dyed until somebody releases it with the Dye tool. A scene's
+  // FIXED sources (its `dye.seeds`, or the default inlet line) run only when
+  // it asks — `dye.on`, or the pulsed timelines of `dyeLine` (m1/m2) — or a
+  // card sets `dyeSeeds` in its viewParams.
+  state.dyeSeeds = !!(sc.dye && sc.dye.on) || sc.dyeLine > 0;
+  state.slineBuf = null; state.slineDpsi = 0; state.slineT = -1;
   state.gauges.length = 0; state.rakes.length = 0; state.tracers = null;
   state.measure = null; state.measDrag = null;
   state.cv = null; state.cvDrag = null;
@@ -215,6 +266,7 @@ function loadScene(id, keepDrawing) {
   state.force = null;
   state.forceHover = null;
   state.forceScale = null;
+  state.pin = null; state.pinProbe = null;
   state.gaugeT = -1;
   state.deliv = null;
   state.tipIdx = 0; state.tipAt = 0;
@@ -236,9 +288,24 @@ function loadScene(id, keepDrawing) {
   // syncing at the callers instead is how one of them gets missed.
   LEGEND.sync();
   showToast(sc.name, sc.blurb);
-  document.getElementById("sceneName").textContent = sc.name;
-  document.getElementById("sceneKey").textContent = sc.key;
+  syncTitle();
   PICKER.refresh();
+}
+
+/** The label at the top right: the loaded EXERCISE's title (what its menu
+ *  calls it) while one is open, the scene's name otherwise. Several exercises
+ *  share one scene, and a student who opened "Steady and unsteady flow" should
+ *  not find "Plan view — flow past a body" named over it. Called when a scene
+ *  loads and when an exercise is picked or cleared. */
+function syncTitle() {
+  const sc = state.scene || {};
+  let ex = typeof EX !== "undefined" ? EX.current : null;
+  // Only while the bench IS that exercise's scene: a scene picked from the
+  // menu afterwards is named as itself.
+  if (ex && ex.scene !== sc.id) ex = null;
+  const n = document.getElementById("sceneName"), k = document.getElementById("sceneKey");
+  if (n) n.textContent = ex ? ex.title : (sc.name || "");
+  if (k) k.textContent = ex ? ex.id + " · " + (sc.name || "") : (sc.key || "");
 }
 
 /** Load a scene from the UI — the picker, the bar button, the panel row.
@@ -264,12 +331,20 @@ function loadScene(id, keepDrawing) {
 function switchScene(id) {
   if (!SCENES.byId[id]) return false;
   state.speed = 1.0;
-  state.dye = true;
+  state.dyeSeeds = false;             // loadScene turns them on where the scene asks
   state.jumps = true;
   state.particles = false;            // scenes that want them set `sc.particles`
   state.grade = false;                // an exercise that wants them says so in viewParams
+  state.sline = false; state.slineN = 12;   // likewise the streamlines
   state.gaugeField = "h";
+  state.gaugeSpan = "window";         // an exercise that wants the whole run says gaugeSpan: "all"
+  state.instReadouts = true;          // an exercise that wants them off says so in viewParams
+  state.hoverCard = true;
   state.tracerN = 9;
+  // Live, as a fresh boot is. Average used to survive a switch, so a class
+  // that had averaged FF-5 opened VC-2 — an unsteady fill — on Average. An
+  // exercise that wants it says `avg: true` in viewParams (none does).
+  if (state.avg) setAverage(false);
   UIMODE.reset();                     // a new scene is a whole interface again
   GINSP.closeAll();
   if (state.paused) togglePause();    // via the toggle, so the glyph follows
@@ -302,7 +377,7 @@ function syncURL(id) {
 // ==========================================================================
 //  The fields the water can be painted with.
 // ==========================================================================
-/** The seven colourings, as data.
+/** The colourings, as data.
  *
  *  A field used to be described in three disconnected places — a `u_mode`
  *  integer in the GLSL, an `opts` pair in the panel spec, and prose in an
@@ -346,8 +421,16 @@ const FIELDS = [
     ramp: "turbo", def: () => [0, sceneNow().headMax || 3],
     mean: "A true average of the pressure.",
     blurb: "The pressure alone. In still water it is simply the depth below the surface, so it climbs down every column and is not comparable between cells at different heights." },
+  // The pressure itself, p = ρP in kPa (the solver carries the kinematic
+  // P = p/ρ). Unlike the heads it does not divide by g, so it means the same
+  // thing in a plan view (gravity ≈ 0), where a head is p/0.001. Next to
+  // Pressure head because it is the same picture times ρg wherever g is real.
+  { mode: 8, id: "p", name: "Pressure", sym: "p", unit: "kPa",
+    ramp: "turbo", def: () => pressureRange(), floating: true,
+    mean: "A true average of the pressure.",
+    blurb: "The pressure above atmospheric, in kPa. In still water it grows with depth, p = ρg × depth; in moving water it is highest where the flow is stopped against something and lowest where it is fastest." },
   { mode: 4, id: "vort", name: "Vorticity", sym: "ω", unit: "1/s",
-    ramp: "divg", mid: 0, def: () => [-40, 40],
+    ramp: "divg", mid: 0, def: () => { const v = sceneNow().vortMax || 40; return [-v, v]; },
     mean: "The spin OF the mean flow — it matches the averaged spin only where the fill holds steady.",
     blurb: "∂w/∂x − ∂u/∂z: the local spin. Shear layers, the roller of a jump and the separation off a step each show as sheets of one sign." },
   { mode: 3, id: "froude", name: "Froude number", sym: "Fr", unit: "",
@@ -368,11 +451,99 @@ const FIELDS = [
 function sceneNow() { return state.scene || {}; }
 /** The scene's own maximum for the Water view's depth hue. */
 function hmaxScene() { const s = sceneNow(); return s.hmax || (s.g ? 2.0 : 1); }
+/** The Pressure field's default range, in kPa. A scene may state its own
+ *  (`pRange: [lo, hi]`); otherwise under gravity it is the hydrostatic scale
+ *  ρgH over the scene's pressure-head maximum, and in a plan view (|g| < 0.5,
+ *  where hydrostatics is absent) the live field's own spread, fitted ONCE when
+ *  the range is first asked for and held from then on like any other range.
+ *  A plan view's pressure has no hydrostatic zero: a closed or level-fed
+ *  domain carries an arbitrary reference (`body` sits near 37 kPa and creeps
+ *  ~0.1 kPa a minute) under differences of ±½ρU² (~0.2 kPa there), so no
+ *  fixed number would show them. Before there is water to fit, ±½ρ·vmax².
+ *  ρ = 1000 kg/m³, so p in kPa is numerically ρ·P/1000. */
+function pressureRange() {
+  const s = sceneNow();
+  if (Array.isArray(s.pRange)) return s.pRange.slice();
+  const g = s.g === undefined ? 9.81 : Math.abs(s.g);
+  if (g < 0.5) {
+    const st = (sim && SIM.fieldStats) ? SIM.fieldStats(8, !!state.avg) : null;
+    if (st && isFinite(st.lo) && isFinite(st.hi) && st.hi > st.lo) {
+      const pad = 0.1 * (st.hi - st.lo);
+      return [+(st.lo - pad).toFixed(3), +(st.hi + pad).toFixed(3)];
+    }
+    const v = s.vmax || 4, q = 0.5 * v * v;
+    return [-q, q];
+  }
+  return [0, +(g * (s.headMax || 3)).toFixed(1)];
+}
 /** The momentum-flux scale, as the display pass has always computed it. */
 function momScene() { return 0.5 * Math.pow(sceneNow().vmax || 4, 2); }
 
 /** The registry entry for a shader mode integer. */
 function fieldFor(mode) { return FIELDS.find((f) => f.mode === mode) || FIELDS[0]; }
+
+/** The field's one-line description, as THIS exercise wants it said. A card
+ *  can replace a description that names concepts its lecture has not met
+ *  (`ui.fieldText: { froude: "above 1: fast and shallow; …" }`); `⋯ Show
+ *  everything` brings the registry's own words back with the rest. */
+function fieldBlurb(f) {
+  const u = state.ui;
+  const t = u && !u.lifted && u.fieldText && u.fieldText[f.id];
+  return t || f.blurb;
+}
+
+/** What a GAUGE can record — the gauges' own register, kept apart from FIELDS
+ *  (what the water is painted with) for the reason GINSP's header gives.
+ *  Described once, like FIELDS: the sampler writes every one of these keys on
+ *  every sample, the corner card, the inspector, the panel's "Gauges plot"
+ *  select and the CSV all read this list, and `ui.gaugeFields` narrows what is
+ *  OFFERED by id — never what is recorded.
+ *
+ *  `id` is the sample key and the wire key (rig `ui.field`, `viewParams
+ *  .gaugeField`, `ui.gaugeFields`): ASCII, notation-register symbols
+ *  (docs/notation.md) — `eta` for η and `speed` for |u|, as before; `phead`
+ *  is p/ρg, the same name `probe()` uses. `k` converts the STORED value to the
+ *  displayed one: pressure is stored in Pa and shown in kPa; the CSV writes
+ *  the stored value in `csv` units at full precision. Order is the order a
+ *  student meets them in the course (pressure first, heads last). */
+const GAUGE_QTY = [
+  { id: "p",     sym: "p",    unit: "kPa", csv: "Pa",  k: 1e-3, name: "Pressure p",
+    note: "pressure at the gauge, above atmospheric" },
+  { id: "phead", sym: "p/ρg", unit: "m",   csv: "m",   k: 1, name: "Pressure head p/ρg",
+    note: "the pressure as a height of water" },
+  { id: "u",     sym: "u",    unit: "m/s", csv: "mps", k: 1, name: "Velocity u (horizontal)",
+    note: "horizontal velocity, + to the right" },
+  { id: "w",     sym: "w",    unit: "m/s", csv: "mps", k: 1, name: "Velocity w (vertical)",
+    note: "vertical velocity, + upwards" },
+  { id: "speed", sym: "|u|",  unit: "m/s", csv: "mps", k: 1, name: "Speed |u|",
+    note: "speed at the gauge cell" },
+  { id: "eta",   sym: "η",    unit: "m",   csv: "m",   k: 1, name: "Level η",
+    note: "water level, η = z_b + d" },
+  { id: "d",     sym: "d",    unit: "m",   csv: "m",   k: 1, name: "Depth d",
+    note: "water depth of the column" },
+  { id: "h",     sym: "h",    unit: "m",   csv: "m",   k: 1, name: "Piezometric head h",
+    note: "piezometric head, h = z + p/ρg" },
+  { id: "H",     sym: "H",    unit: "m",   csv: "m",   k: 1, name: "Total head H",
+    note: "total head, H = z + p/ρg + |u|²/2g" },
+];
+function gaugeQty(id) { return GAUGE_QTY.find((q) => q.id === id) || null; }
+/** The quantity a gauge plots: its own choice, else the session default
+ *  (`state.gaugeField`), moved to the first one offered when the profile does
+ *  not offer it. Rig scripts push bare `{x, z}` gauges, so `field` is optional. */
+function gaugeFieldOf(g) {
+  const offer = UIMODE.gaugeFields();
+  const want = (g && g.field) || state.gaugeField;
+  if (offer.some((q) => q.id === want)) return want;
+  return offer.length ? offer[0].id : "h";
+}
+/** Set what EVERY gauge plots, and the default for the next one — what the
+ *  old global "Gauges plot" select meant, which old rigs and printed
+ *  worksheets ("set Gauges plot to Depth") still rely on. */
+function setAllGaugeFields(id) {
+  if (!gaugeQty(id)) return;
+  state.gaugeField = id;
+  state.gauges.forEach((g) => { g.field = id; });
+}
 
 /** The live colour range for a field, in its own units. Seeded from the
  *  registry default the first time it is asked for, then owned by whatever
@@ -427,7 +598,7 @@ const CONTROLS = [
       }
     },
     fmt: () => EX.statusLine(),
-    info: "The forty verified teaching demos in <code>exercises/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. The card prints the RULE for your own parameter (d is your student number's last digit — your lecturer explains it); working it out and setting it is yours, because the picker never moves a slider or drops a gauge. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
+    info: "The verified teaching demos, one folder per course in <code>courses/</code>. Picking one gives everybody the same STARTING POINT — its scene, Resolution Medium, its drawn rig if the rig pack is in this build, and only the settings a README documents as load-bearing — then opens a small card: what you are looking at, what to do, and where the gauges go. The card prints the RULE for your own parameter (d is your student number's last digit — your lecturer explains it); working it out and setting it is yours, because the picker never moves a slider or drops a gauge. Everything that was applied is itemised on the card under \"already set\", and the full brief is one link away. <b>E</b> opens the same menu, and <code>?ex=&lt;id&gt;</code> boots straight into one." },
 
   { h: "Flow" },
   { id: "speed", label: "Speed", min: 0.02, max: 10, step: 0.01, log: true,
@@ -611,6 +782,16 @@ const CONTROLS = [
   { id: "waveX", place: "piston", label: "Piston position", min: 0, max: 1, step: 0.01, rel: "W",
     get: () => sim.p.wave.x, set: (v) => sim.p.wave.x = v,
     fmt: (v) => v.toFixed(2) + " m from the left" },
+  // The flap and the train are the two opt-in halves of SIM.paddle; neither
+  // is in the rig wire format (v2), so a saved rig carries the scene's own.
+  { id: "waveFlap", place: "piston", type: "check", label: "Hinged flap",
+    get: () => sim.p.wave.flap > 0.5, set: (v) => sim.p.wave.flap = v ? 1 : 0,
+    info: "A paddle hinged at the bed instead of a piston: it moves the water most at the surface and not at all at the hinge, which is how a deep-water wave moves. Needs a scene that declares its still depth (the wall paddles)." },
+  { id: "waveN", place: "piston", label: "Wave train", min: 0, max: 20, step: 1,
+    get: () => sim.p.wave.train || 0, set: (v) => { sim.p.wave.train = Math.round(v); sim.p.wave.t0 = undefined; },
+    fmt: (v) => (v < 0.5 ? "off — the paddle runs continuously"
+                          : Math.round(v) + " periods per train · press V or the strip's Wave train"),
+    info: "A train of waves instead of an endless wave: the paddle ramps up over a period and a half, holds, ramps down and stops. Fire one with the strip's Wave train button or V." },
 
   { h: "Orbit tracers" },
   { id: "tracerOn", type: "check", label: "Show orbit tracers",
@@ -644,7 +825,7 @@ const CONTROLS = [
     opts: FIELDS.map((f) => [String(f.mode), f.name]),
     get: () => String(state.mode),
     set: (v) => { state.mode = +v; LEGEND.sync(); },
-    fmt: () => fieldFor(state.mode).blurb },
+    fmt: () => fieldBlurb(fieldFor(state.mode)) },
   // The same toggle as the strip's A. The sandbox must be able to reproduce
   // any scene by hand, so every strip toggle needs a panel row as well.
   { id: "avg", type: "check", label: "Average the flow",
@@ -680,6 +861,7 @@ const CONTROLS = [
       [["Q", "Q", "volume flow rate through each face, m²/s"],
        ["M", "M→", "momentum flux plus pressure force on each face, N/m"],
        ["E", "Ė", "energy flow rate through each face, W/m"]].forEach(([id, txt, why]) => {
+        if (id === "E" && UIMODE.hides("energy")) return;     // ui.hide "energy"
         const b = document.createElement("button");
         b.textContent = txt; b.title = why;
         b.className = state.cvShow === id ? "on" : "";
@@ -689,8 +871,8 @@ const CONTROLS = [
     },
     fmt: () => !state.cv ? "left-drag a box on the water with the Control volume tool (9)"
       : !state.cv.flux ? "settling…"
-      : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s  ·  " +
-        "Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m",
+      : "Σ Q " + state.cv.flux.total.Q.toFixed(4) + " m²/s" +
+        (UIMODE.hides("energy") ? "" : "  ·  Σ Ė " + state.cv.flux.total.E.toFixed(1) + " W/m"),
     info: "The box is a control volume, and every face of it carries a budget: the volume crossing it, the momentum it carries plus the pressure on it, and the energy going with them. Air contributes nothing — every term is weighted by the fill fraction, so an empty cell adds zero and a half-full one adds half. Read outward-positive: what leaves is positive wherever it leaves from, so Σ Q is continuity and Σ Ė is the loss." },
   { id: "fluxList", type: "buttons", label: "Flux sections",
     sync: (el) => {
@@ -724,21 +906,54 @@ const CONTROLS = [
   { id: "jumps", type: "check", label: "Jump analysis",
     get: () => state.jumps, set: (v) => state.jumps = v,
     info: "Brackets every hydraulic jump and compares the measured conjugate depth against the momentum prediction d₂/d₁ = ½(√(1+8Fr₁²) − 1)." },
+  { id: "instReadouts", type: "check", label: "Instrument readouts",
+    get: () => state.instReadouts, set: (v) => state.instReadouts = v,
+    info: "The number boxes the instruments draw on the water: the gauges' corner cards, the Control volume's budget and the numbers on its faces, each flux section's readings and the balance between two, the rakes' q and u_max, and the pressure-force values. Off folds them all away — the instruments stay where they are and keep measuring and recording, so the gauge histories, the inspector and the CSV are complete when they come back. I toggles it." },
+  { id: "hoverCard", type: "check", label: "Hover readout",
+    get: () => state.hoverCard, set: (v) => state.hoverCard = v,
+    info: "The card of numbers that follows the cursor over the water — position, and whatever the exercise lists of depth, level, velocity and pressure there." },
   { id: "particles", type: "check", label: "Particles",
     get: () => state.particles, set: (v) => state.particles = v,
     info: "Massless tracers. The clearest way to see wave orbits and jet spreading." },
-  { id: "dye", type: "check", label: "Dye",
-    get: () => state.dye, set: (v) => state.dye = v },
+  { id: "partTrail", label: "Particle trail", min: 0.2, max: 10, step: 0.1,
+    get: () => SIM.particleTrail(), set: (v) => SIM.particleTrail(v),
+    fmt: (v) => v.toFixed(1) + " s of flow",
+    info: "How much flow each particle's trail records. It starts at a length fitted to the scene — a typical particle draws about a seventh of the view — so slow flow still leaves a visible trace and a fast jet does not become a smear." },
+  { id: "dyeSeeds", type: "check", label: "Dye sources",
+    get: () => state.dyeSeeds, set: (v) => state.dyeSeeds = v,
+    info: "The scene's own FIXED dye sources: short seed lines placed where the flow goes — ahead of the body, at the pipe entrance, in the jet — or, where a scene names none, a line just inside the inflow. Off unless the scene asks (the timeline flumes do). To release dye anywhere else, pick the <b>Dye</b> tool and hold the pointer in the water. Either way it is black ink, carried by the water and diffusing as it goes; it stands down under <b>Average</b>, which has no record of it." },
+  { id: "sline", type: "check", label: "Streamlines",
+    get: () => state.sline, set: (v) => state.sline = v,
+    info: "Contours of the stream function ψ, drawn at equal steps Δψ, so every tube between two neighbouring lines carries the same discharge per unit width — where the lines crowd the water is fast, where they spread it is slow. Walls, the bed and (in steady flow) the free surface are streamlines themselves. Under <b>Average</b> they are the streamlines of the MEAN flow: compare them with the dye and the particles, which follow the unsteady flow, and they agree only where the flow is steady. Refreshed about four times a second; the key at the bottom left quotes Δψ." },
+  { id: "slineN", label: "Streamline density", min: 6, max: 60, step: 1,
+    get: () => state.slineN, set: (v) => { state.slineN = v; state.slineDpsi = 0; },
+    fmt: (v) => "≈ " + v.toFixed(0) + " tubes across the flow",
+    info: "Roughly how many equal-discharge tubes the whole range of ψ is cut into. The step is rounded to 1, 2, 2.5 or 5 × 10ⁿ m²/s so it can be quoted, and then held while the flow develops." },
   { id: "dyeLine", label: "Dye timelines", min: 0, max: 4, step: 0.1,
     get: () => sim.p.dyeLine, set: (v) => sim.p.dyeLine = v,
-    fmt: (v) => v === 0 ? "off" : "every " + v.toFixed(1) + " s",
-    info: "Injects a vertical line of dye at the inlet. It shears as it travels — that shape IS the velocity–depth distribution." },
+    fmt: (v) => v === 0 ? "off — continuous" : "pulsed every " + v.toFixed(1) + " s",
+    info: "Pulses the fixed dye sources (<b>Dye sources</b>): on for half of each period, off for the other half. The front of each band leaves the seed line at one instant, so it is a timeline — it shears as it travels, and in a channel that shape IS the velocity–depth distribution." },
   { id: "dyeDecay", label: "Dye fade", min: 0, max: 0.3, step: 0.005,
     get: () => sim.p.dyeDecay, set: (v) => sim.p.dyeDecay = v,
     fmt: (v) => v === 0 ? "permanent" : (1 / v).toFixed(0) + " s half-life-ish" },
+  // Sets what EVERY gauge plots and what the next one starts on; each gauge
+  // can then be changed on its own corner card or in its inspector. The
+  // options the panel shows follow `ui.gaugeFields` (`optsNow`, re-read by
+  // syncPanel); `opts` stays the whole register for the card's own text.
   { id: "gaugeField", type: "select", label: "Gauges plot",
-    opts: [["h", "Piezometric head"], ["H", "Total head"], ["d", "Depth"], ["eta", "Level η"], ["speed", "Speed"]],
-    get: () => state.gaugeField, set: (v) => state.gaugeField = v },
+    opts: GAUGE_QTY.map((q) => [q.id, q.name]),
+    optsNow: () => UIMODE.gaugeFields().map((q) => [q.id, q.name]),
+    get: () => gaugeFieldOf(null), set: (v) => setAllGaugeFields(v),
+    info: "What every gauge plots, and what a new gauge starts on. Each gauge can then be switched on its own: the small selector beside its card, or the tabs in its inspector window. Every quantity is recorded all the time whatever is plotted, and the CSV carries all of them." },
+  // How much of the run the corner cards plot. "window" (the default) is the
+  // scrolling recent window the cards always showed; "all" spans t = 0 → now,
+  // compressing the time axis as the run grows, so an approach to steady state
+  // (VC-2's level rising from its starting depth, the overshoot after a valve
+  // is shut and opened) stays on the chart from its first sample.
+  { id: "gaugeSpan", type: "select", label: "Gauge charts",
+    opts: [["window", "recent (scrolling)"], ["all", "whole run, from t = 0"]],
+    get: () => state.gaugeSpan, set: (v) => { state.gaugeSpan = v === "all" ? "all" : "window"; },
+    info: "What each gauge's corner chart spans. Recent: the last few hundred samples, scrolling. Whole run: from t = 0 to now, the time axis compressing as the run grows (thinned for drawing — the inspector and the CSV keep every sample). R restarts it with the clock." },
   { id: "gaugeInspect", type: "buttons", label: "Gauge inspector",
     // One button per live gauge (the same window the ⤢ on a corner card
     // opens), plus a CSV of everything recorded.
@@ -764,12 +979,7 @@ const CONTROLS = [
       x.textContent = "✕ Clear all";
       x.title = "Remove every gauge — or click one with the Gauge tool to remove just that one";
       x.disabled = !state.gauges.length;
-      x.onclick = () => {
-        x.blur();
-        GINSP.closeAll();
-        state.gauges.length = 0;
-        syncPanel();
-      };
+      x.onclick = () => { x.blur(); clearAllGauges(); };
       el.appendChild(x);
     },
     fmt: () => state.gauges.length
@@ -896,6 +1106,16 @@ function syncPanel() {
         c.label = d.label; c.min = d.min; c.max = d.max; c.step = d.step;
         input.step = d.step;           // the range input's own step, not just c's
         input.parentElement.querySelector(".lbl").textContent = d.label;
+      }
+    }
+    // A select whose choices depend on the exercise (Gauges plot under
+    // `ui.gaugeFields`) is rebuilt when the set changes, and only then.
+    if (c.type === "select" && c.optsNow) {
+      const opts = c.optsNow(), key = opts.map((o) => o[0]).join(",");
+      if (input.dataset.opts !== key) {
+        input.dataset.opts = key;
+        input.textContent = "";
+        opts.forEach(([ov, t]) => { const o = document.createElement("option"); o.value = ov; o.textContent = t; input.appendChild(o); });
       }
     }
     const v = c.get();
@@ -1033,7 +1253,14 @@ const MINI = (() => {
     const t = txt || it.label;
     if (it.pill.textContent !== t) it.pill.textContent = t;
   }
-  return { add, set, isMin, anchor, pillText };
+  /** Put a box's own minimise button back after its content was rewritten
+   *  (the tips line is rewritten wholesale on every tip and every frame of a
+   *  countdown, which used to take the button with it). */
+  function keep(id) {
+    const it = items[id];
+    if (it && it.btn.parentNode !== it.el) it.el.appendChild(it.btn);
+  }
+  return { add, set, isMin, anchor, pillText, keep };
 })();
 
 // ------------------------------------------------------------------ tools
@@ -1042,7 +1269,7 @@ const TOOLS = [
   ["erase", "Erase", "Left-drag to remove"],
   ["valve", "Valve", "Draw a gate you can slam with V"],
   ["spout", "Spout", "Click or drag to move the falling inflow"],
-  ["gauge", "Gauge", "Click to log head / depth — click one again to remove it"],
+  ["gauge", "Gauge", "Click to log a time series — click one again (or its ×) to remove it; press this button again to clear all gauges"],
   ["rake", "Rake", "Click for a velocity–depth profile — click it again to remove it"],
   ["tracer", "Tracers", "Click to drop a column of orbit tracers"],
   ["measure", "Measure", "Left-drag a tape measure (Shift snaps) — click to clear"],
@@ -1060,7 +1287,15 @@ const TOOLS = [
   // click on (Task 2 of the polygon-geometry work), which nothing draws yet,
   // so it has no digit of its own either.
   ["force", "Pressure force", "Click a wall or gate face for its pressure diagram — click the same solid again to cycle faces, click open water to clear"],
+  // THIRTEENTH, appended like Flux and Force so no digit moves. Its key is the
+  // letter D (TOOL_LETTER), which used to toggle the Dye view button this
+  // replaced: dye is no longer released automatically, the student puts it
+  // where the question is.
+  ["dye", "Dye", "Hold the pointer in the water to release black dye there — drag to move the release point, let go to stop"],
 ];
+
+/** Tools with a LETTER shortcut rather than a digit. */
+const TOOL_LETTER = { dye: "D" };
 
 /** The tools the number keys can reach. */
 const TOOL_KEYS = Math.min(9, TOOLS.length);
@@ -1102,6 +1337,9 @@ const ICONS = {
   pause:   '<rect x="5.2" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>' +
            '<rect x="11.6" y="4" width="3.2" height="12" rx="1" fill="currentColor" stroke="none"/>',
   play:    '<path d="M6.5 4.2 15.5 10l-9 5.8Z" fill="currentColor" stroke="none"/>',
+  // A wave train: three crests under a hump-shaped envelope.
+  train:   '<path d="M2.5 12c1.6 0 2-1.2 3-1.2s1.6 2.6 3 2.6 1.8-6.4 3-6.4 1.6 6.4 3 6.4 1.8-2.6 3-2.6"/>' +
+           '<path d="M2.5 16.5h15" opacity=".55"/>',
   reset:   '<path d="M4.5 10a5.5 5.5 0 1 1 1.7 4"/><path d="M4.5 15v-5h5"/>',
   undo:    '<path d="M7 5.5 3.5 9 7 12.5"/><path d="M3.5 9h8A4.5 4.5 0 0 1 16 13.5v1"/>',
   pour:    '<path d="M4.5 4.5h7l-1 4.5h-5z"/><path d="M11.5 6.2c1.6 0 2.2 1 2.2 2s-.8 1.9-2.2 1.9"/>' +
@@ -1128,7 +1366,14 @@ const ICONS = {
   particles: '<circle cx="5" cy="7" r="1.3"/><circle cx="11" cy="5.5" r="1.3"/>' +
              '<circle cx="15" cy="9.5" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/>' +
              '<circle cx="13" cy="15" r="1.3"/>',
+  // The neutral tool: nothing in hand, a press reads the water there.
+  read:    '<circle cx="10" cy="10" r="2" fill="currentColor" stroke="none"/>' +
+           '<circle cx="10" cy="10" r="5.6" opacity=".6"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2"/>',
   dye:     '<path d="M10 3.5c3 3.6 4.5 5.9 4.5 8a4.5 4.5 0 0 1-9 0c0-2.1 1.5-4.4 4.5-8Z"/>',
+  // Streamlines squeezing past a body: three lines, closer over the bump.
+  sline:   '<path d="M2.5 5c4 0 5 2.5 7.5 2.5S13.5 5 17.5 5"/>' +
+           '<path d="M2.5 10c4 0 5 1.2 7.5 1.2s3.5-1.2 7.5-1.2"/>' +
+           '<path d="M2.5 15.5h4.5a3 2.6 0 0 1 6 0h4.5"/>',
   // Average: a wobbling trace with the mean line drawn flat through it. The
   // glyph is the claim — the line is not the signal, it is what the signal
   // spent the window doing.
@@ -1137,6 +1382,12 @@ const ICONS = {
   // The two grade lines over a wavy surface: what the overlay actually draws.
   channel: '<path d="M3 6h14"/><path d="M3 9.5h14" stroke-dasharray="2.4 2"/>' +
            '<path d="M3 15c3.5 0 4.5-2.2 7-2.2s3.5 2.2 7 2.2"/>',
+  // A corner card with a trace on it — what the gauge cards look like.
+  readouts: '<rect x="2.5" y="5" width="15" height="10" rx="2"/>' +
+            '<path d="M5 12l2.5-2.5 2 1.5 2.5-3.5 3 2.5"/>',
+  // A pointer with its little card of numbers beside it.
+  hover:   '<path d="M3.5 3.5l4.5 11 1.6-4.4 4.4-1.6z"/>' +
+           '<path d="M11.5 12.5h6v5h-6z" opacity=".7"/><path d="M13 14.5h3M13 16h2" opacity=".7"/>',
   // A vertical face with three arrows of growing length pressing on it — the
   // textbook pressure diagram drawForce paints on the canvas.
   force:   '<path d="M13.5 3v14"/><path d="M4 6.5h5M6 10h3M8 13.5h1"/>' +
@@ -1174,12 +1425,20 @@ const TIP = (() => {
     t.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px";
     t.style.top = (r.bottom + 8) + "px";
   }
-  function hide() { if (el) el.classList.remove("show"); }
+  let flashT = 0;
+  function hide() { clearTimeout(flashT); if (el) el.classList.remove("show"); }
+  /** The touch screen's tooltip: shown by the tap that pressed the button,
+   *  gone by itself after a moment (no key — a tablet has none). */
+  function flash(anchor, label, hint) {
+    show(anchor, label, hint, "");
+    clearTimeout(flashT);
+    flashT = setTimeout(() => { if (el) el.classList.remove("show"); }, 1800);
+  }
   /** Whether this machine has a pointer that can hover at all. */
   function hoverable() {
     return !(window.matchMedia && matchMedia("(hover: none)").matches);
   }
-  return { show, hide, hoverable };
+  return { show, hide, flash, hoverable };
 })();
 
 /** The colour key — and the field picker, because they are the same question.
@@ -1284,6 +1543,10 @@ const LEGEND = (() => {
       // the midpoint of whatever the reading happened to be.
       const m = Math.max(f.mid - s.lo, s.hi - f.mid, 1e-6);
       state.range[f.id] = [f.mid - m, f.mid + m];
+    } else if (f.floating && sim && Math.abs(sim.p.g) < 0.5) {
+      // No zero worth anchoring to (a plan view's pressure sits on an
+      // arbitrary reference): fit the spread itself.
+      state.range[f.id] = [s.lo, Math.max(s.hi, s.lo + 1e-3)];
     } else {
       state.range[f.id] = [Math.min(0, s.lo), Math.max(s.hi, s.lo + 1e-3)];
     }
@@ -1407,7 +1670,7 @@ const LEGEND = (() => {
       b.dataset.mode = String(f.mode);
       const t = document.createElement("b"); t.textContent = f.name;
       const s = document.createElement("i"); s.textContent = f.sym;
-      const w = document.createElement("span"); w.textContent = f.blurb;
+      const w = document.createElement("span"); w.textContent = fieldBlurb(f);
       b.appendChild(t); b.appendChild(s); b.appendChild(w);
       b.onclick = () => { state.mode = f.mode; closeMenu(); sync(); syncPanel(); };
       m.appendChild(b);
@@ -1504,6 +1767,16 @@ const UIMODE = (() => {
     return list.indexOf(it.tool) >= 0 || list.indexOf(it.id) >= 0;
   }
 
+  /** Does the strip offer this tool under the live profile? */
+  function offers(tool) {
+    return allows(familyOf(tool), { tool, id: tool });
+  }
+  /** Is ANY pointer tool offered? Only then does the strip carry the Read
+   *  button that puts the tool down again. */
+  function anyTool() {
+    return TOOLS.some((t) => offers(t[0]));
+  }
+
   /** Whether anything at all is hidden — what puts ⋯ on the strip. */
   function narrowed() {
     const u = state.ui;
@@ -1511,11 +1784,17 @@ const UIMODE = (() => {
     return ["build", "measure", "view"].some((f) => u[f] !== true) ||
            u.fields !== true || u.panel !== "full" || u.controls !== true ||
            u.legend !== true ||
+           Array.isArray(u.gaugeFields) || (Array.isArray(u.hide) && u.hide.length > 0) ||
            Object.keys(u.readouts || {}).some((k) => u.readouts[k] === false);
   }
 
   function apply(profile) {
     state.ui = Object.assign(full(), profile || {});
+    // The tool in hand must be one the strip offers. Before this the default
+    // Wall stayed armed under a card that hides BUILD, so the first touch on
+    // an iPad drew a block the student had no button to take back. A tool the
+    // profile hides goes down, and the hand is empty: the Read tool.
+    if (state.tool && !offers(state.tool)) state.tool = null;
     if (state.ui.legend === false) LEGEND.close(); else LEGEND.open();
     // A profile that hides the live field would leave the legend naming
     // something its own picker cannot reach, so the field moves to the first
@@ -1569,7 +1848,37 @@ const UIMODE = (() => {
     return u.readouts[what] !== false;
   }
 
-  return { full, fromExercise, apply, lift, reset, allows, narrowed, fields, shows, rows };
+  /** The quantities a gauge may plot here — GAUGE_QTY unless `ui.gaugeFields`
+   *  narrows it (ids, in the register's order). Narrows what is OFFERED on
+   *  the corner card, the inspector and the Gauges plot select; every
+   *  quantity is still recorded and still in the CSV. */
+  function gaugeFields() {
+    const u = state.ui;
+    if (!u || u.lifted || !Array.isArray(u.gaugeFields) || !u.gaugeFields.length) return GAUGE_QTY;
+    const L = GAUGE_QTY.filter((q) => u.gaugeFields.indexOf(q.id) >= 0);
+    return L.length ? L : GAUGE_QTY;
+  }
+
+  /** Is a CONCEPT withheld from this card's on-canvas words? `ui.hide` lists
+   *  them (see HIDE_IDS); each id is honoured where that concept is printed:
+   *
+   *    "energy"    the energy row of the Control volume budget, its Ė face
+   *                labels (B skips them), ρgQH on a flux section and the
+   *                energy line between two, and the reservoir marker's
+   *                "· energy line" — it reads "reservoir level 3.16 m".
+   *    "critical"  the words critical / subcritical / supercritical and the
+   *                profile class (H2, M1 …) on the hover card; the Fr row,
+   *                where a card keeps it, says "fast, shallow" / "slow, deep".
+   *
+   *  A label, not a cage: ⋯ Show everything brings the words back. */
+  function hides(concept) {
+    const u = state.ui;
+    if (!u || u.lifted || !Array.isArray(u.hide)) return false;
+    return u.hide.indexOf(concept) >= 0;
+  }
+
+  return { full, fromExercise, apply, lift, reset, allows, offers, anyTool, narrowed,
+           fields, shows, rows, gaugeFields, hides };
 })();
 
 /** Open or close the Controls panel. Hoisted out of `boot` because the strip,
@@ -1581,6 +1890,54 @@ function setPanel(open) {
 }
 function togglePanel() {
   setPanel(!document.getElementById("panel").classList.contains("open"));
+}
+
+/** Is the scene menu offered right now? Not while an exercise is on screen:
+ *  its students reach everything through the exercise menu, and a second menu
+ *  of bare geometry beside it only confuses. The strip's ⋯ (show everything)
+ *  brings it back, and with no exercise loaded — the start screen, the
+ *  sandbox, a `?scene=` boot — it is always there. `?scene=` links still boot.
+ *  A card with a `secondScene` keeps it too: its "Also:" line sends the
+ *  student to the Scenes menu for that second scene. */
+function scenesOffered() {
+  const ex = typeof EX !== "undefined" && EX.current;
+  return !ex || !!(ex.secondScene && ex.secondScene.scene) || !!(state.ui && state.ui.lifted);
+}
+
+/** Is there a wave train to fire? (wave.train > 0 on a running paddle.) The
+ *  strip's Wave train button shows only then, and V fires it where there is
+ *  no valve to work. */
+function trainOffered() {
+  return !!sim && !!sim.p && sim.p.wave.on > 0.5 && sim.p.wave.train > 0;
+}
+function fireTrain() {
+  if (SIM.fireTrain()) {
+    const w = sim.p.wave;
+    showToast("Wave train", w.train + " waves of period " + w.period.toFixed(2) + " s. Follow one crest, then follow the group.");
+  } else if (trainOffered()) {
+    showToast("Still making the last train", "Wait for the paddle to stop, then press again.");
+  }
+  syncToolbar();
+}
+
+/** Is there a valve on the bench — one the scene declares, or a drawn one
+ *  (segment kind 128)? The strip shows the Valves button only then. */
+function hasValves() {
+  if (!sim || !sim.scene) return false;
+  if (sim.segs && sim.segs.some((s) => (s[5] | 0) === 128)) return true;
+  const sc = sim.scene;
+  if (!sc.valves) return false;
+  try { return sc.valves(sc.W, sc.H, SIM.params().values || {}).length > 0; }
+  catch (_) { return true; }               // a scene that cannot say keeps its button
+}
+/** Rebuild the strip when the answer changes — cheap to ask, rare to change. */
+let valvesShown = null, trainLit = false;
+function syncValveBtn() {
+  const v = hasValves() + ":" + trainOffered();
+  if (v !== valvesShown) { valvesShown = v; buildToolbar(); }
+  // The Wave train button is lit while the paddle is making one.
+  const run = trainOffered() && SIM.paddle().running;
+  if (run !== trainLit) { trainLit = run; syncToolbar(); }
 }
 
 /** A blank flume, from wherever you are. This is the sandbox's "new document":
@@ -1602,6 +1959,9 @@ function newSandbox() {
   }
   newArmed = 0;
   EX.clear();
+  // The one door that is a choice to BUILD: Wall goes into the hand. Every
+  // other way in leaves the neutral Read tool there (see state.tool).
+  state.tool = "wall";
   switchScene("sandbox");     // announces itself — `loadScene` toasts the blurb
 }
 
@@ -1627,6 +1987,7 @@ const TOOLBAR = [
       act: () => START.open() },
     { id: "sceneBtn", icon: "scenes", label: "Scenes", key: "S",
       hint: "Ready-made flumes, tanks and pipe runs",
+      when: () => scenesOffered(),
       act: (b) => PICKER.toggle(b) },
     { id: "exBtn", icon: "ex", label: "Exercises", key: "E",
       hint: "Set up one of the teaching demos",
@@ -1647,10 +2008,20 @@ const TOOLBAR = [
        { id: "clearBtn", icon: "clear", label: "Clear drawing", key: "C",
          hint: "Remove every segment you have drawn — the scene stays",
          act: () => SIM.clearSegs() }]) },
+  // MEASURE opens with READ: the empty hand. A press with it never draws or
+  // places anything — it pins the readout card where it lands, which is the
+  // touch screen's hover. It is not in TOOLS (no digit to renumber) and no
+  // profile can hide it: it is offered wherever any pointer tool is, because
+  // it is the way to put that tool down.
   { cap: "MEASURE", family: "measure",
-    items: toolItems("gauge", "rake", "tracer", "measure", "cv", "flux", "force") },
+    items: [{ id: "inspectBtn", icon: "read", label: "Read", key: "",
+              always: true,
+              hint: "Nothing in hand: tap or click the water to pin its numbers there — a press never draws. Tap dry ground to clear",
+              on: () => !state.tool,
+              act: () => { state.tool = null; state.forceHover = null; syncToolbar(); syncPanel(); } }]
+      .concat(toolItems("gauge", "rake", "tracer", "dye", "measure", "cv", "flux", "force")) },
   // VIEW: how the water is DRAWN. The three toggles were reachable only from
-  // the P / D / N keys or from a scroll of the Controls panel, which on a
+  // the P / N keys or from a scroll of the Controls panel, which on a
   // touch screen meant not at all.
   { cap: "VIEW", family: "view", items: [
     { id: "legendBtn", icon: "legend", label: "Field & legend", key: "L",
@@ -1660,10 +2031,10 @@ const TOOLBAR = [
       hint: "Massless tracers — the clearest way to see orbits and jets",
       on: () => state.particles,
       act: () => { state.particles = !state.particles; syncPanel(); } },
-    { id: "dyeBtn", icon: "dye", label: "Dye", key: "D",
-      hint: "Dye and the dye timelines injected at the inlet",
-      on: () => state.dye,
-      act: () => { state.dye = !state.dye; syncPanel(); } },
+    { id: "slineBtn", icon: "sline", label: "Streamlines", key: "T",
+      hint: "Streamlines — equal discharge between neighbouring lines; of the mean flow under Average",
+      on: () => state.sline,
+      act: () => { state.sline = !state.sline; syncPanel(); } },
     { id: "chanBtn", icon: "channel", label: "Open-channel overlay", key: "N",
       hint: "Critical depth, normal depth and the energy grade line",
       on: () => state.channel,
@@ -1672,6 +2043,18 @@ const TOOLBAR = [
       hint: "Energy and hydraulic grade lines — the gap between them is the velocity head",
       on: () => state.grade,
       act: () => { state.grade = !state.grade; syncPanel(); } },
+    // The two readout switches. Separate, because they answer different
+    // wishes: the boxes are the instruments' numbers (fold them away to look
+    // at the water, or to ask for a prediction first); the hover card is the
+    // cursor's own probe, which a first lecture may not want at all.
+    { id: "readBtn", icon: "readouts", label: "Readouts", key: "I",
+      hint: "The instruments' number boxes — gauge cards, control volume, flux lines, rakes, force. They keep recording while hidden",
+      on: () => state.instReadouts,
+      act: () => { state.instReadouts = !state.instReadouts; syncPanel(); } },
+    { id: "hoverBtn", icon: "hover", label: "Hover readout", key: "",
+      hint: "The card of numbers that follows the cursor over the water",
+      on: () => state.hoverCard,
+      act: () => { state.hoverCard = !state.hoverCard; syncPanel(); } },
     // VIEW and not MEASURE, deliberately, although it is the one toggle here
     // that changes what the numbers say: it changes how the water is DRAWN,
     // and everything else follows the picture — the overlay, the instruments
@@ -1696,7 +2079,18 @@ const TOOLBAR = [
     // explicit `valveOpen` starts shut, valve drawn or not.
     { id: "valveBtn", icon: "valve", label: "Valves", key: "V",
       hint: "Open or slam every valve you have drawn",
+      // Only where there is a valve to work: the scene's own or one drawn.
+      // Re-read every frame (tickFrame → syncValveBtn), so drawing the first
+      // valve puts the button up and erasing the last takes it away.
+      when: () => hasValves(),
       on: () => !!sim && sim.p.valveClosed < 0.5, act: () => toggleValve() },
+    // Only where the paddle makes trains (wave.train > 0, WV-5): one press,
+    // one train. Shares V with the valves — V fires the train where there is
+    // no valve to work.
+    { id: "trainBtn", icon: "train", label: "Wave train", key: "V",
+      hint: "Fire one wave train: the paddle ramps up, holds and stops",
+      when: () => trainOffered() && !hasValves(),
+      on: () => !!sim && SIM.paddle().running && sim.p.wave.train > 0, act: () => fireTrain() },
   ] },
   // Chrome, not a family: captioning it would put it in the same taxonomy as
   // the four above, which is exactly what it is not.
@@ -1756,9 +2150,17 @@ function toolItem([id, label, tip]) {
   // `tool` is the item's own name for the thing it arms, and it is what a UI
   // profile names — an exercise says `measure: ["gauge"]`, not "Gauge".
   return { tool: id, icon: id === "valve" ? "gate" : id, label, hint: tip,
-           key: n <= TOOL_KEYS ? String(n) : "",
+           key: n <= TOOL_KEYS ? String(n) : (TOOL_LETTER[id] || ""),
            on: () => state.tool === id,
-           act: () => { state.tool = id; state.forceHover = null; syncToolbar(); syncPanel(); } };
+           act: () => {
+             // The Gauge button pressed while the Gauge tool is ALREADY in
+             // hand clears every gauge (its hint says so); the first press
+             // only arms the tool, as every other tool does. The digit key
+             // never clears — a key pressed twice by habit must not cost a
+             // run's histories.
+             if (id === "gauge" && state.tool === "gauge") { clearAllGauges(); return; }
+             state.tool = id; state.forceHover = null; syncToolbar(); syncPanel();
+           } };
 }
 
 /** On the Pages build Jekyll renders numerics.md to numerics.html (it is not
@@ -1775,6 +2177,9 @@ function aboutHref() {
     : "docs/view.html?doc=numerics.md";
 }
 
+/** Strip buttons whose press opens a menu, a screen or a page. */
+const OPENERS = /^(homeBtn|sceneBtn|exBtn|panelBtn|fsBtn|popBtn|keysBtn|aboutBtn)$/;
+
 function buildToolbar() {
   const host = document.getElementById("groups");
   host.textContent = "";
@@ -1788,7 +2193,8 @@ function buildToolbar() {
     // narrowing is the thing a lecturer chose, then the capability check,
     // which is fixed at boot and so is never re-read by `syncToolbar`.
     const items = group.items.filter((it) =>
-      UIMODE.allows(group.family, it) && (!it.when || it.when()));
+      (it.always ? UIMODE.anyTool() : UIMODE.allows(group.family, it)) &&
+      (!it.when || it.when()));
     if (!items.length) return;
     if (host.children.length) {
       const s = document.createElement("div"); s.className = "tsep"; host.appendChild(s);
@@ -1814,7 +2220,16 @@ function buildToolbar() {
       b.appendChild(iconEl(typeof it.icon === "function" ? it.icon() : it.icon));
       const tip = () => TIP.show(b, typeof it.label === "function" ? it.label() : it.label,
                                  it.hint, it.key);
-      b.onclick = () => { b.blur(); TIP.hide(); it.act(b); syncToolbar(); };
+      b.onpointerdown = (e) => { b._touch = e.pointerType === "touch"; };
+      b.onclick = () => {
+        b.blur(); TIP.hide(); it.act(b); syncToolbar();
+        // A finger has no hover, so a glyph on its own would never be named.
+        // The tap that presses it shows its card briefly instead — long
+        // enough to read the name, gone before it sits on the water.
+        // Not for a button that opens something: what it opens names itself,
+        // and a card on top of a menu would cover its first rows.
+        if (b._touch && b.isConnected && !OPENERS.test(b.id)) TIP.flash(b, typeof it.label === "function" ? it.label() : it.label, it.hint);
+      };
       // Only a pointer that can hover gets the card. On a touch screen there
       // is no hover to leave, so it would appear on the tap that presses the
       // button and then sit there over the water until something else was
@@ -1877,10 +2292,29 @@ function fitBar() {
   // would otherwise shrink itself for nothing. Two pixels of slack is already
   // too much — it leaves the last button clipped along its edge.
   const over = () => g.scrollWidth > g.clientWidth + 1;
-  bar.classList.remove("tight", "tighter", "tightest");
+  bar.classList.remove("tight", "tighter", "tightest", "wraps", "notitle");
+  bar.classList.remove("scrolls");
   if (over()) bar.classList.add("tight");
   if (over()) bar.classList.add("tighter");
-  if (over()) bar.classList.add("tightest");
+  // A FINGER needs its 40 px more than the strip needs one row: on a touch
+  // screen the last rungs (26 px glyphs, then a sideways scroll nobody finds)
+  // would leave half of an iPad's strip out of sight or out of reach, so the
+  // groups wrap onto a second row instead, and whatever hangs under the strip
+  // moves down with it (--barb).
+  // Before a second row, the title chip goes — the brief beside the water
+  // already names the exercise — if that alone makes one row enough.
+  const coarse = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  if (coarse && over()) {
+    bar.classList.add("notitle");
+    if (over()) { bar.classList.remove("notitle"); bar.classList.add("wraps"); }
+  } else if (over()) bar.classList.add("tightest");
+  const barb = bar.classList.contains("wraps") ? Math.round(bar.getBoundingClientRect().bottom) : 0;
+  document.documentElement.style.setProperty("--barb", barb + "px");
+  // A two-row strip is tall enough to hide the top of the flume, so the
+  // fitted view starts under it (baseRect); one row sits in the letterbox
+  // band as it always has.
+  const top = barb ? barb + 4 : 0;
+  if (top !== state.barTop) { state.barTop = top; if (sim) applyAutoVex(); }
   // Still too many for the room: the groups scroll, and the last one visible
   // is faded so that it looks like it continues rather than like it ends.
   bar.classList.toggle("scrolls", over());
@@ -1932,12 +2366,14 @@ const KEYS = (() => {
     ["L", "the legend — which field, over what range, in what units"],
     ["B", "what the Control volume reads on each edge: Q / momentum / energy"],
     ["P", "particles"],
-    ["D", "dye"],
+    ["D", "the Dye tool — hold the pointer in the water to release dye"],
+    ["T", "streamlines"],
     ["N", "open-channel overlay"],
     ["A", "average the flow — the mean field, over one window"],
+    ["I", "the instruments' readout boxes — they keep recording while hidden"],
     ["M", "ruler"],
     ["F", "full screen"],
-    ["S", "scenes"],
+    ...(scenesOffered() ? [["S", "scenes"]] : []),
     ["E", "exercises"],
     ["H", "the start screen"],
   ];
@@ -2015,7 +2451,14 @@ const DOCK = (() => {
   const foot = () => el().querySelector(".dock-foot");
 
   function narrow() { return innerWidth < MINW; }
-  function phone() { return innerWidth < PHONE; }
+  // A tablet held upright (768 × 1024, 820 × 1180) is under MINW too, and an
+  // overlaid 348 px panel hid the right half of the flume AND of the strip
+  // (whose buttons ran on behind it). Upright there is height to spare and
+  // never width, so it gets the bottom sheet as a phone does: the water keeps
+  // the full width, the strip its full length.
+  function phone() {
+    return innerWidth < PHONE || (innerWidth < MINW && innerHeight > innerWidth * 1.1);
+  }
   /** Must agree with `--sheet-h` in the stylesheet. */
   function sheetH() { return Math.round(Math.min(0.58 * innerHeight, 520)); }
   function sync() {
@@ -2105,26 +2548,18 @@ const START = (() => {
     });
   }
 
-  /** The pack, grouped by the register's own `topic` in register order — the
-   *  same grouping the exercise menu uses, so the two never disagree. */
-  function grouped() {
-    const order = [], by = new Map(), f = foldText(filter.trim());
-    EX.all().forEach((e) => {
-      if (f && !foldText(e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
-                         (e.start || "")).includes(f)) return;
-      const g = e.topic || "Other";
-      if (!by.has(g)) { by.set(g, []); order.push(g); }
-      by.get(g).push(e);
-    });
-    return order.map((g) => [g, by.get(g)]);
-  }
+  /** The pack as the exercise menu groups it — the course menu when this
+   *  deployment ships one (js/menu.js), otherwise the register by `topic` —
+   *  so the two never disagree. */
+  function grouped() { return EX.groupsFor(filter); }
 
   function renderList() {
     const host = document.getElementById("startlist");
     host.textContent = "";
     const n = EX.all().length;
     document.getElementById("startcount").textContent =
-      n ? n + " verified demos" : "pack not loaded";
+      n ? (EX.course() ? EX.listed().length + (EX.listed().length === 1 ? " exercise" : " exercises")
+             : n + " verified demos") : "pack not loaded";
     if (!n) {
       const d = document.createElement("div");
       d.className = "none";
@@ -2153,11 +2588,17 @@ const START = (() => {
       box.appendChild(hd);
       list.forEach((e) => {
         const b = document.createElement("button");
-        b.type = "button"; b.className = "si"; b.dataset.id = e.id;
+        b.type = "button"; b.className = "si"; b.dataset.id = e.ref || e.id;
         const i = document.createElement("span"); i.className = "eid"; i.textContent = e.id;
         const t = document.createElement("span"); t.className = "t"; t.textContent = e.title;
         b.appendChild(i); b.appendChild(t);
-        b.onclick = () => { close(); EX.pick(e.id); };
+        if (e.aim) b.title = e.aim;   // the exercise's `aim`, on hover
+        // …which a touch screen never shows: print it under the title there.
+        if (e.aim && !TIP.hoverable()) {
+          const a = document.createElement("span"); a.className = "aim"; a.textContent = e.aim;
+          b.appendChild(a);
+        }
+        b.onclick = () => { close(); EX.pick(e.ref || e.id); };   // e.ref: a tab ("CR-1#forces")
         box.appendChild(b);
       });
       const k = h[0] <= h[1] ? 0 : 1;
@@ -2222,45 +2663,102 @@ function pointerPos(e) {
 
 const pointers = new Map();          // active pointers, for pinch zoom
 
+/** Let go of the Dye tool: the release stops at once. */
+function stopDye() {
+  state.dyeInj = null;
+  if (sim && sim.p) sim.p.dyeInj = null;
+}
+
+/** A FINGER's press is held back this long before it becomes a tool action.
+ *  A pinch starts with one finger and the second follows a few tens of
+ *  milliseconds later; acting on the first at once placed a gauge, pinned a
+ *  readout or let a blot of dye go at the start of every zoom. A press that
+ *  moves further than TOUCH_SLOP_PX first is committed at once (from where it
+ *  landed, so a stroke still starts under the finger); a mouse or pen press
+ *  is never held back. */
+const TOUCH_HOLD_MS = 90, TOUCH_SLOP_PX = 6;
+/** How far a press may wander and still count as a TAP (the Read tool). */
+const TAP_PX = 10;
+
+function cancelPending() {
+  if (state.pending) { clearTimeout(state.pending.timer); state.pending = null; }
+}
+function commitPending(ev) {
+  if (!ev || state.pending !== ev) return;
+  clearTimeout(ev.timer);
+  state.pending = null;
+  beginPress(ev);
+}
+
 function onDown(e) {
   try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* synthetic events */ }
-  pointers.set(e.pointerId, pointerPx(e));
-  const [x, z] = pointerPos(e);
+  state.ptr = e.pointerType || "mouse";
+  const px = pointerPx(e);
+  pointers.set(e.pointerId, px);
+  const [x, z] = view.toDomain(px[0], px[1]);
   state.cursor = [x, z];
-  if (pointers.size === 2) {         // second finger: abandon tools, pinch
+  if (pointers.size >= 2) {          // second finger: abandon tools, pinch
+    cancelPending();
+    if (pointers.size > 2) return;
     state.drag = null; state.spoutDrag = false; state.measDrag = null;
-    state.cvDrag = null; state.fluxDrag = null;
+    state.cvDrag = null; state.fluxDrag = null; state.press = null;
+    state.vexDrag = null; state.panDrag = null;
     if (state.pour) { state.pour = null; sim.p.pour = null; }
+    stopDye();
     const ps = [...pointers.values()];
-    state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]) };
+    state.pinch = { d: Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]),
+                    mid: [(ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2] };
     return;
   }
-  if (e.button === 1) {              // middle-drag pans
-    e.preventDefault();
-    const px = pointerPx(e);
-    state.panDrag = { px, c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
+  if (e.button === 1) e.preventDefault();
+  const ev = { pointerId: e.pointerId, button: e.button, px, x, z,
+               // "" is a synthetic event (the tests); it behaves as a mouse.
+               mouse: !e.pointerType || e.pointerType === "mouse" };
+  if (e.pointerType === "touch") {
+    state.pending = ev;
+    ev.timer = setTimeout(() => commitPending(ev), TOUCH_HOLD_MS);
+    return;
+  }
+  beginPress(ev);
+}
+
+/** What a press DOES — everything after the pinch bookkeeping. `ev` is the
+ *  press as it landed: {button, px, x, z, mouse}. */
+function beginPress(ev) {
+  const x = ev.x, z = ev.z;
+  if (ev.button === 1) {             // middle-drag pans
+    state.panDrag = { px: ev.px, c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
     return;
   }
   // Drag in the empty letterbox band above or below the domain to stretch it
   // vertically. That band is dead space — nothing to draw on — so grabbing it
   // is unambiguous, and it is the natural place to reach for when a long flat
-  // flume is squashed into a strip.
+  // flume is squashed into a strip. A TAP there is a tap on empty space: it
+  // clears a pinned readout and claims nothing (onUp).
   {
-    const B = baseRect(), py = pointerPx(e)[1];
+    const B = baseRect(), py = ev.px[1];
     if (state.zoom < 1.001 && (py < B.by - 2 || py > B.by + B.h + 2)) {
-      state.vexDrag = { py, vex: state.vex, mid: B.by + B.h / 2 };
-      state.vexAuto = false;          // dragging the band claims the number
+      state.vexDrag = { py, vex: state.vex, mid: B.by + B.h / 2, moved: false };
       return;
     }
   }
-  // Pouring: a right-drag anywhere, or the Pour tool. The tool exists because
-  // a touch screen has no second button and no Shift — the old
+  // Pouring: a right-drag with a MOUSE, or the Pour tool. The tool exists
+  // because a touch screen has no second button and no Shift — the old
   // `pointerType === "touch" && e.shiftKey` was unreachable on every device it
   // named, which made half of "draw an edge, pour water" impossible on a
-  // phone. Right-drag still works regardless of the tool in your hand.
-  if (e.button === 2 || state.tool === "pour") {
+  // phone. Right-drag still works regardless of the tool in your hand; a pen's
+  // barrel button also reports button 2 and must not pour.
+  if ((ev.button === 2 && ev.mouse) || state.tool === "pour") {
     state.pour = { x, z, r: state.brush * 4, vx: 0, vz: sim.p.g > 0.5 ? -2.0 : 0, lx: x, lz: z };
     sim.p.pour = state.pour;
+    return;
+  }
+  // The Dye tool: press and HOLD. While the pointer is down the solver
+  // releases ink at it every substep (FS_VOF, u_dyeInj) — into water only, so
+  // a press in the air releases nothing until the drag reaches the water.
+  if (state.tool === "dye") {
+    state.dyeInj = { x, z, r: SIM.dyeInjRadius() };
+    sim.p.dyeInj = state.dyeInj;
     return;
   }
   if (state.tool === "spout") {
@@ -2270,7 +2768,7 @@ function onDown(e) {
     return;
   }
   if (state.tool === "gauge") { placeGauge(x, z); return; }
-  if (state.tool === "rake") { placeRake(x); return; }
+  if (state.tool === "rake") { placeRake(x, z); return; }
   if (state.tool === "tracer") {
     // Click anywhere in the water to hang a fresh column of tracers there;
     // click on dry ground to clear them.
@@ -2302,7 +2800,7 @@ function onDown(e) {
     // the grab radius wrong under vex for sloped or horizontal faces — the
     // same anisotropy nearSegment's per-axis scaling exists to handle. Pick
     // in screen space instead, GRAB_PX applied directly as a screen radius.
-    const hit = faceAtPx(sim.solids || [], x, z, GRAB_PX);
+    const hit = faceAtPx(sim.solids || [], x, z, grabPx());
     if (!hit) { state.force = null; return; }
     if (state.force && state.force.solidId === hit.solid.id) {
       // Same solid again: cycle to its next named face.
@@ -2315,23 +2813,67 @@ function onDown(e) {
     state.force.scale = forceScale();
     return;
   }
-  state.drag = { x0: x, z0: z, x1: x, z1: z };
+  // Only a drawing tool draws. Anything else in hand — above all NO tool, the
+  // Read tool — makes the press a reading: a tap pins the readout card there
+  // (onUp → tapRead), and a drag pans the view when it is zoomed in.
+  if (state.tool === "wall" || state.tool === "erase" || state.tool === "valve") {
+    state.drag = { x0: x, z0: z, x1: x, z1: z };
+    return;
+  }
+  state.press = { px: ev.px, x, z, moved: false,
+                  c: state.panC ? state.panC.slice() : [sim.W / 2, sim.H / 2] };
+}
+
+/** A tap with the Read tool: pin the readout card where it landed — the touch
+ *  screen's hover. A tap on the pin itself, on dry ground or a solid, or
+ *  outside the domain takes it away. A card that withholds the cursor readout
+ *  (`readouts.cursor: false`) withholds this too; the Hover readout switch
+ *  does NOT — it governs the card that FOLLOWS a mouse, and reading the water
+ *  by touching it is the one way a tablet has to read it at all. */
+function tapRead(x, z) {
+  if (!UIMODE.shows("cursor")) { state.pin = null; return; }
+  if (state.pin && pxApart(state.pin.x, state.pin.z, x, z) < grabPx() + 8) {
+    state.pin = null; return;
+  }
+  const inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
+  const p = inside ? SIM.probe(x, z, measuringAvg()) : null;
+  if (!p || !(p.f > 0.02)) { state.pin = null; return; }
+  state.pin = { x, z }; state.pinProbe = p; state.pinTick = 3;
 }
 
 function onMove(e) {
+  state.ptr = e.pointerType || "mouse";
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, pointerPx(e));
+  // A held-back finger (TOUCH_HOLD_MS) that starts to travel is a stroke, not
+  // the start of a pinch: commit it from where it landed, then carry on.
+  const pend = state.pending;
+  if (pend && pend.pointerId === e.pointerId) {
+    const px = pointerPx(e);
+    if (Math.hypot(px[0] - pend.px[0], px[1] - pend.px[1]) < TOUCH_SLOP_PX) return;
+    commitPending(pend);
+  }
   if (state.pinch && pointers.size === 2) {
+    // Two fingers zoom about their midpoint AND carry the view with it, so a
+    // pinch can pan as well — the one-finger drag is the tool's.
     const ps = [...pointers.values()];
     const d = Math.hypot(ps[0][0] - ps[1][0], ps[0][1] - ps[1][1]);
-    if (d > 8 && state.pinch.d > 8) {
-      zoomAt((ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2, d / state.pinch.d);
+    const mid = [(ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2];
+    if (d > 8 && state.pinch.d > 8) zoomAt(mid[0], mid[1], d / state.pinch.d);
+    if (state.zoom > 1.001 && state.pinch.mid) {
+      const c = state.panC || [sim.W / 2, sim.H / 2];
+      state.panC = [c[0] - (mid[0] - state.pinch.mid[0]) * sim.W / view.w,
+                    c[1] + (mid[1] - state.pinch.mid[1]) * sim.H / view.h];
+      computeView();
     }
-    state.pinch.d = d;
+    state.pinch.d = d; state.pinch.mid = mid;
     return;
   }
   if (state.vexDrag) {
     // Pull away from the middle to stretch, toward it to squash.
     const d = state.vexDrag, py = pointerPx(e)[1];
+    if (!d.moved && Math.abs(py - d.py) < TAP_PX) return;
+    d.moved = true;
+    state.vexAuto = false;            // dragging the band claims the number
     const r0 = Math.max(Math.abs(d.py - d.mid), 8);
     const r1 = Math.max(Math.abs(py - d.mid), 8);
     state.vex = Math.max(1, Math.min(12, d.vex * (r1 / r0)));
@@ -2341,6 +2883,18 @@ function onMove(e) {
   const [x, z] = pointerPos(e);
   state.cursor = [x, z];
   state.inside = x >= 0 && z >= 0 && x <= sim.W && z <= sim.H;
+  // The Read tool's press: still a tap until it travels; then, zoomed in, a
+  // one-finger (or left-button) drag pans the view. Never draws.
+  if (state.press) {
+    const p = state.press, px = pointerPx(e);
+    if (!p.moved && Math.hypot(px[0] - p.px[0], px[1] - p.px[1]) >= TAP_PX) p.moved = true;
+    if (p.moved && state.zoom > 1.001) {
+      state.panC = [p.c[0] - (px[0] - p.px[0]) * sim.W / view.w,
+                    p.c[1] + (px[1] - p.px[1]) * sim.H / view.h];
+      computeView();
+    }
+    return;
+  }
   // The Force tool's own hover pick: pure CPU (faceAtPx, screen-space),
   // recomputed on every move so the surface under the cursor lights up
   // BEFORE a click selects it — no SIM.faceForce call, so no GPU readback.
@@ -2364,6 +2918,10 @@ function onMove(e) {
   }
   if (state.spoutDrag) {
     sim.p.source.x = x; sim.p.source.z = z;
+    return;
+  }
+  if (state.dyeInj) {
+    state.dyeInj.x = x; state.dyeInj.z = z;
     return;
   }
   if (state.pour) {
@@ -2399,11 +2957,28 @@ function onMove(e) {
 
 function onUp(e) {
   pointers.delete(e.pointerId);
+  // A cancelled touch (the browser took the gesture) does nothing at all; a
+  // finger lifted before its hold ran out was a tap, and acts now.
+  if (e.type === "pointercancel") { cancelPending(); state.press = null; }
+  else if (state.pending && state.pending.pointerId === e.pointerId) commitPending(state.pending);
   if (pointers.size < 2) state.pinch = null;
   state.panDrag = null;
   state.spoutDrag = false;
-  if (state.vexDrag) { state.vexDrag = null; syncPanel(); return; }
+  if (state.press) {
+    const p = state.press;
+    state.press = null;
+    if (!p.moved) tapRead(p.x, p.z);
+    return;
+  }
+  if (state.vexDrag) {
+    const moved = state.vexDrag.moved;
+    state.vexDrag = null;
+    if (!moved) state.pin = null;     // a tap on the empty band: empty space
+    else syncPanel();
+    return;
+  }
   if (state.pour) { state.pour = null; sim.p.pour = null; }
+  stopDye();
   if (state.measDrag) {
     const d = state.measDrag;
     // Shorter than a cell is a click: clear the tape rather than keep a dot.
@@ -2445,23 +3020,65 @@ function onUp(e) {
 }
 
 // -------------------------------------------------------------------- loop
-let lastT = performance.now(), acc = 0, fpsAcc = 0, fpsN = 0, probeTick = 0;
+let lastT = performance.now(), acc = 0, probeTick = 0;
+// The status line's window: frames, wall seconds and SIMULATED seconds over
+// the last ~0.5 s, so ×RT is (sim advanced) / (wall elapsed) across the whole
+// window rather than one frame's ratio — which alternated ×3 between a frame
+// that queued work and the readback frame that waited for it.
+const statWin = { wall: 0, sim: 0, n: 0, sub: 0 };
+// The governor's state: when the previous tickFrame started (measured here, so
+// APP.frames in a headless loop is governed by what it really costs too —
+// see tickFrame for what a scripted frame is charged) and the time-windowed
+// mean interval between frames (ms) — see governFrame.
+const gov = { last: 0, W: 0, N: 0, ema: 0,
+  win: { W: 0, N: 0, S: 0 },                     // this window's measured frames
+  fit: { w: 0, n: 0, T: 0, nn: 0, nT: 0 },       // decayed sums for T = T0 + c n
+  c: 0, T0: 0, T0floor: 0, warming: false,
+  raf: false,                                    // inside frame(), not APP.frames
+  end: 0 };                                      // when the last APP.frames frame returned
+document.addEventListener("visibilitychange", () => { gov.last = 0; });
 // Whether the previous frame was still warming up, so the end of spin-up can
 // be caught as an edge rather than as a state — see tickFrame.
 let wasWarming = false;
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const realDt = Math.min(0.05, (now - lastT) / 1000);
+  // 100 ms, not less: the governor may run as slow as CONFIG.frameCeilMs,
+  // and a frame must be able to ask for the sim time its wall time covers or
+  // ×1 is unreachable below 20 fps however fast the GPU is.
+  const realDt = Math.min(0.1, (now - lastT) / 1000);
   lastT = now;
+  gov.raf = true;
   tickFrame(realDt);
+  gov.raf = false;
 }
 
 function tickFrame(realDt) {
+  // The real interval since the previous frame started, unclamped: `realDt`
+  // is capped at 100 ms for the sim's sake and is fixed at 1/60 under
+  // APP.frames, and neither is what a frame actually cost. A gap longer than
+  // A hidden tab stops requestAnimationFrame, so the gap across one is not a
+  // frame: `visibilitychange` zeroes `gov.last` and that frame goes
+  // unmeasured. Long frames are otherwise REAL and must be counted — under a
+  // heavy load a spin-up readback frame can take more than a second, and a
+  // governor that ignored those frames saw only the fast ones and ran away.
+  // A scripted frame (APP.frames) is charged only what the previous scripted
+  // frame took, start to return. The gap since then is the caller's own work
+  // (smoke's hydro slam probes the surface between frames), and the gap since
+  // a rAF frame or boot is whatever the script did before — APP.tick, a
+  // settle — so the first scripted frame goes unmeasured. Charged with the
+  // seconds of its __settle, the slam's first frame cut nsubMax from ~400 to
+  // 2.7 and 150 frames meant to cover 15 s covered 0.7 s.
+  const tNow = performance.now();
+  const wallMs = !gov.raf ? (gov.end > gov.last ? gov.end - gov.last : 0)
+               : gov.last ? tNow - gov.last : 0;
+  gov.last = tNow;
+  const measured = wallMs > 0 && wallMs < 10000;
   computeView();
+  syncValveBtn();                // a valve drawn or erased shows / hides V on the strip
+  collectStream();               // before this frame's substeps: see requestStream
 
-  const t0 = performance.now();
-  let simAdvanced = 0;
+  let simAdvanced = 0, warming = false, binding = false;
   if (!state.paused) {
     const h = SIM.dt();
     state.simDt = h;
@@ -2474,7 +3091,7 @@ function tickFrame(realDt) {
     // way. It is a sim-clock target, so the speed slider does not lengthen it.
     const exWarm = EX.settleTarget();
     const warmTo = Math.max(state.scene.spinup || 0, exWarm);
-    const warming = sim.t < warmTo;
+    warming = sim.t < warmTo;
     // The last of §9's reset conditions. Spin-up is an initialisation
     // interval, not part of the reported flow state — a pipe filling, a
     // channel finding its depth — and a window opened across it carries the
@@ -2484,8 +3101,11 @@ function tickFrame(realDt) {
     if (wasWarming && !warming) SIM.avgReset();
     wasWarming = warming;
     let want = warming ? state.nsubMax : Math.round(state.speed * realDt / h);
-    // nsubMax is fractional (the AIMD governor creeps it), so round at the
-    // point of use — a substep count is an integer, and the panel prints it.
+    // The cap is what holds this frame back — the only case in which the
+    // governor may RAISE it (see governFrame).
+    binding = want >= state.nsubMax;
+    // nsubMax is fractional (the governor moves it continuously), so round at
+    // the point of use — a substep count is an integer, and the panel prints it.
     want = Math.max(1, Math.round(Math.min(state.nsubMax, want)));
     simAdvanced = SIM.step(want);
     state.nsub = want;
@@ -2494,10 +3114,14 @@ function tickFrame(realDt) {
         ? EX.settleHint()
         : "establishing steady flow… <b>" + sim.t.toFixed(1) + " / " +
           state.scene.spinup.toFixed(0) + " s</b>";
+      MINI.keep("hint");
       // A minimised tips pill still shows the countdown — reading a number
       // before the flow has settled is the classic worksheet mistake.
       MINI.pillText("hint", "▸ " + Math.max(0, warmTo - sim.t).toFixed(0) + " s");
       state.tipAt = 9.5;   // pop the first tip the moment spin-up finishes
+      // …and for a card's own tips that is the FIRST one, not the second (a
+      // scene's keeps its old order: it showed tips[0] before the countdown).
+      if (exerciseTips()) state.tipIdx = -1;
     } else {
       MINI.pillText("hint", "");
     }
@@ -2522,16 +3146,14 @@ function tickFrame(realDt) {
   // a particle through a wall rather than round it.
   if (state.particles) SIM.advanceParticles(Math.min(simAdvanced, 0.05), measuringAvg());
 
-  const simMs = performance.now() - t0;
-  // AIMD governor: creep up while there is headroom, back off hard when not
-  if (simMs > CONFIG.frameBudgetMs * 1.6) state.nsubMax = Math.max(2, state.nsubMax * 0.82);
-  else if (simMs < CONFIG.frameBudgetMs * 0.75) state.nsubMax = Math.min(4000, state.nsubMax * 1.05 + 1);
+  if (measured && !state.paused) governFrame(wallMs, warming, binding);
 
   // Average mode must describe ONE window: the field, the overlay and every
   // number derived from it. Mixing a mean field with live markers would put
   // two flow states in one screenshot.
   const avgCols = state.avg && SIM.avgActive() ? SIM.avgColumns() : null;
   refreshGrade();
+  requestStream();
   // hv is the MEAN flow's velocity head or nothing (SIM.hydraulicGrade), so
   // it only ever reaches analyse alongside the mean columns it belongs to.
   const hv = avgCols && state.gradeBuf ? state.gradeBuf.hv : null;
@@ -2555,19 +3177,26 @@ function tickFrame(realDt) {
   // soon as there is enough water to hang it in.
   if (!state.tracers && state.scene.tracerX && sim.t > 0.5) seedTracers(state.scene.tracerX);
 
-  const cur = state.inside ? state.cursor : [-99, -99];
+  // The brush ring is a TOOL's footprint: none with the Read tool in hand, and
+  // none under a finger, which hides it anyway.
+  const cur = state.inside && state.tool && state.ptr !== "touch" ? state.cursor : [-99, -99];
   const rg = rangeFor(fieldFor(state.mode).id);
   SIM.render(view, {
     mode: state.mode, vmax: vmaxFor(), lo: rg[0], hi: rg[1],
     // The same simulated step the particles were advanced by, so the trail
     // fades over a fixed span of FLOW rather than of wall clock.
     pdt: Math.min(simAdvanced, 0.05),
-    // Dye has no accumulator, so a live tracer over a mean picture would put
-    // two flow states in one screenshot: under an open window it stands down.
-    dye: state.dye && !measuringAvg(), particles: state.particles,
+    // Dye is drawn whenever there is any (the Dye tool, or a scene's fixed
+    // sources). It has no accumulator, so a live tracer over a mean picture
+    // would put two flow states in one screenshot: under an open window it
+    // stands down, and nothing is released either.
+    dye: !measuringAvg(), dyeSeeds: state.dyeSeeds, particles: state.particles,
     // One window, one picture: the same flag the overlay above was built with.
     avg: state.avg,
-    cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1 : state.brush * 0.55],
+    // The Dye tool's ring is its release radius, so the student sees where
+    // the ink will go in before pressing.
+    cursor: [cur[0], cur[1], state.tool === "erase" ? state.brush * 1.1
+             : state.tool === "dye" ? SIM.dyeInjRadius() : state.brush * 0.55],
     guide: state.drag ? [state.drag.x0, state.drag.z0, state.drag.x1, state.drag.z1] : [0, 0, 0, 0],
     guideOn: !!state.drag,
   });
@@ -2575,14 +3204,137 @@ function tickFrame(realDt) {
   drawOverlay(analysis);
   EX.tick();                    // the card's settle countdown, when one is open
 
-  fpsAcc += realDt; fpsN++;
-  if (fpsAcc > 0.5) {
-    state.fps = fpsN / fpsAcc;
-    state.rt = simAdvanced / Math.max(realDt, 1e-4);
-    fpsAcc = 0; fpsN = 0;
+  // The status line reads the whole window: simulated over wall seconds, and
+  // frames over wall seconds. A frame with no measurable interval (the first,
+  // or one after a hidden tab) still counts its sim time against `realDt`.
+  statWin.wall += measured ? wallMs / 1000 : realDt;
+  statWin.sim += simAdvanced; statWin.n++; statWin.sub += state.paused ? 0 : state.nsub;
+  if (measured) { gov.win.W += wallMs; gov.win.N++; gov.win.S += state.paused ? 0 : state.nsub; }
+  if (statWin.wall > 0.5) {
+    governLearn();
+    // Each window's own ratio, then blended half-and-half with the previous
+    // reading (~1 s effective): a 0.5 s window holds only a handful of
+    // frames when the GPU is busy, and one readback more or less moved it
+    // ±30%. A paused window is taken as it stands, so a pause reads ×0 at once.
+    const fps = statWin.n / statWin.wall, rt = statWin.sim / statWin.wall;
+    const fresh = state.paused;
+    state.fps = fresh ? fps : 0.5 * (state.fps + fps);
+    state.rt = fresh ? rt : 0.5 * (state.rt + rt);
+    state.nsubAvg = statWin.sub / statWin.n;
+    statWin.wall = statWin.sim = statWin.n = statWin.sub = 0;
     updateStatus();
   }
   cycleTips(realDt);
+}
+
+/** The frame-rate governor: sets `state.nsubMax`, the most substeps one frame
+ *  may run, so that the SMOOTHED frame interval sits at the target
+ *  (`governTarget`).
+ *
+ *  What it replaced timed the CPU around SIM.step and cut ×0.82 above 24 ms /
+ *  crept ×1.05 below 11 ms. WebGL is asynchronous, so that clock read ~1 ms
+ *  on two frames in three and the WHOLE queued GPU backlog on the third, when
+ *  `columns()`'s readback forced a sync — the governor saw 3× the real cost,
+ *  saw-toothed, and settled at a quarter of what the GPU could deliver
+ *  (h23: ×0.1–0.2 RT interactive against ×0.42 flat out). The interval
+ *  between frames is what the GPU's throughput actually sets, and over a few
+ *  readback cycles it is not bimodal.
+ *
+ *  An integral controller on the log error, rate-limited and with a dead
+ *  band: d ln(nsubMax)/dt = ln(target / mean) per second, limited to ±1 /s
+ *  (±1.5 /s in spin-up), no move within ±6% of target; the mean interval is
+ *  windowed over τ = 0.8 s, long enough to hold several frames even at
+ *  5 fps. It may only RAISE the cap when the cap is what limits the frame —
+ *  otherwise a scene running at ×0.25 speed would ratchet it to the ceiling
+ *  and the first touch of the speed slider would queue seconds of work.
+ *  Spin-up has its own, longer target, so it runs near flat out; the rate
+ *  limit makes the hand-over a ramp of a second or two rather than a cliff,
+ *  and halves a cap made absurd by a resolution change in under a second. */
+function governFrame(wallMs, warming, binding) {
+  const dt = wallMs / 1000;
+  gov.warming = warming;
+  // Frames per unit time, exponentially windowed in TIME: the mean interval
+  // is (decayed wall time) / (decayed frame count). Not an EMA of the
+  // interval with a time-based weight — that weights each interval by its own
+  // length and so over-counts the readback frames (16, 16, 150 ms reads as
+  // 126 ms against a true mean of 61) and starves the sim.
+  const k = Math.exp(-dt / 0.8);
+  gov.W = gov.W * k + wallMs; gov.N = gov.N * k + 1;
+  gov.ema = gov.W / gov.N;
+  const target = governTarget(warming);
+  const err = Math.log(target / gov.ema);
+  if (Math.abs(err) < 0.06) return;
+  if (err > 0 && !binding) return;
+  // Symmetric. An asymmetric limit (fast down, slow up) looked kinder to
+  // the interface, but on a noisy interval it is a rectifier: every spike
+  // above target cut harder than the dips below it restored, and the cap
+  // settled well under the target (hammer spin-up, shared GPU: n 30–45 at
+  // T ≈ 130 ms against a 220 ms target).
+  const lim = warming ? 1.5 : 1;
+  const rate = Math.max(-lim, Math.min(lim, err));
+  state.nsubMax = Math.max(2, Math.min(4000, state.nsubMax * Math.exp(rate * dt)));
+}
+
+/** The interval the governor steers to. The configured frame time when the
+ *  machine can meet it with the sim taking a real share of the frame — and
+ *  otherwise long enough that it does: at least half the frame (¾ in
+ *  spin-up) goes to substeps, up to CONFIG.frameCeilMs (400 ms in spin-up).
+ *  Without that floor a machine whose render alone takes 30 ms (an integrated GPU on a 4K panel; measured here: Iris Xe at
+ *  1440×900 shared with other headless Chromes paused at 27 fps) would cut
+ *  the sim to two substeps a frame chasing a frame rate that substeps were
+ *  not costing — ×0.01 RT for no visible gain in smoothness. */
+function governTarget(warming) {
+  // A scripted APP.frames(n) loop is not being watched: there is no frame
+  // rate to keep, and the caller sized n for frames of the plain running
+  // cost. Giving it the spin-up target made ui-smoke's APP.frames(600) on m2
+  // (still warming) take minutes — 600 frames of 200–400 ms. It gets the
+  // running target without the share rule.
+  if (!gov.raf) return CONFIG.frameTargetMs;
+  const base = warming ? CONFIG.warmFrameTargetMs : CONFIG.frameTargetMs;
+  const share = warming ? 0.75 : 0.5;
+  return Math.max(base, Math.min(warming ? 400 : CONFIG.frameCeilMs, gov.T0 / (1 - share)));
+}
+
+/** Learns the frame's cost model T = T0 + c·n from each status window (mean
+ *  substeps per frame against mean interval): least squares with a ~15 s
+ *  memory (×0.97 a window). T0 is the cost of a frame that runs no substeps
+ *  — render, overlay, instruments — and c the cost of one substep, readback
+ *  stalls and all. The slope is refitted only when the windows in memory
+ *  span a spread of n (it is otherwise undetermined); T0 follows the
+ *  windows' mean through the held slope, so a heavier overlay or a resized
+ *  window is picked up as the memory turns over. Paused windows (n = 0)
+ *  measure T0 directly. */
+function governLearn() {
+  const w = gov.win, F = gov.fit;
+  if (w.N >= 3) {
+    const n = w.S / w.N, T = w.W / w.N;
+    const k = 0.97;
+    F.w = F.w * k + 1; F.n = F.n * k + n; F.T = F.T * k + T;
+    F.nn = F.nn * k + n * n; F.nT = F.nT * k + n * T;
+    const mn = F.n / F.w, mT = F.T / F.w;
+    const vn = F.nn / F.w - mn * mn, cv = F.nT / F.w - mn * mT;
+    if (vn > Math.max(1, 0.01 * mn * mn) && cv > 0) gov.c = cv / vn;
+    // No slope learned yet: assume the frame is all substeps (T0 = 0), which
+    // is the plain frame-rate target and moves n enough to learn one. The
+    // intercept comes from the fit's own means, not from this window: taken
+    // per window it followed T up whenever the slope was underestimated, the
+    // target followed T0, and the frame rate walked away.
+    // A fit needs n to MOVE, and a governor pinned at its floor never moves
+    // it: measured on hammer straight after spin-up, the backlog draining
+    // made T rise as n fell, no slope was accepted, T0 stayed 0, the 30 ms
+    // target was out of reach and n sat at 2 for good (×0.03 RT). Pinned at
+    // the floor with the frame still too slow, the frame IS its overhead, so
+    // that is taken as a lower bound on T0 — which raises the target, lets n
+    // climb, and gives the fit its spread back. It fades over ~15 s.
+    // Not in spin-up: the first frames of a scene (shader compiles, the
+    // initial fill) are pinned and slow for reasons that pass, and latching
+    // one of those read a 650 ms "overhead" off hammer's boot.
+    const pinned = !gov.warming && state.nsubMax <= 4 && T > CONFIG.frameTargetMs;
+    gov.T0floor = pinned ? Math.max(gov.T0floor, T) : gov.T0floor * k;
+    const T0fit = gov.c > 0 ? Math.max(0, Math.min(mT, mT - gov.c * mn)) : 0;
+    gov.T0 = Math.max(T0fit, gov.T0floor);
+  }
+  w.W = w.N = w.S = 0;
 }
 
 /** The speed scale — the particle colouring and the Water view's brightness
@@ -2614,8 +3366,13 @@ function sampleGauges(A) {
   if (!(sim.t > state.gaugeT)) return;
   state.gaugeT = sim.t;
   const av = measuringAvg();
-  state.gauges.forEach((gg) => {
-    const pr = SIM.probe(gg.x, gg.z, av);
+  // One batched read for all the gauges: each readPixels is a synchronous GPU
+  // round trip of a few ms whatever its size, and one per gauge per texture
+  // was most of the frame with three gauges up (SIM.probeMany). No sample
+  // uses the fill f, so its texture is not read: one read per grid row.
+  const prs = SIM.probeMany(state.gauges.map((gg) => [gg.x, gg.z]), av, true);
+  state.gauges.forEach((gg, gk) => {
+    const pr = prs[gk];
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(gg.x / sim.dx)));
     // Piezometric head h = z + p/ρg. For a scene whose bed is real geometry
     // z is just the gauge's own z, but a tilted-gravity scene (m2) draws a FLAT
@@ -2630,22 +3387,54 @@ function sampleGauges(A) {
     // by the friction loss between them; a still column (reservoir, shaft) has
     // |u| ≈ 0, so there H = h = η.
     const g = Math.abs(sim.p.g) || 9.81;
+    // EVERY quantity in GAUGE_QTY, on every sample, whatever the gauge is
+    // plotting: the probe returns all of them from the one batched read, so
+    // switching a gauge's quantity later shows its whole history, and the
+    // CSV always has the lot. The solver's p is kinematic (p/ρ, m²/s²);
+    // ×ρ = 1000 kg/m³ stores it in Pa — the unit the CSV writes.
     const s = { t: sim.t, h: z + pr.phead, H: z + pr.phead + pr.speed * pr.speed / (2 * g),
-                d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed };
+                d: A.d[i], eta: A.bed[i] + A.d[i], speed: pr.speed,
+                u: pr.u, w: pr.w, p: 1000 * pr.p, phead: pr.phead };
     gg.hist.push(s);
     if (gg.hist.length > CONFIG.histMax) gg.hist.splice(0, gg.hist.length - CONFIG.histMax);
+    // The WHOLE run, thinned: what the corner card plots under Gauge charts
+    // = whole run (viewParams gaugeSpan: "all"). Every sample until it holds
+    // WHOLE_MAX, then every other one is dropped and the spacing doubles, so
+    // t = 0 stays on the chart however long the run goes, in bounded memory.
+    // The log above stays the full-resolution record (inspector, CSV).
+    if (!gg.whole) { gg.whole = []; gg.wdt = 0; }
+    const Wh = gg.whole;
+    if (!Wh.length || s.t - Wh[Wh.length - 1].t >= gg.wdt) {
+      Wh.push(s);
+      if (Wh.length > WHOLE_MAX) {
+        gg.whole = Wh.filter((_, n) => n % 2 === 0);
+        gg.wdt = 2 * (s.t - gg.whole[0].t) / gg.whole.length;
+      }
+    }
     if (!gg.log) gg.log = [];
     gg.log.push(s);
     if (gg.log.length > CONFIG.logMax) gg.log.splice(0, gg.log.length - CONFIG.logMax);
     gg.last = pr;
   });
 }
+/** Samples a gauge's whole-run series holds before it is thinned by half. */
+const WHOLE_MAX = 1200;
+/** What a corner card plots: the scrolling window, or the whole run with the
+ *  newest sample on its end (the thinned series may lag it by one spacing). */
+function gaugeSeries(gg) {
+  if (state.gaugeSpan !== "all" || !gg.whole || !gg.whole.length) return gg.hist;
+  const last = gg.hist[gg.hist.length - 1];
+  return last && last !== gg.whole[gg.whole.length - 1] ? gg.whole.concat([last]) : gg.whole;
+}
 
 /** R (reset water) restarts the clock, so the traces cannot be continued —
  *  both stores are emptied and the inspectors go blank. Loading a scene drops
  *  the gauges entirely. Said out loud in the inspector's caption. */
 function clearGaugeHistory() {
-  state.gauges.forEach((g) => { g.hist.length = 0; if (g.log) g.log.length = 0; });
+  state.gauges.forEach((g) => {
+    g.hist.length = 0; if (g.log) g.log.length = 0;
+    g.whole = null; g.wdt = 0;
+  });
   state.gaugeT = -1;
 }
 /** True while measurements should come from the averaging window: Average is
@@ -2655,7 +3444,13 @@ function measuringAvg() { return state.avg && SIM.avgActive(); }
 
 function sampleRakes() {
   const av = measuringAvg();
-  state.rakes.forEach((rk) => { const r = SIM.rake(rk.x, rk.buf, av); rk.buf = r.buf; rk.i = r.i; });
+  // The fill column only for a rake that drawRake found inside a conduit
+  // (`needF`): an open-channel rake spans bed → surface off the column
+  // analysis and costs no extra readback.
+  state.rakes.forEach((rk) => {
+    const r = SIM.rake(rk.x, rk.buf, av, rk.needF ? (rk.f || true) : null);
+    rk.buf = r.buf; rk.i = r.i; rk.f = r.f;
+  });
 }
 
 /** Place (or move) the force control volume. Corners are normalised and the
@@ -2665,7 +3460,7 @@ function sampleRakes() {
  *  than inlined because a click and a drag are different gestures on this
  *  tool: removal happens on the way DOWN, placement on the way up. */
 function removeFluxAt(x, z) {
-  const hit = state.flux.findIndex((L) => nearSegment(L, x, z) < GRAB_PX);
+  const hit = state.flux.findIndex((L) => nearSegment(L, x, z) < grabPx());
   if (hit < 0) return false;
   state.flux.splice(hit, 1);
   syncPanel();
@@ -2742,7 +3537,7 @@ function sampleCV() {
                     : { fx: r.fx, fz: r.fz };
     cv.flux = emaFlux(cv.flux, b, a);
   }
-  cv.hist.push({ t: sim.t, fx: r.fx });
+  cv.hist.push({ t: sim.t, fx: r.fx, vol: r.vol });   // vol: the storage term dV/dt
   while (cv.hist.length > 2 && sim.t - cv.hist[0].t > 8) cv.hist.shift();
   cv.last = r;
 }
@@ -2881,6 +3676,51 @@ function refreshGrade() {
   state.gradeBuf = SIM.hydraulicGrade(state.gradeBuf, avg);
 }
 
+/** Streamlines, in two halves around the frame's GPU work.
+ *
+ *  `collectStream` runs at the TOP of the frame, before this frame's substeps
+ *  are queued: it polls the async readback (SIM.streamPoll), and when one has
+ *  landed rebuilds psi and its contours (STREAM.psi / STREAM.contours) — one
+ *  pass over the grid for each, skipping every cell no level crosses.
+ *  Polling before the substeps matters: the copy-out is a round trip to the
+ *  GPU process, which is cheap while its queue is empty and waits behind
+ *  every substep once it is not.
+ *
+ *  `requestStream` runs after the substeps and the averaging step, so the
+ *  field it asks for is this frame's, and asks at most every 250 ms of wall
+ *  clock (~4 Hz). Never a stall: SIM.streamRequest packs the fluxes on the
+ *  GPU, reads them into a pixel-pack buffer behind a fence, and returns.
+ *
+ *  Off costs one boolean. Paused, nothing new is requested: the field is not
+ *  changing. A result read in the other window mode (Live vs Average) is
+ *  dropped, and the drawn buffer carries its mode, so a mean picture never
+ *  carries live streamlines or the other way round. */
+function collectStream() {
+  if (!state.sline) { state.slineBuf = null; return; }
+  const avg = measuringAvg();
+  const R = SIM.streamPoll();
+  if (!R || R.avg !== avg) return;
+  const G = STREAM.psi(R, state.slineGrid);
+  state.slineGrid = G;
+  const rg = STREAM.range(G);
+  if (!rg) { state.slineBuf = null; return; }
+  const N = state.slineN, span = rg[1] - rg[0];
+  let d = state.slineDpsi;
+  if (state.slineBuf && state.slineBuf.avg !== avg) d = 0;
+  if (!(d > 0) || span / d < 0.6 * N || span / d > 1.7 * N) d = STREAM.nice(span / N);
+  state.slineDpsi = d;
+  state.slineBuf = { seg: STREAM.contours(G, d), dpsi: d, avg, t: R.t };
+}
+function requestStream() {
+  if (!state.sline) return;
+  const avg = measuringAvg(), now = performance.now();
+  const stale = !state.slineBuf || state.slineBuf.avg !== avg || sim.t !== state.slineT;
+  if (stale && now - state.slineAt > 250 && !SIM.streamPending()) {
+    SIM.streamRequest(avg);
+    state.slineAt = now; state.slineT = sim.t;
+  }
+}
+
 /** What the reservoir is actually DELIVERING.
  *
  *  Neither reservoir number on the panel is a measurement: `inflow.q` is a
@@ -2986,6 +3826,11 @@ function drawOverlay(A) {
   const ctx = octx;
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   ctx.clearRect(0, 0, view.pxW, view.pxH);
+  // What the overlay may print this frame: the instruments' boxes (VIEW →
+  // Readouts) and the concepts this card's `ui.hide` withholds.
+  OVERLAY.setPrint({ boxes: state.instReadouts,
+                     energy: !UIMODE.hides("energy"),
+                     critical: !UIMODE.hides("critical") });
   OVERLAY.drawFrame(ctx, view, sim);
   if (state.ruler) OVERLAY.drawRuler(ctx, view, sim);
   ctx.save();
@@ -2997,7 +3842,25 @@ function drawOverlay(A) {
     if (state.labels) OVERLAY.drawProfileLabels(ctx, view, A, sim);
     if (state.jumps) OVERLAY.drawJumps(ctx, view, OVERLAY.findJumps(A, sim));
   }
-  state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A); });
+  if (state.sline && state.slineBuf && state.slineBuf.avg === measuringAvg()) {
+    OVERLAY.drawStreamlines(ctx, view, state.slineBuf);
+  }
+  // ONE velocity scale for every rake: the Speed field's held range (the
+  // scene's `vmax` until someone Fits the Speed legend), so rakes compare side
+  // by side and still water draws flat. Held, not tracked — the same rule as
+  // the colour ranges; the bar at the bottom left says what it is.
+  if (state.rakes.some((rk) => rk.buf)) {
+    const uRef = Math.max(0.05, rangeFor("speed")[1]);
+    const pxPerMps = Math.min(view.w * 0.13, 110) / uRef;
+    state.rakes.forEach((rk) => { if (rk.buf) OVERLAY.drawRake(ctx, view, sim, rk, A, pxPerMps); });
+    OVERLAY.drawRakeScale(ctx, view, pxPerMps);
+  }
+  // Wind over the water (FF-1): only a scene declaring a "tau" param has one.
+  const tau = SIM.windTau();
+  if (tau) {
+    const td = (SIM.params().decl || []).find((d) => d.key === "tau");
+    OVERLAY.drawWind(ctx, view, A, sim, tau, td ? Math.max(Math.abs(td.min), Math.abs(td.max)) : Math.abs(tau));
+  }
   if (state.tracers) OVERLAY.drawTracers(ctx, view, state.tracers);
   const meas = state.measDrag || state.measure;
   if (meas) OVERLAY.drawMeasure(ctx, view, meas);
@@ -3024,18 +3887,43 @@ function drawOverlay(A) {
   drawSpout(ctx);
   ctx.restore();
   OVERLAY.drawGaugeMarks(ctx, view, state.gauges);
-  const fld = state.gaugeField;
   // The MARKS always stay — a gauge you cannot see is a gauge you place twice.
   // What a profile can withhold is the card that reads it out, for an exercise
-  // that wants a prediction before a number.
-  const cards = UIMODE.shows("gauges")
-    ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, fld,
-        fld === "h" ? "h" : fld === "H" ? "H" : fld === "d" ? "d" : fld === "eta" ? "η" : "|u|",
-        fld === "speed" ? "m/s" : "m")
+  // that wants a prediction before a number; and the Readouts view toggle
+  // (state.instReadouts) folds every instrument's boxes away — the gauges go
+  // on recording either way. Each card plots its own gauge's quantity.
+  const cards = UIMODE.shows("gauges") && state.instReadouts
+    ? OVERLAY.drawGaugeCharts(ctx, view, state.gauges, (gg) => {
+        const q = gaugeQty(gaugeFieldOf(gg));
+        return { label: q.sym, unit: q.unit, get: (s) => s[q.id] * q.k,
+                 series: gaugeSeries(gg), whole: state.gaugeSpan === "all" };
+      })
     : [];
   GINSP.tick(cards);
+  // The tips line centres on the width the corner cards leave (#hint, --gcw):
+  // on an iPad it used to sit right on top of VC-2's pre-placed gauge chart.
+  // The width counts the selector and ⤢ that hang off the card's left edge.
+  const gcw = cards.length ? Math.round(cards[0].w + 76) : 0;
+  if (gcw !== state.gcw) {
+    state.gcw = gcw;
+    document.documentElement.style.setProperty("--gcw", gcw + "px");
+  }
   if (state.grade) OVERLAY.drawGradeLines(ctx, view, A, sim, state.gradeBuf);
-  if (state.inside && !state.drag && UIMODE.shows("cursor")) {
+  // The pinned readout (a tap with the Read tool): the same card and the same
+  // rows as the hover readout, held at the point that was touched and kept
+  // live. It answers to the card's `readouts.cursor`, not to the Hover
+  // readout switch — see tapRead.
+  const pin = state.pin;
+  if (pin && UIMODE.shows("cursor")) {
+    if (--state.pinTick <= 0) { state.pinTick = 3; state.pinProbe = SIM.probe(pin.x, pin.z, measuringAvg()); }
+    OVERLAY.drawPinMark(ctx, view, pin.x, pin.z);
+    OVERLAY.drawCursorReadout(ctx, view, A, sim, pin.x, pin.z, state.pinProbe, UIMODE.rows());
+  }
+  // The hover card follows a mouse or a pen — never a finger, which would sit
+  // on top of it — and stands down over the pin, which already says it.
+  if (state.inside && !state.drag && UIMODE.shows("cursor") && state.hoverCard &&
+      state.ptr !== "touch" &&
+      !(pin && pxApart(pin.x, pin.z, state.cursor[0], state.cursor[1]) < 24)) {
     // Another readPixels sync — once every few frames is plenty for a hover
     // readout, and it keeps the sim loop off the GPU's critical path.
     if (--probeTick <= 0) { probeTick = 3; state.hover = SIM.probe(state.cursor[0], state.cursor[1], measuringAvg()); }
@@ -3054,6 +3942,10 @@ function pxApart(x0, z0, x1, z1) {
   return Math.hypot(dx, dz);
 }
 const GRAB_PX = 16;      // a finger is 44 px; this is for a pointed-at marker
+/** The hit radius for the pointer that is pressing: a fingertip covers a
+ *  dozen pixels on its own and lands a few off where its owner aimed, so a
+ *  touch gets the 44 px target the guidelines ask for (a 22 px radius). */
+function grabPx() { return state.ptr === "touch" ? 22 : GRAB_PX; }
 
 /** Screen distance from a point to a drawn section, in pixels. */
 function nearSegment(L, x, z) {
@@ -3095,26 +3987,45 @@ function faceAtPx(solids, x, z, tolPx) {
  *  The tape, the Control volume and the orbit tracers all already clear on a click,
  *  so this is the convention the rest of the toolbox was using. */
 function placeGauge(x, z) {
-  const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < GRAB_PX);
-  if (hit >= 0) {
-    const gone = state.gauges.splice(hit, 1)[0];
-    GINSP.closeFor(gone);
-    syncPanel();
-    return;
-  }
+  const hit = state.gauges.findIndex((g) => pxApart(g.x, g.z, x, z) < grabPx());
+  if (hit >= 0) { removeGauge(state.gauges[hit]); return; }
   if (state.gauges.length >= 4) state.gauges.shift();
   state.gauges.push({ x, z, hist: [], log: [], id: ++state.gaugeSeq,
+                      field: gaugeFieldOf(null),     // starts on the session default
                       colour: CONFIG.gaugeColours[state.gauges.length % 4] });
   syncPanel();                      // the inspector row lists the live gauges
 }
 
-/** Place a rake — or take away the one at that station. A rake is a whole
- *  column, so only the station is compared. */
-function placeRake(x) {
-  const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < GRAB_PX);
+/** Take one gauge away — the click on its mark, the × on its corner card and
+ *  the Remove in its inspector all come here. Its history goes with it; the
+ *  others' (and so their CSV columns) are untouched. */
+function removeGauge(g) {
+  const k = state.gauges.indexOf(g);
+  if (k < 0) return;
+  state.gauges.splice(k, 1);
+  GINSP.closeFor(g);
+  syncPanel();
+}
+/** Every gauge at once: the panel's ✕ Clear all, and the strip's Gauge button
+ *  pressed while the Gauge tool is already in hand. */
+function clearAllGauges() {
+  GINSP.closeAll();
+  state.gauges.length = 0;
+  syncPanel();
+}
+
+/** Place a rake — or take away the one at that station. A rake spans the
+ *  water around the CLICKED point: from the first solid below it up to the
+ *  first solid above it or the free surface, whichever comes first. In an
+ *  open channel that is bed → surface, exactly as before; inside a pipe it is
+ *  wall → wall (drawRake works the span out each frame). `z` is optional — a
+ *  rake from a rig or a script without one spans the column's bed → surface.
+ *  Removal compares the station only. */
+function placeRake(x, z) {
+  const hit = state.rakes.findIndex((r) => Math.abs(r.x - x) * view.w / sim.W < grabPx());
   if (hit >= 0) { state.rakes.splice(hit, 1); syncPanel(); return; }
   if (state.rakes.length >= 2) state.rakes.shift();
-  state.rakes.push({ x, buf: null });
+  state.rakes.push({ x, z: Number.isFinite(z) ? z : undefined, buf: null });
   syncPanel();
 }
 
@@ -3160,17 +4071,71 @@ function drawMarkers(ctx) {
     // named on the chip so nobody reads the marker as a promised surface.
     const st = SIM.inletStage();
     const drawn = p.inflow.level - st.stage;
+    // A card before the energy lecture (ui.hide "energy") gets the plain
+    // reading — "reservoir level 3.16 m" — with neither the energy line nor
+    // "head-driven" (a head, also L7) attached.
     level("L", p.inflow.level,
-      "reservoir " + p.inflow.level.toFixed(2) + " m"
-        + (p.inflow.free > 0.5 ? " · head-driven"
-           : st.choked ? " · energy line · over-drawn"
-           : drawn > 0.005 ? " · energy line" : ""),
+      UIMODE.hides("energy")
+        ? "reservoir level " + p.inflow.level.toFixed(2) + " m"
+        : "reservoir " + p.inflow.level.toFixed(2) + " m"
+          + (p.inflow.free > 0.5 ? " · head-driven"
+             : st.choked ? " · energy line · over-drawn"
+             : drawn > 0.005 ? " · energy line" : ""),
       "#7fd4ff", "res");
   }
   if (p.tailwater.on > 0.5) {
     level("R", p.tailwater.level, "tailwater " + p.tailwater.level.toFixed(2) + " m", "#5fd08a", "tw");
   }
-  if (p.wave.on > 0.5) {
+  const wall = SIM.wallPaddle();
+  if (wall) {
+    // The paddle at the left wall (WV-4). The solver imposes its velocity
+    // a·ω·cos ωt at the mean position; it is drawn as a solid plate whose
+    // face moves through the displacement a·sin ωt to scale, about a mean
+    // 10 px off the wall, so it reads as the thing a wave flume has. The view
+    // starts at x = 0, so the back half of the stroke is drawn squashed
+    // against the wall (4 px) rather than off-screen.
+    // The displacement and velocity are SIM.paddle's — the same numbers the
+    // solver imposes, train envelope included. A flap (SIM.flapOn) is drawn
+    // as a plate hinged at its hinge: the face leans, moving the full stroke
+    // at the still-water level and nothing at the hinge.
+    const f = flashOf("piston");
+    const om = 2 * Math.PI / Math.max(p.wave.period, 0.05);
+    const pd = SIM.paddle();
+    const pxm = V.w / sim.W;
+    const yTop = V.Y(sim.H * 0.95), yBot = V.Y(0);
+    const flap = SIM.flapOn();
+    const zh = flap ? SIM.paddleBed() - Math.max(0, p.wave.hinge || 0) : 0;
+    const z0 = flap ? SIM.paddleBed() + p.wave.d : 1;
+    const faceAt = (z) => V.X(0) + Math.max(4, 10 + pd.X * (flap ? (z - zh) / (z0 - zh) : 1) * pxm);
+    const face = faceAt(sim.H * 0.95), faceBot = faceAt(flap ? zh : 0);
+    ctx.save();
+    ctx.fillStyle = "#c98a2e"; ctx.globalAlpha = 0.92;
+    ctx.beginPath();
+    ctx.moveTo(V.X(0) - 2, yTop); ctx.lineTo(face, yTop);
+    if (flap) { ctx.lineTo(faceBot, V.Y(zh)); ctx.lineTo(faceBot, yBot); }
+    else ctx.lineTo(face, yBot);
+    ctx.lineTo(V.X(0) - 2, yBot); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#ffcf7a"; ctx.lineWidth = 2 + 2 * f;
+    ctx.beginPath(); ctx.moveTo(face, yTop);
+    if (flap) {
+      ctx.lineTo(faceBot, V.Y(zh)); ctx.stroke();
+      ctx.beginPath(); ctx.arc(faceBot, V.Y(zh), 3.5, 0, 2 * Math.PI); ctx.stroke();   // the hinge
+    } else { ctx.lineTo(face, yBot); ctx.stroke(); }
+    // the push/pull arrow: its length is the paddle's speed now
+    const u = pd.U / Math.max(p.wave.amp * om, 1e-6), ym = yTop + 34, L = 24 * u;
+    if (Math.abs(L) > 3) {
+      const tip = face + 6 + Math.max(0, L), tail = face + 6 + Math.max(0, -L);
+      const [a, b] = L > 0 ? [tail, tip] : [tip, tail];
+      const s = L > 0 ? -1 : 1;
+      ctx.beginPath(); ctx.moveTo(a, ym); ctx.lineTo(b, ym);
+      ctx.moveTo(b, ym); ctx.lineTo(b + s * 5, ym - 4);
+      ctx.moveTo(b, ym); ctx.lineTo(b + s * 5, ym + 4);
+      ctx.stroke();
+    }
+    OVERLAY.chip(ctx, face + 6, yTop + 12, flap ? "hinged flap" : "wave paddle", "#ffb648");
+    ctx.restore();
+  } else if (p.wave.on > 0.5) {
     const x = V.X(p.wave.x), f = flashOf("piston");
     ctx.save();
     ctx.globalAlpha = 0.5 + 0.5 * f;
@@ -3200,6 +4165,7 @@ function drawMarkers(ctx) {
   ctx.strokeStyle = "#dfe8f2"; ctx.lineCap = "round";
   for (const [key, on, pos, dx, dy] of sides) {
     if (!(on > 0.5)) continue;
+    if (key === "openL" && wall) continue;             // that edge IS the paddle
     const f = flashOf(key);
     ctx.globalAlpha = (on > 1.5 ? 0.55 : 0.30) + 0.5 * f;   // outfalls read stronger
     ctx.lineWidth = 1.3 + 1.5 * f;
@@ -3259,7 +4225,7 @@ function updateStatus() {
   const nSpeed = document.getElementById("n_speed");
   if (nSpeed) nSpeed.textContent =
     "×" + state.speed.toFixed(2) + " asked, ×" + state.rt.toFixed(2) + " achieved  " +
-    "(Δt " + (state.simDt * 1e3).toFixed(2) + " ms × " + state.nsub + ")";
+    "(Δt " + (state.simDt * 1e3).toFixed(2) + " ms × " + Math.round(state.nsubAvg || state.nsub) + ")";
   // The delivered numbers move on their own, so their notes are refreshed on
   // this cadence rather than only when a slider is touched.
   if (state.deliv) { refreshNote("inQ"); refreshNote("inLevel"); }
@@ -3277,14 +4243,44 @@ function refreshNote(id) {
   if (c && n && c.fmt) n.textContent = c.fmt(c.get());
 }
 
+/** THE TIPS LINE at the foot of the screen. A scene's `tips` are shared by
+ *  every exercise built on it, so they cannot keep pace with a course: a
+ *  scene used in the momentum lecture may not talk about a quantity taught
+ *  later. An exercise card (or one of its tabs — EX.view merges it) may
+ *  therefore carry its own `tips: [...]`, which replace the scene's while
+ *  that exercise is on screen ON ITS OWN SCENE. A card's tips are plain text
+ *  with the card's inline markup ({tool:…}, {btn:…}, {key:…}) drawn as the
+ *  strip's own chips; a scene's tips stay HTML, exactly as before. With no
+ *  card tips nothing changes — every scene and every card without `tips`
+ *  behaves as it always did. */
+function exerciseTips() {
+  const ex = (typeof EX !== "undefined") ? EX.current : null;
+  return (ex && ex.scene === state.scene.id && Array.isArray(ex.tips) && ex.tips.length)
+    ? ex.tips : null;
+}
+function tipList() { return exerciseTips() || state.scene.tips || []; }
+function showTip(i) {
+  const el = document.getElementById("hint"), own = exerciseTips();
+  if (own) EX.rich(el, own[((i % own.length) + own.length) % own.length]);
+  else el.innerHTML = state.scene.tips[i] || "";
+  MINI.keep("hint");
+}
+/** Start the line again from the first tip — a card or a tab was just put
+ *  on screen (or taken off it). While a settle countdown is running the
+ *  frame loop owns the line, and the first tip follows it. */
+function restartTips() {
+  state.tipIdx = 0; state.tipAt = 0;
+  showTip(0);
+}
+
 function cycleTips(dt) {
-  const tips = state.scene.tips;
+  const tips = tipList();
   if (!tips.length || sim.t < (state.scene.spinup || 0)) return;
   state.tipAt += dt;
   if (state.tipAt > 9) {
     state.tipAt = 0;
     state.tipIdx = (state.tipIdx + 1) % tips.length;
-    document.getElementById("hint").innerHTML = tips[state.tipIdx];
+    showTip(state.tipIdx);
   }
 }
 
@@ -3366,12 +4362,15 @@ function boot() {
 
   // The scene menu (see PICKER). Four ways in: the scene chip at the end of
   // the strip, the strip's Scenes icon, the panel's Scene row, and the S key.
+  // Under a course menu with `scenes: false` the chip names the exercise and
+  // opens the EXERCISE menu instead.
   const title = document.getElementById("title");
-  title.onclick = (e) => PICKER.toggle(e.currentTarget);
+  const chipMenu = (el) => (scenesOffered() ? PICKER.toggle(el) : EX.toggle(el));
+  title.onclick = (e) => chipMenu(e.currentTarget);
   title.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault(); e.stopPropagation();          // not the global Space = pause
-    PICKER.toggle(title);
+    chipMenu(title);
   });
   window.addEventListener("pointerdown", PICKER.onDown, true);
   addEventListener("resize", () => { if (PICKER.isOpen()) PICKER.place(); });
@@ -3403,6 +4402,9 @@ function boot() {
   buildPanel();
   const q = new URLSearchParams(location.search);
   loadScene(q.get("scene") || "sandbox", false);
+  // `?scene=sandbox` is the sandbox door by address: building is what it is
+  // for, so Wall is in hand. Any other boot opens on the neutral Read tool.
+  if (q.get("scene") === "sandbox" && !q.get("ex")) state.tool = "wall";
   // Read the rig code BEFORE the exercise rewrites the address bar — setting
   // one up drops the hash exactly as a scene switch does.
   const rigCode = RIG.hashCode();
@@ -3410,7 +4412,9 @@ function boot() {
   // included, so it runs INSTEAD of `?scene=` (which has already loaded, and
   // is what you are left on if the id is unknown to this build).
   const exId = q.get("ex");
-  if (exId && !EX.pick(exId)) showToast("Unknown exercise", "\"" + exId +
+  // `&tab=<key>` opens a tabbed card on that tab (CR-1's "forces"); an old
+  // id that became a tab (`?ex=MM-2`) is resolved by EX itself.
+  if (exId && !EX.pick(exId, q.get("tab") ? { tab: q.get("tab") } : undefined)) showToast("Unknown exercise", "\"" + exId +
     "\" is not in this build's teaching pack — loaded the scene instead.");
   // Embedded, the brief lives on the page around the frame; the card starts
   // folded to its tab so the water keeps the width (spec §1.1).
@@ -3432,7 +4436,7 @@ function boot() {
   // The status line is otherwise written on the half-second cadence in
   // `tickFrame`, which leaves the chip half-empty for the first frames.
   updateStatus();
-  document.getElementById("hint").innerHTML = state.scene.tips[0] || "";
+  showTip(0);
 
   // A BARE visit lands on the start screen: this is a teaching tool, so the
   // pack is the front door and the sandbox is a card on it. Any address that
@@ -3492,9 +4496,9 @@ function boot() {
     else if (k === "escape") { KEYS.close(); DOCK.fold(true); }
     else if (k === "?" || (k === "/" && e.shiftKey)) KEYS.toggle(document.getElementById("keysBtn"));
     else if (k === "h") START.open();
-    else if (k === "s") PICKER.open(document.getElementById("sceneBtn"));
+    else if (k === "s") { if (scenesOffered()) PICKER.open(document.getElementById("sceneBtn")); }
     else if (k === "e") EX.open(document.getElementById("exBtn"));
-    else if (k === "v") toggleValve();
+    else if (k === "v") { if (trainOffered() && !hasValves()) fireTrain(); else toggleValve(); }
     else if (k === "z") SIM.undoSeg();
     else if (k === "c") SIM.clearSegs();
     else if (k === "r") { SIM.resetWater(); clearGaugeHistory(); }
@@ -3508,10 +4512,26 @@ function boot() {
       LEGEND.sync(); syncPanel();
     }
     else if (k === "l") LEGEND.toggle();
-    else if (k === "b") { state.cvShow = CV_NEXT[state.cvShow] || "Q"; syncPanel(); }
-    else if (k === "d") { state.dye = !state.dye; syncPanel(); }
+    else if (k === "b") {
+      state.cvShow = CV_NEXT[state.cvShow] || "Q";
+      // A card that withholds energy has two things to cycle, not three.
+      if (state.cvShow === "E" && UIMODE.hides("energy")) state.cvShow = "Q";
+      syncPanel();
+    }
+    else if (k === "d") {
+      // The Dye tool, by letter — the same gate as a digit: a hidden tool's
+      // key says why rather than arming it.
+      if (UIMODE.allows(familyOf("dye"), { tool: "dye", id: "dye" })) {
+        state.tool = "dye"; state.forceHover = null; window.syncTools();
+      } else {
+        showToast("Dye is off for this exercise",
+                  "The ⋯ button at the end of the strip brings every control back.");
+      }
+    }
+    else if (k === "t") { state.sline = !state.sline; syncPanel(); }
     else if (k === "n") { state.channel = !state.channel; syncPanel(); }
     else if (k === "a") setAverage(!state.avg);
+    else if (k === "i") { state.instReadouts = !state.instReadouts; syncPanel(); }
     else if (k === "m") { state.ruler = !state.ruler; syncPanel(); }
     // requestFullscreen needs a user gesture; a keypress is one. A frame with
     // no allow="fullscreen" simply rejects — toggleFullscreen already swallows
@@ -3585,7 +4605,7 @@ function toggleValve() {
   syncToolbar();
   showToast(sim.p.valveClosed > 0.5 ? "Valve closed" : "Valve open",
     sim.p.valveClosed > 0.5
-      ? "Watch the gauge: the surge should be ΔH = c·Δv/g."
+      ? "Watch the gauges: a pressure wave runs up the pipe at c, and the pressure head jumps by c·Δv/g."
       : "Flow re-established.");
 }
 
@@ -3647,10 +4667,13 @@ window.APP = {
   gaugeCSV: (list) => GINSP.csv(list),     // the CSV text, without downloading
   clearGaugeHistory,
   tick: (n) => { for (let k = 0; k < (n || 1); k++) SIM.step(1); },
-  frames: (n, dt) => { for (let k = 0; k < (n || 1); k++) tickFrame(dt || 1 / 60); },
+  frames: (n, dt) => {
+    for (let k = 0; k < (n || 1); k++) { tickFrame(dt || 1 / 60); gov.end = performance.now(); }
+  },
   probe: (x, z) => SIM.probe(x, z),
   particlePos: (n) => SIM.particlePos(n),  // x, z pairs — headless only
   placeGauge, placeRake,                   // place, or remove one already there
+  removeGauge, clearAllGauges,             // what the ×s and the second Gauge press do
   boxForce: (x0, z0, x1, z1) => SIM.boxForce(x0, z0, x1, z1),   // one raw integral
   boxFlux: (x0, z0, x1, z1) => SIM.boxFlux(x0, z0, x1, z1),     // the whole budget
   faceForce: (sid, fid, avg) => SIM.faceForce(sid, fid, avg),   // the pressure diagram on one named face

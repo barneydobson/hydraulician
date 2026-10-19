@@ -92,8 +92,10 @@ const PROBE = `
       n + grp.items.filter((it) => !it.when || it.when()).length, 0),
     toolCount: APP.TOOLS.length,
     litTools: [...document.querySelectorAll("#groups .tbtn.on")].length,
-    valveHot: document.getElementById("valveBtn").classList.contains("on") ||
-              document.getElementById("valveBtn").classList.contains("hot"),
+    // The Valves button is only on the strip where there is a valve (hasValves).
+    valveHot: ((b) => !!b && (b.classList.contains("on") || b.classList.contains("hot")))(
+              document.getElementById("valveBtn")),
+    valveShown: !!document.getElementById("valveBtn"),
     exId: APP.EX.current ? APP.EX.current.id : null,
     sceneId: APP.state.scene ? APP.state.scene.id : null,
   };
@@ -124,7 +126,9 @@ async function main() {
           rightField:+right.value,leftSlider:+sliders[0].value,types:sliders.map(s=>s.type),
           selfContained:! /readme|see the brief/i.test([card.start,card.task,...card.setup].join(' ')),
           rule:card.digit.base===6.75 && card.digit.step===0.25 && card.digit.also[0].base===3.75,
-          lecturerLink:document.querySelector('#dock .exlink').textContent};
+          lecturerLink:document.querySelector('#dock .exlink').textContent,
+          linkShown:getComputedStyle(document.querySelector('#dock .exlink')).display!=='none',
+          scenesOnCard:!!document.getElementById('sceneBtn')};
       `);
       eq("both Geometry controls are sliders",r.types.join(','),'range,range');
       eq("card fields use the scene's own bounds",r.bounds.join(','),'6,9,0.25,3,6,0.25');
@@ -137,6 +141,8 @@ async function main() {
       check("student instructions stand alone",r.selfContained);
       check("both student-number rules are declared",r.rule);
       eq("README link identifies its lecturer audience",r.lecturerLink,'Lecturer notes');
+      check("the brief link is hidden unless a deployment asks for it",!r.linkShown);
+      check("no Scenes button while an exercise is on screen",!r.scenesOnCard);
       check("no uncaught errors",tab.errors.length===0,tab.errors[0]);
       await tab.close();
     }
@@ -147,7 +153,9 @@ async function main() {
       const p = await tab.evaluate(PROBE);
       check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("start screen is up", p.startOpen);
-      eq("the whole pack is listed", p.startItems, await tab.evaluate("return APP.EX.all().length;"));
+      // What the start screen lists is the exercise menu: the course menu when
+      // this deployment ships one (js/menu.js), otherwise the whole register.
+      eq("the menu's exercises are listed", p.startItems, await tab.evaluate("return APP.EX.groupsFor('').reduce((n, g) => n + g[1].length, 0);"));
       check("the pack does not overflow sideways", !p.startSideways);
       check("every strip button has an icon", p.emptyIcons === 0, p.emptyIcons + " empty");
       check("every strip button is labelled", p.unlabelled === 0, p.unlabelled + " bare");
@@ -170,14 +178,16 @@ async function main() {
                  blurbless: F.filter((f) => !f.blurb || f.blurb.length < 20).length,
                  opts: [...document.getElementById("c_mode").options].map((o) => o.value) };
       `);
-      eq("the registry has every field", reg.n, 8);
-      check("every mode 0-7 is described once",
-            [...reg.modes].sort((a, b) => a - b).join(",") === "0,1,2,3,4,5,6,7", reg.modes.join(","));
+      eq("the registry has every field", reg.n, 9);
+      check("every mode 0-8 is described once",
+            [...reg.modes].sort((a, b) => a - b).join(",") === "0,1,2,3,4,5,6,7,8", reg.modes.join(","));
       // The ORDER is a decision, not an accident: Water first because it is
       // the default, then speed, then the three heads in the order they nest
-      // (H contains h contains p/rho.g), then the two derived numbers.
+      // (H contains h contains p/rho.g), the plain Pressure (p = rho.g times
+      // the pressure head where g is real) beside the last of them, then the
+      // derived numbers.
       eq("the picker lists them in the agreed order", reg.ids.join(","),
-         "water,speed,ehead,head,phead,vort,froude,mom");
+         "water,speed,ehead,head,phead,p,vort,froude,mom");
       check("every field is fully described", reg.bare === 0, reg.bare + " incomplete");
       check("every field carries a blurb", reg.blurbless === 0, reg.blurbless + " unexplained");
       // The panel select is BUILT from the registry, so it cannot fall behind it.
@@ -188,7 +198,7 @@ async function main() {
       // Filtering the pack, and the side door out of it.
       const filtered = await tab.evaluate(`
         const f = document.getElementById("startfilter");
-        f.value = "belanger"; f.dispatchEvent(new Event("input"));
+        f.value = APP.EX.listed()[0].id; f.dispatchEvent(new Event("input"));
         return document.querySelectorAll("#startlist .si").length;
       `);
       check("the filter narrows the pack", filtered >= 1 && filtered < p.startItems,
@@ -646,8 +656,8 @@ async function main() {
       check("the grade line covers the reach", p.n > 200, p.n + " columns");
       check("and lies on the water surface where the column is hydrostatic",
             p.ratio < 0.25,
-            "median |HGL - surface| " + p.median.toFixed(5) + " m = " +
-            p.ratio.toFixed(3) + " dx");
+            "median |HGL - surface| " + (p.n ? p.median.toFixed(5) : "n/a") + " m = " +
+            (p.n ? p.ratio.toFixed(3) : "n/a") + " dx");
       check("the GPU column pass is the CPU walk, column for column",
             p.walkOff === 0 && p.walkWorst < 1e-5,
             p.walkOff + " wet/dry mismatches, worst |Δh| " + p.walkWorst.toExponential(2) + " m");
@@ -710,6 +720,13 @@ async function main() {
         const def = cap(null);
         const narrow = cap(["pos", "d", "Sf"]);
         const withF = cap(["pos", "f"]);
+        // The class title ("M1 profile") is governed by the list too — it
+        // used to be drawn whatever the list said — and by ui.hide "critical".
+        const title = (seen) => seen.some((t) => / profile$/.test(t));
+        const crit = (seen) => seen.some((t) => /critical/.test(t));
+        OVERLAY.setPrint({ critical: false });
+        const plain = cap(null);
+        OVERLAY.setPrint({ critical: true });
         const idsCovered = OVERLAY.ROW_IDS.every((id) => typeof id === "string" && id.length);
         return {
           nIds: OVERLAY.ROW_IDS.length,
@@ -719,6 +736,9 @@ async function main() {
           narrowDropsQ: !narrow.some((t) => t === "q"),
           narrowKeepsSf: narrow.some((t) => /S_f/.test(t)),
           fReturnsWhenNamed: withF.some((t) => /fill f/.test(t)),
+          defTitle: title(def), defCrit: crit(def),
+          narrowTitle: title(narrow), plainTitle: title(plain), plainCrit: crit(plain),
+          plainFr: plain.some((t) => /fast, shallow|slow, deep/.test(t)),
           idsCovered,
         };
       `);
@@ -732,6 +752,161 @@ async function main() {
       check("a profile's row list drops what it omits", p.narrowDropsQ);
       check("and keeps what it names", p.narrowKeepsSf);
       check("naming f puts it back", p.fReturnsWhenNamed);
+      check("the default card carries the profile class and the regime word",
+            p.defTitle && p.defCrit, JSON.stringify(p));
+      check("a row list without `profile` drops the class title", !p.narrowTitle);
+      check("ui.hide critical drops the class and the regime words",
+            !p.plainTitle && !p.plainCrit && p.plainFr, JSON.stringify(p));
+      await tab.close();
+    }
+
+    // ------------------------- per-gauge quantities and the readout switches
+    console.log("\neach gauge plots its own quantity; readouts and hover switch independently");
+    {
+      const tab = await browser.open(INDEX + "?ex=HJ-2",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const r = await tab.evaluate(`
+        return APP.EX.ready.then(() => {
+          APP.placeGauge(2.5, 0.6); APP.placeGauge(8.0, 0.3);
+          const G = APP.state.gauges;
+          const startOn = G.map((g) => g.field).join(",");
+          G[1].field = "speed";
+          APP.frames(20);
+          const s = G[0].log[G[0].log.length - 1] || {};
+          const keys = ["p", "phead", "u", "w", "speed", "eta", "d", "h", "H"]
+            .filter((k) => Number.isFinite(s[k]));
+          const hdr = APP.gaugeCSV().split("\\n")[0].split(",").length;
+          const sels = [...document.querySelectorAll(".gcardSel")]
+            .filter((e) => e.style.display !== "none").map((e) => e.value + ":" +
+              [...e.options].map((o) => o.value).join("|"));
+          const panelOpts = [...document.querySelectorAll("#c_gaugeField option")].map((o) => o.value).join(",");
+          const n0 = G[0].log.length, hover0 = APP.state.hoverCard;
+          document.getElementById("readBtn").click();
+          APP.frames(10);
+          const hidden = { inst: APP.state.instReadouts, hover: APP.state.hoverCard, hover0,
+                           recorded: G[0].log.length - n0,
+                           sels: [...document.querySelectorAll(".gcardSel")].filter((e) => e.style.display !== "none").length };
+          document.getElementById("readBtn").click();
+          document.getElementById("hoverBtn").click();
+          const hov = { inst: APP.state.instReadouts, hover: APP.state.hoverCard, hover0 };
+          const hj = { energyHidden: APP.UIMODE.hides("energy"), title: document.getElementById("sceneName").textContent };
+          return { startOn, keys, hdr, sels, panelOpts, hidden, hov, hj };
+        });
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("new gauges start on the card's Gauges plot", r.startOn, "d,d");
+      eq("every sample records all nine quantities", r.keys.length, 9);
+      eq("the CSV carries every quantity of every gauge", r.hdr, 1 + 2 * 9);
+      eq("each card's selector shows its own gauge, from the offered set",
+         r.sels.join(" "), "speed:u|speed|eta|d d:u|speed|eta|d");
+      eq("Gauges plot offers the card's quantities only", r.panelOpts, "u,speed,eta,d");
+      check("Readouts off hides the boxes, keeps recording, leaves the hover card",
+            r.hidden.inst === false && r.hidden.recorded > 0 && r.hidden.sels === 0 && r.hidden.hover === r.hidden.hover0,
+            JSON.stringify(r.hidden));
+      check("Hover readout switches on its own", r.hov.inst === true && r.hov.hover === !r.hov.hover0,
+            JSON.stringify(r.hov));
+      check("a Year 1 card withholds the energy terms", r.hj.energyHidden);
+      check("the strip names the exercise, not its scene (a tabbed card adds its tab)", r.hj.title.indexOf("Momentum balance: sluice gate and hydraulic jump") === 0, r.hj.title);
+      await tab.close();
+      const ff1 = await browser.open(INDEX + "?ex=FF-1",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const h = await ff1.evaluate("return APP.EX.ready.then(() => APP.state.hoverCard);");
+      eq("FF-1 opens with the hover card off", h, false);
+      await ff1.close();
+    }
+    // ------------------------------------- tabs, the short layout, inline icons
+    console.log("\na tabbed card swaps its steps and interface, not the bench; steps draw the strip's own icons");
+    {
+      // ?ex=MM-2 is an ALIAS: the id the Forces question had before the
+      // contraction rig became one exercise with three tabs.
+      const tab = await browser.open(INDEX + "?ex=MM-2",
+        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+      const r = await tab.evaluate(`
+        return APP.EX.ready.then(() => {
+          const c0 = APP.EX.current.ref, url0 = location.search, mode0 = APP.state.mode;
+          APP.tick(60);
+          const t0 = APP.sim.t;
+          document.querySelector('#dock .extab[data-tab="streamlines"]').click();
+          const ico = [...document.querySelectorAll('#dock .exsteps .exico')];
+          return { c0, url0, mode0, c1: APP.EX.current.ref, url1: location.search,
+            t0, t1: APP.sim.t, scene: APP.sim.scene.id,
+            fields: APP.UIMODE.fields().map((f) => f.id).join(","),
+            measure: APP.state.ui.measure,
+            tabs: [...document.querySelectorAll('#dock .extab')]
+              .map((b) => b.textContent + (b.classList.contains("on") ? "*" : "")).join(","),
+            steps: document.querySelectorAll('#dock .exsteps li').length,
+            icons: ico.map((e) => e.textContent).join("|"),
+            svgs: ico.filter((e) => e.querySelector("svg")).length,
+            bad: document.querySelectorAll('#dock .exico.bad').length,
+            bgShown: getComputedStyle(document.querySelector('#dock .exbg')).display !== "none",
+            bgOpen: document.querySelector('#dock .exbg').open,
+            start: getComputedStyle(document.querySelector('#dock .exstart')).display,
+            task: getComputedStyle(document.querySelector('#dock .extask')).display };
+        });
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("an old id opens its tab", r.c0, "CR-1#forces");
+      check("and the address bar names the entry and the tab",
+            /ex=CR-1/.test(r.url0) && /tab=forces/.test(r.url0), r.url0);
+      eq("the Forces tab opens on Pressure", r.mode0, 8);
+      eq("a tab click switches the card", r.c1, "CR-1#streamlines");
+      check("without reloading the scene or restarting the flow",
+            r.scene === "contraction" && r.t1 >= r.t0 && r.t0 > 0, JSON.stringify([r.t0, r.t1]));
+      check("the address bar follows the tab", /tab=streamlines/.test(r.url1), r.url1);
+      eq("the tab's own fields", r.fields, "water,speed");
+      eq("the tab's own tools — only the Dye tool", JSON.stringify(r.measure), '["dye"]');
+      eq("the tab bar marks the open tab", r.tabs, "Streamlines*,Continuity,Forces,Energy");
+      eq("five steps", r.steps, 5);
+      eq("the steps name strip buttons by their own labels", r.icons, "Particles|Streamlines|Dye");
+      eq("each with the strip's own icon", r.svgs, 3);
+      eq("no unknown markup", r.bad, 0);
+      check("Background is there, and closed", r.bgShown && !r.bgOpen, JSON.stringify(r));
+      check("the short layout drops Start and Do", r.start === "none" && r.task === "none",
+            r.start + " " + r.task);
+      await tab.close();
+    }
+    console.log("\na gauge can be removed one by one or all at once; the strip shows only what the bench can use");
+    {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      const r = await tab.evaluate(`
+        const G = APP.state.gauges;
+        APP.placeGauge(3, 0.3); APP.placeGauge(6, 0.3); APP.placeGauge(9, 0.3);
+        APP.frames(5);
+        const xs = [...document.querySelectorAll(".gcardX")].filter((e) => e.style.display !== "none");
+        const nX = xs.length;
+        xs[0].click();                                   // the × on one corner card
+        const afterX = G.length;
+        APP.inspect(0);
+        document.querySelector(".ginsp .ginsp-rm").click();   // Remove in the inspector
+        const afterRm = G.length, wins = document.querySelectorAll(".ginsp").length;
+        APP.placeGauge(4, 0.3);
+        const gb = () => [...document.querySelectorAll("#groups .tbtn")].find((b) => b.getAttribute("aria-label") === "Gauge");
+        gb().click();                                    // arms the tool: nothing removed
+        const armed = APP.state.tool, keptOnArm = G.length;
+        gb().click();                                    // again: clears every gauge
+        const cleared = G.length;
+        // Valves: none on m2, one drawn puts the button up, undo takes it away.
+        const v0 = !!document.getElementById("valveBtn");
+        APP.SIM.addSeg(5, 0.1, 5, 0.6, 0.05, 128); APP.frames(1);
+        const v1 = !!document.getElementById("valveBtn");
+        APP.SIM.undoSeg(); APP.frames(1);
+        const v2 = !!document.getElementById("valveBtn");
+        // No exercise on screen (a ?scene= boot): the Scenes button is offered.
+        const had = true, s1 = !!document.getElementById("sceneBtn"), s2 = null;
+        return { nX, afterX, afterRm, wins, armed, keptOnArm, cleared, v0, v1, v2, had, s1, s2,
+                 sceneTool: APP.state.scene.id };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      eq("every corner card carries a ×", r.nX, 3);
+      eq("its × removes that gauge", r.afterX, 2);
+      check("the inspector's Remove removes its gauge and closes its window",
+            r.afterRm === 1 && r.wins === 0, JSON.stringify(r));
+      check("a first press on Gauge arms the tool and removes nothing",
+            r.armed === "gauge" && r.keptOnArm === 2, JSON.stringify(r));
+      eq("a second press on Gauge clears every gauge", r.cleared, 0);
+      check("Valves is off the strip until a valve is drawn, and goes with it",
+            !r.v0 && r.v1 && !r.v2, JSON.stringify(r));
+      check("with no exercise loaded the Scenes button is offered", r.s1 === true, JSON.stringify(r));
       await tab.close();
     }
 
@@ -986,7 +1161,10 @@ async function main() {
         return { note: !!note,
                  text: note ? note.textContent : "",
                  // Both ways out are offered, and both actually work.
-                 github: !!document.querySelector('#doc .note a[href*="github.com"]'),
+                 // On a Pages site the repository is linked (derived from the
+                 // host); from file:// there is no repository to name, so the
+                 // note points at GitHub in words.
+                 github: /GitHub/.test(note ? note.textContent : ""),
                  back: !!document.querySelector('a.back') };
       `);
       check("it explains itself instead of showing nothing", r.note);
@@ -1091,6 +1269,54 @@ async function main() {
       await tab.close();
     }
 
+    // ------------------------------------------------- the Dye tool
+    console.log("\nthe Dye tool releases ink only while it is held");
+    {
+      // Nothing is dyed on boot (a scene's fixed sources are off unless it
+      // asks); press-and-hold releases at the pointer, a drag moves the
+      // release point, letting go stops it. Plan view (`body`), so every cell
+      // is water. Driven through real pointer events on the canvas.
+      const tab = await browser.open(INDEX + "?scene=body");
+      const r = await tab.evaluate(`
+        const S = APP.sim, cv = document.querySelector("canvas");
+        const strip = APP.ui.TOOLBAR.flatMap((g) => g.items);
+        const item = strip.find((i) => i.tool === "dye");
+        const inMeasure = APP.ui.TOOLBAR.find((g) => g.cap === "MEASURE").items
+                             .some((i) => i.tool === "dye");
+        const oldBtn = strip.some((i) => i.id === "dyeBtn");
+        APP.frames(20);
+        const x0 = 0.2 * S.W, z0 = 0.5 * S.H, x1 = 0.3 * S.W;
+        const before = APP.probe(x0, z0).dye;
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "d", bubbles: true }));
+        const byKey = APP.state.tool;
+        const R = cv.getBoundingClientRect(), sc = R.width / cv.clientWidth;
+        const at = (x, z) => ({ clientX: R.left + APP.view.X(x) * sc,
+                                clientY: R.top + APP.view.Y(z) * sc,
+                                pointerId: 7, button: 0, buttons: 1, bubbles: true });
+        cv.dispatchEvent(new PointerEvent("pointerdown", at(x0, z0)));
+        const held = !!S.p.dyeInj;
+        APP.frames(30);
+        const dyed = APP.probe(x0, z0).dye;
+        cv.dispatchEvent(new PointerEvent("pointermove", at(x1, z0)));
+        const moved = S.p.dyeInj ? S.p.dyeInj.x : -1;
+        APP.frames(10);
+        cv.dispatchEvent(new PointerEvent("pointerup", at(x1, z0)));
+        return { inMeasure, oldBtn, key: item && item.key, byKey, before, held, dyed,
+                 moved, x1, released: S.p.dyeInj == null, seeds: APP.state.dyeSeeds };
+      `);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      check("Dye is a tool in MEASURE", r.inMeasure);
+      check("the old Dye view toggle is gone", !r.oldBtn);
+      eq("its key is D", r.key, "D");
+      eq("D arms it", r.byKey, "dye");
+      check("nothing is dyed before a release", r.before === 0 && !r.seeds, JSON.stringify(r));
+      check("pressing starts the release", r.held);
+      check("holding dyes the water under the pointer", r.dyed > 0.5, String(r.dyed));
+      check("dragging moves the release point", Math.abs(r.moved - r.x1) < 1e-6, String(r.moved));
+      check("letting go stops it", r.released);
+      await tab.close();
+    }
+
     // ------------------------------------------------- the Geometry section
     console.log("\nthe Geometry panel binds to whatever the scene actually declares");
     {
@@ -1171,10 +1397,10 @@ async function main() {
       eq("the revised tutorial title reaches the card", c.title,
          "Hydropower and unsteady flow: test the tutorial predictions");
       check("the fixed tutorial hides Geometry", !c.geomKept);
-      eq("only Gauges plot survives in Controls", c.rows.join(","), "gaugeField");
+      eq("only the card's own rows survive in Controls (HP-3 lists Gauges plot and the CV readout)", c.rows.join(","), "cvShow,gaugeField");
       eq("the gauges open on Level eta", c.gaugeField, "eta");
       eq("the field opens on Speed", c.mode, 2);
-      eq("the measurement strip keeps rake and gauge", c.measure.join(","), "rake,gauge");
+      eq("the measurement strip keeps the card's tools (rake, gauge, control volume)", c.measure.join(","), "rake,gauge,cv");
       eq("the legend offers only Speed", c.fields.join(","), "speed");
       await ex.close();
     }
@@ -1354,10 +1580,18 @@ async function main() {
           const sim = { dx: 1, ny: 3 };
           const A = { bed: [0], surf: [3] };
           const rk = { i: 0, buf: new Float32Array(12) };
+          // Every rake on ONE scale (px per m/s handed in): the profile's
+          // reach is proportional to u, never renormalised to the rake's own
+          // maximum — so a slow section draws short and still water flat.
           const paint = (u) => {
             for (let j = 0; j < 3; j++) rk.buf[j * 4] = u;
-            APP.OVERLAY.drawRake(ctx, V, sim, rk, A);
-            return rk.uScaleMax;
+            let reach = 0;
+            const mt = ctx.moveTo.bind(ctx), lt = ctx.lineTo.bind(ctx);
+            ctx.moveTo = (x, y) => { reach = Math.max(reach, x); return mt(x, y); };
+            ctx.lineTo = (x, y) => { reach = Math.max(reach, x); return lt(x, y); };
+            APP.OVERLAY.drawRake(ctx, V, sim, rk, A, 20);
+            ctx.moveTo = mt; ctx.lineTo = lt;
+            return Math.round(reach - 0.5);       // x0 = 0.5 (cell centre)
           };
           const scale = [paint(2), paint(0.5), paint(3)];
 
@@ -1403,8 +1637,8 @@ async function main() {
       eq("the nozzle slider is plainly labelled", un1.gap.label, "Nozzle width");
       check("widening the nozzle opens more cells", un1.gap.after > un1.gap.before,
             JSON.stringify(un1.gap));
-      eq("a slower rake frame keeps the experienced maximum", un1.scale.join(","),
-         "2,2,3");
+      eq("every rake shares one velocity scale (reach ∝ u at 20 px per m/s)", un1.scale.join(","),
+         "40,10,60");
       await tab.close();
     }
 
@@ -1572,6 +1806,130 @@ async function main() {
         check("and stays inside the width", !leg.shown || leg.right <= leg.inner);
         await tab.close();
       } finally { await phone.close(); }
+    }
+
+    // ----------------------------------------------------------------- tablets
+    // An iPad, emulated: a mobile viewport at devicePixelRatio 2 with touch
+    // input, driven by real touch events (Input.dispatchTouchEvent). The
+    // lecturer touched an exercise to read it and it drew a block: the default
+    // tool was Wall even where the card hides BUILD.
+    console.log("\na tablet reads the water by touch and never draws by accident");
+    {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      async function tablet(url, w, h) {
+        const tab = await browser.open(url);
+        await tab.send("Emulation.setDeviceMetricsOverride",
+                       { width: w, height: h, deviceScaleFactor: 2, mobile: true });
+        await tab.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+        await tab.send("Page.reload", { ignoreCache: true });
+        await sleep(300);
+        for (let i = 0; ; i++) {
+          let ok = false;
+          try { ok = await tab.evaluate("return !!window.APP && !!document.querySelector('#groups .tbtn');"); }
+          catch (_) { /* still navigating */ }
+          if (ok) break;
+          if (i > 200) throw new Error("tablet tab did not boot: " + url);
+          await sleep(150);
+        }
+        await tab.evaluate("return APP.EX.ready ? APP.EX.ready.then(() => true) : true;");
+        await tab.evaluate("APP.frames(5); return true;");
+        return tab;
+      }
+      const touch = (tab, type, pts) => tab.send("Input.dispatchTouchEvent",
+        { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+      async function tap(tab, x, y) {
+        await touch(tab, "touchStart", [[x, y]]);
+        await sleep(40);
+        await touch(tab, "touchEnd", []);
+        await sleep(200);                 // past the touch hold (TOUCH_HOLD_MS)
+      }
+      // A point in the water, in CSS pixels: scan a column for a full cell.
+      const WET = `
+        const W = APP.sim.W, H = APP.sim.H;
+        for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) for (let k = 1; k < 40; k++) {
+          const x = W * fx, z = H * k / 40, p = APP.probe(x, z);
+          if (p && p.f > 0.9 && p.f < 1.05) {
+            const cv = document.getElementById("view"), r = cv.getBoundingClientRect();
+            const px = [r.left + APP.view.X(x), r.top + APP.view.Y(z)];
+            if (document.elementFromPoint(px[0], px[1]) === cv) return px;
+          }
+        }
+        return null;`;
+
+      const tab = await tablet(INDEX + "?ex=FF-1", 768, 1024);
+      const before = await tab.evaluate(`return { tool: APP.state.tool,
+        segs: (APP.sim.segs || []).length, build: !!document.getElementById("undoBtn") };`);
+      eq("an exercise opens with nothing in hand", before.tool, null);
+      check("FF-1 offers no BUILD (the case that drew)", !before.build);
+      const at = await tab.evaluate(WET);
+      check("found the water on screen", !!at);
+      await tap(tab, at[0], at[1]);
+      await tab.evaluate("APP.frames(4); return true;");
+      const after = await tab.evaluate(`return { segs: (APP.sim.segs || []).length,
+        pin: APP.state.pin, ptr: APP.state.ptr };`);
+      eq("a touch tap creates no geometry", after.segs, before.segs);
+      eq("the tap was a touch", after.ptr, "touch");
+      check("a tap pins the readout where it landed", !!after.pin);
+      // A second tap on the pin takes it away; so does a tap on dry ground.
+      await tap(tab, at[0], at[1]);
+      const gone = await tab.evaluate("return APP.state.pin;");
+      eq("a tap on the pin clears it", gone, null);
+      await tap(tab, at[0], at[1]);
+      // Dry ground: air over the water, at a point the canvas itself is under
+      // (not the strip or the legend, which float over the top of the view).
+      const dry = await tab.evaluate(`
+        const cv = document.getElementById("view"), r = cv.getBoundingClientRect();
+        for (const fx of [0.3, 0.5, 0.15, 0.7]) for (let k = 39; k > 0; k--) {
+          const x = APP.sim.W * fx, z = APP.sim.H * k / 40, p = APP.probe(x, z);
+          const px = [r.left + APP.view.X(x), r.top + APP.view.Y(z)];
+          if (p && p.f < 0.01 && document.elementFromPoint(px[0], px[1]) === cv) return px;
+        }
+        return null;`);
+      check("found dry ground on screen", !!dry);
+      await tap(tab, dry[0], dry[1]);
+      eq("a tap on dry ground clears it", await tab.evaluate("return APP.state.pin;"), null);
+      // The card fits a portrait iPad: a bottom sheet inside the viewport,
+      // the strip's every button a finger's width and on screen.
+      const fit = await tab.evaluate(`
+        const d = document.getElementById("dock"), r = d.getBoundingClientRect();
+        const body = d.querySelector(".dock-body");
+        const btns = [...document.querySelectorAll("#groups .tbtn")].map((b) => b.getBoundingClientRect());
+        return { sheet: d.classList.contains("sheet"), open: d.classList.contains("open"),
+                 inside: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5,
+                 scrolls: getComputedStyle(body).overflowY,
+                 small: btns.filter((b) => b.width > 0 && (b.width < 40 || b.height < 40)).length,
+                 off: btns.filter((b) => b.left < 0 || b.right > innerWidth || b.top < 0).length,
+                 pageW: document.documentElement.scrollWidth, iw: innerWidth };`);
+      check("the card is open as a bottom sheet at 768 × 1024", fit.open && fit.sheet);
+      check("and sits inside the viewport", fit.inside);
+      eq("its body scrolls", fit.scrolls, "auto");
+      eq("every strip button is at least 40 px", fit.small, 0);
+      eq("and on screen", fit.off, 0);
+      eq("nothing overflows sideways", fit.pageW, fit.iw);
+      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      await tab.close();
+
+      // A pinch is not a tool action: with the Gauge tool in hand, two
+      // fingers zoom and place nothing.
+      const t2 = await tablet(INDEX + "?ex=VC-2", 1024, 768);
+      const g0 = await t2.evaluate(`APP.state.tool = "gauge"; return { n: APP.state.gauges.length, z: APP.state.zoom };`);
+      const c = await t2.evaluate(WET);
+      // Both fingers in one event: the first finger's pointerdown is still
+      // held (TOUCH_HOLD_MS) when the second arrives, which is the case that
+      // used to place a gauge. Two separate CDP calls can take longer than
+      // the hold in a loaded headless browser, which is not a pinch.
+      await touch(t2, "touchStart", [[c[0] - 30, c[1]], [c[0] + 30, c[1]]]);
+      for (let k = 1; k <= 6; k++) {
+        await touch(t2, "touchMove", [[c[0] - 30 - 12 * k, c[1]], [c[0] + 30 + 12 * k, c[1]]]);
+        await sleep(20);
+      }
+      await touch(t2, "touchEnd", []);
+      await sleep(200);
+      const g1 = await t2.evaluate("return { n: APP.state.gauges.length, z: APP.state.zoom };");
+      eq("a pinch places no gauge", g1.n, g0.n);
+      check("and zooms", g1.z > g0.z * 1.2, "zoom " + g0.z + " → " + g1.z);
+      check("no uncaught errors", t2.errors.length === 0, t2.errors[0]);
+      await t2.close();
     }
 
     // ------------------------------------------------------- embedded in an LMS

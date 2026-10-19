@@ -115,8 +115,10 @@ const RIG = (() => {
             // A view flag like the three above it: what a shared rig was
             // being LOOKED at with, which is part of the rig for a demo
             // whose whole subject is where the HGL runs.
-            grade: b01(state.grade),
-            dye: b01(state.dye) },
+            grade: b01(state.grade), sline: b01(state.sline),
+            // The scene's FIXED dye sources (Dye sources); the wire key
+            // stays `dye` — the Dye tool's ink is not part of a rig.
+            dye: b01(state.dyeSeeds) },
     };
     // additive, optional — a scene with no `params` declaration writes none,
     // and an old rig read back into one just keeps that scene's defaults.
@@ -211,12 +213,16 @@ const RIG = (() => {
 
     const U = o.ui || {};
     if (U.mode !== undefined) state.mode = U.mode | 0;
-    if (U.field) state.gaugeField = U.field;
+    // One quantity for every gauge, as the rig was shared showing. A gauge's
+    // own `field` is deliberately NOT on the wire (no V bump): a rig carries
+    // the session default, and per-gauge choices are made in the room.
+    if (U.field) setAllGaugeFields(U.field);
     if (U.cvShow && CV_NEXT[U.cvShow]) state.cvShow = U.cvShow;
     if (U.speed !== undefined) state.speed = +U.speed;
-    ["channel", "labels", "jumps", "particles", "dye", "grade"].forEach((k) => {
+    ["channel", "labels", "jumps", "particles", "grade", "sline"].forEach((k) => {
       if (U[k] !== undefined) state[k] = !!(+U[k]);
     });
+    if (U.dye !== undefined) state.dyeSeeds = !!(+U.dye);
 
     SIM.resetWater();                        // R — a clean start on the new bed
     state.deliv = null;
@@ -373,7 +379,9 @@ const RIG = (() => {
    *  at boot (docs/embedding.md): folded card, ctrl + wheel, the pop-out. */
   function embedCode() {
     const id = (window.APP && APP.EX && APP.EX.current)
-      ? "ex=" + APP.EX.current.id : "scene=" + state.scene.id;
+      ? "ex=" + APP.EX.current.id +
+        (APP.EX.current.tabKey ? "&tab=" + APP.EX.current.tabKey : "")   // a tabbed card's tab
+      : "scene=" + state.scene.id;
     const src0 = location.origin + location.pathname + "?" + id + "&embed=1";
     // A rig-bearing link is `#rig=<code>` — link() builds the whole URL, so
     // only its fragment is kept; a bare exercise or scene needs no fragment

@@ -720,11 +720,142 @@ itself ~2 cells thick. Consequences:
   deep flume's train arrives at 0.04–0.07 m in its far half against 0.05–0.07
   (a strain-based `ν_t` took it to one cell — no wave — by x = 3 m). The
   stress-free surface itself did not make waves last longer.
-- **Plunging breakers are out of reach.** The Iribarren number on the 1 : 3.4
-  beach is ξ ≈ 1.3, squarely in the plunging band, so the *conditions* are
-  right — but an overturning tongue is thinner than the interface can hold.
-  Measured trapped air under the crest never exceeds 7 mm, i.e. half a cell:
-  the breaks are spilling, and no parameter set changes that.
+- **Plunging breakers are out of reach — and resolution is not the reason.**
+  The conditions can be right (ξ ≈ 0.9–1.8 on WV-4's beach; the 1 : 3.4 beach
+  was ξ ≈ 1.3), and overturning needs no air pressure: it is kinematic. What
+  stops it was measured on the textbook plunger, a solitary wave of
+  H/h = 0.45 on a 1 : 15 slope (h = 0.25 m, the beach scene's c 14, C_f 0.01,
+  C_s 0.08, bulk 0.03, c_α 0.8), at five resolutions and with one switch at a
+  time at Ultra (Δx = 2.4 mm, 105 cells of depth, 47 of wave height).
+  Overturning is scored off the fill field as water standing over air in the
+  same column ("overhang": horizontal span, trapped-air area, gap height).
+  - *Resolution alone does nothing.* h/Δx = 27, 39, 53, 74, 105: the largest
+    overhang is 9, 6, 5, 3, 2 mm across (≤ 90 mm² of air, gaps ≤ 13 mm),
+    i.e. a cell or two: the crest frays at its top and the front stands at
+    55–60° and then runs up the beach as a bore.
+  - *The mixing length is the damper.* Measured under the crest, `ν_t` is
+    0.8–1.0 × 10⁻³ m²/s through the body of the wave and up to 4 × 10⁻³ near
+    the top, the same at every resolution (it is `κy`, a physical length) —
+    a thousand times water's, a crest Reynolds number of ~100. With
+    `kappa: 0` the crest overturns at every resolution (span 26–33 mm, gaps
+    to 24 mm, trapped air to 540 mm² at Ultra) — but as cell-sized curls,
+    not a tongue, and it starts at h ≈ 0.18 m, metres before a real wave of
+    this height breaks: the closure was hiding grid-scale surface noise, not
+    a physical breaker. (The WV-5 deep-water train saw the same: `kappa: 0`
+    takes a short wave a little further and fills the flume with noise.)
+    `C_s` = 0.16 or 0.3 on top of `kappa: 0` does not clean it up.
+  - *The near-surface layer runs too fast, and the void treatment sets it.*
+    Under the crest on the flat bed, u is 0.46 m/s at the bed (theory: about
+    the same) and 0.99 m/s in the top cells (1.16 with `kappa: 0`) against
+    ~0.6 from solitary-wave theory. Without the stress-free extension the
+    void is a sink instead (0.32 m/s at the surface; the front never passes
+    32°); an extension that copies u up with `∂u/∂z = ∂w/∂x` (zero vorticity
+    at the corner) brings the top to 0.55–0.59 m/s but the wave then fails
+    to steepen at all (front ≤ 61°, no overhang). `∂u/∂z = 0` is a channel's
+    stress-free condition, not a wave's, and every variant tried leaves the
+    surface layer's speed to the void rather than to the dynamics. The face
+    on top of every part-full cell also free-falls: it reads w ≈ −0.26 m/s
+    over a still pond.
+  - *The crest does not shoal.* A small solitary wave (H/h = 0.2) keeps its
+    crest elevation to the millimetre from h = 0.24 m to 0.07 m, where Green's
+    law asks for +36%; the H/h = 0.45 wave stays within 0.40–0.43 m in every
+    run. A plunger is the crest outrunning a wave that has grown; this one
+    never grows. Cause not isolated.
+  - *No effect* (overhang, front angle and crest speed within the
+    run-to-run scatter): bulk viscosity 0, `C_s` 0, `C_f` 0, c 14 → 28, the
+    void bleed off or ×10, gravity without the 5% fade, the transport cap off,
+    a superbee limiter, `c_α` 0. Worse: `c_α` 2 (front ≤ 61°) and first-order
+    advection of either f or u.
+
+  So the old wording here ("thinner than the interface can hold … no
+  parameter set changes that") was wrong on both counts: the tongue is
+  stopped by the closure and the surface treatment, not by Δx, and one
+  parameter (`kappa`) does change it — into noise. Do not build a demo that
+  needs a plunging tongue; the nearest honest picture is WV-4's collapsing
+  front. The scratch harness behind these numbers (a solitary-wave scene,
+  shader switches, the overhang metric) is described in the plunge-diag
+  branch's commit message.
+
+**Two wavemakers.** The `wave` piston is a column of prescribed `u` at
+`wave.x`, with water on both sides: the pocket behind it rises and falls in
+antiphase and is part of the picture. WV-4's `beach` puts it AT THE WALL
+instead (`wave.x = 0`, left edge open, `wave.d` = still depth; `SIM.wallPaddle()`
+decides): the open edge's zero-gradient ghost feeds the face, and the shader
+imposes the paddle's VOLUME flux a·ω·D·cos ωt over the live depth from the
+column pass. The face velocity alone would not conserve volume — u and η are
+in phase in a progressive wave, so ⟨uη⟩ ≈ 0.02 m²/s (estimated: ~10% of the
+flume's water in 16 s) would go in — and with the volume flux the water
+holds to 0.2% over 16 s (measured at tanβ 0.06–0.7). Per unit stroke the wall paddle makes the
+taller wave (no pocket to fill): 0.14 m there matches the piston's 0.18 m.
+
+**The flap and the train envelope** (WV-5) are two opt-in keys on the same
+`wave` group, both off unless a scene or the Wavemaker panel asks; with
+neither, FS_VEL takes the old expression bit for bit. `wave.flap = 1` (with
+`wave.d`) makes the paddle a flap hinged `wave.hinge` below the bed: the
+imposed velocity grows linearly from the hinge, u(z) = U·(z − z_h)/(z₀ − z_h),
+and at the wall its volume flux is the flap's swept rate, held over the live
+depth as the piston's is. `wave.train = N` makes it fire one train of N
+periods with `wave.ramp`-period cosine ramps (default 1.5) on `SIM.fireTrain()`
+— the strip's Wave train button and V where there is no valve — and stand
+still otherwise. Every fire resets the water first (`resetWater`, t = 0, the
+gauges' history with it): a lecturer could not see how to run WV-5 twice,
+because a press was refused while the paddle moved and a second train ran
+into the first one's leftovers; the velocity is the exact derivative of the displacement
+a·E(τ)·sin ωτ, so a train ends with the paddle where it started. The CPU
+computes U per substep (`SIM.paddle`) and hands it in as `u_waveU`. Neither
+key is in the rig wire format (v2): a saved rig carries the scene's own.
+`SIM.wavemakerHS` is Biésel's linear transfer function H/S for either.
+Measured: Biésel's flap/piston ratio holds on the grid to the percent
+(equal H from strokes in its ratio, 1.50 at kh = 2.55 and 1.93 at
+kh = 0.68), but the absolute H falls short of it — 0.6–0.75 of linear theory
+half a wavelength out in deep water — because the grid damps the near field.
+Deep water: the flap is cleaner where it should be, near the paddle (bed
+velocity range at x = 0.6 m 0.21 against the piston's 0.29 m/s; surface
+residue at x = 1 m after a train 6 against 21 mm), and identical a
+wavelength out. On WV-4's beach (kh = 0.68) the two are indistinguishable
+in breaker shape at tanβ 0.06, 0.15 and 0.7, H along the flume agrees to
+about 0.01 m, and
+the flap needs nearly twice the stroke (±0.27 m on 0.40 m of water), so WV-4
+keeps the piston.
+
+**Deep-water waves are the worst case of the resolution damping.** A wave
+of L = 1 m on a 13.7 mm grid (73 cells per wavelength, H ≈ 4 cells) was
+gone within one wavelength of the paddle; at L/Δx = 106, 145 and 204 it
+lasted about 2, 2.5 and 3.5 wavelengths, and a wave dies quickly once H is
+under ~4 cells. The mixing length takes part (with `kappa: 0` the wave goes
+further, but the whole flume fills with grid-scale surface noise within
+10 s — not a usable fix); `c`, `bulk` and `cf` do not. The first WV-5 was
+sized around it: L ≈ 2 m on 10.4 mm (190 cells), H ≈ 0.14 m (13 cells), and
+the group still faded from 0.14 m at 1 m to 0.04 m at 8 m.
+
+**WV-5, round 2: what actually damps a wave train (Oct 2026).** Measured
+on a 0.5 m deep flume, T = 1.0–1.1 s (L = 1.5–1.8 m), a 0.05 m flap stroke
+(H ≈ 0.07–0.09 m), envelope height along the flume from the fill fraction:
+- *kappa* is the first damper (issue #77): at 0.41 the train was gone by
+  5 m at Medium and at High; 0.1 took H at 4 m from 0.02 to 0.04 m
+  (Medium, T = 1.0 s); 0 a little further.
+- *ca* is the second — the old line above that it "does not" was measured
+  with the closure on, which hid it. With the closure at 0.1, ca 0.8 → 0
+  took H at 7 m from 0.011 to 0.044 m (Medium). But ca 0 smears the
+  interface and traps air: columns of missing water stand behind the train.
+  0.2 keeps most of the gain without that.
+- *nu* then decides between reach and noise, and it is NOT the bulk 2νk²:
+  that is 0.007 /s at ν = 3e-4, nothing, yet going 1e-4 → 3e-4 cut H at
+  6 m from ~0.06 to 0.03 m. A uniform ν works on the shear layer the void
+  treatment leaves at the surface, not on the wave's interior. With
+  kappa 0, ca 0.2 at High: ν 1e-4 carried the train to 9 m at 0.05 m but
+  left cell-sized spikes and drifting air holes behind it; 1.5e-4 and
+  2e-4 fewer; 3e-4 none, but then the train is down to 0.016 m by 8 m.
+  WV-5 ships 1e-4: the train reaching the end came first (lecturer).
+- *cs*, *bulk*: cs 0 with bulk 0.01 left the water behind the train rough
+  and carried it no further; cs 0.2 on top of ν 3e-4 damped more. Kept.
+- *Resolution* still matters for the same settings: Medium (9.4 mm) lost
+  the train by ~6–7 m where High (6.2 mm) carried it to 9 m.
+- The beach (WV-4, H/d ≈ 0.4, T = 2 s in 0.4 m) is a different case: there
+  every setting tried, kappa 0 included, lost about a third of the height
+  over 6 m of flat bed — the steep long wave reshaping (first harmonic into
+  higher ones), not viscosity — and kappa 0 broke the undertow (Average) into
+  a row of small cells. WV-4 keeps the closure; see its README.
 
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from
@@ -743,6 +874,81 @@ whose walk down each column is serial — every 8 substeps it cost hammer 20%,
 so it refreshes every 32. `analyse` costs 0.5 ms per frame against that — well
 under a percent. If a scene feels
 slow, check `state.rt` in the status bar before suspecting the overlay.
+
+## Frame pacing: the governor and the status line
+
+`state.speed` is what the user ASKS for (simulated seconds per wall second);
+each frame wants `speed · Δt_wall / Δt_sim` substeps and runs at most
+`state.nsubMax`. The governor (`governFrame` in main.js) sets that cap. Spin-up
+(`warming`) asks for the cap every frame, i.e. as fast as the governor allows.
+
+**What was wrong (Oct 2026).** The old governor was AIMD on the CPU time
+around `SIM.step` + `columns()` + particles: ×0.82 above 24 ms, ×1.05 + 1
+below 11 ms. WebGL is asynchronous, so on two frames in three that clock read
+only the enqueue (~1 ms), and on the third — `columns()`'s readback, every
+`readEvery = 3` frames, is a full pipeline sync — it read the entire GPU
+backlog of all three frames. Per-frame trace on hammer (Iris Xe, shared GPU):
+stale frames 1–2 ms, readback frames 110–260 ms, every third frame like
+clockwork. The governor saw ~3× the real cost of a frame, saw-toothed, and
+pinned the cap at ~18–24 whatever the GPU could do. The status line made it
+look worse than it was and better than it was at once: `fps` and `×RT` were
+computed from `realDt`, which is CLAMPED to 50 ms, and `×RT` from the single
+frame that happened to close the 0.5 s window — so it alternated ×3 between a
+queueing frame and a readback frame (h23: 0.07 ↔ 0.23), and on hammer it
+printed ×0.98 RT at a measured 0.18 sim-s per wall-s and "36 fps" at ~12.
+
+**What it does now.**
+
+- *Measure the interval, not the frame.* `tickFrame` times the real interval
+  between its own starts (`performance.now()`, unclamped). Long frames are
+  real and are counted — a governor that skipped >1 s frames saw only the fast
+  ones during a loaded spin-up and ran away; only the gap across a hidden tab
+  is dropped (`visibilitychange` resets the clock). The governor's signal is
+  the mean interval over a ~0.8 s exponential window (several frames even at
+  5 fps), computed as decayed wall time ÷ decayed frame count. NOT an EMA of
+  the interval with a time-based weight: that weights each interval by its own
+  length and over-counts the readback frames (16, 16, 150 ms reads 126 ms
+  against a true mean of 61).
+- *Integral control on the log error.* d ln(nsubMax)/dt = ln(target / mean),
+  limited to ±1 /s (±1.5 /s in spin-up), ±6 % dead band: no sawtooth. The
+  limit is SYMMETRIC on purpose — a fast-down/slow-up limit on a noisy
+  interval is a rectifier and settled the cap far under target. The cap is
+  only RAISED when it is what limits the frame, so a scene at ×0.25 cannot
+  ratchet it to the ceiling and then queue seconds of work on the first touch
+  of the speed slider. The rate limit is also the warm-up hand-over: the cap
+  ramps from the spin-up target to the running one over a second or two.
+- *The target.* `CONFIG.frameTargetMs` = 30 ms (≈ 33 fps) running,
+  `warmFrameTargetMs` = 200 ms in spin-up (throughput only grows with the
+  batch). Unless the machine cannot meet it with the sim taking a real share
+  of the frame: `governLearn` fits T = T0 + c·n (frame interval against
+  substeps per frame) over the status windows, ~15 s memory, slope refitted
+  only when the windows span a spread of n, and the target becomes
+  max(30 ms, 2·T0) — at least half of each frame is substeps (¾ in spin-up) —
+  capped at `frameCeilMs` = 150 ms (400 ms in spin-up; 100 ms was tried and
+  left hammer, whose particles make the render heavy, at 31 % of flat out). Without that floor a
+  machine whose render alone costs 30 ms cut the sim to 2 substeps chasing a
+  frame rate the substeps were not costing (measured: ×0.01 RT). A fit needs
+  n to move, so a cap pinned at its floor with the frame still too slow takes
+  that frame as a lower bound on T0 (`T0floor`, fading over ~15 s) — without
+  it hammer, straight after spin-up, sat at n = 2 for good.
+- `frame()` clamps `realDt` at 100 ms (was 50): the substeps a frame asks for
+  are speed · realDt / Δt, so below 20 fps a 50 ms clamp made ×1
+  unreachable however fast the GPU.
+- *The status line* reads the whole 0.5 s window: `×RT` = simulated seconds
+  advanced ÷ wall seconds elapsed, `fps` = frames ÷ wall seconds, each blended
+  half-and-half with the previous reading (~1 s effective; a paused window
+  is taken as it stands), and the speed note under the slider prints the
+  window's mean substeps per frame. It is now the truth: measured against
+  `sim.t` over 55 s, it agrees to ~2 %, where the old one over-read 3–5×.
+
+Headless numbers are only comparable within one run: on a shared iGPU the
+flat-out cost of a substep moved 0.6 → 2.5 ms between consecutive runs. The
+`APP.frames` headless path is governed by its own real intervals too, but
+always to the plain 30 ms target — no spin-up target, no share rule: a
+scripted `APP.frames(600)` on a warming m2 at 200–400 ms a frame timed
+ui-smoke out. So `APP.frames(n)` advances what n frames of ~30 ms of work
+buy, which is more sim time per call than under the old governor (whose
+readback-stalled CPU clock held a sync loop near 20 substeps a frame).
 
 ## The view
 
@@ -786,6 +992,54 @@ picture saturated or flat is the symptom of the two having drifted apart.
 - **Screen-anchored overlay furniture follows `view.vis`** — the visible part
   of the domain — so the frame, the scale bar, the legend and the label
   clamps stay on screen zoomed in.
+
+### Streamlines are contours of ψ, read back without a stall
+
+VIEW → *Streamlines* draws contours of the stream function at equal steps
+Δψ, so neighbouring lines bound tubes of equal discharge per unit width and
+their spacing goes as 1/speed. Contours rather than integrated seed lines,
+because ψ makes every hard case automatic: a wall carries no flux, so every
+solid (bed, soffit, bluff body) is a level of ψ; the flux is fill-weighted,
+so the void carries none and a steady free surface is a streamline;
+recirculation is a closed contour; a pressurised pipe needs nothing special.
+Seeded RK lines bunch by accident of where they started, stop at stagnation
+points and need a stopping rule at every boundary.
+
+- **The pieces.** `FS_SFLUX` (shaders.js) packs the face fluxes `q = f u`
+  (fill capped at 1; zero on any face touching a solid or a closed valve)
+  two cells per texel; `SIM.streamRequest` reads that into a pixel-pack
+  buffer behind a fence; `SIM.streamPoll` copies it out once the fence has
+  signalled; `STREAM.psi` (js/stream.js) integrates ψ along the floor
+  (−q_z dx, non-zero only where the floor is open, as under `jet`'s falling
+  jet) then up every node column (+q_x dx); `STREAM.contours` marches the
+  wet cells (f ≥ 0.5) at ψ = (k + ½)Δψ. Under Average the flux is the Favre
+  accumulator's own `⟨f u_c⟩` averaged onto faces.
+- **Exact for a discretely solenoidal field** (checked: ψ rebuilt from the
+  face fluxes of an analytic ψ to 3e-8). Where the field is not — the slot
+  EOS's small dilatation, a surface moving within the instant — the error is
+  a column-to-column mismatch in ψ *above* that cell, which is mostly void
+  and never drawn. Integrating from the floor is right because every scene's
+  floor is solid (or, in plan view, a wall).
+- **Δψ is held.** It is a round 1/2/2.5/5 × 10ⁿ near (range / `slineN`) and is
+  re-picked only when the ψ range drifts outside 0.6–1.7 × `slineN` steps,
+  on a Live/Average switch or a density change — otherwise the lines breathe
+  as the range jitters, the same reason the colour range is held.
+- **Gotcha: a WebGL fence only updates between tasks.** A headless script
+  that runs `APP.frames(n)` in one `evaluate` never sees a streamline
+  result; yield (await a timeout) between frames. The refresh is ~4 Hz of
+  wall clock and requests nothing while paused.
+- **Cost, measured** on m2 (1265 × 75) and plan (409 × 232), once per
+  refresh (~4 Hz), never per frame: request (pack pass + PBO read + fence)
+  0.1–2 ms; ψ 2–8 ms; contours 3–15 ms; drawing ~1 ms per frame. The
+  copy-out (`getBufferSubData` after the fence has signalled) does not wait
+  for the GPU to finish the sim, but it is still one synchronous round trip
+  to Chrome's GPU process — `SIM.streamPoll()` returns `ms.wait/copy` so it
+  can be watched. Measured with eight agents sharing one GPU it was
+  5–100 ms, the SAME as a 1 × 1 `SIM.probe` readPixels on that machine
+  (40–180 ms) and well under a synchronous full-field `fieldStats`
+  (300–800 ms) — i.e. it costs what one round trip costs, not what the
+  queued substeps cost. On an uncontended machine expect a millisecond or
+  two; re-measure there before quoting a number. Off, it costs one boolean.
 
 ## Measurement gotchas
 
@@ -876,6 +1130,24 @@ picture saturated or flat is the symptom of the two having drifted apart.
   s1's roller — never fall below tolerance at all; for those the mean profile
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
+- **Average used to survive a scene switch.** `switchScene` reset the view
+  toggles but not `state.avg`, so a class that switched FF-5 to Average
+  opened VC-2 — an unsteady fill — still averaging, its level curve smeared
+  into a window mean. It now calls `setAverage(false)` (the single writer:
+  the flag alone would leave the accumulators open) before loading.
+- **A rake inside a conduit.** The rake used to span the column analysis's
+  `A.bed → A.surf`, which in a pipe over a full tank (FF-4) is the tank, not
+  the pipe. It now spans the water around the clicked point (`rakeSpan` in
+  overlay.js): open water — same bed, nothing solid between the click and
+  `A.surf` — keeps `A.bed → A.surf` bit-for-bit (NC-2's q is unchanged
+  whatever z is clicked); anything else walks to the walls and needs the
+  column's fill to find a free surface inside the conduit, one extra 1 × ny
+  read per such rake per frame (`needF`), none for an open-channel rake.
+- **The hover card's title is a row.** The profile class ("H2 profile") was
+  drawn whenever the column could be classified, outside the `rows` filter,
+  so every Year 1 card that named its rows still printed it. It is the row
+  id `profile` now (in the default set), and `ui.hide: ["critical"]` drops it
+  with the sub/supercritical words.
 
 ## Hydropower scheme (`hydro`): the surge shaft
 
@@ -1140,3 +1412,76 @@ having settled before anything calls into it.
   valve reads the real diagram — the water-hammer teaching number — and an
   erased hole in a wall contributes nothing to the integral either side of
   it.
+
+## Tracers: dye and particles
+
+Both were reworked (Oct 2026) after a lecturer's report that the dye "doesn't
+really work" and the particle traces were too short to see in slow scenes.
+
+**Dye is a field, released where the flow goes.** It stays the `F.g` channel
+(it diffuses, which is what real dye does), but it is no longer injected as
+pulsed timelines at the left ghost: in the contraction rig those never reached
+the pipe, and in FF-3 they had spread into a wash before the wake. A scene
+declares `dye: { seeds: [[x0, z0, x1, z1, ports?, radius?], …], on? }` (or a
+function of its params); `ports` 0 is a continuous sheet, n > 0 that many
+point releases (separate streaks). With none declared, `SIM` seeds a vertical
+six-port line just inside an upstream inflow (over the depth the column
+reduction last saw) or a point at a running spout. FS_VOF sets `dye = 1` in
+wet cells (f > 0.3) within the radius of a seed, every substep, up to eight
+seeds; the scene's `dyeLine` (panel: Dye timelines) now pulses the seeds, on
+for half of each period, so the band edges are timelines (m1/m2 keep that).
+**Released by hand (Oct 2026).** A lecturer found FF-2's automatic sheet a
+"strange black wedge" on the crest and asked for dye released wherever the
+student clicks, for as long as the click is held. That is the **Dye tool**
+(`dye`, thirteenth in TOOLS, key D, MEASURE family; it replaced the Dye VIEW
+toggle): pointer-down sets `sim.p.dyeInj = {x, z, r}`, FS_VOF's `u_dyeInj`
+sets dye A = 1 in wet cells (f > 0.3, so air takes nothing) within r of it
+every substep, a drag moves it, pointer-up clears it. r =
+max(3 Δx, 0.008 · max(W, H)) (`SIM.dyeInjRadius`), shown as the cursor
+ring. The seeds above stay as a mechanism but are OFF unless the scene says
+`dye.on` or `dyeLine` > 0 (m1/m2's timelines), or a card sets viewParams
+`dyeSeeds` (Controls → Dye sources; rig wire key still `ui.dye`). Dye is
+always drawn now, so there is no "Dye off"; under Average (no accumulator,
+docs/averaging.md) nothing is drawn and neither source releases. The van
+Leer dye faces switch on with the first dye A released since the last reset
+(`S.dyeUsed`), so a run nobody dyes costs what it did.
+
+- **Ink is black.** No ramp contains black, so it reads on Water, Speed and
+  every head ramp. Opacity is `0.92·(1 − e^(−5d))`: a plume diluted to 0.1 is
+  still ≈ 0.35 opaque — the old linear 0.85·d lost a plume the moment it had
+  spread over a few cells. The exception is the dark end of a ramp (slow water
+  on Speed is near-black purple): there the plume's edge gets a pale rim from
+  the ink gradient, only where the ground's luminance is low.
+- **The free-surface line is drawn over the ink.** Ink right at a free
+  surface against the near-black canvas is black on black — a dyed nappe
+  vanished. FF-2's sheet stops 0.4 m under the reservoir surface for the same
+  reason, so the nappe keeps a coloured skin.
+- **Limited faces once there is ink.** First-order upwind (numerical diffusivity
+  ≈ u·Δx/2) spread a two-cell streak into grey within a couple of metres; with
+  `u_dyeSeed.z` set the dye-A faces are the same van Leer `faceVal` the fill
+  uses. Before any dye A goes in, the old upwind runs — a uniform branch, so an undyed run costs what it
+  did before.
+- Separate streaks on a sheet only 2–4 cells thick (FF-2's nappe) merge into
+  a faint grey; use a continuous sheet there.
+
+**Particle trails are sized to the scene.** The trail spans τ seconds of flow,
+τ = 0.2 × visible width / (½ × the scene's speed scale), clamped to 0.6–8 s;
+a scene may state `particleTrail` (s) and the Controls slider *Particle
+trail* overrides both until the next scene. The particle lifetime is at
+least 2.5 τ so the respawn does not cut the trail. Three faults made the old
+trails invisible, each worth knowing:
+
+- the tail dabs were blended `SRC_ALPHA, ONE` from a premultiplied colour,
+  which SQUARED the amplitude (0.3 laid down 0.09, ~23 counts the fade took
+  back in a few frames);
+- one dab per frame left a dotted line wherever a particle moves more than a
+  dab per frame; the tail pass now draws six dabs per particle along the
+  frame's step, from the other half of the ping-pong (the previous position);
+- a white trail added to a pale ramp is white on near-white; the composite
+  now lays a dark ±1.5 px shadow of the trail first, and the heads are a
+  white core in a dark ring, alpha-blended.
+
+Respawns land in the water (four tries for a wet, open cell), and the drawn
+count is a DENSITY — 2.5·10⁻³ per screen pixel of water, water share from the
+column reduction (plan view taken as full), 300–2600 — so a shallow flume is
+not a white mat and a full plan-view box is not sparse.

@@ -29,6 +29,7 @@ const OVERLAY = (() => {
 
   const C = {
     dc: "#ffb648", dn: "#5fd08a", egl: "#cfe3f5", hgl: "#ff9de2", surf: "#7fd4ff",
+    sline: "rgba(245,250,255,0.9)", slineHalo: "rgba(8,14,22,0.55)",
     dim: "rgba(223,232,242,0.55)", grid: "rgba(223,232,242,0.13)",
   };
 
@@ -446,6 +447,22 @@ const OVERLAY = (() => {
   }
 
   // --------------------------------------------------------------- drawing
+  /** What the overlay may PRINT, set by main.js once a frame (setPrint):
+   *    boxes     the instruments' readout boxes — VIEW → Readouts. Off, the
+   *              instruments draw their geometry (box, line, profile, arrows)
+   *              and no numbers; they go on measuring either way.
+   *    energy    the energy terms (CV energy row and Ė faces, ρgQH, the
+   *              energy lost between two sections) — off under ui.hide
+   *              "energy" for a card before the energy lecture.
+   *    critical  the critical-flow vocabulary on the hover card (profile
+   *              class, sub/supercritical) — off under ui.hide "critical". */
+  const PRINT = { boxes: true, energy: true, critical: true };
+  function setPrint(o) { Object.assign(PRINT, o || {}); }
+  /** A chip that is an instrument READOUT, and so goes with the boxes. */
+  function rchip(ctx, x, y, text, colour, align) {
+    if (PRINT.boxes) chip(ctx, x, y, text, colour, align);
+  }
+
   function line(ctx, pts, style, width, dash) {
     if (pts.length < 2) return;
     ctx.save();
@@ -588,10 +605,20 @@ const OVERLAY = (() => {
    *  one thing it did say -- that a cell is pressurised -- is already printed
    *  on the head row and is the reason the level row disappears there. A pipe
    *  exercise that genuinely wants it back names it.
+   *
+   *  `profile` is the card's TITLE — the gradually-varied-flow class ("H2
+   *  profile") — and it is a row id like any other so that a profile's
+   *  `rows` list governs it too. It used to be drawn whenever the column could
+   *  be classified, whatever the list said, which put "H2 profile" on every
+   *  Year 1 card that hovered over a channel. In the default set, so a card
+   *  without a list is unchanged.
    */
-  const ROW_IDS = ["pos", "d", "eta", "q", "V", "Fr", "dc", "dn", "S0", "Sf",
-                   "uw", "phead", "h", "f"];
-  const DEFAULT_ROWS = ROW_IDS.filter((r) => r !== "f");
+  const ROW_IDS = ["profile", "pos", "d", "eta", "q", "V", "Fr", "dc", "dn", "S0", "Sf",
+                   "uw", "p", "phead", "h", "f"];
+  // `p` (the pressure in kPa) is opt-in like `f`: the default card already
+  // carries the pressure as p/ρg, and a Year 1 card that shows the Pressure
+  // colouring names `p` instead of `phead`.
+  const DEFAULT_ROWS = ROW_IDS.filter((r) => r !== "f" && r !== "p");
 
   /** `show` is the set of row ids the caller wants, or null for the default.
    *  Every row below carries a stable id as its third element, so an exercise
@@ -657,6 +684,45 @@ const OVERLAY = (() => {
     });
   }
 
+  /** Streamlines: contour segments of ψ (STREAM.contours), in metres, plus a
+   *  one-line key quoting the discharge each tube carries. `L` is
+   *  {seg, dpsi, avg} as main.js refreshStream keeps it. */
+  function drawStreamlines(ctx, V, L) {
+    if (!L || !L.seg) return;
+    const s = L.seg;
+    ctx.save();
+    ctx.beginPath();
+    for (let k = 0; k < s.length; k += 4) {
+      ctx.moveTo(V.X(s[k]), V.Y(s[k + 1]));
+      ctx.lineTo(V.X(s[k + 2]), V.Y(s[k + 3]));
+    }
+    // A dark halo under a light core, so the lines read over every ramp —
+    // the pale middle of vorticity as much as the dark end of speed.
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = C.slineHalo; ctx.lineWidth = 2.6; ctx.stroke();
+    ctx.strokeStyle = C.sline; ctx.lineWidth = 1.1; ctx.stroke();
+    ctx.restore();
+    const B = V.vis || V;
+    chip(ctx, B.x + 10, B.y + B.h - 34,
+         "streamlines" + (L.avg ? " of the MEAN flow" : "") +
+         " · Δψ = " + (+L.dpsi.toPrecision(2)) + " m²/s between lines",
+         C.sline);
+  }
+
+  /** Where a pinned readout reads: a ring and a dot, so the card is visibly
+   *  ABOUT a point rather than floating free once the finger has gone. */
+  function drawPinMark(ctx, V, mx, mz) {
+    const x = V.X(mx), y = V.Y(mz);
+    ctx.save();
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.stroke();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = "#ffd98a";
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.stroke();
+    ctx.fillStyle = "#ffd98a";
+    ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
   function drawCursorReadout(ctx, V, A, sim, mx, mz, probe, show) {
     const i = Math.max(0, Math.min(sim.nx - 1, Math.floor(mx / sim.dx)));
     const d = A.d[i], dc = A.dc[i], dn = A.dn[i], S0 = A.S0[i];
@@ -673,17 +739,23 @@ const OVERLAY = (() => {
     const js = Math.round(A.surf[i] / sim.dx);
     const capped = js > 0 && js < sim.ny && sim.mask[js * sim.nx + i] >= 64;
     const press = !!probe && probe.f > 1.002 && capped;
-    const cls = wet && A.ok[i] && !press ? classify(d, dn, dc, S0) : "";
+    const keep = show || DEFAULT_ROWS;
+    // The class is a title, not a row, but it is governed like one (`profile`
+    // in the list) and withheld with the rest of the critical-flow words.
+    const cls = wet && A.ok[i] && !press && PRINT.critical && keep.indexOf("profile") >= 0
+      ? classify(d, dn, dc, S0) : "";
     const rows = [];
     rows.push(["x, z", fmt(mx, 2) + ", " + fmt(mz, 2) + " m", "pos"]);
     if (wet) {
       rows.push(["depth d", fmt(d, 3) + " m", "d"]);
       if (!press) rows.push(["level η", fmt(A.bed[i] + d, 3) + " m above datum", "eta"]);
-      rows.push(["q", fmt(A.q[i], 3) + " m²/s", "q"]);
-      rows.push(["V", fmt(A.V[i], 2) + " m/s", "V"]);
+      rows.push(["q, whole depth", fmt(A.q[i], 3) + " m²/s", "q"]);
+      rows.push(["V = q/d, depth mean", fmt(A.V[i], 2) + " m/s", "V"]);
     }
     if (wet && !press) {
-      rows.push(["Fr", fmt(A.Fr[i], 2) + (A.Fr[i] > 1 ? "  supercritical" : "  subcritical"), "Fr"]);
+      rows.push(["Fr", fmt(A.Fr[i], 2) + (PRINT.critical
+        ? (A.Fr[i] > 1 ? "  supercritical" : "  subcritical")
+        : (A.Fr[i] > 1 ? "  fast, shallow" : "  slow, deep")), "Fr"]);
       rows.push(["d_c", fmt(dc, 3) + " m", "dc"]);
       if (isFinite(dn)) rows.push(["d_n", fmt(dn, 3) + " m  (measured)", "dn"]);
       rows.push(["S₀", (S0 >= 0 ? "1 : " + fmt(1 / Math.max(S0, 1e-9), 0) : "adverse"), "S0"]);
@@ -693,7 +765,10 @@ const OVERLAY = (() => {
         (isFinite(A.n[i]) ? "   n = " + fmt(A.n[i], 3) : ""), "Sf"]);
     }
     if (probe) {
-      rows.push(["u, w", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s", "uw"]);
+      rows.push(["u, w at cursor", fmt(probe.u, 2) + ", " + fmt(probe.w, 2) + " m/s", "uw"]);
+      // probe.p is the kinematic pressure P = p/ρ; with ρ = 1000 kg/m³ its
+      // value in m²/s² is p in kPa.
+      rows.push(["pressure p", fmt(probe.p, 2) + " kPa", "p"]);
       rows.push(["pressure head p/ρg", fmt(probe.phead, 3) + " m", "phead"]);
       // h = z + p/ρg. Shown in BOTH regimes: in hydrostatic open-channel flow
       // it equals the level η above, but inside a pressurised conduit there is
@@ -705,7 +780,6 @@ const OVERLAY = (() => {
     }
     // Filter to what was asked for. A row with no id is never hidden -- if a
     // future row forgets its tag it keeps showing, which is the safe way round.
-    const keep = show || DEFAULT_ROWS;
     const shown = rows.filter((r) => !r[2] || keep.indexOf(r[2]) >= 0);
     rows.length = 0; Array.prototype.push.apply(rows, shown);
     if (!rows.length) return;
@@ -783,10 +857,73 @@ const OVERLAY = (() => {
    *  The profile is also INTEGRATED over the column — q = ∫u dy — so the rake
    *  is a flow measurement, not just a shape: the discharge it reports can be
    *  checked against the hover readout's flux-based q at the same station. */
-  function drawRake(ctx, V, sim, rk, A) {
+  /** The span a rake reads, [lo, hi] in metres. Open water (the clicked point
+   *  lies in the column the analysis measured, with no solid between bed and
+   *  surface) is A.bed → A.surf, bit-for-bit the old rake, so every worksheet
+   *  that reads one in a channel reads the same. Otherwise — a pipe, a culvert,
+   *  a jet over a reservoir floor — it walks down from the click to the first
+   *  solid and up to the first solid or the end of the water (fill f < ½,
+   *  which needs the column's f: `rk.needF` asks sampleRakes for it). */
+  function rakeSpan(sim, rk, A) {
+    const i = rk.i, nx = sim.nx, ny = sim.ny, dx = sim.dx;
+    const bed = A.bed[i], surf = A.surf[i];
+    if (!Number.isFinite(rk.z)) { rk.needF = false; return [bed, surf]; }
+    const solid = (j) => sim.mask[j * nx + i] >= 192;
+    let jc = Math.max(0, Math.min(ny - 1, Math.floor(rk.z / dx)));
+    if (solid(jc)) { rk.needF = false; return [bed, surf]; }   // clicked into a wall
+    let jb = jc;
+    while (jb > 0 && !solid(jb - 1)) jb--;
+    const lo = jb * dx;
+    // Open water: the same bed, and nothing solid from the click up to the
+    // surface the analysis found (or the click above it, in the air).
+    if (Math.abs(lo - bed) < 0.5 * dx && Number.isFinite(surf)) {
+      let clear = true;
+      for (let j = jc; j * dx < surf && j < ny; j++) if (solid(j)) { clear = false; break; }
+      if (clear) { rk.needF = false; return [bed, surf]; }
+    }
+    rk.needF = true;
+    let jt = jc;
+    while (jt + 1 < ny && !solid(jt + 1)) jt++;
+    let hi = (jt + 1) * dx;
+    if (rk.f) {
+      // the water in the span ends where f drops below ½ above the click
+      for (let j = Math.max(jb, Math.min(jc, jt)); j <= jt; j++) {
+        if (rk.f[j] < 0.5) { hi = j * dx; break; }
+      }
+    }
+    return [lo, Math.max(hi, lo + dx)];
+  }
+
+  /** Screen px per m/s for the rakes: the scene's speed `uRef` maps to the
+   *  rake's nominal length (13% of the view, at most 110 px). Passed in as
+   *  px per m/s already (main.js), so every rake and the bar share it. */
+  function rakePx(V, pxPerMps) {
+    return pxPerMps > 0 ? pxPerMps : Math.min(V.w * 0.13, 110) / 4;
+  }
+  /** The rakes' one scale bar, bottom-left above the streamline key: a 1-2-5
+   *  number of m/s that spans 30–80 px, drawn once whatever the rake count. */
+  function drawRakeScale(ctx, V, pxPerMps) {
+    const s = rakePx(V, pxPerMps);
+    const want = 50 / s;
+    const mag = Math.pow(10, Math.floor(Math.log10(want)));
+    const u = [1, 2, 5, 10].map((m) => m * mag)
+      .reduce((a, b) => Math.abs(b * s - 50) < Math.abs(a * s - 50) ? b : a);
+    const L = u * s, B = V.vis || V;
+    const x = B.x + 12, y = B.y + B.h - 58;
+    ctx.save();
+    ctx.strokeStyle = "rgba(6,10,16,0.85)"; ctx.lineWidth = 4.6;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + L, y); ctx.stroke();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x, y); ctx.lineTo(x + L, y); ctx.lineTo(x + L, y - 4); ctx.stroke();
+    ctx.restore();
+    chip(ctx, x + L + 8, y, "rake: " + String(+u.toPrecision(2)) + " m/s", "#e8f0f8");
+  }
+
+  function drawRake(ctx, V, sim, rk, A, pxPerMps) {
     const { i, buf } = rk;
     const x0 = V.X((i + 0.5) * sim.dx);
-    const bed = A.bed[i], surf = A.surf[i];
+    const span = rakeSpan(sim, rk, A);
+    const bed = span[0], surf = span[1];
     let umax = 1e-3, sum = 0, cnt = 0;
     for (let j = 0; j < sim.ny; j++) {
       const y = (j + 0.5) * sim.dx;
@@ -803,13 +940,15 @@ const OVERLAY = (() => {
     const qNow = sum * sim.dx;
     rk.qE = rk.qE === undefined ? qNow : rk.qE + 0.10 * (qNow - rk.qE);
     const q = rk.qE;
-    // Hold the largest section speed this rake has experienced. Scaling every
-    // frame by the instantaneous maximum made an unsteady profile breathe in
-    // and out, so its shape was hard to follow just when a wave passed. The
-    // scale may contract when a genuinely faster section arrives, but never
-    // expands again until the rake is removed and placed afresh.
-    rk.uScaleMax = Math.max(rk.uScaleMax || 1e-3, umax);
-    const scale = Math.min(V.w * 0.13, 110) / rk.uScaleMax;
+    // ONE scale for every rake in the scene: `pxPerMps`, from the scene's
+    // held speed range (main.js rakeScale). Each rake used to scale to its own
+    // maximum, so a rake in still water blew its noise up to a full-width
+    // erratic profile and two rakes could not be compared side by side. Now
+    // still water draws a nearly flat line, and the scale bar (drawRakeScale)
+    // says what a length means. A section faster than the range is clipped at
+    // 1.6× the nominal length rather than run across the view.
+    const scale = rakePx(V, pxPerMps);
+    const clipPx = 1.6 * Math.min(V.w * 0.13, 110);
 
     ctx.save();
     ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = 1;
@@ -822,19 +961,26 @@ const OVERLAY = (() => {
     for (let j = 0; j < sim.ny; j++) {
       const y = (j + 0.5) * sim.dx;
       if (y < bed || y > surf) continue;
-      const px = x0 + buf[j * 4] * scale, py = V.Y(y);
+      const px = x0 + Math.max(-clipPx, Math.min(clipPx, buf[j * 4] * scale)), py = V.Y(y);
       if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py);
     }
-    ctx.strokeStyle = "#ffd98a"; ctx.lineWidth = 1.8; ctx.stroke();
+    // White over a dark halo: the old pale yellow vanished into the Speed
+    // colouring's fast (yellow) band. A dark casing under a light line reads
+    // on every ramp — the streamlines and the ruler solve it the same way.
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(6,10,16,0.85)"; ctx.lineWidth = 4.6; ctx.stroke();
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2; ctx.stroke();
 
     // depth-average marker
     ctx.beginPath();
-    ctx.moveTo(x0 + Vbar * scale, V.Y(bed)); ctx.lineTo(x0 + Vbar * scale, V.Y(surf));
-    ctx.strokeStyle = "rgba(255,217,138,0.35)"; ctx.lineWidth = 1; ctx.stroke();
+    const xb = x0 + Math.max(-clipPx, Math.min(clipPx, Vbar * scale));
+    ctx.moveTo(xb, V.Y(bed)); ctx.lineTo(xb, V.Y(surf));
+    ctx.strokeStyle = "rgba(6,10,16,0.55)"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)"; ctx.lineWidth = 1; ctx.stroke();
 
-    chip(ctx, x0 + 6, V.Y(surf) - 32,
+    rchip(ctx, x0 + 6, V.Y(surf) - 32,
       "q = ∫u dy = " + fmt(q, 3) + " m²/s", "#7fd4ff");
-    chip(ctx, x0 + 6, V.Y(surf) - 14,
+    rchip(ctx, x0 + 6, V.Y(surf) - 14,
       "u_max " + fmt(umax, 2) + "  V " + fmt(Vbar, 2) + "  ratio " + fmt(umax / Math.max(Vbar, 1e-3), 2),
       "#ffd98a");
     ctx.restore();
@@ -861,15 +1007,25 @@ const OVERLAY = (() => {
    *  is the loop's, each entry `{k, x, y, w, h}` with `k` the gauge index) so
    *  the DOM can hang an affordance on a card without duplicating the layout
    *  arithmetic. Drawing is unchanged — the stack breaks at the same place. */
-  function drawGaugeCharts(ctx, V, gauges, field, label, unit) {
+  /*  `pick(gauge)` returns `{label, unit, get(sample)}` — what THIS gauge
+   *  plots, since each gauge carries its own quantity. A string in its place
+   *  is the old one-quantity-for-all call (`field, label, unit`). */
+  function drawGaugeCharts(ctx, V, gauges, pick, label0, unit0) {
     const rects = [];
     if (!gauges.length) return rects;
+    if (typeof pick !== "function") {
+      const f0 = pick;
+      pick = () => ({ label: label0, unit: unit0, get: (s) => s[f0] });
+    }
     const W = Math.min(330, V.pxW * 0.32), H = 82, pad = 10;
     let y = V.pxH - pad - H;
     for (let k = gauges.length - 1; k >= 0; k--) {
       const gg = gauges[k], x = V.pxW - pad - W;
       rects.push({ k, x, y, w: W, h: H });
-      const hist = gg.hist;
+      const Q = pick(gg), label = Q.label, unit = Q.unit, val = Q.get;
+      // `series`: what to plot — the scrolling window, or the whole run from
+      // t = 0 (main.js gaugeSeries); the card's look is the same either way.
+      const hist = Q.series || gg.hist;
       ctx.save();
       ctx.fillStyle = "rgba(12,17,26,0.80)";
       ctx.strokeStyle = "rgba(255,255,255,0.10)";
@@ -877,29 +1033,83 @@ const OVERLAY = (() => {
 
       if (hist.length > 1) {
         let lo = Infinity, hi = -Infinity;
-        for (const s of hist) { const v = s[field]; if (v < lo) lo = v; if (v > hi) hi = v; }
+        for (const s of hist) { const v = val(s); if (v < lo) lo = v; if (v > hi) hi = v; }
         if (hi - lo < 1e-6) { hi = lo + 1e-3; }
         const pad2 = (hi - lo) * 0.12; lo -= pad2; hi += pad2;
         const t0 = hist[0].t, t1 = hist[hist.length - 1].t;
         const px = (t) => x + 10 + (t - t0) / Math.max(t1 - t0, 1e-6) * (W - 58);
         const py = (v) => y + H - 16 - (v - lo) / (hi - lo) * (H - 30);
         ctx.beginPath();
-        hist.forEach((s, n) => { const a = px(s.t), b = py(s[field]); n ? ctx.lineTo(a, b) : ctx.moveTo(a, b); });
+        hist.forEach((s, n) => { const a = px(s.t), b = py(val(s)); n ? ctx.lineTo(a, b) : ctx.moveTo(a, b); });
         ctx.strokeStyle = gg.colour; ctx.lineWidth = 1.5; ctx.stroke();
         ctx.font = "10px ui-monospace, monospace";
         ctx.fillStyle = C.dim;
-        ctx.fillText(fmt(hi, 2), x + W - 44, y + 16);
+        // Below the card's × (a DOM button in the top-right corner).
+        ctx.fillText(fmt(hi, 2), x + W - 44, y + 32);
         ctx.fillText(fmt(lo, 2), x + W - 44, y + H - 12);
         ctx.fillStyle = "#e8f0f8";
         ctx.font = "700 11px ui-monospace, monospace";
-        ctx.fillText(String(k + 1) + "  " + label + " " + fmt(hist[hist.length - 1][field], 3) + " " + unit,
+        ctx.fillText(String(k + 1) + "  " + label + " " + fmt(val(hist[hist.length - 1]), 3) + " " + unit,
           x + 10, y + 14);
+        // The whole run says so, with its time axis at the foot: "t = 0" at
+        // the left edge and the clock at the right, so a student reads the
+        // approach to steady state against time rather than a bare curve.
+        if (Q.whole) {
+          ctx.font = "9.5px ui-monospace, monospace";
+          ctx.fillStyle = C.dim;
+          ctx.fillText("t = " + Math.round(t0) + " s", x + 10, y + H - 4);
+          ctx.textAlign = "right";
+          ctx.fillText(Math.round(t1) + " s", x + W - 52, y + H - 4);
+          ctx.textAlign = "left";
+        }
       }
       ctx.restore();
       y -= H + 8;
       if (y < V.pxH * 0.35) break;
     }
     return rects;
+  }
+
+  /** Wind over the water (FF-1): a row of arrows above the free surface,
+   *  pointing the way τ blows, longer the stronger it is (|τ|/τmax of the
+   *  scene's slider range), with τ printed beside the first one. Nothing at
+   *  τ = 0. The row sits a fixed fraction of the way from the highest water
+   *  surface to the top of the domain, over the wet columns only. */
+  function drawWind(ctx, V, A, sim, tau, tauMax) {
+    if (!tau || !(tauMax > 0)) return;
+    const nx = sim.nx, dx = sim.dx;
+    let i0 = -1, i1 = -1, zs = 0;
+    for (let i = 0; i < nx; i++) {
+      if (!A || !A.ok[i] || !(A.d[i] > 2 * dx)) continue;
+      if (i0 < 0) i0 = i;
+      i1 = i;
+      zs = Math.max(zs, A.bed[i] + A.d[i]);
+    }
+    if (i0 < 0) { i0 = 1; i1 = nx - 2; zs = 0.5 * sim.H; }
+    const zr = zs + 0.45 * (sim.H - zs);
+    const xa = (i0 + 0.5) * dx, xb = (i1 + 0.5) * dx, span = xb - xa;
+    const n = 5, pitch = V.w * (span / sim.W) / n;                // px between arrows
+    const frac = Math.min(1, Math.abs(tau) / tauMax);
+    const len = Math.max(10, 0.85 * pitch * frac), dir = Math.sign(tau);
+    const y = V.Y(zr), head = Math.min(10, 0.4 * len + 4);
+    ctx.save();
+    ctx.strokeStyle = "rgba(235,245,255,0.9)"; ctx.fillStyle = "rgba(235,245,255,0.9)";
+    ctx.lineWidth = 1.5 + 2.5 * frac; ctx.lineCap = "round";
+    for (let k = 0; k < n; k++) {
+      const xc = V.X(xa + (k + 0.5) * span / n);
+      const xt = xc - dir * len / 2, xh = xc + dir * len / 2;
+      ctx.beginPath(); ctx.moveTo(xt, y); ctx.lineTo(xh - dir * head * 0.6, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(xh, y);
+      ctx.lineTo(xh - dir * head, y - head * 0.55);
+      ctx.lineTo(xh - dir * head, y + head * 0.55);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.font = "12px ui-monospace, SFMono-Regular, monospace";
+    ctx.textBaseline = "bottom"; ctx.textAlign = "center";
+    ctx.fillText("wind  τ = " + tau.toFixed(Math.abs(tau) < 1 ? 2 : 1) + " N/m²",
+                 V.X(0.5 * (xa + xb)), y - 10);
+    ctx.restore();
   }
 
   /** Frame, axes and scale bar — anchored to the VISIBLE part of the domain
@@ -1024,7 +1234,7 @@ const OVERLAY = (() => {
       const fN = (v) => Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
       drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN);
     } else {
-      chip(ctx, x0, y0 - 12, "control volume · settling…", col);
+      rchip(ctx, x0, y0 - 12, "control volume · settling…", col);
     }
     ctx.restore();
   }
@@ -1074,11 +1284,29 @@ const OVERLAY = (() => {
     top:   (v) => (v < 0 ? "▼" : "▲"),
   };
 
+  /** dV/dt of the water inside the box, m²/s: the least-squares slope of the
+   *  enclosed volume over the last 2 s of sim time. null until there are
+   *  enough samples to fit a line through. */
+  function storageRate(hist) {
+    if (!hist || hist.length < 6) return null;
+    const tEnd = hist[hist.length - 1].t;
+    let n = 0, st = 0, sv = 0, stt = 0, stv = 0;
+    for (const q of hist) {
+      if (tEnd - q.t > 2 || !Number.isFinite(q.vol)) continue;
+      n++; st += q.t; sv += q.vol; stt += q.t * q.t; stv += q.t * q.vol;
+    }
+    const den = n * stt - st * st;
+    if (n < 6 || !(den > 1e-12)) return null;
+    return (n * stv - st * sv) / den;
+  }
+
   function drawCVBudget(ctx, cv, show, x0, y0, x1, y1, col, fx, fz, sd, fN) {
     const F = cv.flux;
-    const q = CV_Q[show] || CV_Q.Q;
+    // A card that withholds energy never labels the faces with it, whatever
+    // B was last left on.
+    const q = (show === "E" && !PRINT.energy) ? CV_Q.Q : (CV_Q[show] || CV_Q.Q);
     ctx.font = "10px ui-monospace, monospace";
-    if (F) {
+    if (F && PRINT.boxes) {
       const e = F.edges;
       const mid = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
       const put = (key, x, y, ha, va) => {
@@ -1099,7 +1327,7 @@ const OVERLAY = (() => {
       put("bed",   mid.x, y1 + 4, "center", "top");
     }
     ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-    chip(ctx, x0, y0 - 12,
+    rchip(ctx, x0, y0 - 12,
          "Control volume · " + q.label + " across each face  ·  B cycles", col);
     if (!F) return;
 
@@ -1115,17 +1343,27 @@ const OVERLAY = (() => {
       return { inn, out };
     };
     const Q = gross((e) => e.Q), E = gross((e) => e.E);
+    // Continuity is in − out = dV/dt, not in = out: a box round a tank that
+    // is filling has a net flux and that is the point (VC-2). The storage
+    // rate is the slope of the enclosed water over the last ~2 s of the
+    // history, so the closure printed is the unsteady one and reads 0 for a
+    // steady box exactly as the old "should be 0" did.
+    const dVdt = storageRate(cv.hist);
+    const net = Q.out - Q.inn;
     const lines = [
-      "water    in " + Q.inn.toFixed(3) + "   out " + Q.out.toFixed(3) +
-        "   net " + (Q.out - Q.inn).toFixed(3) + " m²/s" +
-        (Q.inn > 1e-9 ? "  (" + (100 * Math.abs(Q.out - Q.inn) / Q.inn).toFixed(1) + "%, should be 0)" : ""),
+      "water  in " + Q.inn.toFixed(3) + "  out " + Q.out.toFixed(3) +
+        "  net " + net.toFixed(3) +
+        (dVdt === null ? " m²/s"
+          : "  dV/dt " + (dVdt >= 0 ? "+" : "") + dVdt.toFixed(3) + " m²/s" +
+            (Q.inn > 1e-9 ? "  (net + dV/dt: " + (100 * Math.abs(net + dVdt) / Q.inn).toFixed(1) + "%, should be 0)" : "")),
       "force    on what is inside:  →  " + fN(fx) + " ±" + fN(sd) + " N/m    ↑ " + fN(fz) + " N/m",
-      "energy   in " + fmtBig(E.inn, "W/m") + "   out " + fmtBig(E.out, "W/m") +
-        "   lost " + fmtBig(E.inn - E.out, "W/m"),
     ];
+    if (PRINT.energy) lines.push(
+      "energy   in " + fmtBig(E.inn, "W/m") + "   out " + fmtBig(E.out, "W/m") +
+        "   lost " + fmtBig(E.inn - E.out, "W/m"));
     const tall = (y1 - y0) > 3 * 15 + 24;
     const top = tall ? y0 + 18 : y0 - 12 - lines.length * 15;
-    lines.forEach((t, k) => chip(ctx, x1 - 6, top + k * 15, t, col, "right"));
+    lines.forEach((t, k) => rchip(ctx, x1 - 6, top + k * 15, t, col, "right"));
   }
 
   /** The flux sections: what crosses each line, and what happened between
@@ -1167,7 +1405,7 @@ const OVERLAY = (() => {
 
       const e = L.ema;
       const mx = (ax + bx) / 2, my = (ay + by) / 2;
-      if (!e) { chip(ctx, mx + 8, my, "section " + (k + 1) + " · settling…", col); return; }
+      if (!e) { rchip(ctx, mx + 8, my, "section " + (k + 1) + " · settling…", col); return; }
 
       // The arrow shows which way the water crosses, so no reading anywhere on
       // this tool is a bare sign.
@@ -1192,17 +1430,17 @@ const OVERLAY = (() => {
         (k + 1) + "   Q      " + e.Q.toFixed(3) + " m²/s",
         "    M      " + vec(e.Mx, e.Mz, "N/m"),
         "    F      " + vec(e.Fpx, e.Fpz, "N/m"),
-        "    ρgQH   " + fmtBig(e.E, "W/m"),
       ];
+      if (PRINT.energy) rows.push("    ρgQH   " + fmtBig(e.E, "W/m"));
       const side = dir > 0 ? 1 : -1;
       const cx = mx + hx * 1.9 * 1 + side * 8, cy = my - 22;
-      rows.forEach((t, i) => chip(ctx, cx, cy + i * 15, t, col,
+      rows.forEach((t, i) => rchip(ctx, cx, cy + i * 15, t, col,
                                   side > 0 ? "left" : "right"));
       // One section is a reading; two are an ANSWER. Said here, next to the
       // one section that exists, because that is the moment it is useful —
       // and it goes away by itself the moment it has been acted on.
       if (lines.length === 1) {
-        chip(ctx, cx, cy + rows.length * 15 + 3,
+        rchip(ctx, cx, cy + rows.length * 15 + 3,
              "draw a second section for the balance between them",
              "rgba(140,225,176,0.62)", side > 0 ? "left" : "right");
       }
@@ -1229,11 +1467,11 @@ const OVERLAY = (() => {
           "momentum  " + fmtBig(a.Mx, "N/m") + " → " + fmtBig(b.Mx, "N/m"),
           "pressure  " + fmtBig(a.Fpx, "N/m") + " → " + fmtBig(b.Fpx, "N/m"),
           "force on what is between them:  " + vec(fx, fz, "N/m"),
-          "energy    lost " + fmtBig(dE, "W/m"),
         ];
+        if (PRINT.energy) rows.push("energy    lost " + fmtBig(dE, "W/m"));
         const x = Math.min(V.X(A.x0), V.X(A.x1), V.X(B.x0), V.X(B.x1));
         const y = Math.max(V.Y(A.z0), V.Y(A.z1), V.Y(B.z0), V.Y(B.z1));
-        rows.forEach((t, i) => chip(ctx, x + 6, y - 12 - (rows.length - 1 - i) * 15, t, col));
+        rows.forEach((t, i) => rchip(ctx, x + 6, y - 12 - (rows.length - 1 - i) * 15, t, col));
       }
     }
     ctx.restore();
@@ -1360,8 +1598,27 @@ const OVERLAY = (() => {
         ctx.closePath(); ctx.fill();
       }
 
-      chip(ctx, P[0][0] + 6, P[0][1] - 12,
-           "scale: 1 m head = " + pxPerHead.toFixed(0) + " px", col);
+      // The scale in the units the scene can mean. In plan view (|g| < 0.1:
+      // MM-1, FF-3) a "metre of head" is p/(ρ·1e-3 m/s²) — thousands of
+      // metres — and the chip read "1 m head = 0 px". There the scale is
+      // pressure: 1 m head is ρg·1 m Pa, so px per kPa = pxPerHead / g, and
+      // the step is the 1-2-5 number of kPa that spans at least ~12 px. It
+      // is a number about a reading, so it folds away with the readouts.
+      let scaleTxt, at = [P[0][0] + 6, P[0][1] - 12];
+      if (Math.abs(sim.p.g) < 0.1) {
+        // …and at the face's LOWER end on screen: at its top end it sat on
+        // the Control volume's budget, which MM-1 draws round the same plate.
+        const lo = P[0][1] >= P[n - 1][1] ? P[0] : P[n - 1];
+        at = [lo[0] + 6, lo[1] + 14];
+        const pxPerKPa = pxPerHead / g;
+        const want = 12 / Math.max(pxPerKPa, 1e-12);
+        const mag = Math.pow(10, Math.floor(Math.log10(want)));
+        const stepK = [1, 2, 5, 10].map((m) => m * mag).find((v) => v >= want) || 10 * mag;
+        scaleTxt = "scale: " + String(+stepK.toPrecision(1)) + " kPa = " + (stepK * pxPerKPa).toFixed(0) + " px";
+      } else {
+        scaleTxt = "scale: 1 m head = " + pxPerHead.toFixed(0) + " px";
+      }
+      rchip(ctx, at[0], at[1], scaleTxt, col);
 
       // The resultant, through the centre of pressure — heavier, and NOT
       // stretched by vex (see the function comment).
@@ -1385,8 +1642,19 @@ const OVERLAY = (() => {
         }
         const fKN = (v) => Math.abs(v) >= 1000
           ? (v / 1000).toFixed(1) + " kN/m" : v.toFixed(0) + " N/m";
-        chip(ctx, cx + 8, cy - 18, "F = " + fKN(D.F), col);
-        chip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m"), col);
+        rchip(ctx, cx + 8, cy - 18, "F = " + fKN(D.F), col);
+        const refs = (sim.scene && sim.scene.forceRef) || [];
+        const ref = refs.indexOf(D.solidId + ":" + D.faceId) >= 0 ? faceDepth(sim, D, g) : null;
+        if (!ref) rchip(ctx, cx + 8, cy, vec(D.Fx, D.Fz, "N/m", ["F_h ", "F_v "]), col);
+        else {
+          // A face the scene lists in `forceRef` (PF-2's wall) gets
+          // the components on their own rows and ½ρg·d² beside F_h, d being
+          // the wetted height of THIS face.
+          const half = 0.5 * 1000 * g * ref * ref;
+          rchip(ctx, cx + 8, cy, "F_h " + (D.Fx >= 0 ? "→ " : "← ") + fKN(Math.abs(D.Fx)) +
+               "   ½ρgd² = " + fKN(half) + "  (d = " + ref.toFixed(2) + " m)", col);
+          rchip(ctx, cx + 8, cy + 18, "F_v " + (D.Fz >= 0 ? "↑ " : "↓ ") + fKN(Math.abs(D.Fz)), col);
+        }
       }
     }
     ctx.restore();
@@ -1417,19 +1685,43 @@ const OVERLAY = (() => {
     ctx.restore();
   }
 
+  /** The wetted height d of the face a Pressure force reading `D` was taken
+   *  on: the free surface η (z + p/g at the lowest wet sample, evaluated at
+   *  the point SIM.faceForce actually read — 0.75 Δx out along the normal)
+   *  minus the lowest vertex of the face. Null when the face is dry or its
+   *  solid is gone. Only drawn for the faces a scene lists in `forceRef`
+   *  ("solid:face"). */
+  function faceDepth(sim, D, g) {
+    const so = (sim.solids || []).find((s) => s.id === D.solidId);
+    if (!so) return null;
+    let zf = Infinity;
+    GEOM.faceEdges(so, D.faceId).forEach((e) => {
+      zf = Math.min(zf, so.verts[e][1], so.verts[(e + 1) % so.verts.length][1]);
+    });
+    let low = null;
+    for (const s of D.samples) {
+      if (s.f > 0.5 && s.p > 0 && (!low || s.z < low.z)) low = s;
+    }
+    if (!low || !Number.isFinite(zf)) return null;
+    const eta = low.z + low.nz * 0.75 * sim.dx + low.p / g;
+    return eta > zf ? eta - zf : null;
+  }
+
   /** A vector as two signed components with their directions spelled out, so
    *  nothing on this tool is read off a bare sign. */
-  function vec(vx, vz, unit) {
+  function vec(vx, vz, unit, labels) {
     // ONE scale for the pair, and the unit written once at the end. Scaling
     // each component on its own produced "1.51 k  0.0 N/m", where the k had
-    // come adrift from the unit it belonged to.
+    // come adrift from the unit it belonged to. `labels` ([x, z] prefixes,
+    // e.g. ["F_h ", "F_v "]) names the two components.
     const big = Math.max(Math.abs(vx), Math.abs(vz)) >= 1000;
     const d = (v) => {
       const a = Math.abs(v) / (big ? 1000 : 1);
       return big || a < 100 ? a.toFixed(a >= 10 ? 1 : 2) : a.toFixed(0);
     };
-    return (vx >= 0 ? "→ " : "← ") + d(vx) +
-           "   " + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
+    const L = labels || ["", ""];
+    return L[0] + (vx >= 0 ? "→ " : "← ") + d(vx) +
+           "   " + L[1] + (vz >= 0 ? "↑ " : "↓ ") + d(vz) +
            " " + (big ? "k" : "") + unit;
   }
 
@@ -1497,9 +1789,9 @@ const OVERLAY = (() => {
   }
 
   return { analyse, resetEstimates, classify, manning, findJumps, profileRuns,
-           drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawRake,
-           drawGradeLines,
-           ROW_IDS, DEFAULT_ROWS,
+           drawChannel, drawProfileLabels, drawJumps, drawCursorReadout, drawPinMark, drawRake,
+           drawGradeLines, drawStreamlines, drawWind, drawRakeScale,
+           ROW_IDS, DEFAULT_ROWS, setPrint, PRINT,
            drawTracers, drawGaugeMarks, drawGaugeCharts, drawFrame, drawRuler,
            drawMeasure, drawCV, drawFlux, drawForce, drawForceHover, measureText, chip, fmt };
 })();

@@ -93,6 +93,7 @@ uniform vec2  u_inBand;       // z-range the inflow control applies to (bed of t
                               // to the clamp — the steep-scene explosion.
 uniform vec2  u_twBand;       // same for the right tailwater column
 uniform vec2  u_spongeN;      // relaxation-sponge width in columns (inflow, tailwater)
+uniform float u_fillIn;       // head-driven inflow sponge: fill-rate multiplier (a scene's spongeFill, default 1)
 uniform vec4  u_openMode;     // L R B T : 0 wall, 1 open (zero-gradient), 2 outfall
 uniform vec4  u_src0, u_src1; // point sources: x, z, radius (m), on
 uniform vec4  u_sv0,  u_sv1;  // source velocity x, z and dye A, dye B
@@ -120,9 +121,15 @@ uniform float u_cf;      // bed friction coefficient
 uniform float u_slip;    // 0 = no-slip walls, 1 = free-slip
 uniform float u_bulk;    // artificial bulk viscosity (damps pressure waves)
 uniform vec4  u_wave;    // amplitude (m), omega (rad/s), on, piston column
+uniform float u_waveD;   // > 0: a paddle AT THE LEFT WALL over still depth D (m)
+uniform vec2  u_waveU;   // y = 1: the paddle's velocity x comes from the CPU (train envelope / flap); 0 = the plain piston
+uniform vec2  u_flap;    // flap: hinge z, still-water z (m); y > x turns the linear profile on, else a piston
 uniform sampler2D u_Wd;  // wall distance (m) at each cell's SW corner, CPU-built
 uniform sampler2D u_Tc;  // nx×1 open-channel columns: bed z, surface z, on, 0
 uniform float u_kappa;   // mixing-length constant (0 = closure off)
+uniform float u_tau;     // wind stress on the free surface, KINEMATIC: τ/ρ (m²/s²), +x
+uniform vec2  u_nuOut;   // outflow absorbing layer: extra ν (m²/s), width (columns) at the right edge; 0 = off
+uniform float u_twOut;   // 1 = the tailwater's exchange face passes outflow only; 0 = both ways (default)
 
 // --- the depth-scale closure: Prandtl's mixing length, κy damped towards the
 //     free surface, l = κ·y·√((η − z)/d), y the distance to the nearest WALL
@@ -216,6 +223,19 @@ void main(){
   float sxy  = 0.5 * ((tN.r - tS.r) + (tE.g - tW.g)) / (2.0 * dx);
   float smag = sqrt(2.0*(dudx*dudx + dwdz*dwdz) + 4.0*sxy*sxy);
   float nuT  = u_nu + (u_cs*dx)*(u_cs*dx)*smag;
+  // --- outflow absorbing layer (a scene's outflowNu, default off). A
+  //     pressure outlet — the tailwater's pinned hydrostatic f — passes
+  //     whatever velocity reaches it, inflow included, so a tank-sized 2-D
+  //     eddy parked on the edge turns it into an inlet over part of its
+  //     height (pipejet: out by the floor and the lid, IN through the
+  //     middle). A viscosity ramped up quadratically over the last columns
+  //     diffuses the eddies away before they arrive, and what leaves is a
+  //     smooth one-signed profile across the whole edge. Branch on the
+  //     uniform: every scene without it is bit-for-bit unchanged.
+  if (u_nuOut.x > 0.0) {
+    float sO = clamp((float(i) - (u_res.x - 1.0 - u_nuOut.y)) / max(u_nuOut.y, 1.0), 0.0, 1.0);
+    nuT += u_nuOut.x * sO * sO;
+  }
 
   // --- wall-aware Laplacian: a solid neighbour reflects (no-slip) or mirrors
   float sUp = max(SO(ivec2(i,j+1)), SO(ivec2(i-1,j+1)));
@@ -287,6 +307,24 @@ void main(){
   float pC = press(fC, dvC);
   un -= dt * (pC - press(fW, dvW)) / dx;
   wn -= dt * (pC - press(fS, dvS)) / dx;
+
+  // --- wind shear stress on the free surface (FF-1). A tangential stress τ
+  //     on the surface is a force τ per unit area acting on the top layer, so
+  //     the u-face that holds the interface is accelerated by τ/(ρΔz). The
+  //     interface is wherever the face's water fraction drops going up: the
+  //     weight max(f_here − f_above, 0) is a discrete −∂f/∂z, which sums to
+  //     exactly 1 up any column with water below air, so the whole column
+  //     receives τ however the surface sits in its cells — split between a
+  //     part-full top cell and the full one under it. Purely additive, after
+  //     gravity and ∇p (nothing interposed), and before the void handling, so
+  //     the dry u-faces above still take the water's u (the stress-free
+  //     extension) — the wind drives the water, not the void. Branch on the
+  //     uniform: τ = 0 leaves every other scene bit-for-bit unchanged.
+  if (u_tau != 0.0) {
+    float fUp = max(TF(ivec2(i, j+1)).r, TF(ivec2(i-1, j+1)).r);
+    float wTop = clamp(min(fFu, 1.0) - min(fUp, 1.0), 0.0, 1.0);
+    un += dt * u_tau * wTop / dx;
+  }
 
   // --- void handling. Hard-zeroing the velocity in empty cells makes the air
   //     behave like a rigid medium, and the fake shear layer shreds any free
@@ -382,8 +420,44 @@ void main(){
     // "The surface is stress-free".
     un = (pu.y > u_inBand.x && pu.y < u_inBand.y) ? u_in.y : 0.0;
   }
+  bool paddle = false;   // the wall paddle's face, exempt from the outflow-only rule below
   if (u_wave.z > 0.5 && i == int(u_wave.w) && fFu > 0.5) {
     un = u_wave.x * u_wave.y * cos(u_wave.y * u_time);   // piston wavemaker
+    // A paddle AT THE WALL (column 1, left edge open, u_waveD > 0) is the
+    // linear piston condition — the paddle's velocity imposed at its mean
+    // position — fed through the open edge's zero-gradient ghost, so there
+    // is no pocket of water behind it. The face velocity alone would not
+    // conserve volume: in a progressive wave u and η are in phase, so more
+    // goes in under the crest than comes out under the trough and the flume
+    // fills at ~⟨uη⟩. Imposing the paddle's VOLUME flux, a·ω·D·cos ωt over
+    // the column's live depth, integrates to zero over a cycle, which is
+    // what a real paddle's swept volume does.
+    // SIM.wallPaddle() decides; u_waveD is 0 for every other piston.
+    //
+    // Opt-in (SIM.paddle, SIM.flapOn): a train envelope hands the paddle's
+    // velocity in from the CPU, and a FLAP hinged at z_h makes it grow
+    // linearly from the hinge, u(z) = U·(z − z_h)/(z₀ − z_h), with U the
+    // velocity at the still-water level z₀. At the wall the flap's volume
+    // flux is its swept rate U·[(z₀−z_h)² − (z_b−z_h)²]/2(z₀−z_h), held over
+    // the live depth the same way the piston's is.
+    bool flap = u_flap.y > u_flap.x;
+    if (u_waveU.y > 0.5) un = u_waveU.x;
+    float shp = flap ? max(pu.y - u_flap.x, 0.0) / (u_flap.y - u_flap.x) : 1.0;
+    if (u_waveD > 0.0 && i == 1) {
+      paddle = true;
+      vec4 Tc1 = texelFetch(u_Tc, ivec2(1, 0), 0);
+      if (flap) {
+        float eta = max(Tc1.g, Tc1.r + 0.5 * u_waveD);
+        float b2 = (Tc1.r - u_flap.x) * (Tc1.r - u_flap.x);
+        float sw = (u_flap.y - u_flap.x) * (u_flap.y - u_flap.x) - b2;
+        float lv = (eta - u_flap.x) * (eta - u_flap.x) - b2;
+        un *= shp * sw / max(lv, 1e-6);
+      } else {
+        un *= u_waveD / max(Tc1.g - Tc1.r, 0.5 * u_waveD);
+      }
+    } else if (flap) {
+      un *= shp;
+    }
   }
 
   // --- open-boundary ring. The outermost cells see a clamped stencil, and
@@ -420,9 +494,13 @@ void main(){
   // chamber above the pipe was full. Inflow is the level controls' job.
   // Not in plan view: there is no free surface, the plane is full by
   // construction, and its wake legitimately crosses an open edge both ways.
+  // A scene may hold its TAILWATER face to outflow too (u_twOut): a level
+  // control otherwise passes inflow, and behind a short pool it fed a pipe
+  // jet's entrainment straight from the edge (contraction: −2 m/s coming in
+  // along the surface, a 0.17 m mound against the outlet wall).
   if (u_g != 0.0) {
-    if (i == 1 && u_in.z < 0.5)          un = min(un, 0.0);
-    if (i == NXY.x - 1 && u_tw.y < 0.5) un = max(un, 0.0);
+    if (i == 1 && u_in.z < 0.5 && !paddle) un = min(un, 0.0);
+    if (i == NXY.x - 1 && (u_tw.y < 0.5 || u_twOut > 0.5)) un = max(un, 0.0);
     if (j == 1)                          wn = min(wn, 0.0);
     if (j == NXY.y - 1)                  wn = max(wn, 0.0);
   }
@@ -461,7 +539,27 @@ uniform float u_Tacc;                  // window BEFORE this substep
 #endif
 uniform float u_ca;        // interface compression strength
 uniform float u_dyeDecay;  // 1/s
-uniform vec2  u_dyeLine;   // period (s), on — pulsed dye timelines at the inlet
+// Dye SEEDS — where the dye is released, continuously, into the water that is
+// there: up to eight short segments (x0, z0, x1, z1 in metres), each with
+// (ports, radius): ports 0 releases along the whole segment (a sheet that
+// splits round a body and shows the dividing streamline), ports n releases
+// from n evenly spaced points on it (n separate streaks). The seeds are where
+// the FLOW goes in each scene — scenes.js declares them, sim.js supplies a
+// default — because dye injected at the far inlet of a long rig never reached
+// the thing the picture was about. u_dyeSeed.x = how many are live (0 unless
+// the scene or the card switched its fixed sources on, and 0 under Average:
+// nothing is released and nothing extra is paid); .y = pulse period (s, 0 =
+// continuous; on, released for the first half of each period, the dye forms
+// bands whose edges are timelines); .z = 1 for the limited (van Leer) dye
+// faces — once any dye A is in the water — 0 for first-order upwind.
+uniform vec4  u_seed[8];
+uniform vec2  u_seedP[8];
+uniform vec4  u_dyeSeed;
+// The Dye TOOL: x, z, radius (m) of the point the student is holding the
+// pointer on, w = 1 while it is held. Same release as a seed point — dye A
+// set to 1 in the wet cells inside the radius, every substep, never pulsed.
+uniform vec4  u_dyeInj;
+uniform vec2  u_drain;     // residue drain: rate (1/s), speed scale (m/s); 0 = off
 
 // van Leer. Superbee is tempting here but it is over-compressive: it turns the
 // smooth thinning of an accelerating jet into a 0/1 staircase. Interface
@@ -543,7 +641,7 @@ void main(){
     if (gL) {
       if (u_in.z > 0.5) {                   // upstream reservoir
         m.r = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2 : 0.0;
-        m.g = (u_dyeLine.y > 0.5 && fract(u_time / max(u_dyeLine.x, 0.05)) < 0.07) ? 1.0 : 0.0;
+        m.g = 0.0;                          // inflow runs clear: dye comes from the seeds
         m.b = 0.0;
       } else if (u_openMode.x > 1.5) m = vec4(0.0);
     }
@@ -638,19 +736,74 @@ void main(){
     float s = (1.0 + u_spongeN.x - float(i)) / u_spongeN.x;
     float tgt = (z > u_inBand.x && z < u_in.x) ? 1.0 + gMag * (u_in.x - z) / u_c2
               : (z >= u_in.x ? 0.0 : fNew);
-    float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * s : 2.0 * s * s)
+    float rate = (u_in.w > 0.5) ? (tgt > fNew ? 12.0 * u_fillIn * s : 2.0 * s * s)
                                 : (tgt > fNew ? 8.0 * s * s : 2.0 * s * s);
     fNew = mix(fNew, tgt, min(dt * rate, 1.0));
   }
 
-  // --- dye rides along (advective form, first-order upwind is plenty)
+  // --- residue drain (a plan-view scene's residueDrain, default off). With
+  //     gravity into the screen nothing pulls spray down, so every filament
+  //     and droplet the jet sheds drifts for ever (vane: a third of the wet
+  //     cells were such relics after 20 s). Water that is SLOW and has no
+  //     PRESSURISED water within two cells leaves the plane, as if it fell
+  //     through the floor: the jet and the sheets are fast, and the one slow
+  //     place that belongs to them — the stagnation point — is pressurised
+  //     (f > 1 by ½ρU²/ρc²), so neither is touched. A source term like the
+  //     sponges: it acts on fNew after fCons, so the averaging balance books
+  //     it. Branch on the uniform: every other scene is bit-for-bit unchanged.
+  if (u_drain.x > 0.0 && fNew > 0.0) {
+    float fMax = 0.0;
+    for (int b = -2; b <= 2; b++)
+      for (int a = -2; a <= 2; a++) fMax = max(fMax, TF(ivec2(i + a, j + b)).r);
+    if (fMax < 1.003) {
+      float sp = length(vec2(0.5 * (uW + uE), 0.5 * (wS + wN)));
+      float slow = 1.0 - smoothstep(0.5 * u_drain.y, u_drain.y, sp);
+      fNew *= 1.0 - min(dt * u_drain.x * slow, 1.0);
+    }
+  }
+
+  // --- dye rides along (advective form). First-order upwind spread a
+  //     two-cell streak into a grey wash within a couple of metres (its
+  //     numerical diffusivity is ~u·dx/2, far above any real dye's), so while
+  //     Dye is on the faces are the same van Leer limited values the fill
+  //     uses: the streak still thickens and pales downstream — the scheme
+  //     keeps some diffusion and the decay below fades it — but it reads as a
+  //     plume, not a haze. Off, it is the old upwind and costs what it did.
   float div = ((uE - uW) + (wN - wS)) / dx;
   vec2 dC = F0.gb;
   vec2 dWu = uW > 0.0 ? Fw.gb : dC, dEu = uE > 0.0 ? dC : Fe.gb;
   vec2 dSu = wS > 0.0 ? Fs.gb : dC, dNu = wN > 0.0 ? dC : Fn.gb;
+  if (u_dyeSeed.z > 0.5) {
+    float aW = TF(ivec2(i-2,j)).g, aE = TF(ivec2(i+2,j)).g;
+    float aS = TF(ivec2(i,j-2)).g, aN = TF(ivec2(i,j+2)).g;
+    dWu.x = faceVal(aW, Fw.g, dC.x, Fe.g, uW);
+    dEu.x = faceVal(Fw.g, dC.x, Fe.g, aE, uE);
+    dSu.x = faceVal(aS, Fs.g, dC.x, Fn.g, wS);
+    dNu.x = faceVal(Fs.g, dC.x, Fn.g, aN, wN);
+  }
   vec2 dNew = dC - dt * ((uE*dEu - uW*dWu + wN*dNu - wS*dSu) / dx - dC*div);
   dNew *= 1.0 - dt * u_dyeDecay;
   dNew = clamp(dNew, 0.0, 1.0);
+
+  // --- dye seeds release continuously into whatever water is at them
+  if (u_dyeSeed.x > 0.5 && fC > 0.3 &&
+      (u_dyeSeed.y <= 0.0 || fract(u_time / u_dyeSeed.y) < 0.5)) {
+    vec2 q = vec2(x, z);
+    for (int k = 0; k < 8; k++) {
+      if (float(k) >= u_dyeSeed.x) break;
+      vec2 a = u_seed[k].xy, b = u_seed[k].zw, ab = b - a;
+      float L2 = dot(ab, ab);
+      float t = L2 > 1e-12 ? clamp(dot(q - a, ab) / L2, 0.0, 1.0) : 0.0;
+      float n = u_seedP[k].x;
+      if (n > 0.5) t = n > 1.5 ? (floor(t * (n - 1.0) + 0.5)) / (n - 1.0) : 0.5;
+      if (distance(q, a + t * ab) < u_seedP[k].y) dNew.x = 1.0;
+    }
+  }
+  // --- the Dye tool, held down: released into whatever water is under it
+  //     (air and solid have fC <= 0.3 and take nothing)
+  if (u_dyeInj.w > 0.5 && fC > 0.3 && distance(vec2(x, z), u_dyeInj.xy) < u_dyeInj.z) {
+    dNew.x = 1.0;
+  }
 
   // --- point sources add volume and colour
   if (u_src0.w > 0.5 && distance(vec2(x,z), u_src0.xy) < u_src0.z) {
@@ -880,8 +1033,18 @@ void main(){
 
   if (p.z > u_plife || solid || !wet ||
       p.x < 0.0 || p.y < 0.0 || p.x > dom.x || p.y > dom.y) {
+    // Respawn IN THE WATER: up to four tries for a wet, open cell. One blind
+    // draw over the whole domain put most of the cloud in the air or the
+    // rock of a rig that is mostly both (a pipe between two reservoirs), so
+    // the water itself was sparsely seeded however many were drawn.
     vec2 seed = vec2(p.w, u_time);
-    p.xy = vec2(hash(seed), hash(seed + 7.3)) * dom;
+    for (int k = 0; k < 4; k++) {
+      p.xy = vec2(hash(seed), hash(seed + 7.3)) * dom;
+      ivec2 q = ivec2(clamp(p.xy / u_dx, vec2(0.0), u_res - vec2(1.0)));
+      float fq = u_avg > 0.5 ? texelFetch(u_U, q, 0).b : texelFetch(u_F, q, 0).r;
+      if (fq > 0.5 && texelFetch(u_S, q, 0).r < 0.25) break;
+      seed += vec2(1.37, 2.71);
+    }
     p.z  = -hash(seed + 3.1) * u_plife;       // negative age = invisible until born
   }
   o = p;
@@ -890,14 +1053,26 @@ void main(){
   const VS_PART = `#version 300 es
 precision highp float;
 precision highp sampler2D;
-uniform sampler2D u_P, u_U;
+uniform sampler2D u_P, u_Q, u_U;
 uniform vec2  u_pres, u_res;
 uniform vec4  u_rect;
 uniform float u_dx, u_psize;
+uniform int   u_sub;          // dabs per particle per frame (tail pass > 1)
 out float vFade;
 void main(){
-  ivec2 c = ivec2(gl_VertexID % int(u_pres.x), gl_VertexID / int(u_pres.x));
+  int id = gl_VertexID / u_sub, k = gl_VertexID - id * u_sub;
+  ivec2 c = ivec2(id % int(u_pres.x), id / int(u_pres.x));
   vec4 p = texelFetch(u_P, c, 0);
+  // The tail fills in the whole of this frame's step, from where the
+  // particle was (u_Q, the other half of the ping-pong) to where it is: one
+  // dab per frame left a dotted line wherever the flow moves more than a dab
+  // per frame — the trail of a slow scene was a row of specks. Not across a
+  // respawn (the age went DOWN), which would draw a streak through the water.
+  if (u_sub > 1) {
+    vec4 q = texelFetch(u_Q, c, 0);
+    if (q.z <= p.z && distance(q.xy, p.xy) < 64.0 * u_dx)
+      p.xy = mix(q.xy, p.xy, (float(k) + 1.0) / float(u_sub));
+  }
   vec2 dom = u_res * u_dx;
   vec2 uv  = p.xy / dom;
   // Fade IN over the first fraction of a life, and OUT over the last, so a
@@ -919,6 +1094,16 @@ out vec4 o;
 uniform float u_amp;          // 1 = a head, drawn once; < 1 = a tail dab
 void main(){
   float r = length(gl_PointCoord - 0.5) * 2.0;
+  if (u_amp > 0.99) {
+    // A head is a white core in a thin dark ring, alpha-blended rather than
+    // added: a white dot ADDED to the pale middle of a diverging ramp or the
+    // yellow of Speed is white on near-white, and vanished. The ring keeps it
+    // a definite dot on every colouring, the dark ones included (the core).
+    float disc = smoothstep(1.0, 0.82, r);
+    float core = smoothstep(0.62, 0.42, r);
+    o = vec4(mix(vec3(0.03, 0.04, 0.06), vec3(1.00, 0.97, 0.90), core), disc * 0.9 * vFade);
+    return;
+  }
   // A small hard dab with only a hint of edge. The tail is what carries the
   // reading, and a tail is only fine if the thing drawing it is: a fat glowing
   // dab lays down a fat glowing stripe and the reach turns into a wash.
@@ -945,6 +1130,25 @@ precision highp float;
 out vec4 o;
 uniform vec4 u_col;
 void main(){ o = u_col; }`;
+
+  // The trail's SHADOW: the trail buffer's alpha, spread over ±1.5 px and
+  // laid down dark under the trail itself. A white trail added to the pale
+  // or yellow-green colourings was white on near-white; with a dark edge
+  // either side it is a line on every ground.
+  const FS_TRAIL_SHADOW = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 o;
+uniform sampler2D u_T;
+uniform vec2 u_px;            // one texel in uv
+void main(){
+  float a = 0.0;
+  a = max(a, texture(u_T, vUv + vec2( 1.5, 0.0) * u_px).a);
+  a = max(a, texture(u_T, vUv + vec2(-1.5, 0.0) * u_px).a);
+  a = max(a, texture(u_T, vUv + vec2(0.0,  1.5) * u_px).a);
+  a = max(a, texture(u_T, vUv + vec2(0.0, -1.5) * u_px).a);
+  o = vec4(0.02, 0.03, 0.05, min(1.0, a * 1.6) * 0.55);
+}`;
 
   const FS_TEX = `#version 300 es
 precision highp float;
@@ -987,7 +1191,7 @@ uniform float u_dx, u_g, u_c2, u_valve, u_time;
 uniform float u_tilt;         // scene tiltS0: elevation is z − S₀x when set
 uniform int   u_mode;         // 0 water 1 pressure head 2 speed 3 Froude
                               // 4 vorticity 5 momentum flux
-                              // 6 piezometric head 7 energy head
+                              // 6 piezometric head 7 energy head 8 pressure
 uniform float u_vmax;         // speed scale: the particles and the Water sheen
 uniform float u_lo, u_hi;     // the CURRENT field's colour range, in its units
 uniform float u_dyeOn;
@@ -1088,6 +1292,9 @@ float nrmMid(float v, float mid){
                  : 0.5 + 0.5 * clamp((v - mid) / max(u_hi - mid, 1e-6), 0.0, 1.0);
 }
 
+// Ink opacity of a dye concentration: steep, then saturating (see the dye block).
+float inkA(float d){ return 0.92 * (1.0 - exp(-5.0 * clamp(d, 0.0, 1.0))); }
+
 float segDist(vec2 p, vec2 a, vec2 b){
   vec2 pa = p - a, ba = b - a;
   float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-9), 0.0, 1.0);
@@ -1156,7 +1363,10 @@ void main(){
     water = mix(shallow, deep, nrm(sub));
     water += vec3(0.10, 0.14, 0.16) * clamp(length(U.rg) / max(u_vmax, 0.01), 0.0, 1.0);
   } else if (u_mode == 1) {
-    float head = U.b / max(abs(u_g), 1e-3);   // pressure head p/ρg: submergence below the surface (m)
+    // pressure head p/ρg: submergence below the surface (m). In plan view
+    // (g = 0) it is divided by 9.81, as SIM.probe does, so the colour and the
+    // hover card agree instead of the colour reading p/0.001.
+    float head = U.b / (u_g == 0.0 ? 9.81 : abs(u_g));
     water = turbo(nrm(head));
   } else if (u_mode == 2) {
     water = turbo(nrm(length(U.rg)));
@@ -1198,6 +1408,11 @@ void main(){
     float g2 = max(abs(u_g), 1e-3);
     float He = pm.y - u_tilt * pm.x + U.b / g2 + dot(U.rg, U.rg) / (2.0 * g2);
     water = turbo(nrm(He));
+  } else if (u_mode == 8) {
+    // Pressure p in kPa: ρ·P with ρ = 1000 kg/m³ and P (U.b) the kinematic
+    // pressure in m²/s², so kPa = P numerically. No division by g, so it
+    // reads the same in a plan view (g ≈ 0), where the heads cannot.
+    water = turbo(nrm(U.b));
   } else {
     // Momentum flux per unit volume, ρu·|u| with ρ ∝ f. Free because the
     // display pass runs once per FRAME, not once per substep — it is the two
@@ -1211,16 +1426,49 @@ void main(){
   }
   c = mix(c, water, wet);
 
-  // ---- free-surface line
-  float band = (1.0 - smoothstep(0.0, 0.22, abs(fs - 0.55))) * smoothstep(0.10, 0.35, fs);
-  c = mix(c, vec3(0.78, 0.92, 1.0), band * 0.50 * (1.0 - sol));
+  // ---- pressurised marker: cells above the slot threshold get a sheen so
+  //      the free-surface → pressurised transition is legible
+  //      (under the dye: over it, it turned the black ink brown)
+  if (u_mode == 0) {
+    float pz = smoothstep(1.004, 1.05, f);
+    c = mix(c, vec3(0.95, 0.85, 0.55), pz * 0.30 * wet);
+  }
 
   // ---- dye
-  if (u_dyeOn > 0.5) {
-    float dA = F.g, dB = F.b;
-    c = mix(c, vec3(0.15, 0.95, 0.85), clamp(dA, 0.0, 1.0) * 0.85 * wet);
+  // u_dyeOn: 1 = the ink (Dye tool and seeds) and the pour's dye B — what the
+  // app always draws now; 0.5 = dye B alone (a caller that asks for no ink);
+  // 0 = neither (Average).
+  if (u_dyeOn > 0.25) {
+    float dA = u_dyeOn > 0.75 ? F.g : 0.0, dB = F.b;
+    // Seeded dye is INK: near-black, because every colouring is a bright
+    // ramp and the one colour none of them contains is black. Opacity rises
+    // steeply and saturates, 1 − e^(−5d), so a streak that has diffused to a
+    // tenth of its release strength is still a visible grey plume (≈ 0.35)
+    // rather than vanishing — the linear 0.85·d it replaced lost a plume
+    // the moment it had spread over a few cells.
+    float a = inkA(dA);
+    // Black is the one colour no ramp contains — except at their DARK ends:
+    // ink drifting into the slow, near-black purple of Speed vanished. So
+    // where the ground under it is dark, the plume's edge gets a pale rim
+    // (the ink's gradient over ±1.5 cells, on its outer side), and only there:
+    // on the bright colourings the rim is off and the ink is just ink.
+    float lum = dot(c, vec3(0.299, 0.587, 0.114));
+    float dark = 1.0 - smoothstep(0.16, 0.38, lum);
+    if (dark > 0.0 && dA > 0.004) {     // (dA is 0 with Dye off: no rim)
+      float gx = inkA(blF(g + vec2(1.5, 0.0)).g) - inkA(blF(g - vec2(1.5, 0.0)).g);
+      float gz = inkA(blF(g + vec2(0.0, 1.5)).g) - inkA(blF(g - vec2(0.0, 1.5)).g);
+      float edge = clamp(length(vec2(gx, gz)) * 1.4, 0.0, 1.0);
+      c = mix(c, vec3(0.78, 0.84, 0.92), edge * dark * (1.0 - a) * 0.75 * wet);
+    }
+    c = mix(c, vec3(0.02, 0.02, 0.035), a * wet);
     c = mix(c, vec3(1.00, 0.66, 0.20), clamp(dB, 0.0, 1.0) * 0.85 * wet);
   }
+
+  // ---- free-surface line — drawn OVER the dye: ink in a nappe or a jet
+  //      against the near-black canvas is black on black, and the line is
+  //      what keeps the water's outline there.
+  float band = (1.0 - smoothstep(0.0, 0.22, abs(fs - 0.55))) * smoothstep(0.10, 0.35, fs);
+  c = mix(c, vec3(0.78, 0.92, 1.0), band * 0.50 * (1.0 - sol));
 
   // ---- solids
   vec3 rock = vec3(0.16, 0.17, 0.20);
@@ -1228,13 +1476,6 @@ void main(){
   rock += vec3(0.030) * hatch;
   c = mix(c, rock, sol);
   c = mix(c, u_valve > 0.5 ? vec3(0.86, 0.33, 0.22) : vec3(0.35, 0.72, 0.45), valv * 0.85);
-
-  // ---- pressurised marker: cells above the slot threshold get a sheen so
-  //      the free-surface → pressurised transition is legible
-  if (u_mode == 0) {
-    float pz = smoothstep(1.004, 1.05, f);
-    c = mix(c, vec3(0.95, 0.85, 0.55), pz * 0.30 * wet);
-  }
 
   // ---- preview line while dragging a wall
   if (u_guideOn > 0.5) {
@@ -1311,6 +1552,59 @@ void main(){
   o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));
 }`;
 
+  // ------------------------------------------------------------ streamlines
+  /** The volume fluxes the stream function is integrated from (js/stream.js),
+   *  packed TWO cells per texel so the async readback is a quarter of the
+   *  live U + F it replaces. Texel (p, j) covers cells a = (2p, j), b = a + 1:
+   *
+   *    row j >= 1:  (qx_a, qx_b, wet_a + 2 wet_b, 0)
+   *    row j == 0:  (qx_a, qx_b, qz_a, qz_b)   — the floor's flux instead of
+   *                 wetness; the bottom ring row is never drawn.
+   *
+   *  qx is the flux through a cell's LEFT face, qz through its BOTTOM face,
+   *  per unit width: (f u) with the fill capped at 1 (pressurised water is
+   *  still one volume of water), zero on any face touching a solid. Live, u
+   *  already lives on that face and f is the two-cell mean; under Average
+   *  (u_avg) u_U is the Favre accumulator (<f u_c>, <f w_c>, fbar, Pbar),
+   *  whose centred mean fluxes are averaged onto the face. */
+  const FS_SFLUX = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+out vec4 o;
+uniform sampler2D u_U, u_F, u_S;
+uniform vec2  u_res;
+uniform float u_avg, u_valve;
+
+bool inside(ivec2 c){ return c.x >= 0 && c.x < int(u_res.x); }
+bool solid(ivec2 c){
+  float s = texelFetch(u_S, c, 0).r;
+  return s > 0.75 || (s > 0.25 && u_valve > 0.5);
+}
+float fillAt(ivec2 c){ return u_avg > 0.5 ? texelFetch(u_U, c, 0).b : texelFetch(u_F, c, 0).r; }
+vec2 meanQ(ivec2 c){ vec4 A = texelFetch(u_U, c, 0); return A.rg / max(A.b, 1.0); }
+float qx(ivec2 c){
+  if (!inside(c) || solid(c)) return 0.0;
+  ivec2 l = c - ivec2(1, 0);
+  bool hasL = c.x > 0;
+  if (hasL && solid(l)) return 0.0;
+  if (u_avg > 0.5) return hasL ? 0.5 * (meanQ(c).x + meanQ(l).x) : meanQ(c).x;
+  float f = hasL ? 0.5 * (fillAt(c) + fillAt(l)) : fillAt(c);
+  return texelFetch(u_U, c, 0).r * clamp(f, 0.0, 1.0);
+}
+float qz(ivec2 c){
+  if (!inside(c) || solid(c)) return 0.0;
+  if (u_avg > 0.5) return meanQ(c).y;
+  return texelFetch(u_U, c, 0).g * clamp(fillAt(c), 0.0, 1.0);
+}
+float wet(ivec2 c){ return inside(c) && !solid(c) && fillAt(c) >= 0.5 ? 1.0 : 0.0; }
+
+void main(){
+  ivec2 a = ivec2(2 * int(gl_FragCoord.x), int(gl_FragCoord.y));
+  ivec2 b = a + ivec2(1, 0);
+  o = a.y == 0 ? vec4(qx(a), qx(b), qz(a), qz(b))
+               : vec4(qx(a), qx(b), wet(a) + 2.0 * wet(b), 0.0);
+}`;
+
   return { VS_QUAD, VS_RECT, FS_VEL, FS_VOF, FS_VOF_ACC, FS_COL, FS_TCOL, FS_HGL, FS_PART, VS_PART,
-           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, RAMPS, FS_ACC, FS_ACOL };
+           FS_PART_DRAW, FS_DISP, FS_FILL, FS_TEX, FS_TRAIL_SHADOW, RAMPS, FS_ACC, FS_ACOL, FS_SFLUX };
 })();

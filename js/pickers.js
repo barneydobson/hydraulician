@@ -197,7 +197,8 @@ const PICKER = (() => {
 })();
 
 // ------------------------------------------------------- exercise picker
-/** The teaching pack, in the UI. Forty demos live in `exercises/`, and each
+/** The teaching pack, in the UI. Forty demos live in `exercises/` (a
+ *  course's own cards in `courses/<id>/exercises/`), and each
  *  one is a scene PLUS a set of panel settings PLUS (often) a drawn rig, so
  *  far described only in prose in its README. In a lecture hall that is
  *  unusable: this turns "HJ-1" into a set-up simulation and a card telling you
@@ -238,7 +239,136 @@ const EX = (() => {
   function all() {
     return (typeof EXERCISES !== "undefined" && Array.isArray(EXERCISES)) ? EXERCISES : [];
   }
-  function byId(id) { return all().find((e) => e.id === id) || null; }
+  /** The folder holding an entry's brief, relative to the page:
+   *  `exercises/<folder>` for the shared register, `courses/<id>/exercises/
+   *  <folder>` for a card a course owns (COURSES.exercises stamps its `home`;
+   *  a tab's view copies it from the entry). */
+  function briefDir(e) {
+    return (e.home || "exercises") + "/" + e.folder;
+  }
+  /** An exercise by id. A plain id returns the register entry itself; a TAB
+   *  reference — "CR-1#forces", or a tab's `alias` such as "MM-2" — returns
+   *  that tab's view (see `view`), which is what a course menu lists. */
+  function byId(id) {
+    const s = String(id == null ? "" : id);
+    const e = all().find((x) => x.id === s);
+    if (e) return e;
+    const r = resolve(s);
+    return r ? view(r.ex, r.tab) : null;
+  }
+
+  // ------------------------------------------------------- inline markup
+  /** STRIP BUTTONS INSIDE A STEP. A step (or a Background paragraph) may
+   *  name a strip item, and the card draws that item's own icon and label in
+   *  line — read from the same TOOLBAR / ICONS spec the strip is built from,
+   *  so the card cannot show an icon the strip does not:
+   *
+   *    {tool:force}     a tool, by its TOOLS id   → [icon] Pressure force
+   *    {btn:legendBtn}  a strip button, by its id → [icon] Field & legend
+   *    {key:V}          a key                     → V in a key cap
+   *
+   *  An unknown id prints as plain text with a warning class; check_pack.py
+   *  fails the pack over it before it reaches a lecture. */
+  const MARK = /\{(tool|btn|key):([^}\s]+)\}/g;
+  function stripItem(kind, id) {
+    if (typeof TOOLBAR === "undefined") return null;
+    for (const g of TOOLBAR) {
+      for (const it of (g.items || [])) {
+        if (kind === "tool" ? it.tool === id : it.id === id) return it;
+      }
+    }
+    return null;
+  }
+  function chip(kind, id) {
+    if (kind === "key") {
+      const k = document.createElement("kbd"); k.className = "exkey"; k.textContent = id;
+      return k;
+    }
+    const s = document.createElement("span");
+    s.className = "exico";
+    const it = stripItem(kind, id);
+    if (!it) { s.classList.add("bad"); s.textContent = id; return s; }
+    const icon = typeof it.icon === "function" ? it.icon() : it.icon;
+    if (typeof iconEl === "function") {
+      const ic = iconEl(icon);
+      ic.setAttribute("width", "14"); ic.setAttribute("height", "14");
+      s.appendChild(ic);
+    }
+    const b = document.createElement("b");
+    b.textContent = typeof it.label === "function" ? it.label() : it.label;
+    s.appendChild(b);
+    if (it.key) s.title = "key " + it.key;
+    return s;
+  }
+  /** Fill `el` with `text`, the markup above drawn as chips. */
+  function rich(el, text) {
+    el.textContent = "";
+    const t = String(text == null ? "" : text);
+    let at = 0, m;
+    MARK.lastIndex = 0;
+    while ((m = MARK.exec(t))) {
+      if (m.index > at) el.appendChild(document.createTextNode(t.slice(at, m.index)));
+      el.appendChild(chip(m[1], m[2]));
+      at = m.index + m[0].length;
+    }
+    if (at < t.length) el.appendChild(document.createTextNode(t.slice(at)));
+  }
+  /** The same text with the markup spelled out in words — for a toast, a
+   *  tooltip, a test. */
+  function plain(text) {
+    return String(text == null ? "" : text).replace(MARK, (_, k, id) => {
+      if (k === "key") return id;
+      const it = stripItem(k, id);
+      return it ? (typeof it.label === "function" ? it.label() : it.label) : id;
+    });
+  }
+
+  // ------------------------------------------------------------------ tabs
+  /** CARD TABS. One scene asked several questions — the contraction rig
+   *  (CR-1) is streamlines in L4, continuity in L5 and forces in L6 — is ONE
+   *  entry with `tabs: [{ key, label, alias?, title?, aim?, steps,
+   *  background?, ui?, instruments?, viewParams?, studentParams?, note? }]`.
+   *  A tab's own fields replace the entry's (`viewParams` and `ui` are merged
+   *  over the entry's, shallowly); the scene, the rig, `rigParams` and
+   *  `settle` are the entry's alone, because switching tabs must not reload
+   *  the scene or restart the flow — it swaps the steps and the interface
+   *  profile, nothing else.
+   *
+   *  Addressed as "ID#key" (`?ex=ID&tab=key`, a course menu id), or by a
+   *  tab's `alias` — the id the question had before it became a tab, so an
+   *  old `?ex=MM-2` link still opens the Forces tab. */
+  function parseRef(ref) {
+    const s = String(ref == null ? "" : ref), k = s.indexOf("#");
+    return k < 0 ? [s, null] : [s.slice(0, k), s.slice(k + 1) || null];
+  }
+  function resolve(ref, tab) {
+    let [id, t] = parseRef(ref);
+    if (tab) t = tab;
+    let ex = all().find((e) => e.id === id) || null;
+    if (!ex) {
+      ex = all().find((e) => (e.tabs || []).some((x) => x.alias === id)) || null;
+      if (ex && !t) t = ex.tabs.find((x) => x.alias === id).key;
+    }
+    if (!ex) return null;
+    if (ex.tabs && ex.tabs.length) {
+      if (!ex.tabs.some((x) => x.key === t)) t = ex.tabs[0].key;
+    } else t = null;
+    return { ex, tab: t };
+  }
+  const TAB_OWN = ["key", "label", "alias"];
+  /** The entry as one of its tabs sees it: what the card, the UI profile and
+   *  the menu read. An entry without tabs is returned as it is. */
+  function view(ex, key) {
+    if (!ex || !ex.tabs || !ex.tabs.length) return ex;
+    const t = ex.tabs.find((x) => x.key === key) || ex.tabs[0];
+    const v = Object.assign({}, ex);
+    Object.keys(t).forEach((k) => { if (TAB_OWN.indexOf(k) < 0) v[k] = t[k]; });
+    v.viewParams = Object.assign({}, ex.viewParams || {}, t.viewParams || {});
+    v.ui = Object.assign({}, ex.ui || {}, t.ui || {});
+    v.title = t.title || ex.title + " · " + t.label;
+    v.base = ex; v.tabKey = t.key; v.tabLabel = t.label; v.ref = ex.id + "#" + t.key;
+    return v;
+  }
   /** The rig pack is consumed defensively: absent file, absent key and a
    *  payload in any of the shapes RIG understands all end somewhere sane. */
   /** Some rigs come in variants the digit chooses between — B8's three
@@ -391,6 +521,10 @@ const EX = (() => {
     // …and how much of the interface this exercise wants in front of a
     // student. Applied here rather than in `pick` so it lands with everything
     // else the entry declares, including on a re-pick.
+    // An exercise arrives with nothing in hand — the neutral Read tool — even
+    // where it offers BUILD: a press reads the water, and drawing waits until
+    // a step says {tool:wall} and the student picks it.
+    state.tool = null; state.forceHover = null;
     UIMODE.apply(UIMODE.fromExercise(ex));
     syncPanel();
     return miss;
@@ -436,7 +570,9 @@ const EX = (() => {
     (ex.studentParams || []).forEach((p) => {
       if (!p.control || seen.has(p.control)) return;
       seen.add(p.control);
-      rows.push({ label: ctlLabel(p.control), unit: p.unit,
+      // `label` renames the row on the card only — UP-1 calls the panel's
+      // "Slot celerity c" the speed of sound, in the lecture's own words.
+      rows.push({ label: p.label || ctlLabel(p.control), unit: p.unit,
                   text: p.rule || (p.value !== undefined
                           ? "set it to " + ctlText(p.control, p.value) : ""),
                   control: usable(p.control) ? p.control : null,
@@ -470,6 +606,17 @@ const EX = (() => {
     state.cv = null;
     state.gaugeT = -1;
   }
+  /** The exception to the rule above, opt-in per card: `gauges: [{x, z,
+   *  field}]` arrives PLACED, each on its own quantity. For a card whose
+   *  subject is a time series from t = 0 (VC-2's level curve), where where to
+   *  measure is not the question and a gauge dropped late misses the point. */
+  function placeCardGauges(ex) {
+    (ex.gauges || []).slice(0, 4).forEach((g) => {
+      placeGauge(+g.x, +g.z);
+      const k = state.gauges.length - 1;
+      if (g.field && gaugeQty(g.field) && state.gauges[k]) state.gauges[k].field = g.field;
+    });
+  }
   /** A rig payload may be the rig object itself, an encoded `#rig=` code, a
    *  share URL, or raw JSON — RIG reads all of them. Async because the deflate
    *  branch is. */
@@ -485,9 +632,10 @@ const EX = (() => {
 
   /** Load an exercise: scene, rig, settings, digit, countdown, card. */
   function pick(id, opts) {
-    const ex = byId(id);
-    if (!ex) return false;
     const o = opts || {};
+    const r = resolve(id, o.tab);
+    if (!r) return false;
+    const ex = view(r.ex, r.tab);
     note = "";
     if (!switchScene(ex.scene)) {
       note = "scene \"" + ex.scene + "\" is not in this build — loaded the sandbox instead";
@@ -521,13 +669,16 @@ const EX = (() => {
       // happened to have; the student places their own instruments and sets
       // their own values, from an identical bench whatever their digit.
       clearInstruments();
+      placeCardGauges(ex);
       resetStudentControls(fresh);
       const d = d0;
       digit = (d === null || d === undefined || d === "") ? null : (+d | 0);
       if (digit !== null) { memo[ex.id] = digit; lastDigit = digit; }
       cur = ex;
+      restartTips();         // the card's own tips, if it has any (main.js)
+      syncTitle();           // the strip names the exercise, not its scene
       arm(ex.settle || 0, ex.id);
-      syncURLEx(ex.id);
+      syncURLEx(ex.id, ex.tabKey);
       card.show();
       syncPanel();
       showToast(ex.id + " · " + ex.title,
@@ -558,7 +709,29 @@ const EX = (() => {
    *  settings: those were never applied, and re-applying them here would make
    *  the button a way to have the exercise done for you. The digit is kept,
    *  because it is who you are, not a setting. */
-  function reset() { if (cur) pick(cur.id, { digit: digit }); }
+  function reset() { if (cur) pick(cur.id, { digit: digit, tab: cur.tabKey }); }
+
+  /** Switch the loaded entry to another of its tabs WITHOUT touching the
+   *  bench: no scene reload, no water reset, the clock and the placed
+   *  instruments carry on. What changes is what a tab owns — its steps, its
+   *  view (`viewParams`) and its interface profile (fields, strip, tools,
+   *  gauges, hide…). The student's own slider values stay where they are. */
+  function setTab(key) {
+    if (!cur || !cur.base) return false;
+    if (!cur.base.tabs.some((t) => t.key === key)) return false;
+    if (key === cur.tabKey) return true;
+    cur = view(cur.base, key);
+    const v = cur.viewParams || {};
+    Object.keys(v).forEach((k) => setControl(k, v[k]));
+    UIMODE.apply(UIMODE.fromExercise(cur));
+    restartTips();           // a tab may carry tips of its own
+    syncTitle();
+    syncURLEx(cur.id, cur.tabKey);
+    card.refresh();
+    syncPanel();
+    refresh();
+    return true;
+  }
 
   function setDigit(d) {
     if (!cur) return;
@@ -594,26 +767,141 @@ const EX = (() => {
   const menu = () => (el || (el = document.getElementById("exmenu")));
   const isOpen = () => !!(el && el.classList.contains("open"));
 
-  function grouped() {
-    const order = [], by = new Map(), f = foldText(filter.trim());
-    all().forEach((e) => {
-      if (f && !foldText(e.id + " " + e.title + " " + (e.topic || "") + " " + e.scene + " " +
-                         (e.start || "")).includes(f)) return;
-      const g = e.topic || "Other";
-      if (!by.has(g)) { by.set(g, []); order.push(g); }
-      by.get(g).push(e);
+  /** The course menu, if one is active (see COURSES / `?course=` in
+   *  js/courses.js): `{ id, title, sections: [{ title, ids: [...] }] }` plus
+   *  optional switches, all defaulting to the student-facing behaviour:
+   *  `compact: false` (old long rows), `collapsible: false` (all sections
+   *  open), `showAllLink: true` (link to the whole register), `briefLink:
+   *  true` (the card's link to the brief). It only chooses what the MENU
+   *  lists and in what order — every exercise in the register still boots
+   *  from `?ex=`, and `?menu=all` lists the whole register by topic. Ids the
+   *  register does not have are skipped, so a menu can name an exercise
+   *  before it lands. (The Scenes button is not a menu matter: it hides while
+   *  an exercise is on screen — see scenesOffered() in main.js.) */
+  let showAll = /[?&]menu=all\b/.test(location.search);
+  /** COMPACT MENU (default): each item is one line, id and title; its
+   *  description (the `aim`, or the start · ?scene · settle line for an entry
+   *  without one) is a small floating box beside the item, shown on hover and
+   *  for the keyboard-highlighted item. `compact: false` brings back the long
+   *  rows. */
+  function compact() {
+    // On by default; a deployment may ask for the old long rows (compact: false).
+    return !((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.compact === false);
+  }
+  /** COLLAPSIBLE SECTIONS (default; `collapsible: false` opens them all).
+   *  Only the section headings show, each with its count; a click opens that
+   *  section and closes the others. The section holding the exercise on
+   *  screen opens by itself, and a filter opens every section with a match,
+   *  so typing still finds things at once. */
+  let openSec = null;
+  function collapsible() {
+    // On by default, for a course menu and for the register by topic alike.
+    return !((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.collapsible === false);
+  }
+  function describe(e) {
+    return e.aim ? e.aim : (e.start ? e.start + "  ·  " : "") +
+      "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
+  }
+  let descEl = null;
+  function descBox() {
+    if (!descEl) {
+      descEl = document.createElement("div");
+      descEl.className = "glass exdesc";
+      descEl.setAttribute("role", "tooltip");
+      document.body.appendChild(descEl);
+    }
+    return descEl;
+  }
+  /** The floating description beside item `b`: to the right of the menu if
+   *  there is room, otherwise to its left, and always inside the viewport. */
+  function showDesc(b) {
+    if (!compact() || !b || !b.dataset.desc) { hideDesc(); return; }
+    const d = descBox();
+    d.textContent = b.dataset.desc;
+    d.classList.add("open");
+    const mr = menu().getBoundingClientRect(), br = b.getBoundingClientRect();
+    const w = d.offsetWidth, h = d.offsetHeight, gap = 8;
+    let x = mr.right + gap, y = br.top;
+    if (x + w > innerWidth - 8) x = mr.left - gap - w;          // no room right: go left
+    if (x < 8) {                                                // no room either side: under the item
+      x = Math.max(8, Math.min(innerWidth - w - 8, br.left + 24));
+      y = br.bottom + 4;
+    }
+    y = Math.max(8, Math.min(innerHeight - h - 8, y));
+    d.style.left = x + "px"; d.style.top = y + "px";
+  }
+  function hideDesc() { if (descEl) descEl.classList.remove("open"); }
+  function course() {
+    if (showAll || typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU ||
+        !Array.isArray(EXERCISE_MENU.sections)) return null;
+    return EXERCISE_MENU;
+  }
+  function listed() {
+    const c = course();
+    if (!c) return all();
+    const out = [];
+    // A menu id may name a TAB ("CR-1#forces"): byId hands back that tab's
+    // view, so one entry can be listed under several lectures.
+    const seen = new Set();
+    c.sections.forEach((s) => (s.ids || []).forEach((id) => {
+      const e = byId(id), k = e && (e.ref || e.id);
+      if (e && !seen.has(k)) { seen.add(k); out.push(e); }
+    }));
+    return out;
+  }
+
+  function grouped(text) {
+    const order = [], by = new Map(),
+          f = foldText((text === undefined ? filter : text).trim());
+    const hit = (e) => !f || foldText(e.id + " " + e.title + " " + (e.topic || "") + " " +
+                                      e.scene + " " + (e.start || "") + " " + (e.aim || "")).includes(f);
+    const c = course();
+    if (c) {
+      return c.sections.map((s) => [s.title || "",
+        (s.ids || []).map(byId).filter((e) => e && hit(e))]).filter(([, l]) => l.length);
+    }
+    all().forEach((e0) => {
+      // A tabbed entry whose tabs name their own topics is listed once per
+      // tab, each under its topic; otherwise once, as itself.
+      const items = (e0.tabs && e0.tabs.some((t) => t.topic))
+        ? e0.tabs.map((t) => view(e0, t.key)) : [e0];
+      items.forEach((e) => {
+        if (!hit(e)) return;
+        const g = e.topic || "Other";
+        if (!by.has(g)) { by.set(g, []); order.push(g); }
+        by.get(g).push(e);
+      });
     });
     return order.map((g) => [g, by.get(g)]);
+  }
+
+  /** The foot of the menu: switch between the course and the whole register. */
+  function scopeLink() {
+    if (typeof EXERCISE_MENU === "undefined" || !EXERCISE_MENU) return null;
+    // The register stays out of a course's menu unless it asks for the link
+    // (`showAllLink: true`); `?menu=all` still reaches it, for the maintainer.
+    if (EXERCISE_MENU.showAllLink !== true && !showAll) return null;
+    const a = document.createElement("button");
+    a.type = "button"; a.className = "smscope";
+    a.textContent = showAll
+      ? "← back to " + (EXERCISE_MENU.title || "the course menu")
+      : "show all " + all().length + " exercises in the register →";
+    a.onclick = (ev) => { ev.stopPropagation(); showAll = !showAll; hi = -1; render(); place(); };
+    return a;
   }
 
   function render() {
     const m = menu();
     m.textContent = "";
+    hideDesc();
+    m.classList.toggle("compact", compact());
+    m.classList.toggle("inline", compact() && !TIP.hoverable());
     const head = document.createElement("div");
     head.className = "smh";
-    const hb = document.createElement("b"); hb.textContent = "Exercises";
+    const hb = document.createElement("b");
+    hb.textContent = course() ? (course().title || "Exercises") : "Exercises";
     const hi2 = document.createElement("i");
-    hi2.textContent = all().length ? all().length + " · Esc closes" : "none loaded";
+    hi2.textContent = all().length ? listed().length + " · Esc closes" : "none loaded";
     head.appendChild(hb); head.appendChild(hi2);
     m.appendChild(head);
 
@@ -639,20 +927,37 @@ const EX = (() => {
       const n = document.createElement("div");
       n.className = "smnone"; n.textContent = "nothing matches “" + filter + "”.";
       m.appendChild(n);
+      const s0 = scopeLink(); if (s0) m.appendChild(s0);
       return;
+    }
+    const fold = collapsible() && !filter.trim();
+    if (fold && openSec === null) {
+      const mine = groups.find(([, l]) => cur && l.some((e) => e.id === cur.id &&
+                                                     (!e.tabKey || e.tabKey === cur.tabKey)));
+      openSec = mine ? mine[0] : "";
     }
     groups.forEach(([g, list]) => {
       const h = document.createElement("div");
-      h.className = "smg"; h.textContent = g;
+      h.className = "smg";
+      const open = !fold || openSec === g;
+      if (fold) {
+        h.classList.add("fold");
+        h.textContent = (open ? "▾ " : "▸ ") + g;
+        const n = document.createElement("i"); n.textContent = " " + list.length;
+        h.appendChild(n);
+        h.setAttribute("role", "button");
+        h.onclick = (ev) => { ev.stopPropagation(); openSec = open ? "" : g; hi = -1; render(); place(); };
+      } else h.textContent = g;
       m.appendChild(h);
+      if (!open) return;
       list.forEach((e) => {
-        const on = !!(cur && cur.id === e.id);
+        const on = !!(cur && cur.id === e.id && (!e.tabKey || e.tabKey === cur.tabKey));
         const b = document.createElement("button");
         b.type = "button";
         b.className = "smi" + (on ? " on" : "");
-        b.dataset.id = e.id;
+        b.dataset.id = e.ref || e.id;
         b.setAttribute("role", "menuitem");
-        b.title = "exercises/" + e.folder + "/README.md";
+        b.title = briefDir(e) + "/README.md";
         if (needsRig(e)) {
           const t = document.createElement("span");
           t.className = "rigtag";
@@ -662,15 +967,35 @@ const EX = (() => {
         }
         const idc = document.createElement("span"); idc.className = "eid"; idc.textContent = e.id;
         const nm = document.createElement("b"); nm.textContent = e.title;
-        const bl = document.createElement("p");
-        bl.textContent = (e.start ? e.start + "  ·  " : "") +
-          "?scene=" + e.scene + (e.settle ? "  ·  settles in " + e.settle + " s" : "");
-        b.appendChild(idc); b.appendChild(nm); b.appendChild(bl);
-        b.onclick = () => choose(e.id);
+        b.appendChild(idc); b.appendChild(nm);
+        // An entry with an `aim` is introduced by it — what the exercise is
+        // for, in the student's words; the rest keep the bench line. In the
+        // compact menu it moves to the floating box beside the item.
+        // On a screen that cannot hover the floating box would never be seen
+        // — a tap on the item loads the exercise there and then — so the
+        // description is printed inline under the title instead.
+        if (compact() && !TIP.hoverable()) {
+          const bl = document.createElement("p");
+          bl.textContent = describe(e);
+          b.appendChild(bl);
+        } else if (compact()) {
+          b.dataset.desc = describe(e);
+          b.removeAttribute("title");
+          b.onpointerenter = () => showDesc(b);
+          b.onpointerleave = () => hideDesc();
+          b.onfocus = () => showDesc(b);
+          b.onblur = () => hideDesc();
+        } else {
+          const bl = document.createElement("p");
+          bl.textContent = describe(e);
+          b.appendChild(bl);
+        }
+        b.onclick = () => choose(e.ref || e.id);
         m.appendChild(b);
-        if (pending === e.id) m.appendChild(warning(e));
+        if (pending === (e.ref || e.id)) m.appendChild(warning(e));
       });
     });
+    const s1 = scopeLink(); if (s1) m.appendChild(s1);
   }
 
   /** The scene menu's warning, in the same words and the same amber block —
@@ -700,6 +1025,12 @@ const EX = (() => {
   }
 
   function choose(id) {
+    // Another tab of the exercise already on the bench: switch in place.
+    const r = resolve(id);
+    if (r && cur && cur.base && cur.base === r.ex && sim && sim.scene &&
+        sim.scene.id === cur.scene) {
+      pending = null; close(); setTab(r.tab); return;
+    }
     if (sim && sim.segs && sim.segs.length && pending !== id) {
       pending = id; render(); place();
       const w = menu().querySelector(".smwarn");
@@ -714,6 +1045,10 @@ const EX = (() => {
     const m = menu();
     const a = anchor && anchor.isConnected ? anchor : document.getElementById("exBtn");
     const r = a.getBoundingClientRect();
+    // Compact: hang below the anchor and scroll inside rather than ride up
+    // over the strip — unless that leaves less than 240 px.
+    const room = innerHeight - (r.bottom + 8) - 8;
+    m.style.maxHeight = compact() && room >= 240 ? room + "px" : "";
     const w = m.offsetWidth, h = m.offsetHeight;
     m.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
     m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom + 8)) + "px";
@@ -721,7 +1056,7 @@ const EX = (() => {
   function open(a) {
     PICKER.close();
     anchor = a || document.getElementById("exBtn");
-    pending = null; hi = -1;
+    pending = null; hi = -1; openSec = null;   // reopen on the current exercise's section
     render();
     menu().classList.add("open");
     place();
@@ -734,6 +1069,7 @@ const EX = (() => {
   }
   function close() {
     if (el) el.classList.remove("open");
+    hideDesc();
     pending = null; hi = -1;
     const btn = document.getElementById("exBtn");
     if (btn) btn.classList.remove("active");
@@ -754,6 +1090,7 @@ const EX = (() => {
       hi = hi < 0 ? (e.key === "ArrowDown" ? 0 : list.length - 1) : (hi + d) % list.length;
       list.forEach((b, i) => b.classList.toggle("hi", i === hi));
       if (list[hi].scrollIntoView) list[hi].scrollIntoView({ block: "nearest" });
+      showDesc(list[hi]);
       return;
     }
     if (e.key === "Enter") {
@@ -794,6 +1131,7 @@ const EX = (() => {
       box = document.getElementById("dock");
       DOCK.body.innerHTML =
         '<div class="extitle"></div>' +
+        '<div class="extabs" role="tablist"></div>' +
         '<div class="exrules"></div>' +
         '<div class="exline exyours"></div>' +
         '<div class="exd"><label>student number ends in</label>' +
@@ -806,6 +1144,7 @@ const EX = (() => {
         '<div class="exline exnote"></div>' +
         '<ol class="exsteps"></ol>' +
         '<div class="exline exstations"></div>' +
+        '<details class="exbg"><summary>Background</summary><div class="exbgl"></div></details>' +
         '<div class="exline exalso"></div>' +
         '<div class="exline exmiss"></div>' +
         '<details class="exset"><summary>Already set</summary><div class="exsetl"></div></details>';
@@ -849,7 +1188,17 @@ const EX = (() => {
       // Relabel only — a refresh must not unfold a panel somebody folded away.
       DOCK.label("Exercise", cur.id);
       const t = box.querySelector(".extitle");
-      t.textContent = cur.title;
+      // A tabbed entry is titled as the whole exercise; the tab bar says
+      // which of its questions is on.
+      t.textContent = cur.base ? cur.base.title : cur.title;
+      tabBar();
+      // THE SHORT LAYOUT (`steps`): sliders on top, at most ~5 one-line
+      // numbered steps, and a closed Background fold for everything longer.
+      // The Start and Do paragraphs repeated the steps, so a card with
+      // `steps` drops them, and the Instruments line with them (its stations
+      // are in the steps). A card written the old way (`setup`, `start`,
+      // `task`) renders as it always has.
+      const short = Array.isArray(cur.steps);
       // The personalised rules are PRINTED, never computed: d is the last
       // digit of the student number, the lecturer owns explaining it, and
       // doing the arithmetic is the student's own first step. (An input that
@@ -868,17 +1217,19 @@ const EX = (() => {
       // Where the personalised thing is a stroke or a station there is no value
       // to print, so the rule itself is the instruction.
       line(box.querySelector(".exrule"), "", cur.digitNote || "");
-      line(box.querySelector(".exstart"), "Start:", cur.start || "");
-      line(box.querySelector(".extask"), "Do:", cur.task || "");
+      line(box.querySelector(".exstart"), "Start:", short ? "" : (cur.start || ""));
+      line(box.querySelector(".extask"), "Do:", short ? "" : (cur.task || ""));
       line(box.querySelector(".exnote"), "Note:", cur.note || "");
       // Staged rigs: a snapshot cannot hold "fill it, THEN shut the valve".
       const st = box.querySelector(".exsteps");
       st.textContent = "";
-      (cur.setup || []).forEach((s) => {
-        const li = document.createElement("li"); li.textContent = s; st.appendChild(li);
+      const steps = short ? cur.steps : (cur.setup || []);
+      steps.forEach((s) => {
+        const li = document.createElement("li"); rich(li, s); st.appendChild(li);
       });
-      st.style.display = (cur.setup && cur.setup.length) ? "block" : "none";
-      line(box.querySelector(".exstations"), stationLabel(), stations());
+      st.style.display = steps.length ? "block" : "none";
+      line(box.querySelector(".exstations"), stationLabel(), short ? "" : stations());
+      background();
       // Six demos SPAN two scenes (WV-1's second cohort, NC-3's m2 anchor,
       // HJ-1's s1 coda…). `?ex=` boots one of them, so the card has to say
       // which the other is and when to go there — it never switches by itself.
@@ -892,11 +1243,14 @@ const EX = (() => {
       const a = box.querySelector(".exlink");
       // On the Pages build Jekyll renders README.md as the folder's page and
       // does not serve the raw .md; everywhere else the file itself is right.
-      const brief = "exercises/" + cur.folder +
+      const brief = briefDir(cur) +
         (/\.github\.io$/i.test(location.hostname) ? "/" : "/README.md");
       a.href = brief;
       a.textContent = "Lecturer notes";
       a.title = brief;
+      // Students read the card; the brief is the lecturer's. The link to it
+      // shows only when a deployment asks for it (`briefLink: true`).
+      a.style.display = ((typeof EXERCISE_MENU !== "undefined" && EXERCISE_MENU) && EXERCISE_MENU.briefLink === true) ? "" : "none";
       tick();
     }
     /** The "Yours" block: the printed rule, and beside it the control the
@@ -922,7 +1276,13 @@ const EX = (() => {
 
       const h = document.createElement("div");
       h.className = "exhead";
-      h.textContent = "Yours — d is the last digit of your student number";
+      // A card whose only rows are `studentParams` sliders has no digit, so
+      // the student-number line would be a riddle there — unless it carries
+      // a `digitNote`, which is the digit rule in words (B2's drawn gap,
+      // B9's poured level) and needs d defined above it.
+      h.textContent = (rules(cur).length || cur.digitNote)
+        ? "Yours — d is the last digit of your student number"
+        : "Try it yourself";
       host.appendChild(h);
 
       rows.forEach((row) => {
@@ -957,18 +1317,38 @@ const EX = (() => {
       if (!c || !c.set) return null;
       const wrap = document.createElement("div");
       wrap.className = "exrowf";
-      let el;
+      let el, out = null;
+      // A studentParams entry may ask for a slider on a plain numeric row (not
+      // a Geometry one) and give it the range worth playing in: UP-1's Slot
+      // celerity c runs 8–400 m/s on a log scale in the panel, but only
+      // 20–35 m/s keeps its pressure wave honest and above zero pressure.
+      const sp = (cur.studentParams || []).find((x) => x.control === id);
+      const own = sp && sp.slider && c.type !== "check" && c.type !== "select" ? sp.slider : null;
       if (c.type === "check") {
         el = document.createElement("input");
         el.type = "checkbox";
         el.onchange = () => { c.set(el.checked); syncPanel(); };
       } else if (c.type === "select") {
         el = document.createElement("select");
-        (c.opts || []).forEach(([v, txt]) => {
+        ((c.optsNow ? c.optsNow() : c.opts) || []).forEach(([v, txt]) => {
           const o = document.createElement("option");
           o.value = v; o.textContent = txt; el.appendChild(o);
         });
         el.onchange = () => { c.set(el.value); syncPanel(); };
+      } else if (own || c.par) {
+        // A Geometry row is a dimension of the scene — a weir crest, a gate
+        // opening, a beach slope — and is played with rather than typed: a
+        // slider, with the value printed beside it. Range and step are the
+        // param's own, read off the control (syncPanel copies them there).
+        el = document.createElement("input");
+        el.type = "range";
+        const B = own || c;
+        el.min = B.min; el.max = B.max; el.step = B.step;
+        el.oninput = () => {
+          const v = +el.value;
+          if (isFinite(v)) { c.set(v); syncPanel(); }
+          if (out) out.textContent = round4(v) + " " + unitOf(c);
+        };
       } else {
         el = document.createElement("input");
         el.type = "number";
@@ -988,12 +1368,12 @@ const EX = (() => {
       el.setAttribute("aria-label", ctlLabel(id));
       wrap.appendChild(el);
       if (c.type !== "check" && c.type !== "select") {
-        const u = document.createElement("span");
-        u.className = "exunit";
-        u.textContent = unitOf(c);
-        wrap.appendChild(u);
+        out = document.createElement("span");
+        out.className = "exunit";
+        out.textContent = unitOf(c);
+        wrap.appendChild(out);
       }
-      fields.push({ id, el, type: c.type });
+      fields.push({ id, el, type: own || c.par ? "range" : c.type, out, own });
       return wrap;
     }
 
@@ -1011,13 +1391,21 @@ const EX = (() => {
      *  typed, and "0.4" on the way to "0.45" is a legitimate half-typed value. */
     function syncValues() {
       if (!box || !cur) return;
-      fields.forEach(({ id, el, type }) => {
+      fields.forEach(({ id, el, type, out, own }) => {
         if (!el.isConnected || el === document.activeElement) return;
         const c = CONTROLS.find((x) => x.id === id);
         if (!c || !c.get) return;
         const v = c.get();
         if (type === "check") el.checked = !!v;
         else if (type === "select") el.value = v;
+        else if (type === "range") {
+          // The slider follows the panel's row, and so do its bounds — a
+          // Geometry row's param can change with the scene.
+          const B = own || c;
+          el.min = B.min; el.max = B.max; el.step = B.step;
+          if (!(Math.abs(+el.value - v) < 1e-9)) el.value = v;
+          if (out) out.textContent = round4(v) + " " + unitOf(c);
+        }
         else {
           const shown = el.value === "" ? NaN : +el.value;
           if (!(Math.abs(shown - v) < 1e-9)) el.value = round4(v);
@@ -1030,6 +1418,41 @@ const EX = (() => {
       return typeof v === "number" ? String(Math.round(v * 1e4) / 1e4) : String(v);
     }
 
+    /** The tab bar of a tabbed entry: one button per tab; a click swaps the
+     *  steps and the interface profile and leaves the bench alone (setTab). */
+    function tabBar() {
+      const host = box.querySelector(".extabs");
+      host.textContent = "";
+      const T = cur.base && cur.base.tabs;
+      if (!T || !T.length) { host.style.display = "none"; return; }
+      host.style.display = "flex";
+      T.forEach((tb) => {
+        const b = document.createElement("button");
+        const on = tb.key === cur.tabKey;
+        b.type = "button"; b.className = "extab" + (on ? " on" : "");
+        b.textContent = tb.label;
+        b.dataset.tab = tb.key;
+        b.setAttribute("role", "tab");
+        b.setAttribute("aria-selected", on ? "true" : "false");
+        b.onclick = () => { b.blur(); setTab(tb.key); };
+        host.appendChild(b);
+      });
+    }
+    /** BACKGROUND: the longer material — a definition, a formula, a remark —
+     *  folded away at the foot of the steps, closed whenever a new card or
+     *  tab is shown, open with one click. `background` is a string or a list
+     *  of paragraphs, with the same inline markup as the steps. */
+    let bgFor = null;
+    function background() {
+      const det = box.querySelector(".exbg"), host = det.querySelector(".exbgl");
+      const b = cur.background;
+      const paras = Array.isArray(b) ? b : (b ? [b] : []);
+      const k = cur.ref || cur.id;
+      if (k !== bgFor) { det.open = false; bgFor = k; }
+      host.textContent = "";
+      paras.forEach((t) => { const p = document.createElement("p"); rich(p, t); host.appendChild(p); });
+      det.style.display = paras.length ? "block" : "none";
+    }
     /** One plain line: a bold lead-in and the sentence. No line has a colour, a
      *  border or a background of its own — that is the point of the card. */
     function line(el, label, text) {
@@ -1081,6 +1504,11 @@ const EX = (() => {
         if (k === "budget") return;
         items.push([ctlLabel(k), ctlText(k, p[k]), why[k]]);
       });
+      (cur.gauges || []).forEach((g) => {
+        const q = gaugeQty(g.field);
+        items.push(["gauge", "at x " + (+g.x).toFixed(2) + ", z " + (+g.z).toFixed(2) + " m" +
+                    (q ? ", plotting " + q.name : "")]);
+      });
       const v = cur.viewParams || {};
       const vs = Object.keys(v).map((k) => ctlLabel(k) + " " + ctlText(k, v[k]));
       if (vs.length) items.push(["view", vs.join(", "), why.view]);
@@ -1129,15 +1557,19 @@ const EX = (() => {
    *  that, and each of them rebuilds the domain anyway. */
   function clear() {
     if (!cur) return;
+    const hadTips = !!(cur.tips && cur.tips.length);
     cur = null; settleTo = 0; settleWhat = "";
+    if (hadTips) restartTips();   // back to the scene's own
     card.hide();
     UIMODE.reset();          // the exercise's focus goes with the exercise
     refresh();
+    syncTitle();             // the scene's own name again
     syncPanel();
   }
 
   return { open, close, toggle, isOpen, refresh, key, onDown, render, place, choose,
-           pick, reset, clear, setDigit, all, byId, rules, ruleValue, digitSummary,
+           pick, reset, clear, setDigit, setTab, all, byId, listed, course, resolve, plain, rich,
+           groupsFor: grouped, rules, ruleValue, digitSummary,
            studentControls,
            settleTarget, settleHint, tick, statusLine, card,
            needsRig, hasRig, rigFor,
@@ -1149,12 +1581,13 @@ const EX = (() => {
 /** `?ex=<id>` for what is set up. The exercise owns the address bar while it
  *  is loaded (its scene is implied), and `#rig=` is dropped for the same
  *  reason `switchScene` drops it. */
-function syncURLEx(id) {
+function syncURLEx(id, tab) {
   try {
     const u = new URL(location.href);
     u.hash = "";
     u.searchParams.delete("scene");
     u.searchParams.set("ex", id);
+    if (tab) u.searchParams.set("tab", tab); else u.searchParams.delete("tab");
     history.replaceState(null, "", u.pathname + u.search);
   } catch (_) { /* file:// refuses — harmless */ }
 }

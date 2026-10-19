@@ -1110,13 +1110,14 @@ const SCENES = (() => {
     // horizontal one. The culvert is tall enough to be a channel in its own
     // right rather than a pipe.
     //
-    // Levels: 4.00 m left, 3.10 m right, both well above the culvert roof at
-    // 1.60 m, so the culvert stays drowned throughout. The right basin is
+    // Levels: 3.50 m left, 2.60 m right, both well above the culvert roof at
+    // 1.10 m, so the culvert stays drowned throughout. The right basin is
     // narrow so it fills in seconds when the valve opens; the common level
     // follows from the volume the left body loses (its plan area shrinks as
-    // it drops down the slope) — 3.82 m here, measured and closed-form.
-    // The ground top sits at 1.0 m, not near the floor, so the pressure
-    // diagram the Force tool hangs under the culvert roof has room to draw.
+    // it drops down the slope) — 3.32 m here, measured and closed-form.
+    // The ground top sits at 0.50 m (the lecturer's trim, Oct 2026: it was
+    // 1.00 m and the frame ran under the controls); everything above it kept
+    // its own dimensions and moved down 0.50 m with it.
     //
     // nu is an EDDY viscosity, not water's. At the stock 1e-5 the jet that
     // fills the small basin leaves a trapped eddy that never dies: 0.2 m/s
@@ -1125,16 +1126,16 @@ const SCENES = (() => {
     // stand still. Raising C_s to 0.4 or C_f to 0.05 barely moved it; 1e-3
     // took the basins to 4 mm/s by 60 s, 2e-3 to under 5 mm/s by 45 s with
     // the fill itself unchanged (culvert RMS 0.33 m/s at 12 s either way).
-    { id: "dyke", name: "Dyke with a piezometer", key: "Hydrostatics",
+    { id: "dyke", name: "Dike with a piezometer", key: "Hydrostatics",
       group: "Hydrostatics",
-      blurb: "Two reservoirs at different levels either side of a dyke, joined by a shut culvert with a piezometer tapped into its roof. Read the three levels and the face forces, then press V and watch them find one level.",
-      W: 6.0, H: 5.1, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
+      blurb: "Two reservoirs at different levels either side of a dike, joined by a culvert under it with a shut valve and a piezometer tube in its roof. Read the levels and the face forces, then press V and watch the water find one level.",
+      W: 6.0, H: 4.6, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
       hmax: 4.2, headMax: 3.3, vmax: 4,
       valveOpen: 0, particles: 1,
       open: [0, 0, 0, 0],
       solids: () => {
-        const zg = 1.00, zr = 1.60, zc = 4.30;            // ground top, culvert roof, crest
-        const xt = 2.40, zt = 2.40, xs = 3.30;            // toe, top of the toe, slope meets crest
+        const zg = 0.50, zr = 1.10, zc = 3.80;            // ground top, culvert roof, crest
+        const xt = 2.40, zt = 1.90, xs = 3.30;            // toe, top of the toe, slope meets crest
         const s0 = 4.30, s1 = 4.50, x1 = 5.20;            // piezometer slot, downstream face
         return [
           GEOM.rect(-0.5, -0.5, 6.5, zg, { id: "ground",
@@ -1153,15 +1154,15 @@ const SCENES = (() => {
                     { id: "crest", label: "Crest", e0: 2, e1: 2 }] }),
         ];
       },
-      valves: () => [[5.00, 1.00, 5.00, 1.60, 0.08]],   // across the culvert, downstream of the tap
-      water: (x, z, P) => (z <= 1.00 ? 0
-                           : x < 5.00 ? still(4.00, z, P)   // left basin, culvert, piezometer
-                           : still(3.10, z, P)),            // right basin
-      tips: ["Three water surfaces, one level: the left basin, the culvert and the piezometer are the same connected body.",
-             "Hover the dyke's faces with the <b>Pressure force</b> tool — the sloped upstream face carries ½ρg·d² sideways AND the weight of the water standing on the slope downward; the vertical downstream face only the first.",
-             "Press <b>V</b> to open the culvert. The narrow right basin fills in seconds; the common level is where the volume the left body loses equals what the right one gains.",
-             "Once still again — about 45 s — both faces carry the same horizontal force: the dyke feels no net thrust.",
-             "Switch the field to Piezometric head — still water is one colour everywhere, however deep."] },
+      valves: () => [[5.00, 0.50, 5.00, 1.10, 0.08]],   // across the culvert, downstream of the tap
+      water: (x, z, P) => (z <= 0.50 ? 0
+                           : x < 5.00 ? still(3.50, z, P)   // left basin, culvert, piezometer
+                           : still(2.60, z, P)),            // right basin
+      tips: ["Three water surfaces, one level: the left reservoir, the culvert and the piezometer tube are one connected body of still water.",
+             "Pick the <b>Pressure force</b> tool and select a face of the dike: the pressure grows with depth, and the sideways force is ½ρg·d².",
+             "The sloped upstream face also carries the weight of the water standing on it, pushing down; the vertical downstream face does not.",
+             "Press <b>V</b> to open the valve. The small right reservoir fills; once the water is still, every surface stands at one level.",
+             "When all is still again — about 45 s — both faces carry the same sideways force: the dike feels no net push."] },
 
     // -------------------------------------------- pressure and transients
     // A real pipeline, not a lab flume: the static head has to exceed the
@@ -1580,6 +1581,1133 @@ const SCENES = (() => {
              "Colour is vorticity: the two shear layers roll up into a Kármán street.",
              "Draw a splitter plate behind the body and the street stops shedding.",
              "Turn particles on to watch the jet entrain the surrounding water."] },
+
+    // ===== Year 1: pipeline (UP-1) =====
+    // The textbook water-hammer picture, without hammer's nozzle: a reservoir
+    // at constant level, one long straight horizontal pipe, and a valve AT
+    // THE PIPE'S END that discharges into a small tank. The tank overflows a
+    // sharp crest onto a steep chute and the spill leaves through the right
+    // edge, so nothing downstream ponds, drifts or reflects back into the
+    // pipe. The steady pipe velocity is set by the level difference between
+    // the reservoir and the tank — entry, friction and exit losses — and the
+    // tank level by the crest, so the flow regulates itself: no throttle in
+    // the pipe, and the valve, when shut, is a plain closed end.
+    //
+    // Why not a free discharge to air: an unthrottled pipe under d_s of
+    // water would run at ~√(2g·d_s), and the surge c·v/g would exceed d_s
+    // many times over (the low-pressure return wave would empty the pipe).
+    // A drowned outlet into a tank standing a little below the reservoir
+    // keeps v moderate with nothing in the bore.
+    //
+    // ONE Geometry slider, the overflow crest height (geom0): lower crest →
+    // lower tank → bigger level difference → faster pipe flow → bigger surge.
+    // Its range is the one where the return wave stays above zero pressure
+    // at the card's c (see the UP-1 brief for the measured table).
+    //
+    // Scale: L ≈ 47 m of 2 m bore (reservoir face x = 5.0 to the valve's
+    // upstream face x = 51.75), axis z = 2.5; reservoir 12.8 m, so the water
+    // over the axis is 10.3 m at rest. 14.5 m tall (was 18 m: the empty band
+    // above the pipe ran up under the strip). cf, cs, bulk and nu are
+    // hammer's; c is 30 (see the brief: at c·v₀/g the surge must stay under
+    // the ~10 m of water over the axis, or the return wave separates the
+    // column).
+    (() => {
+      const W = 60, H = 14.5;
+      const LEVEL = 12.8;                  // reservoir surface
+      const XR = 5.0, XV = 52.0;           // reservoir wall (pipe mouth), valve centreline
+      const ZI = 1.5, ZS = 3.5, TS = 0.6;  // pipe invert, soffit, soffit wall thickness
+      const RB = 1.0;                      // bellmouth radius at the pipe's mouth
+      const ZC0 = 10.6;                    // default overflow crest (measured, see the brief)
+      const XC = W - 1.6;                  // tank's right wall / crest block
+      const ZTOP = 14.0;                   // top of the reservoir and tank walls
+      const zc = (par) => (par && par.crestZ !== undefined ? par.crestZ : ZC0);
+      return {
+        id: "pipeline", name: "Water hammer: reservoir, pipe, valve", key: "Speed of sound",
+        group: "Pressure & transients",
+        blurb: "A reservoir at constant level feeds a long straight pipe that discharges through a valve into a small overflowing tank. Shut the valve suddenly and a pressure wave runs up the pipe at the speed of sound c, reflects at the reservoir and returns.",
+        W, H, c: 30, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
+        valveOpen: 1, particles: 1, spinup: 20,
+        mode: 1, headMax: 20, hmax: 13, vmax: 4,
+        open: [1, 1, 0, 0],
+        spongeIn: XR - 0.5,                // hold the whole reservoir compartment
+        inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
+        params: [
+          { key: "crestZ", label: "Overflow crest height", min: 10.2, max: 11.6, step: 0.1, value: ZC0, unit: "m", resetWater: true },
+        ],
+        solids: (W_, H_, P, par) => {
+          const ZC = zc(par);
+          return [
+            // Ground, the tank's right wall, and the crest block whose steep
+            // downstream face carries the spill out of the right edge. CCW.
+            GEOM.poly([[-1, -0.5], [W + 1, -0.5], [W + 1, ZC - 5.0], [XC + 0.4, ZC],
+                       [XC, ZC], [XC, ZI], [-1, ZI]],
+              [{ id: "chute", label: "Overflow chute", e0: 2, e1: 2 },
+               { id: "crest", label: "Overflow crest", e0: 3, e1: 3 },
+               { id: "tankR", label: "Tank, right wall", e0: 4, e1: 4 },
+               { id: "invert", label: "Pipe invert and beds", e0: 5, e1: 5 }], "ground"),
+            // The pipe's soffit with the reservoir wall rising from its mouth
+            // and the tank's left wall rising from its end: an inverted U. CCW.
+            // The mouth's top corner is rounded (a bellmouth of radius RB):
+            // MEASURED, a square corner sheds a vena-contracta jet that ran
+            // the axis at 1.96 m/s against a 1.4 m/s bore 9 m in, and wandered
+            // down the pipe for the whole settle.
+            (() => {
+              const mouth = GEOM.arcPts(XR + RB, ZS + RB, RB, Math.PI, 1.5 * Math.PI);
+              const n = mouth.length;                       // edges 0 … n−2 are the bellmouth
+              return GEOM.poly(mouth.concat([[XV + 0.25, ZS], [XV + 0.25, ZTOP], [XV - 0.25, ZTOP],
+                         [XV - 0.25, ZS + TS], [XR + RB, ZS + TS], [XR + RB, ZTOP], [XR, ZTOP]]),
+                [{ id: "mouth", label: "Bellmouth", e0: 0, e1: n - 2 },
+                 { id: "soffit", label: "Pipe soffit", e0: n - 1, e1: n - 1 },
+                 { id: "tankL", label: "Tank, left wall", e0: n, e1: n },
+                 { id: "res", label: "Reservoir wall", e0: n + 6, e1: n + 6 }], "pipe");
+            })(),
+          ];
+        },
+        valves: () => [[XV, ZI, XV, ZS, 0.5]],      // the pipe's end, flush with the tank wall
+        water: (x, z, P, par) => (z <= ZI ? 0
+                             : x < XR + 0.5 ? still(LEVEL, z, P)                 // reservoir
+                             : x < XV + 0.25 ? (z < ZS ? still(LEVEL, z, P) : 0) // pipe, full
+                             : x < XC ? still(zc(par), z, P)                     // tank, to the crest
+                             : 0),
+        tips: ["Drop three <b>gauges</b> on the pipe's centre line (z = 2.5 m), then press <b>V</b> to shut the valve suddenly.",
+               "The gauge nearest the valve reacts first and the others follow one after another: the pressure rise travels up the pipe as a wave, at the speed of sound c.",
+               "In the <b>Gauge inspector</b> the time between two gauges reacting is their spacing divided by c.",
+               "Lower the speed of sound c on the card and repeat: the wave takes longer to arrive and the pressure jump is smaller.",
+               "The wave bounces off the reservoir and comes back as a low-pressure wave: the pressure at the valve rises and falls in a square wave."] };
+    })(),
+    // ===== Year 1: contraction (FF-5, VC-1, MM-2) =====
+    // The shared contraction rig: two reservoirs held at fixed levels, a
+    // 1.00 m pipe (x = 3.6 →) that contracts into a 0.50 m pipe discharging
+    // into the right reservoir at x = 11.0. ONE slider, the contraction
+    // length L: at L = 3 m the wide pipe tapers from x = 4.6 to x = 7.6;
+    // shorter L keeps the wide bore constant for longer and converges over a
+    // shorter, steeper taper, always ending at the fixed narrow pipe at
+    // x = 7.6; L = 0 is the abrupt step. The contraction is symmetric about
+    // the pipe axis (z = 1.00), so both corners separate alike.
+    //
+    // Pressurised duct flow between two head-driven level controls, the
+    // venturi pattern. The pipe sits deep — its crown 1.15 m under the
+    // tailwater — so the lowest pressure in the rig, at the vena contracta
+    // past the step, stays well above zero gauge (the EOS clips there and
+    // would void).
+    //
+    // The two reservoirs were rebuilt after a lecturer's report (measured,
+    // Medium, on the old 11.5 m domain: a 1.6 m left reservoir, a 2.5 m right
+    // one with its sponge over 2.3 m of it):
+    //  * RIGHT: the surface stood 0.17 m ABOVE the 2.40 m tailwater where the
+    //    pipe discharges, dropped abruptly at x ≈ 9.55 and sat at 2.40 from
+    //    there to the edge. Under it ran a surface current of −1.6 to −2.2 m/s
+    //    flowing IN from the right edge (the jet ran out along the floor at
+    //    +1.3–1.9 m/s): the tailwater, a level control, passes inflow as
+    //    readily as outflow, so the edge fed the jet's entrainment directly,
+    //    and the mound was that current's stagnation head against the
+    //    reservoir wall (u²/2g ≈ 0.2 m) — and the abrupt drop the sponge
+    //    holding the level. It also throttled the pipe (Q 0.95 m²/s).
+    //    Now: a 6 m reservoir (W = 17), a 1.5 m sponge at its far end, and
+    //    the tailwater's exchange face passing OUTFLOW ONLY (twOutflowOnly,
+    //    FS_VEL; default off elsewhere). The jet's entrainment has to be fed
+    //    from inside the reservoir, so the return current is a near-field
+    //    roller (−1.1 m/s at the wall, gone by x ≈ 15) and the edge passes
+    //    the spread jet outward over the whole depth. Lengthening alone (no
+    //    clamp) still left −0.8 to −1.4 m/s coming in along the whole surface.
+    //    An absorbing layer (outflowNu, as pipejet) ran to the ±80 rail here:
+    //    it is for full, lidded domains only.
+    //  * LEFT: the level drew down 6–14 cm under its 2.80 m across a 1.6 m
+    //    reservoir. A head-driven sponge supplies the pipe by its deficit, so
+    //    the level it holds sits ~Q / (fill rate × width) under the setting.
+    //    Now 3.6 m wide (the whole rig moved 2.0 m right), a 2.4 m sponge, and
+    //    its fill 4× stiffer (spongeFill): the reservoir holds 2.78–2.80 m and
+    //    the remaining ~5 cm is the real drawdown of water accelerating into
+    //    the pipe. A shorter sponge (0.5 / 1.2 m) drew down MORE (to 2.59 /
+    //    2.62), and the whole compartment (3.4 m) at the default fill only
+    //    moved the dip.
+    // Q rose to ~1.3 m²/s with the outlet no longer throttled; the briefs
+    // carry the re-measured numbers.
+    //
+    // Above the pipe is a sealed EMPTY pocket between the two reservoir
+    // walls: the pipe is a casing with air over it, not a buried tunnel.
+    ...(() => {
+      const XL = 3.6, XS = 7.6, XR = 11.0;          // pipe entry, contraction end, pipe exit
+      const W = 17.0;                               // domain: a 6 m right reservoir
+      const ZC = 1.00, A1 = 0.50, A2 = 0.25;        // axis, wide and narrow half-bores
+      const ZF = 0.20, ZTOP = 1.75, TW = 0.20;      // reservoir floors, casing top, wall thickness
+      const L1 = 2.80, L2 = 2.40;                   // reservoir levels
+      const RB = 0.30, NB = 8;                      // bellmouth radius, chords per lip
+      const LMAX = 3.0;                             // longest taper: x = 4.6 → 7.6
+      const Q0 = 0.95;                              // measured steady Q, m²/s (taper)
+      const Lof = (par) => (par && par.taperL !== undefined ? par.taperL : LMAX);
+      // Half-bore at x: wide, then a straight taper of length L, then narrow.
+      const half = (x, L) => {
+        if (x >= XS) return A2;
+        if (L <= 1e-6 || x <= XS - L) return A1;
+        return A1 + (A2 - A1) * (x - (XS - L)) / L;
+      };
+      return [{
+        id: "contraction", name: "Contraction rig", key: "Taper ↔ step",
+        group: "Pressure & transients",
+        blurb: "Two reservoirs joined by a wide pipe that contracts into a narrow one. One slider takes the contraction from a long gentle taper to an abrupt step.",
+        W, H: 3.4, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
+        mode: 2, hmax: 3.0, headMax: 2.6, vmax: 4, particles: 1, plife: 6,
+        // Dye: six streaks in the left reservoir 0.5 m ahead of the pipe
+        // entrance, over the bore and a little beyond it, so they are drawn
+        // into the bellmouth and down the pipe rather than (as from the
+        // inlet edge) idling in the reservoir.
+        dye: { seeds: [[XL - 0.5, ZC - A1 - 0.1, XL - 0.5, ZC + A1 + 0.1, 6]] },
+        spinup: 25,                               // measured: from a fresh start Q overshoots ~30% at 8 s and is back within a few per cent of steady by 25 s, at either end of the slider
+        open: [1, 1, 0, 1],                      // top open: no lid over the reservoirs (was a closed edge 0.1 m above the left water)
+        spongeIn: 2.4, spongeTw: 1.5, spongeFill: 4,
+        twOutflowOnly: true,                      // see the comment above: the edge must not feed the jet
+        inflow: { level: L1, q: 0, on: 1, free: 1 },
+        tailwater: { level: L2, on: 1 },
+        params: [
+          { key: "taperL", label: "Contraction length L", min: 0, max: LMAX, step: 0.05, value: LMAX, unit: "m", resetWater: true },
+        ],
+        // The pipe entry is a rounded bellmouth (radius RB, NB chords per
+        // lip): a square-edged entry separates and leaves slow layers along
+        // the first metre of the wide pipe, right where a control-volume
+        // face has to stand.
+        solids: (W, H, P, par) => {
+          const L = Lof(par), xt = XS - L;
+          const lo = GEOM.arcPts(XL + RB, ZC - A1 - RB, RB, Math.PI / 2, Math.PI, NB);
+          const ground = GEOM.poly([
+            [-0.5, -0.5], [W + 0.5, -0.5], [W + 0.5, ZF], [XR, ZF], [XR, ZC - A2],
+            [XS, ZC - A2], [xt, ZC - A1], ...lo, [XL, ZF], [-0.5, ZF]], [
+            { id: "rfloor", label: "Right reservoir floor", e0: 2, e1: 2 },
+            { id: "rwall", label: "Right reservoir wall, below the pipe", e0: 3, e1: 3 },
+            { id: "invert2", label: "Narrow pipe invert", e0: 4, e1: 4 },
+            { id: "contr", label: "Contraction, lower face", e0: 5, e1: 5 },
+            { id: "invert1", label: "Wide pipe invert", e0: 6, e1: 6 },
+            { id: "lwall", label: "Bellmouth and left reservoir wall, below the pipe", e0: 7, e1: 7 + NB },
+            { id: "lfloor", label: "Left reservoir floor", e0: 8 + NB, e1: 8 + NB },
+          ], "ground");
+          const up = GEOM.arcPts(XL + RB, ZC + A1 + RB, RB, Math.PI, 1.5 * Math.PI, NB);
+          const casing = GEOM.poly([
+            ...up, [xt, ZC + A1], [XS, ZC + A2], [XR, ZC + A2], [XR, H + 0.5],
+            [XR - TW, H + 0.5], [XR - TW, ZTOP], [XL + TW, ZTOP], [XL + TW, H + 0.5], [XL, H + 0.5]], [
+            { id: "soffit1", label: "Wide pipe soffit", e0: NB, e1: NB },
+            { id: "contr", label: "Contraction, upper face", e0: NB + 1, e1: NB + 1 },
+            { id: "soffit2", label: "Narrow pipe soffit", e0: NB + 2, e1: NB + 2 },
+            { id: "rwall", label: "Right reservoir wall, above the pipe", e0: NB + 3, e1: NB + 3 },
+            { id: "lwall", label: "Left reservoir wall and bellmouth, above the pipe", e0: NB + 9, e1: NB - 1 },
+          ], "casing");
+          return [ground, casing];
+        },
+        // Start the pipe near its steady discharge (Q0, measured) rather
+        // than from rest: the column otherwise takes ~15 s to come up to
+        // speed, a rigid-column establishment that is not this demo's point.
+        flow: (x, z, P, par) => {
+          if (x < XL + RB || x > XR) return null;
+          const hf = half(x, Lof(par));
+          return Math.abs(z - ZC) < hf ? [Q0 / (2 * hf), 0] : null;
+        },
+        // Hydrostatic in each reservoir; in the pipe a head falling linearly
+        // from one level to the other — a charged pipe, at rest.
+        water: (x, z, P, par) => {
+          if (z < ZF) return 0;
+          if (x < XL) return still(L1, z, P);
+          if (x > XR) return still(L2, z, P);
+          const hf = half(x, Lof(par));
+          if (Math.abs(z - ZC) > hf) return 0;
+          return still(L1 - (L1 - L2) * (x - XL) / (XR - XL), z, P);
+        },
+        tips: ["Slide <b>Contraction length L</b> on the card: 3 m is a gentle taper, 0 an abrupt step.",
+               "Particles speed up through the contraction: in steady flow every particle still accelerates.",
+               "Past the step the flow cannot turn the corner: it separates, and the jet narrows to a vena contracta.",
+               "A Flux line in each pipe reads the same Q; a Control volume round the contraction gives the force on it."],
+      }];
+    })(),
+    // ===== Year 1: fillleak, vane =====
+    //
+    // VC-2 · a tank filled from the top by the spout and emptied through a
+    // valved orifice near its floor. Kept deliberately bare: one tank of
+    // plan area S = 2.00 m per metre width (inside faces x = 0.40 → 2.40),
+    // floor top at z = 0.50, an orifice 0.08 m tall (z 0.55 → 0.63) through
+    // the right wall, shut by a scene valve (V). The jet leaves into open air
+    // and falls out through the open right and bottom edges, so nothing the
+    // outlet sheds can come back into the tank.
+    //
+    // The inflow slider is the SPOUT: a scene param cannot write sim.p by
+    // itself, but solids() is handed the live sim.p (rasterise passes it) and
+    // every param change goes through rasterise, so solids() sets the spout's
+    // downward speed from the slider there. The spout is 2r = 0.16 m wide and
+    // the speed asked of it is Q_nom / (2r·K), where K is the measured ratio of
+    // what the disc actually delivers to 2r·|v| (see QIN_K).
+    (() => {
+      const S0 = 0.40, S1 = 2.40, ZF = 0.50;          // tank inside faces, floor top
+      const O0 = 0.55, O1 = 0.63, ZW = 3.00;          // orifice, wall top
+      const R = 0.08;                                 // spout radius
+      const QIN_K = 1.0;                              // delivered Q / (2r|v|), measured
+      const spoutV = (q) => -q / (2 * R * QIN_K);
+      return {
+        id: "fillleak", name: "Tank that fills and leaks", key: "S dh/dt = Q_in − Q_out",
+        group: "Jets & waves",
+        blurb: "A tank fed from the top and drained through a hole near the floor. The outflow grows with the depth of water over the hole, so the level settles where outflow equals inflow; shut the valve (V) and the level climbs at Q/S.",
+        W: 4.0, H: 3.6, c: 26, cf: 0.004, cs: 0.10, nu: 1e-3,
+        mode: 0, hmax: 2.6, headMax: 2.6, vmax: 5,
+        valveOpen: 1, particles: 0, spinup: 0,      // VC-2 opens with the outlet OPEN (lecturer, Oct 2026)
+        open: [0, 1, 1, 0],
+        params: [
+          { key: "q_in", label: "Inflow Q", min: 0.10, max: 0.30, step: 0.01,
+            value: 0.25, unit: "m²/s",
+            fmt: (v) => v.toFixed(2) + " m²/s  (per metre width)" },
+        ],
+        source: { on: 1, x: 1.40, z: 3.30, r: R, vx: 0, vz: spoutV(0.25) },
+        solids: (W, H, P, par = {}) => {
+          const q = par.q_in === undefined ? 0.25 : par.q_in;
+          if (P && P.source) P.source.vz = spoutV(q);
+          return [
+            // Ground, floor, left wall and the right wall below the orifice:
+            // one CCW polygon, solid down past z = 0 and out past x = 0.
+            GEOM.poly([[-0.5, -0.5], [S1 + 0.10, -0.5], [S1 + 0.10, O0], [S1, O0],
+                       [S1, ZF], [S0, ZF], [S0, ZW], [-0.5, ZW]],
+              [{ id: "floor", label: "Tank floor", e0: 4, e1: 4 },
+               { id: "left", label: "Left wall", e0: 5, e1: 5 }], "tank"),
+            GEOM.rect(S1, O1, S1 + 0.10, ZW, { id: "rightWall",
+              faces: [{ id: "inner", label: "Right wall (inside)", e0: 3, e1: 3 }] }),
+          ];
+        },
+        valves: () => [[S1 + 0.05, O0 - 0.02, S1 + 0.05, O1 + 0.02, 0.08]],
+        water: (x, z, P) => (x > S0 && x < S1 && z > ZF ? still(0.70, z, P) : 0),
+        tips: ["The outlet starts OPEN: the outflow grows with the depth over it, and the level creeps up to where out = in.",
+               "Press <b>V</b> to shut the valve: with nothing going out, the level climbs in a straight line at Q/S, S = 2.00 m.",
+               "Slide <b>Inflow Q</b> on the card and the level finds a new balance — higher Q, higher level.",
+               "Drag a Control volume (9) round the whole tank: in, out and net. Net is the rate the tank stores water; it is NOT zero while the level moves."] };
+    })(),
+
+    // MM-1 · a free jet striking a FLAT PLATE whose inclination θ (the angle
+    // between the jet and the plate) is the one slider: 90° (plate square to
+    // the jet, the symmetric split) down to 20°. The plate is fixed in space
+    // at each setting and turns about the point where the jet's axis meets
+    // its wet face, so the jet always strikes its middle and the split is set
+    // by the angle alone. The jet leaves as two sheets along the plate:
+    //     q₁ = q(1 + cos θ)/2  along t = (cos θ, −sin θ)  (down the screen)
+    //     q₂ = q(1 − cos θ)/2  along −t                    (up and back)
+    // and the force on the plate is normal to it, F_n = ρqU sin θ, with
+    // components F_x = F_n sin θ (→) and F_z = F_n cos θ (↑).
+    //
+    // GRAVITY IS (ALMOST) OFF, and that is the design choice: the textbook
+    // plate is a horizontal jet in a horizontal plane, so the picture is a
+    // PLAN view with gravity into the screen. In the vertical plane the jet
+    // sags, a sheet sent up slows and rains back onto the jet (MO-2's +20%
+    // on a flat plate), and the box's vertical force carries the weight of
+    // every drop inside it. Unlike `plan` the plane is NOT full of water:
+    // the jet is free, in air at p = 0. That needs the free-surface EOS,
+    // which the shaders swap for the two-sided plan-view EOS at g exactly 0
+    // (it pulls an interface together), so g is 1e-3 m/s²: the free-surface
+    // path stays on and the jet sags ~0.1 mm over its flight.
+    //
+    // NO FRICTION ALONG THE PLATE, because the teaching point is that an
+    // ideal plate takes no tangential force — that is what makes the split
+    // q(1 ± cos θ)/2. `slip: 1` mirrors the viscous stencil at a solid
+    // (free-slip) and `cf: 0` switches off the wall function; `kappa: 0`
+    // keeps the open-channel mixing length out of the sheets.
+    //
+    // Sizes. The jet is 0.24 m wide (2·RJ): at 30° the small sheet is
+    // 0.067 × 0.24 = 16 mm, ~2 cells at Medium (Δx ≈ 8.7 mm). The plate is
+    // 1.60 m long (0.80 m each side of the impact point): at 20° the jet's
+    // footprint is 0.24/sin 20° = 0.70 m, and what remains past it lets each
+    // sheet run parallel to the plate before it leaves the end. Every edge is
+    // an OUTFALL (ghosts held empty): with no gravity to drain it, spray at a
+    // plain open edge ponded against it.
+    //
+    // RESIDUE DRAIN. The plane starts EMPTY (water: 0) and only the spout
+    // brings water in, but the first impact and every slider move throw
+    // filaments and droplets that, with no gravity, drift for ever: after
+    // 20 s of jet 36% of the wet cells were such relics away from the jet and
+    // sheets, 37–42% in the 15 s after a move to 60°. `residueDrain` (FS_VOF,
+    // plan view only) lets slow water (< 1 m/s) with no pressurised water
+    // within two cells fall out of the plane at 2/s; measured at Medium the same counts are
+    // 5% and 3%, and F_n at 60° 4.14–4.16 kN/m against 4.18 without it
+    // (raw σ ≈ 0.14). The jet and sheets are fast and the stagnation point is
+    // pressurised, so neither is touched.
+    (() => {
+      const XS = 0.40, ZJ = 1.20, RJ = 0.12, UJ = 4.5;  // spout centre, radius, speed
+      const XC = 1.60;                                // impact point on the wet face
+      const LH = 0.80;                                // half the plate's length
+      const TH = 0.06;                                // plate thickness (dry side)
+      const deg = Math.PI / 180;
+      /** The plate at inclination θ (degrees): wet face from the upstream end
+       *  A = C − LH·t to the downstream end B = C + LH·t, thickened along
+       *  d = (sin θ, cos θ), the dry side. A → B → B+d → A+d is CCW. */
+      function plate(theta) {
+        const th = theta * deg, tx = Math.cos(th), tz = -Math.sin(th);
+        const dx = Math.sin(th) * TH, dz = Math.cos(th) * TH;
+        const A = [XC - LH * tx, ZJ - LH * tz], B = [XC + LH * tx, ZJ + LH * tz];
+        return GEOM.poly([A, B, [B[0] + dx, B[1] + dz], [A[0] + dx, A[1] + dz]],
+          [{ id: "face", label: "Plate (wet face)", e0: 0, e1: 0 },
+           { id: "back", label: "Plate (back)", e0: 2, e1: 2 }], "plate");
+      }
+      return {
+        id: "vane", name: "Jet on an inclined plate, plan view", key: "F_n = ρqU sin θ",
+        group: "Jets & waves",
+        blurb: "A free jet seen from above strikes a flat plate set at an angle θ to it. The jet splits into two unequal sheets along the plate; box the plate with a Control volume and read the force, which is at right angles to the plate.",
+        W: 3.4, H: 2.4, g: 1e-3, c: 26, cf: 0, cs: 0.10, nu: 1e-5, slip: 1, kappa: 0,
+        mode: 2, hmax: 1, headMax: 1, vmax: 5,
+        // Pressure (kPa): zero in the still air around the jet, up to the
+        // stagnation pressure ½ρU² ≈ 9.9 kPa where the 4.45 m/s jet meets the
+        // plate (measured 9.2-9.9 at the 99th percentile).
+        pRange: [0, 10],
+        // Dye: three streaks across the jet just out of the spout — the
+        // middle one finds the stagnation point, the outer two the sheets.
+        dye: { seeds: [[XS + RJ + 0.05, ZJ - 0.7 * RJ, XS + RJ + 0.05, ZJ + 0.7 * RJ, 3]] },
+        particles: 0, spinup: 0,
+        open: [2, 2, 2, 2],
+        residueDrain: { rate: 2, speed: 1.0 },
+        params: [
+          { key: "theta", label: "Plate angle θ", min: 20, max: 90, step: 1,
+            value: 90, unit: "°",
+            fmt: (v) => v.toFixed(0) + "°  (90° square to the jet)" },
+        ],
+        source: { on: 1, x: XS, z: ZJ, r: RJ, vx: UJ, vz: 0 },
+        solids: (W, H, P, par = {}) => [plate(par.theta === undefined ? 90 : par.theta)],
+        water: () => 0,
+        tips: ["This is the jet seen from ABOVE: it flies straight, and the sheets keep their speed along the plate.",
+               "Drag a Control volume (9) round the plate, clear of the spout: it reads the force on what is inside — the plate.",
+               "Turn the plate with <b>Plate angle θ</b>: the force stays at right angles to the plate, ρqU sin θ, and the jet splits unequally, q(1 ± cos θ)/2.",
+               "Select the plate's wet face with the <b>Pressure force</b> tool: the pressure diagram's resultant is the same force the box reads — on a smooth plate it is all pressure."] };
+    })(),
+    // ===== Year 1: wall-shape =====
+    // PF-2: a still tank whose right-hand wall changes shape under ONE slider,
+    // with the water depth over the wall's foot held at d = 1.60 m. The point
+    // is the projection rule: the Pressure force tool reads F_h = ½ρg·d² on
+    // every shape, while F_v is the weight of the water standing on the wall
+    // (or, under an overhang, of the "water that isn't there" above it,
+    // pointing up). The scene lists the wall in `forceRef`, which makes
+    // drawForce print the ½ρg·d² reference beside F_h.
+    //
+    // The slider s ∈ [0, 1]: s ≤ 0.75 is a straight face whose angle from the
+    // vertical runs linearly from −30° (overhang) through 0° (s = 0.25) and
+    // 30° (s = 0.5) to 60° (s = 0.75); past 0.75 the 60° face blends vertex by
+    // vertex into a four-step staircase whose outer corners lie on that 60°
+    // line. The face always has the same nine vertices (collinear on a straight
+    // face), each moving monotonically up and to the right, so every
+    // intermediate polygon is simple and stays joined to the bed: the wall and
+    // the ground are ONE polygon, so there is no seam for water to leak
+    // through. The face runs 0.20 m above the water to a flat crest, so the
+    // top step is dry and the free surface never meets a corner.
+    //
+    // nu is an eddy viscosity for the same reason as `dyke`: the point is
+    // still water, and every slider move restarts it from the hydrostatic fill.
+    (() => {
+      const ZB = 0.30, D = 1.60, ETA = ZB + D, ZF = ETA + 0.20;   // bed, depth, surface, face top
+      const XF = 2.00, NSTEP = 4, W = 5.6;                        // foot of the wall, steps, domain
+      const deg = (s) => (s <= 0.75 ? -30 + 120 * s : 60);
+      // The nine face vertices, foot first.
+      const face = (s) => {
+        const th = deg(s) * Math.PI / 180, hf = ZF - ZB, run = hf * Math.tan(th);
+        const beta = s <= 0.75 ? 0 : (s - 0.75) / 0.25;
+        const r = hf / NSTEP, t = run / NSTEP, pts = [];
+        for (let k = 0; k <= 2 * NSTEP; k++) {
+          const P = [XF + run * k / (2 * NSTEP), ZB + hf * k / (2 * NSTEP)];   // on the line
+          const m = Math.ceil(k / 2), q = Math.floor(k / 2);                   // stairs: rise, then tread
+          const Q = [XF + q * t, ZB + m * r];
+          pts.push([P[0] + beta * (Q[0] - P[0]), P[1] + beta * (Q[1] - P[1])]);
+        }
+        return pts;
+      };
+      const shape = (s) => (s === undefined ? 0.25 : s);
+      return {
+        id: "wall-shape", name: "Wall shape and the pressure force", key: "F_h = ½ρgd², whatever the shape",
+        group: "Hydrostatics",
+        blurb: "Still water, 1.60 m deep, against a wall whose shape you set: overhanging, vertical, sloped at 30° or 60°, or stepped. Click the wall with the Pressure force tool and compare F_h and F_v as the shape changes.",
+        W, H: 2.4, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
+        hmax: 2.0, headMax: 1.8, vmax: 1,
+        open: [0, 0, 0, 0], particles: 0, spinup: 0,
+        forceRef: ["tank:wall"],               // drawForce prints ½ρg·d² beside F_h on this face
+        params: [
+          { key: "shape", label: "Wall shape", min: 0, max: 1, step: 0.01, value: 0.25, unit: "",
+            resetWater: true,
+            fmt: (v) => {
+              if (v > 0.75) return v >= 0.995 ? "staircase (4 steps, 60° overall)"
+                : "60° slope → steps " + Math.round(400 * (v - 0.75)) + "%";
+              const th = deg(v);
+              return Math.abs(th) < 0.5 ? "vertical" : th < 0
+                ? "overhang " + (-th).toFixed(0) + "° from vertical"
+                : "sloped " + th.toFixed(0) + "° from vertical";
+            } },
+          { key: "block", label: "Submerged block", min: 0, max: 1, step: 1, value: 0, unit: "",
+            resetWater: true, fmt: (v) => (v > 0.5 ? "on: 0.50 × 0.50 m, held still" : "off") },
+        ],
+        solids: (W_, H_, P_, par = {}) => {
+          const f = face(shape(par.shape));
+          const verts = [[-0.5, -0.5], [W + 0.5, -0.5], [W + 0.5, ZF]];
+          for (let k = f.length - 1; k >= 0; k--) verts.push(f[k]);   // crest end down to the foot
+          verts.push([-0.5, ZB]);
+          // CCW edges: 0 underside, 1 right, 2 crest, 3..10 the face (top
+          // down), 11 the bed, 12 left.
+          const out = [GEOM.poly(verts, [
+            { id: "wall", label: "Right-hand wall", e0: 3, e1: 2 + 2 * NSTEP },
+            { id: "bed", label: "Tank floor", e0: 3 + 2 * NSTEP, e1: 3 + 2 * NSTEP },
+            { id: "crest", label: "Crest", e0: 2, e1: 2 },
+          ], "tank")];
+          if (par.block > 0.5) out.push(GEOM.rect(0.20, 0.80, 0.70, 1.30, { id: "block",
+            faces: [{ id: "all", label: "Submerged block (all four sides)", e0: 0, e1: 3 }] }));
+          return out;
+        },
+        water: (x, z, P) => (z > ZB && z < ETA ? still(ETA, z, P) : 0),
+        tips: ["Pick the <b>Pressure force</b> tool and select the right-hand wall. The chip prints F, then F_h with ½ρg·d² beside it, then F_v.",
+               "Slide <b>Wall shape</b> on the card: overhang → vertical → 30° → 60° → steps. Each change restarts the still water; the depth at the wall stays 1.60 m.",
+               "F_h never changes: only the wall's vertical projection, d, matters.",
+               "F_v is the weight of the water standing on the wall. Under an overhang it is the weight of the water that ISN'T there above it, and it points up.",
+               "Switch <b>Submerged block</b> on and select the block: the pressure all round it adds up to one upward force, its displaced weight."] };
+    })(),
+    // ===== Year 1: lake =====
+    // FF-1 · Wind over a lake. A closed rectangular tank of still water, 6 m
+    // long and 0.30 m deep, with a wind shear stress τ on its free surface
+    // (the scene's one param, key "tau", which the vel pass reads — SIM.windTau).
+    // At τ = 0 it is hydrostatic: u = 0, p = ρg·d, flat pressure-head bands.
+    // Any τ ≠ 0 drives a surface drift downwind, sets the surface up against
+    // the downwind wall and sends a return flow back along the bed. The range
+    // is far beyond a real lake's (a gale is ~0.5 N/m²) so the set-up is
+    // whole cells high in a 6 m tank: τ·L/(ρg·d) ≈ 4 cm at τ = 20 N/m².
+    // nu = 2e-3 is an eddy viscosity, as on the dyke: a scene whose point is
+    // rest has to be able to come back to rest once τ returns to zero.
+    { id: "lake", name: "Wind over a lake", key: "Wind stress",
+      group: "Year 1 · Flow fields",
+      blurb: "A closed tank of still water. Blow on its surface with the wind-stress slider: the water flows however small τ is, piles up against the downwind wall and returns along the bed.",
+      W: 6.0, H: 0.80, c: 12, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
+      hmax: 0.45, headMax: 0.32, vmax: 0.25,
+      particles: 1, spinup: 0,
+      open: [0, 0, 0, 0],
+      params: [
+        { key: "tau", label: "Wind stress τ", min: -20, max: 20, step: 0.5, value: 0,
+          unit: "N/m²", fmt: (v) => (v > 0 ? "+" : "") + v.toFixed(1) + " N/m²" +
+            (v > 0 ? "  → blowing right" : v < 0 ? "  ← blowing left" : "  calm") },
+      ],
+      solids: () => [
+        GEOM.rect(-0.5, -0.5, 6.5, 0.10, { id: "ground",
+          faces: [{ id: "top", label: "Lake bed", e0: 2, e1: 2 }] }),
+      ],
+      water: (x, z, P) => (z <= 0.10 ? 0 : still(0.40, z, P)),
+      tips: ["At rest: tap or point at the water — the velocity is zero and the pressure head p/ρg is just the depth below the surface. Pressure head shows flat bands: pressure only.",
+             "Move the <b>Wind stress τ</b> slider: the surface water is dragged downwind at once, however small τ is.",
+             "Watch the surface pile up against the downwind wall, and the particles near the bed run back upwind.",
+             "Reverse τ and the whole circulation reverses. Set τ = 0 and the motion dies away."] },
+    // ===== Year 1: body (FF-3) =====
+
+    /** FF-3's scene: `plan` (gravity off, looking down) with the duct opened
+     *  to the whole left edge, so the body sits in a uniform stream rather
+     *  than in a jet whose own shear layers would shed regardless, and the
+     *  body's shape on ONE slider.
+     *
+     *  The body is a superellipse |x/a|ⁿ + |z/b|ⁿ = 1. The slider s ∈ [0, 1]
+     *  takes n from 2 (an ellipse) to 12 (a square with softened corners)
+     *  geometrically, n = 2·6^s, and the aspect a/b from 3 (slender, aligned
+     *  with the flow) to 1, a/b = 3^(1−s). HOLD says which size is held:
+     *  "width" keeps the frontal width 2b fixed (shape alone changes);
+     *  "area" keeps the plan area fixed (the body also gets wider as it gets
+     *  bluffer). Both were tried at Medium (README, "For the instructor"):
+     *  width hold sheds from s ≈ 0.3, area hold from s ≈ 0.6; width is kept
+     *  because Re_D = U·2b/ν then stays 180 along the whole slider and the
+     *  onset is down to shape alone. `shape(s, "area")` still builds the
+     *  other family for anyone who wants to compare.
+     *
+     *  ν = 1e-3 (lecturer's call, 2026-10-17: halved from 2e-3, at which the
+     *  square's street was too weak to see). MEASURED at Medium after 40 s,
+     *  rms cross-stream w 1.1 m behind the body: ellipse 0.05 m/s (steady
+     *  along the body, a gentle wiggle far downstream), s = 0.5 0.38, square
+     *  0.59 (a strong street; 0.35 at 2e-3). At `plan`'s 2e-5 even the 3 : 1
+     *  ellipse sheds hard (Re_D ~ 10⁴); at 3e-3 the square sheds only slowly.
+     *  Walls are free-slip as in `plan` (slip 1); measured with no-slip
+     *  the ellipse is marginally unstable at this ν, so the streamlined end
+     *  would not read as clearly steady. */
+    (() => {
+      const XC = 1.9, ZC = 1.7;                // body centre
+      const B_W = 0.20;                        // half frontal width, "width" hold
+      const AREA = 0.16;                       // plan area, "area" hold (= 0.4 m square)
+      const HOLD = "width";
+      const NPTS = 192;
+      const shape = (s, hold) => {
+        s = Math.min(1, Math.max(0, s));
+        const n = 2 * Math.pow(6, s), r = Math.pow(3, 1 - s);
+        const unit = [];
+        for (let k = 0; k < NPTS; k++) {
+          const t = (2 * Math.PI * k) / NPTS, c = Math.cos(t), sn = Math.sin(t);
+          unit.push([r * Math.sign(c) * Math.pow(Math.abs(c), 2 / n),
+                     Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n)]);
+        }
+        let A = 0;                               // shoelace, for the area hold
+        for (let k = 0; k < NPTS; k++) {
+          const p = unit[k], q = unit[(k + 1) % NPTS];
+          A += p[0] * q[1] - q[0] * p[1];
+        }
+        A = Math.abs(A) / 2;
+        const sc = hold === "area" ? Math.sqrt(AREA / A) : B_W;
+        return { n, r, b: sc, a: r * sc,
+                 verts: unit.map((p) => [XC + sc * p[0], ZC + sc * p[1]]) };
+      };
+      return {
+        id: "body", name: "Plan view — flow past a body", key: "Streamlined → bluff",
+        group: "Jets & waves",
+        blurb: "Looking down on a uniform stream past one body whose shape you morph with a slider, from a slender ellipse lined up with the flow to a square. Streamlined: a thin steady wake. Bluff: the flow separates and the wake swings from side to side, shedding eddies.",
+        W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 1e-3, slip: 1, bulk: 0.03,
+        mode: 2, ca: 0, vmax: 1.6, vortMax: 12, headMax: 3.2,
+        // Dye: eight streaks released 0.5 m upstream of the nose, spanning
+        // a little more than the frontal width, so the outer ones graze the
+        // body and are drawn into the wake and the inner ones split on it.
+        dye: { seeds: [[XC - 1.1, ZC - 0.32, XC - 1.1, ZC + 0.32, 8]] },
+        // Left edge open and NOT walled: the inflow prescribes the stream over
+        // the whole of it (see `plan` for why the edge itself must be open).
+        open: [1, 1, 0, 0],
+        inflow: { level: 99, v: 0.9, on: 1 },
+        params: [{ key: "shape", label: "Body shape (streamlined → bluff)",
+                   min: 0, max: 1, step: 0.01, value: 0, unit: "" }],
+        solids: (W, H, P, par) => {
+          const s = par && par.shape !== undefined ? par.shape : 0;
+          return [GEOM.poly(shape(s, HOLD).verts,
+                            [{ id: "body", label: "Body", e0: 0, e1: NPTS - 1 }], "body")];
+        },
+        shape,
+        // Start the box already moving at the stream speed: from rest the
+        // inflow switched on impulsively and sent pressure waves rattling
+        // through the closed plan-view box for seconds (lecturer, 2026-10-17).
+        // The first vel pass zeroes the faces inside the body.
+        flow: () => [0.9, 0],
+        water: () => 1,
+        tips: ["Slide the shape from streamlined to bluff and watch the wake: steady and thin, then wider, then alternating.",
+               "Colour is speed: behind a bluff body the flow separates from the surface, and the slow wake swings from side to side as eddies are shed.",
+               "Particles (P) swing across the shedding wake: in unsteady flow a particle's path is not a streamline. Pick the Dye tool (D) and press and hold just upstream of the body: the black streak splits on the nose and rolls up in the wake.",
+               "Switch the colour bar from Live to Average: the average of the alternating wake is a steady, symmetric wake bubble."] };
+    })(),
+    // ===== Year 1: spillway, pipejet (FF-2, FF-4) =====
+    // Two demo scenes for the Fluid Motion lecture (L4): one flow field each
+    // that the lecturer talks through — speed, steady against unsteady,
+    // streamlines, separation, fluxes, velocity profiles, and turbulence
+    // live against Average.
+
+    // ------------------------------------------- FF-2 · spillway, flip bucket
+    // A reservoir held by the head-driven level control spills over an ogee
+    // crest (the WES shape, x^1.85 = 2 H_d^0.85 · y, for a design head
+    // H_d = 1.5 m), runs down a 1 : 0.75 face into a circular flip bucket
+    // and is thrown into the air; the jet plunges into a deep pool held by a
+    // tailwater on the right edge. No hydraulic jump and no stilling basin:
+    // the pool is simply long enough. It was 44 m of domain (~26 m of pool
+    // past the plunge, a calm drift at the outflow edge); in Oct 2026 the
+    // lecturer asked for the pool to be halved so the fitted view shows more
+    // of the spillway: W = 29 m, ~11 m of pool past the plunge. MEASURED at
+    // Medium (525 × 181, Δx 55 mm) over 105 s live + 40 s averaged: the
+    // turbulence now reaches the outflow edge (its section reads 3.0–4.6
+    // m²/s live) but the edge never flows back (min u > 0.45 m/s over the
+    // column), the tailwater holds at 2.97–3.03 m, and averaged the edge
+    // reads 3.51 and a pool section at x = 22 m 3.33 against 3.52 over the
+    // crest.
+    //   The bucket's lip angle is the one Geometry slider: it moves the lip
+    // along the bucket's own arc, so the throw (where the jet lands, how high
+    // it flies) changes while the crest, the face and q do not. MEASURED at
+    // Medium: the jet leaves at roughly half the lip angle (lip 20/30/40/45°
+    // -> ~6/15/21/27°) at 7.3-8.3 m/s and lands 4-5 m past the lip.
+    //   The open-channel mixing length stays ON here (no `kappa`). Measured
+    // with it off (kappa 0) or weak (0.1) the pool's eddies ran the whole
+    // 30 m to the outflow edge and the tailwater sloshed with them (at 0.1
+    // the pool rose to 6 m and drowned the bucket); at the default the pool
+    // fluctuates hard around the plunge and is a calm drift by x = 30 m.
+    // (Those kappa measurements were on the 44 m pool.) q = 3.52 m²/s over
+    // the crest at the 8.7 m level on the 29 m domain (3.46 on the coarser
+    // 44 m grid); settled by ~40 s.
+    (() => {
+      const W = 29, H = 10;
+      const ZF = 0.3;                 // reservoir floor and pool floor
+      const XU = 7.0;                 // the dam's upstream face
+      const ZC = 7.2, HD = 1.5;       // crest apex, design head
+      const LEVEL = ZC + HD;          // the reservoir level (a still-water head)
+      const SF = 4 / 3;               // the spillway face, 1 : 0.75
+      const R = 2.0, ZINV = 3.3;      // bucket radius and invert
+      const TW = 3.0;                 // tailwater level: a 2.7 m deep pool
+      const DEF = { lip: 40 };
+      const val = (par, k) => (par && par[k] !== undefined ? par[k] : DEF[k]);
+
+      const geom = (par) => {
+        const th = val(par, "lip") * Math.PI / 180;
+        const ea = 0.28 * HD, eb = 0.165 * HD;              // upstream quarter-ellipse
+        const xc = XU + ea;                                 // crest apex x
+        // WES downstream face to where its slope reaches the chute's SF.
+        const k = 0.5 / Math.pow(HD, 0.85);                 // y = k·x^1.85
+        const xw = Math.pow(SF / (1.85 * k), 1 / 0.85);
+        const zw = ZC - k * Math.pow(xw, 1.85);
+        // The bucket: a circle of radius R, invert at ZINV, tangent to the
+        // chute; on a circle centred C the point at angle α has tangent
+        // direction α + 90°.
+        const a1 = -Math.atan(SF) - Math.PI / 2, a2 = th - Math.PI / 2;
+        const cz = ZINV + R;
+        const zT = cz + R * Math.sin(a1);
+        const xT = xc + xw + (zw - zT) / SF;
+        const cx = xT - R * Math.cos(a1);
+        const xl = cx + R * Math.cos(a2), zl = cz + R * Math.sin(a2);
+        const v = [[XU, -0.5], [xl, -0.5], [xl, zl]];
+        const iBucket = v.length - 1;
+        const arc = GEOM.arcPts(cx, cz, R, a2, a1);          // lip → chute, leftwards
+        for (let n = 1; n < arc.length; n++) v.push(arc[n]);
+        const iFace = v.length - 1;
+        const nW = 40;                                      // WES face, tangent → apex
+        for (let n = nW; n >= 0; n--) {
+          const x = xw * n / nW;
+          v.push([xc + x, ZC - k * Math.pow(x, 1.85)]);
+        }
+        const iUp = v.length - 1;
+        for (let n = 1; n <= 16; n++) {                     // apex → upstream face
+          const s = (n / 16) * Math.PI / 2;
+          v.push([xc - ea * Math.sin(s), ZC - eb + eb * Math.cos(s)]);
+        }
+        const nv = v.length;
+        const dam = GEOM.poly(v,
+          [{ id: "ds", label: "Downstream face (under the lip)", e0: 1, e1: 1 },
+           { id: "bucket", label: "Flip bucket", e0: iBucket, e1: iFace - 1 },
+           { id: "face", label: "Spillway face and crest", e0: iFace, e1: iUp - 1 },
+           { id: "us", label: "Upstream face", e0: iUp, e1: nv - 1 }], "dam");
+        const ground = GEOM.rect(-1, -1, W + 1, ZF, { id: "ground",
+          faces: [{ id: "top", label: "Reservoir and pool floor", e0: 2, e1: 2 }] });
+        return { xc, xw, zw, xT, zT, cx, cz, xl, zl, th, dam, ground, solids: [ground, dam] };
+      };
+      let cache = { key: null, g: null };
+      const geomFor = (par) => {
+        const key = JSON.stringify(par || {});
+        if (cache.key !== key) cache = { key, g: geom(par) };
+        return cache.g;
+      };
+
+      return {
+        id: "spillway", name: "Spillway with a flip bucket", key: "Ski-jump into a plunge pool",
+        group: "Flow fields & turbulence",
+        blurb: "A reservoir spills over a curved crest, races down the spillway face and is thrown into the air by a flip bucket. The jet plunges into a deep pool: steady above, wildly unsteady below — and its average is steady again.",
+        W, H, c: 30, cf: 0.005, cs: 0.10, bulk: 0.05, nu: 1e-4,
+        mode: 2, hmax: 9, headMax: 10, vmax: 10, particles: 1,
+        // Dye: a continuous sheet on the crest approach, 0.8 m upstream of
+        // the dam's face, from just under crest level to 0.4 m under the
+        // surface — the core of the layer that actually spills, so the nappe
+        // carries ink and the plunge pool shows it being mixed. Separate
+        // streaks were tried: on a sheet 2–4 cells thick they merged into a
+        // faint grey. The top 0.4 m stays clear so the nappe keeps a
+        // coloured skin: ink right at a free surface, against the dark
+        // canvas, is black on black.
+        dye: { seeds: [[XU - 0.8, ZC - 0.3, XU - 0.8, LEVEL - 0.4, 0, 1.5 * 0.055]] },
+        view: { vex: 1 },
+        spinup: 40,
+        open: [1, 1, 0, 0],
+        // The sponge holds the reservoir compartment up to 2 m short of
+        // the dam: head-driven, that sponge IS the supply.
+        spongeIn: 5.0, spongeTw: 4.0,
+        inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
+        tailwater: { level: TW, on: 1 },
+        params: [
+          { key: "lip", label: "Bucket lip angle", min: 20, max: 45, step: 1, value: DEF.lip, unit: "°" },
+        ],
+        solids: (W_, H_, P_, par) => geomFor(par).solids,
+        water: (x, z, P, par) => {
+          if (z <= ZF) return 0;
+          const g = geomFor(par);
+          const level = Number.isFinite(P.level) ? P.level : LEVEL;
+          if (x < XU) return still(level, z, P);
+          if (x > g.xl) return still(TW, z, P);
+          return 0;
+        },
+        geom: geomFor,
+        tips: ["Colour is speed: nearly still in the reservoir, accelerating over the crest, fastest in the bucket, slowing in the pool.",
+               "Pause twice: the reservoir, crest and face look the same both times — steady. The pool never does.",
+               "Switch the colour bar from Live to <b>Average</b>: the pool becomes a calm mean flow with a steady eddy either side of the plunge.",
+               "Two <b>Flux lines</b> — one on the face, one in the pool — read the same q at very different depths and speeds.",
+               "A <b>Rake</b> in the pool jitters live and draws a clean profile once averaged: mean + fluctuation.",
+               "The <b>Bucket lip angle</b> slider tilts the lip: a steeper lip throws higher and further."] };
+    })(),
+
+    // ------------------------------------------- FF-4 · pipe jet into a reservoir
+    // A header (head-driven level control, its whole compartment held)
+    // drives a 0.5 m pipe, 8 m long, that discharges a jet horizontally into
+    // a reservoir with a FREE SURFACE. Inside the pipe the wall boundary
+    // layers grow from the rounded entrance; past the exit the jet's two free
+    // shear layers roll up, entrain the still water and spread. The pipe axis
+    // sits 2.85 m (5.7 D) over the floor and ~3 m under the surface; the
+    // reservoir ends 13.5 m (27 D) past the exit at an END WALL (x = 24 m)
+    // whose top is a 3 m broad crest, and the water leaves over it through a
+    // brink on an OUTFALL edge (open[1] = 2; a brink is what mode 2 is for).
+    // The crest holds the level (6.15–6.25 m, measured, Medium, 100 s) with
+    // nothing pinned on the right: no tailwater, no sponge, no inflow edge.
+    //   History, all measured at Medium:
+    //  * lidded full tank, submerged tailwater on the right edge behind an
+    //    absorbing layer (outflowNu 0.5 over 6 m): what shipped first. It
+    //    worked (q 0.79, the edge one-signed) but the tank had a lid.
+    //  * free surface + tailwater on the right edge, inflow allowed: a surface
+    //    current ran in from the edge (−8 m/s by 11 s) and drove the pipe
+    //    backwards. With twOutflowOnly it is fine (level 6.14–6.23, q 0.77–
+    //    0.81, no inflow through the edge face, eddies still recirculating
+    //    inside the sponge at up to −0.9 m/s) — the fallback if the end wall
+    //    ever has to go, but it has no wall to see.
+    //  * an early overflow weir in a 14 m tank: the jet struck its face within
+    //    ~10 s and one eddy filled the tank.
+    //  * this end wall with a plain OPEN right edge (mode 1): the crest passed
+    //    too little (q ≈ 1.0 h^1.5), the reservoir rose to 6.39 m, the pipe
+    //    fell to q = 0.50 and needed ~45 s to recover. The outfall brink fixes
+    //    it: the crest passes 0.82 m²/s at 0.62 m over it from t ≈ 10 s.
+    //  * the absorbing layer is not used: documented for lidded domains only.
+    //   What the end wall costs: everything the jet drives stays in a closed
+    //   reservoir, so the far field is livelier than the lidded tank's and
+    //   its eddies come back and nudge the jet: the clean core is ~1.5 m
+    //   (it was ~4 m lidded), the flapping starts by x ≈ 12 m and the jet is
+    //   in eddies by x ≈ 14–15 m. Averaged, the surface drifts 0.2–0.3 m/s
+    //   back towards the pipe over the near jet (x = 12–16 m, the entrained
+    //   water's return) and on towards the crest beyond (+0.2–0.5 m/s): no
+    //   current runs in from the boundary, and q does not move.
+    //   kappa: 0 switches the open-channel mixing length off. Its l = κy
+    // takes y from the nearest wall, metres from a free shear layer, and
+    // with it on (measured) the jet left the pipe as a smooth laminar blob
+    // with no eddies at all; with it off the Smagorinsky term alone leaves
+    // the shear layers free to roll up.
+    //   nu = 2e-3 m²/s is an eddy viscosity, not water's (Re = VD/ν ≈ 400).
+    // Swept again (lidded tank, then this one): lowering ν no longer
+    // throttled the pipe in any run (q 0.79 → 0.89 → 0.95 → 0.99 → 1.02 m²/s at 2e-3,
+    // 1e-3, 5e-4, 2e-4 and water's 1e-6, all stable) — less wall friction —
+    // but it does not buy turbulence either. Below ~5e-4 the Smagorinsky
+    // term (cs Δx)²|S| is the larger viscosity in the shear layers, so 2e-4
+    // and 1e-6 look alike; and in a plane the eddies MERGE instead of
+    // breaking down (no vortex stretching), so a lower ν gives fewer, bigger
+    // tank-sized vortices, not finer turbulence. Lidded: clean core ~4 m at
+    // 2e-3, ~1.5 m at 1e-3 and 5e-4, none at 2e-4 and below (it flaps from
+    // the lip). In this closed reservoir 1e-3 already flapped at the lip
+    // (axis w_rms 0.37 m/s at x = 11 m against 0.11 at 2e-3), the tank was a
+    // churn and a 60 s average was not a bell (x = 12 m peak 0.25 m under
+    // the axis). 2e-3 is the lowest value at which the class still sees a
+    // clean core, its roll-up and break-up, and a converged average.
+    (() => {
+      const W = 27, H = 9;   // 9 m: a lid 1 m above the 8 m top of the card's level slider
+      const ZF = 0.3;                         // floor
+      const XH = 2.2, TWALL = 0.3;            // header wall (left face) and thickness
+      const ZA = 3.15, D = 0.5;               // pipe axis and bore
+      const XE = 10.5;                        // pipe exit
+      const TP = 0.25;                        // pipe wall thickness
+      const LEVEL = 6.6;                      // header head
+      const XW = 24, ZC = 5.55;               // end wall: its face and its crest
+      const LT = 6.2;                         // tank level, as measured settled (initial fill)
+      const RB = 0.35;                        // bellmouth radius at the entrance
+      const z0 = ZA - D / 2, z1 = ZA + D / 2, x1 = XH + TWALL;
+      // Three solids besides the ground. Below: the header wall under the
+      // pipe and the pipe's lower wall; above: the header wall over it and
+      // the upper wall; and the end wall, whose top is the crest. The
+      // entrance corners are rounded (a bellmouth) so the flow enters the
+      // pipe as a near-uniform plug rather than a separated vena contracta,
+      // and the profile development along the pipe is the wall's doing.
+      // Built lazily: geom.js loads after this file, so no GEOM call may run
+      // while the registry is being assembled.
+      let built = null;
+      const build = () => {
+        if (built) return built;
+        const lower = GEOM.poly(
+          [[XH, -0.5], [x1, -0.5], [x1, z0 - TP], [XE, z0 - TP], [XE, z0],
+           ...GEOM.arcPts(XH + RB, z0 - RB, RB, Math.PI / 2, Math.PI)],
+          [{ id: "invert", label: "Pipe invert", e0: 4, e1: 4 },
+           { id: "exitLo", label: "Pipe exit, lower lip", e0: 3, e1: 3 }], "pipeLo");
+        const upper = GEOM.poly(
+          [[XH + RB, z1], [XE, z1], [XE, z1 + TP], [x1, z1 + TP], [x1, H + 1], [XH, H + 1],
+           ...GEOM.arcPts(XH + RB, z1 + RB, RB, Math.PI, 1.5 * Math.PI).slice(0, -1)],
+          [{ id: "soffit", label: "Pipe soffit", e0: 0, e1: 0 },
+           { id: "exitUp", label: "Pipe exit, upper lip", e0: 1, e1: 1 }], "pipeUp");
+        const ground = GEOM.rect(-1, -1, W + 1, ZF, { id: "ground",
+          faces: [{ id: "top", label: "Floor", e0: 2, e1: 2 }] });
+        const end = GEOM.rect(XW, -1, W + 1, ZC, { id: "endwall",
+          faces: [{ id: "face", label: "End wall", e0: 3, e1: 3 },
+                  { id: "crest", label: "Crest", e0: 2, e1: 2 }] });
+        built = { lower, upper, ground, end };
+        return built;
+      };
+
+      return {
+        id: "pipejet", name: "Pipe jet into a reservoir", key: "Boundary layers: wall and jet",
+        group: "Flow fields & turbulence",
+        blurb: "A header drives a pipe that discharges a jet into a large reservoir of still water, which spills over a wall at its far end. Boundary layers grow along the pipe walls; past the exit the edges of the jet roll up into eddies, drag the still water along and spread.",
+        W, H, c: 30, cf: 0.02, cs: 0.10, bulk: 0.05, nu: 2e-3,
+        kappa: 0,
+        mode: 2, hmax: 6, headMax: 6.5, vmax: 3, particles: 1,
+        // Dye: four streaks inside the pipe 0.5 m past the entrance; the two
+        // outer ones run in the wall boundary layers and roll up in the jet's
+        // shear layers past the exit.
+        dye: { seeds: [[x1 + 0.5, z0 + 0.07, x1 + 0.5, z1 - 0.07, 4]] },
+        spinup: 20,
+        // Left: the header's level control. Right: an OUTFALL edge — the
+        // brink at the end of the crest, which is what mode 2 is for.
+        open: [1, 2, 0, 0],
+        spongeIn: XH,
+        inflow: { level: LEVEL, q: 0, on: 1, free: 1 },
+        solids: () => { const g = build(); return [g.ground, g.lower, g.upper, g.end]; },
+        water: (x, z, P) => {
+          if (z <= ZF) return 0;
+          const level = Number.isFinite(P.level) ? P.level : LEVEL;
+          if (x < XH) return still(level, z, P);
+          if (x < x1) return z > z0 && z < z1 ? still(level, z, P) : 0;
+          if (x < XE && z > z0 && z < z1) return still(level, z, P);
+          if (x >= XW) return z > ZC ? still(LT, z, P) : 0;
+          const g = build();
+          if (GEOM.contains(g.lower, x, z) || GEOM.contains(g.upper, x, z)) return 0;
+          return still(LT, z, P);
+        },
+        tips: ["Colour is speed. In the pipe the slow layers by the walls thicken downstream: the boundary layer, with no slip at the wall.",
+               "Past the exit the jet meets still water: its edges roll up into eddies and drag the still water in.",
+               "Drop a <b>Rake</b> in the pipe near the entrance and one near the exit: the profile goes from a flat plug towards a rounded one.",
+               "A Rake across the jet jitters live. Switch the colour bar from Live to <b>Average</b>: a smooth bell-shaped profile that widens and flattens downstream.",
+               "Two <b>Flux lines</b> across the jet: the averaged q GROWS downstream — that is the entrained water.",
+               "The reservoir spills over the wall at its far end, which holds its level; <b>Reservoir level</b> on the card is the header's and drives the pipe: raise it and the jet runs faster."] };
+    })(),
+    // ===== Year 1: HJ-2, WV-4 =====
+    // ------------------------------------------------ THE FLUME LAB, SCALED UP
+    // HJ-2's scene, ported from the lecturer's unversioned 10 Sep copy
+    // (2026_hydraulician-gate-jump). The first-year teaching flume (Lab 2,
+    // "The hydraulic jump"): a sluice gate 43 mm open under a 0.275 m pool
+    // passes 5.85 l/s down a 0.104 m wide flume — q = 0.056 m²/s, d_c =
+    // 0.070 m — and a weir on an operating handle at the far end holds a jump
+    // about 0.7 m downstream of the gate. Here the same flume at roughly seven
+    // to ten times its size: a 0.30 m opening under a 2.85 m pool passing
+    // q = 1.2 m²/s (d_c = 0.53 m), a flap weir hinged 7 m past the gate, the
+    // bed flat throughout. The weir crest (the Geometry slider `weir_h`,
+    // geom1 after the gate's geom0) is the lab's operating handle: raise it
+    // and the jump walks back and the gate drowns.
+    //
+    // channel() builds the bed, the gate and its `gate_a` param; the flap
+    // weir is added here rather than in channel() so the port stays one
+    // block. Its param and polygon are appended to what channel() returns.
+    //
+    // Three decisions measured on the 10 Sep code (the README records them;
+    // re-measured on the stress-free surface, see the README's instructor
+    // section for what still holds):
+    //  · The downstream control is a WEIR with a free overfall behind it, not
+    //    a tailwater level: with the level pinned on the right edge the
+    //    roller ended on the gate at every setting tried.
+    //  · The flume is 14 m, not the 24 m a ×10 lab would be: over a 17 m
+    //    reach the backwater alone drowned the gate at every crest.
+    //  · a = 0.30 rather than the lab's 0.43 ×10: the wider opening's sheet
+    //    was overrun within 2 m at every crest. (On that code crest 0.05
+    //    flooded the flume and the slider stopped at 0.10; on the current
+    //    code crest 0 is a flat bed and the sheet leaves cleanly — measured.)
+    //
+    // RE-MEASURED after the stress-free surface (#72), Medium: the jet keeps
+    // its momentum (d₁ ≈ 0.20 m, 6.4 m/s, Fr₁ ≈ 4.5, conjugate ≈ 1.2 m), so a
+    // supercritical sheet over this flap is hard to turn back.
+    //
+    // THE LECTURER'S SEQUENCE (HJ-2): water only in the pool at t = 0, the
+    // apron and reach dry, the flap flat (crest 0, the slider's floor). The
+    // released water runs under the gate as a sheet and off the end; the pool
+    // settles at d₀ = 2.72 m by t ≈ 26 s. Then the class raises the crest.
+    // Measured from that state (README, instructor section): up to 0.40 the
+    // sheet runs up the flap and over it, no jump; at 0.50 a jump forms at the
+    // flap within 10–60 s and creeps upstream (x ≈ 7.5 m about a minute
+    // later, the gate's foot after ~3 min); 0.60 and above drive it to the
+    // gate in ~30 s and drown it. Once a jump exists, 0.46 holds it where
+    // it is (x ≈ 5.6 m for 300 s), 0.47 lets it creep upstream (~1 m a
+    // minute and a half) and 0.45 washes it back over the flap. The flap stays a plate at crest 0 (its tip flush with the bed),
+    // so the slider's floor is a flat bed, not a missing weir.
+    (function () {
+      const s = channel({
+        W: 14, H: 3.8, bed0: 0.30, S0: 0, cf: 0.008, cs: 0.06, q: 1.2,
+        inletDepth: 2.85, gate: { x: 4.0, a: 0.30 }, xEnd: 12.5,
+        mode: 2, hmax: 3.2, vmax: 8, spinup: 30,   // measured: the pool settles at d₀ = 2.72 m by t ≈ 26 s
+        extra: {
+          headMax: 3.2,
+          water: (x, z, P) => {
+            // Water ONLY in the pool: the flume below the gate starts dry
+            // (the lecturer's sequence). Over a dry bed the sheet is free from
+            // the first second; a jet shot into standing water starts
+            // submerged and the roller is slow to leave the gate.
+            const bed = 0.30;
+            if (z <= bed || x >= 12.5) return 0;
+            return x < 4.0 ? still(bed + 2.85, z, P) : 0;
+          },
+        },
+      });
+      // The flume's flap weir: a plate hinged at its upstream foot (x = 11.0),
+      // leaning downstream, the operating handle turning it about the hinge
+      // so that its tip — the crest — stands at bed + h. The plate is 1.3 m
+      // long and 0.10 m thick, rooted 0.15 m into the bed; the angle is solved
+      // from  L sinθ + t cosθ = h + 0.15  (the tip's upper corner is the
+      // crest). Faces: the water side (upstream), the tip, and the underside
+      // the nappe falls past.
+      const WX = 11.0, BED = 0.30, LP = 1.3, TP = 0.10, ROOT = 0.15;
+      const flap = (h) => {
+        let th = Math.asin(Math.min(0.98, (h + ROOT) / LP));
+        for (let k = 0; k < 6; k++) th = Math.asin(Math.max(0.02, Math.min(0.98, (h + ROOT - TP * Math.cos(th)) / LP)));
+        const cx = Math.cos(th), sx = Math.sin(th), z0 = BED - ROOT;
+        return GEOM.poly(
+          [[WX, z0], [WX + LP * cx, z0 + LP * sx], [WX + LP * cx - TP * sx, z0 + LP * sx + TP * cx], [WX - TP * sx, z0 + TP * cx]],
+          [{ id: "us", label: "Upstream face (water side)", e0: 2, e1: 2 },
+           { id: "crest", label: "Tip", e0: 1, e1: 1 },
+           { id: "ds", label: "Underside", e0: 0, e1: 0 }], "weir");
+      };
+      const gateSolids = s.solids;
+      s.params = s.params.concat([{ key: "weir_h", label: "Weir crest height", min: 0, max: 0.6,
+                                    step: 0.01, value: 0.5, unit: "m" }]);
+      s.solids = (W_, H_, P_, par) => gateSolids(W_, H_, P_, par)
+        .concat([flap(par && par.weir_h !== undefined ? par.weir_h : 0.5)]);
+      return Object.assign(s, {
+        id: "gatejump", name: "Sluice gate → hydraulic jump", key: "The flume lab, scaled up",
+        blurb: "The teaching flume at several times its size: a deep reservoir behind a sluice gate, released into an empty flume. The water shoots under the gate as a fast thin sheet; raise the weir at the far end and the sheet jumps up to a slow deep flow, which can be driven back until it drowns the gate.",
+        tips: ["Select the gate with the Pressure force tool: the pressure grows with depth near the surface as in still water, and falls to zero at the lip, where the water curves under the gate and speeds up.",
+               "Froude number: above 1 the flow is fast and shallow (red), below 1 slow and deep (blue). The sheet under the gate is red.",
+               "Weir crest height (Controls → Geometry): at 0.5 m a jump forms at the weir and creeps up the flume; at 0.6 m or more it runs up to the gate and drowns it.",
+               "A drowned gate: the water below it covers the lip, the reservoir rises and the force on the gate grows."] });
+    })(),
+
+    // ------------------------------------------------ WV-4 · BREAKERS ON A BEACH
+    // One flume, one wave, one slider: the beach slope tanβ. A paddle at the
+    // left wall makes the same wave every time over a flat bed of constant
+    // depth; the slider tilts the beach, and the Iribarren number
+    // ξ = tanβ/√(H₀/L₀) moves through spilling (ξ < 0.5), plunging
+    // (0.5–3.3) and surging (> 3.3) with nothing else changed.
+    //
+    // The paddle is AT THE WALL, not a column inside the water. The `wave`
+    // piston elsewhere is a prescribed-velocity column at wave.x with a pocket
+    // of water behind it that rises and falls in antiphase — on this card it
+    // read as a discontinuity with water on both sides. Here wave.x = 0 puts
+    // it in column 1, the left edge is open (so the ghost column feeds it) and
+    // wave.d declares the still depth, which makes the solver impose the
+    // paddle's VOLUME flux a·ω·D·cos ωt (shaders.js, FS_VEL; SIM.wallPaddle).
+    // That is the linear piston condition — the paddle's motion imposed at its
+    // mean position — and the overlay draws a solid plate whose face moves
+    // through the displacement a·sin ωt (main.js, drawMarkers).
+    // Measured over 12–16 s at every slope: the water volume holds to 0.2%.
+    //
+    // Where the beach goes. Round 2 (lecturer, 2026-10-17): at least twice
+    // the old distance from the paddle to the beach. The still-water
+    // shoreline is held at x = 10.0 m (SHORE) for every slope and the toe
+    // walks: 3.3 m off the paddle at tanβ 0.06, 7.3 m at 0.15, 9.4 m at 0.7
+    // (it was 1.0 / 2.3 / 4.4 m with the shoreline at 5 m). Above the
+    // shoreline the beach runs on to the right edge, so run-up always has
+    // somewhere to go. Changing the slope is a new experiment (resetWater).
+    //
+    // Damping (round 2: "lose energy only where they break"). Measured on the
+    // flat run at tanβ 0.15, Medium (README, "Damping"): the wave's height
+    // falls by about a third over the first 6 m whatever the dampers — with
+    // the mixing length off (kappa 0, nu 1e-4, as WV-5), at kappa 0.2, and
+    // at the default 0.41 with ca 0.8 or 0.2. For this steep long wave
+    // (H/d ≈ 0.4, T = 2 s in 0.4 m) the loss is the wave reshaping — its
+    // first harmonic hands energy to higher ones — not the viscosity. What
+    // the closure DOES decide is the mean flow: with kappa 0 the Average
+    // broke into a row of small cells and the live surface filled with
+    // chop; at 0.2 the undertow ran at twice the default's speed (0.3 m/s,
+    // several times the return flow the waves' mass flux asks for). So the
+    // closure stays at its default and only the interface compression is
+    // lowered (ca 0.2, as WV-5: it keeps a little more height near the
+    // paddle). The undertow at the default: about 0.13–0.19 m/s offshore
+    // along the bed 4–6 m from the paddle.
+    //
+    // The box is cropped to what the waves use, because the cost is cells ×
+    // substeps: the gentlest slope (0.06) has its shoreline at 10 m and
+    // run-up to ~11 m, so the flume is 11.5 m long; the highest run-up
+    // (tanβ 0.7) reaches 0.18 m above still water, so the lid is 0.40 m
+    // above it; the bed is 0.10 m off the bottom. At Medium that is
+    // 1102 × 86 cells, Δx = 10.4 mm.
+    (function () {
+      const BED = 0.10, LEV = 0.50, D = LEV - BED;
+      const TOE0 = 2.5, SHORE = 10.0;
+      const toeOf = (s) => Math.max(TOE0, SHORE - D / s);
+      const slopeOf = (par) => (par && par.beach_s !== undefined ? par.beach_s : 0.06);
+      return {
+        id: "beach", name: "Wave flume · breakers on a beach", key: "Iribarren, one slider",
+        group: "Jets & waves",
+        blurb: "A paddle at the left end of a flume makes the same wave every time; the wave runs onto a beach whose slope is one slider. Gentle: the crest crumbles and spills all the way in. Steep: the front surges up the slope and runs back without breaking.",
+        // c = 14, not the flumes' 26: the substep is acoustic, Δt ∝ Δx/(c + 6),
+        // so this alone is 1.6× the speed. gd/c² = 2% compression at the bed;
+        // measured, H along the flume and the run-up moved by under 5 mm
+        // between c = 12, 16 and 26.
+        W: 11.5, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2,
+        mode: 0, hmax: 0.75, vmax: 1.6,
+        open: [1, 0, 0, 0],
+        // Stroke amplitude 0.14 m: the wall paddle loses nothing to a pocket
+        // behind it, so it makes the old piston's 0.18 m wave with less.
+        // A hinged flap (wave.flap, WV-5) was tried here and is not better:
+        // at kd = 0.68 it needs a 0.27 m stroke for the same wave, and H
+        // along the flume and the breakers matched the piston's (README).
+        wave: { amp: 0.14, period: 2.0, on: 1, x: 0, d: 0.40 },
+        particles: 1, plife: 6,
+        spinup: 0,
+        params: [{ key: "beach_s", label: "Beach slope tanβ", min: 0.06, max: 0.70, step: 0.01,
+                   value: 0.06, unit: "", resetWater: true,
+                   fmt: (v) => v.toFixed(2) + "  (1 : " + (1 / v).toFixed(1) + ")" }],
+        solids: (W_, H_, P_, par) => {
+          const s = slopeOf(par), xt = toeOf(s), zTop = H_ + 0.5;
+          // One CCW polygon: the flat bed, the toe, and the beach rising to
+          // the right edge (or leaving through the top first on a steep one).
+          const xr = W_ + 0.5, zr = BED + s * (xr - xt);
+          const top = zr <= zTop ? [[xr, zr]] : [[xr, zTop], [xt + (zTop - BED) / s, zTop]];
+          return [GEOM.poly([[-0.5, -0.5], [xr, -0.5]].concat(top, [[xt, BED], [-0.5, BED]]),
+            [{ id: "beach", label: "Beach face", e0: 2 + top.length - 1, e1: 2 + top.length - 1 },
+             { id: "bed", label: "Flume bed", e0: 3 + top.length - 1, e1: 3 + top.length - 1 }], "beach")];
+        },
+        water: (x, z, P, par) => {
+          const s = slopeOf(par), xt = toeOf(s);
+          return z > BED && z < LEV && x < xt + (z - BED) / s ? still(LEV, z, P) : 0;
+        },
+        tips: ["One slider: the beach slope. The wave is the same every time — the paddle's stroke and period do not change.",
+               "Iribarren ξ = tanβ/√(H₀/L₀): spilling below about 0.5, plunging 0.5–3.3, surging above 3.3.",
+               "Gentle beach: the wave shoals, steepens, and its crest crumbles down the front — spilling, a long surf zone.",
+               "Steep beach: the front never steepens enough to break; it surges up the slope and slides back, and much of the wave reflects.",
+               "A real plunging breaker throws a tongue of water over a trapped air tube. This model's turbulence closure damps the crest too much for that, so here the front collapses instead of curling."] };
+    })(),
+
+    // ------------------------------------------- WV-5 · GROUP VELOCITY
+    // A wave TRAIN in intermediate-to-deep water: the group travels at
+    // c_g ≈ 0.6 c_p, so crests are born at its back, run through it and die
+    // at its front. A hinged FLAP at the left wall (wave.flap; SIM.paddle,
+    // FS_VEL) fires one train per press of the strip's Wave train button or
+    // V (wave.train = 8 periods with 2-period cosine ramps: about five
+    // crests in the group at once, 8 × 0.6); every press resets the flume to
+    // still water first (SIM.fireTrain), so the experiment is repeated by
+    // pressing again. The paddle stands still otherwise. The tables are in
+    // courses/cive40008/exercises/WV-5-group-velocity/README.md.
+    //
+    // The lecturer's classic lab demo, second round (2026-10-17): 0.5 m of
+    // water, an 11 m flume, L ≈ 1.8 m (T = 1.1 s, kh = 1.76, c_g/c_p = 0.60
+    // in linear theory), a 0.05 m stroke. The first version (0.8 m deep,
+    // L ≈ 2 m, Medium, the default closure) lost its train before the far
+    // end. Every damper was taken as low as it would go while the surface
+    // stayed free of grid noise, measured on this flume at High (README,
+    // "Viscosities"):
+    //   · kappa — the open-channel mixing length. Its ν_t ≈ 1e-3 m²/s in a
+    //     crest (issue #77) was the main damper: at the default 0.41 the
+    //     train was gone by x = 5 m. OFF (kappa: 0): a wave flume has no
+    //     channel shear for it to model.
+    //   · ca — the interface compression, the second damper: at 0.8 with
+    //     the closure off the train still faded to 0.01 m by 8 m. 0.2 lets
+    //     it through; 0 smears the interface and traps air behind the train.
+    //   · nu — with the closure off this is what takes out grid-scale noise,
+    //     and it is the knob that trades reach against noise. 1e-4 m²/s
+    //     carries the train to the absorber (H 0.07 m at 1 m, 0.056 at 8 m,
+    //     0.053 at 9 m) but leaves cell-sized spikes and drifting air holes
+    //     on the surface behind it; 2e-4 fewer; 3e-4 none at all, but then
+    //     the group is down to 0.016 m by 8 m and the flume looks empty by
+    //     the time it should arrive. The lecturer's first complaint was the
+    //     train not reaching the end, so 1e-4 (a tenth of the closure's ν_t);
+    //     3e-4 is the clean alternative (README, "Viscosities").
+    //   · cs, bulk — kept at 0.08 / 0.03: cs 0 with bulk 0.01 left the
+    //     water behind the train rough and did not carry it further; cs 0.3
+    //     cleaned the surface but damped the train like nu 3e-4.
+    // High: H ≈ 0.07 m is ~11 cells at Δx = 6.2 mm; at Medium (9 mm) the
+    // same settings lose the train by about 7 m.
+    //
+    // The far end absorbs: an extra viscosity ramped up over the last 2 m
+    // (outflowNu, FS_VEL) in front of a closed wall — 0.03, which does not
+    // set the time step at High. c = 10: Δt ∝ Δx/(c + 6), so this runs
+    // 1.25× faster than c = 14; gd/c² = 5% at the bed. The box is no taller
+    // than the waves need: 0.02 m of bed, 0.50 m of water, 0.10 m of air.
+    (function () {
+      const BED = 0.02, D = 0.50, LEV = BED + D, W = 11.0;
+      return {
+        id: "wavetrain", name: "Wave flume · a wave train", key: "Group velocity",
+        group: "Jets & waves",
+        blurb: "A hinged flap at the left end of a wave flume makes a short train of waves. Watch one crest: it is born at the back of the group, runs forward through it and dies at its front. The group travels at about 0.6 of the speed of its crests.",
+        W, H: LEV + 0.10, c: 10, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2, nu: 1e-4, kappa: 0,
+        mode: 0, hmax: LEV + 0.1, vmax: 0.5,
+        open: [1, 0, 0, 0],
+        outflowNu: 0.03, outflowLen: 2.0,
+        // amp is the flap's stroke amplitude at the still-water level. Biésel
+        // gives H/S = 0.94 at kh = 1.76, so 0.05 m is H ≈ 0.094 m in linear
+        // theory; the grid delivers 0.07–0.09 m in the first metres.
+        wave: { amp: 0.05, period: 1.1, on: 1, x: 0, d: D, flap: 1, hinge: 0, train: 8, ramp: 2 },
+        particles: 1, plife: 3,
+        spinup: 0,
+        solids: () => [GEOM.rect(-0.5, -0.5, W + 1, BED,
+          { id: "bed", faces: [{ id: "bed", label: "Flume bed", e0: 2, e1: 2 }] })],
+        water: (x, z, P) => (z > BED ? still(LEV, z, P) : 0),
+        tips: ["Press V (or Wave train on the strip) to send one train down the flume. Press again to start again from still water.",
+               "Follow ONE crest: it appears at the back of the group, overtakes the others and fades away at the front.",
+               "Follow the GROUP, where the waves are tallest: it moves at about 0.6 of the speed of a crest.",
+               "The wave energy travels with the group, not with the crests. In deep water c_g = c_p/2.",
+               "The last 2 m of the flume absorb the waves, so nothing comes back."] };
+    })(),
   ];
 
   const byId = {};

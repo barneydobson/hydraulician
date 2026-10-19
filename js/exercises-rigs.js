@@ -1,5 +1,9 @@
 /* Generated rig payloads for the exercise picker. One entry per drawn-rig
-   exercise: the RIG snapshot JSON its folder's rig.js produces.
+   exercise: the RIG snapshot JSON its folder's rig.js produces. Every
+   entry so far belongs to the original teaching pack, so "its folder" is
+   courses/original/exercises/<folder>/, and the "FOLDER/rig.js · ..."
+   headings below are relative to that. Keys are exercise ids (global), so
+   this file is shared: any course's card may point its `rig` at one.
 
    Hand an entry to APP.RIG.apply() (js/main.js) and the drawn geometry, the
    edge modes, the level controls, the spout/piston, every Hydraulics slider,
@@ -46,7 +50,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[4, 2.2], [8.5, 2.2]],
    "rakes": [],
-   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* LL-1-borda-carnot/rig.js · LL1.build() · reservoir 3.45 m (digit d = 0) */
@@ -71,7 +75,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[3.4, 2.2], [7.6, 2.1]],
    "rakes": [],
-   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* LL-2-find-throttle/rig.js · LL2.build() · the CLEAN pipe at the shared level 3.90 m — partner A's hidden fault is NOT in this payload (see NOTES) */
@@ -95,7 +99,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[4, 2.2], [8.5, 2.2]],
    "rakes": [],
-   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* PU-1-system-curve/rig.js · PU1.build() · spout OFF at the sandbox default position; prime by hand (README §2: fillSump 7 s, then installPump(2.2) ~55 s, then the digit's own vx) */
@@ -121,7 +125,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [],
    "rakes": [],
-   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* WE-1-sharp-weir/rig.js · RIGB.build({plate:{x:6.5,P:0.50}, bedX1:6.525, q:0.35, level:1.326, gauge:4.5}) — the README §1 build card verbatim */
@@ -144,7 +148,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[4.5, 0.75]],
    "rakes": [],
-   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* MO-1-gate-cv/rig.js · MOGATE.build({a:0.1522, q:0.33, level:1.2103}) — the README §1 card, the 7-cell opening (digits 5-7) */
@@ -167,7 +171,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[3.5, 0.65]],
    "rakes": [],
-   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* MO-2-jet-vane/rig.js · JETRIG.build(); JETRIG.flat() — the flat plate, first rung of the turning series; d45/d90/deepV are redrawn per step */
@@ -188,7 +192,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [],
    "rakes": [],
-   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* HP-1-penstock-power/rig.js · HP1.build(0.84) on ?scene=hammer — fixed penstock plate (x 8.0, gap 0.70) + nozzle plate at 0.84 m */
@@ -212,7 +216,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [],
    "rakes": [],
-   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* HP-2-pelton/rig.js · JETRIG.build(); JETRIG.flat() — byte-identical to MO-2 (the two folders ship the same rig card) */
@@ -233,7 +237,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [],
    "rakes": [],
-   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* FB-1-choking-hump/rig.js · FB1.buildBase(0.35, 1.00, 1.00) — base channel, NO hump: students raise it themselves (see NOTES) */
@@ -255,7 +259,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[2.5, 0.75]],
    "rakes": [],
-   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* FB-2-yc-three-ways/rig.js · FB2.build(0.35) — the class-base q */
@@ -278,7 +282,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[6.85, 1.134783]],
    "rakes": [],
-   "ui": {"mode": 3, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 3, "field": "d", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   },
 
   /* UN-3-surge-tank/rig.js · UN3.setup(0.98) on ?scene=hammer — b_s = 0.98 m (7 cells, digit d = 2), the width the README's seal audit is quoted at */
@@ -303,7 +307,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[53, 6]],
    "rakes": [],
-   "ui": {"mode": 1, "field": "d", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 1, "field": "d", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* CS-1-cso-spill/rig.js · CS1.build({presses: 0}) — the 6-cell throttle; the storm is the spout, ramped by CS1.storm(vx) from ~1.7 m/s */
@@ -329,7 +333,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0},
    "gauges": [[4.25, 1.62]],
    "rakes": [],
-   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 0, "field": "d", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* B8-three-orifices · ?scene=jet untouched — the sharp-edged orifice IS the scene default (no drawn strokes) */
@@ -347,7 +351,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [],
    "rakes": [],
-   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* B8-three-orifices/rig.js · the BELLMOUTH paste block (two 45° erase bevels on the upstream corners) */
@@ -368,7 +372,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [],
    "rakes": [],
-   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* B8-three-orifices/rig.js · the BORDA paste block (two re-entrant tube walls projecting 0.11 m into the tank) */
@@ -389,7 +393,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [],
    "rakes": [],
-   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 2, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* B9-three-reservoirs/rig.js · B9.build() — zB = 2.0 m. The valve is SHUT and both level controls are still off: run B9.fillAC / fillB / release to stage it */
@@ -413,7 +417,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[2.775, 0.5], [2.775, 1.08], [0.75, 0.2], [5.05, 0.2]],
    "rakes": [],
-   "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 1}
+   "ui": {"mode": 0, "field": "h", "speed": 1, "channel": 0, "labels": 1, "jumps": 1, "particles": 0, "dye": 0}
   },
 
   /* B10-crest-vs-hgl/rig.js · B10.build({level: 3.95}) — RIG-A with a FLAT pipe (no crest yet, digit d = 5). Same mask as FR-1; students lift the crest themselves (see NOTES) */
@@ -437,7 +441,7 @@ const EXERCISE_RIGS = {
    "dye": {"line": 0, "decay": 0.02},
    "gauges": [[3.7, 2.2], [8, 2.2]],
    "rakes": [],
-   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 1}
+   "ui": {"mode": 1, "field": "h", "speed": 1, "channel": 0, "labels": 0, "jumps": 0, "particles": 0, "dye": 0}
   }
 };
 
@@ -452,10 +456,11 @@ const EXERCISE_RIGS = {
    long time being loaded into every page and read by nothing.
 
    Its content lives in the READMEs now, which is where a procedure belongs:
-   `exercises/<folder>/README.md` carries the brush width, the key presses
-   and the coordinates for each of the six. The card says WHAT is personalised
-   (`digitNote` in js/exercises.js) and links to the README for HOW.
+   `courses/original/exercises/<folder>/README.md` carries the brush width,
+   the key presses and the coordinates for each of the six. The card says
+   WHAT is personalised (`digitNote` in courses/original/exercises.js) and
+   links to the README for HOW.
 
    If a drawing procedure ever needs to reach the student in the app again,
-   it belongs on the card through js/exercises.js like every other field —
+   it belongs on the card (its course's exercises.js) like every other field —
    not in a side table here that nothing is obliged to read. */

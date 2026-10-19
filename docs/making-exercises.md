@@ -118,9 +118,12 @@ and the gate-and-jump flume say `true`. Anything that is not a channel flow
 says `false`: waves above all (a wave has thin boundary layers and no log
 layer, and the closure's `ν_t` of ~10⁻³ m²/s in a crest damps it away — issue
 #77), and a free jet in a tank (`l` takes `y` from a wall metres from the
-shear layer: pipejet). The shipped tanks, jets and pipes still say `true`,
-each with a comment: their cards quote constants measured with the closure on
-(QS-1's C_d, QS-2's discharge law, VC-2's C), and switching it off moves them —
+shear layer: pipejet). A wave flume without the closure wants ν = 1e-4 m²/s:
+at water's 1e-5 its short waves fill with grid noise. The shipped tanks, jets
+and pipes, the deep flume and the sloshing tank still say `true`, each with a
+comment: their cards quote numbers measured with the closure on (QS-1's C_d,
+QS-2's discharge law, VC-2's C, B4's orbits, DA-3's periods), and switching it
+off moves them —
 re-measuring those cards is the follow-up on mvreeuwijk#2. A NEW scene of
 that kind should say `false`. With it off the bed still
 has its wall-function friction (`cf`) and the cells their Smagorinsky term

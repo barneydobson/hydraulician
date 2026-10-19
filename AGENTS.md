@@ -71,8 +71,9 @@ Each was bought with a measured failure (stories: [docs/engineering-notes.md](do
 - **The mixing length is a channel closure, and every scene declares it**
   (`mixingLength: true | false`; `scenes.js` throws without it). Off in the
   wave flumes — a wave has no log layer, and the closure damped them (#2) —
-  which keep the wall function `cf` and Smagorinsky `cs`. The shipped tanks,
-  jets and pipes stay on until their cards are re-measured (#2).
+  which keep the wall function `cf` and Smagorinsky `cs`, at ν = 1e-4. The
+  deep flume, the sloshing tank and the shipped tanks, jets and pipes stay on
+  until their cards are re-measured (#2).
 - **Geometry contracts:** butt-ended wall segments; slabs leaving the domain are
   extrapolated, not clamped; a scene's bed stays above `z = 0`; ground is solid
   all the way down; the closed outer ring is stamped last.

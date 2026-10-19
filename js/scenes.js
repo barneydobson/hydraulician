@@ -569,7 +569,12 @@ const SCENES = (() => {
       };
       return {
         id: "slosh-tank", name: "Sloshing tank", key: "Period of a standing wave", group: "Similitude",
-        mixingLength: false,
+        // A standing wave, so not channel flow — but it keeps the closure for
+        // now (mvreeuwijk#2): off, most tanks move within the ±1.5% run-to-run
+        // scatter, while DA-3's model E (8 m long, 0.5 m deep) reads 6.84 s
+        // against 7.23 s, below linear theory, and the tutorial sheet's
+        // answers (.docx / .pdf / charts from tutorial-sheet.py) quote it.
+        mixingLength: true,
         blurb: "A closed tank released from a tilted surface. How does the sloshing period depend on the tank's length and depth?",
         W: 9.0, H: 2.6, c: 25, cf: 0.01, mode: 0, hmax: 1.4, headMax: 1.6, vmax: 1.5,
         open: [0, 0, 0, 0], particles: 0, spinup: 0,

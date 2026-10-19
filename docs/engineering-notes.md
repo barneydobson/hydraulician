@@ -586,14 +586,22 @@ stable and better at 0.44 m.
 Settle times fell with it — m2 from 85 s to 30 s, c13 from 95 s to 30 s — and
 the steep chutes run shallower against the same d_c (s1/s2 d_n 0.32 → ~0.20).
 The closure is a per-scene declaration, `mixingLength: true | false`
-(required: `js/scenes.js` throws on a scene without it), meant for channel
-flow and off in the wave flumes and the sloshing tank (the shipped tanks, jets and pipes keep it
-until their cards are re-measured, mvreeuwijk#2: switching it off moved
-QS-1/B8's jet by 0.42 m in η and 45% in q, CR-1 0.24 m, VC-2 0.15 m, the
-hammer reservoirs 6–70 mm, against 0.0 on every channel card); `p.mixingLength` at run time, the *Channel mixing length* switch in
-Controls, and `hyd.ml` in a rig. It used to be on by default with a numeric
-`kappa` to opt out, and that is how the wave flumes came to be damped by a
-channel closure (issue #77).
+(required: `js/scenes.js` throws on a scene without it); at run time it is
+`p.mixingLength`, in Controls the *Channel mixing length* switch, and in a rig
+`hyd.ml`. It is meant for channel flow, and it is off in the wave flumes
+(`wave`, `wavesurge`, `waveshallow`, WV-4's `beach`, WV-5's `wavetrain`, all
+at ν = 1e-4). Three groups keep it for now, because their cards' numbers were
+measured with it and do not survive it unchanged (mvreeuwijk#2):
+- the deep flume `wavedeep`: off, it builds an unsteady mean current at B4's
+  orbit station and its short periods die before the station;
+- the sloshing tank: DA-3's model E moves from 7.23 to 6.84 s, below theory,
+  and the tutorial sheet quotes it;
+- the tanks, jets and pipes: off moved QS-1/B8's jet by 0.42 m in η and 45% in
+  q, CR-1 0.24 m, VC-2 0.15 m and the hammer reservoirs 6–70 mm, against 0.0 on
+  every channel card.
+
+It used to be on by default with a numeric `kappa` to opt out, and that is
+how the wave flumes came to be damped by a channel closure (issue #77).
 
 ## Verified numbers
 

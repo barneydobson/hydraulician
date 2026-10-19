@@ -140,9 +140,9 @@ adds Prandtl's mixing length — in the scenes that DECLARE channel flow
 (`mixingLength: true`), and nowhere else. A wave is not a channel flow: its
 boundary layers are thin and it has no log layer, and the closure's `ν_t`
 damps it (issue #77), so the wave flumes run without it, on the wall
-function and the Smagorinsky term alone. (Tanks, jets and pipes are not
-channel flow either; the shipped ones keep it for now because their cards
-quote constants measured with it.)
+function and the Smagorinsky term alone, at ν = 1e-4. (Tanks, jets, pipes,
+the deep flume and the sloshing tank are not channel flow either; the shipped
+ones keep it for now because their cards quote numbers measured with it.)
 
 ```math
 \nu_t = l^{2}\,|\omega|,

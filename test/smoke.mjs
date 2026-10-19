@@ -1092,8 +1092,8 @@ SUITES.geom = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=hydro`);
   const hook = await B.evaluate(`(() => {
     const out = {};
-    APP.state.force = { solidId: "wall0", faceId: "side1", data: null, t0: 0 };
-    APP.state.forceHover = { solidId: "wall0", faceId: "side1" };
+    APP.state.force = { solidId: "roof", faceId: "soffit", data: null, t0: 0 };
+    APP.state.forceHover = { solidId: "roof", faceId: "soffit" };
     OVERLAY.analyse(APP.sim, APP.SIM.columns(true));   // live call seeds the estimates
     out.seeded = OVERLAY.estimates(APP.sim).hA !== null;
     const cur = APP.SIM.params().values.gap;
@@ -1115,8 +1115,12 @@ SUITES.geom = async (B) => {
     out.afterOff = n;
     return out;
   })()`);
-  ok("geom setParam drops the Force selection",
-    hook.force === null && hook.hover === null,
+  // A scene's own solids carry fixed ids, so a slider keeps the pick (only a
+  // drawn wrapper's positional id can be renumbered by an edit); the reading
+  // restarts on the new shape.
+  ok("geom setParam keeps a scene solid's Force selection, with its reading restarted",
+    !!hook.force && hook.force.solidId === "roof" && hook.force.faceId === "soffit" &&
+      hook.force.data === null && !!hook.hover,
     `force: ${JSON.stringify(hook.force)}, hover: ${JSON.stringify(hook.hover)}`);
   ok("geom setParam resets the overlay's running estimates",
     hook.seeded && hook.hAcleared && hook.ynKnan,
@@ -1150,6 +1154,21 @@ SUITES.geom = async (B) => {
     APP.tick(100);
     return { freed: pts.length, f0, f1: minF(pts) };
   })()`);
+  // MM-1: the pressure diagram on the plate stays on it while the angle
+  // slider turns the plate, and is dropped only when the face is gone.
+  await B.goto(`http://localhost:${PORT}/?scene=vane`);
+  const turn = await B.evaluate(`(() => {
+    APP.state.force = { solidId: "plate", faceId: "face", data: null, t0: APP.sim.t };
+    APP.SIM.setParam("theta", 60);
+    const kept = APP.state.force && APP.state.force.solidId + "/" + APP.state.force.faceId;
+    APP.frames(5);
+    const read = !!(APP.state.force && APP.state.force.data);
+    APP.state.force = { solidId: "plate", faceId: "nosuchface", data: null, t0: APP.sim.t };
+    APP.SIM.setParam("theta", 45);
+    return { kept, read, gone: APP.state.force };
+  })()`);
+  ok("geom the Force selection on a scene solid survives its slider and reads again",
+    turn.kept === "plate/face" && turn.read && turn.gone === null, JSON.stringify(turn));
   ok("geom cells a morphing body vacates are refilled with water, not left void",
     vac.freed > 0 && vac.f0 > 0.9 && vac.f1 > 0.9,
     `${vac.freed} cells freed; min f ${vac.f0.toFixed(3)} at once, ${vac.f1.toFixed(3)} after 100 substeps`);

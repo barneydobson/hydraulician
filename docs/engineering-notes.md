@@ -1556,8 +1556,11 @@ student clicks, for as long as the click is held. That is the **Dye tool**
 toggle): pointer-down sets `sim.p.dyeInj = {x, z, r}`, FS_VOF's `u_dyeInj`
 sets dye A = 1 in wet cells (f > 0.3, so air takes nothing) within r of it
 every substep, a drag moves it, pointer-up clears it. r =
-max(3 Δx, 0.008 · max(W, H)) (`SIM.dyeInjRadius`), shown as the cursor
-ring. The seeds above stay as a mechanism but are OFF unless the scene says
+max(3 Δx, min(0.008 · max(W, H), 0.025 · H)) (`SIM.dyeInjRadius`), shown as
+the cursor ring, or the scene's own `dye.r` (metres, floored at 2 Δx). The
+height cap is there because a long shallow flume sized by its length alone
+got a blob half its water depth (WV-4's beach: 0.18 m across 0.4 m of
+water). The seeds above stay as a mechanism but are OFF unless the scene says
 `dye.on` or `dyeLine` > 0 (m1/m2's timelines), or a card sets viewParams
 `dyeSeeds` (Controls → Dye sources; rig wire key still `ui.dye`). Dye is
 always drawn now, so there is no "Dye off"; under Average (no accumulator,

@@ -1653,7 +1653,12 @@ const SIM = (() => {
    *  sliver of the domain, so a coarse grid and a fine one both lay a streak
    *  of about the same width on screen. */
   function dyeInjRadius() {
-    return Math.max(3 * S.dx, 0.008 * Math.max(S.W, S.H));
+    // A scene's own dye.r (metres) wins. Otherwise the blob follows the domain
+    // but never exceeds 2.5% of its height: sized to the length alone, a long
+    // shallow flume (WV-4's beach, 11.5 m × 0.9 m) got a blob half its depth.
+    const own = S.scene.dye && S.scene.dye.r;
+    if (own > 0) return Math.max(2 * S.dx, own);
+    return Math.max(3 * S.dx, Math.min(0.008 * Math.max(S.W, S.H), 0.025 * S.H));
   }
 
   function advanceParticles(realDt, avg) {

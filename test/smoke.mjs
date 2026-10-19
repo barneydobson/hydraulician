@@ -1169,6 +1169,20 @@ SUITES.geom = async (B) => {
   })()`);
   ok("geom the Force selection on a scene solid survives its slider and reads again",
     turn.kept === "plate/face" && turn.read && turn.gone === null, JSON.stringify(turn));
+  // The dye blob is sized to the flow, not to the flume's length: on WV-4's
+  // beach (11.5 m long, 0.4 m of water) the old 0.008·max(W, H) rule made a
+  // 0.18 m blob, nearly half the depth. A scene's own dye.r takes precedence.
+  await B.goto(`http://localhost:${PORT}/?scene=beach`);
+  const ink = await B.evaluate(`(() => {
+    const out = { beach: APP.SIM.dyeInjRadius(), dx: APP.sim.dx };
+    const sc = APP.sim.scene, keep = sc.dye;
+    sc.dye = Object.assign({}, keep, { r: 0.05 });
+    out.own = APP.SIM.dyeInjRadius();
+    sc.dye = keep;
+    return out;
+  })()`);
+  ok("geom the dye blob on the beach stays small against its 0.4 m depth",
+    ink.beach <= 0.04 && ink.beach >= 3 * ink.dx - 1e-9 && ink.own === 0.05, JSON.stringify(ink));
   ok("geom cells a morphing body vacates are refilled with water, not left void",
     vac.freed > 0 && vac.f0 > 0.9 && vac.f1 > 0.9,
     `${vac.freed} cells freed; min f ${vac.f0.toFixed(3)} at once, ${vac.f1.toFixed(3)} after 100 substeps`);

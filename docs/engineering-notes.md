@@ -587,7 +587,7 @@ Settle times fell with it — m2 from 85 s to 30 s, c13 from 95 s to 30 s — an
 the steep chutes run shallower against the same d_c (s1/s2 d_n 0.32 → ~0.20).
 The closure is a per-scene declaration, `mixingLength: true | false`
 (required: `js/scenes.js` throws on a scene without it), meant for channel
-flow and off in the wave flumes (the shipped tanks, jets and pipes keep it
+flow and off in the wave flumes and the sloshing tank (the shipped tanks, jets and pipes keep it
 until their cards are re-measured, mvreeuwijk#2: switching it off moved
 QS-1/B8's jet by 0.42 m in η and 45% in q, CR-1 0.24 m, VC-2 0.15 m, the
 hammer reservoirs 6–70 mm, against 0.0 on every channel card); `p.mixingLength` at run time, the *Channel mixing length* switch in
@@ -716,13 +716,23 @@ itself ~2 cells thick. Consequences:
   deep-water flume (L = 1.26 m) loses H = 0.36 → 0.07 m over 3 m, so its
   orbits must be read near the paddle. Long waves are nearly free: the
   shallow-water flume holds 0.123 → 0.121 m over 5 m and then *shoals* to
-  0.152 m on the beach.
+  0.152 m on the beach. (Closure on. Re-measured Oct 2026 with it off, at
+  each scene's default stroke, H crest to trough over 4 periods after 20 s:
+  the deep flume 0.25 / 0.12 / 0.09 m at x = 1 / 2 / 4 m against 0.20 /
+  0.06 / 0.04 with it on — the closure was most of that loss; the shallow
+  flume 0.068 / 0.067 m at 2 / 3 m against 0.072 / 0.068 — no difference for
+  a long wave.)
 - Do not "fix" that by shrinking the tank. Halving the deep flume to W = 6
   improved Δx but put the beach 3 m from the paddle: the reflection built a
   standing wave (H = 0.49 m at x = 1) and the orbit decay collapsed from 244×
   to 16×. Reverted.
-- The mixing-length closure acts on vorticity, so it leaves wave motion
-  alone. Measured against the old model: the intermediate and shallow flumes
+- *Superseded (Oct 2026, mvreeuwijk#2): the closure is now off in every
+  wave flume.* "Acts on vorticity, so it leaves wave motion alone" held
+  against the strain-based model it replaced, not against no closure at all:
+  the numerical vorticity in a crest still bought a ν_t of ~10⁻³ m²/s, and
+  with the closure off waves carry further and shoal (sections below).
+  The original comparison: the mixing-length closure acts on vorticity, so
+  it leaves wave motion alone. Measured against the old model: the intermediate and shallow flumes
   and the slosh tank's period and decay unchanged within the reading; the
   deep flume's train arrives at 0.04–0.07 m in its far half against 0.05–0.07
   (a strain-based `ν_t` took it to one cell — no wave — by x = 3 m). The

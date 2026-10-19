@@ -1,21 +1,21 @@
 student,digit,scene,series,T_s,amp_m,L_theory_m,c_ms,Krefl,method,node_spacing_m,node_spacing_theory_m,aMax_m,aMin_m,note
-s01,0,wavesurge,surging,1.80,0.080,3.086,1.715,0.472,envelope_dft,,1.543,0.0383,0.0137,
-s02,1,wavesurge,surging,1.80,0.080,3.086,1.715,0.472,envelope_dft,,1.543,0.0383,0.0137,digit shares d=0's period -- expected match
-s03,2,wavesurge,surging,2.40,0.110,4.256,1.773,0.658,envelope_dft,2.40,2.128,0.0530,0.0109,
-s04,3,wavesurge,surging,2.40,0.110,4.256,1.773,0.658,envelope_dft,2.40,2.128,0.0530,0.0109,digit shares d=2's period -- expected match
-s05,4,wavesurge,surging,3.00,0.140,5.401,1.800,0.971,envelope_dft,2.80,2.701,0.0708,0.0010,scene default T/amp
-s06,5,wavesurge,surging,3.00,0.140,5.401,1.800,0.971,envelope_dft,2.80,2.701,0.0708,0.0010,same run as d=4 (no repeat re-measured after the Oct 2026 closure change)
-s07,6,wavesurge,surging,3.60,0.169,6.534,1.815,0.929,envelope_dft,3.40,3.267,0.0515,0.0019,
-s08,7,wavesurge,surging,3.60,0.169,6.534,1.815,0.929,envelope_dft,3.40,3.267,0.0515,0.0019,digit shares d=6's period -- expected match
-s09,8,wavesurge,surging,4.20,0.199,7.661,1.822,0.809,envelope_dft,3.80,3.830,0.0856,0.0090,
-s10,9,wavesurge,surging,4.20,0.199,7.661,1.822,0.809,envelope_dft,3.80,3.830,0.0856,0.0090,digit shares d=8's period -- expected match
-s01,0,wave,spilling,1.10,0.055,1.643,1.494,0.125,two_probe,,,0.0230,,d mod 3 == 0
-s02,1,wave,spilling,1.50,0.060,2.484,1.656,0.074,two_probe,,,0.0275,,d mod 3 == 1
-s03,2,wave,spilling,2.10,0.070,3.675,1.750,0.054,two_probe,,,0.0313,,d mod 3 == 2
-s04,3,wave,spilling,1.10,0.055,1.643,1.494,0.125,two_probe,,,0.0230,,d mod 3 == 0
-s05,4,wave,spilling,1.50,0.060,2.484,1.656,0.074,two_probe,,,0.0275,,d mod 3 == 1
-s06,5,wave,spilling,2.10,0.070,3.675,1.750,0.054,two_probe,,,0.0313,,d mod 3 == 2
-s07,6,wave,spilling,1.10,0.055,1.643,1.494,0.125,two_probe,,,0.0230,,d mod 3 == 0
-s08,7,wave,spilling,1.50,0.060,2.484,1.656,0.074,two_probe,,,0.0275,,d mod 3 == 1
-s09,8,wave,spilling,2.10,0.070,3.675,1.750,0.054,two_probe,,,0.0313,,d mod 3 == 2
-s10,9,wave,spilling,1.10,0.055,1.643,1.494,0.125,two_probe,,,0.0230,,d mod 3 == 0
+s01,0,wavesurge,surging,1.80,0.080,3.086,1.715,0.510,envelope_dft,,1.543,0.0410,0.0133,
+s02,1,wavesurge,surging,1.80,0.080,3.086,1.715,0.510,envelope_dft,,1.543,0.0410,0.0133,digit shares d=0's period -- expected match
+s03,2,wavesurge,surging,2.40,0.110,4.256,1.773,0.765,envelope_dft,,2.128,0.0548,0.0073,
+s04,3,wavesurge,surging,2.40,0.110,4.256,1.773,0.765,envelope_dft,,2.128,0.0548,0.0073,digit shares d=2's period -- expected match
+s05,4,wavesurge,surging,3.00,0.140,5.401,1.800,0.798,envelope_dft,2.80,2.701,0.0669,0.0075,scene default T/amp
+s06,5,wavesurge,surging,3.00,0.140,5.401,1.800,0.798,envelope_dft,2.80,2.701,0.0669,0.0075,same run as d=4 (no repeat measured)
+s07,6,wavesurge,surging,3.60,0.170,6.534,1.815,0.847,envelope_dft,3.40,3.267,0.0503,0.0042,
+s08,7,wavesurge,surging,3.60,0.170,6.534,1.815,0.847,envelope_dft,3.40,3.267,0.0503,0.0042,digit shares d=6's period -- expected match
+s09,8,wavesurge,surging,4.20,0.200,7.661,1.822,0.822,envelope_dft,4.20,3.830,0.0909,0.0089,
+s10,9,wavesurge,surging,4.20,0.200,7.661,1.822,0.822,envelope_dft,4.20,3.830,0.0909,0.0089,digit shares d=8's period -- expected match
+s01,0,wave,spilling,1.10,0.055,1.643,1.494,0.102,two_probe,,,0.0204,,d mod 3 == 0
+s02,1,wave,spilling,1.50,0.060,2.484,1.656,0.112,two_probe,,,0.0297,,d mod 3 == 1
+s03,2,wave,spilling,2.10,0.070,3.675,1.750,0.040,two_probe,,,0.0305,,d mod 3 == 2
+s04,3,wave,spilling,1.10,0.055,1.643,1.494,0.102,two_probe,,,0.0204,,d mod 3 == 0
+s05,4,wave,spilling,1.50,0.060,2.484,1.656,0.112,two_probe,,,0.0297,,d mod 3 == 1
+s06,5,wave,spilling,2.10,0.070,3.675,1.750,0.040,two_probe,,,0.0305,,d mod 3 == 2
+s07,6,wave,spilling,1.10,0.055,1.643,1.494,0.102,two_probe,,,0.0204,,d mod 3 == 0
+s08,7,wave,spilling,1.50,0.060,2.484,1.656,0.112,two_probe,,,0.0297,,d mod 3 == 1
+s09,8,wave,spilling,2.10,0.070,3.675,1.750,0.040,two_probe,,,0.0305,,d mod 3 == 2
+s10,9,wave,spilling,1.10,0.055,1.643,1.494,0.102,two_probe,,,0.0204,,d mod 3 == 0

@@ -24,7 +24,7 @@ window.CS1 = (function () {
   const C  = (id) => CONTROLS.find(c => c.id === id);
   const DX = () => APP.sim.dx;
 
-  // The ERASE tool draws with thickness = brush * 2.2 (js/main.js:540). This is
+  // The ERASE tool draws with thickness = brush * 2.2 (js/main.js, the stroke width in the draw handler). This is
   // the keyboard ladder the student uses: presses of [ (negative) or ] (positive)
   // from the default brush of 0.055 m.
   const BRUSH0 = 0.055;

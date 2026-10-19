@@ -1,6 +1,7 @@
-/* CR-1 "The contraction rig" (its tabs Streamlines, Continuity, Forces were FF-5, VC-1 and MM-2) — paste into the dev console.
+/* CR-1 "The contraction rig" — paste into the dev console.
  *
- *   ?ex=CR-1 (&tab=streamlines / continuity / forces; or ?scene=contraction), Resolution: Medium (746 x 127, dx = 0.0228 m).
+ *   ?ex=CR-1 (&tab=streamlines / continuity / forces / energy; or
+ *   ?scene=contraction), Resolution: Medium (689 x 138, dx = 0.0247 m).
  *
  * Nothing to draw: the scene's two polygons ARE the rig, and the one slider
  * (geom0, `taperL`) redraws them. This is the lecturer's spot-check: it reads
@@ -24,10 +25,10 @@ window.CR = {
   run: function (s) { APP.tick(Math.round(s / APP.SIM.dt())); return +APP.sim.t.toFixed(2); },
   setL: function (L) { return APP.SIM.setParam("taperL", L); },
 
-  /** reservoir levels from the hydrostatic pressure near each floor */
+  /** reservoir levels from the hydrostatic pressure near each floor (h = zp + phead) */
   levels: function () {
     var a = APP.probe(3.0, 0.3), b = APP.probe(14.0, 0.3);
-    return { left: a.phead + 0.3, right: b.phead + 0.3 };
+    return { left: a.zp + a.phead, right: b.zp + b.phead };
   },
   /** a section drawn UP across the bore at x: Q, momentum flux M, pressure force F */
   section: function (x) { return APP.SIM.lineFlux(x, 0.4, x, 1.6); },

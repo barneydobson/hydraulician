@@ -7,11 +7,46 @@
  * sized to a cell budget, so changing resolution changes Δx but never the
  * physics you are looking at, and resizing the window only moves the
  * letterbox — the simulation carries on untouched.
+ *
+ * Defines: SIM
+ *
+ * Reads:   canvas, fireTrain, GEOM, GLH, RECON, Shaders, view
  */
 const SIM = (() => {
 
   const CFL = 0.45;          // acoustic Courant number for the staggered update
   const UREF = 6.0;          // headroom for advective velocity in the dt estimate
+
+  // ------------------------------------------------------- shared vocabulary
+  /** The solid mask's one vocabulary. The mask is a Uint8Array of 0 (open),
+   *  128 (valve: solid only while closed) and 255 (wall); the shaders read the
+   *  same byte as a normalised R8 texel and cut at the same two thresholds
+   *  (SO() in shaders.js), RECON.reconstruct takes SOLID_MIN as `o.solidMin`,
+   *  and overlay.js asks `SIM.isSolid`. One place says where the cuts are. */
+  const MASK = { OPEN: 0, VALVE: 128, WALL: 255, VALVE_MIN: 64, SOLID_MIN: 192 };
+  /** Is a mask byte solid right now? A valve texel counts only while shut. */
+  const isSolid = (m, valveClosed) =>
+    m >= MASK.SOLID_MIN || (!!valveClosed && m >= MASK.VALVE_MIN);
+  /** A 0/1 flag held as a number (it is a uniform and a wire value). */
+  const isOn = (v) => v > 0.5;
+  /** |g|, or 9.81 where the scene has none (plan view), so a head p/rho g stays
+   *  finite. With no grid built yet it is 9.81 too: every other module that
+   *  wants "the" gravity asks here rather than keeping a copy. */
+  const gMag = () => (S && Math.abs(S.p.g)) || 9.81;
+  /** Plan view: no gravity, so no columns, no free surface, no depth. */
+  const planView = () => Math.abs(S.p.g) < 0.1;
+
+  /** The Favre unpack of the averaging accumulator's texel `k` (see
+   *  docs/averaging.md section 4.1): it stores (f u_c, f w_c, f, P), so the
+   *  velocity is the momentum over f-bar. Returns [u, w, f, p] in a scratch
+   *  array that the NEXT call overwrites: read it before calling again, and
+   *  when writing back into the buffer you read from, read first. */
+  const FV = [0, 0, 0, 0];
+  function favre(buf, k) {
+    const o = k * 4, f = buf[o + 2], d = Math.max(f, 1e-6);
+    FV[0] = buf[o] / d; FV[1] = buf[o + 1] / d; FV[2] = f; FV[3] = buf[o + 3];
+    return FV;
+  }
   const KAPPA = 0.41;        // von Kármán: the mixing length is κy (FS_VEL's lmix)
   // Substeps between refreshes of the closure's columns. The column walk is
   // serial down each column, so the pass is latency-bound (~0.08 ms on m2,
@@ -64,9 +99,9 @@ const SIM = (() => {
     if (!gl.getExtension("EXT_color_buffer_float")) {
       throw new Error("EXT_color_buffer_float is required (float render targets).");
     }
-    quad = GLH.makeQuad(gl);
-    rect = GLH.makeRect(gl);
-    points = GLH.makePoints(gl);
+    quad = GLH.makeDraw(gl, gl.TRIANGLES, 3);     // fullscreen triangle
+    rect = GLH.makeDraw(gl, gl.TRIANGLES, 6);     // a letterboxed rect
+    points = GLH.makeDraw(gl, gl.POINTS, 0);      // particles: draw(n)
     prog.vel  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VEL);
     prog.vof  = GLH.createProgram(gl, Shaders.VS_QUAD, Shaders.FS_VOF);
     // The same source with ACCUM defined — a separate program, not a uniform
@@ -167,7 +202,7 @@ const SIM = (() => {
    *  0 N/m regardless of how deep the pool behind the gate stood. Skipping
    *  the stroke here (the blade clears the 2-cell floor) restored a real
    *  pressure diagram: Fx = 9.61 kN/m against a ~8.94 kN/m hydrostatic
-   *  estimate (exercises/_runner/smoke.js's closed-form case has the derivation
+   *  estimate (test/smoke.mjs's closed-form case has the derivation
    *  and the run-to-run spread).
    *
    *  MEASURED on the hump crest (160 edges, ~0.025 m chords, before the
@@ -254,13 +289,13 @@ const SIM = (() => {
    *  registration-only GEOM.slab wrappers for every wall, valve and drawn
    *  seg — the pickable surfaces `faceAtPx` and `faceForce` need — without
    *  the mask itself ever being touched again. */
-  function rasterise() {
+  function rasterise(notify = true) {
     const m = S.mask;
     m.fill(0);
     const sc = S.scene;
     const par = S.params || {};
     S.solids = sc.solids ? sc.solids(sc.W, sc.H, S.p, par) : [];
-    if (S.solids.length) S.solids.forEach((so) => stampPoly(m, so, 255));
+    if (S.solids.length) S.solids.forEach((so) => stampPoly(m, so, MASK.WALL));
     // The shim: a scene still on walls() rasterises exactly as it always
     // has — same stampSeg, same capsule, same measured geometry. Kept in
     // wallSegs/valveSegs (rather than called and stamped inline) only so the
@@ -272,17 +307,17 @@ const SIM = (() => {
     // every scene that takes (W, H) only.
     const wallSegs = sc.walls ? sc.walls(sc.W, sc.H, par) || [] : [];
     const valveSegs = sc.valves ? sc.valves(sc.W, sc.H, par) : [];
-    wallSegs.forEach((s) => stampSeg(m, s, 255));
-    valveSegs.forEach((s) => stampSeg(m, s, 128));
+    wallSegs.forEach((s) => stampSeg(m, s, MASK.WALL));
+    valveSegs.forEach((s) => stampSeg(m, s, MASK.VALVE));
     S.segs.forEach((s) => stampSeg(m, s, s[5]));
     const [oL, oR, oB, oT] = S.p ? S.p.open : sc.open;
     for (let j = 0; j < S.ny; j++) {
-      if (!oL) m[j * S.nx] = 255;
-      if (!oR) m[j * S.nx + S.nx - 1] = 255;
+      if (!oL) m[j * S.nx] = MASK.WALL;
+      if (!oR) m[j * S.nx + S.nx - 1] = MASK.WALL;
     }
     for (let i = 0; i < S.nx; i++) {
-      if (!oB) m[i] = 255;
-      if (!oT) m[(S.ny - 1) * S.nx + i] = 255;
+      if (!oB) m[i] = MASK.WALL;
+      if (!oT) m[(S.ny - 1) * S.nx + i] = MASK.WALL;
     }
 
     // Registration-only pick solids: from here down `m` is never touched
@@ -315,28 +350,51 @@ const SIM = (() => {
     valveSegs.forEach((s, i) => register("valve" + i, s, { valve: true }));
     let drawnI = 0, drawnValveI = 0;
     S.segs.forEach((s) => {
-      if (s[5] === 255) register("drawn" + (drawnI++), s);
-      else if (s[5] === 128) register("drawnvalve" + (drawnValveI++), s, { valve: true });
+      if (s[5] === MASK.WALL) register("drawn" + (drawnI++), s);
+      else if (s[5] === MASK.VALVE) register("drawnvalve" + (drawnValveI++), s, { valve: true });
       // kind 0 (eraser) registers nothing — there is no surface to click.
     });
 
-    gl.bindTexture(gl.TEXTURE_2D, S.solid);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, S.nx, S.ny, 0, gl.RED, gl.UNSIGNED_BYTE, m);
+    GLH.upload(gl, S.solid, S.nx, S.ny, gl.RED, gl.UNSIGNED_BYTE, m, 1);
     wallDistance();
+    S.tauV = undefined;                // windTau / paddleBed read what was just rebuilt
+    S.padBed = undefined;
     S.tcolDirty = true;                // the closure's columns are stale too
 
-    S.bandKey = null;                  // invalidate the cached control bands
+    S.bandLv = null;                   // invalidate the cached control bands
 
     // Any change to the mask invalidates the window being averaged: the walls
     // the mean was accumulated through are no longer the walls on screen, and
     // §9 of docs/averaging.md lists a geometry edit as a reset condition. This
     // is the choke point for every path that moves a wall — the drawing tools
-    // here, and the boundary-open toggles in main.js — so one reset covers
+    // here, and the boundary-open toggles in js/panel.js — so one reset covers
     // them all. A no-op during build(), which nulls S.avg before it calls
     // this, so it can neither double-start nor fight build()'s own wasAvg
     // restore.
     if (S.avg) avgReset();
+    // build() passes false: a rebuild is not an edit (the Force pick survives a
+    // resolution change; a fresh grid has fresh overlay estimates anyway).
+    if (notify) emitGeometry();
+  }
+
+  /** Geometry listeners — see onGeometry. */
+  const geomListeners = [];
+  function emitGeometry() {
+    // Iterate a copy so a listener may unsubscribe itself. Exceptions are
+    // deliberately NOT caught: a broken listener must be loud.
+    geomListeners.slice().forEach((fn) => fn(S));
+  }
+  /** Register fn(S), called at the end of every rasterise() — so through
+   *  addSeg, undoSeg, clearSegs, setParam and the boundary toggles. NOT from
+   *  build()'s own rasterise (a rebuild is not an edit) and NOT from setValve
+   *  (a student selects the valve face, then presses V). Returns an
+   *  unsubscribe function. */
+  function onGeometry(fn) {
+    geomListeners.push(fn);
+    return () => {
+      const k = geomListeners.indexOf(fn);
+      if (k >= 0) geomListeners.splice(k, 1);
+    };
   }
 
   /** Distance from every cell corner to the nearest solid, in metres — the
@@ -355,11 +413,10 @@ const SIM = (() => {
     // Far beyond any real squared distance (nx² + ny² < 1.4e8) yet small
     // enough that q² is not lost to rounding in the parabola intersections.
     const INF = 1e12;
-    const shut = S.p ? S.p.valveClosed : 1;
+    const shut = isOn(S.p ? S.p.valveClosed : 1);
     const solid = (i, j) => {
       if (i < 0 || j < 0) return false;
-      const v = m[j * nx + i];
-      return v >= 192 || (v >= 64 && shut > 0.5);
+      return isSolid(m[j * nx + i], shut);
     };
     const n = Math.max(nx, ny);
     if (!S.wdG || S.wdG.length !== nx * ny || S.wdF.length !== n) {
@@ -402,12 +459,10 @@ const SIM = (() => {
       pass(nx);
       for (let i = 0; i < nx; i++) out[j * nx + i] = Math.min(Math.sqrt(d[i]), 1e4) * S.dx;
     }
-    gl.bindTexture(gl.TEXTURE_2D, S.wallTex);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, out);
+    GLH.upload(gl, S.wallTex, nx, ny, gl.RED, gl.FLOAT, out, 4);
   }
 
-  /** Add a drawn edge. kind: 255 wall, 128 valve, 0 eraser. */
+  /** Add a drawn edge. kind: MASK.WALL, MASK.VALVE, or MASK.OPEN (the eraser). */
   function addSeg(x0, z0, x1, z1, th, kind) {
     S.segs.push([x0, z0, x1, z1, th, kind]);
     rasterise();
@@ -513,11 +568,9 @@ const SIM = (() => {
     // before release(old) frees the outgoing accumulator.
     const wasAvg = !!(S && S.avg);
     const aspect = scene.W / scene.H;
-    // The hard cap is the driver's texture limit, not a number picked here.
-    // A fixed 1400 silently swallowed the top resolutions on exactly the
-    // scenes that need them: m2 is 16 m × 0.95 m, so at Ultra it asks for
-    // nx ≈ 3400 and used to get 1400 — the flumes would have ignored two
-    // whole steps of the slider.
+    // The hard cap is the driver's texture limit, not a number picked here:
+    // m2 is 16 m × 0.95 m, so at Ultra it asks for nx ≈ 3400, and a fixed
+    // cap (1400 was one) would ignore two whole steps of the slider.
     const lim = Math.min(8192, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096);
     let nx = Math.round(Math.sqrt(budget * aspect));
     nx = Math.max(96, Math.min(lim, nx));
@@ -572,12 +625,44 @@ const SIM = (() => {
       ? Object.fromEntries(scene.params.map((d) => [d.key, d.value]))
       : {});
     const old = S;                  // everything CPU-side has been read off it
+    // Every field the grid will ever carry, declared here with its initial
+    // value so that `S` has one shape and a reader can find what a name means.
+    // The textures are null until allocated just below, after the outgoing
+    // grid has been released (its VRAM goes back before ours is taken).
     S = {
-      scene, nx, ny, dx, segs,
+      // -- the grid: the domain, its discretisation, the drawing and the live parameters
+      scene, nx, ny, dx, segs, params, p,
       W: nx * dx, H: ny * dx,
       mask: new Uint8Array(nx * ny),
-      t: 0, frames: 0,
-      p, params,
+      solids: [],                   // registered pick surfaces, rebuilt by rasterise()
+      t: 0, frames: 0, nsteps: 0,   // simulated seconds, frames drawn, substeps taken
+      // -- live textures and framebuffers (GPU state)
+      U: null, F: null, P: null, pn: 128,
+      solid: null, wallTex: null,
+      colTex: null, colFbo: null, tcolTex: null, tcolFbo: null, hglTex: null, hglFbo: null,
+      // -- closure scratch: the wall-distance transform's buffers (wallDistance, hydraulicGrade)
+      wdG: null, wdF: null, wdD: null, wdZ: null, wdV: null, wallD: null,
+      ceF: null, ceU: null, ceW: null,
+      // -- readback scratch, reused so a frame's instruments allocate nothing
+      pxBuf: new Float32Array(4), colBuf: new Float32Array(nx * 4), hglBuf: new Float32Array(nx * 4),
+      cvU: null, cvF: null,         // control volume, faceForce
+      lnU: null, lnF: null,         // lineFlux
+      avgFieldScratch: null,        // the averaged field's raw read, hydraulicGrade
+      // -- caches and their keys
+      colFresh: false,              // did the LAST columns() call pull its buffer back
+      tcolDirty: true,              // the closure's columns need a rebuild
+      bandLv: null, inBand: null, twBand: null,    // control bands (bands()): [inflow, tailwater] level
+      stageK: null, stage: null,    // the inlet stage solve (inletStage()): its input tuple
+      tauV: undefined,              // windTau(), cached; rasterise() clears it
+      padBed: undefined,            // paddleBed(): {x, z}, cached; rasterise() clears it
+      wetT: -Infinity, wetFr: 1,    // the water's share of the domain (wetFraction())
+      trailSet: 0,                  // the Particle trail slider, s; 0 = fitted
+      // -- dye
+      dyeOn: false, dyeDraw: true,  // seeds wanted / dye drawn at all
+      dyeUsed: false,               // any ink since the last reset (selects the dye face scheme)
+      seeds: null, seedT: 0,        // the fixed dye sources and when they were drawn
+      // -- averaging: allocated on demand by avgStart()
+      avg: null,
     };
     release(old);                   // free BEFORE allocating: lower peak VRAM
 
@@ -593,14 +678,11 @@ const SIM = (() => {
     S.tcolTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
     S.tcolFbo = GLH.createFBO(gl, S.tcolTex);
     S.wallTex = GLH.createTexture(gl, nx, ny, gl.R32F, gl.RED, FL, null);
-    S.nsteps = 0;
     // The live hydraulic grade line (FS_HGL), one texel per column.
     S.hglTex = GLH.createTexture(gl, nx, 1, F, RGBA, FL, null);
     S.hglFbo = GLH.createFBO(gl, S.hglTex);
-    S.hglBuf = new Float32Array(nx * 4);
 
-    const pn = 128;
-    S.pn = pn;
+    const pn = S.pn;
     const pd = new Float32Array(pn * pn * 4);
     for (let k = 0; k < pn * pn; k++) {
       pd[k * 4] = Math.random() * S.W;
@@ -610,17 +692,13 @@ const SIM = (() => {
     }
     S.P = GLH.createDoubleBuffer(gl, pn, pn, F, RGBA, FL, pd);
 
-    S.colBuf = new Float32Array(nx * 4);
-    // Whether the LAST columns() call actually pulled its buffer back, or
-    // handed out the one from up to two frames ago. avgColumns() rides this:
-    // its readback is the same nx x 1 pipeline sync, so refreshing on the same
-    // frames costs nothing extra and refreshing on the others would double the
-    // stall this throttle exists to avoid.
-    S.colFresh = false;
-    S.pxBuf = new Float32Array(4);
-    S.avg = null;                   // transport accumulator, allocated on demand
+    // `S.colFresh`: whether the LAST columns() call actually pulled its buffer
+    // back, or handed out the one from up to two frames ago. avgColumns()
+    // rides this: its readback is the same nx x 1 pipeline sync, so refreshing
+    // on the same frames costs nothing extra and refreshing on the others
+    // would double the stall this throttle exists to avoid.
 
-    rasterise();
+    rasterise(false);               // a rebuild is not an edit: no onGeometry
     resetWater();
     if (wasAvg) avgStart();         // zeroed against the new grid, f(0) = the reset water
     return S;
@@ -633,7 +711,7 @@ const SIM = (() => {
     // slider (hydro) rather than to a constant reads it here. NaN when the
     // control is off, so a scene cannot mistake 0 for a level.
     const P = { g: Math.abs(S.p.g), c: S.p.c,
-                level: S.p.inflow.on > 0.5 ? S.p.inflow.level : NaN };
+                level: isOn(S.p.inflow.on) ? S.p.inflow.level : NaN };
     const water = S.scene.water;
     // The live params go with the call: a parametric scene fills the pipe
     // its solids() actually drew, not the default one. Scenes taking
@@ -645,13 +723,12 @@ const SIM = (() => {
         d[k] = Math.max(0, water((i + 0.5) * S.dx, (j + 0.5) * S.dx, P, par) || 0);
       }
     }
-    for (const b of [S.F.a, S.F.b]) {
-      gl.bindTexture(gl.TEXTURE_2D, b.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, d);
-    }
+    // texSubImage2D (GLH.upload), never texImage2D: these textures are FBO
+    // colour attachments, and sub-image leaves their storage untouched.
+    S.F.uploadBoth(S.nx, S.ny, gl.RGBA, gl.FLOAT, d, 4);
     // A fresh experiment restarts the closure's refresh cadence, so the same
     // reset followed by the same substeps is the same run — the F1 gate in
-    // smoke.js compares two of them cell for cell.
+    // smoke.mjs compares two of them cell for cell.
     S.nsteps = 0; S.tcolDirty = true;
     S.dyeUsed = false;              // no ink in the water: back to the cheap upwind dye faces
     const vel = new Float32Array(n * 4);
@@ -676,19 +753,16 @@ const SIM = (() => {
         }
       }
     }
-    for (const b of [S.U.a, S.U.b]) {
-      gl.bindTexture(gl.TEXTURE_2D, b.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, S.nx, S.ny, 0, gl.RGBA, gl.FLOAT, vel);
-    }
+    S.U.uploadBoth(S.nx, S.ny, gl.RGBA, gl.FLOAT, vel, 4);
     S.t = 0;
     // A wave train belongs to the run it was fired in: the clock restarts,
     // so does the paddle (the scene's own t0, if it fires one by itself).
     if (S.p.wave) S.p.wave.t0 = S.scene.wave ? S.scene.wave.t0 : undefined;
-    // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex, whose
-    // storage the loop above just RESPECIFIED — the same hazard rescaleFill
-    // sidesteps with texSubImage2D. Rebuild rather than gamble on those
-    // attachments surviving. It also gives R the window reset the averaging
-    // mode wants: a reloaded scene shares nothing with the run being averaged.
+    // The accumulator's MRT framebuffers attach S.F.a.tex / S.F.b.tex; the
+    // uploads above are sub-image writes, so those attachments are intact. The
+    // window is restarted all the same, for the reset the averaging mode wants:
+    // a reloaded scene shares nothing with the run being averaged (f(0) is
+    // snapshotted again from the new water).
     if (S.avg) { avgStop(); avgStart(); }
   }
 
@@ -712,8 +786,7 @@ const SIM = (() => {
   function disposeAvg(a) {
     if (!a) return;
     if (a.T) a.T.dispose();
-    if (a.fboA) gl.deleteFramebuffer(a.fboA);
-    if (a.fboB) gl.deleteFramebuffer(a.fboB);
+    if (a.coupled) a.coupled.dispose();
     if (a.fld) a.fld.dispose();
     if (a.col) a.col.dispose();
     // The two CPU snapshots are plain arrays, so they go with the dropped
@@ -730,15 +803,12 @@ const SIM = (() => {
     const F = gl.RGBA32F, RGBA = gl.RGBA, FL = gl.FLOAT;
     const T = GLH.createDoubleBuffer(gl, S.nx, S.ny, F, RGBA, FL, null);
     // The vof pass writes f and the accumulator together, so both halves of
-    // each ping-pong need a framebuffer that carries both attachments — and
-    // the two ping-pongs must stay in phase, which is what `fA` is for.
-    // Selecting on `S.F.write === S.F.b` would be a tautology (the double
-    // buffer's `write` getter simply RETURNS `b`), so after the first swap it
-    // would keep picking fboA and write f and the accumulator into mismatched
-    // textures — silent corruption of exactly what this exists to detect.
-    // Identity of the attached texture is the only honest test.
-    const fboA = GLH.createFBO2(gl, S.F.b.tex, T.b.tex);
-    const fboB = GLH.createFBO2(gl, S.F.a.tex, T.a.tex);
+    // each ping-pong need a framebuffer that carries both attachments, and the
+    // two ping-pongs must stay in phase. GLH.createCoupled owns that: one MRT
+    // framebuffer per phase, chosen by S.F.parity, both buffers swapped as one
+    // (see its comment for why the old `S.F.write === S.F.b` test was a
+    // tautology). S.F may be mid-run when the window opens; T is fresh.
+    const coupled = GLH.createCoupled(gl, S.F, T);
     // The Favre display accumulator (§4.1) — its own ping-pong, because it is
     // a plain single-attachment target updated once per FRAME by prog.acc,
     // not once per substep by the vof pass's MRT. `tf` is its own clock for
@@ -751,7 +821,7 @@ const SIM = (() => {
     // separate sample (FS_COL's output, not the raw field), so it gets a
     // separate window. Do not fold it into `tf` — see the module note above.
     const col = GLH.createDoubleBuffer(gl, S.nx, 1, F, RGBA, FL, null);
-    S.avg = { T, fboA, fboB, fA: S.F.b.tex, f0buf: null, t: 0, fld, tf: 0,
+    S.avg = { T, coupled, f0buf: null, t: 0, fld, tf: 0,
               col, tc: 0, bedbuf: null, buf: null, out: null };
     snapshotF0();
     snapshotBed();
@@ -767,8 +837,7 @@ const SIM = (() => {
    *  wants f(0) on the GPU it is one texSubImage2D from here. */
   function snapshotF0() {
     const buf = new Float32Array(S.nx * S.ny * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.F.read.fbo, 0, 0, S.nx, S.ny, buf);
     S.avg.f0buf = buf;
   }
 
@@ -820,7 +889,7 @@ const SIM = (() => {
    *  C stays inside 0.40–0.54 over that whole range (0.745 on an ANGLE/D3D11
    *  path), which is what makes the law usable as a gate: scale by √(T/Δt) and
    *  the margin stops moving. `Fmax` is returned so a caller can do exactly
-   *  that — see `avgBound` in exercises/_runner/smoke.js. Those numbers are
+   *  that — see `avgBound` in test/smoke.mjs. Those numbers are
    *  from before the stress-free surface (#72); its steadier chute sheet
    *  leaves the random-walk regime on long windows, where the updates fall
    *  under half an ulp and round away systematically — docs/averaging.md §5.
@@ -834,8 +903,8 @@ const SIM = (() => {
    *  ∇ₕ·⟨F⟩ itself runs to 135 s⁻¹ here.
    *
    *  Cells where ⟨S⟩ is nonzero are the sponge, the Dirichlet bands, the point
-   *  sources AND every positivity-clamp event — the invented-water signature
-   *  the Conservation notes warn about — so `nSrc` is reported separately
+   *  sources AND every NaN/rounding-guard event — the rare cells where the donor-side
+   *  flux cap's guard fires — so `nSrc` is reported separately
    *  rather than silently folded into the exclusion. Solid cells are excluded
    *  too: they early-return in the shader and merely pass their accumulator
    *  through. */
@@ -843,20 +912,17 @@ const SIM = (() => {
     if (!S.avg || !(S.avg.t > 0)) return { max: 0, mean: 0, n: 0, nSrc: 0, Fmax: 0 };
     const n = S.nx * S.ny;
     const A = new Float32Array(n * 4), fT = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.T.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, A);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, fT);
+    GLH.read(gl, S.avg.T.read.fbo, 0, 0, S.nx, S.ny, A);
+    GLH.read(gl, S.F.read.fbo, 0, 0, S.nx, S.ny, fT);
     const f0 = S.avg.f0buf;
-    // 255 = wall, 128 = valve (solid only while closed), 0 = open.
-    const solidLo = S.p.valveClosed > 0.5 ? 64 : 192;
+    const closed = isOn(S.p.valveClosed);
     const T = S.avg.t, nx = S.nx;
     let max = 0, sum = 0, cnt = 0, nSrc = 0, Fmax = 0;
     let maxSrc = 0, sumSrc = 0, Smax = 0;
     for (let j = 1; j < S.ny - 1; j++) {
       for (let i = 1; i < nx - 1; i++) {
         const k = (j * nx + i) * 4;
-        if (S.mask[j * nx + i] >= solidLo) continue;
+        if (isSolid(S.mask[j * nx + i], closed)) continue;
         // The scale of the drift, over every interior fluid cell — source
         // cells included, because their face means still feed a source-free
         // neighbour's divergence.
@@ -871,7 +937,7 @@ const SIM = (() => {
         const a = Math.abs(r);
         if (Math.abs(A[k + 2]) > 1e-9) {
           // Source cell — the sponge, a Dirichlet band, a point source, or a
-          // positivity-clamp event. §5's identity holds HERE TOO because ⟨S⟩
+          // NaN/rounding-guard event. §5's identity holds HERE TOO because ⟨S⟩
           // carries the whole non-conservative difference; kept as its own
           // population (F4) with its own scale, since the drift in these
           // cells rides on ‖⟨S⟩‖ as well as ‖⟨F⟩‖/Δx.
@@ -918,15 +984,12 @@ const SIM = (() => {
    *  leaves the equations looking like themselves in the heavy-fluid limit. */
   function avgField() {
     const n = S.nx * S.ny, buf = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.avg.fld.read.fbo, 0, 0, S.nx, S.ny, buf);
     const fbar = new Float32Array(n), pbar = new Float32Array(n);
     const ubar = new Float32Array(n), wbar = new Float32Array(n);
     for (let k = 0; k < n; k++) {
-      const f = buf[k * 4 + 2];
-      fbar[k] = f; pbar[k] = buf[k * 4 + 3];
-      const d = Math.max(f, 1e-6);
-      ubar[k] = buf[k * 4] / d; wbar[k] = buf[k * 4 + 1] / d;
+      const v = favre(buf, k);
+      ubar[k] = v[0]; wbar[k] = v[1]; fbar[k] = v[2]; pbar[k] = v[3];
     }
     return { fbar, pbar, ubar, wbar };
   }
@@ -991,8 +1054,7 @@ const SIM = (() => {
                     A.out = { C: new Float32Array(S.nx * 4),
                               sigma: new Float32Array(S.nx) }; }
       const buf = A.buf, C = A.out.C, sigma = A.out.sigma, bed = A.bedbuf;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, A.col.read.fbo);
-      gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, A.col.read.fbo, 0, 0, S.nx, 1, buf);
       for (let i = 0; i < S.nx; i++) {
         C[i * 4]     = bed[i];                   // bed, from the window snapshot
         C[i * 4 + 1] = buf[i * 4];               // d̄
@@ -1012,14 +1074,13 @@ const SIM = (() => {
     if (!S.avg) return null;
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
-    const f = S.pxBuf[2], d = Math.max(f, 1e-6);
-    const g = Math.abs(S.p.g) || 9.81;
+    GLH.read(gl, S.avg.fld.read.fbo, i, j, 1, 1, S.pxBuf);
+    const [u, w, f, p] = favre(S.pxBuf, 0);
+    const g = gMag();
     // U.b is KINEMATIC pressure p/rho, so the head is that over g -- it must
     // not be divided by density a second time (docs/averaging.md §4.1).
-    return { i, j, fbar: f, ubar: S.pxBuf[0] / d, wbar: S.pxBuf[1] / d,
-             pbar: S.pxBuf[3], phead: S.pxBuf[3] / g };
+    return { i, j, fbar: f, ubar: u, wbar: w,
+             pbar: p, phead: p / g, zp: j * S.dx };
   }
 
   // ------------------------------------------------------------------ step
@@ -1047,7 +1108,7 @@ const SIM = (() => {
     const runs = [];
     let a = -1;
     for (let j = 1; j < S.ny - 1; j++) {
-      const open = S.mask[j * S.nx + i] < 64;
+      const open = S.mask[j * S.nx + i] < MASK.VALVE_MIN;
       if (open && a < 0) a = j;
       if (a >= 0 && (!open || j === S.ny - 2)) {
         runs.push([a, open ? j : j - 1]);
@@ -1067,11 +1128,12 @@ const SIM = (() => {
 
   function bands() {
     const p = S.p;
-    const key = p.inflow.level + ":" + p.tailwater.level;
-    if (S.bandKey !== key) {
-      S.bandKey = key;
-      S.inBand = columnBand(1, p.inflow.level);
-      S.twBand = columnBand(S.nx - 2, p.tailwater.level);
+    // Keyed on the two levels themselves: compared as numbers, no string built.
+    const lv = S.bandLv, a = p.inflow.level, b = p.tailwater.level;
+    if (!lv || lv[0] !== a || lv[1] !== b) {
+      S.bandLv = [a, b];
+      S.inBand = columnBand(1, a);
+      S.twBand = columnBand(S.nx - 2, b);
     }
     return { inB: S.inBand, twB: S.twBand };
   }
@@ -1103,17 +1165,18 @@ const SIM = (() => {
    *  - A scene that pins `inflow.v` has said what it wants directly; q is not
    *    the control.
    *
-   *  Cached on the same key as `bands()`, because `simUniforms` runs twice a
-   *  substep and the root solve, while cheap, has no business running there. */
+   *  Cached on its input tuple (compared as numbers, as `bands()` does):
+   *  `inletVel` and `stepUniforms` both ask, and the root solve, while
+   *  cheap, has no business running more than when an input moves. */
   function inletStage() {
-    const inf = S.p.inflow, b = bands().inB;
-    const key = inf.level + ":" + inf.q + ":" + inf.free + ":" + inf.v + ":" + b[0] + ":" + b[1];
-    if (S.stageKey === key) return S.stage;
-    S.stageKey = key;
+    const inf = S.p.inflow, b = bands().inB, k = S.stageK;
+    if (k && k[0] === inf.level && k[1] === inf.q && k[2] === inf.free && k[3] === inf.v
+        && k[4] === b[0] && k[5] === b[1]) return S.stage;
+    S.stageK = [inf.level, inf.q, inf.free, inf.v, b[0], b[1]];
     const out = { stage: inf.level, choked: false, qmax: Infinity, dc: 0, Emin: 0 };
-    const solved = !(inf.free > 0.5) && inf.v === undefined && b[1] >= inf.level - 1e-4;
+    const solved = !isOn(inf.free) && inf.v === undefined && b[1] >= inf.level - 1e-4;
     if (solved) {
-      const g = Math.abs(S.p.g) || 9.81;
+      const g = gMag();
       const r = RECON.inletDepth(inf.level - b[0], inf.q || 0, g,
                                  inf.branch === "super" ? "super" : "sub");
       out.stage = b[0] + r.d;
@@ -1136,37 +1199,40 @@ const SIM = (() => {
     return (inf.q || 0) / Math.max(Math.min(surf, b[1]) - b[0], S.dx);
   }
 
-  /** Uniforms shared by the two simulation passes. */
-  function simUniforms(pr, h) {
+  // Uniforms are program state: a value set on a program stays until it is set
+  // again, whichever other programs run in between (turbColumns' TCOL, the
+  // Average accumulators, the particle pass). So what does not change inside
+  // one step() call is set ONCE per call, after `useProgram` on the program it
+  // belongs to (`stepUniforms`, `velOnlyUniforms`, `vofOnlyUniforms`), and
+  // only what moves with the substep clock is set every substep
+  // (`substepUniforms`, the paddle velocity, `u_Tacc`, the dye). The params
+  // are not touched by anything between two substeps of one call.
+
+  /** Per STEP: the uniforms both simulation passes read (SIM_HEAD in
+   *  shaders.js). What only one of them reads is set by `velOnlyUniforms` /
+   *  `vofOnlyUniforms`: a uniform set on a program that never reads it is a
+   *  lookup that returns null, which GLH reports. `pr` must be current. */
+  function stepUniforms(pr, h) {
     const p = S.p;
     gl.uniform2f(pr.u("u_res"), S.nx, S.ny);
     gl.uniform1f(pr.u("u_dx"), S.dx);
     gl.uniform1f(pr.u("u_dt"), h);
     gl.uniform1f(pr.u("u_g"), -Math.abs(p.g));
-    gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(p.g));
-    gl.uniform1f(pr.u("u_c"), p.c);
     gl.uniform1f(pr.u("u_c2"), p.c * p.c);
     gl.uniform1f(pr.u("u_valve"), p.valveClosed);
-    const { inB, twB } = bands();
+    const { inB } = bands();
     // u_in.x is the SURFACE the boundary pins, which is the delivered stage —
     // NOT the reservoir level, which is its energy line. See `inletStage`.
     const inSurf = inletStage().stage;
     gl.uniform4f(pr.u("u_in"), inSurf, inletVel(), p.inflow.on, p.inflow.free || 0);
     gl.uniform2f(pr.u("u_tw"), p.tailwater.level, p.tailwater.on);
     gl.uniform2f(pr.u("u_inBand"), inB[0], Math.min(inSurf, inB[1]));
-    gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
     // Sponge widths are physical (metres) so resolution changes keep the
     // same reservoir; default is ~10 cells.
     const sc = S.scene;
     gl.uniform2f(pr.u("u_spongeN"),
       sc.spongeIn ? Math.round(sc.spongeIn / S.dx) : 10,
       sc.spongeTw ? Math.round(sc.spongeTw / S.dx) : 10);
-    // A head-driven sponge supplies the pipe by its deficit, so the level it
-    // holds sits Q / (fill rate × width) under the setting; a scene may stiffen
-    // the fill (`spongeFill`, default 1 — every scene but contraction).
-    gl.uniform1f(pr.u("u_fillIn"), sc.spongeFill || 1);
-    gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
-    gl.uniform1f(pr.u("u_time"), S.t);
     const s0 = p.source, s1 = p.pour;
     gl.uniform4f(pr.u("u_src0"), s0.x, s0.z, s0.r, s0.on);
     gl.uniform4f(pr.u("u_sv0"), s0.vx, s0.vz, 0, 0);   // spout runs clear
@@ -1177,6 +1243,57 @@ const SIM = (() => {
       gl.uniform4f(pr.u("u_src1"), 0, 0, 0, 0);
       gl.uniform4f(pr.u("u_sv1"), 0, 0, 0, 0);
     }
+  }
+
+  /** Per SUBSTEP, both passes: the simulated clock. */
+  function substepUniforms(pr) {
+    gl.uniform1f(pr.u("u_time"), S.t);
+  }
+
+  /** Per STEP, the velocity pass's own: the slope's gravity component, the slot
+   *  celerity (its bulk-viscosity term), the closure and friction constants,
+   *  the wind, and the wavemaker's fixed part (the paddle's velocity is per
+   *  substep: see step()). */
+  function velOnlyUniforms(pr) {
+    const p = S.p;
+    gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(p.g));
+    gl.uniform1f(pr.u("u_c"), p.c);
+    gl.uniform1f(pr.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
+    gl.uniform1f(pr.u("u_nu"), p.nu);
+    gl.uniform2f(pr.u("u_nuOut"), p.outflowNu || 0,
+      p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);
+    gl.uniform1f(pr.u("u_twOut"), p.twOutflowOnly ? 1 : 0);
+    gl.uniform1f(pr.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
+    gl.uniform1f(pr.u("u_cs"), p.cs);
+    gl.uniform1f(pr.u("u_cf"), p.cf);
+    gl.uniform1f(pr.u("u_slip"), p.slip);
+    gl.uniform1f(pr.u("u_bulk"), p.bulk);
+    gl.uniform4f(pr.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
+      p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
+    gl.uniform1f(pr.u("u_waveD"), wallPaddle() ? p.wave.d : 0);
+    // The flap (opt-in): its hinge and still-water level. y = 0 keeps the old
+    // expression in the shader.
+    if (flapOn()) {
+      const zb = paddleBed();
+      gl.uniform2f(pr.u("u_flap"), zb - Math.max(0, p.wave.hinge || 0), zb + p.wave.d);
+    } else gl.uniform2f(pr.u("u_flap"), 0, 0);
+  }
+
+  /** Per STEP, the VOF pass's own: the tailwater band, the sponges' fill, the
+   *  edges' open modes (ghost ring and sponges live there), the compression and
+   *  dye-decay constants and the residue drain. */
+  function vofOnlyUniforms(pr) {
+    const p = S.p, sc = S.scene, { twB } = bands();
+    gl.uniform2f(pr.u("u_twBand"), twB[0], Math.min(p.tailwater.level, twB[1]));
+    // A head-driven sponge supplies the pipe by its deficit, so the level it
+    // holds sits Q / (fill rate × width) under the setting; a scene may stiffen
+    // the fill (`spongeFill`, default 1 — every scene but contraction).
+    gl.uniform1f(pr.u("u_fillIn"), sc.spongeFill || 1);
+    gl.uniform4f(pr.u("u_openMode"), p.open[0], p.open[1], p.open[2], p.open[3]);
+    gl.uniform1f(pr.u("u_ca"), p.ca);
+    gl.uniform1f(pr.u("u_dyeDecay"), p.dyeDecay);
+    const rd = p.residueDrain && planView() ? p.residueDrain : null;
+    gl.uniform2f(pr.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
   }
 
   /** The open-channel columns the mixing length reads (FS_TCOL): where each
@@ -1199,9 +1316,15 @@ const SIM = (() => {
    *  carried by rigs like any other param); every other scene reads 0, and
    *  the vel pass then skips the term altogether. */
   function windTau() {
-    const decl = (S.scene.params || []).some((d) => d.key === "tau");
-    const v = decl ? S.params.tau : 0;
-    return Number.isFinite(v) ? v : 0;
+    // Cached: the scan is over the scene's declared params, which change only
+    // with the scene (a new S) or through setParam -> rasterise(), which
+    // clears `S.tauV`.
+    if (S.tauV === undefined) {
+      const decl = (S.scene.params || []).some((d) => d.key === "tau");
+      const v = decl ? S.params.tau : 0;
+      S.tauV = Number.isFinite(v) ? v : 0;
+    }
+    return S.tauV;
   }
 
   /** Is the piston a paddle AT THE LEFT WALL? Only when it sits in column 1,
@@ -1211,7 +1334,7 @@ const SIM = (() => {
    *  but WV-4's `beach`; the overlay asks the same question to draw it. */
   function wallPaddle() {
     const p = S.p;
-    return p.wave.on > 0.5 && p.wave.d > 0 && p.open[0] === 1 && p.inflow.on < 0.5
+    return isOn(p.wave.on) && p.wave.d > 0 && p.open[0] === 1 && !isOn(p.inflow.on)
       && Math.round(p.wave.x / S.dx) <= 1;
   }
 
@@ -1277,7 +1400,7 @@ const SIM = (() => {
    *  integral. Returns {k, L, kh, H_S, cp, cg}; k from ω² = gk tanh kh.
    *  On the grid the measured H falls short of it (WV-5's README). */
   function wavemakerHS(T, h, flap, l) {
-    const g = 9.81, om = 2 * Math.PI / T;
+    const g = gMag(), om = 2 * Math.PI / T;
     let k = Math.max(om * om / g, om / Math.sqrt(g * h));
     for (let n = 0; n < 40; n++) {
       const th = Math.tanh(k * h);
@@ -1293,7 +1416,7 @@ const SIM = (() => {
 
   /** Fire one wave train (wave.train > 0). Every press is a fresh
    *  experiment: the flume is reset to still water and t = 0 (resetWater,
-   *  which also clears the gauges' history through main.js's t-went-back
+   *  which also clears the gauges' history through js/instruments.js's t-went-back
    *  check), then the train starts at t = 0. A lecturer could not see how to
    *  run WV-5 a second time: the old rule refused a press while the paddle
    *  was still moving, and a second train fired after the first ran into its
@@ -1301,7 +1424,7 @@ const SIM = (() => {
    *  rest in still water. Returns true when a train starts. */
   function fireTrain() {
     const w = S.p.wave;
-    if (!(w.train > 0) || !(w.on > 0.5)) return false;
+    if (!(w.train > 0) || !isOn(w.on)) return false;
     resetWater();
     S.p.wave.t0 = S.t;
     return true;
@@ -1310,19 +1433,38 @@ const SIM = (() => {
   /** Is the paddle a flap? (wave.flap, with the still depth it needs.) */
   function flapOn() {
     const w = S.p.wave;
-    return w.flap > 0.5 && w.d > 0;
+    return isOn(w.flap) && w.d > 0;
   }
 
   /** The bed under the paddle's column, from the mask (the first non-solid
    *  cell up from the bottom) — the flap's hinge is measured from it. */
   function paddleBed() {
-    const i = Math.max(1, Math.round(S.p.wave.x / S.dx));
-    for (let j = 0; j < S.ny; j++) if (S.mask[j * S.nx + i] < 192) return j * S.dx;
-    return 0;
+    // Cached per rasterise (it clears `S.padBed`) and per paddle column.
+    const i = Math.max(1, Math.round(S.p.wave.x / S.dx)), c = S.padBed;
+    if (c && c.i === i) return c.z;
+    let z = 0;
+    for (let j = 0; j < S.ny; j++) if (!isSolid(S.mask[j * S.nx + i], false)) { z = j * S.dx; break; }
+    S.padBed = { i, z };
+    return z;
   }
 
   function step(nsub) {
     const p = S.p, h = dt();
+    const useAcc = !!S.avg;
+    const pv = useAcc ? prog.vofA : prog.vof;
+    // Everything that cannot change inside this call, once, each on its own
+    // program (useProgram first: uniforms go to the CURRENT program). What
+    // runs between two substeps (turbColumns' TCOL) is a different program and
+    // touches none of these.
+    gl.useProgram(prog.vel);
+    stepUniforms(prog.vel, h);
+    velOnlyUniforms(prog.vel);
+    gl.useProgram(pv);
+    stepUniforms(pv, h);
+    vofOnlyUniforms(pv);
+    // The paddle's velocity is per substep only when something shapes it (a
+    // flap or a train envelope); the plain piston takes u_time instead.
+    const shaped = flapOn() || p.wave.train > 0;
     for (let n = 0; n < nsub; n++) {
       if (S.tcolDirty || S.nsteps % TCOL_EVERY === 0) { turbColumns(); S.tcolDirty = false; }
       S.nsteps++;
@@ -1330,61 +1472,36 @@ const SIM = (() => {
       gl.useProgram(prog.vel);
       GLH.bindTex(gl, prog.vel, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
                                  ["u_Wd", S.wallTex], ["u_Tc", S.tcolTex]]);
-      simUniforms(prog.vel, h);
-      gl.uniform1f(prog.vel.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
-      gl.uniform1f(prog.vel.u("u_nu"), p.nu);
-      gl.uniform2f(prog.vel.u("u_nuOut"), p.outflowNu || 0,
-        p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);
-      gl.uniform1f(prog.vel.u("u_twOut"), p.twOutflowOnly ? 1 : 0);
-      gl.uniform1f(prog.vel.u("u_tau"), windTau() / 1000);   // kinematic τ/ρ
-      gl.uniform1f(prog.vel.u("u_cs"), p.cs);
-      gl.uniform1f(prog.vel.u("u_cf"), p.cf);
-      gl.uniform1f(prog.vel.u("u_slip"), p.slip);
-      gl.uniform1f(prog.vel.u("u_bulk"), p.bulk);
-      gl.uniform4f(prog.vel.u("u_wave"), p.wave.amp, 2 * Math.PI / Math.max(p.wave.period, 0.05),
-        p.wave.on, Math.max(1, Math.round(p.wave.x / S.dx)));
-      gl.uniform1f(prog.vel.u("u_waveD"), wallPaddle() ? p.wave.d : 0);
+      substepUniforms(prog.vel);
       // The flap and the train envelope (both opt-in): the CPU hands the
-      // paddle's velocity for this substep, and the flap's hinge and
-      // still-water level. y = 0 keeps the old expression in the shader.
-      const flap = flapOn(), shaped = flap || p.wave.train > 0;
+      // paddle's velocity for this substep. y = 0 keeps the old expression
+      // in the shader.
       gl.uniform2f(prog.vel.u("u_waveU"), shaped ? paddle(S.t).U : 0, shaped ? 1 : 0);
-      if (flap) {
-        const zb = paddleBed();
-        gl.uniform2f(prog.vel.u("u_flap"), zb - Math.max(0, p.wave.hinge || 0), zb + p.wave.d);
-      } else gl.uniform2f(prog.vel.u("u_flap"), 0, 0);
       GLH.bindTarget(gl, S.U.write.fbo, S.nx, S.ny);
       quad.draw();
       S.U.swap();
 
       // --- volume: conservative limited advection of f (+ dye)
-      const useAcc = !!S.avg;
-      const pv = useAcc ? prog.vofA : prog.vof;
       gl.useProgram(pv);
       GLH.bindTex(gl, pv, useAcc
         ? [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid],
            ["u_A", S.avg.T.read.tex]]
         : [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
-      simUniforms(pv, h);
-      gl.uniform1f(pv.u("u_ca"), p.ca);
-      gl.uniform1f(pv.u("u_dyeDecay"), p.dyeDecay);
+      substepUniforms(pv);
       dyeUniforms(pv);
-      const rd = p.residueDrain && Math.abs(p.g) < 0.1 ? p.residueDrain : null;
-      gl.uniform2f(pv.u("u_drain"), rd ? rd.rate : 0, rd ? rd.speed : 0);
       if (useAcc) {
         // T BEFORE this substep — the running-mean weight is h/(T+h).
         gl.uniform1f(pv.u("u_Tacc"), S.avg.t);
-        // The MRT fbo whose attachments are the two WRITE halves. Compared by
-        // texture identity, not by `S.F.write === S.F.b`: see avgStart.
-        GLH.bindTarget(gl, S.F.write.tex === S.avg.fA ? S.avg.fboA : S.avg.fboB,
-          S.nx, S.ny);
+        // The MRT fbo whose attachments are the two WRITE halves, by phase:
+        // see GLH.createCoupled.
+        GLH.bindTarget(gl, S.avg.coupled.fbo(), S.nx, S.ny);
       } else {
         GLH.bindTarget(gl, S.F.write.fbo, S.nx, S.ny);
       }
       quad.draw();
-      S.F.swap();
       // Both ping-pongs advance together or they fall out of phase.
-      if (useAcc) { S.avg.T.swap(); S.avg.t += h; }
+      if (useAcc) { S.avg.coupled.swap(); S.avg.t += h; }
+      else S.F.swap();
 
       S.t += h;
     }
@@ -1408,7 +1525,7 @@ const SIM = (() => {
     S.colFresh = force || colTick-- <= 0;
     if (S.colFresh) {
       colTick = readEvery - 1;
-      gl.readPixels(0, 0, S.nx, 1, gl.RGBA, gl.FLOAT, S.colBuf);
+      GLH.read(gl, S.colFbo, 0, 0, S.nx, 1, S.colBuf);
     }
     return S.colBuf;
   }
@@ -1478,7 +1595,7 @@ const SIM = (() => {
     }
     const inj = S.dyeDraw !== false ? S.p.dyeInj : null;
     if (n || inj) S.dyeUsed = true;
-    gl.uniform4f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, S.dyeUsed ? 1 : 0, 0);
+    gl.uniform3f(pr.u("u_dyeSeed"), n, S.p.dyeLine > 0 ? S.p.dyeLine : 0, S.dyeUsed ? 1 : 0);
     gl.uniform4f(pr.u("u_dyeInj"), inj ? inj.x : 0, inj ? inj.z : 0, inj ? inj.r : 0, inj ? 1 : 0);
   }
   /** The Dye tool's release radius: a few cells, and never less than a
@@ -1489,18 +1606,18 @@ const SIM = (() => {
   }
 
   function advanceParticles(realDt, avg) {
-    // Under an open window the particles ride the FAVRE MEAN: u_U becomes the
-    // accumulator texture and the shader's u_avg branch divides <f u>/f-bar at
+    // Under an open window the particles ride the FAVRE MEAN: u_AF is the
+    // accumulator texture (bound to the live U otherwise, so the sampler is
+    // always valid) and the shader's u_avg branch divides <f u>/f-bar at
     // cell centres. A steady mean makes their paths the mean flow's
     // streamlines, which is what a tracer over a mean picture should draw.
     const useAvg = !!(avg && S.avg);
     gl.useProgram(prog.part);
-    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex],
-      ["u_U", useAvg ? S.avg.fld.read.tex : S.U.read.tex],
+    GLH.bindTex(gl, prog.part, [["u_P", S.P.read.tex], ["u_U", S.U.read.tex],
+      ["u_AF", useAvg ? S.avg.fld.read.tex : S.U.read.tex],
       ["u_F", S.F.read.tex], ["u_S", S.solid]]);
     gl.uniform1f(prog.part.u("u_avg"), useAvg ? 1 : 0);
     gl.uniform2f(prog.part.u("u_res"), S.nx, S.ny);
-    gl.uniform2f(prog.part.u("u_pres"), S.pn, S.pn);
     gl.uniform1f(prog.part.u("u_dx"), S.dx);
     gl.uniform1f(prog.part.u("u_pdt"), realDt);
     // Particle lifetime is per scene: a tracer has to outlive a wave period
@@ -1524,7 +1641,7 @@ const SIM = (() => {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(prog.draw);
-    // Average paints the same seven branches from the mean state, so the two
+    // Average paints the same nine branches from the mean state, so the two
     // accumulator textures go in beside the live ones and `u_avg` picks. With
     // no window open they are BOUND TO THE LIVE TEXTURES rather than left
     // dangling: an unbound sampler2D reads unit 0, which is whatever the last
@@ -1542,10 +1659,13 @@ const SIM = (() => {
     gl.uniform1f(prog.draw.u("u_dx"), S.dx);
     gl.uniform1f(prog.draw.u("u_g"), -Math.abs(S.p.g));
     gl.uniform1f(prog.draw.u("u_tilt"), S.scene.tiltS0 || 0);
-    gl.uniform1f(prog.draw.u("u_c2"), S.p.c * S.p.c);
     gl.uniform1f(prog.draw.u("u_valve"), S.p.valveClosed);
-    gl.uniform1f(prog.draw.u("u_time"), S.t);
     gl.uniform1i(prog.draw.u("u_mode"), opts.mode);
+    // The active FIELDS row's ramp and midpoint (js/fields.js): the shader tests
+    // no mode number for its colours. An unknown ramp name paints magenta.
+    gl.uniform1i(prog.draw.u("u_ramp"), Shaders.RAMP_IDS.indexOf(opts.ramp));
+    gl.uniform1f(prog.draw.u("u_hasMid"), opts.mid === undefined ? 0 : 1);
+    gl.uniform1f(prog.draw.u("u_mid"), opts.mid === undefined ? 0 : opts.mid);
     gl.uniform1f(prog.draw.u("u_vmax"), opts.vmax);
     gl.uniform1f(prog.draw.u("u_lo"), opts.lo);
     gl.uniform1f(prog.draw.u("u_hi"), opts.hi);
@@ -1557,7 +1677,7 @@ const SIM = (() => {
     S.dyeDraw = !!opts.dye;
     const seeds = !!opts.dye && !!opts.dyeSeeds;
     if (S.dyeOn !== seeds) { S.dyeOn = seeds; S.seeds = null; }
-    gl.uniform4f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2], 0);
+    gl.uniform3f(prog.draw.u("u_cursor"), opts.cursor[0], opts.cursor[1], opts.cursor[2]);
     gl.uniform4f(prog.draw.u("u_guide"), opts.guide[0], opts.guide[1], opts.guide[2], opts.guide[3]);
     gl.uniform1f(prog.draw.u("u_guideOn"), opts.guideOn ? 1 : 0);
     rect.draw();
@@ -1602,8 +1722,8 @@ const SIM = (() => {
   /** The water's share of the domain, from the last column reduction, about
    *  once a second. Plan view (no gravity) has no columns: taken as full. */
   function wetFraction() {
-    if (Math.abs(S.p.g) < 0.1 || !S.colBuf) return 1;
-    if (S.wetT === undefined || S.t < S.wetT || S.t - S.wetT > 1) {
+    if (planView() || !S.colBuf) return 1;
+    if (S.t < S.wetT || S.t - S.wetT > 1) {
       let a = 0;
       for (let i = 0; i < S.nx; i++) a += Math.max(0, S.colBuf[i * 4 + 1]);
       S.wetFr = Math.min(1, Math.max(0.08, a / (S.nx * S.H)));
@@ -1650,7 +1770,7 @@ const SIM = (() => {
     gl.useProgram(prog.pdraw);
     // u_Q is the other half of the ping-pong: where each particle was before
     // the last advance, so the tail can fill in the whole step.
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.prev.tex]]);
     gl.uniform1i(prog.pdraw.u("u_sub"), TAIL_SUB);
     gl.uniform2f(prog.pdraw.u("u_res"), S.nx, S.ny);
     gl.uniform2f(prog.pdraw.u("u_pres"), S.pn, S.pn);
@@ -1673,12 +1793,12 @@ const SIM = (() => {
     GLH.bindTarget(gl, null, cw, ch);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(prog.tshadow);
-    GLH.bindTex(gl, prog.tshadow, [["u_T", trail.tex]]);
+    GLH.bindTex(gl, prog.tshadow, [["u_Trail", trail.tex]]);
     gl.uniform2f(prog.tshadow.u("u_px"), 1 / cw, 1 / ch);
     quad.draw();
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);   // it is premultiplied
     gl.useProgram(prog.tex);
-    GLH.bindTex(gl, prog.tex, [["u_T", trail.tex]]);
+    GLH.bindTex(gl, prog.tex, [["u_Trail", trail.tex]]);
     quad.draw();
 
     // …then the heads, once, straight to the screen at full strength. Drawn
@@ -1688,10 +1808,11 @@ const SIM = (() => {
     // (FS_PART_DRAW), which is what keeps it visible on the pale colourings.
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.useProgram(prog.pdraw);
-    // Re-bind: the composite above pointed texture unit 0 at the trail, and
-    // `u_P` still names unit 0 — without this the heads read the trail as
-    // their own positions and land nowhere.
-    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.write.tex]]);
+    // Re-bind: texture units are context state, not program state. The
+    // composite above bound the trail to unit 0, and `u_P` still names unit 0
+    // (bindTex numbers units by position) — without this the heads read the
+    // trail as their own positions and land nowhere.
+    GLH.bindTex(gl, prog.pdraw, [["u_P", S.P.read.tex], ["u_Q", S.P.prev.tex]]);
     gl.uniform1i(prog.pdraw.u("u_sub"), 1);
     gl.uniform1f(prog.pdraw.u("u_psize"), tail + 3.0);
     gl.uniform1f(prog.pdraw.u("u_amp"), 1.0);
@@ -1711,16 +1832,16 @@ const SIM = (() => {
     if (!(k > 0) || k === 1) return;
     const n = S.nx * S.ny;
     const buf = new Float32Array(n * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.F.read.fbo, 0, 0, S.nx, S.ny, buf);
     for (let i = 0; i < n; i++) {
       const f = buf[i * 4];
       if (f > 1) buf[i * 4] = 1 + (f - 1) * k;
     }
-    // texSubImage2D, not texImage2D: this texture is an FBO colour attachment
-    // and respecifying its storage would invalidate it.
-    gl.bindTexture(gl.TEXTURE_2D, S.F.read.tex);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf);
+    // texSubImage2D (via GLH.upload), not texImage2D: this texture is an FBO
+    // colour attachment. Respecifying it at the SAME size is allowed to keep
+    // the attachment, but the sub-image write never touches the storage, so
+    // nothing here has to rely on that.
+    GLH.upload(gl, S.F.read.tex, S.nx, S.ny, gl.RGBA, gl.FLOAT, buf, 4);
     // Same shape as the reset in rasterise(), for the same reason: this
     // REWRITES f under an open window. f(0) is snapshotted on the CPU, so the
     // endpoint term (f(T) - f(0))/T would absorb the whole rescale increment
@@ -1737,8 +1858,10 @@ const SIM = (() => {
    *  hydrostatic water that is simply the submergence below the local free
    *  surface, so it carries a unit vertical gradient everywhere wet and is not
    *  comparable between cells at different heights. The piezometric head is
-   *  h = z + p/ρg; add the elevation yourself (see the gauge sampler in
-   *  main.js). Renamed from `head` with rig format v2 — the old name kept
+   *  h = z + p/ρg; add the elevation yourself, and use `zp` — j·Δx, the
+   *  cell's lower face, which is the elevation the stored pressure belongs to
+   *  (contract at the top of shaders.js) — not the cursor's or the cell
+   *  centre's z (see the gauge sampler in instruments.js). Renamed from `head` with rig format v2 — the old name kept
    *  being read as piezometric, which it never was. */
   /** One readPixels serving every instrument: the (u, w, P) and (f) rects in
    *  the LIVE layout, from the live textures or — when `avg` is passed and a
@@ -1750,19 +1873,16 @@ const SIM = (() => {
    *  under `avg` they read zero. */
   function readState(i0, j0, w, h, Ubuf, Fbuf, avg) {
     if (avg && S.avg) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
+      GLH.read(gl, S.avg.fld.read.fbo, i0, j0, w, h, Ubuf);
       for (let k = 0; k < w * h; k++) {
-        const f = Ubuf[k * 4 + 2], d = Math.max(f, 1e-6);
-        Fbuf[k * 4] = f; Fbuf[k * 4 + 1] = 0; Fbuf[k * 4 + 2] = 0; Fbuf[k * 4 + 3] = 0;
-        Ubuf[k * 4] /= d; Ubuf[k * 4 + 1] /= d; Ubuf[k * 4 + 2] = Ubuf[k * 4 + 3];
+        const v = favre(Ubuf, k);
+        Fbuf[k * 4] = v[2]; Fbuf[k * 4 + 1] = 0; Fbuf[k * 4 + 2] = 0; Fbuf[k * 4 + 3] = 0;
+        Ubuf[k * 4] = v[0]; Ubuf[k * 4 + 1] = v[1]; Ubuf[k * 4 + 2] = v[3];
       }
       return true;
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Ubuf);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(i0, j0, w, h, gl.RGBA, gl.FLOAT, Fbuf);
+    GLH.read(gl, S.U.read.fbo, i0, j0, w, h, Ubuf);
+    GLH.read(gl, S.F.read.fbo, i0, j0, w, h, Fbuf);
     return false;
   }
 
@@ -1820,7 +1940,7 @@ const SIM = (() => {
   function hydraulicGrade(out, avg) {
     const nx = S.nx, ny = S.ny, dx = S.dx;
     const h = out && out.length >= nx ? out : new Float32Array(nx);
-    const g = Math.abs(S.p.g) || 9.81;
+    const g = gMag();
     const hv = out && out.hv && out.hv.length >= nx ? out.hv : new Float32Array(nx);
     h.hv = hv;
     if (!(avg && S.avg)) {
@@ -1828,23 +1948,22 @@ const SIM = (() => {
       GLH.bindTex(gl, prog.hgl, [["u_U", S.U.read.tex], ["u_F", S.F.read.tex], ["u_S", S.solid]]);
       gl.uniform2f(prog.hgl.u("u_res"), nx, ny);
       gl.uniform1f(prog.hgl.u("u_dx"), dx);
-      gl.uniform1f(prog.hgl.u("u_g"), g);
+      gl.uniform1f(prog.hgl.u("u_gMag"), g);
       GLH.bindTarget(gl, S.hglFbo, nx, 1);
       quad.draw();
-      gl.readPixels(0, 0, nx, 1, gl.RGBA, gl.FLOAT, S.hglBuf);
+      GLH.read(gl, S.hglFbo, 0, 0, nx, 1, S.hglBuf);
       for (let i = 0; i < nx; i++) {
-        h[i] = S.hglBuf[i * 4] > 0.5 ? S.hglBuf[i * 4 + 1] : NaN;
+        h[i] = isOn(S.hglBuf[i * 4]) ? S.hglBuf[i * 4 + 1] : NaN;
         hv[i] = NaN;
       }
       return h;
     }
-    const buf = S.gradeBuf && S.gradeBuf.length >= nx * ny * 4
-      ? S.gradeBuf : (S.gradeBuf = new Float32Array(nx * ny * 4));
+    const buf = S.avgFieldScratch && S.avgFieldScratch.length >= nx * ny * 4
+      ? S.avgFieldScratch : (S.avgFieldScratch = new Float32Array(nx * ny * 4));
     // The averaged field stores (f*u, f*w, f, P) — the pressure in the 4th
     // channel, not the live field's 3rd; reading the wrong one gives a
     // plausible-looking line made of velocity.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-    gl.readPixels(0, 0, nx, ny, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.avg.fld.read.fbo, 0, 0, nx, ny, buf);
     // Reused column scratch for the energy moments — one allocation, not nx.
     const cf = S.ceF && S.ceF.length >= ny ? S.ceF : (S.ceF = new Float64Array(ny));
     const cu = S.ceU && S.ceU.length >= ny ? S.ceU : (S.ceU = new Float64Array(ny));
@@ -1853,7 +1972,7 @@ const SIM = (() => {
       h[i] = NaN; hv[i] = NaN;
       for (let j = 1; j < ny - 1; j++) {
         const k = j * nx + i;
-        if (S.mask[k] >= 192) continue;                      // solid
+        if (isSolid(S.mask[k], false)) continue;             // solid
         if (buf[k * 4 + 2] < 0.25) continue;                 // not water yet
         // j * dx, NOT the cell centre. MEASURED: with (j + 0.5) * dx the
         // whole line sat a uniform 0.00964 m above the free surface on m1
@@ -1871,13 +1990,12 @@ const SIM = (() => {
       cf.fill(0, 0, ny); cu.fill(0, 0, ny); cw.fill(0, 0, ny);
       for (let j = 1; j < ny - 1; j++) {
         const k = j * nx + i;
-        if (S.mask[k] >= 192) continue;
-        const f = buf[k * 4 + 2];
-        if (f < 0.25) continue;
-        const fi = Math.max(f, 1e-6);
-        cf[j] = f;
-        cu[j] = buf[k * 4] / fi;
-        cw[j] = buf[k * 4 + 1] / fi;
+        if (isSolid(S.mask[k], false)) continue;
+        const v = favre(buf, k);
+        if (v[2] < 0.25) continue;
+        cf[j] = v[2];
+        cu[j] = v[0];
+        cw[j] = v[1];
       }
       hv[i] = RECON.columnEnergy(cf, cu, cw, dx, g).hv;
     }
@@ -1893,7 +2011,7 @@ const SIM = (() => {
    *  pixel-pack buffer and drops a fence; `streamPoll` checks the fence with
    *  a zero timeout on a later frame and only copies the bytes out once the
    *  GPU says they are there. One request in flight at a time; the caller
-   *  (main.js refreshStream) sets the rate.
+   *  (js/instruments.js requestStream) sets the rate.
    *
    *  Live: from U and F. Average: from the Favre accumulator. The request
    *  remembers which, and the S it was made against, so a result that lands
@@ -1914,7 +2032,8 @@ const SIM = (() => {
     }
     const A = !!(avg && S.avg);
     gl.useProgram(prog.sflux);
-    GLH.bindTex(gl, prog.sflux, [["u_U", A ? S.avg.fld.read.tex : S.U.read.tex],
+    GLH.bindTex(gl, prog.sflux, [["u_U", S.U.read.tex],
+                                 ["u_AF", A ? S.avg.fld.read.tex : S.U.read.tex],
                                  ["u_F", S.F.read.tex], ["u_S", S.solid]]);
     gl.uniform2f(prog.sflux.u("u_res"), nx, ny);
     gl.uniform1f(prog.sflux.u("u_avg"), A ? 1 : 0);
@@ -1954,21 +2073,17 @@ const SIM = (() => {
     const i = Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx)));
     const j = Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)));
     if (avg && S.avg) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
-      const f = S.pxBuf[2], d = Math.max(f, 1e-6);
-      const u = S.pxBuf[0] / d, w = S.pxBuf[1] / d, p = S.pxBuf[3];
-      const g = Math.abs(S.p.g) || 9.81;
-      return { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w),
+      GLH.read(gl, S.avg.fld.read.fbo, i, j, 1, 1, S.pxBuf);
+      const [u, w, f, p] = favre(S.pxBuf, 0);
+      const g = gMag();
+      return { i, j, f, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
                solid: S.mask[j * S.nx + i] };
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
+    GLH.read(gl, S.U.read.fbo, i, j, 1, 1, S.pxBuf);
     const u = S.pxBuf[0], w = S.pxBuf[1], p = S.pxBuf[2];
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-    gl.readPixels(i, j, 1, 1, gl.RGBA, gl.FLOAT, S.pxBuf);
-    const g = Math.abs(S.p.g) || 9.81;
-    return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, speed: Math.hypot(u, w),
+    GLH.read(gl, S.F.read.fbo, i, j, 1, 1, S.pxBuf);
+    const g = gMag();
+    return { i, j, f: S.pxBuf[0], u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w),
              dye: S.pxBuf[1], solid: S.mask[j * S.nx + i] };
   }
 
@@ -1984,7 +2099,7 @@ const SIM = (() => {
    *  texture's read (the gauges never use f): `f` is then null, and a row
    *  costs ONE read. */
   function probeMany(pts, avg, noFill) {
-    const g = Math.abs(S.p.g) || 9.81;
+    const g = gMag();
     const cell = pts.map(([x, z]) => [
       Math.max(0, Math.min(S.nx - 1, Math.floor(x / S.dx))),
       Math.max(0, Math.min(S.ny - 1, Math.floor(z / S.dx)))]);
@@ -1999,23 +2114,20 @@ const SIM = (() => {
     rows.forEach((r, j) => {
       const n = r.i1 - r.i0 + 1;
       const A = new Float32Array(4 * n);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, useAvg ? S.avg.fld.read.fbo : S.U.read.fbo);
-      gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, A);
+      GLH.read(gl, useAvg ? S.avg.fld.read.fbo : S.U.read.fbo, r.i0, j, n, 1, A);
       let B = null;
       if (!useAvg && !noFill) {
         B = new Float32Array(4 * n);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-        gl.readPixels(r.i0, j, n, 1, gl.RGBA, gl.FLOAT, B);
+        GLH.read(gl, S.F.read.fbo, r.i0, j, n, 1, B);
       }
       r.k.forEach((k) => {
         const i = cell[k][0], o = 4 * (i - r.i0), solid = S.mask[j * S.nx + i];
         if (useAvg) {
-          const f = A[o + 2], d = Math.max(f, 1e-6);
-          const u = A[o] / d, w = A[o + 1] / d, p = A[o + 3];
-          out[k] = { i, j, f, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+          const [u, w, f, p] = favre(A, o / 4);
+          out[k] = { i, j, f, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w), solid };
         } else {
           const u = A[o], w = A[o + 1], p = A[o + 2];
-          out[k] = { i, j, f: B ? B[o] : null, u, w, p, phead: p / g, speed: Math.hypot(u, w), solid };
+          out[k] = { i, j, f: B ? B[o] : null, u, w, p, phead: p / g, zp: j * S.dx, speed: Math.hypot(u, w), solid };
         }
       });
     });
@@ -2048,18 +2160,20 @@ const SIM = (() => {
     // speaks: (u, w, P) in U and f in F.r, with u the Favre mean <f u_c>/f-bar.
     const A = avg && S.avg;
     readState(0, 0, S.nx, S.ny, U, F, A);
-    const g = Math.abs(S.p.g) || 9.81, tilt = S.scene.tiltS0 || 0;
+    const g = gMag(), tilt = S.scene.tiltS0 || 0;
     // The Froude number needs a depth, and under Average it is the mean
     // column's <d> - the same number FS_DISP divides by (docs/averaging.md §6).
     const col = A ? avgColumns(true).C : columns();
     const v = [];
-    const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && S.mask[j * S.nx + i] < 192;
+    const wet = (i, j) => F[(j * S.nx + i) * 4] >= 0.5 && !isSolid(S.mask[j * S.nx + i], false);
     for (let j = 0; j < S.ny; j++) {
       for (let i = 0; i < S.nx; i++) {
         if (!wet(i, j)) continue;
         const k = (j * S.nx + i) * 4;
         const u = U[k], w = U[k + 1], P = U[k + 2];
-        const x = (i + 0.5) * S.dx, z = (j + 0.5) * S.dx;
+        // z is the elevation the stored pressure belongs to: the cell's LOWER
+        // face (contract at the top of shaders.js), as FS_DISP and FS_HGL use.
+        const x = (i + 0.5) * S.dx, z = j * S.dx;
         let q = null;
         if (mode === 0 || mode === 1) q = P / g;
         else if (mode === 8) q = P;          // p in kPa = ρP/1000, ρ = 1000
@@ -2067,7 +2181,7 @@ const SIM = (() => {
         else if (mode === 7) q = z - tilt * x + P / g + (u * u + w * w) / (2 * g);
         else if (mode === 2) q = Math.hypot(u, w);
         else if (mode === 3) q = Math.abs(u) / Math.sqrt(Math.max(g * col[i * 4 + 1], 1e-4));
-        else if (mode === 5) q = F[k] * u * Math.hypot(u, w);
+        else if (mode === 5) q = 1000 * F[k] * u * Math.hypot(u, w);   // ρ = 1000: kg/m/s²
         else if (mode === 4 && i > 0 && j > 0 && i < S.nx - 1 && j < S.ny - 1) {
           // Vorticity is a stencil, not a cell: ∂w/∂x − ∂u/∂z, as FS_DISP does it.
           const dwdx = U[(j * S.nx + i + 1) * 4 + 1] - U[(j * S.nx + i - 1) * 4 + 1];
@@ -2089,8 +2203,7 @@ const SIM = (() => {
   function particlePos(n) {
     const w = Math.max(1, Math.min(S.pn, n || 16));
     const buf = new Float32Array(w * 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, S.P.read.fbo);
-    gl.readPixels(0, 0, w, 1, gl.RGBA, gl.FLOAT, buf);
+    GLH.read(gl, S.P.read.fbo, 0, 0, w, 1, buf);
     const out = [];
     for (let k = 0; k < w; k++) out.push(buf[k * 4], buf[k * 4 + 1]);
     return out;
@@ -2109,20 +2222,17 @@ const SIM = (() => {
     let f = null;
     if (fOut) f = fOut instanceof Float32Array && fOut.length >= S.ny ? fOut : new Float32Array(S.ny);
     if (avg && S.avg) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.avg.fld.read.fbo, i, 0, 1, S.ny, buf);
       for (let k = 0; k < S.ny; k++) {
-        const d = Math.max(buf[k * 4 + 2], 1e-6);
-        if (f) f[k] = buf[k * 4 + 2];
-        buf[k * 4] /= d; buf[k * 4 + 1] /= d; buf[k * 4 + 2] = buf[k * 4 + 3];
+        const v = favre(buf, k);
+        if (f) f[k] = v[2];
+        buf[k * 4] = v[0]; buf[k * 4 + 1] = v[1]; buf[k * 4 + 2] = v[3];
       }
     } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-      gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.U.read.fbo, i, 0, 1, S.ny, buf);
       if (f) {
         const F = new Float32Array(S.ny * 4);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, S.F.read.fbo);
-        gl.readPixels(i, 0, 1, S.ny, gl.RGBA, gl.FLOAT, F);
+        GLH.read(gl, S.F.read.fbo, i, 0, 1, S.ny, F);
         for (let k = 0; k < S.ny; k++) f[k] = F[k * 4];
       }
     }
@@ -2139,15 +2249,13 @@ const SIM = (() => {
     const buf = out && out.length >= w * S.ny * 4 ? out : new Float32Array(w * S.ny * 4);
     const on = !!(avg && S.avg);
     if (on) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.avg.fld.read.fbo);
-      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.avg.fld.read.fbo, a, 0, w, S.ny, buf);
       for (let k = 0; k < w * S.ny; k++) {
-        const d = Math.max(buf[k * 4 + 2], 1e-6);
-        buf[k * 4] /= d; buf[k * 4 + 1] /= d;
+        const v = favre(buf, k);
+        buf[k * 4] = v[0]; buf[k * 4 + 1] = v[1];
       }
     } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, S.U.read.fbo);
-      gl.readPixels(a, 0, w, S.ny, gl.RGBA, gl.FLOAT, buf);
+      GLH.read(gl, S.U.read.fbo, a, 0, w, S.ny, buf);
     }
     return { i0: a, w, ny: S.ny, dx: S.dx, buf, centred: on };
   }
@@ -2181,47 +2289,6 @@ const SIM = (() => {
     return [u, w];
   }
 
-  /** Momentum-theorem force on whatever solid a box encloses, in N per metre
-   *  of width: F = −∮ ρf·[u(u·n) + P·n] dA over the four faces, minus the
-   *  weight of the enclosed water in z. The faces sit ON grid lines, so the
-   *  MAC staggering hands over the exact normal velocity (u on x-faces, w on
-   *  z-faces); f and P (= p/ρ, in U.b — hydrostatic P = g·depth, so ρ·f·P is
-   *  the physical pressure) are averaged across the face. A face segment with
-   *  a solid on either side is skipped: the fluid boundary continues along
-   *  the solid surface there, and the traction on that surface is exactly
-   *  the force being solved for. The whole box comes back in one readPixels
-   *  per texture; the caller owns any time-averaging — the instantaneous
-   *  integral carries every splash that crosses a face. `mdot` (net outflow,
-   *  kg/s per m) is the closure check: it should time-average to ~0, and a
-   *  box that includes the spout's footprint fails it loudly, because the
-   *  spout is a source — mass and momentum appear inside the box and the
-   *  budget is not a force any more. */
-  /** The full control-volume budget, edge by edge, in ONE readback.
-   *
-   *  `boxForce` answers "what force does this box feel"; this answers the
-   *  three questions a control-volume analysis actually asks — does mass
-   *  balance, where does the momentum go, and how much energy is lost — with
-   *  the answer split across the four faces, because which face a flux
-   *  crosses is half of what a student is being asked to see.
-   *
-   *  Everything is OUTWARD-positive and per metre of width. Air contributes
-   *  nothing, and not by a threshold: every term carries the fill fraction, so
-   *  an empty cell adds zero and a half-full one adds half. `Q` uses
-   *  min(f, 1) — the geometric water volume — because f > 1 is water that has
-   *  been compressed, not extra volume of it; the mass-carrying terms use f
-   *  itself, which IS the density in this model.
-   *
-   *  `M` (the momentum the fluid carries through the face) and `Fp` (the
-   *  pressure the surroundings apply to it) are kept apart rather than summed.
-   *  Distinguishing them is the whole content of a control-volume question,
-   *  and their sum is `boxForce`'s answer — which the layout gate checks, so
-   *  the two can never quietly disagree.
-   *
-   *  Energy is per unit time: ρ f uₙ (gz + P + ½|u|²) — the Bernoulli sum, so
-   *  the total over the four faces is the rate of energy LOSS through the box.
-   *  A tilted-gravity scene carries its slope in gravity rather than in the
-   *  bed, so the elevation term is z − S₀x there, exactly as the head views
-   *  and the overlay compute it. */
   /** What crosses one SECTION: the same integrand as a control-volume face,
    *  over a line you drew rather than over a box.
    *
@@ -2243,7 +2310,7 @@ const SIM = (() => {
    *  water that has been compressed rather than more of it. */
   function lineFlux(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
-    const closed = S.p.valveClosed > 0.5;
+    const closed = isOn(S.p.valveClosed);
     const dx = x1 - x0, dz = z1 - z0;
     const len = Math.hypot(dx, dz);
     const out = { Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0,
@@ -2286,7 +2353,7 @@ const SIM = (() => {
       const ci = Math.min(S.nx - 1, Math.max(0, Math.floor(x / S.dx)));
       const cj = Math.min(S.ny - 1, Math.max(0, Math.floor(z / S.dx)));
       const m = S.mask[cj * S.nx + ci];
-      if (m > 192 || (closed && m > 64)) continue;      // a section through rock
+      if (isSolid(m, closed)) continue;                 // a section through rock
       // u lives on x-faces and w on z-faces, so each is offset half a cell —
       // unless the mean state is being read, where both are cell-centred.
       const gx = x / S.dx, gz = z / S.dx;
@@ -2313,7 +2380,10 @@ const SIM = (() => {
       out.Mz += RHO * f * wv * un * ds;
       out.Fpx += RHO * f * P * nx * ds;
       out.Fpz += RHO * f * P * nz * ds;
-      out.E += RHO * f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv)) * ds;
+      // P is bilinear over cell centres, each value belonging to its cell's
+      // LOWER face (contract at the top of shaders.js), so the pressure read
+      // at z belongs at z - dx/2: the elevation of the E term only.
+      out.E += RHO * f * un * (gAbs * ((z - 0.5 * S.dx) - tilt * x) + P + 0.5 * (u * u + wv * wv)) * ds;
       out.wet += Math.min(f, 1) * ds;
       out.n++;
     }
@@ -2338,8 +2408,8 @@ const SIM = (() => {
    *
    *  Two things zero a sample, and they are different questions. First, the
    *  offset sample point itself can land ON rock — the valve-aware test
-   *  `boxForce`'s own `sol()` uses (`m > 192`, or `m > 64` while the valve
-   *  is shut, since a shut valve's texel reads as a lighter solid than a
+   *  `boxForce`'s own `sol()` uses (`SIM.isSolid`: `m >= 192`, or `m >= 64` while
+   *  the valve is shut, since a shut valve's texel reads as a lighter solid than a
    *  wall). Second, and new: `rasterise()`'s wrappers are REGISTRATION-only
    *  — they say where a surface WOULD be, drawn from the same seg the mask
    *  was stamped from, but the mask is what says where a surface actually
@@ -2358,11 +2428,8 @@ const SIM = (() => {
     if (!so) return null;
     const pts = GEOM.faceSamples(so, faceId, S.dx);
     if (!pts || !pts.length) return null;
-    const closed = S.p.valveClosed > 0.5;
-    const sol = (i, j) => {
-      const m = S.mask[j * S.nx + i];
-      return m > 192 || (closed && m > 64);
-    };
+    const closed = isOn(S.p.valveClosed);
+    const sol = (i, j) => isSolid(S.mask[j * S.nx + i], closed);
     // Bounding box of the offset sample points, one readback, with a cell
     // of margin the way lineFlux and boxForce both keep.
     const off = 0.75 * S.dx;
@@ -2404,33 +2471,73 @@ const SIM = (() => {
       if (!inside) { q.p = 0; q.f = 0; }
     }
     const ds = pts.length > 1 ? pts[1].s - pts[0].s : S.dx;   // uniform by construction
-    const r = GEOM.faceForceFromSamples(pts, ds, 1000, Math.abs(S.p.g) || 9.81);
+    const r = GEOM.faceForceFromSamples(pts, ds, 1000, gMag());
     return Object.assign(r, { samples: pts, solidId, faceId,
                               len: pts[pts.length - 1].s + ds / 2 });
   }
 
-  function boxFlux(x0, z0, x1, z1, avg) {
-    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
-    const closed = S.p.valveClosed > 0.5;
+  /** The full control-volume budget, edge by edge, in ONE readback.
+   *
+   *  `boxForce` answers "what force does this box feel"; this answers the
+   *  three questions a control-volume analysis actually asks — does mass
+   *  balance, where does the momentum go, and how much energy is lost — with
+   *  the answer split across the four faces, because which face a flux
+   *  crosses is half of what a student is being asked to see.
+   *
+   *  Everything is OUTWARD-positive and per metre of width. Air contributes
+   *  nothing, and not by a threshold: every term carries the fill fraction, so
+   *  an empty cell adds zero and a half-full one adds half. `Q` uses
+   *  min(f, 1) — the geometric water volume — because f > 1 is water that has
+   *  been compressed, not extra volume of it; the mass-carrying terms use f
+   *  itself, which IS the density in this model.
+   *
+   *  `M` (the momentum the fluid carries through the face) and `Fp` (the
+   *  pressure the surroundings apply to it) are kept apart rather than summed.
+   *  Distinguishing them is the whole content of a control-volume question,
+   *  and their sum is `boxForce`'s answer — which the layout gate checks, so
+   *  the two can never quietly disagree.
+   *
+   *  Energy is per unit time: ρ f uₙ (gz + P + ½|u|²) — the Bernoulli sum, so
+   *  the total over the four faces is the rate of energy LOSS through the box.
+   *  A tilted-gravity scene carries its slope in gravity rather than in the
+   *  bed, so the elevation term is z − S₀x there, exactly as the head views
+   *  and the overlay compute it. */
+  function boxFlux(x0, z0, x1, z1, avg) { return boxBudget(x0, z0, x1, z1, avg).res; }
+
+  /** The box both integrals share: the grid-snapped corners (kept off the
+   *  domain's ghost ring), ONE readback of the rect one cell wider than the box
+   *  on its low sides (readState), and the valve-aware solid test. `cen` says
+   *  whether the state is cell-centred (the mean) or staggered (live). */
+  function boxSetup(x0, z0, x1, z1, avg) {
+    const closed = isOn(S.p.valveClosed);
     let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
     let jB = Math.round(Math.min(z0, z1) / S.dx), jT = Math.round(Math.max(z0, z1) / S.dx);
     iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
     jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
-    const w = iR - iL + 2, h = jT - jB + 2;
+    const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL-1..iR] x [jB-1..jT]
     const need = w * h * 4;
     if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
     const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
-    const U = S.cvU, F = S.cvF;
-    const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
-    const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
-    const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
-    const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
+    return { iL, iR, jB, jT, w, h, cen, U: S.cvU, F: S.cvF,
+             k: (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4,
+             sol: (i, j) => isSolid(S.mask[j * S.nx + i], closed) };
+  }
 
-    // x-faces: u lives ON the face, so the normal velocity needs no averaging
-    // — except from the mean state, whose velocities are cell-centred: there
-    // the face value is the mean of the two adjacent centres.
+  /** Walk the four faces of a box and hand each open one to `visit(key, n, u, wv,
+   *  f, P, z, x)`: the outward sign `n`, the velocity (u, wv) AT the face, the
+   *  fill f and pressure P averaged across it, and the face's elevation z and
+   *  position x (the elevation the stored P belongs to, so `visit` may build a
+   *  head from it). Faces with a solid on either side are skipped: the fluid
+   *  boundary continues along the solid there, and the traction on that surface
+   *  is the force being solved for. `key` is "left"/"right" for the x-faces
+   *  (j runs up, bottom to top) and "bed"/"top" for the z-faces.
+   *
+   *  x-faces: u lives ON the face, so the normal velocity needs no averaging,
+   *  except from the mean state, whose velocities are cell-centred: there the
+   *  face value is the mean of the two adjacent centres. z-faces likewise for w. */
+  function faceLoops(box, visit) {
+    const { iL, iR, jB, jT, cen, U, F, k, sol } = box;
     for (const [i, n, key] of [[iL, -1, "left"], [iR, 1, "right"]]) {
-      const e = out[key];
       for (let j = jB; j < jT; j++) {
         if (sol(i - 1, j) || sol(i, j)) continue;
         const a = k(i - 1, j), b = k(i, j);
@@ -2439,18 +2546,12 @@ const SIM = (() => {
         const P = 0.5 * (U[a + 2] + U[b + 2]);
         const wv = cen ? 0.5 * (U[a + 1] + U[b + 1])
                        : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
-        const un = u * n, z = (j + 0.5) * S.dx, x = i * S.dx;
-        e.Q += Math.min(f, 1) * un;
-        e.mdot += f * un;
-        e.Mx += f * u * un;   e.Mz += f * wv * un;
-        e.Fpx += f * P * n;
-        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
-        e.wet += Math.min(f, 1);
+        // P is the mean of cells (i-1, j) and (i, j), each referenced to its
+        // LOWER face j*dx (contract at the top of shaders.js): z = j*dx.
+        visit(key, n, u, wv, f, P, j * S.dx, i * S.dx);
       }
     }
-    // z-faces: w lives ON the face (same centred-mean exception as above).
     for (const [j, n, key] of [[jB, -1, "bed"], [jT, 1, "top"]]) {
-      const e = out[key];
       for (let i = iL; i < iR; i++) {
         if (sol(i, j - 1) || sol(i, j)) continue;
         const a = k(i, j - 1), b = k(i, j);
@@ -2459,17 +2560,35 @@ const SIM = (() => {
         const P = 0.5 * (U[a + 2] + U[b + 2]);
         const u = cen ? 0.5 * (U[a] + U[b])
                       : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
-        const un = wv * n, z = j * S.dx, x = (i + 0.5) * S.dx;
-        e.Q += Math.min(f, 1) * un;
-        e.mdot += f * un;
-        e.Mx += f * u * un;   e.Mz += f * wv * un;
-        e.Fpz += f * P * n;
-        e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
-        e.wet += Math.min(f, 1);
+        // P is the mean of rows j-1 and j, referenced to (j-1)*dx and j*dx
+        // (contract at the top of shaders.js): it belongs at (j - 1/2)*dx.
+        // Only the elevation in E moves; Fpz and every other term keep P.
+        visit(key, n, u, wv, f, P, (j - 0.5) * S.dx, (i + 0.5) * S.dx);
       }
     }
+  }
 
-    // …to physical units, and the totals.
+  /** boxFlux's work, with the readback box kept for the caller that needs the
+   *  enclosed water too (boxForce). */
+  function boxBudget(x0, z0, x1, z1, avg) {
+    const gAbs = Math.abs(S.p.g), RHO = 1000, tilt = S.scene.tiltS0 || 0;
+    const box = boxSetup(x0, z0, x1, z1, avg);
+    const edge = () => ({ Q: 0, mdot: 0, Mx: 0, Mz: 0, Fpx: 0, Fpz: 0, E: 0, wet: 0 });
+    const out = { left: edge(), right: edge(), bed: edge(), top: edge() };
+
+    faceLoops(box, (key, n, u, wv, f, P, z, x) => {
+      const e = out[key];
+      const xFace = key === "left" || key === "right";
+      const un = xFace ? u * n : wv * n;
+      e.Q += Math.min(f, 1) * un;
+      e.mdot += f * un;
+      e.Mx += f * u * un;   e.Mz += f * wv * un;
+      if (xFace) e.Fpx += f * P * n; else e.Fpz += f * P * n;
+      e.E += f * un * (gAbs * (z - tilt * x) + P + 0.5 * (u * u + wv * wv));
+      e.wet += Math.min(f, 1);
+    });
+
+    // ...to physical units, and the totals.
     const tot = edge();
     let inQ = 0;
     for (const key of ["left", "right", "bed", "top"]) {
@@ -2485,71 +2604,47 @@ const SIM = (() => {
     // The force on what is inside is minus the flux of momentum out plus the
     // pressure on the faces — the same sum `boxForce` reports, less the weight
     // term, which is not a face quantity and is added by the caller if wanted.
-    return { edges: out, total: tot, inQ,
-             fx: -(tot.Mx + tot.Fpx), fz: -(tot.Mz + tot.Fpz),
-             iL, iR, jB, jT };
+    return { res: { edges: out, total: tot, inQ,
+                    fx: -(tot.Mx + tot.Fpx), fz: -(tot.Mz + tot.Fpz),
+                    iL: box.iL, iR: box.iR, jB: box.jB, jT: box.jT },
+             box };
   }
 
+  /** Momentum-theorem force on whatever solid a box encloses, in N per metre
+   *  of width: F = −∮ ρf·[u(u·n) + P·n] dA over the four faces, minus the
+   *  weight of the enclosed water in z. The faces sit ON grid lines, so the
+   *  MAC staggering hands over the exact normal velocity (u on x-faces, w on
+   *  z-faces); f and P (= p/ρ, in U.b — hydrostatic P = g·depth, so ρ·f·P is
+   *  the physical pressure) are averaged across the face. A face segment with
+   *  a solid on either side is skipped: the fluid boundary continues along
+   *  the solid surface there, and the traction on that surface is exactly
+   *  the force being solved for. The whole box comes back in one readPixels
+   *  per texture; the caller owns any time-averaging — the instantaneous
+   *  integral carries every splash that crosses a face. `mdot` (net outflow,
+   *  kg/s per m) is the closure check: it should time-average to ~0, and a
+   *  box that includes the spout's footprint fails it loudly, because the
+   *  spout is a source — mass and momentum appear inside the box and the
+   *  budget is not a force any more. */
   function boxForce(x0, z0, x1, z1, avg) {
     const gAbs = Math.abs(S.p.g), RHO = 1000;
-    const closed = S.p.valveClosed > 0.5;
-    let iL = Math.round(Math.min(x0, x1) / S.dx), iR = Math.round(Math.max(x0, x1) / S.dx);
-    let jB = Math.round(Math.min(z0, z1) / S.dx), jT = Math.round(Math.max(z0, z1) / S.dx);
-    iL = Math.max(1, Math.min(S.nx - 2, iL)); iR = Math.max(iL + 1, Math.min(S.nx - 1, iR));
-    jB = Math.max(1, Math.min(S.ny - 2, jB)); jT = Math.max(jB + 1, Math.min(S.ny - 1, jT));
-    const w = iR - iL + 2, h = jT - jB + 2;          // rect [iL−1..iR] × [jB−1..jT]
-    const need = w * h * 4;
-    if (!S.cvU || S.cvU.length < need) { S.cvU = new Float32Array(need); S.cvF = new Float32Array(need); }
-    const cen = readState(iL - 1, jB - 1, w, h, S.cvU, S.cvF, avg);
-    const U = S.cvU, F = S.cvF;
-    const k = (i, j) => ((j - jB + 1) * w + (i - iL + 1)) * 4;
-    const sol = (i, j) => { const m = S.mask[j * S.nx + i]; return m > 192 || (closed && m > 64); };
-
-    let dFx = 0, dFz = 0, mdot = 0;                  // Σ f[u(u·n) + P n]·ds, Σ f(u·n)·ds
-    for (const [i, nx_] of [[iL, -1], [iR, 1]]) {    // x-faces: u is ON the face
-      for (let j = jB; j < jT; j++) {
-        if (sol(i - 1, j) || sol(i, j)) continue;
-        const a = k(i - 1, j), b = k(i, j);
-        const u = cen ? 0.5 * (U[a] + U[b]) : U[b];  // face value; centred means average
-        const f = 0.5 * (F[a] + F[b]);
-        const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const w = cen ? 0.5 * (U[a + 1] + U[b + 1])
-                      : 0.25 * (U[a + 1] + U[b + 1] + U[k(i - 1, j + 1) + 1] + U[k(i, j + 1) + 1]);
-        const un = u * nx_;
-        dFx += f * (u * un + P * nx_);
-        dFz += f * (w * un);
-        mdot += f * un;
-      }
-    }
-    for (const [j, nz_] of [[jB, -1], [jT, 1]]) {    // z-faces: w is ON the face
-      for (let i = iL; i < iR; i++) {
-        if (sol(i, j - 1) || sol(i, j)) continue;
-        const a = k(i, j - 1), b = k(i, j);
-        const w = cen ? 0.5 * (U[a + 1] + U[b + 1]) : U[b + 1];
-        const f = 0.5 * (F[a] + F[b]);
-        const P = 0.5 * (U[a + 2] + U[b + 2]);
-        const u = cen ? 0.5 * (U[a] + U[b])
-                      : 0.25 * (U[a] + U[b] + U[k(i + 1, j - 1)] + U[k(i + 1, j)]);
-        const wn = w * nz_;
-        dFx += f * (u * wn);
-        dFz += f * (w * wn + P * nz_);
-        mdot += f * wn;
-      }
-    }
+    // The same four-face walk as boxFlux: F = -(momentum flux out + pressure on
+    // the faces), here less the weight of the enclosed water as well.
+    const { res, box } = boxBudget(x0, z0, x1, z1, avg);
+    const { iL, iR, jB, jT, F, k, sol } = box;
     let m = 0, vol = 0;                              // enclosed water, for the z-budget
     for (let j = jB; j < jT; j++) {
       for (let i = iL; i < iR; i++) if (!sol(i, j)) { m += F[k(i, j)]; vol += Math.min(F[k(i, j)], 1); }
     }
     m *= RHO * S.dx * S.dx;
     // `vol` counts a full cell once, as the faces' Q does (min(f, 1)), so its
-    // rate of change balances Q: Σf would add the EOS compression of every
-    // column a rising level loads (gh/c², ~3% in a 2 m tank) to the storage.
-    return { fx: -RHO * dFx * S.dx, fz: -RHO * dFz * S.dx - gAbs * m,
-             mdot: RHO * mdot * S.dx, mass: m, vol: vol * S.dx * S.dx, iL, iR, jB, jT };
+    // rate of change balances Q: sum f would add the EOS compression of every
+    // column a rising level loads (gh/c^2, ~3% in a 2 m tank) to the storage.
+    return { fx: res.fx, fz: res.fz - gAbs * m,
+             mdot: res.total.mdot, mass: m, vol: vol * S.dx * S.dx, iL, iR, jB, jT };
   }
 
   const get = () => S;
-  return { init, build, rasterise, addSeg, undoSeg, clearSegs, resetWater,
+  return { MASK, isSolid, isOn, gMag, planView, init, build, rasterise, onGeometry, addSeg, undoSeg, clearSegs, resetWater,
            step, columns, advanceParticles, render, probe, probeMany, rake, patch, patchVel,
            fieldStats, particlePos, particleTrail, dyeInjRadius,
            boxForce, boxFlux, lineFlux, faceForce, dt, get, inletVel, inletStage, bands, rescaleFill,

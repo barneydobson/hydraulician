@@ -6,9 +6,15 @@
  * independent modules; the block below moved verbatim. What the module is and
  * why it is DOM rather than more canvas is documented on it.
  *
- * It reaches back into main.js for FIELDS, KEYS, canvas, dragWindow, frame,
- * showToast, state and syncPanel -- all from inside functions, which is what
- * makes the load order in index.html a free choice rather than a constraint.
+ * What it borrows from the other files is the machine-checked `Reads:` line
+ * below (test/check_headers.py), used only from inside functions,
+ * which is what makes the load order in index.html a free choice rather than
+ * a constraint.
+ *
+ * Defines: GINSP
+ *
+ * Reads:   dragWindow, FMT, GAUGE_QTY, gaugeFieldOf, gaugeQty, OVERLAY,
+ *          removeGauge, showToast, state, syncPanel, UIMODE
  */
 
 // -------------------------------------------------------- gauge inspector
@@ -21,11 +27,11 @@
  *  canvas because the things it needs (drag, wheel-zoom over a small target,
  *  a download button, text you can select) are what the DOM is for. */
 const GINSP = (() => {
-  // What a gauge records is GAUGE_QTY in main.js — the gauges' own register,
+  // What a gauge records is GAUGE_QTY in fields.js — the gauges' own register,
   // a different one from the FIELDS the water is painted with, and named apart
   // from it for that reason. Every sample carries every quantity in it; what
-  // a gauge PLOTS is its own `field` (gaugeFieldOf), and what the window
-  // OFFERS is the exercise's `ui.gaugeFields` (UIMODE.gaugeFields).
+  // a gauge PLOTS is its own quantity (`g.field`, the wire name; gaugeFieldOf),
+  // and what the window OFFERS is the exercise's `ui.gaugeFields` (UIMODE.gaugeFields).
   //
   // Symbols follow free-surface convention: h is the piezometric head, d the
   // depth and η the water level (wire key "eta" — ASCII, the same pattern as
@@ -48,14 +54,23 @@ const GINSP = (() => {
     }
   }
 
-  function fmtT(t) { return (t < 10 ? t.toFixed(2) : t.toFixed(1)) + " s"; }
+
+  /** Raise window `o`: move it to the end of `open` and renumber every open
+   *  window 21..21+n-1 in stacking order, so the z-indices stay bounded below
+   *  the popups (30/31) and menus (40) however often windows are clicked. */
+  function raise(o) {
+    const i = open.indexOf(o);
+    if (i >= 0) open.splice(i, 1);
+    open.push(o);
+    open.forEach((w, n) => { w.el.style.zIndex = String(21 + n); });
+  }
 
   /** Open (or front) the inspector for gauge index k. */
   function show(k) {
     const g = state.gauges[k];
     if (!g) return null;
     const was = open.find((o) => o.g === g);
-    if (was) { was.el.style.zIndex = String(21 + open.length); return was; }
+    if (was) { raise(was); return was; }
     if (!g.id) g.id = ++state.gaugeSeq;   // rig scripts push bare gauge objects
     hosts();
     const el = document.createElement("div");
@@ -71,8 +86,8 @@ const GINSP = (() => {
       '<div class="ginsp-tabs"></div>' +
       '<canvas class="ginsp-c"></canvas>' +
       '<div class="ginsp-foot">' +
-        '<button class="ginsp-b" data-a="csv">⤓ CSV this gauge</button>' +
-        '<button class="ginsp-b" data-a="csvall">⤓ CSV all gauges</button>' +
+        '<button class="btn-sm ginsp-b" data-a="csv">⤓ CSV this gauge</button>' +
+        '<button class="btn-sm ginsp-b" data-a="csvall">⤓ CSV all gauges</button>' +
         '<span class="ginsp-span"></span>' +
       '</div>' +
       '<div class="ginsp-cap">Wheel zooms the time axis about the cursor · drag pans · ' +
@@ -80,16 +95,14 @@ const GINSP = (() => {
         'and loading a scene clear it.</div>';
     host.appendChild(el);
     const o = { g, el, t0: 0, t1: 1, fit: true,
-                hover: null, drag: null, cv: el.querySelector(".ginsp-c") };
+                hover: null, cv: el.querySelector(".ginsp-c") };
     open.push(o);
 
     const p = posMemo[g.id] ||
       [Math.max(8, innerWidth - 428), 76 + 26 * (open.length - 1)];
     el.style.left = p[0] + "px"; el.style.top = p[1] + "px";
-    el.style.zIndex = String(21 + open.length);
-    el.addEventListener("pointerdown", () => {
-      el.style.zIndex = String(22 + open.length);
-    }, true);
+    raise(o);
+    el.addEventListener("pointerdown", () => raise(o), true);
 
     // ---- header drag (see `dragWindow`)
     dragWindow(el, el.querySelector(".ginsp-h"), (L, T) => { posMemo[g.id] = [L, T]; });
@@ -205,28 +218,29 @@ const GINSP = (() => {
     const g = o.g, L = g.log || [], el = o.el;
     const k = state.gauges.indexOf(g);
     el.querySelector(".ginsp-dot").style.background = g.colour;
-    el.querySelector(".ginsp-name").textContent = "Gauge " + (k + 1);
-    el.querySelector(".ginsp-pos").textContent =
-      "x " + g.x.toFixed(2) + " · z " + g.z.toFixed(2) + " m";
+    // Written every frame, so only when the text changed (FMT.put).
+    FMT.put(el.querySelector(".ginsp-name"), "Gauge " + (k + 1));
+    FMT.put(el.querySelector(".ginsp-pos"),
+      "x " + g.x.toFixed(2) + " · z " + g.z.toFixed(2) + " m");
     const last = L.length ? L[L.length - 1] : null;
     if (o.qkey !== offered().map((q) => q.id).join(",")) buildRows(o);
     o.field = gaugeFieldOf(g);
     const F = gaugeQty(o.field);
     Object.keys(o.vb).forEach((f) => {
       const V = o.vb[f];
-      // A sample logged before a quantity existed (stale main.js next to a
+      // A sample logged before a quantity existed (stale script next to a
       // fresh this) has no such key; throwing here kills the frame loop.
       const v = shown(V.q, last);
-      V.b.textContent = (Number.isFinite(v) ? v.toFixed(3) : "—") + " " + V.q.unit;
+      FMT.put(V.b, (Number.isFinite(v) ? v.toFixed(3) : "—") + " " + V.q.unit);
       V.row.classList.toggle("on", f === o.field);
     });
     [...el.querySelectorAll(".ginsp-tabs button")]
       .forEach((b) => b.classList.toggle("on", b.dataset.f === o.field));
     const sp = el.querySelector(".ginsp-span");
-    sp.textContent = (L.length
+    FMT.put(sp, (L.length
       ? L.length.toLocaleString() + (L.length === 1 ? " sample · " : " samples · ") +
-        fmtT(L[0].t) + " → " + fmtT(L[L.length - 1].t)
-      : "no samples yet") + (state.paused ? "  · frozen" : "");
+        FMT.t(L[0].t) + " → " + FMT.t(L[L.length - 1].t)
+      : "no samples yet") + (state.paused ? "  · frozen" : ""));
     sp.classList.toggle("frozen", state.paused);
 
     const cv = o.cv, dpr = Math.min(devicePixelRatio || 1, 2);
@@ -235,11 +249,11 @@ const GINSP = (() => {
     const c = cv.getContext("2d");
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, w, h);
-    c.fillStyle = "rgba(6,10,16,0.55)";
+    c.fillStyle = OVERLAY.C.chartBg;
     c.beginPath(); c.roundRect(0, 0, w, h, 8); c.fill();
     if (L.length < 2) {
-      c.fillStyle = "rgba(223,232,242,0.45)";
-      c.font = "11px ui-monospace, monospace";
+      c.fillStyle = OVERLAY.C.chartText;
+      c.font = OVERLAY.FONT.mono(11);
       c.fillText(L.length ? "one sample so far" : "no history yet — press ▶︎ Run", 12, h / 2);
       return;
     }
@@ -257,22 +271,20 @@ const GINSP = (() => {
     const PY = (v) => y1 - (v - lo) / (hi - lo) * (y1 - y0);
 
     // gridlines + value labels
-    c.font = "10px ui-monospace, monospace";
-    c.strokeStyle = "rgba(255,255,255,0.07)"; c.lineWidth = 1;
-    c.fillStyle = "rgba(223,232,242,0.45)";
+    c.font = OVERLAY.FONT.mono(10);
+    c.strokeStyle = OVERLAY.C.chartGrid; c.lineWidth = 1;
+    c.fillStyle = OVERLAY.C.chartText;
     for (let n = 0; n <= 4; n++) {
       const v = lo + (hi - lo) * n / 4, y = PY(v);
       c.beginPath(); c.moveTo(x0, y); c.lineTo(x1, y); c.stroke();
-      c.fillText(OVERLAY.fmt(v, 3), x1 + 5, y + 3);
+      c.fillText(FMT.fix(v, 3), x1 + 5, y + 3);
     }
     // time ticks on a 1-2-5 rounding of a quarter of the window
     const tgt = span(o) / 4;
-    const mag = Math.pow(10, Math.floor(Math.log10(Math.max(tgt, 1e-4))));
-    const stp = [1, 2, 5, 10].map((m) => m * mag)
-      .reduce((a, b) => Math.abs(b - tgt) < Math.abs(a - tgt) ? b : a);
+    const stp = FMT.nice(tgt, undefined, 1e-4);
     for (let t = Math.ceil(o.t0 / stp) * stp; t <= o.t1; t += stp) {
       const x = PX(t);
-      c.strokeStyle = "rgba(255,255,255,0.07)";
+      c.strokeStyle = OVERLAY.C.chartGrid;
       c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y1); c.stroke();
       c.fillText(stp < 1 ? t.toFixed(1) : t.toFixed(0), x - 8, h - 7);
     }
@@ -299,21 +311,21 @@ const GINSP = (() => {
       if (i > 0 && (i >= L.length || Math.abs(L[i - 1].t - th) < Math.abs(L[i].t - th))) i--;
       i = Math.max(0, Math.min(L.length - 1, i));
       const X = PX(L[i].t), Y = PY(val(L[i]));
-      c.strokeStyle = "rgba(255,255,255,0.35)"; c.setLineDash([3, 3]);
+      c.strokeStyle = OVERLAY.C.chartCursor; c.setLineDash([3, 3]);
       c.beginPath(); c.moveTo(X, y0); c.lineTo(X, y1); c.stroke();
       c.beginPath(); c.moveTo(x0, Y); c.lineTo(x1, Y); c.stroke();
       c.setLineDash([]);
       c.fillStyle = g.colour;
-      c.beginPath(); c.arc(X, Y, 2.5, 0, 6.2832); c.fill();
+      c.beginPath(); c.arc(X, Y, 2.5, 0, OVERLAY.TAU); c.fill();
       const v = val(L[i]);
       const txt = "t " + L[i].t.toFixed(3) + " s   " + F.sym + " " +
                   (Number.isFinite(v) ? v.toFixed(4) : "—") + " " + F.unit;
-      c.font = "700 10.5px ui-monospace, monospace";
+      c.font = OVERLAY.FONT.mono(10.5, 700);
       const tw = c.measureText(txt).width;
       const bx = Math.min(Math.max(X + 7, x0), x1 - tw - 10);
-      c.fillStyle = "rgba(6,10,16,0.88)";
+      c.fillStyle = OVERLAY.C.chartLabelBg;
       c.beginPath(); c.roundRect(bx - 4, y0 + 1, tw + 8, 15, 4); c.fill();
-      c.fillStyle = "#e8f0f8";
+      c.fillStyle = OVERLAY.C.chartLabelText;
       c.fillText(txt, bx, y0 + 12);
       o.read = { t: L[i].t, v, field: o.field };
     } else o.read = null;
@@ -322,6 +334,10 @@ const GINSP = (() => {
   /** Per-frame: drop windows whose gauge is gone, keep the numbers live, and
    *  park a small ⤢ affordance on each corner card. */
   let lastN = -1;
+  // A card's quantity menu is placed by its own width. Reading offsetWidth
+  // after writing positions forces a layout every frame, so each select's
+  // width is measured once per option set and again after a resize.
+  addEventListener("resize", () => sels.forEach((s) => { s._w = 0; }));
   function tick(rects) {
     for (let i = open.length - 1; i >= 0; i--) {
       if (state.gauges.indexOf(open[i].g) < 0) hide(open[i]); else draw(open[i]);
@@ -374,7 +390,7 @@ const GINSP = (() => {
       b.style.left = Math.max(2, r.x - 23) + "px";
       b.style.top = (r.y + 5) + "px";
       if (s.dataset.q !== qkey) {
-        s.dataset.q = qkey; s.textContent = "";
+        s.dataset.q = qkey; s.textContent = ""; s._w = 0;
         Q.forEach((q) => {
           const o = document.createElement("option");
           o.value = q.id; o.textContent = q.sym; o.title = q.name;
@@ -384,7 +400,8 @@ const GINSP = (() => {
       s.dataset.k = String(r.k);
       // One quantity on offer is no choice at all.
       s.style.display = Q.length > 1 ? "block" : "none";
-      s.style.left = Math.max(2, r.x - 4 - (s.offsetWidth || 48)) + "px";
+      if (Q.length > 1 && !s._w) s._w = s.offsetWidth;
+      s.style.left = Math.max(2, r.x - 4 - (s._w || 48)) + "px";
       s.style.top = (r.y + 28) + "px";
       const want = gaugeFieldOf(state.gauges[r.k]);
       if (document.activeElement !== s && s.value !== want) s.value = want;

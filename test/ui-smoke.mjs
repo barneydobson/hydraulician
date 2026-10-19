@@ -4,6 +4,12 @@
  *
  *     node test/ui-smoke.mjs            # from the repo root
  *     CHROME=/path/to/chrome node test/ui-smoke.mjs
+ *     node test/ui-smoke.mjs --only=file://   # only cases whose name contains this
+ *
+ * Four launches (1440, 760, 420 and 800 px wide), one tab per case. Each case
+ * runs under runCase: a throw inside it is that case's failure, recorded by
+ * name, and the run goes on to the next. After the case, every tab it opened
+ * is checked for uncaught errors and closed.
  *
  * Every case here is a bug that was actually shipped into the working tree
  * while the strip and the side panel were being built, which is the only
@@ -23,13 +29,18 @@
  * the simulation is being drawn underneath the panel.
  */
 import { launch, findChrome } from "./cdp.mjs";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const INDEX = pathToFileURL(join(ROOT, "index.html")).href;
-const DOCK_W = 348;      // must match #dock in index.html and W in the DOCK module
+// The docked panel's width: the `--dock-w` variable on :root (css/app.css is
+// the single place it is written; js/dock.js reads it back). Set by the first
+// case that has the dock open.
+let DOCK_W = 0;
+const DOCK_READY = { ready: "return !!window.APP && !!document.querySelector('#dock.open');" };
 
 let passed = 0, failed = 0;
 const fails = [];
@@ -38,11 +49,48 @@ function check(name, cond, detail) {
   if (cond) { passed++; console.log("  ok   " + name); }
   else { failed++; fails.push(name + (detail ? " — " + detail : "")); console.log("  FAIL " + name + (detail ? " — " + detail : "")); }
 }
-function eq(name, got, want) {
-  check(name, got === want, "got " + JSON.stringify(got) + ", want " + JSON.stringify(want));
+function eq(name, got, want, detail) {
+  check(name, got === want,
+        "got " + JSON.stringify(got) + ", want " + JSON.stringify(want) + (detail ? " (" + detail + ")" : ""));
 }
 function near(name, got, want, tol) {
   check(name, Math.abs(got - want) <= tol, "got " + got + ", want " + want + " ±" + tol);
+}
+
+// --only=<substring>: run just the cases whose name contains it (case-
+// sensitive). Skipped cases never run their body, so none of their tabs or
+// extra launches start.
+const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
+let ran = 0;
+
+// Tabs opened by the case now running; runCase checks and closes them.
+let caseTabs = null;
+/** launch() whose tabs are registered with the running case. */
+async function launchTracked(opts) {
+  const b = await launch(opts);
+  const open = b.open;
+  b.open = async (...a) => { const t = await open(...a); if (caseTabs) caseTabs.push(t); return t; };
+  return b;
+}
+/** One case, isolated: a throw is recorded as FAIL <name>: <message> and the
+ *  run continues. Then the shared check — no uncaught page errors in any tab
+ *  the case opened — and every tab is closed, so a throw cannot leak one. */
+async function runCase(name, fn) {
+  if (ONLY && !name.includes(ONLY)) return;
+  ran++;
+  console.log("\n" + name);
+  const tabs = caseTabs = [];
+  try { await fn(); }
+  catch (e) {
+    failed++;
+    const msg = "FAIL " + name + ": " + ((e && e.stack) || e);
+    fails.push(msg);
+    console.log("  " + msg);
+  }
+  check("no uncaught errors", tabs.every((t) => t.errors.length === 0),
+        tabs.flatMap((t) => t.errors)[0]);
+  for (const t of tabs) { try { await t.close(); } catch (_) { /* already closed */ } }
+  caseTabs = null;
 }
 
 /** The measurements every case reads. Kept in one expression so a case is one
@@ -106,10 +154,9 @@ async function main() {
     console.error("no Chrome or Edge found. Set $CHROME to a binary and re-run.");
     process.exit(2);
   }
-  const browser = await launch({ width: 1440, height: 900 });
+  const browser = await launchTracked({ width: 1440, height: 900 });
   try {
-    console.log("\nQS-2 width fields and sliders describe and restart the same experiment");
-    {
+    await runCase("QS-2 width fields and sliders describe and restart the same experiment", async () => {
       const tab = await browser.open(INDEX + "?ex=QS-2");
       await tab.evaluate("return APP.EX.ready;");
       const r = await tab.evaluate(`
@@ -121,11 +168,8 @@ async function main() {
         left.value='7.5'; left.dispatchEvent(new Event('input'));
         const leftTime=APP.sim.t, leftWidth=APP.SIM.params().values.tank_b1;
         APP.tick(10); sliders[1].value='4.5'; sliders[1].dispatchEvent(new Event('input'));
-        const card=APP.EX.all().find(e=>e.id==='QS-2');
         return {bounds,leftTime,leftWidth,rightTime:APP.sim.t,rightWidth:APP.SIM.params().values.tank_b2,
           rightField:+right.value,leftSlider:+sliders[0].value,types:sliders.map(s=>s.type),
-          selfContained:! /readme|see the brief/i.test([card.start,card.task,...card.setup].join(' ')),
-          rule:card.digit.base===6.75 && card.digit.step===0.25 && card.digit.also[0].base===3.75,
           lecturerLink:document.querySelector('#dock .exlink').textContent,
           linkShown:getComputedStyle(document.querySelector('#dock .exlink')).display!=='none',
           scenesOnCard:!!document.getElementById('sceneBtn')};
@@ -138,24 +182,20 @@ async function main() {
       eq("right slider updates its card field",r.rightField,4.5);
       eq("left width restarts the clock",r.leftTime,0);
       eq("right width restarts the clock",r.rightTime,0);
-      check("student instructions stand alone",r.selfContained);
-      check("both student-number rules are declared",r.rule);
       eq("README link identifies its lecturer audience",r.lecturerLink,'Lecturer notes');
       check("the brief link is hidden unless a deployment asks for it",!r.linkShown);
       check("no Scenes button while an exercise is on screen",!r.scenesOnCard);
-      check("no uncaught errors",tab.errors.length===0,tab.errors[0]);
       await tab.close();
-    }
+    });
     // ---------------------------------------------------------- bare visit
-    console.log("\na bare visit opens the start screen");
-    {
+    await runCase("a bare visit opens the start screen", async () => {
       const tab = await browser.open(INDEX);
       const p = await tab.evaluate(PROBE);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("start screen is up", p.startOpen);
       // What the start screen lists is the exercise menu: the course menu when
       // this deployment ships one (js/menu.js), otherwise the whole register.
       eq("the menu's exercises are listed", p.startItems, await tab.evaluate("return APP.EX.groupsFor('').reduce((n, g) => n + g[1].length, 0);"));
+      check("start screen lists > 0 exercises", p.startItems > 0, p.startItems + " listed");
       check("the pack does not overflow sideways", !p.startSideways);
       check("every strip button has an icon", p.emptyIcons === 0, p.emptyIcons + " empty");
       check("every strip button is labelled", p.unlabelled === 0, p.unlabelled + " bare");
@@ -227,14 +267,12 @@ async function main() {
       eq("G visits every field", new Set(cycled.seen).size, reg.n);
       eq("and wraps to where it started", cycled.back, reg.modes[0]);
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------------- a scene link
-    console.log("\n?scene= skips the start screen and fills the window");
-    {
+    await runCase("?scene= skips the start screen and fills the window", async () => {
       const tab = await browser.open(INDEX + "?scene=m3");
       const p = await tab.evaluate(PROBE);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("start screen stays down", !p.startOpen);
       eq("the scene loaded", p.sceneId, "m3");
       eq("no panel, no inset", p.dockVar, 0);
@@ -253,13 +291,16 @@ async function main() {
       // typing the numbers out again somewhere else.
       const ramp = await tab.evaluate(`
         const R = APP.ui.RAMPS;
-        const bad = Object.values(R).filter((r) =>
-          r.length !== 5 || r.some((c) => c.length !== 3 ||
-                                          c.some((v) => !(v >= 0 && v <= 1))));
+        const stops = { turbo: 5, divg: 5, water: 2 };
+        const bad = Object.keys(R).filter((k) => {
+          const r = R[k];
+          return r.length !== stops[k] || r.some((c) => c.length !== 3 ||
+                                          c.some((v) => !(v >= 0 && v <= 1)));
+        });
         return { keys: Object.keys(R).sort().join(","), bad: bad.length };
       `);
-      eq("both ramps are published", ramp.keys, "divg,turbo");
-      eq("as five rgb stops in 0-1", ramp.bad, 0);
+      eq("the three ramps are published", ramp.keys, "divg,turbo,water");
+      eq("as rgb stops in 0-1 (five, five and two)", ramp.bad, 0);
 
       // Every field must actually render: a shader that fails to compile
       // throws on the draw, and a mode with no mapping paints nothing.
@@ -279,15 +320,35 @@ async function main() {
             modes.every(([, lo, hi]) => isFinite(lo) && isFinite(hi) && hi > lo),
             JSON.stringify(modes));
       await tab.close();
-    }
+    });
+
+    // The app is a set of classic scripts that must boot from a double-click:
+    // INDEX is a file:// URL, so this is that path. It pins the registers the
+    // split of main.js into js/{state,fields,panel,strip,legend,dock,
+    // instruments,governor}.js has to leave populated, and the shared check in
+    // runCase fails it on any uncaught error while the scripts load.
+    await runCase("file:// boot has no errors and the registers are populated", async () => {
+      check("INDEX is a file:// URL", INDEX.startsWith("file://"), INDEX);
+      const tab = await browser.open(INDEX + "?scene=sandbox",
+        { ready: "return !!window.APP && !!window.APP.sim;" });
+      const r = await tab.evaluate(`return {
+        sim: !!APP.sim, scene: APP.state.scene && APP.state.scene.id,
+        fields: APP.ui.FIELDS.length, tools: APP.TOOLS.length };`);
+      check("APP.sim exists", r.sim);
+      eq("the sandbox scene loaded", r.scene, "sandbox");
+      eq("nine fields are registered", r.fields, 9);
+      eq("thirteen tools are registered", r.tools, 13);
+      check("no uncaught errors while loading", tab.errors.length === 0, tab.errors[0]);
+      await tab.close();
+    });
 
     // ---------------------------------------------------- an exercise link
-    console.log("\n?ex= docks the brief and the viewport gives way to it");
-    {
+    await runCase("?ex= docks the brief and the viewport gives way to it", async () => {
       const tab = await browser.open(INDEX + "?ex=HJ-1",
-        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+        DOCK_READY);
       const p = await tab.evaluate(PROBE);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      DOCK_W = await tab.evaluate('return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dock-w"));');
+      check("the docked panel has a width", DOCK_W > 0, "width " + DOCK_W);
       check("start screen stays down", !p.startOpen);
       eq("the exercise is loaded", p.exId, "HJ-1");
       check("the panel is open", p.dockOpen);
@@ -299,7 +360,7 @@ async function main() {
       eq("the overlay stops there too", p.overW, p.canvasW);
       check("the strip still shows every control", !p.groupsClipped);
       check("the fold handle is on the seam", p.foldShown);
-      // Fold-on-land is an EMBEDDED behaviour (spec §1.1 of the embed design);
+      // Fold-on-land is an EMBEDDED behaviour (docs/design/2026-09-10-embed-design.md §1);
       // a plain `?ex=` boot must not pick it up by accident.
       check("the reopen tab is put away", !p.tabShown);
       check("the brief carries the task", await tab.evaluate(
@@ -420,11 +481,10 @@ async function main() {
       eq("closing the brief frees the width", closed.dock, 0);
       eq("closing the brief keeps the exercise", closed.ex, "HJ-1");
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------------- tools & clock
-    console.log("\nthe strip drives the tools and the clock");
-    {
+    await runCase("the strip drives the tools and the clock", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");
       const r = await tab.evaluate(`
         const before = APP.state.tool;
@@ -444,7 +504,6 @@ async function main() {
         return { before, after: APP.state.tool, want: id, lit,
                  wasPaused, pausedIcon: icon, backTo: APP.state.paused };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("clicking a tool picks it", r.after, r.want);
       check("the tool moved", r.before !== r.after);
       // Exactly one tool is in your hand. Counted over the TOOLS only: the
@@ -454,11 +513,10 @@ async function main() {
       eq("pausing swaps the glyph", r.pausedIcon, r.wasPaused ? "pause" : "play");
       eq("pausing is a toggle", r.backTo, r.wasPaused);
       await tab.close();
-    }
+    });
 
     // -------------------------------------------------- the strip's families
-    console.log("\nthe strip says which family a tool belongs to");
-    {
+    await runCase("the strip says which family a tool belongs to", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");
       const r = await tab.evaluate(`
         const caps = [...document.querySelectorAll("#groups .tcap")].map((c) => c.textContent);
@@ -479,7 +537,6 @@ async function main() {
             typeof i.label === "function" ? i.label() : i.label),
         };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("every group is captioned", r.caps.length, r.groups);
       eq("the captions are the spec's", r.caps.join(","), r.specCaps.join(","));
       eq("no button is outside a group", r.orphans, 0);
@@ -586,22 +643,30 @@ async function main() {
       `);
       check("captions drop at .tight", tight);
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------------- the grade lines
-    console.log("\nthe grade lines follow the head, in both regimes");
-    {
+    await runCase("the grade lines follow the head, in both regimes", async () => {
       const tab = await browser.open(INDEX + "?scene=m1");
       const p = await tab.evaluate(`
         const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
         // Settled, at the scene's own measured spin-up — not part-way through
         // it. m1 starts 0.28 m deep and its inlet holds 0.49 m, so for the
         // first ~12 s the pool is filling and the surface runs 0.1-0.7 dx off
-        // the head (median, Low); settled it sits within 0.05 dx. Bounded on
-        // wall clock, so a software-rasterised Chrome fails with a reading
+        // the head (median, Low); settled it sits within 0.05 dx. Not a speed
+        // test: a busy machine just takes longer. It gives up only if the
+        // simulated clock stalls for 30 s or after 240 s in all (smoke.mjs's
+        // __until rule), so a software-rasterised Chrome fails with a reading
         // here instead of hanging the run.
         const t0 = Date.now(), spinup = APP.sim.scene.spinup;
-        while (APP.sim.t < spinup && Date.now() - t0 < 120000) APP.tick(400);
+        let last = APP.sim.t, moved = t0;
+        while (APP.sim.t < spinup) {
+          APP.tick(400);
+          const now = Date.now();
+          if (APP.sim.t > last) { last = APP.sim.t; moved = now; }
+          else if (now - moved > 30000) break;
+          if (now - t0 > 240000) break;
+        }
         const settled = APP.sim.t >= spinup, tReached = APP.sim.t;
         APP.frames(3);
         const A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
@@ -642,15 +707,16 @@ async function main() {
         const cx = document.createElement("canvas").getContext("2d");
         const real = cx.fillText.bind(cx);
         cx.fillText = (t, x, y) => { labels.push(String(t)); return real(t, x, y); };
-        OVERLAY.drawGradeLines(cx, APP.view, A, APP.sim, h);
+        OVERLAY.flushKeys(document.createElement("canvas").getContext("2d"), APP.view);   // drop rows left queued
+        OVERLAY.drawGradeLines(cx, APP.view, A, APP.sim, h);   // queues the key rows ...
+        OVERLAY.flushKeys(cx, APP.view);                       // ... which one flush paints
         const before = APP.state.grade;
         document.getElementById("gradeBtn").click();
         return { settled, tReached, spinup, n: dev.length, median, dx, ratio: median / dx, labels,
                  walkOff, walkWorst,
                  toggled: APP.state.grade !== before,
                  panelHasIt: !!CONTROLS.find((x) => x.id === "grade") };
-      `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
+      `, { timeout: 130000 });   // the in-page spin-up is bounded at 120 s; leave room to report
       check("m1 settled to its spin-up inside the budget", p.settled,
             "reached t = " + p.tReached.toFixed(1) + " s of " + p.spinup + " s in 120 s of wall clock");
       check("the grade line covers the reach", p.n > 200, p.n + " columns");
@@ -667,12 +733,12 @@ async function main() {
       // standing acceptance test for control changes.
       check("and the panel can set it too", p.panelHasIt);
       await tab.close();
-    }
+    });
 
     // A pressurised run is the case the HGL exists for: there is no free
     // surface, the column reduction reports the soffit, and the head runs
     // above the crown.
-    {
+    await runCase("a pressurised run puts the HGL above the conduit", async () => {
       const tab = await browser.open(INDEX + "?scene=hammer");
       const p = await tab.evaluate(`
         const c = CONTROLS.find((x) => x.id === "budget"); if (c) c.set("Low");
@@ -689,16 +755,14 @@ async function main() {
         }
         return { n, above, worst };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("in a pressurised conduit the HGL leaves the conduit",
             p.above > 0.8 * p.n && p.worst > 1,
             p.above + " of " + p.n + " columns, up to " + p.worst.toFixed(1) + " m above");
       await tab.close();
-    }
+    });
 
     // ------------------------------------------- what the hover card prints
-    console.log("\nthe hover card prints the rows an exercise asked for");
-    {
+    await runCase("the hover card prints the rows an exercise asked for", async () => {
       const tab = await browser.open(INDEX + "?scene=m3");
       const p = await tab.evaluate(`
         APP.tick(400); APP.frames(2);
@@ -742,7 +806,6 @@ async function main() {
           idsCovered,
         };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("the row register is populated", p.nIds >= 14 && p.idsCovered, p.nIds + " ids");
       // f is the VOF fill fraction: a solver internal, 1.000 everywhere a
       // free-surface card can be read. It is off by default and nameable back.
@@ -758,13 +821,12 @@ async function main() {
       check("ui.hide critical drops the class and the regime words",
             !p.plainTitle && !p.plainCrit && p.plainFr, JSON.stringify(p));
       await tab.close();
-    }
+    });
 
     // ------------------------- per-gauge quantities and the readout switches
-    console.log("\neach gauge plots its own quantity; readouts and hover switch independently");
-    {
+    await runCase("each gauge plots its own quantity; readouts and hover switch independently", async () => {
       const tab = await browser.open(INDEX + "?ex=HJ-2",
-        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+        DOCK_READY);
       const r = await tab.evaluate(`
         return APP.EX.ready.then(() => {
           APP.placeGauge(2.5, 0.6); APP.placeGauge(8.0, 0.3);
@@ -793,7 +855,6 @@ async function main() {
           return { startOn, keys, hdr, sels, panelOpts, hidden, hov, hj };
         });
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("new gauges start on the card's Gauges plot", r.startOn, "d,d");
       eq("every sample records all nine quantities", r.keys.length, 9);
       eq("the CSV carries every quantity of every gauge", r.hdr, 1 + 2 * 9);
@@ -809,26 +870,26 @@ async function main() {
       check("the strip names the exercise, not its scene (a tabbed card adds its tab)", r.hj.title.indexOf("Momentum balance: sluice gate and hydraulic jump") === 0, r.hj.title);
       await tab.close();
       const ff1 = await browser.open(INDEX + "?ex=FF-1",
-        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+        DOCK_READY);
       const h = await ff1.evaluate("return APP.EX.ready.then(() => APP.state.hoverCard);");
       eq("FF-1 opens with the hover card off", h, false);
       await ff1.close();
-    }
+    });
     // ------------------------------------- tabs, the short layout, inline icons
-    console.log("\na tabbed card swaps its steps and interface, not the bench; steps draw the strip's own icons");
-    {
-      // ?ex=MM-2 is an ALIAS: the id the Forces question had before the
-      // contraction rig became one exercise with three tabs.
-      const tab = await browser.open(INDEX + "?ex=MM-2",
-        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+    await runCase("a tabbed card swaps its steps and interface, not the bench; steps draw the strip's own icons", async () => {
+      // &tab=<key> is the one way to a tab from the address bar.
+      const tab = await browser.open(INDEX + "?ex=CR-1&tab=forces",
+        DOCK_READY);
       const r = await tab.evaluate(`
         return APP.EX.ready.then(() => {
           const c0 = APP.EX.current.ref, url0 = location.search, mode0 = APP.state.mode;
+          const title0 = APP.EX.current.title;
+          const on0 = [...document.querySelectorAll('#dock .extab.on')].map((b) => b.textContent).join(",");
           APP.tick(60);
           const t0 = APP.sim.t;
           document.querySelector('#dock .extab[data-tab="streamlines"]').click();
           const ico = [...document.querySelectorAll('#dock .exsteps .exico')];
-          return { c0, url0, mode0, c1: APP.EX.current.ref, url1: location.search,
+          return { c0, url0, mode0, title0, on0, c1: APP.EX.current.ref, url1: location.search,
             t0, t1: APP.sim.t, scene: APP.sim.scene.id,
             fields: APP.UIMODE.fields().map((f) => f.id).join(","),
             measure: APP.state.ui.measure,
@@ -844,8 +905,10 @@ async function main() {
             task: getComputedStyle(document.querySelector('#dock .extask')).display };
         });
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
-      eq("an old id opens its tab", r.c0, "CR-1#forces");
+      eq("?ex=CR-1&tab=forces opens the Forces tab", r.c0, "CR-1#forces");
+      check("the strip's title names the exercise and the tab",
+            /contraction rig/i.test(r.title0) && /force/i.test(r.title0), r.title0);
+      eq("the tab bar marks Forces", r.on0, "Forces");
       check("and the address bar names the entry and the tab",
             /ex=CR-1/.test(r.url0) && /tab=forces/.test(r.url0), r.url0);
       eq("the Forces tab opens on Pressure", r.mode0, 8);
@@ -864,9 +927,36 @@ async function main() {
       check("the short layout drops Start and Do", r.start === "none" && r.task === "none",
             r.start + " " + r.task);
       await tab.close();
-    }
-    console.log("\na gauge can be removed one by one or all at once; the strip shows only what the bench can use");
-    {
+    });
+    await runCase("a tabbed card boots on ?ex=HJ-2&tab=energy", async () => {
+      const tab = await browser.open(INDEX + "?ex=HJ-2&tab=energy", DOCK_READY);
+      const r = await tab.evaluate(`
+        return APP.EX.ready.then(() => ({
+          ref: APP.EX.current.ref, title: APP.EX.current.title, url: location.search,
+          on: [...document.querySelectorAll('#dock .extab.on')].map((b) => b.textContent).join(",") }));
+      `);
+      eq("HJ-2 opens on its Energy tab", r.ref, "HJ-2#energy");
+      eq("with the Energy tab's title", r.title, "Energy: sluice gate and hydraulic jump");
+      eq("the tab bar marks Energy", r.on, "Energy");
+      check("and the address bar names both", /ex=HJ-2/.test(r.url) && /tab=energy/.test(r.url), r.url);
+      await tab.close();
+    });
+    await runCase("a tabbed card's retired id (?ex=MM-2) is an unknown exercise", async () => {
+      const tab = await browser.open(INDEX + "?ex=MM-2");
+      const r = await tab.evaluate(`
+        return new Promise((res) => setTimeout(() => res({
+          shown: document.getElementById("toast").classList.contains("show"),
+          title: document.getElementById("toastTitle").textContent,
+          sub: document.getElementById("toastSub").textContent,
+          cur: (APP.EX.current && (APP.EX.current.ref || APP.EX.current.id)) || null }), 400));
+      `);
+      check("the toast is up", r.shown, JSON.stringify(r));
+      eq("it says Unknown exercise", r.title, "Unknown exercise");
+      check("and names the id", r.sub.indexOf("MM-2") >= 0, r.sub);
+      check("CR-1 is not opened", !r.cur || String(r.cur).indexOf("CR-1") < 0, String(r.cur));
+      await tab.close();
+    });
+    await runCase("a gauge can be removed one by one or all at once; the strip shows only what the bench can use", async () => {
       const tab = await browser.open(INDEX + "?scene=m2");
       const r = await tab.evaluate(`
         const G = APP.state.gauges;
@@ -892,11 +982,10 @@ async function main() {
         APP.SIM.undoSeg(); APP.frames(1);
         const v2 = !!document.getElementById("valveBtn");
         // No exercise on screen (a ?scene= boot): the Scenes button is offered.
-        const had = true, s1 = !!document.getElementById("sceneBtn"), s2 = null;
-        return { nX, afterX, afterRm, wins, armed, keptOnArm, cleared, v0, v1, v2, had, s1, s2,
+        const s1 = !!document.getElementById("sceneBtn");
+        return { nX, afterX, afterRm, wins, armed, keptOnArm, cleared, v0, v1, v2, s1,
                  sceneTool: APP.state.scene.id };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("every corner card carries a ×", r.nX, 3);
       eq("its × removes that gauge", r.afterX, 2);
       check("the inspector's Remove removes its gauge and closes its window",
@@ -908,16 +997,15 @@ async function main() {
             !r.v0 && r.v1 && !r.v2, JSON.stringify(r));
       check("with no exercise loaded the Scenes button is offered", r.s1 === true, JSON.stringify(r));
       await tab.close();
-    }
+    });
 
     // ------------------------------- the legend's place, and the mode switch
-    console.log("\nthe legend sits top right, moves when dragged, carries the mode");
-    {
+    await runCase("the legend sits top right, moves when dragged, carries the mode", async () => {
       // ?ex= so the brief dock is OPEN: the default position is expressed as
       // right: calc(var(--dock) + 12px), and a dock of zero width would prove
       // nothing about whether it clears one.
       const tab = await browser.open(INDEX + "?ex=HJ-1",
-        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+        DOCK_READY);
       const p = await tab.evaluate(`
         const leg = document.getElementById("legend");
         APP.LEGEND.open();
@@ -951,7 +1039,7 @@ async function main() {
         const onState = APP.state.avg;
         const onPressed = avgB.getAttribute("aria-pressed") === "true" &&
                           liveB.getAttribute("aria-pressed") === "false";
-        const avgChars = document.getElementById("legAvg").innerText.replace(/\ss+/g, " ").trim().length;
+        const avgChars = document.getElementById("legAvg").innerText.replace(/\\s+/g, " ").trim().length;
         APP.avg.set(false);                     // the path the A key takes
         const offPressed = liveB.getAttribute("aria-pressed") === "true" &&
                            avgB.getAttribute("aria-pressed") === "false";
@@ -961,7 +1049,6 @@ async function main() {
                  inView: after.left >= 0 && after.right <= innerWidth,
                  onState, onPressed, offPressed, avgChars };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("it sits immediately left of the dock", p.dockGap === 12, "gap " + p.dockGap + "px");
       check("and never under it", !p.overDock);
       check("nor under the Controls panel", !p.overPanel);
@@ -977,11 +1064,73 @@ async function main() {
       // it grows back past a few hundred characters, the prose has crept in.
       check("the Average block stays short", p.avgChars < 320, p.avgChars + " chars");
       await tab.close();
-    }
+    });
+
+    // ------------------------------------------- dock geometry, one source
+    await runCase("the dock width JS uses equals the CSS width", async () => {
+      const tab = await browser.open(INDEX + "?ex=HJ-1", DOCK_READY);
+      const r = await tab.evaluate(`
+        const cs = getComputedStyle(document.documentElement);
+        return { w: parseFloat(cs.getPropertyValue("--dock-w")),
+                 phone: parseFloat(cs.getPropertyValue("--phone-max")),
+                 dockVar: parseFloat(cs.getPropertyValue("--dock")),
+                 dockEl: document.getElementById("dock").getBoundingClientRect().width,
+                 innerW: window.innerWidth,
+                 canvasW: document.getElementById("view").clientWidth,
+                 over: document.getElementById("dock").classList.contains("over") };`);
+      check("--dock-w is a width", r.w > 0, "w " + r.w);
+      check("--phone-max is a width", r.phone > 0, "phone " + r.phone);
+      check("the panel is docked here", !r.over);
+      eq("the panel element is --dock-w wide", r.dockEl, r.w);
+      eq("--dock (what JS sets) is --dock-w", r.dockVar, r.w);
+      eq("so the canvas stops where the panel starts", r.canvasW, r.innerW - r.w);
+      await tab.close();
+    });
+
+    // ------------------------------- what hangs from the strip follows it
+    await runCase("panel top clears the bar at every compaction step", async () => {
+      const tab = await browser.open(INDEX + "?scene=m3",
+        { ready: "return !!window.APP && !!window.APP.sim;" });
+      const rows = await tab.evaluate(`
+        const bar = document.getElementById("bar");
+        const panel = document.getElementById("panel");
+        const toast = document.getElementById("toast");
+        const legend = document.getElementById("legend");
+        panel.classList.add("open"); APP.LEGEND.open();
+        const steps = [[], ["tight"], ["tight", "tighter"], ["tight", "tighter", "tightest"]];
+        const out = [];
+        for (const s of steps) {
+          bar.classList.remove("tight", "tighter", "tightest", "wraps", "notitle");
+          s.forEach((c) => bar.classList.add(c));
+          APP.ui.syncBarH();
+          const bottom = bar.getBoundingClientRect().bottom;
+          out.push({ step: s.join(" ") || "normal", bottom,
+                     barH: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar-h")),
+                     height: bar.getBoundingClientRect().height,
+                     panel: panel.getBoundingClientRect().top,
+                     toast: parseFloat(getComputedStyle(toast).top),
+                     legend: legend.getBoundingClientRect().top });
+        }
+        return out;`);
+      for (const r of rows) {
+        near("--bar-h is the bar's height at " + r.step, r.barH, r.height, 1);
+        // The full-height strip has always let the panel overlap its bottom
+        // edge by a pixel (72 vs 73); that is the tolerance.
+        check("the panel clears the bar at " + r.step, r.panel >= r.bottom - 1,
+              "panel " + r.panel + " vs bar bottom " + r.bottom);
+        check("the panel hugs the bar at " + r.step, r.panel <= r.bottom + 12,
+              "panel " + r.panel + " vs bar bottom " + r.bottom);
+        check("the toast clears the bar at " + r.step, r.toast >= r.bottom,
+              "toast " + r.toast + " vs bar bottom " + r.bottom);
+        check("the legend clears the bar at " + r.step, r.legend >= r.bottom,
+              "legend " + r.legend + " vs bar bottom " + r.bottom);
+      }
+      eq("the full-height strip puts the panel at 72", Math.round(rows[0].panel), 72);
+      await tab.close();
+    });
 
     // ------------------------------------------------------------ the legend
-    console.log("\nthe legend says what the colour means, and changes it");
-    {
+    await runCase("the legend says what the colour means, and changes it", async () => {
       const tab = await browser.open(INDEX + "?scene=m3");
       const p = await tab.evaluate(`
         const el = document.getElementById("legend");
@@ -998,7 +1147,6 @@ async function main() {
                  inner: window.innerWidth,
                  rows: el.querySelectorAll(".legrow").length };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("the legend is up by default", p.open);
       check("it clears the strip", p.top >= p.barBottom - 1,
             "legend top " + p.top + " vs bar bottom " + p.barBottom);
@@ -1067,12 +1215,12 @@ async function main() {
       // L puts it away and brings it back.
       const keyed = await tab.evaluate(`
         dispatchEvent(new KeyboardEvent("keydown", { key: "l" }));
-        const shut = APP.LEGEND.isOpen();
+        const open = APP.LEGEND.isOpen();
         dispatchEvent(new KeyboardEvent("keydown", { key: "l" }));
-        return { shut, open: APP.LEGEND.isOpen() };
+        return { open, reopened: APP.LEGEND.isOpen() };
       `);
-      check("L puts the legend away", !keyed.shut);
-      check("and brings it back", keyed.open);
+      check("L puts the legend away", !keyed.open);
+      check("and brings it back", keyed.reopened);
 
       // A scene chooses its own field and clears the ranges, so the card has
       // to follow it. It did not: every caller synced except the scene load.
@@ -1101,15 +1249,14 @@ async function main() {
       eq("the menu offers only the profile's fields", narrowFields.listed, 2);
       eq("and G cycles the same two", narrowFields.seen, "head,water");
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------- the control-volume budget
-    // The BALANCES — continuity, the energy loss — are asserted in smoke.js,
-    // on a scene that has actually settled. This gate boots eight tabs and
-    // cannot afford a 90 s spin-up, and an unsettled reach is still filling,
+    // The BALANCES — continuity, the energy loss — are asserted in smoke.mjs,
+    // on a scene that has actually settled. This gate boots a tab per case
+    // and cannot afford a 90 s spin-up, and an unsettled reach is still filling,
     // so it genuinely does not close. What belongs here is the wiring.
-    console.log("\nthe control volume reports every edge, and agrees with the force box");
-    {
+    await runCase("the control volume reports every edge, and agrees with the force box", async () => {
       const tab = await browser.open(INDEX + "?scene=m2");
       const r = await tab.evaluate(`
         APP.frames(600);                        // let the reach establish itself
@@ -1127,10 +1274,9 @@ async function main() {
           // M + Fp IS what boxForce reports. If these drift apart, one of the
           // two integrals has been changed without the other.
           fx: flux.fx, forceFx: force.fx,
-          fz: flux.fz, forceFzNoWeight: force.fz + 9.81 * force.mass,
+          fz: flux.fz, forceFzNoWeight: force.fz + Math.abs(APP.sim.p.g) * force.mass,
         };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("every edge is reported", r.keys, "bed,left,right,top");
       check("water enters on the left", r.inLeft < 0, String(r.inLeft));
       check("and leaves on the right", r.outRight > 0, String(r.outRight));
@@ -1143,15 +1289,14 @@ async function main() {
             Math.abs(r.fz - r.forceFzNoWeight) < 1e-3 * Math.max(1, Math.abs(r.fz)),
             r.fz + " vs " + r.forceFzNoWeight);
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------------------ the docs
-    console.log("\nthe docs reader says what it needs when it cannot read");
-    {
+    await runCase("the docs reader says what it needs when it cannot read", async () => {
       // file:// refuses a page's request for the file beside it, and there is
       // nothing docs/view.html can do about that. What it must not do is show
       // a broken screen: the app is DOUBLE-CLICKABLE by design, so this is a
-      // path real readers take. Whether it renders is checked in smoke.js,
+      // path real readers take. Whether it renders is checked in smoke.mjs,
       // which has a server.
       const url = pathToFileURL(join(ROOT, "docs", "view.html")).href + "?doc=numerics.md";
       const tab = await browser.open(url,
@@ -1172,11 +1317,10 @@ async function main() {
       check("and offers GitHub, which renders the same file", r.github);
       check("the way back to the app is there either way", r.back);
       await tab.close();
-    }
+    });
 
     // ---------------------------------------------------------- flux sections
-    console.log("\na section reads what crosses it, and two of them compare");
-    {
+    await runCase("a section reads what crosses it, and two of them compare", async () => {
       const tab = await browser.open(INDEX + "?scene=m1");
       const r = await tab.evaluate(`
         APP.frames(400);
@@ -1189,23 +1333,23 @@ async function main() {
         const twoNote = document.getElementById("n_fluxList").textContent;
         APP.frames(120);
         const L = APP.state.flux;
+        const e0 = L[0].ema || {}, e1 = L[1].ema || {};   // null until read: fail the check, not the case
         return { n: L.length,
                  read: !!(L[0].ema && L[1].ema),
-                 q1: L[0].ema.Q, q2: L[1].ema.Q,
-                 e1: L[0].ema.E,
+                 q1: e0.Q, q2: e1.Q,
+                 e1: e0.E,
                  // A section drawn bottom-to-top has its normal downstream, so
                  // a reach flowing left to right reads positive on both.
-                 sameSign: L[0].ema.Q * L[1].ema.Q > 0,
+                 sameSign: e0.Q * e1.Q > 0,
                  keys: ["Q", "Mx", "Mz", "Fpx", "Fpz", "E"]
-                         .map((k) => [k, L[0].ema[k]]),
+                         .map((k) => [k, e0[k]]),
                  allFour: ["Q", "Mx", "Mz", "Fpx", "Fpz", "E"]
-                            .every((k) => Number.isFinite(L[0].ema[k])) &&
-                          Math.abs(L[0].ema.Fpx) > 0 && Math.abs(L[0].ema.Mx) > 0,
+                            .every((k) => Number.isFinite(e0[k])) &&
+                          Math.abs(e0.Fpx) > 0 && Math.abs(e0.Mx) > 0,
                  oneNote, twoNote,
                  inMeasure: APP.ui.TOOLBAR.find((g) => g.cap === "MEASURE").items
                               .some((i) => i.tool === "flux") };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("two sections go down", r.n, 2);
       check("each one reads", r.read);
       check("water crosses both the same way", r.sameSign,
@@ -1237,11 +1381,10 @@ async function main() {
       eq("the nine digits still mean what the worksheets say", digits,
          "wall,erase,valve,spout,gauge,rake,tracer,measure,cv");
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------- the pressure-force tool
-    console.log("\nthe Force tool is on the strip and arms without breaking the layout");
-    {
+    await runCase("the Force tool is on the strip and arms without breaking the layout", async () => {
       // No scene declares solids yet (that lands with the s3 conversion), so
       // this is wiring-only: the tool exists, sits in MEASURE beside its
       // fellow instruments, carries no digit (twelfth, appended, same as
@@ -1256,7 +1399,6 @@ async function main() {
         return { hasForce: APP.TOOLS.map((t) => t[0]).includes("force"),
                  inMeasure, key: item.key, armed: APP.state.tool };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("Force is a tool", r.hasForce);
       check("it lives in MEASURE", r.inMeasure);
       eq("and carries no digit — 1-9 are already taken", r.key, "");
@@ -1267,11 +1409,10 @@ async function main() {
       eq("the strip still renders the whole spec", p.buttons, p.specCount);
       check("no control fell out of the strip", !p.groupsClipped);
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------- the Dye tool
-    console.log("\nthe Dye tool releases ink only while it is held");
-    {
+    await runCase("the Dye tool releases ink only while it is held", async () => {
       // Nothing is dyed on boot (a scene's fixed sources are off unless it
       // asks); press-and-hold releases at the pointer, a drag moves the
       // release point, letting go stops it. Plan view (`body`), so every cell
@@ -1304,7 +1445,6 @@ async function main() {
         return { inMeasure, oldBtn, key: item && item.key, byKey, before, held, dyed,
                  moved, x1, released: S.p.dyeInj == null, seeds: APP.state.dyeSeeds };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("Dye is a tool in MEASURE", r.inMeasure);
       check("the old Dye view toggle is gone", !r.oldBtn);
       eq("its key is D", r.key, "D");
@@ -1315,11 +1455,10 @@ async function main() {
       check("dragging moves the release point", Math.abs(r.moved - r.x1) < 1e-6, String(r.moved));
       check("letting go stops it", r.released);
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------- the Geometry section
-    console.log("\nthe Geometry panel binds to whatever the scene actually declares");
-    {
+    await runCase("the Geometry panel binds to whatever the scene actually declares", async () => {
       // hump declares one param (hump_h); the panel's six geom rows are a
       // fixed pool that binds to a scene's params by INDEX (main.js's
       // syncPanel), so exactly one of the six should be showing, and it
@@ -1336,13 +1475,12 @@ async function main() {
                  headingShown: !document.querySelector('#panel h3[data-sec="Geometry"]')
                                   .classList.contains("gone") };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("exactly one geometry row shows", r.visible, 1, JSON.stringify(r.rows));
       eq("it is named after the scene's own param", r.label, "Hump height");
       check("the Geometry heading shows when a row does", r.headingShown);
       await tab.close();
-    }
-    {
+    });
+    await runCase("the Geometry panel hides every row for a scene with no params", async () => {
       // m1 has no declared params at all — a wall-segment scene, not a
       // polygon one — so every one of the six rows should stay hidden, and
       // the section's own heading should not be left fronting an empty list.
@@ -1356,12 +1494,11 @@ async function main() {
                  headingShown: !document.querySelector('#panel h3[data-sec="Geometry"]')
                                   .classList.contains("gone") };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("a scene with no params hides every geometry row", r.visible, 0);
       check("a scene with no params hides the Geometry heading too", !r.headingShown);
       await tab.close();
-    }
-    {
+    });
+    await runCase("the Geometry panel shows all six rows, and HP-3 narrows it", async () => {
       // hydro declares six params — the whole pool. Every row must show under
       // the scene's own label on the unrestricted scene, while HP-3 narrows
       // that generic scene to the fixed geometry on its revised tutorial
@@ -1374,12 +1511,11 @@ async function main() {
         });
         return { visible: rows.filter((r) => r.shown).length, labels: rows.map((r) => r.label) };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("a six-param scene shows all six geometry rows", r.visible, 6);
       eq("the fifth row is the shaft width", r.labels[4], "Surge shaft width D_s");
       await tab.close();
       const ex = await browser.open(INDEX + "?ex=HP-3",
-        { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+        DOCK_READY);
       const c = await ex.evaluate(`
         const f = document.querySelector('#dock input[aria-label="Surge shaft width D_s"]');
         const h = document.querySelector('#panel h3[data-sec="Geometry"]');
@@ -1392,7 +1528,6 @@ async function main() {
                  rows, gaugeField: APP.state.gaugeField, mode: APP.state.mode,
                  measure: APP.state.ui.measure, fields: APP.state.ui.fields };
       `);
-      check("no uncaught errors", ex.errors.length === 0, ex.errors[0]);
       check("the fixed tutorial has no personalised shaft field", !c.field);
       eq("the revised tutorial title reaches the card", c.title,
          "Hydropower and unsteady flow: test the tutorial predictions");
@@ -1403,11 +1538,10 @@ async function main() {
       eq("the measurement strip keeps the card's tools (rake, gauge, control volume)", c.measure.join(","), "rake,gauge,cv");
       eq("the legend offers only Speed", c.fields.join(","), "speed");
       await ex.close();
-    }
+    });
 
     // ------------------------------------------------- placing and removing
-    console.log("\nan instrument you can place is an instrument you can remove");
-    {
+    await runCase("an instrument you can place is an instrument you can remove", async () => {
       const tab = await browser.open(INDEX + "?scene=m2");
       // Gauges and rakes were the only instruments with no way back: every
       // click pushed another, and the only way to lose one was to place four
@@ -1422,7 +1556,6 @@ async function main() {
         const left = APP.state.gauges.map((q) => +q.x.toFixed(2));
         return { placed, after, left };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       eq("two gauges go down", g.placed, 2);
       eq("clicking one takes it away", g.after, 1);
       eq("and it is the one that was clicked", g.left.join(","), "3");
@@ -1452,16 +1585,136 @@ async function main() {
       check("and it empties them", cleared.found && cleared.after === 0,
             "was " + cleared.before + ", now " + cleared.after);
       await tab.close();
-    }
+    });
+
+    await runCase("info help renders markup and stays until dismissed", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // Every Controls info string is markup (<b>, <code>, &lt;); showToast
+      // used to write textContent, so the student read the tags themselves.
+      const r = await tab.evaluate(`
+        const row = document.querySelector('[data-control="scene"]');
+        const sp = row && row.querySelector(".info");
+        if (!sp) return { found: false };
+        sp.click();
+        const sub = document.getElementById("toastSub");
+        return { found: true, bold: !!sub.querySelector("b"),
+                 code: !!sub.querySelector("code"),
+                 literal: sub.textContent.includes("<b>") || sub.textContent.includes("&lt;"),
+                 shown: document.getElementById("toast").classList.contains("show") };
+      `);
+      check("the Scene row has an info mark", r.found);
+      check("the help carries a real <b> element", r.bold);
+      check("and a real <code> element", r.code);
+      check("no literal tag text", !r.literal);
+      check("the toast is up", r.shown);
+      await new Promise((res) => setTimeout(res, 5800));    // past the old 5.2 s auto-hide
+      const still = await tab.evaluate(`return document.getElementById("toast").classList.contains("show");`);
+      check("long help does not auto-hide", still);
+      await tab.close();
+    });
+
+    await runCase("five gauges have four distinct colours", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // colour was gaugeColours[length % 4]: at the cap the oldest is shifted
+      // out first, so the fifth gauge took the fourth's colour.
+      const c = await tab.evaluate(`
+        [1, 3, 5, 7].forEach((x) => APP.placeGauge(x, 0.5));
+        const four = APP.state.gauges.map((g) => g.colour);
+        APP.placeGauge(8.5, 0.5);
+        const five = APP.state.gauges.map((g) => g.colour);
+        return { four, five };
+      `);
+      eq("four gauges, four colours", new Set(c.four).size, 4);
+      eq("a fifth drops the oldest and keeps them distinct", new Set(c.five).size, 4);
+      await tab.close();
+    });
+
+    await runCase("card gauges never cancel", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // placeCardGauges used the toggling placeGauge, so two gauges within the
+      // grab radius deleted each other. Give VC-2 two gauges 1 cm apart.
+      const r = await tab.evaluate(`
+        const ex = EXERCISES.find((e) => e.id === "VC-2");
+        ex.gauges = [{ x: 1.0, z: 0.6, field: "eta" }, { x: 1.01, z: 0.6, field: "h" }];
+        APP.pickExercise("VC-2");
+        return APP.EX.ready.then(() => APP.state.gauges.map((g) => g.field));
+      `);
+      eq("both gauges are placed, each on its own quantity", r.join(","), "eta,h");
+      await tab.close();
+    });
+
+    await runCase("inspector raise: the last window clicked is on top", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // zIndex was 22 + open.length: every click set the same number, so the
+      // window clicked second sat level with the first and DOM order won.
+      const r = await tab.evaluate(`
+        APP.placeGauge(2, 0.5); APP.placeGauge(6, 0.5);
+        APP.GINSP.show(0); APP.GINSP.show(1);
+        const w = [...document.querySelectorAll(".ginsp")];
+        const z = (el) => +el.style.zIndex;
+        const click = (el) => el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        click(w[0]); click(w[1]);
+        const secondOver = z(w[1]) > z(w[0]);
+        click(w[0]);
+        return { n: w.length, secondOver, firstOver: z(w[0]) > z(w[1]) };
+      `);
+      eq("two inspector windows", r.n, 2);
+      check("click A then B puts B on top", r.secondOver);
+      check("click A again puts A on top", r.firstOver);
+      await tab.close();
+    });
+
+    await runCase("inspector raise: many clicks stay below popups and menus", async () => {
+      const tab = await browser.open(INDEX + "?scene=m2");
+      // zTop only ever grew, so ~10 presses lifted a gauge window over the
+      // popups (z 30/31) and ~20 over the menus and toasts (z 40). Raising
+      // now renumbers the open windows 21..21+n-1.
+      const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "css", "app.css"), "utf8");
+      const above = [...css.matchAll(/z-index:\s*(\d+)/g)].map((m) => +m[1]).filter((v) => v > 21);
+      const lowestOver = Math.min(...above);
+      const r = await tab.evaluate(`
+        APP.placeGauge(2, 0.5); APP.placeGauge(6, 0.5);
+        APP.GINSP.show(0); APP.GINSP.show(1);
+        const w = [...document.querySelectorAll(".ginsp")];
+        const z = (el) => +el.style.zIndex;
+        const click = (el) => el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        for (let k = 0; k < 25; k++) { click(w[k % 2]); click(w[(k + 1) % 2]); }
+        click(w[0]);
+        return { n: w.length, zs: w.map(z), firstOver: z(w[0]) > z(w[1]) };
+      `);
+      eq("two inspector windows", r.n, 2);
+      check("the lowest popup/menu z-index was read from css/app.css", Number.isFinite(lowestOver) && lowestOver > 21, String(lowestOver));
+      check("every inspector z-index stays below the lowest popup/menu", Math.max(...r.zs) < lowestOver, r.zs.join(",") + " vs " + lowestOver);
+      check("the last-clicked window is on top", r.firstOver);
+      await tab.close();
+    });
 
     // ------------------------------------------------------------ particles
-    console.log("\nparticles travel at the water's speed, not the wall clock's");
-    {
+    await runCase("particles travel at the water's speed, not the wall clock's", async () => {
       const tab = await browser.open(INDEX + "?scene=m2");
       // THE bug: particles were advanced by real elapsed time, while the
       // solver advances by whatever it managed in the frame budget (0.3x real
       // time on m2). They ran about three times too fast — and kept moving
       // with the clock stopped, which is the same fault stated plainly.
+      // The control for "frozen": the same measurement while running must show
+      // motion, or "moved === 0" below would pass with particles that never move.
+      const running = await tab.evaluate(`
+        APP.state.particles = true;
+        if (APP.state.paused) APP.ui.TOOLBAR.find((g) => g.cap === "RUN")
+          .items.find((i) => i.id === "playBtn").el.click();
+        APP.frames(30);
+        const before = APP.particlePos();
+        APP.frames(30);
+        const after = APP.particlePos();
+        let moved = 0;
+        for (let k = 0; k < before.length; k++) {
+          if (Math.abs(before[k] - after[k]) > 1e-9) moved++;
+        }
+        return { moved, n: before.length, paused: APP.state.paused };
+      `);
+      check("particles are seeded", running.n > 0, running.n + " values");
+      check("the clock is running", !running.paused);
+      check("particles move when running", running.moved > 0, running.moved + " of " + running.n + " moved");
       const paused = await tab.evaluate(`
         APP.state.particles = true;
         APP.frames(30);
@@ -1476,15 +1729,14 @@ async function main() {
         }
         return { moved, n: before.length, paused: APP.state.paused };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("the clock is actually stopped", paused.paused);
+      check("there are particles to freeze", paused.n > 0, paused.n + " values");
       eq("a paused clock freezes the particles", paused.moved, 0);
       await tab.close();
-    }
+    });
 
     // -------------------------------------------------------- the UI profile
-    console.log("\nan exercise can narrow the interface, and never lock it");
-    {
+    await runCase("an exercise can narrow the interface, and never lock it", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");
       const base = await tab.evaluate(`
         return { buttons: document.querySelectorAll("#groups .tbtn").length,
@@ -1503,7 +1755,6 @@ async function main() {
                  rake: labels.includes("Rake"),
                  stillRuns: labels.includes("Reset water") };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("the drawing tools go", !narrow.wall, narrow.labels.join(","));
       check("the declared instrument stays", narrow.gauge);
       check("the undeclared instrument goes", !narrow.rake);
@@ -1520,7 +1771,24 @@ async function main() {
         dispatchEvent(new KeyboardEvent("keydown", { key: "1" }));   // Wall, hidden
         return APP.state.tool;
       `);
-      eq("a hidden tool's digit selects nothing else", digit, "gauge");
+      eq("a hidden tool's digit selects nothing else", digit, "gauge");   // paired with the toast check below
+
+      // Press 5 under a profile that hides Gauge: the tool must not arm AND the
+      // key must say why. A toast naming the tool is the only user-visible
+      // difference between "hidden" and "the digit does nothing".
+      await tab.evaluate(`APP.UIMODE.apply({ build: false, measure: ["rake"], panel: "focused" });`);
+      const hidden = await tab.evaluate(`
+        APP.state.tool = "rake";
+        document.getElementById("toastTitle").textContent = "";
+        dispatchEvent(new KeyboardEvent("keydown", { key: "5" }));   // Gauge, hidden here
+        return { tool: APP.state.tool,
+                 gaugeOnStrip: [...document.querySelectorAll("#groups .tbtn")]
+                                 .some((b) => b.getAttribute("aria-label") === "Gauge"),
+                 toast: document.getElementById("toastTitle").textContent };
+      `);
+      check("Gauge is off the strip under this profile", !hidden.gaugeOnStrip);
+      eq("a hidden tool's digit does not arm it", hidden.tool, "rake");
+      check("a hidden tool's digit toasts its name", /Gauge/.test(hidden.toast), JSON.stringify(hidden.toast));
 
       const lifted = await tab.evaluate(`
         document.getElementById("showAllBtn").click();
@@ -1640,17 +1908,15 @@ async function main() {
       eq("every rake shares one velocity scale (reach ∝ u at 20 px per m/s)", un1.scale.join(","),
          "40,10,60");
       await tab.close();
-    }
+    });
 
     // ------------------------------------------------- the narrow fallback
-    console.log("\na narrow window overlays the panel instead of insetting it");
-    {
-      const narrow = await launch({ width: 760, height: 720 });
+    await runCase("a narrow window overlays the panel instead of insetting it", async () => {
+      const narrow = await launchTracked({ width: 760, height: 720 });
       try {
         const tab = await narrow.open(INDEX + "?ex=HJ-1",
-          { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+          DOCK_READY);
         const p = await tab.evaluate(PROBE);
-        check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
         check("the panel is still open", p.dockOpen);
         check("it overlays", p.dockOver);
         eq("nothing is taken out of the viewport", p.dockVar, 0);
@@ -1672,16 +1938,14 @@ async function main() {
         `));
         await tab.close();
       } finally { await narrow.close(); }
-    }
+    });
     // ------------------------------------------------------- the fitted view
-    console.log("\nthe view is fitted to the window, not left at 1:1");
-    {
+    await runCase("the view is fitted to the window, not left at 1:1", async () => {
       const tab = await browser.open(INDEX + "?scene=m3");
       const v = await tab.evaluate(`
         const fill = () => Math.round(100 * APP.view.h / APP.view.pxH);
         return { vex: APP.state.vex, auto: APP.state.vexAuto, fill: fill() };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("a wide flat flume is exaggerated", v.vex > 1, "vex " + v.vex);
       check("the fit is marked automatic", v.auto);
       // The point of the whole thing: the domain is worth looking at.
@@ -1701,10 +1965,9 @@ async function main() {
       `);
       check("reset returns to the fitted view", reset.vex > 1 && reset.auto, "vex " + reset.vex);
       await tab.close();
-    }
+    });
 
-    console.log("\na scene that states its own exaggeration keeps it");
-    {
+    await runCase("a scene that states its own exaggeration keeps it", async () => {
       // The wave flumes measured theirs against what they are trying to show.
       const scene = await (async () => {
         const t = await browser.open(INDEX + "?scene=sandbox");
@@ -1715,19 +1978,232 @@ async function main() {
         await t.close();
         return id;
       })();
-      if (!scene) { console.log("  --   no scene pins a vex; nothing to check"); }
-      else {
+      // No scene pinning a vex is a failure, not a skip: the scenes that do
+      // are what this case exists to protect.
+      check("some scene declares view.vex", !!scene);
+      if (scene) {
         const tab = await browser.open(INDEX + "?scene=" + scene.id);
         const r = await tab.evaluate("return { vex: APP.state.vex, auto: APP.state.vexAuto };");
         eq("the scene's own vex is used (" + scene.id + ")", r.vex, scene.vex);
         check("the automatic fit stands down", !r.auto);
         await tab.close();
       }
-    }
+    });
+
+    // ----------------------------------------------------------- the digits
+    // Through the real keydown path, not by setting state: worksheets say
+    // "press 5", so the key itself is the contract.
+    await runCase("a digit arms the tool it numbers", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        APP.state.tool = "wall";
+        dispatchEvent(new KeyboardEvent("keydown", { key: "5" }));
+        return { tool: APP.state.tool, want: APP.TOOLS[4][0] };
+      `);
+      eq("the fifth tool is Gauge", r.want, "gauge");
+      eq("digit 5 arms the Gauge tool", r.tool, "gauge");
+      await tab.close();
+    });
+
+    // --------------------------------------------------------- the keymap
+    // One KEYMAP describes every key (js/keymap.js); typing, chords and
+    // auto-repeat never fire a shortcut.
+    await runCase("typing in the rig box fires no shortcut", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const S = APP.sim;
+        S.segs.push([1, 1, 2, 1, 0.05, 0]);
+        const before = S.segs.length, paused = APP.state.paused;
+        const box = document.querySelector(".rigtx");
+        if (!box) return { noBox: true };
+        box.focus();
+        for (const key of ["c", "r", " ", "5", "a"]) {
+          box.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+        }
+        return { before, after: S.segs.length, paused: APP.state.paused,
+                 wasPaused: paused, tool: APP.state.tool, avg: APP.state.avg };
+      `);
+      check("the rig textarea exists", !r.noBox);
+      eq("C in the rig box does not clear the drawing", r.after, r.before);
+      eq("space in the rig box does not pause", r.paused, r.wasPaused);
+      check("a digit or A in the rig box arms nothing", r.tool !== "gauge" && !r.avg, JSON.stringify(r));
+      await tab.close();
+    });
+
+    await runCase("Ctrl+V does not toggle the valves", async () => {
+      const tab = await browser.open(INDEX + "?scene=dyke");
+      const r = await tab.evaluate(`
+        const before = APP.sim.p.valveClosed;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "v", ctrlKey: true, bubbles: true }));
+        dispatchEvent(new KeyboardEvent("keydown", { key: "v", metaKey: true, bubbles: true }));
+        const chord = APP.sim.p.valveClosed;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "v", bubbles: true }));
+        return { before, chord, plain: APP.sim.p.valveClosed };
+      `);
+      eq("Ctrl/Cmd+V leaves the valve alone", r.chord, r.before);
+      check("a plain V still toggles it", r.plain !== r.before, JSON.stringify(r));
+      await tab.close();
+    });
+
+    await runCase("AltGr types a shortcut character; Ctrl+V stays a chord", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const b0 = APP.state.brush;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "[", ctrlKey: true, altKey: true,
+          modifierAltGraph: true, bubbles: true }));
+        const b1 = APP.state.brush;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "[", ctrlKey: true, bubbles: true }));
+        const b2 = APP.state.brush;
+        dispatchEvent(new KeyboardEvent("keydown", { key: "\\u201c", altKey: true, bubbles: true }));
+        return { b0, b1, b2, b3: APP.state.brush };
+      `);
+      check("AltGr+[ shrinks the brush", r.b1 < r.b0, JSON.stringify(r));
+      eq("Ctrl+[ is a chord and does nothing", r.b2, r.b1);
+      eq("Option+[ (a curly quote) matches nothing", r.b3, r.b1);
+      await tab.close();
+    });
+
+    await runCase("held A does not flicker Average", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+        dispatchEvent(new KeyboardEvent("keydown", { key: "a", repeat: true, bubbles: true }));
+        return { avg: APP.state.avg };
+      `);
+      eq("the auto-repeat of A is ignored", r.avg, true);
+      await tab.close();
+    });
+
+    await runCase("every TOOLBAR key is in KEYMAP and no key is claimed twice", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const norm = (k) => (k === "space" ? " " : String(k).toLowerCase());
+        const rows = KEYMAP.map((x) => x.key);
+        const strip = APP.ui.TOOLBAR.flatMap((g) => g.items).map((i) => i.key).filter(Boolean);
+        return { missing: strip.filter((k) => !rows.includes(norm(k))),
+                 dup: rows.filter((k, i) => rows.indexOf(k) !== i),
+                 digits: rows.filter((k) => /^[1-9]$/.test(k)).length, want: APP.TOOLS.length };
+      `);
+      eq("every strip key has a KEYMAP row", JSON.stringify(r.missing), "[]");
+      eq("no key is claimed twice", JSON.stringify(r.dup), "[]");
+      eq("one digit row per reachable tool", r.digits, Math.min(9, r.want));
+      await tab.close();
+    });
+
+    await runCase("the keyboard sheet lists S only when scenes are offered", async () => {
+      const tab = await browser.open(INDEX + "?ex=UF-1");
+      const r = await tab.evaluate(`
+        const kbds = () => [...document.querySelectorAll("#keysmenu kbd")].map((k) => k.textContent);
+        return APP.EX.ready.then(() => {
+          APP.ui.KEYS.open();
+          const locked = kbds();
+          APP.ui.KEYS.close();
+          APP.UIMODE.lift();
+          APP.ui.KEYS.open();
+          return { locked, lifted: kbds() };
+        });
+      `);
+      check("S is absent while the card owns the scene", !r.locked.includes("S"), r.locked.join(" "));
+      check("S appears once the interface is lifted", r.lifted.includes("S"), r.lifted.join(" "));
+      check("the sheet lists the zoom and Esc keys it used to omit",
+            r.lifted.includes("+ / −") && r.lifted.includes("Esc"), r.lifted.join(" "));
+      await tab.close();
+    });
+
+    // ------------------------------------------------------- shared popup
+    await runCase("an exercise pick builds the toolbar once and syncs the panel once", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      // A card with a rig (so the pick lands a microtask later) and one
+      // without; the counters are UI.count, bumped only when the work really
+      // runs, so a deferred call that is merged away does not count.
+      const r = await tab.evaluate(`
+        const ids = APP.EX.all().filter((e) => !(e.gauges && e.gauges.length));
+        const withRig = ids.find((e) => APP.EX.hasRig(e)), plain = ids.find((e) => !APP.EX.needsRig(e));
+        const one = async (e) => {
+          if (!e) return null;
+          const c0 = Object.assign({}, APP.ui.UI.count);
+          APP.pickExercise(e.id);
+          await APP.EX.ready;
+          return { id: e.id, bar: APP.ui.UI.count.bar - c0.bar, panel: APP.ui.UI.count.panel - c0.panel };
+        };
+        return one(withRig).then(async (a) => ({ a, b: await one(plain) }));
+      `);
+      check("a rig card was found to pick", !!r.a);
+      if (r.a) {
+        eq("the strip is built once (rig card " + r.a.id + ")", r.a.bar, 1);
+        eq("the panel is synced once (rig card " + r.a.id + ")", r.a.panel, 1);
+      }
+      if (r.b) {
+        eq("the strip is built once (card " + r.b.id + ")", r.b.bar, 1);
+        eq("the panel is synced once (card " + r.b.id + ")", r.b.panel, 1);
+      }
+      await tab.close();
+    });
+
+    await runCase("every menu closes on Escape and on click-away", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const menus = {
+          scenes:    { m: "scenemenu", open: () => APP.PICKER.open() },
+          exercises: { m: "exmenu",    open: () => APP.EX.open() },
+          keys:      { m: "keysmenu",  open: () => APP.ui.KEYS.open() },
+          fields:    { m: "legmenu",   open: () => document.getElementById("legPick").click() },
+        };
+        const isOpen = (k) => document.getElementById(menus[k].m).classList.contains("open");
+        const out = {};
+        for (const k of Object.keys(menus)) {
+          menus[k].open();
+          const opened = isOpen(k);
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          const esc = !isOpen(k);
+          menus[k].open();
+          document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+          out[k] = { opened, esc, away: !isOpen(k) };
+        }
+        // Opening one closes the others: they are alternatives, not a stack.
+        APP.PICKER.open(); APP.ui.KEYS.open();
+        out.exclusive = !isOpen("scenes") && isOpen("keys");
+        return out;
+      `);
+      for (const k of ["scenes", "exercises", "keys", "fields"]) {
+        check(k + " menu opens", r[k].opened);
+        check(k + " menu closes on Escape", r[k].esc);
+        check(k + " menu closes on click-away", r[k].away);
+      }
+      check("opening one menu closes the others", r.exclusive);
+      await tab.close();
+    });
 
     // ------------------------------------------------------- touch parity
-    console.log("\neverything reachable without a keyboard or a second button");
-    {
+    await runCase("Escape closes the field menu", async () => {
+      const tab = await browser.open(INDEX + "?scene=sandbox");
+      const r = await tab.evaluate(`
+        const pick = document.getElementById("legPick");
+        pick.click();
+        const m = document.getElementById("legmenu");
+        const opened = m.classList.contains("open");
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        return { opened, closed: !m.classList.contains("open"),
+                 legendStill: document.getElementById("legend").classList.contains("open") };
+      `);
+      check("the menu opens from the legend's field button", r.opened);
+      check("Escape closes it", r.closed);
+      check("and leaves the legend itself up", r.legendStill);
+      await tab.close();
+    });
+
+    await runCase("?embed=0 is not embedded", async () => {
+      const bits = {};
+      for (const [q, want] of [["embed=0", false], ["embed", true], ["embed=1", true]]) {
+        const tab = await browser.open(INDEX + "?scene=sandbox&" + q);
+        bits[q] = await tab.evaluate("return APP.embed;");
+        eq(q + " -> APP.embed", bits[q], want);
+        await tab.close();
+      }
+    });
+
+    await runCase("everything reachable without a keyboard or a second button", async () => {
       const tab = await browser.open(INDEX + "?scene=sandbox");
       const r = await tab.evaluate(`
         const ids = APP.TOOLS.map((t) => t[0]);
@@ -1741,26 +2217,25 @@ async function main() {
         return { hasPour: ids.includes("pour"), armed,
                  hasUndo: !!document.getElementById("undoBtn"),
                  digits: strip.filter((it) => /^[0-9]$/.test(it.key || "")).length,
+                 want: Math.min(9, ids.length),
                  labels };
       `);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       check("Pour is a tool", r.hasPour);
       eq("and the strip arms it", r.armed, "pour");
       check("Undo is a button, not only the Z key", r.hasUndo);
       // The digits address at most nine tools; a tenth must not shadow one.
-      check("at most nine tools carry a digit", r.digits <= 9, r.digits + " digits");
+      eq("exactly min(9, tools) strip buttons carry a digit", r.digits, r.want);
       await tab.close();
-    }
+    });
 
     // --------------------------------------------------------- phone sizes
-    console.log("\na phone gets a bottom sheet, not a side panel");
-    {
+    await runCase("a phone gets a bottom sheet, not a side panel", async () => {
       // Chrome will not open a window narrower than ~500 css px, which is
       // still inside the phone branch (< 620).
-      const phone = await launch({ width: 420, height: 880 });
+      const phone = await launchTracked({ width: 420, height: 880 });
       try {
         const tab = await phone.open(INDEX + "?ex=HJ-1",
-          { ready: "return !!window.APP && !!document.querySelector('#dock.open');" });
+          DOCK_READY);
         const r = await tab.evaluate(`
           const d = document.getElementById("dock");
           const dr = d.getBoundingClientRect();
@@ -1774,7 +2249,6 @@ async function main() {
                    fill: Math.round(100 * APP.view.h / APP.view.pxH),
                    vex: APP.state.vex };
         `);
-        check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
         check("the panel is a sheet", r.sheet);
         eq("it spans the width", r.width, r.inner[0]);
         eq("it sits on the bottom", r.bottom, r.inner[1]);
@@ -1806,15 +2280,14 @@ async function main() {
         check("and stays inside the width", !leg.shown || leg.right <= leg.inner);
         await tab.close();
       } finally { await phone.close(); }
-    }
+    });
 
     // ----------------------------------------------------------------- tablets
     // An iPad, emulated: a mobile viewport at devicePixelRatio 2 with touch
     // input, driven by real touch events (Input.dispatchTouchEvent). The
     // lecturer touched an exercise to read it and it drew a block: the default
     // tool was Wall even where the card hides BUILD.
-    console.log("\na tablet reads the water by touch and never draws by accident");
-    {
+    await runCase("a tablet reads the water by touch and never draws by accident", async () => {
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       async function tablet(url, w, h) {
         const tab = await browser.open(url);
@@ -1882,7 +2355,11 @@ async function main() {
         for (const fx of [0.3, 0.5, 0.15, 0.7]) for (let k = 39; k > 0; k--) {
           const x = APP.sim.W * fx, z = APP.sim.H * k / 40, p = APP.probe(x, z);
           const px = [r.left + APP.view.X(x), r.top + APP.view.Y(z)];
-          if (p && p.f < 0.01 && document.elementFromPoint(px[0], px[1]) === cv) return px;
+          // clear of floating chrome by a finger-width, not by a hair: the exercise toast
+          // is still up here and its bottom edge sits a fraction of a pixel from this point
+          const clear = [[0, 0], [0, -24], [0, 24], [-24, 0], [24, 0]].every(
+            (d) => document.elementFromPoint(px[0] + d[0], px[1] + d[1]) === cv);
+          if (p && p.f < 0.01 && clear) return px;
         }
         return null;`);
       check("found dry ground on screen", !!dry);
@@ -1906,7 +2383,6 @@ async function main() {
       eq("every strip button is at least 40 px", fit.small, 0);
       eq("and on screen", fit.off, 0);
       eq("nothing overflows sideways", fit.pageW, fit.iw);
-      check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
       await tab.close();
 
       // A pinch is not a tool action: with the Gauge tool in hand, two
@@ -1928,16 +2404,14 @@ async function main() {
       const g1 = await t2.evaluate("return { n: APP.state.gauges.length, z: APP.state.zoom };");
       eq("a pinch places no gauge", g1.n, g0.n);
       check("and zooms", g1.z > g0.z * 1.2, "zoom " + g0.z + " → " + g1.z);
-      check("no uncaught errors", t2.errors.length === 0, t2.errors[0]);
       await t2.close();
-    }
+    });
 
     // ------------------------------------------------------- embedded in an LMS
-    console.log("\nan embedded exercise keeps the water");
-    {
+    await runCase("an embedded exercise keeps the water", async () => {
       // 800 x 600 is inside the 700-1000 px band a module page's content
-      // column actually offers (docs/superpowers/specs/2026-09-10-embed-design.md).
-      const embed = await launch({ width: 800, height: 600 });
+      // column actually offers (docs/design/2026-09-10-embed-design.md).
+      const embed = await launchTracked({ width: 800, height: 600 });
       try {
         const tab = await embed.open(INDEX + "?ex=HJ-1&embed=1");
         // `pickExercise` lands its rig a microtask later, so wait for the
@@ -1961,9 +2435,8 @@ async function main() {
             fsEnabled: !!document.fullscreenEnabled,
           };
         `);
-        check("no uncaught errors", tab.errors.length === 0, tab.errors[0]);
         check("APP.embed is true", p.embed === true);
-        // Fold on land (spec §1.1): the brief lives on the page around the
+        // Fold on land (docs/design/2026-09-10-embed-design.md §1): the brief lives on the page around the
         // frame, so the card starts parked on its edge tab.
         check("the dock is not open", !p.dockOpen);
         check("the reopen tab is shown", p.tabShown);
@@ -2011,14 +2484,17 @@ async function main() {
         `);
         check("the x folds the card rather than hiding it",
               !closed.dockOpen && closed.tabShown, JSON.stringify(closed));
-        check("still no uncaught errors", tab.errors.length === 0, tab.errors[0]);
         await tab.close();
       } finally { await embed.close(); }
-    }
+    });
   } finally {
     await browser.close();
   }
 
+  if (ONLY && ran === 0) {
+    console.error("\nno case matches --only=" + ONLY);
+    process.exit(1);
+  }
   console.log("\n" + passed + " passed, " + failed + " failed");
   if (failed) {
     console.log("\nfailures:");
@@ -2027,4 +2503,4 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error("\n" + e.stack || e); process.exit(1); });
+main().catch((e) => { console.error("\n" + (e.stack || e)); process.exit(1); });

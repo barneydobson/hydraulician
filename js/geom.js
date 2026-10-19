@@ -26,6 +26,10 @@
  * below the finest cell the app runs at (Δx ~ 2.6 mm at Ultra) — everything
  * downstream (rasteriser, `contains`, `faceSamples`) only ever has to know
  * about straight edges.
+ *
+ * Defines: GEOM
+ *
+ * Reads:   none
  */
 const GEOM = (() => {
 

@@ -353,6 +353,9 @@ class Runner:
             json.dump(self.state, fh, indent=1)
 
     def _chrome(self):
+        env = os.environ.get("CHROME")  # as test/cdp.mjs
+        if env:
+            return env
         for c in CHROME_CANDIDATES:
             p = shutil.which(c)
             if p:

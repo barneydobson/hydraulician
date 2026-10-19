@@ -13,13 +13,12 @@
  *
  * The card is the complete student exercise: setup, assignment, actions and
  * readings, including any data/formulas needed to do it without another
- * document. Each folder's README is lecturer-only: derivation, worked
- * answers and verification. HS-1 is the model for a concise standalone card.
+ * document. Each folder's README is lecturer-only (defined once, below).
+ * HS-1 is the model for a concise standalone card.
  *
  * Every number on a card is the SHIPPED value from the demo's own README —
- * remeasured constants, not the ones a programme sheet promised (the
- * original pack's history of amended rules is in
- * courses/original/CHANGES-NEEDED.md §2b).
+ * remeasured constants, not the ones a programme sheet promised: each value
+ * is the one the demo's README measured.
  *
  * THE LINE THIS FILE DRAWS — read before adding a value
  * ----------------------------------------------------
@@ -66,13 +65,8 @@
  * three orifice lips are different rigs, not different numbers, and nobody is
  * going to hand-draw them. Geometry is part of the common starting point.
  *
- * OTHER FIELDS
+ * OTHER FIELDS (every key CARD_KEYS allows; TAB_KEYS below for `tabs`)
  *   id       programme id, e.g. "HJ-1"           title    the README's own h1
- *   aim      optional: one or two plain sentences on what the scene is and
- *            what the student does in it. When present the exercise menu
- *            prints it under the title (instead of the start · ?scene · settle
- *            line) and the start screen shows it on hover; it is NOT on the
- *            card. Written in the vocabulary of the lecture it is used in.
  *   topic    grouping for the menu (the register by topic, ?course=none)
  *   folder   the brief's folder, courses/<id>/exercises/<folder>/ for a card
  *            in courses/<id>/exercises.js — COURSES.exercises stamps it with
@@ -92,8 +86,19 @@
  *            geometry or a station on screen — there is no control to set.
  *   setup    the ordered sequence a snapshot cannot hold ("fill it, THEN shut
  *            the valve"). Steps for the student to follow, never automated.
- *   aim      optional: ONE line on what the exercise is for; the exercise
- *            menu shows it in place of `start`.
+ *            A card with `steps` ignores `setup`.
+ *   steps    the short layout: at most FIVE lines, in order, with the inline
+ *            markup of `tips` ({tool:…}, {btn:…}, {key:…}). When present the
+ *            card prints these INSTEAD of `start`, `task` and the Instruments
+ *            line, which the steps carry themselves.
+ *   background  optional: a string or a list of paragraphs for the material a
+ *            step cannot hold — a definition, a formula, a remark. Folded away
+ *            at the foot of the steps, closed until the student opens it.
+ *   aim      optional: one or two plain sentences on what the scene is and
+ *            what the student does in it. The exercise menu prints it under
+ *            the title (in place of the start · ?scene · settle line); the
+ *            start screen shows it on hover; it is NOT on the card. Written in
+ *            the vocabulary of the lecture it is used in.
  *   start    ONE short line on what is on the bench when the card opens —
  *            "a chute onto a level apron, with a tailwater control".
  *   task     ONE or two short lines on what to do, INCLUDING what to read off
@@ -112,55 +117,95 @@
  *   secondScene  an optional coda the card offers as a suggestion — {scene,
  *            when}. Nothing is applied; the student switches by hand from the
  *            Scenes menu, and `when` is the sentence that says why.
+ *   tips     optional, on an entry or a tab: the card's own lines for the tips
+ *            strip at the foot of the screen. They replace the scene's `tips`
+ *            while the card (or the tab) is on screen ON ITS OWN SCENE; a tab
+ *            without `tips` inherits the entry's. Plain text with the inline
+ *            markup, in the vocabulary of the lecture the card belongs to.
+ *            Without it the scene's tips show, as before (docs/making-
+ *            exercises.md, "The tips line"). A non-empty list of non-empty
+ *            strings.
+ *   tabs     optional: one scene asking several questions (CR-1 is streamlines,
+ *            continuity, forces and energy, in four tabs). A list of objects with the
+ *            TAB_KEYS: `key` (unique) and `label` name the tab. `title`, `topic`, `aim`, `steps`, `background`,
+ *            `tips`, `instruments` and `studentParams` replace the entry's own;
+ *            `ui` and `viewParams` are merged over the entry's, shallowly. The
+ *            scene, the rig, `rigParams` and `settle` are the entry's alone:
+ *            switching tabs swaps the steps and the profile, never the bench.
+ *            Addressed as ID#key (`?ex=ID&tab=key`).
  *   ui       the UI PROFILE: what of the interface this exercise wants in
- *            front of a student (UIMODE in js/main.js). Families are `build`,
+ *            front of a student (UIMODE in js/legend.js). Families are `build`,
  *            `measure` and `view` — each `true`, `false`, or the list of tool
  *            ids that survive — plus `fields` (which colourings the legend
- *            offers), `panel` ("full" / "focused" / "shut"), `controls`
- *            (the individual Controls-panel row ids that survive),
- *            `readouts` ({gauges, cursor, status, rows}), `gaugeFields` (the
- *            GAUGE_QTY ids a gauge may plot), `hide` (concepts withheld from
- *            the canvas words: "energy", "critical") and `fieldText` (a
- *            field's description, reworded for the card's lecture).
- *            docs/making-exercises.md has each of them.
- *   gauges   optional [{x, z, field}]: gauges the card arrives with already
- *            PLACED — the one exception to "the picker places none", for a
- *            card whose subject is a time series from t = 0 (VC-2).
+ *            offers), `legend` (`false` closes the legend), `panel` ("full" /
+ *            "focused" / "shut"), `controls` (the individual Controls-panel row
+ *            ids that survive), `readouts` ({gauges, cursor, status, rows}),
+ *            `gaugeFields` (the GAUGE_QTY ids a gauge may plot), `hide`
+ *            (concepts withheld from the canvas words: "energy", "critical")
+ *            and `fieldText` (a field's description, reworded for the card's
+ *            lecture). docs/making-exercises.md has each of them.
  *
- *            MOSTLY IT IS DERIVED, so most entries carry no `ui` at all.
- *            `instruments` narrows MEASURE to the tools it names; an entry
- *            naming no build tool loses BUILD, on the reasoning that an
- *            exercise arrives with its rig already built; and the panel opens
- *            focused on the sections its own controls live in. What you write
- *            here is merged ON TOP of that derivation.
+ *            EVERY CURRENT CARD DECLARES ONE, and the derivation below still
+ *            fills in whatever a card's `ui` omits. `instruments`
+ *            narrows MEASURE to the tools it names; an entry naming no build
+ *            tool loses BUILD, on the reasoning that an exercise arrives with
+ *            its rig already built; and the panel opens focused on the sections
+ *            its own controls live in. What you write in `ui` is merged ON TOP
+ *            of that derivation.
  *
- *            SO: a card whose `task` or `setup` tells a student to draw, cut,
- *            erase or move something MUST say `ui: { build: true }` or name a
- *            build tool in `instruments`. Otherwise the derivation takes the
- *            tools away and the student is told "Erase is off for this
- *            exercise" by a card that just told them to erase. check_pack.py
- *            fails the pack over it, because the alternative is a tool that is
- *            silently not there.
+ *            SO: check_pack.py scans `task`, `start`, `setup` and `steps` for
+ *            the verbs draw, draws, drawing, redraw, redraws, erase, sketch,
+ *            cut, cuts, move, widen, narrow, shrink. A card that uses one of
+ *            them MUST say `ui: { build: true }` or name a build tool in
+ *            `instruments`. Otherwise the derivation takes the tools away and
+ *            the student is told "Erase is off for this exercise" by a card
+ *            that just told them to erase; check_pack.py fails the pack over
+ *            it, because the alternative is a tool that is silently not there.
  *
  *            A profile is never a cage — the `⋯` on the strip restores
  *            everything in one click, which is what keeps the standing
  *            acceptance test (the sandbox reproduces any scene by hand) true.
  *
+ *   gauges   optional [{x, z, field}]: gauges the card arrives with already
+ *            PLACED — the one exception to "the picker places none", for a
+ *            card whose subject is a time series from t = 0 (VC-2).
+ *
  * A card must stand alone. `start` describes the bench, `instruments.where`
  * gives the stations and `task` says what to do and read afterwards. Use
- * `setup` for ordered steps and necessary calculation data. Do not send the
- * student to the README for an equation, a procedure or what to record.
- * Derivations, worked answers and verification remain in lecturer notes.
+ * `steps` (or `setup`) for ordered steps and necessary calculation data.
  *
- * `tips` (optional, on an entry or a tab): the card's own lines for the tips
- * strip at the foot of the screen, replacing its scene's `tips` while the
- * card is on screen — plain text with the inline markup ({tool:…}, {btn:…},
- * {key:…}), in the vocabulary of the lecture the card belongs to. Without
- * it the scene's tips show, as before (docs/making-exercises.md, "The tips
- * line").
+ * THE README, DEFINED ONCE. Every other place that points at a folder's
+ * README (AGENTS.md, docs/making-exercises.md, courses/original/INDEX.md and
+ * js/courses.js) points here: lecturer notes — derivation, worked answers,
+ * verification; a student is never sent there for an equation or a procedure;
+ * the one exception is the draw-it-yourself fallback when the rig pack is
+ * absent. The original pack's READMEs predate this definition and still read
+ * as student briefs; they are due for retirement with the pack.
  *
- * Standing rules every worksheet carries: Resolution Medium · wait out the
- * settle · median-of-the-wobble reads, never one frame · after changing q,
- * re-check any tailwater ≥ 1.3·d_c · keep the tab visible.
+ * Standing rules every worksheet carries (courses/original/INDEX.md repeats
+ * them verbatim): Resolution Medium · wait out the settle · median-of-the-
+ * wobble reads, never one frame · after changing q, re-check any tailwater
+ * ≥ 1.3·d_c · keep the tab visible · read promptly (the chart buffer keeps
+ * moving).
+ *
+ * Defines: EXERCISES, CARD_KEYS, CARD_KEYS_STAMPED, TAB_KEYS
+ *
+ * Reads:   none
  */
 const EXERCISES = [];
+
+/* The card schema, machine-readable: every top-level key a card may carry.
+ * exercises/_runner/check_pack.py reads these by evaluating this file and
+ * fails the pack on any other key, so a misspelt key (`instrument`) is an
+ * error rather than a field the app silently never reads. Add a key here in
+ * the same commit that teaches the app to read it, and document it above.
+ * CARD_KEYS_STAMPED are the two COURSES.exercises writes itself. */
+const CARD_KEYS = ["id", "title", "aim", "topic", "folder", "scene", "rig", "rigParams",
+  "viewParams", "studentParams", "digit", "rigTable", "instruments", "digitNote", "setup",
+  "start", "task", "steps", "background", "note", "settle", "rigWhy", "secondScene", "ui",
+  "gauges", "tabs", "tips"];
+const CARD_KEYS_STAMPED = ["course", "home"];
+/* What one entry of a card's `tabs` may carry: `key` and `label`
+ * name the tab; the rest are the fields a tab overrides (see EX.view). */
+const TAB_KEYS = ["key", "label", "title", "topic", "aim", "steps", "background",
+  "ui", "viewParams", "instruments", "studentParams", "tips"];

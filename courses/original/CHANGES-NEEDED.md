@@ -41,11 +41,15 @@ q ranges (valid, conservative) — widening them under the new 2.0 cap
 needs re-measurement first. P11's reset lives in a main.js wrapper;
 folding it into SIM.rasterise is a suggested tidy-up.
 
-## 2 · Interface / panel change proposals (still open, deferred with
-## reasons)
+## 2 · Interface / panel change proposals
+
+**Done:** P1 and P4 (acbe904, marked DONE below); P13 (rig save / share is
+now `js/rig.js`). **Open, deferred with reasons:** P2, P3, P5-P12 — not
+re-checked against the current tree; verify before relying on one.
 
 - **[P1, from UN-1] Suppress the free-surface hover block inside pressurised
-  pipes.** The hover readout currently labels a full pipe "H2 profile" and
+  pipes. DONE (acbe904):** the profile chip is withheld on a capped column
+  with f > 1.002. The hover readout currently labels a full pipe "H2 profile" and
   prints y_c/S₀/S_f there, which is meaningless for pressurised flow and
   will confuse students in every duct demo (FR-1, LL-1, LL-2, PU-1, B10).
   Proposal: gate the profile/GVF part of the readout on fill fraction
@@ -74,13 +78,13 @@ folding it into SIM.rasterise is a suggested tidy-up.
   workaround meanwhile is "read the actual reservoir surface with a gauge,
   not the slider".
 
-- **[P4, from UF-1] Raise the `Inflow q` slider cap.** js/main.js:161 caps
-  the slider at max = 1.2 m²/s; the programme's UF-1 wants q up to 1.6 (and
+- **[P4, from UF-1] Raise the `Inflow q` slider cap. DONE (acbe904):** the
+  slider now stops at 2.0. Before it capped at max = 1.2 m²/s; the programme's UF-1 wants q up to 1.6 (and
   a wider spread helps every pooled sweep on the steep scenes). No shipped
   scene sets q > 1.2, so raising the max to ~2.0 changes no defaults;
   risk is only students dialling silly values (the standing tailwater rule
-  already governs that). Until raised, UF-1's rule is trimmed to
-  q = 0.80 + 0.04·d (0.80–1.16).
+  already governs that). UF-1's trimmed rule, q = 0.80 + 0.04·d (0.80–1.16),
+  is no longer needed; the wider range is the worksheet's to adopt.
 
 - **[P5, from GV-1] Print cursor coordinates (x, y) and surface ELEVATION in
   the hover readout.** Students assigned "station x = 7 m" currently have no

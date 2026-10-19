@@ -1,3 +1,10 @@
+/**
+ * stream.js — dependency record (checked by test/check_headers.py).
+ *
+ * Defines: STREAM
+ *
+ * Reads:   FMT
+ */
 /* =========================================================================
  * stream.js — STREAMLINES as contours of the stream function. No WebGL here:
  * SIM.streamRequest/streamPoll fetch the field, this turns it into line
@@ -81,10 +88,7 @@ const STREAM = (() => {
 
   /** A round Δψ (1, 2, 2.5 or 5 × 10^k) within a factor 0.7–1.43 of `raw`,
    *  so the key can quote it and the line count stays near what was asked. */
-  function nice(raw) {
-    const e = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / e;
-    return (m < 1.4 ? 1 : m < 2.2 ? 2 : m < 3.5 ? 2.5 : m < 7 ? 5 : 10) * e;
-  }
+  function nice(raw) { return FMT.niceBand(raw, [1, 2, 2.5, 5], [1.4, 2.2, 3.5, 7]); }
 
   /** Marching squares over wet cells at the levels ψ = (k + ½)Δψ — the
    *  half-step keeps every level off the walls' own ψ (a wall is already

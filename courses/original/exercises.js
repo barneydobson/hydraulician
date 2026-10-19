@@ -12,7 +12,7 @@
 // `home: "courses/original/exercises"`, so `folder` names a folder under
 // courses/original/exercises/ and the card's brief link, check_pack.py and
 // courses/original/INDEX.md all look there. Ids are global: none of these may
-// repeat an id (or tab alias) of another course.
+// repeat an id of another course.
 //
 // Every number here is the SHIPPED value from the demo's own README —
 // remeasured constants, not the ones the original programme sheet promised.

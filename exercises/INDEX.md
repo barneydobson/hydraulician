@@ -15,8 +15,7 @@ of them.
 What is left in this folder is shared tooling, not exercises:
 
 - `_runner/` — `check_pack.py` (the pack agrees with itself, every course
-  included), `check_notation.py`, `smoke.js` (boots every scene and every
-  exercise) and the Linux CDP `runner.py` (see its HOWTO.md).
+  included) and the Linux CDP `runner.py` (see its HOWTO.md).
 - `_code-changes/` — reports and screenshots from the app changes made while
   the original pack was built (picker, gauges, rig sharing, card fixes).
 

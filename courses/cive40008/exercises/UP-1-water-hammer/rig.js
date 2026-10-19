@@ -7,7 +7,11 @@
  * reads the steady state, slams the valve and prints the arrival times, the
  * head rise and the period, through the same entry points the strip uses:
  *   APP.placeGauge(x, z)              = a click with the Gauge tool
- *   APP.probe(x, z).phead + z         = the gauge's h
+ *   APP.probe(x, z).phead + z         = p/rho g + z on the axis. NOT the gauge's h (that is zp + phead, zp = j*dx, a
+ *                                       shift of up to dx = 0.096 m here): this script keeps the plain sum because
+ *                                       report() works in differences (h - h0, rise, period), so a constant
+ *                                       reference per gauge cancels; its one absolute number, h0_46, is
+ *                                       p/rho g + Z on the nominal axis Z = 2.5 m, not a gauge's h
  *   toggleValve()                     = the V key
  *   APP.tick(n)                       = n solver substeps, flat out
  *

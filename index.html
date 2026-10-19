@@ -2,52 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hydraulician — 2D hydraulics in profile</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+<svg style="display:none" aria-hidden="true"><symbol id="drop" viewBox="0 0 20 20"><path d="M10 2.5c3 4 5 6.5 5 9a5 5 0 1 1-10 0c0-2.5 2-5 5-9z"></path></symbol></svg>
 
 <canvas id="view"></canvas>
 <canvas id="over"></canvas>
 
-<!-- The top strip. `#groups` is generated from the TOOLBAR spec in main.js —
+<!-- The top strip. `#groups` is generated from the TOOLBAR spec in strip.js —
      one icon per action, each with a hover card carrying its name, what it
      does and its shortcut. -->
 <div id="bar" class="glass">
   <div id="brand">
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#4dc3ff"
-         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M10 2.5c3 4 5 6.5 5 9a5 5 0 1 1-10 0c0-2.5 2-5 5-9z"></path>
-    </svg>
+    <svg class="brandmark" width="18" height="18" aria-hidden="true"><use href="#drop"/></svg>
     <span class="word">Hydraulician</span>
   </div>
   <div id="groups"></div>
   <button id="title" type="button">
     <b id="sceneName">Sandbox</b><span class="caret">▾</span>
-    <span id="sceneKey">Draw the hydraulics</span>
     <span id="status"></span>
   </button>
 </div>
 
-<!-- The colour key, and the field picker, because they are the same question.
-     DOM rather than part of the overlay canvas: it carries a menu, a button
-     and two editable numbers, which is hit-testing and text entry the 2D
-     context would have to be taught from scratch. A window or CDP screenshot
-     captures it either way, which is the point — a screenshot in a worksheet
-     should say what it is showing. -->
+<!-- The colour key and field picker: DOM, not the overlay canvas. See docs/engineering-notes.md, "Legend". -->
 <div id="legend" class="glass">
   <button id="legPick" type="button" title="Which variable the colour shows">
     <b id="legName">Water</b><i id="legSym"></i><span class="caret">▾</span>
   </button>
-  <!-- The mode switch lives HERE, on the legend, because the legend is what
-       declares which flow you are looking at: under Average the colour, the
-       surface line and every instrument come from one window, and each field's
-       own `mean` string prints two rows below this. Putting the statement and
-       the switch on one object is what stops them disagreeing. `setAverage` is
-       still the single writer -- the strip's A, the panel checkbox and this all
-       go through it. -->
+  <!-- The Live/Average switch sits on the legend: docs/engineering-notes.md, "Legend". -->
   <div id="legMode" role="group" aria-label="Live or averaged flow">
     <button id="legLive" type="button" aria-pressed="true"
             title="Show the flow as it is, frame by frame">Live</button>
@@ -65,23 +51,13 @@
     <button id="legFit" type="button" title="Rescale once to this frame — the 99th percentile over wet cells">Fit</button>
     <button id="legDef" type="button" title="Back to the scene's own scale">⟲ scene</button>
   </div>
-  <!-- Average: docs/averaging.md §6 (what the nonlinear fields become) and
-       §7.3 (the line is η̄, the depth is d̄, and δ_a is the difference).
-       DELIBERATELY SHORT. This block used to carry two further paragraphs —
-       what the window covers, and the six things that restart it — about seven
-       lines of prose that never changed. Both already exist, verbatim in
-       substance, in the Controls panel's own `info` for Average and in
-       docs/averaging.md §9; three copies of a list is how the three come to
-       disagree. What is left is the window length, the hover readout and the
-       field's own `mean` string: all of it either live or field-specific.
-       The same lesson the exercise cards learned — see the note on `start`
-       and `task` in js/exercises.js. -->
+  <!-- Average: docs/averaging.md §6, §7.3; why this block is short: docs/engineering-notes.md, "Legend". -->
   <div id="legAvg">
     <div class="legahd"><b>Average</b><span id="legAvgT">T = 0.00 s</span></div>
     <div id="legAvgRead">— hover the water for the averaged column</div>
     <div id="legAvgWhat" class="legnote"></div>
   </div>
-  <button class="minbtn corner" id="legX" title="Put the legend away (L)">–</button>
+  <button class="minbtn corner" id="legX" type="button" title="Put the legend away (L)">–</button>
 </div>
 <div id="legmenu" class="glass"></div>
 <div id="tip" class="glass"></div>
@@ -99,43 +75,34 @@
 
 <div id="hint" class="glass"></div>
 
-<!-- The docked side panel: the loaded exercise, never floating over the water.
-     Its contents are built in main.js (see EX.card). -->
+<!-- The dock: the loaded exercise, never floating over the water.
+     Its contents are built in pickers.js (see EX.card). -->
 <aside id="dock" aria-label="Exercise">
   <div class="dock-h">
     <span class="eid"></span>
     <span class="kind">Exercise</span>
     <span class="grow"></span>
-    <button class="dock-x" data-a="close" aria-label="Close">×</button>
+    <button class="dock-x" type="button" data-a="close" aria-label="Close">×</button>
   </div>
   <div class="dock-body"></div>
   <div class="dock-foot"></div>
 </aside>
 <button id="dockfold" type="button" aria-label="Fold the panel away">
-  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M7 4l6 6-6 6"></path>
-  </svg>
+  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"></path></svg>
 </button>
 <button id="docktab" type="button" aria-label="Open the instructions">
-  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor"
-       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M13 4l-6 6 6 6"></path>
-  </svg>
+  <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4l-6 6 6 6"></path></svg>
   <span class="eid"></span>
   <span class="kind">exercise</span>
 </button>
 
-<!-- The start screen. The pack list and the side doors are built in main.js
+<!-- The start screen. The pack list and the side doors are built in dock.js
      (see START) from the exercise register. -->
 <div id="start">
   <div id="startwrap">
     <div id="starthead">
       <div class="mark">
-        <svg width="30" height="30" viewBox="0 0 20 20" fill="none" stroke="#4dc3ff"
-             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M10 2.5c3 4 5 6.5 5 9a5 5 0 1 1-10 0c0-2.5 2-5 5-9z"></path>
-        </svg>
+        <svg class="brandmark" width="30" height="30" aria-hidden="true"><use href="#drop"/></svg>
         <h1>Hydraulician</h1>
       </div>
       <p>2D hydraulics in the vertical plane — pick an exercise, or draw your own</p>
@@ -156,6 +123,7 @@
 
 <script src="js/gl.js"></script>
 <script src="js/reconstruct.js"></script>
+<script src="js/format.js"></script>
 <script src="js/shaders.js"></script>
 <script src="js/scenes.js"></script>
 <script src="js/geom.js"></script>
@@ -183,10 +151,27 @@
      putting PICKER, EX, GINSP and RIG on window.APP, and that runs at parse
      time, so the bindings have to exist by then. Everything pointing the
      other way (these files reaching back for state, sim, syncPanel and the
-     rest) is inside a function body and resolves when called. -->
+     rest) is inside a function body and resolves when called. The exception is
+     POPUP.make, which pickers, strip and legend call while loading, so
+     popup.js goes first (format.js is up with the numerics, before overlay). -->
+<script src="js/popup.js"></script>
 <script src="js/pickers.js"></script>
 <script src="js/gauge-inspector.js"></script>
 <script src="js/rig.js"></script>
+<script src="js/keymap.js"></script>
+<!-- main.js, split by responsibility (each file's header lists what it defines
+     and reads; test/check_headers.py holds them to it). Order matters
+     only where a file touches an earlier name WHILE LOADING: state, fields,
+     panel, strip (TOOLS, TOOLBAR, KEYS), legend, dock, instruments, governor,
+     then main.js, which boots on DOMContentLoaded. -->
+<script src="js/state.js"></script>
+<script src="js/fields.js"></script>
+<script src="js/panel.js"></script>
+<script src="js/strip.js"></script>
+<script src="js/legend.js"></script>
+<script src="js/dock.js"></script>
+<script src="js/instruments.js"></script>
+<script src="js/governor.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

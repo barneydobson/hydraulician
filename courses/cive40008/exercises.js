@@ -8,7 +8,7 @@
 // `home: "courses/cive40008/exercises"`, so `folder` names a folder under
 // courses/cive40008/exercises/ and the card's brief link, check_pack.py and
 // courses/cive40008/INDEX.md all look there. Ids are global: none of these
-// may repeat an id (or tab alias) of another course.
+// may repeat an id of another course.
 //
 // HS-1, the dike (Statics, L3), started in the original pack and moved here;
 // the original course's menu still lists it (ids are global).
@@ -98,7 +98,7 @@ COURSES.exercises("cive40008", [
     settle: 25,
   },
 
-  // ===== Year 1: the contraction rig (CR-1: was FF-5, VC-1, MM-2) =====
+  // ===== Year 1: the contraction rig (CR-1) =====
   // Four questions asked of ONE scene, `contraction`: a 1.00 m pipe that
   // contracts into a 0.50 m pipe between two reservoirs held by head-driven
   // level controls. Geometry slider geom0 = contraction length L (3 m taper
@@ -106,14 +106,14 @@ COURSES.exercises("cive40008", [
   // scene's measured spin-up runs flat out again, so every L is read steady.
   // One entry with four TABS (lecturer, Oct 2026), one per lecture:
   // Streamlines (L4), Continuity (L5), Forces (L6), Energy (L7). Switching tabs swaps the
-  // steps and the interface and leaves the flow running. The old ids are the
-  // tabs' aliases, so ?ex=FF-5 / VC-1 / MM-2 still open the right tab.
+  // steps and the interface and leaves the flow running. A tab opens as
+  // ?ex=CR-1&tab=<key>.
   // Students play with it (the lecturer can show it in class): no digit,
   // nothing pooled; the slider is on the card through studentParams.
   {
     id: "CR-1",
     title: "The contraction rig",
-    aim: "Two reservoirs joined by a pipe that narrows gently or suddenly — its streamlines, its continuity and the force on it.",
+    aim: "Two reservoirs joined by a pipe that narrows gently or suddenly — its streamlines, its continuity, the force on it and the energy it loses.",
     topic: "Volume conservation",
     folder: "CR-1-contraction-rig",
     scene: "contraction",
@@ -128,7 +128,7 @@ COURSES.exercises("cive40008", [
     tabs: [
       // L4. Vorticity is never offered in Year 1: the separated corners are
       // read on Speed (slow eddies), with streamlines and the Average instead.
-      { key: "streamlines", label: "Streamlines", alias: "FF-5",
+      { key: "streamlines", label: "Streamlines",
         title: "Contraction rig: streamlines and separation",
         topic: "Flow fields, shear and turbulence",
         aim: "A pipe that narrows gently or suddenly — see the streamlines follow a taper but separate at a sharp step.",
@@ -155,7 +155,7 @@ COURSES.exercises("cive40008", [
           "The narrowest section of the jet just past the step is the vena contracta; the jet then spreads to fill the narrow pipe.",
           "Where streamlines crowd together the water is fast, where they spread it is slow.",
         ] },
-      { key: "continuity", label: "Continuity", alias: "VC-1",
+      { key: "continuity", label: "Continuity",
         title: "Contraction rig: Q in equals Q out",
         topic: "Volume conservation",
         aim: "Water through a pipe that narrows — measure Q in the wide pipe, in the narrow pipe and round a control volume.",
@@ -188,7 +188,7 @@ COURSES.exercises("cive40008", [
           "The shape of the contraction changes the streamlines, not continuity: Q₁ = Q₂ for a taper and for a step.",
           "The {tool:cv} counts outflow as positive: Σ Q = 0 means nothing builds up inside the box.",
         ] },
-      { key: "forces", label: "Forces", alias: "MM-2",
+      { key: "forces", label: "Forces",
         title: "Contraction rig: the force on a contraction",
         topic: "Momentum conservation",
         aim: "A pipe that narrows — find the force of the water on it from the momentum and the pressure at both ends, for a taper and a step.",
@@ -546,7 +546,7 @@ COURSES.exercises("cive40008", [
     // here (Oct 2026) because in this plan view p/ρg divides by g = 0 and
     // shows nothing worth reading; the plain Pressure does not divide by g.
     // Its level is arbitrary in a plan view (~37 kPa, creeping), so its
-    // range is fitted the first time it is shown (pressureRange in main.js).
+    // range is fitted the first time it is shown (pressureRange in js/fields.js).
     ui: { measure: ["gauge", "dye"], view: ["legendBtn", "partBtn", "slineBtn", "readBtn", "hoverBtn"],
           fields: ["speed", "p"], panel: "focused", controls: ["speed", "geom0"],
           gaugeFields: ["speed", "u", "w", "p"], hide: ["energy", "critical"],
@@ -690,8 +690,10 @@ COURSES.exercises("cive40008", [
   // The lecturer's sequence is kept: water only in the reservoir at t = 0,
   // the weir at 0.5 m (lecturer, 2026-10-17; slider 0–0.6 m for finer
   // control): the jump forms near the weir by ~20 s and creeps to the gate's
-  // foot by ~40 s; 0.46 m holds it partway; 0.6 m drowns the gate. Vocabulary is L6's: no heads, no grade
-  // lines, no jump box; Froude is kept on the lecturer's own decision, in
+  // foot by ~40 s; 0.46 m holds it partway; 0.6 m drowns the gate. Two tabs:
+  // Momentum keeps L6's vocabulary (no heads, no grade lines, no jump box);
+  // Energy (L7) adds the grade lines, the energy head and the box's energy
+  // rows. Froude is kept on the lecturer's own decision, in
   // plain words. The crest → jump map and the balance numbers are measured
   // (README, instructor section).
   {

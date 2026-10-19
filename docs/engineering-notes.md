@@ -296,7 +296,7 @@ that have both cost time:
   is a measurement of a different thing, and no tolerance makes it right.
 
 This is what issue #46 actually was. A 2.6x spread looked like a conservation
-bug; it was an unsettled scene read on a single frame. `smoke.js --only=physics`
+bug; it was an unsettled scene read on a single frame. `smoke.mjs --only=physics`
 now settles, opens a 20 s averaging window, and gates the spread at 0.01 —
 where the old gate was 0.8.
 
@@ -372,7 +372,7 @@ exactly where suction runs away. Anything along these lines has to be measured
 against `hammer` and against `docs/hydrostatic-attractor.js` before it is
 believed.
 
-So the voids stand, and `smoke.js --only=physics` **bounds** them instead:
+So the voids stand, and `smoke.mjs --only=physics` **bounds** them instead:
 enclosed void must stay under 4% of the water volume (about twice the worst
 scene). It is a bound, not a zero — its job is to stop the number growing
 silently when someone edits the advection, the flux cap or the EOS.
@@ -533,11 +533,11 @@ Two parts, together:
   maximum at mid-depth.
 
 What it delivers, on sa1's uniform reach at Medium (Average mode, x = 6–10 m,
-the `smoke.js` PROFILE suite): the maximum at y/d = 0.93–0.98 with the
+the `smoke.mjs` PROFILE suite): the maximum at y/d = 0.93–0.98 with the
 surface at 1.22–1.27 V; u(0.6 d below the surface)/V = 1.015–1.025;
 ½(u(0.2d) + u(0.8d))/V = 1.02; a log law over 0.05–0.35 d with fitted
 κ = 0.41–0.43; α = 1.17–1.19; n = 0.031–0.033 at C_f = 0.25. Two GPU mutants
-in `smoke.js` (`surface-sink`, `no-mixing-length`) put each half back and
+in `smoke.mjs` (`surface-sink`, `no-mixing-length`) put each half back and
 watch the suite fail; their recorded numbers are the old profile.
 
 **The inflow plug is full to the surface.** A prescribed-q inlet's plug used
@@ -610,7 +610,7 @@ off.
   −8%; −39% before #72): the horizontal-bed momentum balance has no weight
   component, and s1's bed falls 1 in 4.
 - **Velocity profile** (`sa1`): the 0.6-depth and 0.2/0.8 gauging rules within
-  2.5%, κ 0.41–0.43 — see the section above; `smoke.js --only=profile`.
+  2.5%, κ 0.41–0.43 — see the section above; `smoke.mjs --only=profile`.
 - **Sloshing period** (`slosh-tank`, DA-3): the first standing mode, released
   from a tilt a/d = 0.2. Against T = 2π/√(gk·tanh kd), k = π/B, timed crest
   to crest on a Depth gauge at x = 0.5 m, Medium: +2.2% (B/d = 4, d = 1 m,
@@ -879,7 +879,7 @@ slow, check `state.rt` in the status bar before suspecting the overlay.
 
 `state.speed` is what the user ASKS for (simulated seconds per wall second);
 each frame wants `speed · Δt_wall / Δt_sim` substeps and runs at most
-`state.nsubMax`. The governor (`governFrame` in main.js) sets that cap. Spin-up
+`state.nsubMax`. The governor (`governFrame` in js/governor.js) sets that cap. Spin-up
 (`warming`) asks for the cap every frame, i.e. as fast as the governor allows.
 
 **What was wrong (Oct 2026).** The old governor was AIMD on the CPU time
@@ -949,6 +949,31 @@ scripted `APP.frames(600)` on a warming m2 at 200–400 ms a frame timed
 ui-smoke out. So `APP.frames(n)` advances what n frames of ~30 ms of work
 buy, which is more sim time per call than under the old governor (whose
 readback-stalled CPU clock held a sync loop near 20 substeps a frame).
+
+## Legend
+
+The colour key (`#legend`) is DOM rather than part of the overlay canvas. It
+carries a menu, a button and two editable numbers, which is hit-testing and
+text entry the 2D context would have to be taught from scratch. A window or
+CDP screenshot captures it either way, which is the point: a screenshot in a
+worksheet should say what it is showing.
+
+The Live / Average switch lives on the legend because the legend is what
+declares which flow you are looking at. Under Average the colour, the surface
+line and every instrument come from one window, and each field's own `mean`
+string prints two rows below the switch. Putting the statement and the switch
+on one object is what stops them disagreeing. `setAverage` is still the single
+writer: the strip's A, the panel checkbox and the legend switch all go through
+it.
+
+The Average block (`#legAvg`) is deliberately short. It once carried two more
+paragraphs, what the window covers and the six things that restart it, about
+seven lines of prose that never changed. Both already exist in substance in the
+Controls panel's `info` for Average and in [averaging.md](averaging.md) §9.
+Three copies of a list is how the three come to disagree. What is left is the
+window length, the hover readout and the field's own `mean` string, all of
+which are either live or field-specific. It is the same lesson the exercise
+cards learned: see the note on `start` and `task` in `js/exercises.js`.
 
 ## The view
 
@@ -1059,7 +1084,7 @@ points and need a stopping rule at every boundary.
   outward-positive and per metre of width: `Q` volume, `M` momentum flux,
   `Fp` pressure force, `Ė` energy. `M` and `Fp` are kept apart rather than
   summed — distinguishing them is the content of a control-volume question —
-  and their sum is exactly what `boxForce` returns, which `smoke.js` asserts
+  and their sum is exactly what `boxForce` returns, which `smoke.mjs` asserts
   so the two integrals cannot drift.
 - **`Q` and `ṁ/ρ` are not the same number, and the gap is the compression.**
   `Q` uses `min(f, 1)`, the geometric volume; the mass terms use `f`, which
@@ -1077,7 +1102,7 @@ points and need a stopping rule at every boundary.
   way you would draw a section on paper and the sign comes out as expected.
   It is exact only along a cell face; at an angle it interpolates the
   staggered velocities, the same thing the rake and the orbit tracers do.
-  `smoke.js` checks a vertical section against the control-volume face it lies
+  `smoke.mjs` checks a vertical section against the control-volume face it lies
   on, which is the only way to know the two integrals still agree.
 - **A section reports all four at once** — Q, the momentum flux M, the
   pressure force F and ρgQH — with M and F kept apart, because telling them
@@ -1131,7 +1156,7 @@ points and need a stopping rule at every boundary.
   is there almost at once and only the fluctuation remains, so a short
   spin-up is the honest setting.
 - **Average used to survive a scene switch.** `switchScene` reset the view
-  toggles but not `state.avg`, so a class that switched FF-5 to Average
+  toggles but not `state.avg`, so a class that switched CR-1 to Average
   opened VC-2 — an unsteady fill — still averaging, its level curve smeared
   into a window mean. It now calls `setAverage(false)` (the single writer:
   the flag alone would leave the accumulators open) before loading.
@@ -1306,7 +1331,7 @@ having settled before anything calls into it.
   every upstream-face sample read solid and Fx measured 0 N/m regardless of
   pool depth. Skipping the stroke on a solid that clears the 2-cell floor
   restored a real pressure diagram: **Fx = 9.61 kN/m against a ~8.94 kN/m
-  hydrostatic estimate** (`exercises/_runner/smoke.js`'s closed-form case
+  hydrostatic estimate** (`test/smoke.mjs`'s closed-form case
   has the derivation and the run-to-run spread — the two are not expected to
   match exactly because the diagram integrates the actual flow field, not
   still water).
@@ -1327,7 +1352,7 @@ having settled before anything calls into it.
 - **The shim (a scene still declaring `walls()` instead of `solids()`)
   rasterises byte-for-byte identically to the old path** — same `stampSeg`,
   same capsule, same measured geometry — which is the promise that lets 20
-  pre-existing scenes go untouched by this branch. `smoke.js` measures the
+  pre-existing scenes go untouched by this branch. `smoke.mjs` measures the
   diff directly on the sandbox's drawn segments: at Medium the segments
   clear the same 2-cell floor as s3's gate, so the stroke never runs on
   either the reference or the polygon path and there is no rim left to
@@ -1370,7 +1395,7 @@ having settled before anything calls into it.
   that nobody watches. A per-face scale was tried next and was wrong too: it
   resized the diagram every time you clicked from one face to the next, so
   the upstream face and the downstream face of the same dyke could not be
-  compared by eye. `forceScale()` in main.js now reads every named face of
+  compared by eye. `forceScale()` in js/instruments.js now reads every named face of
   every solid once, at the first pick, and stores `{headMax}` on
   `state.forceScale`; every selection shares it, so the same pixels per
   metre draw every face and a bigger triangle is a bigger force anywhere in
@@ -1485,3 +1510,69 @@ Respawns land in the water (four tries for a wet, open cell), and the drawn
 count is a DENSITY — 2.5·10⁻³ per screen pixel of water, water share from the
 column reduction (plan view taken as full), 300–2600 — so a shallow flume is
 not a white mat and a full plan-view box is not sparse.
+
+## Interface and instrument history
+
+Stories that explain how a piece of the interface got to be the way it is,
+moved out of `js/` comments so the code keeps only the reason it is that way
+now. Nothing here is a rule; the rules are in the sections above.
+
+- **`familyOf` reads `TOOLBAR`.** The digit-key handler used to recompute a
+  tool's family positionally: `TOOLS.slice(0, 4)` plus `TOOLS[TOOLS.length - 1]`
+  meant "the four drawing tools, and Pour" on the day it was written. Then Flux
+  was appended eleventh and the expression silently changed its mind, calling
+  Flux a build tool and Pour a measuring one. Nothing broke, because neither
+  has a digit (`TOOL_KEYS` caps at 9), but a field is described once.
+- **Pour has its own tool.** The first version keyed pouring on
+  `pointerType === "touch" && e.shiftKey`, which was unreachable on every
+  device it named (no second button, no Shift on a touch screen), so half of
+  "draw an edge, pour water" was impossible on a phone.
+- **The strip's Build family.** Undo used to be the Z key and nothing else, so
+  on a touch screen a mis-drawn stroke could not be taken back; Clear used to
+  sit with the clock although it edits the rig rather than running it.
+- **The Force arrow carries both components.** It was drawn from `fx` alone, so
+  a box on a weir crest or an apron, where the vertical component is the whole
+  point, showed an arrow that flatly ignored it.
+- **The hover card's `profile` row.** The class title ("H2 profile") used to be
+  drawn whenever the column could be classified, whatever the card's `rows`
+  list said, which put it on every Year 1 card that hovered over a channel. It
+  is now a row id like any other.
+- **One rake scale.** Each rake used to scale to its own maximum, so a rake in
+  still water blew its noise up to a full-width erratic profile and two rakes
+  could not be compared. The scene's held speed range now sets one scale.
+- **Resolution cap.** A fixed 1400-column cap silently swallowed the top
+  resolutions on the scenes that need them (m2 asks for nx ≈ 3400 at Ultra);
+  the cap is now the driver's texture limit.
+- **Ramps in JS.** The colour stops used to be `vec3` literals inside the
+  display shader, so the only way to draw a matching legend key was to type the
+  numbers out again somewhere else. They are now `Shaders.RAMPS`.
+- **Docs reader.** Off the Pages build the browser used to be handed raw
+  markdown, which is not a document so much as its source code;
+  `docs/view.html` renders it in the app's own styling.
+
+## Zero dependencies, classic scripts: what the rule does and does not forbid
+
+The rule is "no modules, no bundlers, no fetch, and no YAML front matter in
+`index.html`, `js/*` or `css/*`" (the Pages build copies them verbatim only
+because there is none). Those three are one rule wearing three hats: **the app
+boots with no server**. A browser refuses both `fetch` of a file beside it and
+an ES module under `file://`, and double-clicking `index.html` is a real way
+this gets used.
+
+What the rule does NOT forbid is more than one file. `<script src>` and
+`<link rel=stylesheet>` to relative paths both work under `file://`, which is
+why the app already loads a few dozen classic scripts and one stylesheet, and
+why splitting a long file is never blocked by this rule. Only `fetch`, ES
+modules and a build step are. If you find yourself keeping something in one
+enormous file "because zero dependencies", check which of the three you are
+actually protecting; usually it is none of them (`main.js` was split into nine
+files on exactly that reasoning; the globals each file defines and reads are
+listed in its header and held to the code by `test/check_headers.py`).
+
+The rule binds the APP. The docs reader (`docs/view.html`) does fetch the
+markdown it renders, because nothing about running a simulation depends on it
+and it degrades to a message and two working links when it cannot. Any
+published page carrying `math` code fences must end with a `<script>` tag
+loading `docs/math.js`: stripped on github.com, live on the Pages build, where
+it rewrites the fences for MathJax (README.md and docs/numerics.md show the
+pattern).

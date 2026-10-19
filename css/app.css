@@ -12,16 +12,40 @@
  * --dock in particular is read back by the layout gate. */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; background: #070b0f; }
-body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #dfe8f2; }
+/* `manipulation` takes the double-tap zoom away on touch screens (the viewport
+   allows pinch zoom); #view below goes further and keeps every gesture. */
+html { touch-action: manipulation; }
+body { font: 14px/1.45 var(--font-ui); color: #dfe8f2; }
 
-/* --dock is the width the docked side panel takes OUT of the viewport. The
+/* --dock is the width the docked column takes OUT of the viewport. The
    canvases are inset by it, so the simulation is never drawn underneath the
-   panel — a docked panel that overlaps the water is just a floating card
+   column — a docked column that overlaps the water is just a floating card
    with extra steps. Everything that centres on the water (the tips line, the
-   toast) centres on `100vw - var(--dock)` for the same reason. */
-/* --dock is what the side panel takes; --dockb is what the same panel takes
-   as a bottom sheet on a phone. One of the two is always zero. */
-:root { --dock: 0px; --dockb: 0px; --barb: 0px; --gcw: 0px; --sheet-h: min(58vh, 520px); }
+   toast) centres on `100vw - var(--dock)` for the same reason. --dockb is
+   what the same dock takes as a bottom sheet on a phone; one of the two is
+   always zero. Both are set by DOCK.sync (js/dock.js).
+
+   The geometry constants are written HERE and nowhere else; js/dock.js reads
+   them back with getComputedStyle once per sync:
+     --dock-w     the docked column's width;
+     --dock-min   the window width below which the dock overlays the water
+                  instead of taking width from it;
+     --phone-max  the window width below which the dock becomes a bottom sheet
+                  (a media query cannot read a variable, so the two
+                  `@media (max-width: 620px)` rules below, each commented
+                  "= --phone-max", repeat the number);
+     --sheet-h    the sheet's height (a calc on vh, so DOCK measures the sheet
+                  itself rather than parsing the formula).
+   --bar-h is the strip's measured height, kept by fitBar (js/strip.js) at
+   every compaction step; the panel, toast and legend hang from it. --gcw is
+   the width the gauge corner cards take from the bottom right. */
+:root {
+  --dock: 0px; --dockb: 0px; --gcw: 0px;
+  --dock-w: 348px; --dock-min: 900px; --phone-max: 620px; --sheet-h: min(58vh, 520px);
+  --bar-h: 63px;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
 
 /* Sized, not just inset: a <canvas> has an intrinsic 300 × 150, and a fixed
    box with `width: auto` keeps it rather than stretching to the four edges. */
@@ -41,6 +65,20 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
 }
 
+/* ------------------------------------------------------- small buttons */
+/* One look for the small text buttons: the inspector's CSV pair, the exercise
+   Reset, the discard / cancel pair of a menu warning (class `btn-sm`), and —
+   because their buttons are made at a dozen sites in panel.js / rig.js —
+   the Controls panel's button rows and the legend's actions, by selector.
+   Each family then states only what differs from this base (font, padding,
+   radius, border), after it, with the same specificity. */
+.btn-sm, #panel .btnrow button, #panel .rigui button, #panel .rigfile, #legActs button {
+  appearance: none; background: rgba(255,255,255,0.07); color: inherit;
+  border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
+  font: 600 11px var(--font-ui); padding: 4px 9px; cursor: pointer;
+}
+.btn-sm:hover, #panel .rigui button:hover, #panel .rigfile:hover { background: rgba(77,195,255,0.20); }
+
 /* ------------------------------------------------ minimisable UI boxes */
 /* A floating box carries a small – in a corner; clicking it collapses the
    box to a pill that restores it. The boxes are chrome and the water is the
@@ -48,15 +86,14 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 .minbtn {
   appearance: none; border: 0; background: transparent; color: inherit;
   width: 20px; height: 20px; padding: 0; border-radius: 6px;
-  font: 14px/18px ui-monospace, monospace; text-align: center;
+  font: 14px/18px var(--font-mono); text-align: center;
   cursor: pointer; opacity: .40; flex: 0 0 auto;
 }
 .minbtn:hover { opacity: 1; background: rgba(255,255,255,0.12); }
 .minbtn.corner { position: absolute; top: 5px; right: 5px; z-index: 3; }
-.minbtn.cornerL { position: absolute; top: 5px; left: 5px; z-index: 3; }
 .minpill {
   position: fixed; z-index: 10; padding: 6px 12px; cursor: pointer;
-  font: 600 12px system-ui, sans-serif; opacity: .78; display: none;
+  font: 600 12px var(--font-ui); opacity: .78; display: none;
   white-space: nowrap; user-select: none;
 }
 .minpill:hover { opacity: 1; background: rgba(20, 30, 44, 0.72); }
@@ -78,6 +115,8 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   opacity: .92; padding-right: 4px; white-space: nowrap;
 }
 #brand svg { flex: 0 0 auto; }
+.brandmark { fill: none; stroke: #4dc3ff; stroke-width: 1.7; stroke-linecap: round;
+  stroke-linejoin: round; flex: 0 0 auto; }
 /* The strip must never silently drop a control. It shrinks first (the two
    media queries below), and if a window is narrower than even that, the
    groups scroll sideways rather than being clipped away. */
@@ -105,7 +144,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .trow { display: flex; align-items: center; gap: 2px; }
 .tcap {
-  font: 600 8.5px ui-monospace, SFMono-Regular, monospace;
+  font: 600 8.5px var(--font-mono);
   letter-spacing: .13em; text-align: center; line-height: 10px; height: 10px;
   opacity: .75; user-select: none; white-space: nowrap;
   color: rgba(223,232,242,0.55);
@@ -148,7 +187,10 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   box-shadow: inset 0 0 0 1px rgba(255,182,72,0.50);
 }
 /* The hairline and the caption do the same job, so only one of them is ever
-   shown: captions while there is room for them, the rule once they go. */
+   shown. Captions are what a desktop strip has; touch machines drop them at
+   every width (see the pointer: coarse block), so there the rule is shown
+   instead; strip.js builds `.tsep` only under a coarse pointer, and it is
+   display:none unless that block shows it. */
 .tsep { width: 1px; height: 32px; background: rgba(255,255,255,0.13);
         margin: 0 3px; flex: 0 0 auto; display: none; }
 
@@ -169,23 +211,25 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #title b { font-size: 13px; letter-spacing: .01em; }
 #title .caret { font-size: 9px; opacity: .5; margin-left: 5px; vertical-align: 1.5px; }
 #title:hover .caret, #title.open .caret { color: #7fd4ff; opacity: 1; }
-#sceneKey { display: none; }
 #status {
-  display: block; font: 10px ui-monospace, SFMono-Regular, monospace;
+  display: block; font: 10px var(--font-mono);
   opacity: .48; margin-top: 1px; font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* Two steps of compaction, applied by `fitBar()` from a MEASUREMENT of the
-   strip rather than from a viewport media query — the side panel takes its
-   width out of the bar too, so the window size does not say whether the
-   icons fit. */
+#status.gone { display: none; }   /* UIMODE withholds it (updateStatus) */
+/* Three steps of compaction (.tight, .tighter, .tightest; a touch screen
+   wraps instead of taking the last one), applied by `fitBar()` from a
+   MEASUREMENT of the strip rather than from a viewport media query — the dock
+   takes its width out of the bar too, so the window size does not say whether
+   the icons fit. fitBar then publishes the resulting height as --bar-h. */
 /* The caption is decoration before it is information, so it is the first
-   thing dropped when the strip runs out of room — never a control. The
-   hairline comes back in its place, and the bar loses the row's height. */
+   thing dropped when the strip runs out of room — never a control — and the
+   bar loses the row's height. (On touch machines the hairline takes its
+   place; see .tsep.) */
 #bar.tight .tcap { display: none; }
 #bar.tight { height: 52px; }
 #bar.tight .tbtn { width: 32px; height: 32px; }
-#bar.tight .tsep { margin: 0 2px; height: 22px; }
+#bar.tight .tsep { margin: 0 2px; height: 22px; }   /* shown only when coarse */
 #bar.tight #brand .word { display: none; }
 #bar.tighter .tbtn { width: 30px; height: 30px; }
 #bar.tighter #groups { gap: 2px; }
@@ -195,7 +239,6 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    26 px still fit an 1100 px strip, which is what a 1440 px window with the
    exercise panel open actually has. */
 #bar.tightest .tbtn { width: 26px; height: 26px; }
-#bar.tightest .tsep { display: none; }
 #bar.tightest #groups { gap: 1px; }
 /* At this width the mark is the only thing on the strip that is decoration,
    so it is the last thing to go before a control would have to. */
@@ -217,17 +260,17 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   appearance: none; width: 100%; text-align: left; cursor: pointer;
   background: rgba(77,195,255,0.10); color: #bfe6ff;
   border: 1px solid rgba(77,195,255,0.30); border-radius: 8px;
-  padding: 6px 10px; font: 11px system-ui, sans-serif;
+  padding: 6px 10px; font: 11px var(--font-ui);
 }
 #panelAll:hover { background: rgba(77,195,255,0.20); }
 
 /* ------------------------------------------------------------- the legend */
-/* Seven colourings existed long before anything on screen said which one was
+/* Nine colourings existed long before anything on screen said which one was
    up, over what range, in what units — so a screenshot pasted into a
-   worksheet carried no statement of what it showed. Top left, because the
-   gauge cards stack bottom-right and the ruler owns the edges. */
-/* Top right, immediately left of the Controls panel. `--dock` is the width
-   the docked panel takes out of the viewport, so this is the same expression
+   worksheet carried no statement of what it showed. Top right, because the
+   gauge cards stack bottom-right and the ruler owns the edges, immediately
+   left of the Controls panel. `--dock` is the width
+   the dock takes out of the viewport, so this is the same expression
    #bar uses and the legend tracks the panel opening and closing for free --
    including the phone case, where the panel becomes a bottom sheet and --dock
    goes to 0, leaving this at the right edge with no special case.
@@ -237,17 +280,17 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
    theirs and stops following the panel. Same bargain as the vertical
    exaggeration -- fitted until somebody sets it by hand. */
 #legend {
-  position: fixed; z-index: 12; right: calc(var(--dock) + 12px); top: max(84px, calc(var(--barb) + 11px));
-  width: 236px;
+  position: fixed; z-index: 12; right: calc(var(--dock) + 12px);
+  top: calc(var(--bar-h) + 21px);   /* 84px under the full-height strip */
+  cursor: grab; width: 236px;
   display: none; padding: 9px 11px 8px; gap: 5px; flex-direction: column;
-  font: 11.5px system-ui, sans-serif;
+  font: 11.5px var(--font-ui);
 }
 #legend.placed { right: auto; }
-/* The whole card drags; dragWindow's own guard excludes every button, the
-   editable range numbers and anything else you can click. */
-#legend { cursor: grab; }
-#legend button, #legend [contenteditable] { cursor: auto; }
-#legPick, #legend #legMode button, #legend #legActs button { cursor: pointer; }
+/* The whole card drags (the cursor above); dragWindow's own guard excludes
+   every button, the editable range numbers and anything else you can click. */
+#legend button { cursor: pointer; }
+#legend [contenteditable] { cursor: text; }
 
 /* Live | Average. A segmented pair rather than one toggle button: the two
    states are equally real and a student should be able to see which one they
@@ -259,7 +302,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #legMode button {
   appearance: none; flex: 1 1 0; cursor: pointer;
   background: transparent; border: 1px solid transparent; border-radius: 6px;
-  color: #9fb0c4; font: 600 11px system-ui, sans-serif;
+  color: #9fb0c4; font: 600 11px var(--font-ui);
   padding: 3px 0; letter-spacing: .02em;
 }
 #legMode button:hover { background: rgba(255,255,255,0.07); color: #dfe8f2; }
@@ -279,17 +322,17 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 #legPick:hover, #legPick.open { background: rgba(255,255,255,0.08); border-color: rgba(77,195,255,0.40); }
 #legPick b { font-size: 12.5px; font-weight: 600; }
-#legPick i { font: 11px ui-monospace, monospace; opacity: .60; font-style: normal; }
+#legPick i { font: 11px var(--font-mono); opacity: .60; font-style: normal; }
 #legPick .caret { font-size: 9px; opacity: .5; margin-left: auto; }
 #legPick:hover .caret, #legPick.open .caret { color: #7fd4ff; opacity: 1; }
 .legrow { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
 .legbar { height: 10px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.10); }
 .legcap {
-  font: 10px ui-monospace, monospace; opacity: .58;
+  font: 10px var(--font-mono); opacity: .58;
   display: flex; justify-content: space-between; gap: 8px;
 }
 #legFoot, #legActs { display: flex; align-items: center; gap: 6px; }
-#legFoot { font: 10.5px ui-monospace, monospace; opacity: .82; margin-top: 2px; }
+#legFoot { font: 10.5px var(--font-mono); opacity: .82; margin-top: 2px; }
 #legFoot .grow { flex: 1 1 auto; }
 .legnum {
   padding: 1px 4px; border-radius: 5px; cursor: text; outline: none;
@@ -297,11 +340,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .legnum:hover { background: rgba(255,255,255,0.08); }
 .legnum:focus { background: rgba(12,17,26,0.92); border-color: rgba(77,195,255,0.55); }
-#legActs button {
-  appearance: none; background: rgba(255,255,255,0.07); color: inherit;
-  border: 1px solid rgba(255,255,255,0.12); border-radius: 7px;
-  padding: 2px 9px; font: 10.5px system-ui, sans-serif; cursor: pointer;
-}
+#legActs button { border-color: rgba(255,255,255,0.12); padding: 2px 9px; font: 10.5px var(--font-ui); }
 #legActs button:hover { background: rgba(77,195,255,0.22); }
 /* The Average block. Present in the markup and revealed by a class rather
    than built on demand: the card above it is painted from the ramps, and a
@@ -313,13 +352,13 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 #legend.avg #legAvg { display: flex; }
 .legahd { display: flex; align-items: baseline; gap: 8px; }
-.legahd b { font: 600 11px system-ui, sans-serif; color: #7fd4ff; }
+.legahd b { font: 600 11px var(--font-ui); color: #7fd4ff; }
 .legahd span {
-  margin-left: auto; font: 10.5px ui-monospace, monospace;
+  margin-left: auto; font: 10.5px var(--font-mono);
   font-variant-numeric: tabular-nums; opacity: .85;
 }
 #legAvgRead {
-  font: 10.5px ui-monospace, monospace; opacity: .88;
+  font: 10.5px var(--font-mono); opacity: .88;
   font-variant-numeric: tabular-nums;
 }
 .legnote { font-size: 10px; line-height: 1.35; opacity: .58; }
@@ -335,13 +374,13 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .legopt:hover { background: rgba(255,255,255,0.09); }
 .legopt.on { background: rgba(77,195,255,0.18); }
-.legopt b { font: 600 12px system-ui, sans-serif; }
-.legopt i { font: 10.5px ui-monospace, monospace; opacity: .6; font-style: normal; margin-left: 6px; }
+.legopt b { font: 600 12px var(--font-ui); }
+.legopt i { font: 10.5px var(--font-mono); opacity: .6; font-style: normal; margin-left: 6px; }
 .legopt span { display: block; font-size: 11px; opacity: .62; margin-top: 2px; }
 /* On a phone the bottom sheet owns the lower half and the strip the top, so
    there is no room for a floating card as well. The field stays reachable
    from Controls. */
-@media (max-width: 620px) { #legend.open { display: none; } }
+@media (max-width: 620px) { #legend.open { display: none; } }   /* = --phone-max */
 
 /* ---------------------------------------------------------- hover card */
 /* Replaces every `title=` on the strip: a native tooltip cannot carry the
@@ -351,10 +390,10 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   pointer-events: none; max-width: 320px;
 }
 #tip.show { display: flex; align-items: center; gap: 9px; }
-#tip b { font: 600 12.5px system-ui, sans-serif; white-space: nowrap; }
+#tip b { font: 600 12.5px var(--font-ui); white-space: nowrap; }
 #tip span { font-size: 11.5px; opacity: .62; }
 #tip kbd {
-  font: 10.5px ui-monospace, monospace; background: rgba(255,255,255,0.10);
+  font: 10.5px var(--font-mono); background: rgba(255,255,255,0.10);
   border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 1px 5px;
   flex: 0 0 auto; margin-left: auto;
 }
@@ -373,7 +412,8 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #hint .minbtn { pointer-events: auto; }
 
 #toast {
-  position: fixed; top: max(76px, calc(var(--barb) + 3px)); z-index: 11; padding: 12px 20px; text-align: center;
+  position: fixed; top: calc(var(--bar-h) + 13px);   /* 76px under the full-height strip */
+  z-index: 11; padding: 12px 20px; text-align: center;
   left: calc((100vw - var(--dock)) / 2); transform: translateX(-50%) translateY(-8px);
   opacity: 0; transition: opacity .35s, transform .35s;
   pointer-events: none; max-width: min(560px, 80vw);
@@ -385,7 +425,8 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #toastSub { font-size: 12.5px; opacity: .72; margin-top: 2px; }
 
 #panel {
-  position: fixed; top: 72px; left: 14px; z-index: 10;
+  --panel-top: calc(var(--bar-h) + 9px);   /* 72px under the full-height strip */
+  position: fixed; top: var(--panel-top); left: 14px; z-index: 10;
   width: min(340px, calc(100vw - 28px));
   padding: 14px 16px; display: none; max-height: calc(100vh - 100px); overflow: auto;
 }
@@ -397,7 +438,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #panel label.row { display: flex; align-items: center; gap: 8px; margin: 7px 0 1px; font-size: 13px; }
 #panel .row .lbl { flex: 1 1 auto; white-space: nowrap; }
 #panel input[type=range] { width: 138px; flex: 0 0 auto; accent-color: #4dc3ff; }
-#panel .notes { font: 11px ui-monospace, SFMono-Regular, monospace; opacity: .5; margin: 0 0 6px; min-height: 12px; }
+#panel .notes { font: 11px var(--font-mono); opacity: .5; margin: 0 0 6px; min-height: 12px; }
 /* A dynamic row (Geometry's geom0…geom5) with nothing to bind to — most
    scenes declare no params, so these stay hidden rather than showing a dead
    slider. The section's own h3 rides the same class: when every one of its
@@ -413,12 +454,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 
 #panel .btnrow { display: flex; gap: 4px; flex: 0 0 auto; }
-#panel .btnrow button {
-  appearance: none; background: rgba(255,255,255,0.07); color: inherit;
-  border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
-  font: 600 11.5px ui-monospace, SFMono-Regular, monospace;
-  padding: 3px 8px; cursor: pointer;
-}
+#panel .btnrow button { font: 600 11.5px var(--font-mono); padding: 3px 8px; }
 #panel .btnrow button:hover:not(:disabled) { background: rgba(77,195,255,0.20); }
 #panel .btnrow button:disabled { opacity: .35; cursor: default; }
 /* A chosen one of several, as opposed to a button that DOES something. */
@@ -431,23 +467,19 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #panel .rigui { flex: 1 0 100%; display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
 #panel .rigrow { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 #panel .rigui button, #panel .rigfile {
-  appearance: none; background: rgba(255,255,255,0.07); color: inherit;
-  border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
-  font: 600 11.5px ui-monospace, SFMono-Regular, monospace;
-  padding: 4px 9px; cursor: pointer; white-space: nowrap;
+  font: 600 11.5px var(--font-mono); white-space: nowrap;
 }
-#panel .rigui button:hover, #panel .rigfile:hover { background: rgba(77,195,255,0.20); }
 #panel .rigtx {
   width: 100%; height: 52px; resize: vertical; display: block;
   background: rgba(0,0,0,0.28); color: #dfe8f2;
   border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-  font: 10.5px/1.35 ui-monospace, SFMono-Regular, monospace;
+  font: 10.5px/1.35 var(--font-mono);
   padding: 6px 7px; user-select: text; word-break: break-all;
 }
 #panel .rigtx:focus { outline: 1px solid rgba(77,195,255,0.55); }
 #panel .rigtx::placeholder { color: rgba(223,232,242,0.35); }
 #panel .rigmsg {
-  font: 10.5px ui-monospace, SFMono-Regular, monospace; opacity: .62;
+  font: 10.5px var(--font-mono); opacity: .62;
   margin-left: auto; text-align: right; color: #7fd4ff;
 }
 
@@ -456,7 +488,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   position: fixed; z-index: 12; width: 19px; height: 19px; padding: 0;
   appearance: none; cursor: pointer; color: #dfe8f2;
   background: rgba(12,17,26,0.85); border: 1px solid rgba(255,255,255,0.20);
-  border-radius: 6px; font: 11px/17px ui-monospace, monospace; text-align: center;
+  border-radius: 6px; font: 11px/17px var(--font-mono); text-align: center;
 }
 .gcardBtn:hover { background: rgba(77,195,255,0.30); }
 /* What one gauge plots: a small select hung just outside its corner card,
@@ -465,7 +497,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   position: fixed; z-index: 12; min-width: 42px; max-width: 64px; height: 20px; padding: 0 2px;
   cursor: pointer; color: #dfe8f2; background: rgba(12,17,26,0.85);
   border: 1px solid rgba(255,255,255,0.20); border-radius: 6px;
-  font: 11px ui-monospace, monospace;
+  font: 11px var(--font-mono);
 }
 .gcardSel:hover { background: rgba(77,195,255,0.30); }
 .gcardSel option { background: #0c111a; color: #dfe8f2; }
@@ -475,13 +507,13 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   position: fixed; z-index: 12; width: 17px; height: 17px; padding: 0;
   appearance: none; cursor: pointer; color: #dfe8f2; background: rgba(12,17,26,0.6);
   border: 1px solid rgba(255,255,255,0.18); border-radius: 5px;
-  font: 13px/15px ui-monospace, monospace; text-align: center;
+  font: 13px/15px var(--font-mono); text-align: center;
 }
 .gcardX:hover { background: rgba(255,90,110,0.45); }
 .ginsp-rm {
   appearance: none; cursor: pointer; color: #ffb3bf; background: transparent;
   border: 1px solid rgba(255,143,163,0.35); border-radius: 6px;
-  font: 11px ui-monospace, monospace; padding: 2px 7px;
+  font: 11px var(--font-mono); padding: 2px 7px;
 }
 .ginsp-rm:hover { background: rgba(255,90,110,0.30); }
 
@@ -495,7 +527,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .ginsp-dot { width: 9px; height: 9px; border-radius: 50%; background: #7fd4ff; flex: 0 0 auto; }
 .ginsp-h b { font-size: 12.5px; letter-spacing: .01em; white-space: nowrap; }
-.ginsp-pos { font: 10.5px ui-monospace, SFMono-Regular, monospace; opacity: .58;
+.ginsp-pos { font: 10.5px var(--font-mono); opacity: .58;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ginsp-grow { flex: 1 1 auto; }
 .ginsp-x {
@@ -504,14 +536,14 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .ginsp-x:hover { background: rgba(255,255,255,0.12); }
 
-.ginsp-vals { display: flex; gap: 6px; padding: 8px 10px 2px; }
+.ginsp-vals { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 2px; }
 .ginsp-vals div {
-  flex: 1 1 0; padding: 4px 6px; border-radius: 7px;
+  flex: 1 1 88px; padding: 4px 6px; border-radius: 7px;
   background: rgba(255,255,255,0.04); border: 1px solid transparent;
 }
 .ginsp-vals div.on { border-color: rgba(77,195,255,0.40); background: rgba(77,195,255,0.10); }
-.ginsp-vals span { font: 10px ui-monospace, monospace; opacity: .55; }
-.ginsp-vals b { display: block; font: 700 12.5px ui-monospace, monospace;
+.ginsp-vals span { font: 10px var(--font-mono); opacity: .55; }
+.ginsp-vals b { display: block; font: 700 12.5px var(--font-mono);
   font-variant-numeric: tabular-nums; margin: 1px 0; user-select: text; }
 .ginsp-vals i { display: block; font-style: normal; font-size: 9.5px; opacity: .42; line-height: 1.25; }
 
@@ -519,7 +551,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 .ginsp-tabs button {
   appearance: none; background: rgba(255,255,255,0.06); color: inherit;
   border: 1px solid rgba(255,255,255,0.14); border-radius: 999px;
-  font: 600 10.5px ui-monospace, monospace; padding: 2px 10px; cursor: pointer;
+  font: 600 10.5px var(--font-mono); padding: 2px 10px; cursor: pointer;
 }
 .ginsp-tabs button.on { background: rgba(77,195,255,0.22); border-color: rgba(77,195,255,0.55); }
 
@@ -529,15 +561,9 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 
 .ginsp-foot { display: flex; align-items: center; gap: 6px; padding: 8px 10px 2px; }
-.ginsp-b {
-  appearance: none; background: rgba(255,255,255,0.07); color: inherit;
-  border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
-  font: 600 11px system-ui, sans-serif; padding: 4px 9px; cursor: pointer;
-  white-space: nowrap; flex: 0 0 auto;
-}
-.ginsp-b:hover { background: rgba(77,195,255,0.20); }
+.ginsp-b { border-radius: 8px; white-space: nowrap; flex: 0 0 auto; }
 .ginsp-span {
-  margin-left: auto; text-align: right; font: 10px ui-monospace, monospace;
+  margin-left: auto; text-align: right; font: 10px var(--font-mono);
   opacity: .5; font-variant-numeric: tabular-nums; user-select: text;
 }
 .ginsp-span.frozen { color: #ffb648; opacity: .8; }
@@ -563,7 +589,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 .gmenu .smh b { font-size: 12.5px; letter-spacing: .01em; }
 .gmenu .smh i {
   font-style: normal; margin-left: auto; opacity: .45;
-  font: 10.5px ui-monospace, SFMono-Regular, monospace;
+  font: 10.5px var(--font-mono);
 }
 .gmenu .smg {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em;
@@ -582,10 +608,10 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 .gmenu .smi b { font-size: 13px; font-weight: 600; }
 .gmenu .smi em {
   font-style: normal; margin-left: 7px; opacity: .45;
-  font: 10px ui-monospace, SFMono-Regular, monospace;
+  font: 10px var(--font-mono);
 }
 .gmenu .smi .tag {
-  float: right; font: 9.5px ui-monospace, monospace; letter-spacing: .06em;
+  float: right; font: 9.5px var(--font-mono); letter-spacing: .06em;
   text-transform: uppercase; opacity: .75; color: #7fd4ff; margin-top: 3px;
 }
 .gmenu .smi p { font-size: 11.5px; line-height: 1.35; opacity: .60; margin: 2px 0 0; }
@@ -596,40 +622,39 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 .gmenu .smwarn b { color: #ffb648; }
 .gmenu .smwarn .r { display: flex; gap: 5px; margin-top: 7px; }
-.gmenu .smwarn button {
-  appearance: none; background: rgba(255,255,255,0.07); color: inherit;
-  border: 1px solid rgba(255,255,255,0.20); border-radius: 7px;
-  font: 600 11px system-ui, sans-serif; padding: 4px 10px; cursor: pointer;
-}
+.gmenu .smwarn button { border-color: rgba(255,255,255,0.20); padding: 4px 10px; }
 .gmenu .smwarn button:hover { background: rgba(255,255,255,0.16); }
 .gmenu .smwarn button.go { border-color: rgba(255,182,72,0.6); color: #ffd9a0; }
 
 /* ---------------------------------------------------------- exercises */
 /* The exercise menu is the scene menu's twin (.gmenu above) plus a filter
-   box and an id chip. Picking one loads it into the side panel below. */
+   box and an id chip. Picking one loads it into the dock below. */
 #exmenu { width: 428px; }
 .gmenu .smf {
   display: block; width: calc(100% - 6px); margin: 2px 3px 4px;
   background: rgba(0,0,0,0.28); color: #dfe8f2;
   border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-  font: 12px system-ui, sans-serif; padding: 5px 8px;
+  font: 12px var(--font-ui); padding: 5px 8px;
 }
 .gmenu .smf:focus { outline: 1px solid rgba(77,195,255,0.55); }
 .gmenu .smf::placeholder { color: rgba(223,232,242,0.35); }
 .gmenu .smi .eid {
   display: inline-block; min-width: 38px; margin-right: 7px;
-  font: 700 10.5px ui-monospace, SFMono-Regular, monospace;
+  font: 700 10.5px var(--font-mono);
   color: #7fd4ff; letter-spacing: .04em;
 }
 .gmenu .smi .rigtag {
-  float: right; font: 9.5px ui-monospace, monospace; letter-spacing: .05em;
+  float: right; font: 9.5px var(--font-mono); letter-spacing: .05em;
   text-transform: uppercase; opacity: .6; margin-top: 3px;
 }
+.gmenu .smi .rigtag.has  { color: #5fd08a; }   /* the card ships its drawing */
+.gmenu .smi .rigtag.draw { color: #ffb648; }   /* the student draws it */
 .gmenu .smnone { padding: 10px 9px; font-size: 12px; opacity: .5; }
 /* Compact exercise menu (EXERCISE_MENU.compact): one line per item, the
    description in a floating box beside it. The menu never runs off the page:
-   place() clamps it and this caps its height, the list scrolls inside. */
-#exmenu.compact { width: 360px; max-height: calc(100vh - 16px); }
+   place() clamps it and this caps its height (--menu-room, which place()
+   sets when the menu hangs below its opener), the list scrolls inside. */
+#exmenu.compact { width: 360px; max-height: var(--menu-room, calc(100vh - 16px)); }
 #exmenu.compact .smi {
   padding: 4px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -653,17 +678,17 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #keysmenu .kline span { opacity: .72; }
 #keysmenu kbd {
   background: rgba(255,255,255,0.10); border-radius: 4px; padding: 1px 5px;
-  font: 10.5px ui-monospace, monospace; border: 1px solid rgba(255,255,255,0.12);
+  font: 10.5px var(--font-mono); border: 1px solid rgba(255,255,255,0.12);
   flex: 0 0 auto; min-width: 62px; text-align: center;
 }
 
-/* ============================================================ side panel */
+/* ============================================================ dock */
 /* The exercise lives HERE, not in a window over the water: the canvases are
-   inset by --dock, so the panel takes its width out of the viewport instead
+   inset by --dock, so the dock takes its width out of the viewport instead
    of covering it. Below the width where there is anything to give away it
    goes back to overlaying (`.over`) and the canvas keeps the whole window. */
 #dock {
-  position: fixed; top: 0; right: 0; bottom: 0; width: 348px; z-index: 14;
+  position: fixed; top: 0; right: 0; bottom: 0; width: var(--dock-w); z-index: 14;
   display: none; flex-direction: column;
   background: rgba(12, 17, 26, 0.86);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -671,13 +696,13 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
 }
 #dock.open { display: flex; }
-#dock.over { width: min(348px, 100vw); box-shadow: -8px 0 48px rgba(0,0,0,0.6); }
+#dock.over { width: min(var(--dock-w), 100vw); box-shadow: -8px 0 48px rgba(0,0,0,0.6); }
 .dock-h {
   display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
   padding: 14px 12px 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .dock-h .eid {
-  font: 700 11px ui-monospace, monospace; color: #7fd4ff; letter-spacing: .04em;
+  font: 700 11px var(--font-mono); color: #7fd4ff; letter-spacing: .04em;
   background: rgba(77,195,255,0.14); border-radius: 6px; padding: 2px 6px; flex: 0 0 auto;
 }
 .dock-h .kind {
@@ -725,7 +750,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 #docktab.show { display: flex; }
 #docktab .eid {
-  writing-mode: vertical-rl; font: 700 10.5px ui-monospace, monospace;
+  writing-mode: vertical-rl; font: 700 10.5px var(--font-mono);
   color: #7fd4ff; letter-spacing: .06em;
 }
 #docktab .kind {
@@ -734,7 +759,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 }
 
 /* ------------------------------------------------- the panel as a sheet */
-/* On a phone a 348px panel down the side would leave a 40px slice of water,
+/* On a phone a --dock-w panel down the side would leave a 40px slice of water,
    which is no use to anybody. It becomes a bottom sheet instead: the flume
    keeps the top of the screen — the only part of a phone tall enough to
    read one in — and the brief takes the bottom, where a thumb is. */
@@ -771,7 +796,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   #bar.tightest .tbtn { width: 38px; height: 38px; }
   /* Out of room on a touch screen: the groups WRAP rather than shrink below
      40 px or scroll out of sight (fitBar). The bar grows a row, and the
-     legend, the toast and the panel follow its bottom edge (--barb). */
+     legend, the toast and the panel follow its bottom edge (--bar-h). */
   #bar.wraps { height: auto; min-height: 58px; padding-top: 5px; padding-bottom: 5px; }
   #bar.wraps #groups { flex: 1 1 auto; flex-wrap: wrap; row-gap: 5px; overflow: visible; }
   #bar.wraps .tbtn { width: 42px; height: 42px; }
@@ -784,7 +809,10 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   .gcardSel { height: 28px; }
   /* A slider is dragged with a fingertip: a taller track to land on. */
   #dock input[type=range], #panel input[type=range] { height: 32px; }
-  #panel { top: max(78px, calc(var(--barb) + 8px)); max-height: calc(100vh - max(78px, calc(var(--barb) + 8px)) - 20px); }
+  #panel {
+    --panel-top: max(78px, calc(var(--bar-h) + 18px));
+    max-height: calc(100vh - var(--panel-top) - 20px);
+  }
   /* The canvas is a surface to touch, not text: no callout, no selection
      loupe and no grey flash on a long press. */
   #view, #over, #bar { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
@@ -810,16 +838,15 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #dock .extitle { font-size: 14.5px; font-weight: 700; line-height: 1.3; }
 #dock .exline { font-size: 12px; line-height: 1.5; user-select: text; }
 #dock .exline b { font-weight: 700; opacity: .78; }
-#dock .exyours { white-space: pre-line; }
 #dock .exd { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 #dock .exd label { font-size: 11.5px; opacity: .72; white-space: nowrap; }
 #dock .exd input {
   width: 52px; background: rgba(0,0,0,0.30); color: #dfe8f2; text-align: center;
   border: 1px solid rgba(255,255,255,0.18); border-radius: 7px;
-  font: 700 13px ui-monospace, monospace; padding: 3px 5px;
+  font: 700 13px var(--font-mono); padding: 3px 5px;
 }
 #dock .exd input:focus { outline: 1px solid rgba(77,195,255,0.55); }
-#dock .exval { font: 11.5px ui-monospace, monospace; opacity: .85; user-select: text; }
+#dock .exval { font: 11.5px var(--font-mono); opacity: .85; user-select: text; }
 /* "Yours": the printed rule, and the control the answer goes on. The field
    is the Controls panel's own control, moved to where the rule is — before
    this the only thing saying where q went was the words "· Inflow q slider"
@@ -840,7 +867,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #dock .exrowf input[type=number] {
   width: 76px; background: rgba(0,0,0,0.32); color: #dfe8f2; text-align: right;
   border: 1px solid rgba(255,255,255,0.20); border-radius: 7px;
-  font: 700 13px ui-monospace, SFMono-Regular, monospace; padding: 4px 6px;
+  font: 700 13px var(--font-mono); padding: 4px 6px;
 }
 #dock .exrowf input[type=number]:focus { outline: 1px solid rgba(77,195,255,0.65); }
 #dock .exrowf input[type=checkbox] { width: 17px; height: 17px; accent-color: #4dc3ff; }
@@ -849,12 +876,12 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   border-radius: 7px; padding: 3px 6px; font: inherit; font-size: 12px; max-width: 130px;
 }
 #dock .exunit {
-  font: 10.5px ui-monospace, monospace; opacity: .5; min-width: 26px;
+  font: 10.5px var(--font-mono); opacity: .5; min-width: 26px;
 }
 
 #dock .exsteps {
   margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.45;
-  display: flex; flex-direction: column; gap: 3px; user-select: text;
+  user-select: text;
 }
 #dock .exsteps li { opacity: .88; }
 /* A strip button named in a step ({tool:force}, {btn:legendBtn}): its own
@@ -870,14 +897,14 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #dock .exico.bad, #hint .exico.bad { color: #ffb648; }
 #dock .exkey, #hint .exkey {
   display: inline-block; min-width: 15px; padding: 0 4px; text-align: center;
-  font: 700 10.5px ui-monospace, monospace; line-height: 16px;
+  font: 700 10.5px var(--font-mono); line-height: 16px;
   border: 1px solid rgba(255,255,255,0.28); border-bottom-width: 2px; border-radius: 4px;
   background: rgba(255,255,255,0.06);
 }
 /* Tabs: one scene, several questions (CR-1). Switching keeps the bench. */
 #dock .extabs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: -4px; }
 #dock .extab {
-  appearance: none; cursor: pointer; color: inherit; font: 600 11.5px system-ui, sans-serif;
+  appearance: none; cursor: pointer; color: inherit; font: 600 11.5px var(--font-ui);
   padding: 4px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.16);
   background: rgba(255,255,255,0.04); opacity: .7;
 }
@@ -902,7 +929,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #dock .exset { font-size: 11px; user-select: text; }
 #dock .exset > summary {
   cursor: pointer; opacity: .62; list-style: none;
-  font: 10px ui-monospace, monospace; letter-spacing: .03em; padding: 2px 0;
+  font: 10px var(--font-mono); letter-spacing: .03em; padding: 2px 0;
 }
 #dock .exset > summary::before { content: "▸ "; }
 #dock .exset[open] > summary::before { content: "▾ "; }
@@ -910,22 +937,25 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 #dock .exsetl {
   display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; margin-top: 3px;
   background: rgba(255,255,255,0.05); border-radius: 7px; opacity: .78;
-  font: 10.5px ui-monospace, monospace;
+  font: 10.5px var(--font-mono);
 }
 #dock .exsetl b { opacity: .9; font-weight: 700; }
 #dock .exsetl i {
   display: block; font-style: normal; opacity: .7; padding-left: 9px;
-  font: 10px system-ui, sans-serif; line-height: 1.35;
+  font: 10px var(--font-ui); line-height: 1.35;
 }
-#dock .exsettle { font: 10.5px ui-monospace, monospace; opacity: .6; }
-.exb {
-  appearance: none; background: rgba(255,255,255,0.07); color: inherit;
-  border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
-  font: 600 11px system-ui, sans-serif; padding: 5px 10px; cursor: pointer; white-space: nowrap;
-}
-.exb:hover { background: rgba(77,195,255,0.20); }
+#dock .exsettle { font: 10.5px var(--font-mono); opacity: .6; }
+/* JS hides a part of the brief with `.gone`, never with an inline display —
+   an inline value beats every rule above and the part could not be restyled.
+   Last of the #dock rules, so no later display value can win. */
+#dock .gone { display: none; }
+/* The dock footer Reset: .btn-sm plus this. The font-size is restated AFTER the
+   touch media query above (which lists .exb at 16px): on main this rule came
+   later and won, so the button stayed 11px on tablets; as a bare .btn-sm base it
+   lost to the query and grew. */
+.btn-sm.exb { border-radius: 8px; padding: 5px 10px; white-space: nowrap; font-size: 11px; }
 .exlink {
-  font: 10px ui-monospace, monospace; opacity: .5; margin-left: auto;
+  font: 10px var(--font-mono); opacity: .5; margin-left: auto;
   color: inherit; text-decoration: none; user-select: text;
 }
 .exlink:hover { opacity: .9; color: #7fd4ff; text-decoration: underline; }
@@ -959,12 +989,12 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   padding: 14px 16px 11px; border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 #startpack .ph b { font-size: 13.5px; }
-#startpack .ph i { font-style: normal; margin-left: auto; opacity: .45; font: 10.5px ui-monospace, monospace; }
+#startpack .ph i { font-style: normal; margin-left: auto; opacity: .45; font: 10.5px var(--font-mono); }
 #startpack .pf { padding: 10px 12px 4px; }
 #startpack .pf input {
   display: block; width: 100%; background: rgba(0,0,0,0.28); color: #dfe8f2;
   border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
-  font: 12.5px system-ui, sans-serif; padding: 7px 10px;
+  font: 12.5px var(--font-ui); padding: 7px 10px;
 }
 #startpack .pf input:focus { outline: 1px solid rgba(77,195,255,0.55); }
 #startpack .pf input::placeholder { color: rgba(223,232,242,0.35); }
@@ -981,7 +1011,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 @media (max-width: 700px) { #startlist { flex-direction: column; gap: 0; } }
 #startlist::-webkit-scrollbar { width: 6px; }
 #startlist::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 3px; }
-#startlist .g { break-inside: avoid; margin-bottom: 10px; }
+#startlist .g { margin-bottom: 10px; }
 #startlist .gh {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em;
   opacity: .45; padding: 6px 8px 4px;
@@ -992,10 +1022,10 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
   border: 1px solid transparent; border-radius: 8px;
   padding: 5px 8px; cursor: pointer;
 }
-#startlist .si:hover, #startlist .si.hi { background: rgba(255,255,255,0.08); }
+#startlist .si:hover { background: rgba(255,255,255,0.08); }
 #startlist .si .eid {
   display: inline-block; min-width: 38px;
-  font: 700 10.5px ui-monospace, monospace; color: #7fd4ff; letter-spacing: .04em;
+  font: 700 10.5px var(--font-mono); color: #7fd4ff; letter-spacing: .04em;
 }
 #startlist .si .t { font-size: 12px; }
 /* The aim, printed only where there is no hover to show it as a tooltip. */
@@ -1013,7 +1043,7 @@ body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: 
 .startcard .go { margin-left: auto; opacity: .5; }
 .startcard p { font-size: 12px; line-height: 1.5; opacity: .65; margin: 7px 0 0; }
 .startcard.primary { border-color: rgba(77,195,255,0.35); }
-@media (max-width: 620px) {
+@media (max-width: 620px) {   /* = --phone-max */
   #start { padding: 18px 12px 28px; }
   #starthead { margin-bottom: 16px; }
   #starthead h1 { font-size: 22px; }

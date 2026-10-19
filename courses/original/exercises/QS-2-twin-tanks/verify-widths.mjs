@@ -1,10 +1,10 @@
 // Student-width sweep and parameter persistence; Node 22+, GPU Chrome.
-import { launch } from '../../test/cdp.mjs';
+import { launch } from '../../../../test/cdp.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const browser = await launch();
 try {
-  const page = await browser.open(new URL('../../index.html?ex=QS-2', import.meta.url).href);
+  const page = await browser.open(new URL('../../../../index.html?ex=QS-2', import.meta.url).href);
   await page.evaluate(readFileSync(new URL('rig.js', import.meta.url), 'utf8'));
   const results = [];
   for (let digit = 0; digit <= 9; digit++) {

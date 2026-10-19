@@ -57,15 +57,15 @@ function hydrostatic(eta, c, dx, ny, g = 9.81) {
   }
   return { f, P };
 }
-for (const [c, rawExpect] of [[25, 1.00785], [8, 1.07664]]) {
+// (Uncompacted, the same column would read 1.00785 at c = 25 and 1.07664 at
+// c = 8 — the slot storage the compaction removes.)
+for (const c of [25, 8]) {
   const dx = 0.002, ny = 700, eta = 1.0;
   const { f, P } = hydrostatic(eta, c, dx, ny);
   const g = new Float64Array(ny);
-  let raw = 0;
-  for (let j = 0; j < ny; j++) { g[j] = RECON.geomFill(f[j], P[j], c); raw += f[j] * dx; }
+  for (let j = 0; j < ny; j++) g[j] = RECON.geomFill(f[j], P[j], c);
   const d = RECON.columnDepth(g, 0, ny - 1, dx);
   ok(`B c=${c} compacted depth is 1.0`, near(d, eta, 1e-9), `got ${d}`);
-  ok(`B c=${c} uncompacted would read ${rawExpect}`, near(raw, rawExpect, 5e-4), `got ${raw}`);
 }
 // B3: pressurised throughout — the identity on its f > 1 branch.
 {
@@ -95,26 +95,20 @@ ok("B4 dry column has zero depth and no NaN",
 
 // ---- Group G: numerical robustness --------------------------------------
 // G1: 5 mm wobble on a 1 m datum. The naive <eta^2>-<eta>^2 in float32 keeps
-// about two digits of sigma^2; weighted Welford keeps it.
+// about two digits of sigma^2; weighted Welford keeps it. (Only the Welford
+// side is asserted: a "naive is worse" check would only test Math.fround.)
 {
   const eta0 = 1.0, a = 0.005, N = 200000;
   let m = 0, M2 = 0, T = 0;
-  let sum = Math.fround(0), sumSq = Math.fround(0);
   for (let n = 0; n < N; n++) {
     const e = eta0 + a * Math.sin(2 * Math.PI * n / 1000);
     const mNew = RECON.accumStep(m, e, T, 1);
     M2 = RECON.welford(M2, m, mNew, e, 1);
     m = mNew; T += 1;
-    sum = Math.fround(sum + Math.fround(e));
-    sumSq = Math.fround(sumSq + Math.fround(e * e));
   }
   const exact = a / Math.SQRT2;
-  const naive = Math.sqrt(Math.max(0, Math.fround(sumSq / N) - Math.pow(Math.fround(sum / N), 2)));
   ok("G1 Welford sigma to 3 digits", near(RECON.sigma(M2, T), exact, exact * 1e-3),
      `welford ${RECON.sigma(M2, T)} exact ${exact}`);
-  ok("G1 naive float32 sigma is demonstrably worse",
-     Math.abs(naive - exact) > Math.abs(RECON.sigma(M2, T) - exact) * 10,
-     `naive ${naive} welford ${RECON.sigma(M2, T)} exact ${exact}`);
 }
 
 // ---- Group D: falling jets and connectivity ------------------------------
@@ -217,11 +211,11 @@ for (const [gap, sep] of [[1, false], [2, false], [3, true], [4, true]]) {
   ok("C1 exceedance integral is the mean level",
      near(RECON.columnDepth(g, 0, ny - 1, dx), eta0, 1e-9));
   const { eta05, eta95 } = RECON.bandLevels(g, b.j0, ny - 1, dx);
-  // C3: the arcsine percentiles, to the linear-interpolation error.
+  // C3: the arcsine percentiles, to the linear-interpolation error. Pinning
+  // each side to its own signed offset also fixes the orientation: fbar = 0.05
+  // is the HIGH edge (eta95), so an inverted band fails here.
   ok("C3 eta95 = eta0 + 0.98769a", near(eta95, eta0 + 0.98769 * a, 5e-4), `got ${eta95}`);
   ok("C3 eta05 = eta0 - 0.98769a", near(eta05, eta0 - 0.98769 * a, 5e-4), `got ${eta05}`);
-  // C4: the inversion. fbar = 0.05 is the HIGH edge.
-  ok("C4 the fbar=0.05 crossing is the HIGH edge", eta95 > eta05);
 }
 // C2 + C5: ONE synthetic surface, TWO independent routes to its width.
 //
@@ -277,10 +271,9 @@ for (const [gap, sep] of [[1, false], [2, false], [3, true], [4, true]]) {
     const z = (j + 0.5) * dx;
     g[j] = z < lo ? 1 : z < hi ? p : 0;          // exceedance of a two-state eta
   }
-  const mean = p * hi + (1 - p) * lo, median = lo;
+  const mean = p * hi + (1 - p) * lo;   // 1.12; the median is lo = 1.0
   ok("C6 the volume integral gives the MEAN, not the median",
-     near(RECON.columnDepth(g, 0, ny - 1, dx), mean, 1e-9) &&
-     !near(mean, median, 1e-6), `got ${RECON.columnDepth(g, 0, ny - 1, dx)}`);
+     near(RECON.columnDepth(g, 0, ny - 1, dx), mean, 1e-9), `got ${RECON.columnDepth(g, 0, ny - 1, dx)}`);
 }
 // The aeration gap reconciles the drawn line with the reported depth.
 ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12), 0.28, 1e-12));
@@ -306,6 +299,10 @@ ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12),
   const R = RECON.reconstruct({ fbar, pbar, mask, nx, ny, dx, c });
   ok("C8 reconstruct returns one entry per column",
      R.d2d.length === nx && R.bed.length === nx && R.bodies.length === nx);
+  // d2d exists to cross-check the GPU's own column reduction, which `continue`s
+  // past sub-threshold cells without accumulating depth. Built from the
+  // unmasked integral it would read (1 + 1 + 0.1 + 0.6) dx here and disagree
+  // with FS_COL by construction (ruling R8); the exact value pins that too.
   ok("C8 depth lands in the column it was written to, not its transpose",
      near(R.d2d[3], (1 + 1 + 0.6) * dx, 1e-12) && near(R.d2d[1], 1 * dx, 1e-12),
      `d2d ${Array.from(R.d2d).join(",")}`);
@@ -314,14 +311,24 @@ ok("delta_a is eta_bar - (bed + d_bar)", near(RECON.aerationGap(1.4, 0.0, 1.12),
   ok("C8 a cell with mask >= 192 is solid even when its fill says water",
      R.bodies[0].length === 0 && R.d2d[0] === 0,
      `bodies0 ${JSON.stringify(R.bodies[0])} d2d0 ${R.d2d[0]}`);
-  // d2d exists to cross-check the GPU's own column reduction, which `continue`s
-  // past sub-threshold cells without accumulating depth. Built from the
-  // unmasked integral it would disagree with FS_COL by construction — measuring
-  // the shader's bridging rather than checking against it (ruling R8).
-  ok("C8 d2d masks bridged sub-threshold cells, as FS_COL does",
-     near(R.d2d[3], (1 + 1 + 0.6) * dx, 1e-12) &&
-     !near(R.d2d[3], (1 + 1 + 0.1 + 0.6) * dx, 1e-12),
-     `d2d[3] ${R.d2d[3]}`);
+}
+// E: bed is the first wet row of the lowest body. Three columns, beds at rows
+// 2, 5 and 0, each with a second body above so 'lowest' is exercised.
+{
+  const nx = 3, ny = 12, dx = 0.1, c = 25;
+  const fbar = new Float64Array(nx * ny), pbar = new Float64Array(nx * ny);
+  const mask = new Uint8Array(nx * ny);
+  const at = (i, j) => j * nx + i;
+  for (const [i, j0] of [[0, 2], [1, 5], [2, 0]]) {
+    fbar[at(i, j0)] = 1; fbar[at(i, j0 + 1)] = 1;
+    fbar[at(i, 10)] = 1;                       // a separate body above
+  }
+  const R = RECON.reconstruct({ fbar, pbar, mask, nx, ny, dx, c });
+  const b = R.bodies;
+  ok("E bed is the first wet row of the lowest body",
+     [0, 1, 2].every((i) => b[i].length === 2 && R.bed[i] === b[i][0].j0 * dx)
+       && [2, 5, 0].every((j0, i) => b[i][0].j0 === j0),
+     `bed ${Array.from(R.bed).join(",")}`);
 }
 // crossing() takes the FIRST crossing walking upward. That is the outer
 // surface for the monotone exceedance profile of a sharp interface, and it is

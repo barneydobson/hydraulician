@@ -113,9 +113,9 @@ needs and does not do:
 - It needs **WebGL2** and a GPU-backed browser — a lab machine or almost any
   laptop from the last several years; a browser running under remote desktop
   or heavy virtualisation may not have one.
-- It **stores nothing and sets no cookies** — there is nothing to consent
-  to, and nothing carries over between sessions except what is in the link
-  itself (a `#rig=` fragment, which never leaves the browser's address bar).
+- It sets **no cookies**; the chosen course is remembered in `sessionStorage`
+  for the visit — there is nothing to consent to, and nothing carries over
+  between sessions except what is in the link itself (a `#rig=` fragment, which never leaves the browser's address bar).
 
 ## Confirmed placements
 

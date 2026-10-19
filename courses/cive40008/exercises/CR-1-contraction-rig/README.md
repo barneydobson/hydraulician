@@ -9,12 +9,12 @@ into a 0.50 m pipe discharging into the right-hand reservoir. One slider,
 The card has four **tabs**; switching tabs swaps the steps and the
 interface (fields, strip buttons, tools) and leaves the flow running:
 
-| tab | lecture | the question | was |
-|---|---|---|---|
-| **Streamlines** | L4 Fluid motion | the taper's streamlines follow the walls; the step separates, with a vena contracta | FF-5 |
-| **Continuity** | L5 Mass conservation | Lagrangian and Eulerian; Q₁ = Q₂ and Σ Q = 0 round a control volume, for any shape | VC-1 |
-| **Forces** | L6 Momentum | the force on the contraction from a momentum balance, R = p₁A₁ − p₂A₂ − ρQ(U₂ − U₁); a straight pipe's friction | MM-2 |
-| **Energy** | L7 Energy (the colleague's) | grade lines: the EGL nearly level through a taper, falling past a step and at the outlet; the head loss H₁ − H₂ for each | — |
+| tab | lecture | the question |
+|---|---|---|
+| **Streamlines** | L4 Fluid motion | the taper's streamlines follow the walls; the step separates, with a vena contracta |
+| **Continuity** | L5 Mass conservation | Lagrangian and Eulerian; Q₁ = Q₂ and Σ Q = 0 round a control volume, for any shape |
+| **Forces** | L6 Momentum | the force on the contraction from a momentum balance, R = p₁A₁ − p₂A₂ − ρQ(U₂ − U₁); a straight pipe's friction |
+| **Energy** | L7 Energy (the colleague's) | grade lines: the EGL nearly level through a taper, falling past a step and at the outlet; the head loss H₁ − H₂ for each |
 
 **Open it:** press **E** in the [app](../../../../)
 and pick **CR-1**, or link straight to a tab:
@@ -22,8 +22,7 @@ and pick **CR-1**, or link straight to a tab:
 [`&tab=continuity`](../../../../?ex=CR-1&tab=continuity),
 [`&tab=forces`](../../../../?ex=CR-1&tab=forces),
 [`&tab=energy`](../../../../?ex=CR-1&tab=energy).
-The old links `?ex=FF-5`, `?ex=VC-1` and `?ex=MM-2` still work and open the
-matching tab. A course menu lists a tab as `"CR-1#forces"`.
+A course menu lists a tab as `"CR-1#forces"`.
 How to run any exercise: see the [course index](../../INDEX.md#running-an-exercise).
 
 ## The bench
@@ -147,8 +146,10 @@ reads the pressure in kPa.
   real profiles (∫ρu² exceeds ρQU by the momentum coefficient β, most just
   past the step) and includes the wall shear.
 - **Taper against step.** R moves by +0.23 kN/m (box) or +0.45 kN/m
-  (formula), 3–5%; the step loses 0.072 m more head between the faces, and
-  ρg·0.072·A₂ ≈ 0.35 kN/m is the same size (energy is L7 — for the lecturer).
+  (formula), 3–5%; the step loses 0.021 m more head than the taper over
+  4.3 → 10.6 m (0.073 − 0.052, from the Energy table below), and
+  ρg·0.021·A₂ ≈ 9.81 × 0.021 × 0.50 ≈ 0.10 kN/m accounts for only a quarter
+  to a half of that shift (energy is L7 — for the lecturer).
 - **Straight pipe.** Friction is small at this Reynolds number and
   resolution, so read the box's F→ (it prints in N/m under 1 kN) or the
   "force on what is between them" line of the two Flux sections. With the
@@ -179,17 +180,21 @@ fill the narrow pipe and the corner eddies dissipate it, and above all at the
 outlet, where the jet's whole velocity head U₂²/2g ≈ 0.38 m is mixed away in
 the right reservoir (the EGL falls to the tailwater there).
 
-Measured at Medium (`?ex=CR-1&tab=forces`, 2026-10-18): each L restarted and
+Measured at Medium (`?ex=CR-1&tab=energy`, Δx = 24.7 mm). The three H rows
+and the head-loss row were re-measured after the pressure-reference fix (H is
+read against the cell's lower face, which lowered every absolute H by about
+Δx/2 and left the losses alone); the Q row and the Control-volume row are the
+earlier measurement, untouched by it. Each L restarted and
 run 35–40 s, then the mean of 40 samples, two flux sections drawn up across
 the pipe, z = 0.4 → 1.6 m. H is the flux-weighted mean, Ė/(ρgQ).
 
 | reading | taper, L = 3 m | step, L = 0 |
 |---|---|---|
 | Q | 1.366 m²/s | 1.313 m²/s |
-| H at x = 4.3 m (wide pipe) | 2.826 m | 2.828 m |
-| H at x = 9.0 m | 2.780 m | 2.766–2.774 m |
-| H at x = 10.6 m (near the outlet) | 2.772 m | 2.756–2.762 m |
-| **head loss 4.3 → 10.6 m** | **0.05 m** (0.053–0.054) | **0.07 m** (0.068–0.072) |
+| H at x = 4.3 m (wide pipe) | 2.813 m | 2.814 m |
+| H at x = 9.0 m | 2.768 m | 2.752 m |
+| H at x = 10.6 m (near the outlet) | 2.761 m | 2.741 m |
+| **head loss 4.3 → 10.6 m** | **0.05 m** (0.052) | **0.07 m** (0.073) |
 | the Control volume (4.3, 0.3) → (10.6, 1.65), Ė lost ÷ ρgQ | 0.036 m | 0.055 m |
 
 - The taper's loss is the wall friction along ~6 m of pipe (most of it in

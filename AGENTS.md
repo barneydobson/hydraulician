@@ -5,50 +5,35 @@ dependencies, no build step. A teaching tool — draw a channel, a pipe or a
 tank and free-surface Navier–Stokes runs through it, with the measurements
 (depths, heads, profiles, jumps) done on screen.
 
-**Run it:** serve statically (`python3 -m http.server 8124`) and open
-`index.html` — or double-click it; classic scripts, so `file://` works.
+**Run it:** serve statically (`python3 -m http.server 8124`; Windows: `py -3`)
+and open `index.html` — or double-click it; classic scripts, so `file://` works.
 `.claude/launch.json` has a preview config on port 8124. `?scene=<id>` boots a
-scene, `?ex=<id>` an exercise. Sibling project: `hydraulics-fun` (plan-view
-shallow water); this one resolves the depth.
+scene, `?ex=<id>` an exercise. Agent worktrees live in `.claude/worktrees/`
+(`.gitignore` already says so). Sibling project: `hydraulics-fun`.
 
 ## Where things live
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | markup and the classic script tags, and little else — under 200 lines; the control panel is generated from a spec in `main.js` |
-| `css/app.css` | every rule the app uses. A `<link rel=stylesheet>` to a relative path works under `file://` (unlike `fetch` and ES modules), so this costs the no-server guarantee nothing |
-| `js/gl.js` | `GLH` — programs, float textures, FBOs, ping-pong, fullscreen draws |
-| `js/reconstruct.js` | `RECON` — the averaging numerics with no WebGL in them: running mean, Welford, geometric fill, connected bodies, column compaction, band level sets |
-| `js/shaders.js` | `Shaders` — the five passes: `vel`, `vof`, `col` (column reduction), `part` (particles), `disp` (display) |
+| `index.html`, `css/app.css` | markup and the classic script tags, under 200 lines, the panel generated from `panel.js`; every CSS rule |
+| `js/gl.js`, `js/shaders.js` | `GLH` — programs, float textures, FBOs, ping-pong; `Shaders` — the GPU programs: per-substep `vel`, `vof`; per-frame columns, display, particles, averaging, streamlines |
 | `js/sim.js` | `SIM` — grid, wall rasterisation, substep loop, control bands, probe/rake readbacks, `boxForce` / `boxFlux` / `lineFlux` |
-| `js/geom.js` | `GEOM` — polygon solids with named faces: builders, samplers, point-in-polygon, face force integration; no WebGL |
-| `js/scenes.js` | `SCENES` — scene definitions; `channel()` and `drop()` builders |
-| `js/overlay.js` | `OVERLAY` — 2D canvas: d_c, d_n, EGL, profile classification, jump boxes, gauge charts, rake |
-| `js/main.js` | boot, `CONFIG`/`state`, the view transform, `FIELDS`, the `CONTROLS` panel spec, the `TOOLBAR` strip, `LEGEND`, `UIMODE`, `START`, `DOCK`, `KEYS`, pointer tools, the frame loop and instrument sampling, `window.APP` |
-| `js/pickers.js` | `PICKER` (the scene menu) and `EX` (the exercise picker: cards — the short layout, inline strip icons, tabs —, digit rules, the settings a pick applies) |
-| `js/stream.js` | `STREAM` — streamlines as contours of the stream function ψ, built on the CPU from a fenced face-flux readback; of the mean flow under Average |
-| `js/gauge-inspector.js` | `GINSP` — a draggable window per gauge: identity, live values, the full history chart, CSV export |
-| `js/rig.js` | `RIG` — rig save / load / share, the wire format and its version gate |
-| `js/exercises.js` | declares `EXERCISES`, the register the picker reads — empty here; every course's `exercises.js` appends to it — and its header is the card schema |
-| `js/exercises-rigs.js` | drawn rigs + applied settings per exercise, as rig-format JSON |
-| `js/courses.js` | `COURSES` — the course registry; `?course=<id>` picks one (remembered for the visit), else a course whose `hosts` names the page's hostname; exposed as `EXERCISE_MENU`. `COURSES.exercises(id, [...])` appends a course's own cards to `EXERCISES`, stamped `course` and `home` |
-| `courses/<id>/` | one course each: `course.js` (`COURSES.add({id, title, sections, hosts?})`), its own cards in `exercises.js`, their briefs in `exercises/<ID>-<slug>/` and `INDEX.md`; one script tag per file in `index.html`; `check_pack.py` holds every course to the same rules |
-| `courses/original/` | the original teaching pack — its cards, menu by topic (still listing HS-1, now CIVE40008's), the default on `barneydobson.github.io` — plus its history (`demo-programme.html`, `feasibility-sheet.html`, `CHANGES-NEEDED.md`, `_director-status.md`, `_worker-recipe.md`). Due to be retired: delete the folder and its two script tags |
-| `courses/cive40008/` | CIVE40008 Year 1 (default on `mvreeuwijk.github.io`); owns HS-1 too, which `original`'s menu still lists |
-| `docs/numerics.md` | the full derivation: multiphase NS → heavy-fluid limit → Preissmann-slot EOS → discretisation |
-| `docs/notation.md` | the symbol register and why it was chosen (the literatures disagree) |
-| `docs/engineering-notes.md` | the measured lore: guard rails, conservation, geometry contracts, verified numbers, gotchas |
-| `docs/averaging.md` | time averaging, user-facing: what Average shows, the Favre mean, the discrete balance it satisfies, surface reconstruction, reset conditions — section numbers are load-bearing (code and tests cite them) |
-| `docs/boundary-conditions.md` | every boundary in one place: the solid mask, wall mechanisms, the tri-state outer ring, level controls with their sponges and clamps, edge ownership |
-| `docs/making-exercises.md` | how a demo becomes a card: scene vs rig, the card's applied/displayed split, the `ui` profile, the rig wire format, the folder recipe, what `check_pack.py` enforces, the headless measuring recipe — HS-1 as the worked example |
-| `docs/embedding.md` | putting one exercise inside a Blackboard or Canvas page: the iframe tag, what `?embed=1` changes, the per-LMS clicks, sizes, and the confirmed-placements table |
-| `docs/view.html` | renders `docs/*.md` in the app's own styling — what "About the solver" opens off the Pages build |
-| `docs/hydrostatic-attractor.js` | standalone check that the solver finds hydrostatic balance |
-| `exercises/` | shared tooling only, plus `INDEX.md` pointing at each course's index; no exercise folders (they are under `courses/<id>/exercises/`: `README.md` brief, `rig.js` headless script, `collect_plot.py`) |
-| `exercises/_runner/` | `runner.py` CDP harness (Linux-bound; see its HOWTO.md), `check_pack.py` consistency checker, `check_notation.py`, `smoke.js` |
-| `exercises/_code-changes/` | reports and screenshots from app changes (picker, gauges, rig share, card fixes) |
-| `test/` | `ui-smoke.mjs` layout gate, `recon-test.mjs` (RECON's unit tests, no browser) and `cdp.mjs`, its portable headless-Chrome client |
-| `.github/workflows/pages.yml` | Jekyll over the repo — briefs and docs render as pages; underscore folders unpublished |
+| `js/reconstruct.js`, `js/overlay.js`, `js/stream.js` | `RECON` — numerics with no WebGL: running mean, Welford, surface reconstruction, inlet depth, column energy, compaction; `OVERLAY` — d_c, d_n, EGL, profile classes, jump boxes, gauge charts, rake; `STREAM` — streamlines as contours of ψ from a fenced face-flux readback |
+| `js/geom.js`, `js/scenes.js` | `GEOM` — polygon solids with named faces, point-in-polygon, face forces, no WebGL; `SCENES` — scene definitions, `channel()` and `drop()` |
+| `js/state.js`, `js/fields.js`, `js/format.js`, `js/panel.js`, `js/strip.js`, `js/keymap.js` | `CONFIG`, `state`, `EMBED`, the view handles; `FIELDS` (nine colourings) and `GAUGE_QTY`; `FMT`, every number-to-text rule; `CONTROLS` spec, `buildPanel`, `syncPanel`, `UI.batch`; `TOOLS`, `TOOLBAR`, `TIP`, `KEYS`; `KEYMAP`, every shortcut described once |
+| `js/legend.js`, `js/dock.js`, `js/popup.js`, `js/instruments.js`, `js/gauge-inspector.js`, `js/governor.js` | `LEGEND`, `UIMODE` (the exercise interface profile); toasts, `MINI`, `DOCK`, `START`, `dragWindow`; `POPUP`, the one popup behaviour behind every menu; gauges, rakes, flux sections, control volume, force, tracers; `GINSP`, a window per gauge; the frame-rate governor |
+| `js/rig.js`, `js/pickers.js`, `js/exercises.js`, `js/exercises-rigs.js`, `js/courses.js` | `RIG` — save / load / share, the wire format and its version gate; `PICKER` (scene menu) and `EX` (exercise picker, digit rules, what a pick applies); `EXERCISES`, the empty register (its header is the card schema and the definition of a README brief); rig payloads per exercise; `COURSES`, `?course=<id>` or by `hosts` |
+| `js/main.js` | boot, the view transform, `loadScene`, pointer tools, the frame loop, overlay drawing, status bar, Average (`setAverage`), `window.APP` |
+| `courses/<id>/` | one course each: `course.js`, cards in `exercises.js`, briefs in `exercises/<ID>-<slug>/`, `INDEX.md`; `original` (default on `barneydobson.github.io`, due to be [retired](docs/making-exercises.md#retiring-the-original-pack)) and `cive40008` (default on `mvreeuwijk.github.io`, owns HS-1) |
+| `test/` | every gate except `check_pack.py` (it lives in `exercises/_runner/`): `smoke.mjs`, `ui-smoke.mjs` (browser); `recon-test.mjs`, `geom-test.mjs`, `mutation-test.mjs`; `check_notation.py`, `check_headers.py`, `check_docs.py`; `cdp.mjs`, the headless-Chrome client |
+| `exercises/_runner/` | `check_pack.py`, `probe-pref.mjs` (the pressure-reference probe numerics.md cites), `runner.py` (CDP harness, Linux-bound), `HOWTO.md`, `bench.md`, `fixtures/`; `exercises/` also holds `INDEX.md` and `_code-changes/` |
+| `docs/numerics.md`, `docs/boundary-conditions.md`, `docs/averaging.md` | the derivation (multiphase NS → Preissmann-slot EOS → discretisation); every boundary in one place; time averaging (section numbers are load-bearing: code and tests cite them) |
+| `docs/notation.md`, `docs/engineering-notes.md` | the symbol register; the measured lore: guard rails, conservation, geometry contracts, verified numbers, the zero-dependency rule |
+| `docs/making-exercises.md`, `docs/testing.md`, `docs/embedding.md` | demo to card; the gates in full; one exercise in Blackboard or Canvas |
+| `docs/syllabus.md`, `docs/year1-programme.md`, `docs/design/` | the original pack by topic; the agreed CIVE40008 plan; dated design notes. `docs/_archive/` holds old plans, unpublished |
+| `.github/workflows/` | `checks.yml` (instant gates, no-GPU browser job), `pages.yml` (Jekyll deploy after Checks; underscore folders unpublished); `docs/view.html` is the docs reader ("About the solver"), `docs/math.js` the MathJax rewrite for `math` fences (Pages only), `docs/hydrostatic-attractor.js` a float64 CPU re-implementation of the closure, not a solver check, not a gate |
+
+Each `js/*.js` header lists the globals it defines and reads (`test/check_headers.py`); load order is `index.html`'s.
 
 ## The model, in one paragraph
 
@@ -59,266 +44,98 @@ no interface reconstruction), an over-full cell is pressurised water with
 celerity `c`. No Poisson solve; two fullscreen passes per substep. In an
 open channel the free surface is stress-free (the void over it carries the
 water's `u`) and a depth-scale mixing length carries the bed's stress up the
-column, so the profile is a log law and the bed sets the resistance. The whole
-derivation, including what is deliberately not represented, is in
-[docs/numerics.md](docs/numerics.md).
+column, so the profile is a log law and the bed sets the resistance. The
+derivation, including what is not represented: [docs/numerics.md](docs/numerics.md).
 
 ## Notation
 
-Symbols are the register in [docs/notation.md](docs/notation.md) — depth `d`
-(`d_c`, `d_n`, `d₁`, `d₂`), level `η`, piezometric head `h = z + p/ρg`,
-energy head `H`, specific energy `E = H − z_b`, velocity `u = (u, w)`,
-pressure head always spelled `p/ρg`. Two standing rules:
-
-- **Code identifiers follow the notation too.** The whole stack — GLSL
-  identifiers, runtime state, public API fields — uses `z` for the domain
-  vertical, `w` for the vertical velocity, `d` for depth (`probe().w`,
-  `boxForce().fz`, `analyse().d/.dc/.dn/.H`, `findJumps().d1/.d2`,
-  `gauges[].z`, `source.z/.vz`). Two deliberate exceptions: GLSL *swizzles*
-  (`.y` is component syntax, `U.g` still stores w) and screen-space pixel
-  coordinates (canvas y-down) stay `y`; the view transform (`V.Y(z)`,
-  `toDomain`) is the boundary between the two.
-- **Serialized keys go through the version gate.** The rig wire format is v2
-  (`z`, `vz`, gauge fields `"h"`/`"d"`/`"speed"`); `RIG.migrate` in `main.js`
-  accepts exactly the current version and rejects anything else — prototype,
-  no back-compat. Any future key change bumps `V`; old links just break.
+The register is [docs/notation.md](docs/notation.md): depth `d`, level `η`,
+head `h = z + p/ρg`, energy head `H`, velocity `u = (u, w)`. **Code follows it** (`z` vertical, `w` vertical velocity, `d` depth;
+exceptions: GLSL swizzles, screen-pixel `y`). **Serialized keys go through the
+version gate**: `RIG.migrate` in `js/rig.js` accepts exactly the current wire
+version; a key change bumps `V`, old links break.
 
 ## Rules that keep it alive
 
-Each of these was bought with a measured failure; the stories and numbers are
-in [docs/engineering-notes.md](docs/engineering-notes.md). Breaking one tends
-to look fine for a minute and explode in an exercise.
+Each was bought with a measured failure (stories: [docs/engineering-notes.md](docs/engineering-notes.md)).
 
 - **VOF positivity is a donor-side flux cap, never an `f` clamp** — clamping
-  invents water at machine speed. Both face neighbours must compute the
-  identical flux. Read the Conservation section before touching the vof pass.
+  invents water; both face neighbours compute the identical flux
+  ("Conservation" before touching `vof`).
 - **Gravity and `∇p` stay additive in the vel pass** — anything interposed
-  breaks the discrete hydrostatic equilibrium.
-- **The free surface is stress-free and the bed carries the resistance.**
-  Over a channel the dry `u`-faces take the water's `u`; `w` and every other
-  void face keep the bleed. Do not bleed `u` over the water again (the
-  surface becomes a drag boundary, the profile peaks mid-depth and `n` jumps
-  to ~0.08), do not extrapolate `w` (the interface free-falls), and keep the
-  extension out of the reservoir sponge, and do not feather the inflow plug
-  (its slow top layer is never shed). The mixing length acts on the
-  VORTICITY in conservative form: on the strain it kills the deep flume's
-  waves, and as `ν_t∇²u` it puts the maximum back at mid-depth.
-  `smoke.js --only=profile` is the gate.
-- **Geometry contracts:** wall segments have butt ends; slabs leaving the
-  domain are extrapolated, not clamped; a scene's bed stays above `z = 0`;
-  ground is solid all the way down; the closed outer ring is stamped last.
-- **Controls:** a subcritical reach needs a real downstream control; a
-  tailwater stands clear of critical (`≥ 1.3 d_c`, rechecked when `q`
-  changes), and one holding a jump stands near its conjugate; outfall edges
-  (`open` = 2) are for brinks, never ponds; under gravity an open edge that
-  no level control owns passes outflow only.
-- **The panel toggles are self-configuring** — the sandbox must be able to
-  reproduce any scene by hand; that is the acceptance test for control
-  changes. An exercise may narrow the interface (`UIMODE`), but never lock
-  it: the `⋯` on the strip and at the head of the panel puts everything back
-  in one click, which is what keeps that acceptance test true.
-- **A field is described once.** The nine colourings live in `FIELDS` in
-  `main.js` — mode integer, name, symbol, unit, ramp and default range — and
-  the legend, the Controls select and the `G` key all read it. The ramp
-  colours themselves are `Shaders.RAMPS`, interpolated into the display
-  shader, so the key on screen and the water cannot drift apart. Adding a
-  field is a row, not three edits. Each field's colour range is explicit
-  (`u_lo`/`u_hi`) and **held**, never tracked — see the engineering notes.
-- **Zero dependencies, classic scripts** — no modules, no bundlers, no fetch,
-  and no YAML front matter in `index.html`, `js/*` or `css/*` (the Pages build
-  copies them verbatim only because there is none). Those three are one rule
-  wearing three hats: **the app boots with no server**. A browser refuses both
-  `fetch` of a file beside it and an ES module under `file://`, and
-  double-clicking `index.html` is a real way this gets used.
-
-  What the rule does NOT forbid is more than one file. `<script src>` and
-  `<link rel=stylesheet>` to relative paths both work under `file://` — that is
-  why the app already loads a dozen classic scripts and one stylesheet, and why
-  splitting a long file is never blocked by this rule. Only `fetch`, ES modules
-  and a build step are. If you find yourself keeping something in one enormous
-  file "because zero dependencies", check which of the three you are actually
-  protecting; usually it is none of them. The rule binds the APP; the docs
-  reader (`docs/view.html`) does fetch the markdown it renders, because
-  nothing about running a simulation depends on it and it degrades to a
-  message and two working links when it cannot. Any published page carrying
-  `math` code fences must end with a `<script>` tag loading `docs/math.js` —
-  stripped on github.com, live on the Pages build, where it rewrites the
-  fences for MathJax (README.md and docs/numerics.md show the pattern).
+  breaks hydrostatic equilibrium.
+- **The free surface is stress-free and the bed carries the resistance.** Do
+  not bleed `u` over the water, extrapolate `w`, feather the inflow plug or let
+  the extension into the reservoir sponge; the mixing length acts on the
+  vorticity in conservative form. `smoke.mjs --only=profile` is the gate.
+- **Geometry contracts:** butt-ended wall segments; slabs leaving the domain are
+  extrapolated, not clamped; a scene's bed stays above `z = 0`; ground is solid
+  all the way down; the closed outer ring is stamped last.
+- **Controls:** a subcritical reach needs a real downstream control; a tailwater
+  stands `≥ 1.3 d_c` (rechecked when `q` changes) and, holding a jump, near its
+  conjugate; outfall edges (`open` = 2) are for brinks, never ponds; an open
+  edge no level control owns passes outflow only.
+- **The panel toggles are self-configuring** — the sandbox must reproduce any
+  scene by hand (the acceptance test for control changes). An exercise may
+  narrow the interface (`UIMODE`), never lock it: `⋯` puts everything back.
+- **A field is described once:** a row of `FIELDS`; legend, Controls select, `G`
+  key and `Shaders.RAMPS` read it. Colour ranges are **held**, never tracked.
+- **Zero dependencies, classic scripts** — no modules, bundlers, `fetch` or YAML
+  front matter in `index.html`, `js/*`, `css/*`: **the app boots with no
+  server**. More than one file is fine; only those three are not (essay in the
+  engineering notes). A page with `math` fences ends with a `<script>` loading `docs/math.js`.
 
 ## Testing
 
-Ten gates, all zero-dependency and all non-zero on failure:
+Gates exit non-zero on failure; the manual (suites, CI, ANGLE, `$CHROME`, mutation gate) is [docs/testing.md](docs/testing.md).
 
 | Command | Guards | Cost |
 | --- | --- | --- |
-| `python3 exercises/_runner/check_pack.py` | the pack agrees with itself (folders, ids, countdowns, digit ladders, UI profiles) | instant |
-| `python3 exercises/_runner/check_notation.py` | one notation everywhere — retired field names, gauge keys, wire keys, the y-family in briefs | instant |
-| `node test/geom-test.mjs` | `GEOM`'s closed forms — winding, slab corners, arc lengths, ½ρgH² — no browser; runs in checks.yml with the other instant gates | instant |
-| `node exercises/_runner/smoke.js` | the app actually boots and its contracts are WIRED: API field names, rig round-trip, physics invariants, the open-channel velocity profile, every scene, every exercise | ~9 min |
-| `node exercises/_runner/smoke.js --only=docs` | the docs reader renders `docs/*.md` rather than handing over its source | ~3 s |
-| `node test/recon-test.mjs` | `RECON`'s closed-form answers: running mean, Welford σ, compaction, connected bodies, band level sets — 43 assertions, no browser | instant |
-| `node test/mutation-test.mjs` | that `recon-test.mjs` can actually FAIL: fifteen known bugs patched into `RECON` one at a time, each required to kill the assertion it targets | ~9 s |
-| `node exercises/_runner/smoke.js --only=avg` | the averaging engine on the GPU: the transport residual against its √T bound, every reset condition, the Favre display field, the mean columns, the overlay, the display pass painting the mean and the legend's Fit — 46 assertions | ~4 min |
-| `node exercises/_runner/smoke.js --only=profile` | uniform open-channel flow (sa1, Medium) has a channel's velocity profile: the maximum at the surface, the 0.6-depth and 0.2/0.8 rules, a log law with κ 0.33–0.50, α, and the bed delivering the `n` — 7 assertions; `--mutate=surface-sink` and `--mutate=no-mixing-length` put each half of issue #72 back | ~1 min |
-| `node test/ui-smoke.mjs` | the interface holds its layout agreements — start-screen / `?scene=` / `?ex=` boots, the strip, the narrow-window overlay, the fitted view; the side panel is DOCKED so `--dock` and `canvas.clientWidth` agree and nothing is drawn underneath it; the strip's families, the legend and an exercise's UI profile | 10 boots |
+| `python3 exercises/_runner/check_pack.py` | the exercise pack agrees with itself | instant |
+| `python3 test/check_notation.py`, `python3 test/check_headers.py js/*.js` | one notation (retired names, gauge and wire keys); each header's `Defines:` / `Reads:` match the code | instant |
+| `python3 test/check_docs.py` | paths and `--only` suites these docs name exist; no assertion counts | instant |
+| `node test/recon-test.mjs`, `node test/geom-test.mjs` | `RECON`'s and `GEOM`'s closed-form answers, no browser | instant |
+| `node test/mutation-test.mjs` | that those two suites can fail: known bugs patched in one at a time | seconds |
+| `node test/smoke.mjs --check-catalogue` | the shader/sim mutant catalogue still matches the code, no browser | instant |
+| `node test/smoke.mjs` | the app boots and its contracts are WIRED | ~9 min |
+| `node test/ui-smoke.mjs` | layout agreements, the docked panel, the UI profile | ~10 min |
 
-Run the first two before printing worksheets, and `smoke.js` before pushing
-anything that touches `js/`. Run `mutation-test.mjs` after touching
-`js/reconstruct.js` or its suite — it is the only gate that fails when a *test*
-stops testing, which is a failure the others cannot see. `smoke.js --only=api,rig` is the fast subset
-(~2.5 min); `--keep` leaves the browser open on failure.
+`smoke.mjs --only=<suite,...>` takes `api`, `geom`, `rig`, `physics`, `profile`,
+`scenes`, `hydro`, `docs`, `pack`, `avg`: `api,rig` is the fast subset,
+`pack,scenes` boots every card and scene. Run the instant gates before printing
+worksheets, `smoke.mjs` before pushing anything that touches `js/`,
+`mutation-test.mjs` after touching `js/reconstruct.js` or `js/geom.js`,
+`ui-smoke.mjs` after touching strip, panel, legend, dock or boot wiring. Browser
+gates need a real GPU, so CI runs the instant ones plus the two no-GPU browser checks
+(`--only=docs`, `--only=file://`); run GPU gates one at a time.
 
-`.github/workflows/checks.yml` runs the first, second, third, sixth and
-seventh of these gates on every push and pull request — the ones that are
-instant and need no browser. `smoke.js` and `ui-smoke.mjs` are not in that workflow at
-all, not even as a manual `workflow_dispatch` job: both need a real
-GPU-backed Chrome (see `angleArgs()` in `test/cdp.mjs` and
-`exercises/_runner/smoke.js`, which pick the ANGLE backend by platform —
-`d3d11`/`metal`/`gl` — because the software rasteriser is too slow to settle
-a scene inside `smoke.js`'s physics budget), and standard GitHub-hosted
-runners have no GPU passthrough, so ubuntu-latest's `gl` backend would very
-likely fall back to the same class of software rasteriser and fail the same
-way. Run both locally, where a real GPU is available.
-
-`ui-smoke.mjs` is the interface's own gate (Node 22+ for the global
-`WebSocket`; `$CHROME` overrides the browser it finds): run it after touching
-`index.html`, `css/app.css`, `js/pickers.js`, the TOOLBAR spec, `FIELDS`, `LEGEND`, `UIMODE`, `DOCK`,
-`START`, `setAverage`, `EMBED` or the boot wiring. Every
-case in it is a bug that reached the working tree while the strip was being
-built, so a failure there is a real regression rather than a tightened
-expectation. Its `test/cdp.mjs` launcher passes a GPU-backed `--use-angle`
-itself (`d3d11`/`metal`/`gl` by platform, `$ANGLE` to override, `$SOFTWARE=1`
-for the old `--disable-gpu` behaviour), because the software rasteriser
-renders a full-window WebGL canvas so slowly that a spin-up scene times the
-run out.
-
-**Why there is a mutation gate.** Eleven assertions written during the averaging
-work passed while asserting nothing — a constant fed where a varying value was
-needed, a cell marked solid with no water in it, a `Number.isFinite` check that
-survived a deliberately broken variance, a bed compared against the very buffer
-it was copied from. Every one was caught by breaking the code and watching the
-suite stay green; none by reading it. `test/mutation-test.mjs` runs that
-practice on every commit for the pure numerics. For the shader and sim code it
-cannot reach, `smoke.js --mutate=<id>` patches one known bug into a served file
-in flight — never touching the working tree — so the same control can be run by
-hand: `node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds`.
-Each catalogue entry carries what was measured when the control was performed.
-
-Both checkers read the register the way it should be read: `check_pack.py`
-runs `js/exercises.js` (the empty register), `js/courses.js` and every
-course's `course.js` / `exercises.js` in `node` as script tags would (one shared global scope) and
-gets `EXERCISES` back as JSON, so a
-nested `ui` profile parses instead of being truncated at the first `}`; and
-`check_notation.py` walks `git ls-files`, so an untracked scratch file cannot
-fail a commit gate. Neither is a new dependency — Node is already required by
-the browser gates.
-
-The two checkers are complements: `check_notation.py` greps for *names*,
-`smoke.js` proves the names are *connected* — a field renamed at the write
-site but not the read site greps clean and returns `undefined` at runtime.
-
-Driving the app yourself: the render loop stops when the page is hidden, so
-headless work goes through `APP.frames(n)`, `APP.tick(n)`, `APP.probe(x,z)`
-(returns `u, w, p, phead, f, speed` — `phead` is pressure head only),
-`APP.volume()`, `APP.zoomAt(...)`, `APP.boxForce` / `APP.placeCV`.
-`exercises/_runner/runner.py` wraps that over CDP (Linux-bound — macOS shims
-in its HOWTO.md); `smoke.js` carries its own portable CDP client.
-
-Two sharp edges that have cost time, both now commented in `smoke.js`:
-`APP.volume()` reads the **cached** column reduction, so straight after a
-rebuild or `resetWater()` it returns 0 until `SIM.columns(true)` forces the
-readback; and `APP.pickExercise()` lands its rig a microtask later, so
-`await EX.ready` before reading what it applied.
-
-## The exercise pack
-
-Every exercise belongs to a course (`courses/<id>/`); the original pack is
-`courses/original/`. An exercise is described in four places with different
-jobs that do **not** collapse into one register: the course's `exercises.js`
-is the machine-readable source (schema: the header of `js/exercises.js`),
-each folder's `README.md` is the human brief, the course's `INDEX.md` is
-abbreviated navigation, and — for the original pack —
-`courses/original/demo-programme.html` is the dated rev-1 document it was
-built from — history. Briefs carry the minimum needed to run the demo; statistics and
-methodology live in each folder's uncommitted `_archive/`. Coordinates in a
-recipe are exact — rounding them makes a new geometry; re-measure before
-shipping. `spinup` values are measured settle times, not guesses. **Adding
-one, end to end** — which of these files it touches, in what order, and what
-each gate will ask of it — is
-[docs/making-exercises.md](docs/making-exercises.md); read it before
-writing a card or a scene.
-
-A **course** owns its exercises: the same pieces, in its folder
-(`courses/<id>/exercises.js`, `courses/<id>/exercises/<ID>-<slug>/`,
-`courses/<id>/INDEX.md`, the menu in `course.js`). They are still the one
-register — `?ex=` reaches every card wherever it lives, and ids are unique
-across all of them — and nothing in the app may assume a brief is under
-`exercises/`: use the card's `home` (pickers.js `briefDir`). A course is upstream-shaped by construction:
-another lecturer's course is another folder beside it.
-
-An entry may also carry a **`ui` profile** — which strip families and
-instruments it wants in front of a student, how focused the Controls panel
-opens, which fields the legend offers, and which on-canvas readouts it
-withholds. What it does not spell out is derived from what it already
-declares: `instruments` narrows MEASURE, an entry naming no build tool loses
-BUILD, and the panel opens on the sections its own controls live in. So a
-card whose task tells a student to draw something **must** say
-`ui: { build: true }` or name a build tool in `instruments` —
-`check_pack.py` fails the pack otherwise, because the alternative is a tool
-that is silently not there. Hidden tools keep their digit: worksheets say
-"press 5", so the key explains itself rather than arming something else.
+Headless driving: the render loop stops on a hidden page, so use `APP.frames(n)`,
+`APP.tick(n)`, `APP.probe(x,z)` (`phead` is pressure head only). `APP.volume()`
+reads a **cached** column reduction (0 after a rebuild until `SIM.columns(true)`);
+`APP.pickExercise()` lands its rig a microtask later: `await APP.EX.ready` first.
 
 ## Gotchas worth knowing on day one
 
-- **Tablets are a first-class target** (a lecturer runs exercises on an
-  iPad). The neutral tool is **Read** (`state.tool === null`): a press with
-  it never draws — a tap pins the readout card, a drag pans when zoomed —
-  and every exercise arrives with it in hand; only the sandbox door arms
-  Wall. A finger's press is held ~90 ms (`TOUCH_HOLD_MS`) so a pinch never
-  places, pins or dyes anything. On a coarse pointer the strip wraps onto a
-  second row rather than shrinking below 40 px or scrolling (`fitBar`,
-  `--barb`, `state.barTop`), and an upright tablet under 900 px gets the
-  bottom sheet, not an overlaid side panel. `ui-smoke.mjs` drives a real
-  emulated iPad (touch events, dpr 2); details in
-  [docs/making-exercises.md](docs/making-exercises.md) → *Reading the water
-  by touch*.
+- **Exercises:** every one belongs to a course; ids are unique across courses
+  and `?ex=` reaches any card. A card whose task has a student draw must say
+  `ui: { build: true }` or name a build tool. The README brief is defined in the
+  header of `js/exercises.js`; the recipe is [docs/making-exercises.md](docs/making-exercises.md).
+- **Tablets are a first-class target** (a lecturer runs exercises on an iPad):
+  the neutral tool is **Read** (`state.tool === null`), a finger's press is held
+  ~90 ms so a pinch never places anything. See *Reading the water by touch* in
+  [docs/making-exercises.md](docs/making-exercises.md).
 - A dev browser may serve stale JS from `http.server`; force with
-  `fetch(url, {cache:"reload"})` then `location.reload()`.
-- Resolution changes Δx, not the physics: the domain is a fixed physical
-  rectangle and the grid is sized to a cell budget.
-- A scene's `params` (the Geometry sliders — six rows, bound by index) reach
-  its `solids()`, `walls()`, `valves()` and `water()`, and an optional `flow()`
-  seeds the initial velocity field (`hydro` opens near its steady flow instead
-  of surging from rest). A digit rule on a `geomN` row is cross-checked against
-  the scene's declaration by `check_pack.py`; the lore is in the engineering
-  notes under "Hydropower scheme".
-- `state.rt` in the status bar is the speed truth — m2 at ~0.8–0.9× real
-  time is the design point, not a bug (the closure costs 11–14% a substep).
-- A steady sloping surface sits in one-cell terraces: the VOF surface locks to
-  cell faces while the pressure carries the sub-cell slope. The overlay's
-  energy line (and so `S_f`, `n`, `d_n`) is built on the HGL for that reason;
-  a gauge's depth still steps by a whole Δx. "Steady surfaces terrace" in
-  the engineering notes.
-- The vertical exaggeration is fitted to the window (`autoVex` in main.js),
-  not 1:1 — a scene's `view.vex`, the slider or a drag on the letterbox band
-  takes the number over, and `0` resets to the fitted value, not to 1:1. The
-  ruler, scale bar and ∇ markers follow the same rect, so nothing on screen
-  stops being true; details in
-  [docs/engineering-notes.md](docs/engineering-notes.md).
-- The Control volume, the Froude view, and surface-wave damping all have
-  non-obvious failure modes — read their sections in
-  [docs/engineering-notes.md](docs/engineering-notes.md) before "fixing"
-  anything they show.
-- **Average** (VIEW → A) is a measurement mode, not a blur. While it is up the
-  colour, the free-surface line, the channel overlay, the particle tracers
-  (switched on with the mode, advected by the mean) and EVERY instrument
-  reading — probe, gauges, rake, sections, control volume — come from ONE
-  window, with no per-instrument smoothing layered on top; dye is the one
-  live tracer with no accumulator and stands down. The window restarts on each of
-  [docs/averaging.md](docs/averaging.md) §9's conditions — including the
-  boundary-open switches in Controls, which look like view settings and are a
-  change of control volume. The velocity stored is the FAVRE mean, so `H`,
-  `Fr`, `|u|` and `ρu|u|` are fields **of the mean flow**; each field's `mean`
-  string in `FIELDS` is what the legend prints to say so. `setAverage` is the
-  single writer: the flag alone is not the mode, because the accumulators
-  (~22 MB apiece at Ultra) have to be opened and released with it.
+  `fetch(url, {cache:"reload"})` then `location.reload()`. Resolution changes
+  Δx, not the physics: the domain is a fixed rectangle.
+- A scene's `params` (six Geometry rows, bound by index) reach `solids()`,
+  `walls()`, `valves()`, `water()`; an optional `flow()` seeds the velocity
+  (lore: "Hydropower scheme" in the engineering notes).
+- `state.rt` is the speed truth — m2 at ~0.8–0.9× real time is the design point.
+  Steady sloping surfaces sit in one-cell terraces, so the energy line is built
+  on the HGL ("Steady surfaces terrace"). Vertical exaggeration is fitted to the
+  window (`autoVex`); `0` resets to the fit. The Control volume, the Froude view
+  and wave damping have non-obvious failure modes: read their notes first.
+- **Average** (VIEW → A) is a measurement mode, not a blur: the picture and every
+  instrument reading come from ONE window, restarted on each condition of
+  [docs/averaging.md](docs/averaging.md) §9, including the boundary-open switches.
+  `setAverage` is its single writer.

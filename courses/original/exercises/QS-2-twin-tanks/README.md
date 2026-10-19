@@ -72,7 +72,7 @@ not a circular-pipe friction factor or a grid-converged material property.
 Changing resolution, duct dimensions or drag requires a new calibration.
 The original circular-pipe friction factor 0.007 is not the solver's wall
 roughness. Its separate calculation is retained in
-[the original-problem comparison](../../../../docs/qs2-two-tank.md).
+[the original-problem comparison](two-tank.md).
 
 ### Worked answers at 120 s
 

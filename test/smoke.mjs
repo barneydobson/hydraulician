@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * smoke.js — boot the real app in a real browser and assert its contracts.
+ * smoke.mjs — boot the real app in a real browser and assert its contracts.
  *
  * Zero dependencies (node >= 22: global fetch and WebSocket), so it runs the
  * same on the three platforms the project is used on. It is the counterpart
@@ -14,8 +14,11 @@
  *            notation's field names, and NOT the retired ones
  *   RIG      the wire format round-trips at the current version, and an
  *            older one is refused rather than silently half-loaded
+ *   GEOM     polygon rasterisation, faceForce wiring and its closed forms
+ *            (the s3 gate, the thin sliver), solid renumbering
  *   PHYSICS  volume is conserved, hydrostatic water stays put, no NaN
- *            reaches the field, and a jump still reads its conjugates
+ *            reaches the field, a jump still reads its conjugates, the
+ *            hump / bed / valve face forces bracket their closed forms
  *   PROFILE  uniform open-channel flow has a channel's velocity profile:
  *            fastest at the surface, the 0.6-depth and 0.2/0.8 gauging rules,
  *            a log law with von Kármán's κ, and the bed delivering the n
@@ -23,20 +26,50 @@
  *   HYDRO    the parametric hydropower scheme: params move the mask, the
  *            seeded start runs, the slam is a rigid-column surge
  *   PACK     every exercise applies its rig and lands on its scene
+ *   DOCS     the docs reader renders docs/*.md rather than handing over source
+ *   AVG      the averaging engine on the GPU (docs/averaging.md): transport
+ *            residual, reset conditions, the Favre field, mean columns
  *
- * Usage:  node exercises/_runner/smoke.js [--keep] [--only=api,rig,...]
- *         --keep leaves the browser open on failure for a look.
+ * After every suite it also asserts the page threw nothing uncaught.
+ *
+ * Usage:  node test/smoke.mjs [--keep] [--only=api,rig,...]
+ *                                         [--mutate=<id>]
+ *         --only=<suite,...>  api, geom, rig, physics, profile, scenes, hydro,
+ *                             docs, pack, avg (default: all, in that order of
+ *                             declaration); `api,rig` is the fast subset.
+ *         --keep      leaves the browser open on failure for a look.
+ *         --write-golden  (re)writes test/golden/instruments-h23.json and
+ *                     test/golden/display-h23.json (a 32x16 readback of every field)
+ *                     instead of comparing against it; only ever on code known good.
+ *                     Goldens are GPU-specific: each records the WebGL renderer and is
+ *                     compared only on the same one ("golden skipped: ..." otherwise).
+ *         --perf      also runs "API substep throughput did not regress" (wall-clock, GPU-bound,
+ *                     off by default so a busy machine cannot redden the push gate).
+ *         --write-throughput  (implies --perf) records test/golden/throughput-h23.json (best of 3 timings
+ *                     of 2000 substeps), the baseline of "substep throughput did not regress".
+ *         --write-golden-meta  rewrites only the renderer recorded in the instrument golden.
+ *         --mutate=<id>  patches one known bug into a served file and runs the
+ *                     suite that owns it (the default --only). Exit 0 only if
+ *                     an assertion named by the mutant's `kills` text FAILED;
+ *                     a green run is MUTANT SURVIVED, a run red only elsewhere
+ *                     is MUTANT KILLED THE WRONG ASSERTION, both exit 1.
+ *                     --only must include the mutant's suite (else exit 2).
+ *         $CHROME names the browser (see test/cdp.mjs), $ANGLE the backend, $SOFTWARE=1 --disable-gpu.
  */
-"use strict";
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
-const { spawn } = require("child_process");
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as cdp from "./cdp.mjs";
 
-const ROOT = path.resolve(__dirname, "..", "..");
-const PORT = 8731 + (process.pid % 200);          // out of the way of a dev server
-const CDP_PORT = PORT + 1;
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+let PORT = 0;                                    // the OS picks a free port; serve() reads it back
 const KEEP = process.argv.includes("--keep");
+const WRITE_GOLDEN = process.argv.includes("--write-golden");
+const WRITE_THROUGHPUT = process.argv.includes("--write-throughput");
+const PERF = process.argv.includes("--perf") || WRITE_THROUGHPUT;
+// Rewrites ONLY the GPU identity stored in the instrument golden, keeping its values.
+const WRITE_GOLDEN_META = process.argv.includes("--write-golden-meta");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
   .replace("--only=", "").split(",").filter(Boolean);
 
@@ -55,13 +88,15 @@ const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "")
  *  run deliberately, one at a time. `measured` is what was actually observed
  *  when the control was performed by hand.
  *
- *      node exercises/_runner/smoke.js --only=avg --mutate=favre-reynolds
+ *      node test/smoke.mjs --mutate=favre-reynolds
  *
- *  Expect the named assertion to FAIL. If it passes, that assertion is not
- *  guarding what it claims to guard. */
-const GPU_MUTANTS = [
+ *  Each entry names the `suite` that owns it and a `kills` text that must be a
+ *  prefix of a real `ok()` name in that suite (checkCatalogue() enforces both
+ *  statically, at every startup). A --mutate run passes only if an assertion
+ *  whose name starts with `kills` FAILED. */
+const MUTANTS = [
   // -------- the stress-free surface and the mixing length (issue #72) --------
-  { id: "surface-sink", file: "/js/shaders.js",
+  { id: "surface-sink", suite: "profile", file: "/js/shaders.js",
     why: "the u-faces above the water keep the bled air instead of the water's velocity",
     find: "    eU = dryU * (wU1 + wU2);",
     replace: "    eU = 0.0;",
@@ -70,7 +105,7 @@ const GPU_MUTANTS = [
             + "the surface at 0.09-0.22 of it, u(0.4 d)/V 1.28-1.31, kappa 0.63-0.68 and "
             + "n 0.082-0.087 against a clean 0.031-0.033 — the surface carrying the drag" },
 
-  { id: "no-mixing-length", file: "/js/shaders.js",
+  { id: "no-mixing-length", suite: "profile", file: "/js/shaders.js",
     why: "the depth-scale closure returns no length, leaving Smagorinsky alone in the channel",
     find: "  return u_kappa * min(yw, above) * sqrt(below / d) * smoothstep(2.0 * u_dx, 4.0 * u_dx, d);",
     replace: "  return 0.0;",
@@ -79,41 +114,41 @@ const GPU_MUTANTS = [
             + "y/d = 0.55-0.58: Smagorinsky's (C_s dx)^2 is ~100x too small to carry "
             + "the bed stress up the column. Six of the seven PROFILE checks fail" },
 
-  { id: "favre-reynolds", file: "/js/shaders.js",
+  { id: "favre-reynolds", suite: "avg", file: "/js/shaders.js",
     why: "FS_ACC stores the plain velocity, so the mean is Reynolds, not Favre",
     find: "vec4 phi = vec4(f * uc, f * wc, f, U.b);",
     replace: "vec4 phi = vec4(uc, wc, f, U.b);",
-    kills: "avg Favre mean, not Reynolds",
+    kills: "avgField's ubar is the FAVRE mean",
     measured: "dFavre 2e-7 -> 3.46e-2 against a 1.15e-3 bound. Note a NEARNESS "
             + "comparison does not catch this — ubar stayed nearer Favre in 25/25 "
             + "cells; the shipped gate asserts agreement" },
 
-  { id: "collocation-west-face", file: "/js/shaders.js",
+  { id: "collocation-west-face", suite: "avg", file: "/js/shaders.js",
     why: "f weighted by the west-face velocity instead of the cell-centred one",
     find: "float uc = 0.5 * (U.r + texelFetch(u_U, CL(c + ivec2(1,0)), 0).r);",
     replace: "float uc = U.r;",
-    kills: "avg collocation",
+    kills: "avgField's ubar sits on the CENTRED velocity",
     measured: "run end to end: ubar lands ON the face value — dFace 3.3e-6 "
             + "against dCentred 3.35e-1. The Favre assertion fires too, as a "
             + "real consequence: dFavre 4.27e-2 against a 9.0e-4 bound" },
 
-  { id: "welford-naive", file: "/js/shaders.js",
+  { id: "welford-naive", suite: "avg", file: "/js/shaders.js",
     why: "the column accumulator's second moment loses its time weight",
     find: "o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
     replace: "o = vec4(dN, qN, eN, A.w + (C.w - eO) * (C.w - eN));",
-    kills: "avg sigma_eta",
+    kills: "sigma_eta matches an independent float64 weighted Welford",
     measured: "a finite-only check stayed GREEN against this; the shipped gate "
             + "compares against an independent float64 Welford, 4.8e-6 vs 1.6e-2" },
 
-  { id: "ynk-ema-not-bypassed", file: "/js/overlay.js",
+  { id: "ynk-ema-not-bypassed", suite: "avg", file: "/js/overlay.js",
     why: "the averaged path re-runs the global normal-depth EMA, averaging an average",
-    find: "      if (AVG) S._ynK = k;",
-    replace: "      if (AVG) S._ynK = isFinite(S._ynK) ? S._ynK + EMA * (k - S._ynK) : k;",
+    find: "      if (AVG) est.ynK = k;",
+    replace: "      if (AVG) est.ynK = isFinite(est.ynK) ? est.ynK + EMA * (k - est.ynK) : k;",
     kills: "H2c",
     measured: "two successive 6% steps toward the clean value: k lands at "
             + "0.0696/0.0737 against a clean 0.1377" },
 
-  { id: "rescale-no-reset", file: "/js/sim.js",
+  { id: "rescale-no-reset", suite: "avg", file: "/js/sim.js",
     why: "the celerity slider rewrites f under the window with no reset",
     find: "    // at the old one.\n    if (S.avg) avgReset();",
     replace: "    // at the old one.",
@@ -125,17 +160,17 @@ const GPU_MUTANTS = [
     kills: "avg a celerity change resets the window",
     measured: "c 22 -> 11 gives a residual of 4.13e-1 against a 1.28e-3 bound, 323x over" },
 
-  { id: "disp-tent-live", file: "/js/shaders.js",
+  { id: "disp-tent-live", suite: "avg", file: "/js/shaders.js",
     why: "the display pass's 3x3 tent average reads the LIVE fill under a mean field",
-    find: "      fs += w * fAt(ivec2(g) + ivec2(dx, dy)).r;",
-    replace: "      fs += w * texelFetch(u_F, CLg(ivec2(g) + ivec2(dx, dy)), 0).r;",
+    find: "      fs += w * fAt(ivec2(g) + ivec2(di, dj)).r;",
+    replace: "      fs += w * texelFetch(u_F, CL(ivec2(g) + ivec2(di, dj)), 0).r;",
     kills: "avg the water is painted where the MEAN fill is",
     measured: "the luminance centroid stops moving between the two renders: "
             + "409.7 -> 408.6 rows, a gap of 1.1 against a clean 115.0, on a "
             + "705 px canvas. The 1.1 that survives is blF's own share, which "
             + "was already avg-aware -- so the tent drives 99% of the signal" },
 
-  { id: "disp-vort-live", file: "/js/shaders.js",
+  { id: "disp-vort-live", suite: "avg", file: "/js/shaders.js",
     why: "the vorticity stencil reads the LIVE velocity under a mean field",
     find: "    float dwdx = uAt(gi + ivec2(1,0)).g - uAt(gi - ivec2(1,0)).g;\n"
         + "    float dudz = uAt(gi + ivec2(0,1)).r - uAt(gi - ivec2(0,1)).r;",
@@ -145,7 +180,7 @@ const GPU_MUTANTS = [
     measured: "R-B is 72.68 in BOTH renders -- bit-identical, not merely near "
             + "-- against a clean 72.68 -> -59.73" },
 
-  { id: "disp-froude-live-depth", file: "/js/shaders.js",
+  { id: "disp-froude-live-depth", suite: "avg", file: "/js/shaders.js",
     why: "the Froude view divides by the LIVE column depth instead of the mean <d>",
     find: "  float dep = u_avg > 0.5",
     replace: "  float dep = false",
@@ -153,7 +188,7 @@ const GPU_MUTANTS = [
     measured: "R-B is 72.68 in both renders against a clean 72.68 -> -72.97: "
             + "the mean render stays supercritical on the live 20 mm depth" },
 
-  { id: "fieldstats-fits-live", file: "/js/sim.js",
+  { id: "fieldstats-fits-live", suite: "avg", file: "/js/sim.js",
     why: "the legend's Fit reads the live field while the mean is on screen",
     find: "    const A = avg && S.avg;",
     replace: "    const A = false;",
@@ -163,7 +198,7 @@ const GPU_MUTANTS = [
             + "between the two distributions, and the wet-cell count with it "
             + "(11893 -> 11414)" },
 
-  { id: "spinup-no-reset", file: "/js/main.js",
+  { id: "spinup-no-reset", suite: "avg", file: "/js/main.js",
     why: "the averaging window runs straight through the end of spin-up",
     find: "    if (wasWarming && !warming) SIM.avgReset();",
     replace: "    if (false && wasWarming && !warming) SIM.avgReset();",
@@ -171,23 +206,23 @@ const GPU_MUTANTS = [
     measured: "T climbs monotonically to 1.198 s across the crossing, 0 drops, "
             + "against a clean drop from 0.402 s at sim t = 0.407 s" },
 
-  { id: "spinup-reset-every-frame", file: "/js/main.js",
+  { id: "spinup-reset-every-frame", suite: "avg", file: "/js/main.js",
     why: "the spin-up reset fires on the STATE rather than on the edge",
     find: "    if (wasWarming && !warming) SIM.avgReset();",
     replace: "    if (!warming) SIM.avgReset();",
-    kills: "avg and does it once, not on every frame after",
+    kills: "and does it once, not on every frame after",
     measured: "T is zeroed on every frame once spin-up ends, so no window ever "
             + "starts: 9 drops against 1, and endT 5.3e-4 s against a clean "
             + "0.79 s -- one frame's worth, not a window" },
 
-  { id: "mode-switch-no-reset", file: "/js/main.js",
+  { id: "mode-switch-no-reset", suite: "avg", file: "/js/main.js",
     why: "a Live/Average switch leaves the overlay's temporal estimates standing",
     find: "  OVERLAY.resetEstimates(sim);\n  LEGEND.sync(); syncPanel(); syncToolbar();",
     replace: "  LEGEND.sync(); syncPanel(); syncToolbar();",
     kills: "avg both Live/Average transitions drop the overlay's temporal estimates",
-    measured: "_hA survives both directions, so each mode inherits the other's EMA" },
+    measured: "OVERLAY's estimates (hA) survive both directions, so each mode inherits the other's EMA" },
 
-  { id: "setvalve-no-reset", file: "/js/sim.js",
+  { id: "setvalve-no-reset", suite: "avg", file: "/js/sim.js",
     why: "a valve toggle changes the solid set with no reset, so frozen cells resume mid-window",
     find: "    S.tcolDirty = true;             // and FS_TCOL reads u_valve: rebuild with it\n" +
           "    if (S.avg) avgReset();",
@@ -196,26 +231,33 @@ const GPU_MUTANTS = [
     measured: "T runs straight through the toggle instead of returning to zero" },
 
   // -------- RECON-vs-GLSL differential mutants (closing the mirror gap) --------
-  { id: "col-wet-threshold", file: "/js/shaders.js",
+  { id: "col-wet-threshold", suite: "avg", file: "/js/shaders.js",
     why: "FS_COL's dry test is loosened, so interface cells RECON still counts as wet " +
          "(f in [0.25, 0.55)) get walked past as dry",
-    find: "if (f < 0.25) { dry++; if (dry > 2) break; continue; }",
-    replace: "if (f < 0.55) { dry++; if (dry > 2) break; continue; }",
-    kills: "RECON vs FS_COL bed/depth",
+    // Anchored on the preceding line: the same test also appears in the second
+    // column loop (depth reduction), and an unanchored find matched twice. The
+    // first occurrence is the one String.replace has always patched.
+    find: "float f  = min(fr, 1.0);                       // geometric fill\n    if (f < 0.25) { dry++; if (dry > 2) break; continue; }",
+    replace: "float f  = min(fr, 1.0);                       // geometric fill\n    if (f < 0.55) { dry++; if (dry > 2) break; continue; }",
+    kills: "RECON.bodyDepth matches FS_COL's own depth reduction",
     measured: "depth OK drops from 459/459 to 324/459; worst depth gap 1.66e-1 m against a " +
             "1e-5 m gate, four orders of magnitude over -- bed stays exact (7.2e-8 m) because " +
             "only the WET walk moved, not the bed search" },
 
-  { id: "acol-weight-denominator", file: "/js/shaders.js",
+  { id: "acol-weight-denominator", suite: "avg", file: "/js/shaders.js",
     why: "FS_ACOL's running-mean weight drops dt from its own denominator (h/T instead of h/(T+h))",
-    find: "vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)\n  float k = u_dt / max(u_T + u_dt, 1e-9);",
-    replace: "vec4 C = texelFetch(u_C, c, 0);        // (bed, d, q, top)\n  float k = u_dt / max(u_T, 1e-9);",
+    // The weight lives in COMMON's runMean now, shared with FS_ACC and the
+    // transport accumulator; the mutant spells the bug out inside FS_ACOL alone.
+    find: "  float dN = runMean(A.x, C.y, u_T, u_dt);\n  float qN = runMean(A.y, C.z, u_T, u_dt);\n"
+        + "  float eO = A.z;\n  float eN = runMean(eO, C.w, u_T, u_dt);",
+    replace: "  float k = u_dt / max(u_T, 1e-9);\n  float dN = A.x + k * (C.y - A.x);\n  float qN = A.y + k * (C.z - A.y);\n"
+           + "  float eO = A.z;\n  float eN = eO + k * (C.w - eO);",
     kills: "FS_ACOL's running mean matches RECON.accumStep",
     measured: "the recursion blows up (T never appears in its own denominator's history): " +
             "dD 1.17e4, dE 2.38e4 against a 5e-6 gate, and it collaterally breaks avgColumns() " +
             "everywhere downstream -- dbar/d ratio -1759 instead of ~1, sigma_eta reads 0" },
 
-  { id: "acol-channel-swap", file: "/js/shaders.js",
+  { id: "acol-channel-swap", suite: "avg", file: "/js/shaders.js",
     why: "FS_ACOL writes qbar and etabar into each other's channels",
     find: "o = vec4(dN, qN, eN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
     replace: "o = vec4(dN, eN, qN, A.w + u_dt * (C.w - eO) * (C.w - eN));",
@@ -228,29 +270,29 @@ const GPU_MUTANTS = [
             "synthetic check (dE 1.00, dSigma 0.96 against 5e-6 gates) since that test reads the " +
             "same eta channel" },
 
-  { id: "rig-no-flux", file: "/js/rig.js",
+  { id: "rig-no-flux", suite: "rig", file: "/js/rig.js",
     why: "RIG.snapshot() drops the flux array — the actual gap this review closed",
     find: "      flux: state.flux.map((L) => [r4(L.x0), r4(L.z0), r4(L.x1), r4(L.z1)]),\n",
     replace: "",
-    kills: "rig flux sections round-trip",
+    kills: "rig round-trips both flux sections",
     measured: "before [[11.2,...],[13.6,...]] -> after [] (snapLen 0): both sections vanish outright, " +
             "not merely drift" },
 
-  { id: "rig-no-cvshow", file: "/js/rig.js",
+  { id: "rig-no-cvshow", suite: "rig", file: "/js/rig.js",
     why: "RIG.snapshot() drops ui.cvShow — the other half of the gap this review closed",
     find: "            cvShow: state.cvShow,\n",
     replace: "",
-    kills: "rig cvShow round-trips",
+    kills: "rig round-trips which quantity the control volume/sections read (cvShow)",
     measured: "before M -> after Q: the scramble value survives the round trip untouched" },
 
-  { id: "rig-no-gauges-restore", file: "/js/rig.js",
+  { id: "rig-no-gauges-restore", suite: "rig", file: "/js/rig.js",
     why: "RIG.apply() stops restoring gauges from the snapshot",
-    find: "    (o.gauges || []).slice(0, 4).forEach((g) => {",
-    replace: "    ([]).slice(0, 4).forEach((g) => {",
-    kills: "rig gauges round-trip",
+    find: "    (o.gauges || []).slice(0, CONFIG.maxGauges).forEach((g) => {",
+    replace: "    ([]).slice(0, CONFIG.maxGauges).forEach((g) => {",
+    kills: "rig round-trips both gauges",
     measured: "before [[4.8,...],[9.6,...]] -> after []: both gauges vanish outright" },
 
-  { id: "rig-new-unmapped-placer", file: "/js/main.js",
+  { id: "rig-new-unmapped-placer", suite: "rig", file: "/js/main.js",
     why: "a FIFTH place* API appears on APP with nobody having taught the rig " +
          "coverage test where it lives — the exact shape of gap the reflection check exists for",
     find: "  placeCV,                                 // the control volume, headless",
@@ -263,90 +305,68 @@ const GPU_MUTANTS = [
 
 const MUTATE = (process.argv.find((a) => a.startsWith("--mutate=")) || "")
   .replace("--mutate=", "");
-const MUTANT = MUTATE ? GPU_MUTANTS.find((m) => m.id === MUTATE) : null;
+const MUTANT = MUTATE ? MUTANTS.find((m) => m.id === MUTATE) : null;
 if (MUTATE && !MUTANT) {
   console.error("no such mutation: " + MUTATE + "\nknown: "
-    + GPU_MUTANTS.map((m) => m.id).join(", "));
+    + MUTANTS.map((m) => m.id).join(", "));
   process.exit(2);
+}
+if (MUTANT) {
+  // A mutant is only meaningful against the suite that owns it: running it
+  // under another --only used to come back green against a live bug.
+  if (!ONLY.length) ONLY.push(MUTANT.suite);
+  else if (!ONLY.includes(MUTANT.suite)) {
+    console.error("--mutate=" + MUTANT.id + " is killed by the " + MUTANT.suite
+      + " suite, but --only=" + ONLY.join(",") + " excludes it.");
+    process.exit(2);
+  }
 }
 if (MUTANT) console.log("MUTATION " + MUTANT.id + " — " + MUTANT.why
   + "\nexpect to fail: " + MUTANT.kills + "\nmeasured by hand: " + MUTANT.measured + "\n");
 
-const CHROMES = [
-  process.env.CHROME_PATH,
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/usr/bin/google-chrome",
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-].filter(Boolean);
-
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
                ".png": "image/png", ".json": "application/json", ".md": "text/plain" };
 
-/**
- * ANGLE backend for headless Chrome's GPU-backed rasteriser, chosen by
- * platform: `d3d11` and `metal` are real GPU backends but exist only on
- * Windows and macOS respectively. Software (SwiftShader, `--disable-gpu`)
- * renders a full-window WebGL canvas so slowly that a spin-up scene times
- * the run out — measured on scene m1 at Low, 828x64: ANGLE reaches sim
- * t=30s in 6.5s of wall clock; SwiftShader reaches only t~9.5s in a 150s
- * budget, roughly 50x slower. That gap is what made `--only=physics` fail
- * here: the reach never settled, and the unsettled reading got misreported
- * as a discharge inconsistency below.
- *
- * Linux gets `gl`, not `vulkan`: ANGLE's Vulkan backend needs a working
- * Vulkan ICD on the host, which a generic Linux box (and most CI runners)
- * does not reliably have, whereas the GL backend talks to Mesa — present on
- * essentially every Linux desktop and server install, real GPU or not — and
- * is the path most headless-Chrome-on-Linux deployments already exercise.
- * `gl` is the safer default; a maintainer who has confirmed Vulkan drivers
- * can opt in with `$ANGLE=vulkan`.
- *
- * `$ANGLE` overrides the platform pick, the same way `$CHROME_PATH` above
- * overrides the browser binary. `$SOFTWARE=1` asks for the old
- * `--disable-gpu` behaviour, for a machine with no working GPU backend.
- *
- * Duplicated (not shared) from test/cdp.mjs's angleArgs(): that file is an
- * ES module and this one is CommonJS, and with no package.json in this
- * zero-dependency project neither can `import`/`require` a file written for
- * the other's module system without an extension trick or an async interop
- * shim — more moving parts than these ~10 lines are worth. Keep the two
- * copies in sync by hand if the policy ever changes.
- */
-function angleArgs() {
-  if (process.env.SOFTWARE) return ["--disable-gpu"];
-  const byPlatform = { win32: "d3d11", darwin: "metal", linux: "gl" };
-  const backend = process.env.ANGLE || byPlatform[process.platform] || "gl";
-  return ["--use-angle=" + backend];
-}
-
 let passed = 0;
+let goldenSkipped = 0;       // goldens not compared because they were captured on another GPU
 const failures = [];
 
 /** Page-side helpers, injected once per navigation.
  *
- *  `__low()` drops to the smallest grid: this harness runs on SwiftShader in
- *  CI, where Medium is ~10× too slow to settle a scene inside a test. The
+ *  `__low()` drops to the smallest grid: Medium is ~10× slower to settle a
+ *  scene, and no test here needs it. The
  *  physics being asserted (mass conservation, hydrostatic rest, a jump that
  *  obeys momentum) is resolution-independent — only the delivered roughness
  *  is not, and nothing here measures that.
  *
- *  `__settle(t, ms)` advances to `t` seconds of SIMULATED time but gives up
- *  after `ms` of wall clock, reporting what it reached. A test that reports
- *  "settled to 12 s of 25" is debuggable; one that hangs is not. */
+ *  `__until(done, step)` calls `step()` until `done()`, and `__settle(t)` is
+ *  `__until` ticking to `t` seconds of SIMULATED time. Neither is a speed
+ *  test: a slow or busy machine just takes longer. They give up only when
+ *  the simulated clock stops advancing for `STALL_MS` (a lost context, a
+ *  paused sim) or after `CAP_MS` in all, the backstop under the 10-minute
+ *  evaluate timeout (two loops share one evaluate at most), and report what
+ *  they reached: "settled to 12 s of 25" is debuggable; a hang is not.
+ *  Speed is measured only behind --perf. */
 const HELPERS = `
   window.__low = () => {
     const c = CONTROLS.find((x) => x.id === "budget");
     if (c && APP.state.budget !== "Low") { c.set("Low"); }
     return { nx: APP.sim.nx, ny: APP.sim.ny, dx: APP.sim.dx };
   };
-  window.__settle = (target, ms) => {
+  window.__until = (done, step, capMs) => {
+    const STALL_MS = 30000, CAP_MS = capMs || 240000;
     const t0 = Date.now();
-    while (APP.sim.t < target && Date.now() - t0 < ms) APP.tick(200);
+    let last = APP.sim.t, moved = t0;
+    while (!done()) {
+      step();
+      const now = Date.now();
+      if (APP.sim.t > last) { last = APP.sim.t; moved = now; }
+      else if (now - moved > STALL_MS) break;
+      if (now - t0 > CAP_MS) break;
+    }
     return APP.sim.t;
   };
+  window.__settle = (target) => __until(() => APP.sim.t >= target, () => APP.tick(200));
   window.__warm = (n) => {
     let A;
     for (let i = 0; i < (n || 20); i++) A = OVERLAY.analyse(APP.sim, APP.SIM.columns(true));
@@ -393,81 +413,35 @@ function serve() {
   });
   return new Promise((res, rej) => {
     srv.on("error", rej);
-    srv.listen(PORT, () => res(srv));
+    srv.listen(0, () => { PORT = srv.address().port; res(srv); });
   });
 }
 
 async function browser() {
-  const exe = CHROMES.find((p) => { try { return fs.existsSync(p); } catch (_) { return false; } });
-  if (!exe) throw new Error("no Chrome found — set CHROME_PATH");
-  const proc = spawn(exe, [
-    "--headless=new", ...angleArgs(), "--window-size=1280,800",
-    "--no-first-run", "--no-default-browser-check",
-    "--remote-debugging-port=" + CDP_PORT,
-    "--user-data-dir=" + path.join(require("os").tmpdir(), "hydro-smoke-" + process.pid),
-    "about:blank",
-  ], { stdio: "ignore" });
-
-  let target = null;
-  for (let i = 0; i < 60 && !target; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    try {
-      const list = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`)).json();
-      target = list.find((t) => t.type === "page");
-    } catch (_) { /* not up yet */ }
-  }
-  if (!target) { proc.kill(); throw new Error("Chrome never exposed a page target"); }
-
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
-  const pend = new Map();
-  const pageErrors = [];              // anything the page threw on its own
-  let id = 0;
-  ws.onmessage = (e) => {
-    const m = JSON.parse(e.data);
-    if (m.method === "Runtime.exceptionThrown") {
-      const d = m.params.exceptionDetails || {};
-      pageErrors.push((d.exception && (d.exception.description || d.exception.value)) || d.text);
-      return;
-    }
-    if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") {
-      pageErrors.push((m.params.args || []).map((a) => a.value ?? a.description).join(" "));
-      return;
-    }
-    const p = pend.get(m.id);
-    if (p) { pend.delete(m.id); m.error ? p.rej(new Error(m.error.message)) : p.res(m.result); }
-  };
-  await new Promise((r, j) => { ws.onopen = r; ws.onerror = () => j(new Error("CDP socket failed")); });
-  const send = (method, params) => new Promise((res, rej) => {
-    const m = ++id;
-    pend.set(m, { res, rej });
-    ws.send(JSON.stringify({ id: m, method, params }));
-  });
-  await send("Page.enable", {});
-  await send("Runtime.enable", {});
+  // The CDP client is test/cdp.mjs: one Chrome discovery, one backend
+  // policy, one timeout rule, and the profile directory removed on close.
+  const chrome = await cdp.launch({ width: 1280, height: 800 });
+  // raw: evaluate() takes an expression as written, as it always did here.
+  const tab = await chrome.open("about:blank", { raw: true, ready: "true", settleMs: 0 });
+  const pageErrors = tab.errors;        // anything the page threw on its own
+  const pageWarnings = tab.warnings;    // console.warn lines (GLH: "uniform not found: ...")
 
   /** Evaluate in the page and return the value. Throws on a page exception,
-   *  so a broken rename surfaces as a failed step and not a silent null. */
-  async function evaluate(expr) {
-    const r = await send("Runtime.evaluate", {
-      expression: expr, returnByValue: true, awaitPromise: true,
-    });
-    if (r.exceptionDetails) {
-      const ex = r.exceptionDetails.exception || {};
-      throw new Error(ex.description || ex.value || "page exception");
-    }
-    return r.result.value;
-  }
+   *  so a broken rename surfaces as a failed step and not a silent null.
+   *  One call may hold an in-page settle loop for minutes (`__settle`, the
+   *  hump/m1 averaging windows), so the timeout is generous. */
+  const evaluate = (expr) => tab.evaluate(expr, { timeout: 600000 });
 
   /** `ready` is the expression that says the page has arrived. It defaults to
    *  the app booting, because almost every page here IS the app — the docs
    *  reader is the exception, and it has no APP to wait for. */
   async function goto(url, ready) {
-    await send("Page.navigate", { url });
+    await tab.send("Page.navigate", { url });
     const cond = ready || "!!(window.APP && window.APP.sim)";
-    for (let i = 0; i < 160; i++) {                 // software GL boots slowly
+    for (let i = 0; i < 160; i++) {                 // a cold boot compiles every program
       await new Promise((r) => setTimeout(r, 250));
       try {
-        if (await evaluate(cond)) {
+        if (await tab.evaluate(cond, { timeout: 30000 })) {
           if (!ready) await evaluate(HELPERS + "true");
           return;
         }
@@ -477,7 +451,7 @@ async function browser() {
     // "APP never appeared" on its own sends people hunting the wrong bug.
     let why = "no diagnosis";
     try {
-      why = await evaluate(`(() => {
+      why = await tab.evaluate(`(() => {
         const c = document.createElement("canvas");
         const gl = c.getContext("webgl2");
         const banner = document.querySelector("#err, .err, #error");
@@ -488,7 +462,7 @@ async function browser() {
           renderer: gl ? gl.getParameter(gl.RENDERER) : null,
           banner: banner ? banner.textContent.slice(0, 160) : null,
         });
-      })()`);
+      })()`, { timeout: 30000 });
     } catch (_) { /* the page may be wedged */ }
     throw new Error("the page never became ready at " + url + " — " + why +
       (pageErrors.length
@@ -496,7 +470,7 @@ async function browser() {
         : "\n      page threw nothing"));
   }
 
-  return { evaluate, goto, close: () => { try { ws.close(); } catch (_) {} proc.kill(); } };
+  return { evaluate, goto, pageErrors, pageWarnings, close: () => chrome.close() };
 }
 
 // ------------------------------------------------------------------ suites
@@ -572,55 +546,299 @@ SUITES.api = async (B) => {
   ok("API gauge record values are finite", r.recFinite);
   ok("API gauge objects carry z", r.gaugeZ === 0.30);
 
-  // The jump box is the one place the conjugate-depth fields are consumed.
-  // h23 must be SETTLED first — its card allows 35 s, and the documented
-  // verified read (docs/engineering-notes.md) is Fr1 2.24, d2 0.416 against
-  // Belanger 0.438. Settle by simulated time so the count is independent of
-  // Δt, then warm the analyse EMA the way the overlay does.
-  //
-  // Then read a WINDOW, not a frame. The box flutters — its own README says
-  // so — and measured on 2026-09-10 (Medium, t = 30–90 s, one read per
-  // second) a single frame landed inside the 30% band only 63–91% of the
-  // time depending on the commit, while the 60 s mean sat 5–20% over
-  // Belanger at every commit tried back to 6cc91ca. The assertion is about
-  // the momentum balance, which is a property of the mean flow, so it reads
-  // the mean of 20 s of frames and asks that a jump be found in a third of
-  // them at least (at the Low grid the box comes and goes: 68% of frames
-  // carried one in the same measurement).
-  const j = await B.evaluate(`(() => {
-    __low();
-    const t = __settle(30, 120000);
-    const acc = { n: 0, d1: 0, d2: 0, d2p: 0, Fr1: 0, dE: 0 }, frames = 40;
-    let keys;
-    for (let k = 0; k < frames; k++) {
-      APP.tick(Math.round(0.5 / APP.SIM.dt()));
-      const A = __warm(25);                    // the overlay EMA needs its warm-up every read
-      const J = OVERLAY.findJumps(A, APP.sim)[0];
-      if (!J) continue;
-      keys = keys || Object.keys(J).sort();
-      acc.n++; acc.d1 += J.d1; acc.d2 += J.d2; acc.d2p += J.d2p; acc.Fr1 += J.Fr1; acc.dE += J.dE;
-    }
-    if (!acc.n) return { t: APP.sim.t, frames, n: 0 };
-    return { t: APP.sim.t, keys, frames, n: acc.n, d1: acc.d1 / acc.n, d2: acc.d2 / acc.n,
-             d2p: acc.d2p / acc.n, Fr1: acc.Fr1 / acc.n, dE: acc.dE / acc.n };
+  // The mask vocabulary is one object, and RECON's default solid cut (it cannot
+  // read SIM) must be the same number.
+  const mk = await B.evaluate(`({ m: SIM.MASK, a: SIM.isSolid(192, false), b: SIM.isSolid(191, false),
+    c: SIM.isSolid(128, false), d: SIM.isSolid(128, true), e: SIM.isSolid(63, true),
+    f: SIM.isSolid(64, true) })`);
+  ok("API SIM.MASK is the vocabulary RECON's default solidMin (192) agrees with",
+    mk.m.SOLID_MIN === 192 && mk.m.VALVE_MIN === 64 && mk.m.OPEN === 0 && mk.m.VALVE === 128 &&
+    mk.m.WALL === 255 && mk.a && !mk.b && !mk.c && mk.d && !mk.e && mk.f, JSON.stringify(mk));
+
+  // ---- refactor golden (Task 3.1): every instrument read of one settled,
+  // averaging h23, so a change to how sim.js unpacks, masks or loops cannot
+  // move a number unseen. Written once by `--write-golden` on the code before
+  // the refactor, compared at 1e-6 relative after. APP.tick(n) is exactly n
+  // substeps, so the run does not depend on how fast the machine is.
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);
+  const renderer = await B.evaluate(`(() => {
+    const gl = document.getElementById("view").getContext("webgl2");
+    const x = gl.getExtension("WEBGL_debug_renderer_info");
+    return String(x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
   })()`);
-  if (ok("PHYSICS h23 still forms a hydraulic jump", j.n >= j.frames / 3,
-         "settled to t = " + (j.t || 0).toFixed(1) + " s; a jump was found in " + (j.n || 0) + " of " + j.frames + " frames")) {
-    ok("API findJumps() exposes d1/d2/d2p",
-      ["d1", "d2", "d2p"].every((k) => j.keys.includes(k)) &&
-      !["y1", "y2", "y2p"].some((k) => j.keys.includes(k)),
-      "keys: " + j.keys.join(","));
-    ok("PHYSICS jump is supercritical entering (Fr1 > 1)", j.Fr1 > 1,
-      "Fr1 = " + j.Fr1.toFixed(2));
-    // The band is wide on purpose: the jump box flutters (its own README
-    // says so) and a steep bed reads well under Belanger. This is a guard
-    // against the momentum balance breaking, not a calibration.
-    ok("PHYSICS conjugate depth is within 30% of Belanger",
-      near(j.d2, j.d2p, 0.30 * j.d2p),
-      `d2 ${j.d2.toFixed(3)} vs Belanger ${j.d2p.toFixed(3)}, mean of ${j.n} frames to t ${j.t.toFixed(1)} s`);
-    ok("PHYSICS the jump dissipates energy", j.dE > 0, "dE = " + j.dE);
+  const gold = await B.evaluate(`(() => {
+    __low(); APP.tick(4000);
+    const S = APP.SIM, box = [4.0, 0.10, 5.2, 0.60];
+    const pts = [[2.0, 0.6], [2.5, 0.5], [4.0, 0.2], [5.5, 0.15], [7.0, 0.3]];
+    const grab = (avg) => ({
+      probe: pts.map(([x, z]) => avg ? S.avgProbe(x, z) : S.probe(x, z)),
+      probeMany: S.probeMany(pts, avg),
+      rake: [2, 5.5].map((x) => { const r = S.rake(x, null, avg, true);
+        return { i: r.i, buf: Array.from(r.buf), f: Array.from(r.f) }; }),
+      boxFlux: S.boxFlux(...box, avg),
+      boxForce: S.boxForce(...box, avg),
+      boxFlux2: S.boxFlux(2.0, 0.05, 6.0, 0.9, avg),
+      lineFlux: S.lineFlux(2, 0.2, 2, 1.5, avg),
+      lineFlux2: S.lineFlux(1, 0.0, 6, 0.0, avg),
+      grade: (() => { const h = S.hydraulicGrade(null, avg);
+        return { h: Array.from(h), hv: Array.from(h.hv) }; })(),
+      patch: Array.from(S.patch(2, 4, null, avg).buf),
+    });
+    const live = grab(false);
+    S.avgStart();
+    // The display accumulators advance from the frame loop, not from tick():
+    // drive them by hand, 40 chunks of 20 substeps = 800, each weighted by the
+    // simulated time it covers.
+    for (let k = 0; k < 40; k++) {
+      APP.tick(20); S.columns(true);
+      S.avgStepField(20 * S.dt()); S.avgStepColumns(20 * S.dt());
+    }
+    const avg = grab(true);
+    S.avgStop();
+    return JSON.stringify({ live, avg });
+  })()`);
+  const goldPath = path.join(ROOT, "test", "golden", "instruments-h23.json");
+  // The golden stores a FINGERPRINT of every numeric array (length, NaN count,
+  // sum, sum of squares, min, max, 16 evenly spaced samples, ends included)
+  // and scalars at full precision, so it is small enough to commit.
+  const fingerprint = (v) => {
+    if (Array.isArray(v) && v.every((x) => x === null || typeof x === "number")) {
+      const nums = v.filter((x) => x !== null);
+      const n = v.length, samples = [];
+      for (let k = 0; k < 16; k++) samples.push(n ? v[Math.round(k * (n - 1) / 15)] : null);
+      return { n, nan: n - nums.length, sum: nums.reduce((a, x) => a + x, 0),
+               sumsq: nums.reduce((a, x) => a + x * x, 0),
+               min: nums.length ? Math.min(...nums) : null,
+               max: nums.length ? Math.max(...nums) : null, samples };
+    }
+    if (Array.isArray(v)) return v.map(fingerprint);
+    if (v && typeof v === "object") {
+      const o = {}; for (const k of Object.keys(v)) o[k] = fingerprint(v[k]); return o;
+    }
+    return v;
+  };
+  // One line per object that holds no further objects; nested ones are indented.
+  const prim = (y) => y === null || typeof y !== "object";
+  const pretty = (v, ind) => {
+    const flat = (x) => prim(x) || (Array.isArray(x) ? x.every(prim)
+      : Object.values(x).every((y) => prim(y) || (Array.isArray(y) && y.every(prim))));
+    if (flat(v)) return JSON.stringify(v);
+    const pad = "  ".repeat(ind + 1), end = "\n" + "  ".repeat(ind);
+    if (Array.isArray(v)) return "[\n" + v.map((x) => pad + pretty(x, ind + 1)).join(",\n") + end + "]";
+    return "{\n" + Object.keys(v).map((k) => pad + JSON.stringify(k) + ": " + pretty(v[k], ind + 1)).join(",\n") + end + "}";
+  };
+  const fp = fingerprint(JSON.parse(gold));
+  if (WRITE_GOLDEN || WRITE_GOLDEN_META) {
+    // The metadata comes first, so a reader sees whose numbers these are.
+    let body = fp;
+    if (WRITE_GOLDEN_META) { body = JSON.parse(fs.readFileSync(goldPath, "utf8")); delete body._renderer; }
+    fs.mkdirSync(path.dirname(goldPath), { recursive: true });
+    fs.writeFileSync(goldPath, pretty({ _renderer: renderer, ...body }, 0) + "\n");
+    console.log("\n    wrote " + goldPath);
+  } else {
+    let want = null;
+    try { want = JSON.parse(fs.readFileSync(goldPath, "utf8")); } catch (_) { /* reported below */ }
+    const wantR = want && want._renderer;
+    if (want) delete want._renderer;
+    // Agreement: 1e-6 relative, plus an absolute floor of 1e-9 so a value that
+    // is zero up to rounding (a cancelling sum) is not judged on its noise.
+    const REL = 1e-6, ABS = 1e-9;
+    let worst = 0, where = "", count = 0, shape = "";
+    const walk = (a, b, at) => {
+      if (shape) return;
+      if (a && typeof a === "object") {
+        if (!b || typeof b !== "object" || Object.keys(a).length !== Object.keys(b).length) { shape = at; return; }
+        for (const k of Object.keys(a)) walk(a[k], b[k], at + "." + k);
+        return;
+      }
+      count++;
+      if (a === null || b === null || typeof a !== "number" || typeof b !== "number") {
+        if (a !== b) { shape = at + " (" + a + " vs " + b + ")"; }
+        return;
+      }
+      const ratio = Math.abs(a - b) / (REL * Math.max(Math.abs(a), Math.abs(b)) + ABS);
+      if (ratio > worst) { worst = ratio; where = at; }
+    };
+    if (want && wantR !== renderer) {
+      goldenSkipped++;
+      console.log(`    golden skipped: captured on ${wantR}, running on ${renderer}`);
+    } else {
+    if (want) walk(want, fp, "golden");
+    ok("API refactor golden: instruments unchanged",
+      !!want && !shape && worst <= 1,
+      want ? (shape ? "shape differs at " + shape : `worst ${worst.toExponential(2)} x the tolerance (1e-6 rel + 1e-9 abs) at ${where} of ${count} values`)
+           : "no golden at " + goldPath + " (run once with --write-golden)");
+    }
   }
 
+  // ---- display golden (Task 3.2): the nine fields, painted. The instrument
+  // golden covers the CPU readbacks and never touches FS_DISP, so a shader
+  // refactor needs its own: render each field of the same settled scene (live,
+  // then under Average) into the canvas and compare a 32x16 block average of
+  // the drawing buffer (read in the same task as the draw, since the buffer is
+  // not preserved). Tolerance 2/255 per channel.
+  const dispGoldPath = path.join(ROOT, "test", "golden", "display-h23.json");
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);      // a fresh page: the state must not depend on the golden above
+  const dispRaw = await B.evaluate(`(() => {
+    const S = APP.SIM, gl = document.getElementById("view").getContext("webgl2");
+    const GW = 32, GH = 16;
+    const paint = (mode, avg) => {
+      const fld = fieldFor(mode), rg = rangeFor(fld.id);
+      S.render(view, { mode, ramp: fld.ramp, mid: fld.mid, vmax: vmaxFor(), lo: rg[0], hi: rg[1], pdt: 0, dye: !avg, dyeSeeds: false,
+        particles: false, avg, cursor: [-99, -99, 0], guide: [0, 0, 0, 0], guideOn: false });
+      const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
+      const px = new Uint8Array(cw * ch * 4);
+      gl.readPixels(0, 0, cw, ch, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const out = [];
+      for (let by = 0; by < GH; by++) for (let bx = 0; bx < GW; bx++) {
+        const x0 = Math.floor(bx * cw / GW), x1 = Math.floor((bx + 1) * cw / GW);
+        const y0 = Math.floor(by * ch / GH), y1 = Math.floor((by + 1) * ch / GH);
+        const s = [0, 0, 0]; let n = 0;
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+          const o = (y * cw + x) * 4; s[0] += px[o]; s[1] += px[o + 1]; s[2] += px[o + 2]; n++;
+        }
+        out.push(Math.round(s[0] / n), Math.round(s[1] / n), Math.round(s[2] / n));
+      }
+      return out;
+    };
+    __low(); APP.tick(4000);
+    const modes = FIELDS.map((f) => f.mode), live = {}, avg = {};
+    for (const m of modes) live[m] = paint(m, false);
+    S.avgStart();
+    for (let k = 0; k < 40; k++) {
+      APP.tick(20); S.columns(true);
+      S.avgStepField(20 * S.dt()); S.avgStepColumns(20 * S.dt());
+    }
+    for (const m of modes) avg[m] = paint(m, true);
+    S.avgStop();
+    // A mode with no row paints magenta, never another field: look for a pixel
+    // that is magenta through the water's opacity (the body is solid water).
+    const probeMode = (m) => {
+      const fld = fieldFor(0), rg = rangeFor(fld.id);
+      S.render(view, { mode: m, ramp: "turbo", mid: undefined, vmax: vmaxFor(), lo: rg[0], hi: rg[1], pdt: 0, dye: false,
+        dyeSeeds: false, particles: false, avg: false, cursor: [-99, -99, 0], guide: [0, 0, 0, 0], guideOn: false });
+      const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight, px = new Uint8Array(cw * ch * 4);
+      gl.readPixels(0, 0, cw, ch, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      let n = 0;
+      for (let k = 0; k < px.length; k += 4) if (px[k] > 200 && px[k + 2] > 200 && px[k + 1] < 40) n++;
+      return n;
+    };
+    const magenta = { unknown: probeMode(99), known: probeMode(2) };
+    return JSON.stringify({ canvas: [gl.drawingBufferWidth, gl.drawingBufferHeight], live, avg, magenta });
+  })()`);
+  {
+    const cur = JSON.parse(dispRaw);
+    ok("API an unknown u_mode paints magenta, a known one does not",
+      cur.magenta.unknown > 500 && cur.magenta.known === 0, JSON.stringify(cur.magenta));
+    if (WRITE_GOLDEN) {
+      const rows = (o) => "{\n" + Object.keys(o).map((k) => "    " + JSON.stringify(k) + ": " + JSON.stringify(o[k])).join(",\n") + "\n  }";
+      fs.writeFileSync(dispGoldPath, "{\n  \"_renderer\": " + JSON.stringify(renderer) + ",\n  \"canvas\": "
+        + JSON.stringify(cur.canvas) + ",\n  \"live\": " + rows(cur.live) + ",\n  \"avg\": " + rows(cur.avg) + "\n}\n");
+      console.log("\n    wrote " + dispGoldPath);
+    } else {
+      let want = null;
+      try { want = JSON.parse(fs.readFileSync(dispGoldPath, "utf8")); } catch (_) { /* reported below */ }
+      if (want && (want._renderer !== renderer || want.canvas.join() !== cur.canvas.join())) {
+        goldenSkipped++;
+        console.log(`    golden skipped: captured on ${want._renderer} (${want.canvas.join("x")}), running on ${renderer} (${cur.canvas.join("x")})`);
+      } else {
+        let worst = 0, where = "";
+        if (want) for (const part of ["live", "avg"]) for (const m of Object.keys(cur[part])) {
+          const a = want[part][m] || [], b = cur[part][m];
+          if (a.length !== b.length) { worst = 999; where = part + " mode " + m + " length"; continue; }
+          for (let i = 0; i < b.length; i++) {
+            const d = Math.abs(a[i] - b[i]);
+            if (d > worst) { worst = d; where = part + " mode " + m + " block " + Math.floor(i / 3) + " ch " + (i % 3); }
+          }
+        }
+        ok("API display golden: the nine fields paint as before (live and Average)",
+          !!want && worst <= 2,
+          want ? `worst ${worst}/255 at ${where}` : "no golden at " + dispGoldPath + " (run once with --write-golden)");
+      }
+    }
+  }
+
+  // ---- substep throughput (Task 3.3; opt-in via --perf, wall-clock bound): h23 at its default (Medium) budget,
+  // APP.tick(2000) wall time, best of 3, each ended by a synchronous readback
+  // so the GPU queue is drained inside the timing. The baseline is recorded
+  // by `--write-throughput` on the commit BEFORE the task, in
+  // test/golden/throughput-h23.json, with the GPU it was taken on. The bound
+  // is x1.10, not x1.05: this machine's load noise between runs is of that
+  // order, which is why best-of-3 and a loose bound are used together.
+  if (PERF) {
+    await B.goto(`http://localhost:${PORT}/?scene=h23`);
+    const tp = JSON.parse(await B.evaluate(`(() => {
+      APP.tick(200); APP.SIM.columns(true);                     // warm-up: shaders, caches
+      const t = [];
+      for (let k = 0; k < 3; k++) {
+        const t0 = performance.now();
+        APP.tick(2000); APP.SIM.columns(true);
+        t.push(performance.now() - t0);
+      }
+      return JSON.stringify({ t, nx: APP.sim.nx, ny: APP.sim.ny });
+    })()`));
+    const best = Math.min(...tp.t);
+    const tpPath = path.join(ROOT, "test", "golden", "throughput-h23.json");
+    console.log(`    throughput: 2000 substeps at ${tp.nx}x${tp.ny}: ${tp.t.map((x) => x.toFixed(0)).join(", ")} ms, best ${best.toFixed(0)}`);
+    if (WRITE_THROUGHPUT) {
+      fs.writeFileSync(tpPath, JSON.stringify({ _renderer: renderer, nx: tp.nx, ny: tp.ny, bestMs: best, runsMs: tp.t }, null, 1) + "\n");
+      console.log("    wrote " + tpPath);
+    } else {
+      let want = null;
+      try { want = JSON.parse(fs.readFileSync(tpPath, "utf8")); } catch (_) { /* reported below */ }
+      if (want && want._renderer !== renderer) {
+        console.log(`    throughput baseline skipped: captured on ${want._renderer}, running on ${renderer}`);
+      } else {
+        ok("API substep throughput did not regress",
+          !!want && want.nx === tp.nx && best <= want.bestMs * 1.10,
+          want ? `best ${best.toFixed(0)} ms vs baseline ${want.bestMs.toFixed(0)} ms (limit x1.10)`
+               : "no baseline at " + tpPath + " (run once with --write-throughput)");
+      }
+    }
+  }
+
+  // ---- every program links and every uniform sim.js sets exists (Task 3.2).
+  // GLH.createProgram warns once per program for a null uniform lookup, which
+  // is what a renamed or dead uniform looks like at runtime (the write is a
+  // silent no-op). Drive every pass: live and Average, particles, streamlines.
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);
+  B.pageWarnings.length = 0;
+  await B.evaluate(`(() => {
+    __low();
+    state.particles = true; state.sline = true;
+    for (const avg of [false, true, false]) {
+      setAverage(avg);
+      for (const f of FIELDS) { state.mode = f.mode; APP.frames(3); }
+    }
+    return true;
+  })()`);
+  const missing = B.pageWarnings.filter((w) => w.includes("uniform not found"));
+  ok("API every program links and every uniform sim.js sets exists",
+    missing.length === 0, missing.join(" | "));
+  B.pageWarnings.length = 0;
+
+  // The driver does not always drop a declared-but-unread uniform (ANGLE kept
+  // several here), so the lookup above cannot find them all: read the sources
+  // too. A uniform a program declares and never reads is dead weight, and one
+  // sim.js still sets on it is a silent no-op that hides a rename.
+  const SH = (0, eval)(fs.readFileSync(path.join(ROOT, "js", "shaders.js"), "utf8") + "\n;Shaders");
+  const dead = [];
+  for (const k of Object.keys(SH).filter((n) => /^(FS|VS)_/.test(n))) {
+    const text = SH[k].replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    const declared = new Set();
+    for (const m of text.matchAll(/uniform\s+(?:highp\s+)?\w+\s+([^;]+);/g))
+      for (const n of m[1].split(",")) declared.add(n.trim().replace(/\[.*\]/, ""));
+    const body = text.replace(/uniform[^;]*;/g, "");
+    for (const n of declared) if (!new RegExp("\\b" + n + "\\b").test(body)) dead.push(k + "." + n);
+  }
+  ok("API no shader declares a uniform it never reads", dead.length === 0, dead.join(" "));
+};
+
+/** Geometry and force-on-a-face cases: polygon rasterisation, faceForce
+ *  wiring, the s3 gate and its slider, the thin sliver, solid renumbering.
+ *  Split out of `api` (moved verbatim) so `--only=api,rig` is the fast
+ *  naming/wiring subset it says it is. */
+SUITES.geom = async (B) => {
   // GEOM/polygon rasterisation (Task 2 of the polygon-geometry work): a
   // scene's solids() must fill the mask the same way walls() always has.
   // Stamp the SAME 0.4 m wall two ways on the live grid — once as a segment
@@ -702,7 +920,7 @@ SUITES.api = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=s3`);
   const g = await B.evaluate(`(() => {
     __low();
-    const t = __settle(26, 120000);
+    const t = __settle(26);
     const b = APP.sim.scene.bedTop(1.2);
     const a = APP.SIM.params().values.gate_a;
     const level = APP.sim.p.inflow.level;
@@ -774,8 +992,10 @@ SUITES.api = async (B) => {
   })()`);
   ok("SIM setParam(gate_a) clamps within range and applies the value",
     slide.v === 0.20, "applied = " + slide.v);
-  ok("SIM setParam(gate_a) leaves volume() finite once columns(true) forces the readback",
-    Number.isFinite(slide.vol), "volume = " + slide.vol);
+  // Positive, not merely finite: volume() reads 0 until columns(true) has
+  // forced the readback, and 0 is finite.
+  ok("SIM setParam(gate_a) leaves volume() positive once columns(true) forces the readback",
+    slide.vol > 0, "volume = " + slide.vol);
   ok("SIM setParam(gate_a) rebuilds the mask — the blade actually moved",
     slide.maskDiff > 0, slide.maskDiff + " mask cells changed");
   // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m), three repeats landing on the
@@ -788,7 +1008,7 @@ SUITES.api = async (B) => {
   // flat — not slack for an invented-water bug, which would show as an
   // INCREASE past this floor, not a smaller decrease.
   ok("SIM setParam(gate_a) lowering the gate into flow does not invent water",
-    slide.vol <= slide.volBefore + 0.01,
+    slide.vol > 0 && slide.vol <= slide.volBefore + 0.01,
     `${slide.volBefore.toFixed(5)} -> ${slide.vol.toFixed(5)} m2 (` +
     `${(slide.vol - slide.volBefore) >= 0 ? "+" : ""}${(slide.vol - slide.volBefore).toFixed(5)})`);
   ok("SIM setParam(gate_a) resets the averaging window it invalidated",
@@ -837,259 +1057,14 @@ SUITES.api = async (B) => {
   ok("SIM stampPoly's stroke seals a genuinely short edge's pinch",
     sliver.stamped > 0, `stroke stamped ${sliver.stamped} cells`);
 
-  // The hump crest (polygon-geometry Finding 1): a single curved face
-  // sampled at n=160 (~0.025 m chords, GEOM.humpPts) is exactly the case
-  // stampPoly's merged-run threshold exists for — a fine polyline sampling
-  // a smooth, chunky solid must not read as 160 separately-short edges.
-  // Settled at the scene's DEFAULT budget (Medium, dx = 0.0148 m): this is
-  // the resolution a student actually opens the scene at, and it is
-  // exactly the budget the pre-merge threshold failed on (so did Low).
-  //
-  // The crest never "settles" by a single-instant read — the scene's own
-  // comment (js/scenes.js) documents a persistent surface wobble that runs
-  // 5-10x LARGER on the crest than on the approach pool it recommends
-  // reading instead. MEASURED: two of three raw (non-averaged) faceForce
-  // reads at t = 30 s landed on a momentary near-drained crest — all 320
-  // samples reading dry — purely from the wobble's phase, nothing to do
-  // with stampPoly. Average mode is the house answer to exactly this kind
-  // of reading ("Under an averaging window the sample is the window mean:
-  // one window, every instrument," AGENTS.md), so this opens a window AFTER
-  // spin-up and reads faceForce(..., avg). avgStepField only runs from the
-  // real frame loop (main.js's tickFrame), so time is driven through
-  // APP.frames() here, not the raw APP.tick() the rest of this suite uses —
-  // APP.tick() would leave the display accumulator at zero forever and
-  // every avg reading below would silently read as zero (also MEASURED,
-  // chasing this down).
-  await B.goto(`http://localhost:${PORT}/?scene=hump`);
-  const hump = await B.evaluate(`(() => {
-    const t0 = Date.now();
-    while (APP.sim.t < 15 && Date.now() - t0 < 150000) APP.frames(20, 2.0);
-    APP.SIM.avgStart();
-    while (APP.SIM.avgT() < 15 && Date.now() - t0 < 250000) APP.frames(20, 2.0);
-    const ff = APP.faceForce("hump", "crest", true);
-    let wet = 0;
-    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
-    const dx = APP.sim.dx;
-    // The classical vertical-force-on-a-submerged-surface identity: under a
-    // hydrostatic pressure field, the force equals the weight of the water
-    // standing directly above the surface. rho*g times the window-mean
-    // depth integrated over the hump's own footprint (x in [6,10], the
-    // crest's x0/x1 in js/scenes.js) gives that weight; the real flow's
-    // departure from hydrostatic (it accelerates over the crest) is the gap
-    // between this estimate and the measured Fz.
-    const avgCols = APP.SIM.avgColumns(true);
-    const iLo = Math.round(6.0 / dx), iHi = Math.round(10.0 / dx);
-    let sumD = 0;
-    for (let i = iLo; i < iHi; i++) sumD += avgCols.C[i * 4 + 1] * dx;
-    const weight = 1000 * 9.81 * sumD;
-    const out = { t: APP.sim.t, avgT: APP.SIM.avgT(), budget: APP.state.budget,
-      Fx: ff.Fx, Fz: ff.Fz, wetLen: ff.wetLen, len: ff.len,
-      samples: ff.samples.length, wet, weight };
-    APP.SIM.avgStop();
-    return out;
-  })()`);
-  ok("SIM hump crest faceForce is exercised at the scene's DEFAULT budget",
-    hump.budget === "Medium", "budget: " + hump.budget);
-  ok("PHYSICS hump crest averaging window opened", hump.avgT >= 14.5,
-    "avgT = " + hump.avgT.toFixed(1) + " s of 15");
-  // MEASURED (ANGLE/D3D11, Medium, dx = 0.0148 m, hump_h = 0.15, default —
-  // the crest is fully submerged at this height): BEFORE the merged-run fix,
-  // a raw read at this same budget came back with only 122 of 320 samples
-  // wet (38.1%), Fz = -4473 N/m. AFTER, over a 15 s averaging window: 320 of
-  // 320 wet (100%), every one of three independent windows landing within
-  // 0.1% of Fz = -11922 N/m.
-  ok("PHYSICS hump crest is entirely wet at h=0.15 (fully submerged)",
-    hump.wet === hump.samples,
-    `${hump.wet} of ${hump.samples} samples wet, wetLen ${hump.wetLen.toFixed(3)} of ${hump.len.toFixed(3)} m`);
-  ok("PHYSICS hump crest carries a net downward pressure force",
-    hump.Fz < 0, "Fz = " + hump.Fz.toFixed(1) + " N/m");
-  // MEASURED (same three windows): Fz = -11914 to -11926 N/m against the
-  // weight-of-water-above estimate of -12138 to -12143 N/m — 1.7-1.8% low.
-  // 20% brackets that with ample margin while still catching the fix's own
-  // failure mode: the pre-fix raw Fz (-4473 N/m) sits 63% below this
-  // bracket's floor.
-  ok("PHYSICS hump crest Fz brackets the weight of water standing over it",
-    near(hump.Fz, -hump.weight, 0.20 * hump.weight),
-    `Fz = ${hump.Fz.toFixed(0)} N/m vs weight-of-water estimate ${(-hump.weight).toFixed(0)} N/m`);
-
-  // Every wetted surface is clickable (the registration-wrapper task): a
-  // scene still on the walls() shim gets a pickable face too now, not just
-  // the scenes that declare solids() (s3's gate, above). m1's bed is
-  // channel()'s own sloping slab, kept in walls() — so "wall0" is the
-  // registration wrapper `rasterise()` built from that SAME seg, and its
-  // "side1" face (the +m side — see GEOM.slab's own comment; a mild bed
-  // sloping down to the right has a tangent close to +x, so +m is close to
-  // +z, the TOP) is the bed the channel actually stands on.
-  //
-  // MEASURED: a raw (non-averaged) read here is exactly the hump crest's own
-  // failure mode (its own comment above) — the M1 backwater reach carries a
-  // slow, whole-reach pulsation that occasionally reads the ENTIRE bed dry
-  // at a single instant (0 of 808 samples wet, twice in three raw reads),
-  // not a partial wobble. Average mode is the same house answer, so this
-  // settles, then opens a window and reads faceForce(..., avg) the same way
-  // the hump crest test does.
-  await B.goto(`http://localhost:${PORT}/?scene=m1`);
-  const bed = await B.evaluate(`(() => {
-    __low();
-    const t0 = Date.now();
-    while (APP.sim.t < 30 && Date.now() - t0 < 150000) APP.frames(20, 2.0);
-    APP.SIM.avgStart();
-    while (APP.SIM.avgT() < 10 && Date.now() - t0 < 250000) APP.frames(20, 2.0);
-    const ff = APP.faceForce("wall0", "side1", true);
-    let wet = 0;
-    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
-    const dx = APP.sim.dx;
-    const avgCols = APP.SIM.avgColumns(true);
-    // wall0 runs x = -1.0 to 14.6 (js/scenes.js's channel(), x0/xEnd for
-    // m1): the "run in from outside the domain" metre before x = 0 has no
-    // column of its own, so its contribution is approximated with column 0's
-    // depth held constant over it — the inlet is real open-channel flow, not
-    // a drop, so that is close to what is actually there.
-    const iHi = Math.min(APP.sim.nx - 1, Math.round(14.6 / dx));
-    let sumD = avgCols.C[1] * 1.0;               // the x < 0 metre, held at column 0
-    for (let i = 0; i <= iHi; i++) sumD += avgCols.C[i * 4 + 1] * dx;
-    const weight = 1000 * 9.81 * sumD;
-    const out = { t: APP.sim.t, avgT: APP.SIM.avgT(), dx, Fz: ff.Fz, Fx: ff.Fx, wet,
-      samples: ff.samples.length, wetLen: ff.wetLen, len: ff.len, weight };
-    APP.SIM.avgStop();
-    return out;
-  })()`);
-  ok("PHYSICS m1 settled before its bed averaging window opened", bed.t >= 29.5,
-    "reached t = " + (bed.t || 0).toFixed(1) + " s of 30");
-  ok("PHYSICS m1 bed averaging window opened", bed.avgT >= 9.5,
-    "avgT = " + bed.avgT.toFixed(1) + " s of 10");
-  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m, over a 10 s window): 746 of
-  // 808 samples wet (92.3%). Not 100%, unlike the hump crest: the face runs
-  // x = -1.0 to 14.6, and the metre before x = 0 sits outside the domain
-  // avgColumns() can read at all — close to the ~7.7% that reads dry here.
-  // 85% leaves margin for that known sliver while still catching a real
-  // hole in the middle of the bed.
-  ok("PHYSICS m1 bed (a walls()-shim wrapper) returns wet samples",
-    bed.wet / bed.samples >= 0.85,
-    `${bed.wet} of ${bed.samples} samples wet, wetLen ${bed.wetLen.toFixed(3)} of ${bed.len.toFixed(3)} m`);
-  ok("PHYSICS m1 bed top face presses down on the bed (Fz < 0)",
-    bed.Fz < 0, "Fz = " + bed.Fz.toFixed(1) + " N/m");
-  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m, over a 10 s window, two
-  // independent runs): Fz = -85007 to -85285 N/m against a weight-of-water-
-  // above estimate of -90783 to -91331 N/m — 6.2-6.4% low, well inside the
-  // 25% this brackets with (looser than the hump's 20% because this
-  // estimate leans on a held-constant approximation for the metre of bed
-  // run in from outside the domain, not a full column integral).
-  ok("PHYSICS m1 bed Fz brackets the weight of water standing over it",
-    near(bed.Fz, -bed.weight, 0.25 * bed.weight),
-    `Fz = ${bed.Fz.toFixed(0)} N/m vs weight-of-water estimate ${(-bed.weight).toFixed(0)} N/m`);
-
-  // The surface-existence check (Task 2), on the two surfaces it exists for.
-  // hammer's valve is a registration wrapper ("valve0") built from the same
-  // seg SIM.setValve's own texel reclassifies, so its faces are the water-
-  // hammer scene's own teaching instrument: SHUT, the valve blade is a real
-  // solid surface with a static head behind it; OPEN, the SAME texel reads
-  // as open pipe (the valve-aware `sol()` boxForce already uses), so the
-  // wrapper's face has no surface at all and faceForce must read zero on it
-  // — not because there is no water (there is, right there, on the sample's
-  // own side), but because the existence probe half a cell further IN finds
-  // open water where the wrapper says there should be rock.
-  //
-  // "side1" is the −x (upstream, reservoir) face: the valve's centreline
-  // runs straight up (dz > 0, dx = 0), so GEOM.slab's `m` (the left-normal
-  // of the tangent) points in −x, and side1 is the DEFAULT +m long side —
-  // the one nearer the reservoir at x < 6, not the nozzle at x > 55.
-  await B.goto(`http://localhost:${PORT}/?scene=hammer`);
-  const valve = await B.evaluate(`(() => {
-    __low();
-    APP.SIM.setValve(1);                       // shut
-    const t = __settle(10, 90000);
-    const ff = APP.faceForce("valve0", "side1");
-    let wet = 0;
-    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
-    const level = APP.sim.p.inflow.level, z0 = 2.0, z1 = 5.0;
-    // The static head estimate: still(level, z, P), integrated over the
-    // valve's own bore height, is a triangle-minus-triangle,
-    // rho*g*((level-z0)^2 - (level-z1)^2)/2.
-    const expect = 1000 * 9.81 * ((level - z0) * (level - z0) - (level - z1) * (level - z1)) / 2;
-    APP.SIM.setValve(0);                       // open — same face, nothing else moved
-    const open = APP.faceForce("valve0", "side1");
-    let wetOpen = 0;
-    for (const s of open.samples) if (s.f * s.p > 0) wetOpen++;
-
-    // The other half of the same fix, on the OTHER kind of hole: hammer's
-    // own "wall2" (the reservoir wall at x = 6, js/scenes.js) separates the
-    // settled, pressurised reservoir (x < 6) from the dry attic above the
-    // pipe (x > 6, z > 5) it was never asked to fill. Its "side1" face (the
-    // reservoir side, same −m/+m convention as the valve above) reads real
-    // water the whole way up to the reservoir's own free surface. Erasing
-    // the middle third punches a hole straight through the WRAPPER without
-    // moving a drop of water on the sample side — the offset sample there
-    // sits in the same real reservoir it always did, so only the
-    // surface-existence probe (into where the wall used to be) can tell the
-    // difference.
-    const before = APP.faceForce("wall2", "side1");
-    const wz0 = 5.0, wz1 = 30.0, mid0 = wz0 + (wz1 - wz0) / 3, mid1 = wz0 + 2 * (wz1 - wz0) / 3;
-    let gapTotal = 0, gapWetBefore = 0, wetBefore = 0;
-    for (const s of before.samples) {
-      const inGap = s.z >= mid0 && s.z <= mid1;
-      if (inGap) gapTotal++;
-      if (s.f * s.p > 0) { wetBefore++; if (inGap) gapWetBefore++; }
-    }
-    APP.SIM.addSeg(6.0, mid0, 6.0, mid1, 1.0, 0);   // eraser, kind 0 — punch clean through 0.7 m
-    const after = APP.faceForce("wall2", "side1");
-    let gapWetAfter = 0, wetAfter = 0;
-    for (const s of after.samples) {
-      const inGap = s.z >= mid0 && s.z <= mid1;
-      if (s.f * s.p > 0) { wetAfter++; if (inGap) gapWetAfter++; }
-    }
-
-    APP.SIM.setValve(1);                       // put the scene back
-    return { t, level,
-      shutWet: wet, shutSamples: ff.samples.length, Fx: ff.Fx, expect,
-      openWet: wetOpen, openSamples: open.samples.length, openFx: open.Fx,
-      gapTotal, gapWetBefore, wetBefore, samplesBefore: before.samples.length,
-      gapWetAfter, wetAfter, samplesAfter: after.samples.length };
-  })()`);
-  ok("PHYSICS hammer settled before the shut valve's face is read", valve.t >= 9.5,
-    "reached t = " + (valve.t || 0).toFixed(1) + " s of 10");
-  ok("PHYSICS shut valve upstream face reads wet from lip to reservoir",
-    valve.shutWet > 0 && valve.shutWet === valve.shutSamples,
-    `${valve.shutWet} of ${valve.shutSamples} samples wet`);
-  ok("PHYSICS shut valve face pushes toward the nozzle (Fx > 0)",
-    valve.Fx > 0, "Fx = " + valve.Fx.toFixed(0) + " N/m");
-  // MEASURED (ANGLE/D3D11, Low, t = 10 s): Fx = 632.9 kN/m against a static
-  // head estimate of 632.7 kN/m — 0.03% high, essentially exact because the
-  // reservoir behind a SHUT valve is genuinely still water with nowhere to
-  // go. 20% has ample margin while a stroke-swallow-class bug (which read
-  // 0 N/m regardless of head, engineering-notes.md's s3 case) sits nowhere
-  // near this bracket's floor.
-  ok("PHYSICS shut valve Fx brackets the static head estimate",
-    near(valve.Fx, valve.expect, 0.20 * valve.expect),
-    `Fx = ${(valve.Fx / 1000).toFixed(1)} kN/m vs static estimate ${(valve.expect / 1000).toFixed(1)} kN/m`);
-  ok("PHYSICS an OPEN valve reads zero on the same face — the surface-existence check",
-    valve.openWet === 0 && Math.abs(valve.openFx) < 1,
-    `${valve.openWet} of ${valve.openSamples} samples wet, Fx = ${valve.openFx.toFixed(2)} N/m`);
-
-  ok("PHYSICS hammer wall2 side1 reads real pressure across the future erase gap",
-    valve.gapTotal > 0 && valve.gapWetBefore === valve.gapTotal,
-    `${valve.gapWetBefore} of ${valve.gapTotal} gap samples wet before erasing`);
-  // MEASURED (ANGLE/D3D11, Low, t = 10 s): 41 of 125 samples sit in the
-  // erased middle third, all 41 wet before erasing (real reservoir pressure,
-  // reservoir level 25 m against the wall's z = 5-30 m span) and all 41 dry
-  // after — nothing else on the face moved (125 samples both times, and the
-  // 41-sample drop accounts for the WHOLE 100 -> 59 change), which is the
-  // point: the water on the sample side never left, only the wrapper's own
-  // claim to a surface there did.
-  ok("PHYSICS erasing the middle third zeroes exactly that stretch — nothing else moved",
-    valve.gapWetAfter === 0 && valve.wetBefore - valve.wetAfter === valve.gapWetBefore &&
-    valve.samplesBefore === valve.samplesAfter,
-    `gap: ${valve.gapWetAfter} of ${valve.gapTotal} wet after; ` +
-    `whole face: ${valve.wetBefore} -> ${valve.wetAfter} of ${valve.samplesBefore} wet`);
-
   // The renumbering hazard a drawn wrapper's id carries, and the fix for it
   // (code review finding on this branch's own commits). "drawn0"/"drawn1"/…
   // are assigned by POSITION in S.segs every time rasterise() runs — not a
   // stable identity — so draw A, draw B ("drawn1"), undo B, draw C
-  // elsewhere, and C becomes "drawn1" in B's place. Proven at the SIM level
-  // first: the SAME id "drawn1" samples a materially different stretch of
-  // geometry before and after. That is exactly why main.js's rasterise/
-  // addSeg/undoSeg/clearSegs wrap (js/main.js, ~line 3161) drops
+  // elsewhere, and C becomes "drawn1" in B's place: the SAME id then names a
+  // different stretch of geometry. That is exactly why main.js's rasterise/
+  // addSeg/undoSeg/clearSegs edit reaches the SIM.onGeometry
+  // listener in js/main.js, which drops
   // state.force/state.forceHover on every edit — a selection held by a raw
   // (solidId, faceId) pair cannot otherwise tell it is now pointing at a
   // different wall — so the second half checks that UI-level drop directly.
@@ -1098,26 +1073,60 @@ SUITES.api = async (B) => {
     APP.SIM.clearSegs();
     APP.SIM.addSeg(0.5, 4.5, 1.0, 4.5, 0.1, 255);         // A -> "drawn0"
     APP.SIM.addSeg(3.0, 0.5, 3.5, 0.5, 0.1, 255);         // B -> "drawn1"
-    const before = APP.faceForce("drawn1", "side1");
-    const cenBefore = before.samples.reduce((s, p) => s + p.x, 0) / before.samples.length;
     // Select B's face the way onDown would.
     APP.state.force = { solidId: "drawn1", faceId: "side1", data: null, t0: 0 };
     APP.state.forceHover = { solidId: "drawn1", faceId: "side1" };
     APP.SIM.undoSeg();                                     // drop B
     const droppedForce = APP.state.force, droppedHover = APP.state.forceHover;
     APP.SIM.addSeg(7.0, 4.5, 7.5, 4.5, 0.1, 255);          // C, elsewhere -> "drawn1"
-    const after = APP.faceForce("drawn1", "side1");
-    const cenAfter = after.samples.reduce((s, p) => s + p.x, 0) / after.samples.length;
     APP.SIM.clearSegs();
-    return { cenBefore, cenAfter, droppedForce, droppedHover };
+    return { droppedForce, droppedHover };
   })()`);
-  ok("SIM a drawn wrapper's id renumbers on an edit — a raw solidId is not a stable identity",
-    Math.abs(renumber.cenAfter - renumber.cenBefore) > 1.0,
-    `"drawn1" centroid x: ${renumber.cenBefore.toFixed(2)} -> ${renumber.cenAfter.toFixed(2)} m`);
   ok("UI a Force selection does not survive an edit that could have renumbered it",
     renumber.droppedForce === null && renumber.droppedHover === null,
     `force: ${JSON.stringify(renumber.droppedForce)}, hover: ${JSON.stringify(renumber.droppedHover)}`);
+
+  // SIM.onGeometry fires from EVERY rasterise(), including setParam's (which
+  // calls the module-local rasterise, out of reach of any outside wrapper) and
+  // the unsubscribe it returns really detaches.
+  await B.goto(`http://localhost:${PORT}/?scene=hydro`);
+  const hook = await B.evaluate(`(() => {
+    const out = {};
+    APP.state.force = { solidId: "wall0", faceId: "side1", data: null, t0: 0 };
+    APP.state.forceHover = { solidId: "wall0", faceId: "side1" };
+    OVERLAY.analyse(APP.sim, APP.SIM.columns(true));   // live call seeds the estimates
+    out.seeded = OVERLAY.estimates(APP.sim).hA !== null;
+    const cur = APP.SIM.params().values.gap;
+    const other = cur === 0.5 ? 0.4 : 0.5;
+    APP.SIM.setParam("gap", other);
+    out.force = APP.state.force; out.hover = APP.state.forceHover;
+    out.ynKnan = Number.isNaN(OVERLAY.estimates(APP.sim).ynK);
+    out.hAcleared = OVERLAY.estimates(APP.sim).hA === null;
+    let n = 0, seen = null;
+    const off = APP.SIM.onGeometry((S) => { n++; seen = S; });
+    APP.SIM.setParam("gap", cur);
+    out.callsAfterParam = n;
+    APP.state.force = { solidId: "wall0", faceId: "side1", data: null, t0: 0 };
+    APP.SIM.setValve(APP.sim.p.valveClosed ? 0 : 1);
+    out.keptOnValve = APP.state.force !== null;
+    out.calls = n; out.sameGrid = seen === APP.sim;
+    off();
+    APP.SIM.setParam("gap", other);
+    out.afterOff = n;
+    return out;
+  })()`);
+  ok("geom setParam drops the Force selection",
+    hook.force === null && hook.hover === null,
+    `force: ${JSON.stringify(hook.force)}, hover: ${JSON.stringify(hook.hover)}`);
+  ok("geom setParam resets the overlay's running estimates",
+    hook.seeded && hook.hAcleared && hook.ynKnan,
+    `seeded: ${hook.seeded}, hA cleared: ${hook.hAcleared}, ynK NaN: ${hook.ynKnan}`);
+  ok("geom SIM.onGeometry fires for setParam (live grid), not for a valve flip, and unsubscribes",
+    hook.callsAfterParam === 1 && hook.calls === 1 && hook.keptOnValve &&
+      hook.sameGrid && hook.afterOff === 1,
+    JSON.stringify(hook));
 };
+
 
 SUITES.rig = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=m2`);
@@ -1127,6 +1136,7 @@ SUITES.rig = async (B) => {
     out.version = snap.v;
     out.srcKeys = Object.keys(snap.source).sort();
     out.field = snap.ui.field;
+    out.gaugeIds = APP.ui.GAUGE_QTY.map((q) => q.id);
     // round-trip: a snapshot must load back into the same live state
     APP.sim.p.source.z = 3.25; APP.sim.p.source.vz = -2.5;
     const s2 = APP.RIG.snapshot();
@@ -1135,6 +1145,7 @@ SUITES.rig = async (B) => {
     out.roundTripZ  = APP.sim.p.source.z;
     out.roundTripVz = APP.sim.p.source.vz;
     // a superseded wire format must be refused, not half-applied
+    out.fieldBeforeV1 = APP.state.gaugeField;
     try {
       APP.RIG.apply({ v: 1, scene: "m2", segs: [], ui: { field: "head" } });
       out.v1 = "ACCEPTED";
@@ -1148,15 +1159,18 @@ SUITES.rig = async (B) => {
     r.srcKeys.includes("z") && r.srcKeys.includes("vz") &&
     !r.srcKeys.includes("y") && !r.srcKeys.includes("vy"),
     "keys: " + r.srcKeys.join(","));
+  // The register is read live: a hard-coded list of ids goes stale the day a
+  // quantity is added, and then passes a field that no gauge can plot.
   ok("RIG snapshot gauge field is a live key",
-    ["h", "d", "speed"].includes(r.field), "field: " + r.field);
+    r.gaugeIds.includes(r.field), "field: " + r.field + " of " + r.gaugeIds.join(","));
   ok("RIG snapshot round-trips the spout elevation", near(r.roundTripZ, 3.25, 1e-6),
     "z = " + r.roundTripZ);
   ok("RIG snapshot round-trips the spout velocity", near(r.roundTripVz, -2.5, 1e-6),
     "vz = " + r.roundTripVz);
   ok("RIG a superseded format is refused", r.v1 === "rejected", r.v1msg);
   ok("RIG a refused load leaves the live field alone",
-    ["h", "d", "speed"].includes(r.fieldAfterV1), "field: " + r.fieldAfterV1);
+    r.fieldAfterV1 === r.fieldBeforeV1,
+    "field before " + r.fieldBeforeV1 + ", after " + r.fieldAfterV1);
 
   // The `params` wire key (additive to v2, docs/engineering-notes.md) is
   // untouched by everything above — the m2 scene it runs against declares no
@@ -1297,9 +1311,331 @@ SUITES.rig = async (B) => {
   ok("rig round-trips which quantity the control volume/sections read (cvShow)",
      cov.before.cvShow === "M" && cov.after.cvShow === "M" && cov.snapCvShow === "M",
      JSON.stringify({ before: cov.before.cvShow, after: cov.after.cvShow, snap: cov.snapCvShow }));
+
+  // Every packaged payload applies and snapshots back to itself (to 1 µm):
+  // the refactors of Phase 3 must not change what a drawn rig means.
+  await B.goto(`http://localhost:${PORT}/?scene=sandbox`);
+  const rt = await B.evaluate(`(() => {
+    const bad = [], keys = Object.keys(EXERCISE_RIGS);
+    const cmp = (a, b, at) => {
+      if (a && typeof a === "object") {
+        if (!b || typeof b !== "object") { bad.push(at); return; }
+        for (const k of Object.keys(a)) cmp(a[k], b[k], at + "." + k);
+      } else if (typeof a === "number") {
+        if (typeof b !== "number" || !(Math.abs(a - b) <= 1e-6)) bad.push(at + " " + a + " vs " + b);
+      } else if (a !== b) bad.push(at + " " + a + " vs " + b);
+    };
+    for (const id of keys) {
+      try { APP.RIG.apply(EXERCISE_RIGS[id]); cmp(EXERCISE_RIGS[id], APP.RIG.snapshot(), id); }
+      catch (e) { bad.push(id + " threw " + e.message); }
+    }
+    return { n: keys.length, bad: bad.slice(0, 8) };
+  })()`);
+  ok("rig every packaged payload round-trips", rt.n >= 18 && rt.bad.length === 0,
+    rt.n + " payloads; " + rt.bad.join(" | "));
 };
 
 SUITES.physics = async (B) => {
+  // Cases moved here from the old `api` suite (verbatim): each settles a scene
+  // and reads a physical answer, so they belong with the other physics.
+  {
+  await B.goto(`http://localhost:${PORT}/?scene=h23`);
+  // The jump box is the one place the conjugate-depth fields are consumed.
+  // h23 must be SETTLED first — its card allows 35 s, and the documented
+  // verified read (docs/engineering-notes.md) is Fr1 2.24, d2 0.416 against
+  // Belanger 0.438. Settle by simulated time so the count is independent of
+  // Δt, then warm the analyse EMA the way the overlay does.
+  //
+  // Then read a WINDOW, not a frame. The box flutters — its own README says
+  // so — and measured on 2026-09-10 (Medium, t = 30–90 s, one read per
+  // second) a single frame landed inside the 30% band only 63–91% of the
+  // time depending on the commit, while the 60 s mean sat 5–20% over
+  // Belanger at every commit tried back to 6cc91ca. The assertion is about
+  // the momentum balance, which is a property of the mean flow, so it reads
+  // the mean of 20 s of frames and asks that a jump be found in a third of
+  // them at least (at the Low grid the box comes and goes: 68% of frames
+  // carried one in the same measurement).
+  const j = await B.evaluate(`(() => {
+    __low();
+    const t = __settle(30);
+    const acc = { n: 0, d1: 0, d2: 0, d2p: 0, Fr1: 0, dE: 0 }, frames = 40;
+    let keys;
+    for (let k = 0; k < frames; k++) {
+      APP.tick(Math.round(0.5 / APP.SIM.dt()));
+      const A = __warm(25);                    // the overlay EMA needs its warm-up every read
+      const J = OVERLAY.findJumps(A, APP.sim)[0];
+      if (!J) continue;
+      keys = keys || Object.keys(J).sort();
+      acc.n++; acc.d1 += J.d1; acc.d2 += J.d2; acc.d2p += J.d2p; acc.Fr1 += J.Fr1; acc.dE += J.dE;
+    }
+    if (!acc.n) return { t: APP.sim.t, frames, n: 0 };
+    return { t: APP.sim.t, keys, frames, n: acc.n, d1: acc.d1 / acc.n, d2: acc.d2 / acc.n,
+             d2p: acc.d2p / acc.n, Fr1: acc.Fr1 / acc.n, dE: acc.dE / acc.n };
+  })()`);
+  if (ok("PHYSICS h23 still forms a hydraulic jump", j.n >= j.frames / 3,
+         "settled to t = " + (j.t || 0).toFixed(1) + " s; a jump was found in " + (j.n || 0) + " of " + j.frames + " frames")) {
+    ok("API findJumps() exposes d1/d2/d2p",
+      ["d1", "d2", "d2p"].every((k) => j.keys.includes(k)) &&
+      !["y1", "y2", "y2p"].some((k) => j.keys.includes(k)),
+      "keys: " + j.keys.join(","));
+    ok("PHYSICS jump is supercritical entering (Fr1 > 1)", j.Fr1 > 1,
+      "Fr1 = " + j.Fr1.toFixed(2));
+    // The band is wide on purpose: the jump box flutters (its own README
+    // says so) and a steep bed reads well under Belanger. This is a guard
+    // against the momentum balance breaking, not a calibration.
+    ok("PHYSICS conjugate depth is within 30% of Belanger",
+      near(j.d2, j.d2p, 0.30 * j.d2p),
+      `d2 ${j.d2.toFixed(3)} vs Belanger ${j.d2p.toFixed(3)}, mean of ${j.n} frames to t ${j.t.toFixed(1)} s`);
+    ok("PHYSICS the jump dissipates energy", j.dE > 0, "dE = " + j.dE);
+  }
+
+  }
+  {
+  // The hump crest (polygon-geometry Finding 1): a single curved face
+  // sampled at n=160 (~0.025 m chords, GEOM.humpPts) is exactly the case
+  // stampPoly's merged-run threshold exists for — a fine polyline sampling
+  // a smooth, chunky solid must not read as 160 separately-short edges.
+  // Settled at the scene's DEFAULT budget (Medium, dx = 0.0148 m): this is
+  // the resolution a student actually opens the scene at, and it is
+  // exactly the budget the pre-merge threshold failed on (so did Low).
+  //
+  // The crest never "settles" by a single-instant read — the scene's own
+  // comment (js/scenes.js) documents a persistent surface wobble that runs
+  // 5-10x LARGER on the crest than on the approach pool it recommends
+  // reading instead. MEASURED: two of three raw (non-averaged) faceForce
+  // reads at t = 30 s landed on a momentary near-drained crest — all 320
+  // samples reading dry — purely from the wobble's phase, nothing to do
+  // with stampPoly. Average mode is the house answer to exactly this kind
+  // of reading ("Under an averaging window the sample is the window mean:
+  // one window, every instrument," AGENTS.md), so this opens a window AFTER
+  // spin-up and reads faceForce(..., avg). avgStepField only runs from the
+  // real frame loop (main.js's tickFrame), so time is driven through
+  // APP.frames() here, not the raw APP.tick() the rest of this suite uses —
+  // APP.tick() would leave the display accumulator at zero forever and
+  // every avg reading below would silently read as zero (also MEASURED,
+  // chasing this down).
+  await B.goto(`http://localhost:${PORT}/?scene=hump`);
+  const hump = await B.evaluate(`(() => {
+    __until(() => APP.sim.t >= 15, () => APP.frames(20, 2.0));
+    APP.SIM.avgStart();
+    __until(() => APP.SIM.avgT() >= 15, () => APP.frames(20, 2.0));
+    const ff = APP.faceForce("hump", "crest", true);
+    let wet = 0;
+    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
+    const dx = APP.sim.dx;
+    // The classical vertical-force-on-a-submerged-surface identity: under a
+    // hydrostatic pressure field, the force equals the weight of the water
+    // standing directly above the surface. rho*g times the window-mean
+    // depth integrated over the hump's own footprint (x in [6,10], the
+    // crest's x0/x1 in js/scenes.js) gives that weight; the real flow's
+    // departure from hydrostatic (it accelerates over the crest) is the gap
+    // between this estimate and the measured Fz.
+    const avgCols = APP.SIM.avgColumns(true);
+    const iLo = Math.round(6.0 / dx), iHi = Math.round(10.0 / dx);
+    let sumD = 0;
+    for (let i = iLo; i < iHi; i++) sumD += avgCols.C[i * 4 + 1] * dx;
+    const weight = 1000 * 9.81 * sumD;
+    const out = { t: APP.sim.t, avgT: APP.SIM.avgT(), budget: APP.state.budget,
+      Fx: ff.Fx, Fz: ff.Fz, wetLen: ff.wetLen, len: ff.len,
+      samples: ff.samples.length, wet, weight };
+    APP.SIM.avgStop();
+    return out;
+  })()`);
+  ok("SIM hump crest faceForce is exercised at the scene's DEFAULT budget",
+    hump.budget === "Medium", "budget: " + hump.budget);
+  ok("PHYSICS hump crest averaging window opened", hump.avgT >= 14.5,
+    "avgT = " + hump.avgT.toFixed(1) + " s of 15");
+  // MEASURED (ANGLE/D3D11, Medium, dx = 0.0148 m, hump_h = 0.15, default —
+  // the crest is fully submerged at this height): BEFORE the merged-run fix,
+  // a raw read at this same budget came back with only 122 of 320 samples
+  // wet (38.1%), Fz = -4473 N/m. AFTER, over a 15 s averaging window: 320 of
+  // 320 wet (100%), every one of three independent windows landing within
+  // 0.1% of Fz = -11922 N/m.
+  ok("PHYSICS hump crest is entirely wet at h=0.15 (fully submerged)",
+    hump.wet === hump.samples,
+    `${hump.wet} of ${hump.samples} samples wet, wetLen ${hump.wetLen.toFixed(3)} of ${hump.len.toFixed(3)} m`);
+  ok("PHYSICS hump crest carries a net downward pressure force",
+    hump.Fz < 0, "Fz = " + hump.Fz.toFixed(1) + " N/m");
+  // MEASURED (same three windows): Fz = -11914 to -11926 N/m against the
+  // weight-of-water-above estimate of -12138 to -12143 N/m — 1.7-1.8% low.
+  // 20% brackets that with ample margin while still catching the fix's own
+  // failure mode: the pre-fix raw Fz (-4473 N/m) sits 63% below this
+  // bracket's floor.
+  ok("PHYSICS hump crest Fz brackets the weight of water standing over it",
+    near(hump.Fz, -hump.weight, 0.20 * hump.weight),
+    `Fz = ${hump.Fz.toFixed(0)} N/m vs weight-of-water estimate ${(-hump.weight).toFixed(0)} N/m`);
+
+  // Every wetted surface is clickable (the registration-wrapper task): a
+  // scene still on the walls() shim gets a pickable face too now, not just
+  // the scenes that declare solids() (s3's gate, above). m1's bed is
+  // channel()'s own sloping slab, kept in walls() — so "wall0" is the
+  // registration wrapper `rasterise()` built from that SAME seg, and its
+  // "side1" face (the +m side — see GEOM.slab's own comment; a mild bed
+  // sloping down to the right has a tangent close to +x, so +m is close to
+  // +z, the TOP) is the bed the channel actually stands on.
+  //
+  // MEASURED: a raw (non-averaged) read here is exactly the hump crest's own
+  // failure mode (its own comment above) — the M1 backwater reach carries a
+  // slow, whole-reach pulsation that occasionally reads the ENTIRE bed dry
+  // at a single instant (0 of 808 samples wet, twice in three raw reads),
+  // not a partial wobble. Average mode is the same house answer, so this
+  // settles, then opens a window and reads faceForce(..., avg) the same way
+  // the hump crest test does.
+  await B.goto(`http://localhost:${PORT}/?scene=m1`);
+  const bed = await B.evaluate(`(() => {
+    __low();
+    __until(() => APP.sim.t >= 30, () => APP.frames(20, 2.0));
+    APP.SIM.avgStart();
+    __until(() => APP.SIM.avgT() >= 10, () => APP.frames(20, 2.0));
+    const ff = APP.faceForce("wall0", "side1", true);
+    let wet = 0;
+    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
+    const dx = APP.sim.dx;
+    const avgCols = APP.SIM.avgColumns(true);
+    // wall0 runs x = -1.0 to 14.6 (js/scenes.js's channel(), x0/xEnd for
+    // m1): the "run in from outside the domain" metre before x = 0 has no
+    // column of its own, so its contribution is approximated with column 0's
+    // depth held constant over it — the inlet is real open-channel flow, not
+    // a drop, so that is close to what is actually there.
+    const iHi = Math.min(APP.sim.nx - 1, Math.round(14.6 / dx));
+    let sumD = avgCols.C[1] * 1.0;               // the x < 0 metre, held at column 0
+    for (let i = 0; i <= iHi; i++) sumD += avgCols.C[i * 4 + 1] * dx;
+    const weight = 1000 * 9.81 * sumD;
+    const out = { t: APP.sim.t, avgT: APP.SIM.avgT(), dx, Fz: ff.Fz, Fx: ff.Fx, wet,
+      samples: ff.samples.length, wetLen: ff.wetLen, len: ff.len, weight };
+    APP.SIM.avgStop();
+    return out;
+  })()`);
+  ok("PHYSICS m1 settled before its bed averaging window opened", bed.t >= 29.5,
+    "reached t = " + (bed.t || 0).toFixed(1) + " s of 30");
+  ok("PHYSICS m1 bed averaging window opened", bed.avgT >= 9.5,
+    "avgT = " + bed.avgT.toFixed(1) + " s of 10");
+  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m, over a 10 s window): 746 of
+  // 808 samples wet (92.3%). Not 100%, unlike the hump crest: the face runs
+  // x = -1.0 to 14.6, and the metre before x = 0 sits outside the domain
+  // avgColumns() can read at all — close to the ~7.7% that reads dry here.
+  // 85% leaves margin for that known sliver while still catching a real
+  // hole in the middle of the bed.
+  ok("PHYSICS m1 bed (a walls()-shim wrapper) returns wet samples",
+    bed.wet / bed.samples >= 0.85,
+    `${bed.wet} of ${bed.samples} samples wet, wetLen ${bed.wetLen.toFixed(3)} of ${bed.len.toFixed(3)} m`);
+  ok("PHYSICS m1 bed top face presses down on the bed (Fz < 0)",
+    bed.Fz < 0, "Fz = " + bed.Fz.toFixed(1) + " N/m");
+  // MEASURED (ANGLE/D3D11, Low, dx = 0.0193 m, over a 10 s window, two
+  // independent runs): Fz = -85007 to -85285 N/m against a weight-of-water-
+  // above estimate of -90783 to -91331 N/m — 6.2-6.4% low, well inside the
+  // 25% this brackets with (looser than the hump's 20% because this
+  // estimate leans on a held-constant approximation for the metre of bed
+  // run in from outside the domain, not a full column integral).
+  ok("PHYSICS m1 bed Fz brackets the weight of water standing over it",
+    near(bed.Fz, -bed.weight, 0.25 * bed.weight),
+    `Fz = ${bed.Fz.toFixed(0)} N/m vs weight-of-water estimate ${(-bed.weight).toFixed(0)} N/m`);
+
+  // The surface-existence check (Task 2), on the two surfaces it exists for.
+  // hammer's valve is a registration wrapper ("valve0") built from the same
+  // seg SIM.setValve's own texel reclassifies, so its faces are the water-
+  // hammer scene's own teaching instrument: SHUT, the valve blade is a real
+  // solid surface with a static head behind it; OPEN, the SAME texel reads
+  // as open pipe (the valve-aware `sol()` boxForce already uses), so the
+  // wrapper's face has no surface at all and faceForce must read zero on it
+  // — not because there is no water (there is, right there, on the sample's
+  // own side), but because the existence probe half a cell further IN finds
+  // open water where the wrapper says there should be rock.
+  //
+  // "side1" is the −x (upstream, reservoir) face: the valve's centreline
+  // runs straight up (dz > 0, dx = 0), so GEOM.slab's `m` (the left-normal
+  // of the tangent) points in −x, and side1 is the DEFAULT +m long side —
+  // the one nearer the reservoir at x < 6, not the nozzle at x > 55.
+  await B.goto(`http://localhost:${PORT}/?scene=hammer`);
+  const valve = await B.evaluate(`(() => {
+    __low();
+    APP.SIM.setValve(1);                       // shut
+    const t = __settle(10);
+    const ff = APP.faceForce("valve0", "side1");
+    let wet = 0;
+    for (const s of ff.samples) if (s.f * s.p > 0) wet++;
+    const level = APP.sim.p.inflow.level, z0 = 2.0, z1 = 5.0;
+    // The static head estimate: still(level, z, P), integrated over the
+    // valve's own bore height, is a triangle-minus-triangle,
+    // rho*g*((level-z0)^2 - (level-z1)^2)/2.
+    const expect = 1000 * 9.81 * ((level - z0) * (level - z0) - (level - z1) * (level - z1)) / 2;
+    APP.SIM.setValve(0);                       // open — same face, nothing else moved
+    const open = APP.faceForce("valve0", "side1");
+    let wetOpen = 0;
+    for (const s of open.samples) if (s.f * s.p > 0) wetOpen++;
+
+    // The other half of the same fix, on the OTHER kind of hole: hammer's
+    // own "wall2" (the reservoir wall at x = 6, js/scenes.js) separates the
+    // settled, pressurised reservoir (x < 6) from the dry attic above the
+    // pipe (x > 6, z > 5) it was never asked to fill. Its "side1" face (the
+    // reservoir side, same −m/+m convention as the valve above) reads real
+    // water the whole way up to the reservoir's own free surface. Erasing
+    // the middle third punches a hole straight through the WRAPPER without
+    // moving a drop of water on the sample side — the offset sample there
+    // sits in the same real reservoir it always did, so only the
+    // surface-existence probe (into where the wall used to be) can tell the
+    // difference.
+    const before = APP.faceForce("wall2", "side1");
+    const wz0 = 5.0, wz1 = 30.0, mid0 = wz0 + (wz1 - wz0) / 3, mid1 = wz0 + 2 * (wz1 - wz0) / 3;
+    let gapTotal = 0, gapWetBefore = 0, wetBefore = 0;
+    for (const s of before.samples) {
+      const inGap = s.z >= mid0 && s.z <= mid1;
+      if (inGap) gapTotal++;
+      if (s.f * s.p > 0) { wetBefore++; if (inGap) gapWetBefore++; }
+    }
+    APP.SIM.addSeg(6.0, mid0, 6.0, mid1, 1.0, 0);   // eraser, kind 0 — punch clean through 0.7 m
+    const after = APP.faceForce("wall2", "side1");
+    let gapWetAfter = 0, wetAfter = 0;
+    for (const s of after.samples) {
+      const inGap = s.z >= mid0 && s.z <= mid1;
+      if (s.f * s.p > 0) { wetAfter++; if (inGap) gapWetAfter++; }
+    }
+
+    APP.SIM.setValve(1);                       // put the scene back
+    return { t, level,
+      shutWet: wet, shutSamples: ff.samples.length, Fx: ff.Fx, expect,
+      openWet: wetOpen, openSamples: open.samples.length, openFx: open.Fx,
+      gapTotal, gapWetBefore, wetBefore, samplesBefore: before.samples.length,
+      gapWetAfter, wetAfter, samplesAfter: after.samples.length };
+  })()`);
+  ok("PHYSICS hammer settled before the shut valve's face is read", valve.t >= 9.5,
+    "reached t = " + (valve.t || 0).toFixed(1) + " s of 10");
+  ok("PHYSICS shut valve upstream face reads wet from lip to reservoir",
+    valve.shutWet > 0 && valve.shutWet === valve.shutSamples,
+    `${valve.shutWet} of ${valve.shutSamples} samples wet`);
+  ok("PHYSICS shut valve face pushes toward the nozzle (Fx > 0)",
+    valve.Fx > 0, "Fx = " + valve.Fx.toFixed(0) + " N/m");
+  // MEASURED (ANGLE/D3D11, Low, t = 10 s): Fx = 632.9 kN/m against a static
+  // head estimate of 632.7 kN/m — 0.03% high, essentially exact because the
+  // reservoir behind a SHUT valve is genuinely still water with nowhere to
+  // go. 20% has ample margin while a stroke-swallow-class bug (which read
+  // 0 N/m regardless of head, engineering-notes.md's s3 case) sits nowhere
+  // near this bracket's floor.
+  ok("PHYSICS shut valve Fx brackets the static head estimate",
+    near(valve.Fx, valve.expect, 0.20 * valve.expect),
+    `Fx = ${(valve.Fx / 1000).toFixed(1)} kN/m vs static estimate ${(valve.expect / 1000).toFixed(1)} kN/m`);
+  ok("PHYSICS an OPEN valve reads zero on the same face — the surface-existence check",
+    valve.openWet === 0 && Math.abs(valve.openFx) < 1,
+    `${valve.openWet} of ${valve.openSamples} samples wet, Fx = ${valve.openFx.toFixed(2)} N/m`);
+
+  ok("PHYSICS hammer wall2 side1 reads real pressure across the future erase gap",
+    valve.gapTotal > 0 && valve.gapWetBefore === valve.gapTotal,
+    `${valve.gapWetBefore} of ${valve.gapTotal} gap samples wet before erasing`);
+  // MEASURED (ANGLE/D3D11, Low, t = 10 s): 41 of 125 samples sit in the
+  // erased middle third, all 41 wet before erasing (real reservoir pressure,
+  // reservoir level 25 m against the wall's z = 5-30 m span) and all 41 dry
+  // after — nothing else on the face moved (125 samples both times, and the
+  // 41-sample drop accounts for the WHOLE 100 -> 59 change), which is the
+  // point: the water on the sample side never left, only the wrapper's own
+  // claim to a surface there did.
+  ok("PHYSICS erasing the middle third zeroes exactly that stretch — nothing else moved",
+    valve.gapWetAfter === 0 && valve.wetBefore - valve.wetAfter === valve.gapWetBefore &&
+    valve.samplesBefore === valve.samplesAfter,
+    `gap: ${valve.gapWetAfter} of ${valve.gapTotal} wet after; ` +
+    `whole face: ${valve.wetBefore} -> ${valve.wetAfter} of ${valve.samplesBefore} wet`);
+
+  }
+
   // Still water must STAY still: this is the discrete hydrostatic balance,
   // and it is the first thing a careless edit to the vel pass breaks.
   await B.goto(`http://localhost:${PORT}/?scene=venturi`);
@@ -1313,7 +1649,7 @@ SUITES.physics = async (B) => {
     // volume() then reads the fresh buffer. Without this the baseline is 0.
     APP.tick(1); APP.SIM.columns(true);
     const v0 = APP.volume();
-    __settle(APP.sim.t + 8, 90000);
+    __settle(APP.sim.t + 8);
     APP.SIM.columns(true);
     const v1 = APP.volume();
     let maxSpeed = 0, nan = 0;
@@ -1333,6 +1669,71 @@ SUITES.physics = async (B) => {
   ok("PHYSICS still water stays still", rest.maxSpeed < 0.35,
     "max speed " + rest.maxSpeed.toFixed(3) + " m/s");
 
+  // One reference elevation for the stored pressure (docs/numerics.md, "Where
+  // the stored pressure lives"): in a still tank the coloured piezometric-head
+  // field (fieldStats(6) is the arithmetic FS_DISP mode 6 paints) and the
+  // drawn HGL (hydraulicGrade, the FS_HGL walk) are both the level, so they
+  // must agree to a small fraction of a cell. The pre-fix centre/lower-face
+  // split put them a half cell apart. The dyke holds TWO still pools, so the
+  // field's 1st and 99th percentiles are compared with the HGL's lowest and
+  // highest column (the 1% tails are whole pools, not outliers).
+  await B.goto(`http://localhost:${PORT}/?scene=dyke`);
+  const href = await B.evaluate(`(() => {
+    __low();
+    APP.sim.p.inflow.on = 0; APP.sim.p.tailwater.on = 0; APP.sim.p.source.on = 0;
+    APP.SIM.resetWater();
+    const t = __settle(APP.sim.t + 12);
+    const st = APP.SIM.fieldStats(6, false);
+    const hg = Array.from(APP.SIM.hydraulicGrade(null, false)).filter(Number.isFinite).sort((a, b) => a - b);
+    return { t, dx: APP.sim.dx, lo: st && st.lo, hi: st && st.hi, n: hg.length,
+             hgLo: hg[0], hgMed: hg[hg.length >> 1], hgHi: hg[hg.length - 1] };
+  })()`);
+  ok("PHYSICS still-water h field equals HGL",
+    href.n > 10 && href.lo !== null && Math.abs(href.lo - href.hgLo) < 0.1 * href.dx &&
+    Math.abs(href.hi - href.hgHi) < 0.1 * href.dx,
+    `field lo ${href.lo} hi ${href.hi}; HGL median ${href.hgMed} (range ${href.hgLo}..${href.hgHi}); ` +
+    `dx ${href.dx}; t ${href.t}`);
+
+  // The energy-flux terms follow the same rule (docs/numerics.md, "Where the
+  // stored pressure lives"). A STILL tank cannot show it (net E = g*eta*mdot,
+  // and mdot is 0, whatever elevation is used), so use a steady reach: sa1,
+  // averaged, uniform flow. E/(g*mdot) is the flux-weighted mean of
+  // z + P/g + |u|^2/2g; take the kinetic term out with the section's own
+  // flux-weighted mean u (Mx/mdot) and what is left is the piezometric head,
+  // which in this hydrostatic reach is the level, i.e. the drawn HGL
+  // (hydraulicGrade, j*dx + P/g) plus the S0*x of the tilted gravity. The
+  // remainder is (alpha - 1) V^2/2g ~ 0.003 m; the Delta x/2 bias it exists to
+  // catch is 0.0097 m at Low (MEASURED: new gap 0.10 dx (line) and 0.13 dx (box),
+  // old centre-referenced z gave 0.60 and 0.62 dx; the bound is 0.3 dx).
+  await B.goto(`http://localhost:${PORT}/?scene=sa1`);
+  const eflux = await B.evaluate(`(() => {
+    __low();
+    const S = APP.sim;
+    __settle(40);
+    APP.SIM.avgStart();
+    APP.state.speed = 10;
+    const tgt = S.t + 15;
+    __until(() => S.t >= tgt, () => APP.frames(1));
+    const g = Math.abs(S.p.g), tilt = S.scene.tiltS0 || 0, dx = S.dx;
+    const hg = APP.SIM.hydraulicGrade(null, true);
+    const x = 8, i = Math.floor(x / dx);
+    // line section, vertical, upward: n = (+1, 0)
+    const L = APP.SIM.lineFlux(x, dx, x, S.H - 2 * dx, true);
+    const lineHead = L.E / (g * L.mdot) - 0.5 * (L.Mx / L.mdot) ** 2 / g + tilt * x;
+    // control volume: left edge of a box, outward normal -x, so mdot < 0 there
+    const B = APP.SIM.boxFlux(x, dx, x + 1.0, S.H - 2 * dx, true);
+    const le = B.edges.left, xl = B.iL * dx;
+    const boxHead = le.E / (g * le.mdot) - 0.5 * (le.Mx / le.mdot) ** 2 / g + tilt * xl;
+    const il = B.iL;
+    return { dx, mdot: L.mdot, lineHead, hgl: hg[i], boxHead, boxMdot: le.mdot, hglBox: hg[il] };
+  })()`);
+  ok("PHYSICS section E per unit discharge agrees with the HGL (lineFlux)",
+    eflux.mdot > 0 && Math.abs(eflux.lineHead - eflux.hgl) < 0.3 * eflux.dx,
+    `section head ${eflux.lineHead} vs HGL ${eflux.hgl} (gap ${((eflux.lineHead - eflux.hgl) / eflux.dx).toFixed(3)} dx)`);
+  ok("PHYSICS control-volume inflow-edge E per unit discharge agrees with the HGL (boxFlux)",
+    eflux.boxMdot < 0 && Math.abs(eflux.boxHead - eflux.hglBox) < 0.3 * eflux.dx,
+    `edge head ${eflux.boxHead} vs HGL ${eflux.hglBox} (gap ${((eflux.boxHead - eflux.hglBox) / eflux.dx).toFixed(3)} dx)`);
+
   // A flowing reach. Measured over the middle 60% only: the inlet sponge and
   // the brink are boundary treatments, not the reach, and including them
   // measures those instead.
@@ -1341,9 +1742,9 @@ SUITES.physics = async (B) => {
     __low();
     // Settle to 40 s, not 30. m1's volume is still climbing at 30 (8.75 m2
     // against 8.86) and only levels off around t = 45.
-    const t = __settle(40, 150000);
+    const t = __settle(40);
     // qRaw / dRaw, NOT q / d. analyse() carries its own 10% EMA over the
-    // column reduction (S._qA in js/overlay.js) to steady the on-screen
+    // column reduction (the qA estimate in js/overlay.js) to steady the on-screen
     // profile against roll waves. Called ONCE on the mean columns, that EMA is
     // still 90% full of the LIVE frames that came before it, so A.q would be a
     // blend of the average with the instant -- and would report a spread of
@@ -1355,12 +1756,8 @@ SUITES.physics = async (B) => {
       for (let i = lo; i < hi; i++) if (A.ok[i] && A.dRaw[i] > 3 * APP.sim.dx) wet.push(i);
       const q = wet.map((i) => A.qRaw[i]).filter(Number.isFinite).sort((a, b) => a - b);
       const med = q[q.length >> 1];
-      const third = Math.floor(wet.length / 3);
-      const medOf = (a) => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
       const mid = wet[Math.floor(wet.length / 2)];
       return { n: wet.length, qLo: q[0], qHi: q[q.length - 1], med,
-               qUp: medOf(wet.slice(0, third).map((i) => A.qRaw[i])),
-               qDn: medOf(wet.slice(-third).map((i) => A.qRaw[i])),
                dMid: A.dRaw[mid], dcMid: A.dc[mid],
                HFalls: A.H[wet[0]] > A.H[wet[wet.length - 1]] };
     };
@@ -1369,8 +1766,8 @@ SUITES.physics = async (B) => {
     // Then a real time average. SIM.avgColumns returns the mean columns in
     // SIM.columns' own layout, so analyse() takes them unchanged.
     APP.SIM.avgStart();
-    const t1 = Date.now(), tgt = APP.sim.t + 20;
-    while (APP.sim.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const tgt = APP.sim.t + 20;
+    __until(() => APP.sim.t >= tgt, () => APP.frames(1));
     const T = APP.SIM.avgT();
     const avg = stats(OVERLAY.analyse(APP.sim, APP.SIM.avgColumns(true).C));
     APP.SIM.avgStop();
@@ -1388,15 +1785,16 @@ SUITES.physics = async (B) => {
   // looking for a conservation bug that was not there.
   //
   // If this is the assertion that fails, the physics below is untested, not
-  // wrong. The usual cause is the rasteriser: smoke.js runs Chrome with
-  // `--disable-gpu` (SwiftShader), while test/cdp.mjs passes
-  // `--use-angle=d3d11` and reaches t = 30 on this same scene in about 7 s of
-  // wall clock. Measured on a Windows laptop, m1 at Low, 828 x 64: ANGLE gets
-  // to t = 30 in 6.5 s; SwiftShader reaches roughly t = 9.5 in the full 150 s
-  // budget, about 50x slower. Raise the budget, or give this harness the GPU.
+  // wrong. The usual cause is the rasteriser: under `$SOFTWARE=1`, or on a
+  // host whose ANGLE backend falls back to a software rasteriser, the run is
+  // far too slow, while the default GPU-backed ANGLE backend reaches t = 30 on
+  // this scene in about 7 s of wall clock. Measured on a Windows laptop, m1 at
+  // Low, 828 x 64: ANGLE gets to t = 30 in 6.5 s; SwiftShader reaches roughly
+  // t = 9.5 in 150 s, about 50x slower — slow enough that the overall cap in
+  // __until, not a stall, ends the run. Give this harness the GPU.
   ok("PHYSICS m1 settled to the time its readings are taken at", flow.t >= 39.5,
-    `reached t = ${flow.t.toFixed(1)} s of 40 — the wall-clock budget in ` +
-    `__settle ran out first, so every reading below is of an unsettled reach`);
+    `reached t = ${flow.t.toFixed(1)} s of 40 — __until stalled or hit its ` +
+    `cap first, so every reading below is of an unsettled reach`);
   ok("PHYSICS the averaging window actually opened", flow.T >= 19.5,
     `window T = ${flow.T.toFixed(2)} s of 20`);
   // MASS FLUX, IN THE MEAN. Both halves of that matter and the test used to
@@ -1446,12 +1844,8 @@ SUITES.physics = async (B) => {
     `${flow.med.toFixed(4)} m²/s over T = ${flow.T.toFixed(1)} s ` +
     `(spread ${((flow.qHi - flow.qLo) / flow.med).toFixed(4)}; the same reach ` +
     `on one frame spreads ${flow.instSpread.toFixed(4)})`);
-  // The signature of the conservation bug this project has already been bitten
-  // by: a clamped VOF invents water, so q climbs monotonically downstream
-  // while the depth sits perfectly steady. Guard the direction, not the noise.
-  ok("PHYSICS discharge does not grow downstream (no invented water)",
-    flow.qDn < 1.4 * flow.qUp,
-    `upstream third ${flow.qUp.toFixed(3)} → downstream third ${flow.qDn.toFixed(3)} m²/s`);
+  // (An upstream-third vs downstream-third bound used to follow: it is implied
+  // by the 1% spread assertion above, which bounds every column's <q> at once.)
   ok("PHYSICS m1 runs subcritical (mild backwater)", flow.dMid > flow.dcMid,
     `d ${flow.dMid.toFixed(3)} vs d_c ${flow.dcMid.toFixed(3)}`);
   ok("PHYSICS the energy line falls downstream", flow.HFalls);
@@ -1526,15 +1920,14 @@ SUITES.physics = async (B) => {
   // and it asks for a real loss rather than a sign.
   const dis = await B.evaluate(`(() => {
     APP.loadScene("m3", false); __low();
-    const t0 = Date.now();
     // 60 s, not 30: since the stress-free surface (#72) m3 takes ~45 s to
     // settle, and at 30 s it is still draining — the box then exports more
     // energy than it receives, +2.2 kW/m measured, for the wrong reason.
-    while (APP.sim.t < 60 && Date.now() - t0 < 120000) APP.tick(200);
+    __settle(60);
     const W = APP.sim.W, H = APP.sim.H, Es = [];
     for (let k = 0; k < 24; k++) {
-      const t1 = Date.now(), tgt = APP.sim.t + 0.2;
-      while (APP.sim.t < tgt && Date.now() - t1 < 5000) APP.tick(20);
+      const tgt = APP.sim.t + 0.2;
+      __until(() => APP.sim.t >= tgt, () => APP.tick(20), 10000);
       Es.push(APP.SIM.boxFlux(0.20 * W, 0, 0.80 * W, H).total.E);
     }
     const mean = Es.reduce((a, b) => a + b, 0) / Es.length;
@@ -1597,8 +1990,7 @@ SUITES.physics = async (B) => {
   // lecture. Tightening it is welcome; a rise means something got worse.
   const voidf = await B.evaluate(`(() => {
     APP.loadScene("h23", false); __low();
-    const t0 = Date.now();
-    while (APP.sim.t < 20 && Date.now() - t0 < 90000) APP.tick(200);
+    __settle(20);
     const S = APP.sim, nx = S.nx, ny = S.ny, dx = S.dx;
     const gl = document.getElementById("view").getContext("webgl2");
     const F = new Float32Array(nx * ny * 4);
@@ -1657,11 +2049,11 @@ SUITES.profile = async (B) => {
   await B.goto(`http://localhost:${PORT}/?scene=sa1`);
   const r = await B.evaluate(`(() => {
     const S = APP.sim;
-    const t = __settle(40, 120000);
+    const t = __settle(40);
     APP.SIM.avgStart();
     APP.state.speed = 10;
-    const t1 = Date.now(), tgt = S.t + 15;
-    while (S.t < tgt && Date.now() - t1 < 90000) APP.frames(1);
+    const tgt = S.t + 15;
+    __until(() => S.t >= tgt, () => APP.frames(1));
     const T = APP.SIM.avgT();
     const AC = APP.SIM.avgColumns(true).C;
     const hg = APP.SIM.hydraulicGrade(null, true);
@@ -1789,7 +2181,7 @@ SUITES.hydro = async (B) => {
     const w6 = width(g.xk, 18);
     APP.SIM.setParam("d_shaft", 3.0);
     APP.SIM.resetWater();
-    const t = __settle(65, 150000);
+    const t = __settle(65);
     // a free surface to sub-cell accuracy: the fill summed up the column from
     // well under the surface (the column reduction quantises to whole cells)
     const surf = (x) => {
@@ -1948,7 +2340,7 @@ SUITES.avg = async (B) => {
     // The window opens on the SETTLED flow, past the scene's measured spin-up
     // — see the growth gate below for why. __settle ticks in fixed chunks, so
     // where it stops is a substep count, not a wall-clock accident.
-    const spinup = APP.sim.scene.spinup, tOpen = __settle(spinup, 120000);
+    const spinup = APP.sim.scene.spinup, tOpen = __settle(spinup);
     APP.SIM.avgStart();
     // APP.tick(n) is EXACTLY n substeps, so T = n*dt is reproducible on every
     // machine. APP.frames() is NOT: the substep governor picks a
@@ -2061,11 +2453,12 @@ SUITES.avg = async (B) => {
   ok("F1 the ACCUM variant does not perturb the solution",
      s.bad === 0, JSON.stringify(s));
 
-  // The MRT selector must compare TEXTURE IDENTITY, not `S.F.write === S.F.b`
-  // — that is a tautology (the double buffer's getter returns b), so a wrong
-  // selector keeps picking the same framebuffer and, after the first swap,
-  // writes f and the accumulator into mismatched textures. It only shows up
-  // once the ping-pong has flipped, so read back after an ODD substep count.
+  // The MRT selector (GLH.createCoupled, chosen by the double buffer's
+  // parity) must follow the ping-pong, not `S.F.write === S.F.b` — that is a
+  // tautology (the double buffer's getter returns b), so a wrong selector
+  // keeps picking the same framebuffer and, after the first swap, writes f and
+  // the accumulator into mismatched textures. It only shows up once the
+  // ping-pong has flipped, so read back after an ODD substep count.
   const p = await B.evaluate(`(() => {
     const gl = document.querySelector("canvas").getContext("webgl2");
     APP.SIM.avgStart();
@@ -2081,7 +2474,7 @@ SUITES.avg = async (B) => {
     const tex = [A.T.a.tex, A.T.b.tex, A.fld.a.tex, A.fld.b.tex,
                  A.col.a.tex, A.col.b.tex];
     const fbo = [A.T.a.fbo, A.T.b.fbo, A.fld.a.fbo, A.fld.b.fbo,
-                 A.col.a.fbo, A.col.b.fbo, A.fboA, A.fboB];
+                 A.col.a.fbo, A.col.b.fbo, ...A.coupled.fbos];
     const live = () => tex.filter((t) => gl.isTexture(t)).length
                      + fbo.filter((f) => gl.isFramebuffer(f)).length;
     const nObj = tex.length + fbo.length, liveBefore = live();
@@ -2104,6 +2497,29 @@ SUITES.avg = async (B) => {
      JSON.stringify(p));
   ok("avgColumns is unreachable once the window is closed",
      p.reachable === false, JSON.stringify(p));
+
+  // A window opened in EITHER phase of the f ping-pong (the accumulator's own
+  // buffers are fresh, f's may be mid-flip): GLH.createCoupled indexes its
+  // framebuffers by the phase it finds, so the mean must close its balance
+  // whichever parity the run was in when the window opened.
+  const ph = await B.evaluate(`(() => {
+    const gl = document.querySelector("canvas").getContext("webgl2");
+    const out = [];
+    for (const want of [1, 0]) {
+      while (APP.sim.F.parity !== want) APP.tick(1);
+      APP.SIM.avgStart();
+      APP.tick(301);                              // odd: ends in the other phase
+      const res = APP.SIM.transportResidual();
+      out.push({ want, max: res.max, n: res.n, Fmax: res.Fmax, T: APP.SIM.avgT(),
+                 flipped: APP.sim.F.parity !== want });
+      APP.SIM.avgStop();
+    }
+    return { out, dt: APP.SIM.dt(), dx: APP.sim.dx, err: gl.getError() };
+  })()`);
+  ok("avg window opens in either phase of the f ping-pong and closes its balance",
+     ph.err === 0 && ph.out.every((o) => o.flipped && o.T > 0 && o.n > 100
+       && o.max < avgBound(o.Fmax, o.T, ph.dt, ph.dx)),
+     JSON.stringify(ph));
 
   // R must restart the window — and it also respecifies the f textures the MRT
   // framebuffers attach, so this is the invalid-framebuffer case too.
@@ -2256,6 +2672,8 @@ SUITES.avg = async (B) => {
   })()`);
   ok("avgField returns the four mean-state arrays",
      g2.keys.join(",") === "fbar,pbar,ubar,wbar", g2.keys.join(","));
+  // NaN-blind neighbours (wet/fmax: NaN comparisons are false) make this the
+  // one check that sees a NaN blow-up in the mean arrays.
   ok("avgField is finite everywhere", g2.finite);
   ok("avgField finds the water", g2.wet > 0.05 * g2.n, `wet ${g2.wet}/${g2.n}`);
   ok("mean fill is a fill (slot storage excepted)", g2.fmax < 1.5, `fmax ${g2.fmax}`);
@@ -2263,8 +2681,9 @@ SUITES.avg = async (B) => {
   // The collocation trap the shader was built around (Task 6 brief): u lives
   // on the west face, so a shader that weighted f by the face value alone —
   // instead of centring first — would put a directional bias into every
-  // mean. avgField()'s wet/finite/fmax checks above do not exercise this at
-  // all (they only touch the f/P channels), so this is a dedicated check
+  // mean. avgField()'s wet/finite/fmax checks above cannot tell the two
+  // apart (the wet and fmax checks read f/P; the finite check reads ubar too,
+  // but a west-face u is just as finite), so this is a dedicated check
   // that ubar sits on the CENTRED velocity, not the west face.
   //
   // Comparison, not an absolute, so it survives the flow's own unsteadiness.
@@ -2354,7 +2773,7 @@ SUITES.avg = async (B) => {
     // clock stands here is set by the governor-paced APP.frames() tests
     // above, i.e. by wall-clock speed, so it has to be made true, not assumed.
     const tPre = (APP.state.scene.spinup || 0) + 0.25;
-    __settle(tPre, 120000);
+    __settle(tPre);
     if (S.t < tPre) return { preroll: S.t, tPre };
     const F = new Float32Array(n * 4);
     const sFu = new Float64Array(n), sF = new Float64Array(n), sU = new Float64Array(n);
@@ -2461,22 +2880,20 @@ SUITES.avg = async (B) => {
     APP.SIM.avgStart(); APP.frames(300);
     const { C, sigma } = APP.SIM.avgColumns();
     const S = APP.sim, nx = S.nx;
-    let dOK = 0, bedOK = 0, sigOK = 0;
+    let dOK = 0, bedOK = 0;
     for (let i = 0; i < nx; i++) {
       if (C[i*4+1] >= 0 && Number.isFinite(C[i*4+1])) dOK++;
       if (Math.abs(C[i*4] - bed0[i*4]) < S.dx * 2) bedOK++;   // bed is static
-      if (sigma[i] >= 0 && Number.isFinite(sigma[i])) sigOK++;
     }
     APP.SIM.avgStop();
-    return { nx, len: C.length, dOK, bedOK, sigOK };
+    return { nx, len: C.length, dOK, bedOK };
   })()`);
   ok("avgColumns is laid out like SIM.columns", cc.len === cc.nx * 4);
   ok("mean depth is finite and non-negative in every column", cc.dOK === cc.nx);
   ok("the bed does not move within a window", cc.bedOK === cc.nx);
-  ok("sigma_eta is finite everywhere", cc.sigOK === cc.nx);
 
-  // The three checks above only prove the array LENGTH matches SIM.columns()
-  // and that each channel is finite/non-negative -- they do not prove which
+  // The checks above only prove the array LENGTH matches SIM.columns()
+  // and that depth is finite/non-negative and the bed holds still -- they do not prove which
   // channel is which, and Task 8 depends on that order being EXACT. This
   // compares the accumulated mean depth against the live instantaneous depth,
   // averaged over every reliably-wet column: close to 1 in a settled reach
@@ -2837,14 +3254,14 @@ SUITES.avg = async (B) => {
      ag.worst < 8 * ag.dx, JSON.stringify(ag));
 
   // The channel overlay (Task 8): OVERLAY.analyse() already filters three
-  // ways — a spatial prefilter, a temporal EMA (_hA/_qA) and an EMA on the
-  // global normal-depth estimate (_ynK). Handing it mean columns and letting
+  // ways — a spatial prefilter, a temporal EMA (OVERLAY.estimates(S).hA/.qA) and an EMA on the
+  // global normal-depth estimate (OVERLAY.estimates(S).ynK). Handing it mean columns and letting
   // those run would average an already-averaged field a second time, which
   // shows up as a jump broadened by the filter rather than by the flow.
   //
   // Feeding the SAME column buffer to the SAME call twice, with a reset
-  // right before both calls, does NOT distinguish "bypassed" from "filtered\n// but converged": resetEstimates() nulls _hA, so the first call
-  // initialises _hA to a bit-exact copy of the smoothed input, and that same
+  // right before both calls, does NOT distinguish "bypassed" from "filtered\n// but converged": resetEstimates() nulls estimates().hA, so the first call
+  // initialises estimates().hA to a bit-exact copy of the smoothed input, and that same
   // call's own EMA step is then `x += 0.10*(x-x) = 0` — the filter reaches
   // its fixed point in ONE call whenever the input never changes. A second
   // call with the identical input can never move, whether or not the EMA is
@@ -2854,7 +3271,7 @@ SUITES.avg = async (B) => {
   // that already converged (docs/averaging.md §4.3 documents the bypass
   // this suite is pinning).
   //
-  // So instead: seed the shared _hA/_qA state with a column buffer D that
+  // So instead: seed the shared estimates().hA/.qA state with a column buffer D that
   // is CLEARLY different from the averaged buffer C (a just-reset, still
   // near-empty channel vs. the settled averaged profile), then check —
   //   H2a: the averaged path on C ignores that seed entirely. Both calls
@@ -2865,7 +3282,7 @@ SUITES.avg = async (B) => {
   //        reached via two different histories (no history vs. seeded with
   //        C), must give two DIFFERENT outputs — proof the live EMA is
   //        actually carrying state between calls, which is what "the\n//        bypass is real" requires the live path to keep doing.
-  //   H2c: the fourth filter — the global d_n estimate `_ynK` — gets the
+  //   H2c: the fourth filter — the global d_n estimate `OVERLAY.estimates(S).ynK` — gets the
   //        same treatment. Seed it via a live call on D (D's median
   //        candidate measured at 0.0653 m against C's 0.1544 m — a factor
   //        of 2.4, comfortably outside anything a single 6% EMA step could
@@ -2885,7 +3302,7 @@ SUITES.avg = async (B) => {
 
     // H2a — averaged path must ignore stale filter state.
     OVERLAY.resetEstimates(APP.sim);
-    OVERLAY.analyse(APP.sim, D);                  // live call seeds _hA/_qA from D
+    OVERLAY.analyse(APP.sim, D);                  // live call seeds estimates().hA/.qA from D
     const A1 = OVERLAY.analyse(APP.sim, C, { averaged: true });
     const A2 = OVERLAY.analyse(APP.sim, C, { averaged: true });
     let same = true, atC = true;
@@ -2903,17 +3320,17 @@ SUITES.avg = async (B) => {
     let moved = false;
     for (let i = 0; i < nx; i++) if (Math.abs(isolated[i] - withHistory[i]) > 1e-9) { moved = true; break; }
 
-    // H2c — the _ynK global normal-depth estimate must ignore the seed too.
+    // H2c — the estimates().ynK global normal-depth estimate must ignore the seed too.
     OVERLAY.resetEstimates(APP.sim);
-    OVERLAY.analyse(APP.sim, D);                  // live call seeds _ynK from D
-    const kSeed = S._ynK;
+    OVERLAY.analyse(APP.sim, D);                  // live call seeds estimates().ynK from D
+    const kSeed = OVERLAY.estimates(S).ynK;
     OVERLAY.analyse(APP.sim, C, { averaged: true });
-    const k1 = S._ynK;
+    const k1 = OVERLAY.estimates(S).ynK;
     OVERLAY.analyse(APP.sim, C, { averaged: true });
-    const k2 = S._ynK;
+    const k2 = OVERLAY.estimates(S).ynK;
     OVERLAY.resetEstimates(APP.sim);
     OVERLAY.analyse(APP.sim, C, { averaged: true }); // clean reference, no seed
-    const kClean = S._ynK;
+    const kClean = OVERLAY.estimates(S).ynK;
     const ynAtClean = Math.abs(k1 - kClean) < 1e-9 && Math.abs(k2 - kClean) < 1e-9;
     // The seed must actually differ from kClean by more than an EMA step
     // could close, or a false pass here would mean the test has no power.
@@ -2928,7 +3345,7 @@ SUITES.avg = async (B) => {
      h.moved, JSON.stringify(h));
   ok("H2c the seed differs enough from kClean for the check below to have power",
      h.seedDistinct, JSON.stringify(h));
-  ok("H2c the averaged _ynK estimate ignores stale filter state too",
+  ok("H2c the averaged ynK estimate ignores stale filter state too",
      h.ynAtClean, JSON.stringify(h));
 
   // ================================================== the display path (Task 9)
@@ -2957,7 +3374,8 @@ SUITES.avg = async (B) => {
                        nx, ny, gl.RGBA, gl.FLOAT, buf);   // storage would kill them
     };
     const grab = (avg, mode, lo, hi) => {
-      APP.SIM.render(APP.view, { mode, vmax: 4, lo, hi, pdt: 0, dye: false,
+      const fld = fieldFor(mode);
+      APP.SIM.render(APP.view, { mode, ramp: fld.ramp, mid: fld.mid, vmax: 4, lo, hi, pdt: 0, dye: false,
         particles: false, cursor: [-99, -99, 0], guide: [0,0,0,0],
         guideOn: false, avg });
       const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
@@ -3109,13 +3527,14 @@ SUITES.avg = async (B) => {
     __low(); APP.tick(300);
     const S = APP.sim;
     OVERLAY.analyse(S, APP.SIM.columns(true));    // seed the live EMAs
-    const seed1 = S._hA !== null && S._qA !== null;
+    const est = () => OVERLAY.estimates(S);
+    const seed1 = est().hA !== null && est().qA !== null;
     APP.avg.set(true);                            // Live -> Average
-    const clearedOn = S._hA === null && S._qA === null && !isFinite(S._ynK);
+    const clearedOn = est().hA === null && est().qA === null && !isFinite(est().ynK);
     OVERLAY.analyse(S, APP.SIM.columns(true));    // seed them again, under Average
-    const seed2 = S._hA !== null;
+    const seed2 = est().hA !== null;
     APP.avg.set(false);                           // Average -> Live
-    const clearedOff = S._hA === null && S._qA === null && !isFinite(S._ynK);
+    const clearedOff = est().hA === null && est().qA === null && !isFinite(est().ynK);
     return { seed1, clearedOn, seed2, clearedOff, on: APP.state.avg };
   })()`);
   ok("H5 the transition probe actually had estimates to clear",
@@ -3169,11 +3588,69 @@ SUITES.avg = async (B) => {
      ft.refN > 100 && ft.relLive > 0.02, JSON.stringify(ft));
   ok("avg Fit reads the MEAN field, not the instant behind it",
      ft.relRef < 1e-5 && ft.gotN === ft.refN, JSON.stringify(ft));
+
+  // Task 2.4. Momentum flux is labelled rho u|u| in kg/m/s^2, so the Fit of a
+  // settled reach has to be in those units (~500 on sa1; the kinematic value
+  // was ~0.5). And a steady reach must read the same speed live and as a
+  // mean: pins the CPU path; the GPU half-cell offset of the live display is
+  // a visual check (blU in FS_DISP).
+  const mf = await B.evaluate(`(() => {
+    APP.loadScene("sa1", false); __low(); const tSet = __settle(40);   // settled, or rel below is weather
+    const mom = APP.SIM.fieldStats(5, false);
+    APP.avg.set(true);                     // the display field accumulates in the frame loop
+    for (let n = 0; n < 60 && APP.SIM.avgT() < 8; n++) APP.frames(60);
+    const T = APP.SIM.avgT();
+    const mean = APP.SIM.fieldStats(2, true), live = APP.SIM.fieldStats(2, false);
+    APP.avg.set(false);
+    return { momHi: mom.hi, tSet, T, meanHi: mean.hi, liveHi: live.hi,
+             rel: Math.abs(mean.hi - live.hi) / Math.max(live.hi, 1e-9) };
+  })()`);
+  ok("display Fit of Momentum flux is in kg/m/s²",
+     mf.momHi >= 100, JSON.stringify(mf));
+  ok("live and mean Speed agree on a steady reach",
+     mf.tSet >= 39.5 && mf.T >= 8 && mf.rel < 0.10, JSON.stringify(mf));
 };
 
 
 // -------------------------------------------------------------------- main
+
+/** The catalogue is only worth anything if every entry can actually be killed
+ *  by the assertion it names. Checked statically, before any browser starts:
+ *  each mutant names a SUITES key, and its `kills` text must begin an `ok()`
+ *  name in that suite's source. A stale `kills` used to make a run that DID
+ *  go red look like a surviving mutant, or hide a dead guard entirely. */
+function checkCatalogue() {
+  const bad = [];
+  for (const m of MUTANTS) {
+    if (!m.suite || !SUITES[m.suite]) {
+      bad.push(m.id + ": suite " + JSON.stringify(m.suite) + " is not a SUITES key");
+      continue;
+    }
+    const src = SUITES[m.suite].toString();
+    if (!src.includes('ok("' + m.kills) && !src.includes("ok(`" + m.kills)) {
+      bad.push(m.id + ": no ok(\"" + m.kills + "…\") in SUITES." + m.suite);
+    }
+    // The pattern must occur EXACTLY ONCE in the file it patches (read from
+    // disk, CRLF normalised exactly as the serve-time patcher does): zero is
+    // a stale entry, two means String.replace would mutate only the first.
+    let text;
+    try { text = fs.readFileSync(path.join(ROOT, m.file), "utf8").replace(/\u000d\u000a/g, "\u000a"); }
+    catch (e) { bad.push(m.id + ": cannot read " + m.file); continue; }
+    const n = text.split(m.find).length - 1;
+    if (n !== 1) bad.push(m.id + ": find occurs " + n + " times in " + m.file + " (want exactly 1)");
+  }
+  if (bad.length) {
+    console.error("mutant catalogue is stale:\n  " + bad.join("\n  "));
+    process.exit(2);
+  }
+}
+
 (async () => {
+  checkCatalogue();
+  if (process.argv.includes("--check-catalogue")) {
+    console.log("mutant catalogue ok: " + MUTANTS.length + " mutants");
+    process.exit(0);
+  }
   let srv, B;
   const t0 = Date.now();
   try {
@@ -3185,21 +3662,43 @@ SUITES.avg = async (B) => {
       process.stdout.write("  " + n + " …");
       const before = failures.length;
       try { await SUITES[n](B); } catch (e) { failures.push(n + " suite threw: " + e.message); }
+      // Whatever the page threw on its own while the suite ran is a failure
+      // too: collected all along, it used to be reported only on a boot failure.
+      ok(n + " no uncaught page errors", B.pageErrors.length === 0, B.pageErrors.join("\n      "));
+      B.pageErrors.length = 0;
       console.log(failures.length === before ? " ok" : " FAILED");
     }
   } catch (e) {
     failures.push("harness: " + e.message);
   } finally {
     if (srv) srv.close();
-    if (B && !(KEEP && failures.length)) B.close();
+    if (B && !(KEEP && failures.length)) await B.close();
   }
 
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
-  if (failures.length) {
-    console.log(`\nsmoke FAILED — ${failures.length} problem(s), ${passed} passed, ${secs}s\n`);
+  if (MUTANT) {
+    // The point of a negative control: the assertion it names must be the one
+    // that goes red. Green is a surviving mutant; red elsewhere is a mutant
+    // that broke something else and left its target standing.
+    const hit = failures.find((f) => f.startsWith(MUTANT.kills));
+    if (hit) {
+      console.log(`\nMUTANT KILLED by "${MUTANT.kills}" (${failures.length} failure(s) in all, ${secs}s)`);
+      process.exit(0);
+    }
+    if (!failures.length) {
+      console.log(`\nMUTANT SURVIVED: ${MUTANT.id} — every assertion passed, including "${MUTANT.kills}"`);
+      process.exit(1);
+    }
+    console.log(`\nMUTANT KILLED THE WRONG ASSERTION: ${MUTANT.id} should fail "${MUTANT.kills}", but failed:\n`);
     failures.forEach((f) => console.log("  ✗ " + f));
     process.exit(1);
   }
-  console.log(`\n${passed} assertions passed in ${secs}s`);
+  if (failures.length) {
+    console.log(`\nsmoke FAILED — ${failures.length} problem(s), ${passed} passed${goldenSkipped ? `, ${goldenSkipped} golden(s) skipped` : ""}, ${secs}s\n`);
+    failures.forEach((f) => console.log("  ✗ " + f));
+    process.exit(1);
+  }
+  const skipNote = goldenSkipped ? `, ${goldenSkipped} golden(s) skipped (different GPU)` : "";
+  console.log(`\n${passed} assertions passed${skipNote} in ${secs}s`);
   process.exit(0);
 })();

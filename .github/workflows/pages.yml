@@ -1,14 +1,15 @@
 name: Deploy to GitHub Pages
 
 # The app is static (no build step, no dependencies) and is copied through
-# verbatim — but the deploy runs Jekyll (_config.yml) so the markdown briefs
-# in exercises/ render as web pages rather than as raw text. Runs on pushes
-# to main, which includes every merged PR — a pull_request:closed trigger was
-# tried and removed: it runs in the PR branch's context, which the
-# github-pages environment's main-only rule refuses (a failed run with zero
-# steps on every merge).
+# verbatim, but the deploy runs Jekyll (_config.yml) so the markdown briefs
+# render as web pages. It runs only after the "Checks" workflow has succeeded
+# on main, for exactly the commit Checks ran on. (A pull_request:closed trigger
+# was tried and removed: the github-pages environment's main-only rule refuses
+# it.) workflow_dispatch stays for a manual deploy.
 on:
-  push:
+  workflow_run:
+    workflows: [Checks]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -24,12 +25,22 @@ concurrency:
 
 jobs:
   deploy:
+    # Only a push to this repo's own main: a fork PR from the fork's "main" also matches branches: [main].
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Empty on workflow_dispatch, which then checks out the triggering ref.
+          ref: ${{ github.event.workflow_run.head_sha }}
       - uses: actions/configure-pages@v5
         # Turns Pages on itself the first time this runs against a repo where
         # it is available, so going public is the only manual step.

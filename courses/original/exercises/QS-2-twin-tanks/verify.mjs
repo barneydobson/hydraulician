@@ -1,10 +1,10 @@
 // Run from any directory with Node 22+ and a GPU-backed Chrome.
-import { launch } from '../../test/cdp.mjs';
+import { launch } from '../../../../test/cdp.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 const browser = await launch();
 try {
-  const page = await browser.open(new URL('../../index.html?scene=two-tank', import.meta.url).href);
+  const page = await browser.open(new URL('../../../../index.html?scene=two-tank', import.meta.url).href);
   await page.evaluate(readFileSync(new URL('rig.js', import.meta.url), 'utf8'));
   await page.evaluate('return QS2.setup();');
   const geometry = await page.evaluate(`return (() => {
@@ -55,7 +55,7 @@ try {
   const clip = await page.evaluate(`const r=document.getElementById('view').getBoundingClientRect();
     const h=r.width*289/480; return {x:r.x,y:r.y+(r.height-h)/2,width:r.width,height:h,scale:480/r.width};`);
   const thumb = await page.send('Page.captureScreenshot', {format:'jpeg',quality:85,clip});
-  writeFileSync(new URL('../../docs/thumbs/QS-2.jpg', import.meta.url), Buffer.from(thumb.data,'base64'));
+  writeFileSync(new URL('../../thumbs/QS-2.jpg', import.meta.url), Buffer.from(thumb.data,'base64'));
   console.log('Maximum whole-domain mass drift:', Math.max(...rows.map(r=>Math.abs(r.massArea/rows[0].massArea-1))));
   if (page.errors.length) throw new Error(page.errors.join('\n'));
   console.log('PASS: calibration, held-out prediction, branch balance, conservation, exercise boot and rig reload.');

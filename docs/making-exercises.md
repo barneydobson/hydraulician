@@ -7,7 +7,8 @@ model behind what the demo shows is in [numerics.md](numerics.md).
 
 **Two audiences, two documents.** The in-app card is the complete student
 exercise. The folder's README is for the lecturer: derivation, worked
-answers, teaching notes and verification. A student must be able to perform
+answers, teaching notes and verification (the one definition of that, and of
+the card schema, is the header of `js/exercises.js`). A student must be able to perform
 the task from the card alone, without opening the README or being referred
 to it. HS-1's on-screen description is the model: state the starting setup,
 where to measure, the action to take and the readings to compare afterwards.
@@ -37,6 +38,30 @@ course `original` (`courses/original/`), CIVE40008's Year 1 is
 register (empty) they are all appended to, and its header is the card schema;
 `exercises/` keeps only the shared tooling (`_runner/`) and an index of the
 courses.
+
+**Four descriptions, four jobs.** An exercise is described in four places that
+do not collapse into one register: the course's `exercises.js` is the
+machine-readable source, each folder's `README.md` is the human brief, the
+course's `INDEX.md` is abbreviated navigation, and for the original pack
+`courses/original/demo-programme.html` is the dated rev-1 document it was built
+from (history). Briefs carry the minimum needed to run the demo; statistics and
+methodology live in each folder's uncommitted `_archive/`. Coordinates in a
+recipe are exact (rounding them makes a new geometry; re-measure before
+shipping), and `spinup` values are measured settle times, not guesses.
+
+A course owns its exercises (`courses/<id>/exercises.js`,
+`courses/<id>/exercises/<ID>-<slug>/`, `courses/<id>/INDEX.md`, the menu in
+`course.js`), but they are still the one register: `?ex=` reaches every card
+wherever it lives and ids are unique across all of them. Nothing in the app may
+assume a brief is under `exercises/`: use the card's `home` (`pickers.js`
+`briefDir`). A course is upstream-shaped by construction: another lecturer's
+course is another folder beside it.
+
+**Hidden tools keep their digit.** A card whose task tells a student to draw
+something must say `ui: { build: true }` or name a build tool in `instruments`
+(`check_pack.py` fails the pack otherwise, because the alternative is a tool
+that is silently not there). Worksheets say "press 5", so a hidden tool's key
+explains itself rather than arming something else.
 
 Worked example throughout: **HS-1**, the dyke with a piezometer
 (`courses/cive40008/exercises/HS-1-dyke-piezometer/`), a lecturer demo on a
@@ -138,7 +163,7 @@ An entry in a course's `exercises.js`, appended to `EXERCISES` (declared in
 | field | applied? | holds |
 |---|---|---|
 | `rigParams` | yes | the plumbing without which the rig is not a rig: `budget` (Resolution) first, then the edges (`openL..openT`), then supplies and levels — *edges before level controls*, because ticking a level opens its own edge |
-| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `gaugeSpan` (`"window"`, the default, or `"all"`: the corner charts span the whole run from t = 0 — VC-2), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' number boxes, default on) and `hoverCard` (the hover card that follows a mouse, default on — FF-1 opens with it off; it does not govern the tap-to-read card, see *Reading the water by touch*), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
+| `viewParams` | yes | how it is looked at: `mode` (a `FIELDS` mode as a string), `particles`, `gaugeField` (what every gauge starts on — see *Gauges* below), `gaugeSpan` (`"window"`, the default, or `"all"`: the corner charts span the whole run from t = 0 — VC-2), `speed`, `channel`, `labels`, `jumps`, `grade`, `sline` (streamlines) and `slineN` (their density, ≈ tubes across the flow), `forceSize` (the Pressure force diagram's length multiplier, for a submerged face whose arrows would run into the opposite wall), `instReadouts` (the instruments' readout boxes, default on) and `hoverCard` (the hover card that follows a mouse, default on — FF-1 opens with it off; it does not govern the tap-to-read card, see *Reading the water by touch*), `avg` (every scene switch lands on Live; none of the pack asks for Average) |
 | `gauges` | yes | `[{x, z, field}]`, at most four: gauges the card arrives with ALREADY PLACED, each on its own quantity. The exception to "the picker places no instruments", for a card whose subject is a time series from t = 0 (VC-2's level curve). The card lists them under *Already set* |
 | `digit`, `digitNote` | **no** | the personalised rule the card prints; `base`+`step`·d, a `table`, `mod`, `also` |
 | `studentParams` | **no** | values the worksheet asks the student to set — and the way a scene's own slider (a Geometry row `geomN`) gets onto the card: listed here, it is drawn on the card as a slider beside its `rule`. For a slider give a short `label` ("Speed of sound in water, c", "Wall shape", "Inflow Q") and **no** `rule`: a sentence under every slider made the Year 1 cards mostly slider, so what it does and its starting value go in `setup` |
@@ -163,7 +188,7 @@ parameter, and the line is simply left out.
 
 ### The `ui` profile
 
-`UIMODE` (`js/main.js`) derives a profile from the card and merges `ui` on
+`UIMODE` (`js/legend.js`) derives a profile from the card and merges `ui` on
 top:
 
 - `instruments` narrows MEASURE to the tools it names; a card naming no
@@ -179,7 +204,7 @@ top:
   `dye.seeds` run only if the scene says `dye: { on: true }` or the card sets
   viewParams `dyeSeeds: true` (Controls → Dye sources). The `V` valve button lives
   in RUN and is never hidden. `readBtn` (**Readouts**, key **I**) folds away
-  every instrument's number boxes — the gauges' corner cards, the Control
+  every instrument's readout boxes — the gauges' corner cards, the Control
   volume's budget and face numbers, the flux sections' readings and their
   balance, the rakes' q / u_max chips and the Pressure force values — while
   the instruments stay placed and keep recording; `hoverBtn` (**Hover
@@ -233,7 +258,7 @@ and the 5 key never clears). Every sample records every quantity — `p` (pressu
 Pa, shown in kPa), `phead` (p/ρg), `u`, `w`, `speed` (|u|), `eta` (η),
 `d`, `h` (piezometric head) and `H` (total head) — from the one batched
 probe, so switching shows the whole history and the CSV (`⤓ CSV`) always has
-every column at full precision. The register is `GAUGE_QTY` in `js/main.js`.
+every column at full precision. The register is `GAUGE_QTY` in `js/fields.js`.
 Controls → **Gauges plot** (`viewParams.gaugeField`) sets every gauge at
 once and the quantity new gauges start on, which is what old worksheets
 ("set Gauges plot to Depth") and rigs mean by it. A gauge's own choice is
@@ -265,6 +290,13 @@ Hover readout switch (`hoverCard`): that switch governs the card that
 FOLLOWS a mouse on a desktop, and a tablet has no other way to read the
 flow. So FF-1's "turn on Hover readout" is a desktop instruction; on an iPad
 a tap reads the same rows with the switch off.
+
+**Tablet layout.** On a coarse pointer the strip wraps onto a second row
+rather than shrink its buttons below 40 px or scroll (`fitBar` in
+`js/strip.js`, which also publishes the strip's height as `--bar-h` for the
+panel, toast and legend to hang from), and an upright tablet under 900 px
+wide (`MINW` in `js/dock.js`) gets the bottom sheet as a phone does instead
+of an overlaid side panel.
 
 **Rakes.** A rake reads the water around the point CLICKED: down to the
 first solid, up to the first solid or the end of the water. In open water
@@ -373,10 +405,10 @@ in L5, forces in L6 and energy in L7, so it is ONE entry, CR-1, with four tabs:
   rigParams: { budget: "Medium" }, settle: 25, studentParams: [...],
   ui: { panel: "focused", hide: ["energy", "critical"] },
   tabs: [
-    { key: "streamlines", label: "Streamlines", alias: "FF-5", topic: "…",
+    { key: "streamlines", label: "Streamlines", topic: "…",
       title: "…", aim: "…", viewParams: {...}, ui: {...}, steps: [...], background: [...] },
-    { key: "continuity", label: "Continuity", alias: "VC-1", instruments: [...], … },
-    { key: "forces", label: "Forces", alias: "MM-2", … },
+    { key: "continuity", label: "Continuity", instruments: [...], … },
+    { key: "forces", label: "Forces", … },
     { key: "energy", label: "Energy", ui: { hide: ["critical"], … }, tips: [...], … } ] }
 ```
 
@@ -391,11 +423,10 @@ carry on. The card shows a tab bar under its title.
 
 Addressing: `?ex=CR-1&tab=forces` opens a tab directly (the address bar
 follows the tab), `"CR-1#forces"` is the same in a course menu or
-`APP.pickExercise`, and a tab's `alias` — the id the question had before it
-became a tab — still works as `?ex=MM-2`. A tab without `title` is called
+`APP.pickExercise`. A tab without `title` is called
 "<entry title> · <label>" in menus; one with `topic` is listed under that
-topic in the register view. `check_pack.py` checks the tab keys and labels,
-that an alias collides with no id, and runs every per-card check on each
+topic in the register view. `check_pack.py` checks the tab keys and labels
+and runs every per-card check on each
 tab's merged view (reported as `CR-1#forces`).
 
 ### The Pressure field
@@ -484,8 +515,8 @@ except `course.js`:
 The original teaching pack (`courses/original/`) is a course like any other: its menu is the cards grouped by `topic`
 — the sections the whole-register menu draws — and `hosts:
 ["barneydobson.github.io"]` makes it the main site's default, so that site
-opens as it did before the pack moved. It is due to be retired; deleting the
-folder and its two script tags is the whole job (HS-1, which its menu still
+opens as it did before the pack moved. It is due to be retired, and that is
+more than deleting a folder: see "Retiring the original pack" below (HS-1, which its menu still
 lists, is CIVE40008's and stays). Its history documents
 (`demo-programme.html`, `feasibility-sheet.html`, `CHANGES-NEEDED.md`,
 `_director-status.md`, `_worker-recipe.md`) moved with it; the drawn-rig
@@ -499,7 +530,7 @@ reach it wherever it is registered — the brief link is
 `<home>/<folder>/README.md`, or `<home>/<folder>/` on the Pages build, where
 Jekyll renders the README as the folder's page (`courses/` is not
 underscore-prefixed, so it is published). **Ids are
-global**: a card whose id or tab alias is already in the register is refused
+global**: a card whose id is already in the register is refused
 with a console warning and `check_pack.py` fails the pack. A course's menu may
 list another course's cards beside its own (the original pack's menu still
 lists HS-1, which moved to CIVE40008). Scenes stay in `js/scenes.js`, shared. Moving a card
@@ -525,8 +556,8 @@ and README under `home`, an H1 that matches, a row in the course's
 `INDEX.md`, no orphan rows or folders — and adds the course ones: every
 `course.js` and `exercises.js` is loaded by `index.html`, ids are unique
 across the register and every course, a course's `exercises.js` registers
-only under its own id, `hosts` is well-formed, and every id a menu lists
-exists.
+only under its own id, `hosts` is well-formed, every id a menu lists
+exists, and every card a course owns is listed in one of its sections.
 
 ## 4. The rig payload, when there is one
 
@@ -586,7 +617,7 @@ menu files it.
 
 ## 6. What the gates check
 
-`python exercises/_runner/check_pack.py` fails the pack when: a folder or
+`py -3 exercises/_runner/check_pack.py` fails the pack when: a folder or
 README is missing; the H1 id or title differs from the card; the INDEX row
 is missing; a bold "about **N s**" disagrees with `settle`; a base/step
 ladder disagrees with the rule; the `ui` profile names a tool, button, field,
@@ -595,20 +626,26 @@ panel or readout row that does not exist, a gauge quantity outside
 concept other than `energy` / `critical`, or a `fieldText` key that is not a
 field; a card's `gauges` entry is malformed; a drawing task hides BUILD; a
 card has more than five `steps`, or its inline markup names a tool or button
-that does not exist; a tab has no key or label, repeats a key, or its alias
-collides with an id (every check above runs on each tab's merged view); or a
+that does not exist; a tab has no key or label, or repeats a key
+(every check above runs on each tab's merged view); or a
 folder or INDEX row has no card. `check_notation.py` then greps the brief for
 retired names (the y-family, old gauge keys). Both are instant and run in CI.
 
-Then, locally with a GPU: `node exercises/_runner/smoke.js --only=api,rig`
-boots every card and every scene (the PACK section), and `node
+Then, locally with a GPU: `node test/smoke.mjs --only=pack,scenes`
+boots every card (applying its rig) and every scene (the PACK and SCENES sections), and `node
 test/ui-smoke.mjs` proves the profile leaves the strip and legend as agreed.
 
 ## 7. Measuring before shipping
 
 The render loop stops on a hidden tab, so headless work drives the solver
 directly: `APP.tick(n)` steps, `APP.frames(n)` also fills gauge history,
-`APP.probe(x, z)` returns `u, w, p, phead, f, speed` (so `h = phead + z`),
+`APP.probe(x, z)` returns `i, j, f, u, w, p, phead, zp, speed, dye, solid`
+(the live cell; `APP.avg.probe` returns the same set from the averaging
+window, without `dye`), where `zp = j·Δx` is the pressure's reference
+elevation. A gauge's head is `h = zp + phead − tiltS0·x`, the last term
+nonzero only in the tilted-gravity scenes that set `tiltS0` (see
+`js/instruments.js` and `js/overlay.js`), so on an untilted scene
+`h = zp + phead`,
 `APP.faceForce(solidId, faceId)` returns `{F, Fx, Fz, cop, wetLen}` in N per
 metre, `APP.volume()` the water area the column reduction can see, and
 `toggleValve()` the V key.
@@ -646,6 +683,24 @@ candidate viscosity — the table in its README is that run.
    restores anything the derived profile would otherwise hide.
 3. Folder: lecturer README with the exact H1 and measured numbers, `rig.js` that
    reproduces them, `collect_plot.py` if the class submits.
-4. INDEX row; thumbnail in `docs/thumbs/` and the README gallery cell.
-5. `check_pack.py`, `check_notation.py` clean; `smoke.js --only=api,rig`
+4. INDEX row; thumbnail in the card's own folder (`thumb.jpg`) and the README gallery cell.
+5. `check_pack.py`, `check_notation.py` clean; `smoke.mjs --only=api,rig`
    and `ui-smoke.mjs` run locally when `js/` changed.
+
+## Retiring the original pack
+
+Deleting `courses/original/` and its two script tags is the last step, not the
+whole job. In order:
+
+1. HS-1 already lives in `courses/cive40008/` (the original menu merely lists it); drop that menu entry from `courses/original/course.js` with the folder.
+2. Repoint the gates' original-pack ids to CIVE40008 cards. Today that is
+   `test/ui-smoke.mjs` (`?ex=HJ-1`, `QS-2`, `UF-1`, and the HP-3, UN-1, UN-2
+   cases) and `test/smoke.mjs` (HP-3); the `check_pack.py` output below is the
+   authoritative list — those are the examples, not the whole of it.
+3. Remove `js/exercises-rigs.js` payloads (every payload is original-pack).
+4. Remove `docs/syllabus.md`, the README links, `check_notation.py`'s `HISTORICAL` entries and the `_config.yml` comments that name the pack.
+5. Delete the folder and its two script tags in `index.html`.
+
+The list of references is generated, not remembered: `py -3 exercises/_runner/check_pack.py`
+prints every file outside `courses/original/` that mentions an original-pack id
+(it never fails). Work it down to the files that are history only.

@@ -1582,9 +1582,9 @@ const SCENES = (() => {
       amp: 0.20, period: 0.9, particles: 1, plife: 9,
       blurb: "A short, fast wave in water deeper than half its length. The orbits are circles at the surface that shrink to nothing well above the bed — the classic deep-water picture.",
       tips: ["The bright trails ARE the orbits — a bare dot moving 30 mm is invisible, the path is the whole point. The red dot is where each tracer is right now.",
-             "Measured trail extents at this station: 58 × 1 mm at the bed against 58 × 67 mm at the surface — the VERTICAL motion dies out 67×.",
+             "Measured trail extents at this station: about 60 × 1 mm at the bed against 62 × 30 mm at the surface — the VERTICAL motion dies out some 40×.",
              "So the near-bed trail is a flat horizontal line: water there slides back and forth and never rises.",
-             "The horizontal length stays ~58 mm all the way down because most of it is the return current, not orbit — a closed flume must send the water back somehow.",
+             "The horizontal length stays ~60 mm all the way down because most of it is the return current, not orbit — a closed flume must send the water back somehow.",
              "h/L = 0.59. Deep water is h/L > 0.5, where the bed stops being felt at all. Press <b>0</b> to zoom out."] }),
 
     flume({

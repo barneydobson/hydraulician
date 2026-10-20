@@ -86,8 +86,22 @@ export const EVALUATE_TIMEOUT = 150000;
  *  Options: `chrome` (binary; else `findChrome()`), `angle` (backend),
  *  `headless` (default true), `args` (extra command-line flags), `port`
  *  (default 0, learned from stderr), `width`, `height`. */
-export async function launch({ port = 0, width = 1440, height = 900,
-                               chrome, angle, headless = true, args: extra = [] } = {}) {
+export async function launch(opts = {}) {
+  // A cold Chrome on a CI runner occasionally never prints its endpoint (a
+  // no-gpu run on main failed that way in 30 s, while the same commit passed
+  // on its PR). A launch that fails before the endpoint has cost nothing yet,
+  // so try again, twice, before calling the harness broken.
+  for (let attempt = 1; ; attempt++) {
+    try { return await launchOnce(opts); }
+    catch (e) {
+      if (attempt >= 3 || !/DevTools endpoint|Chrome exited/.test(e.message)) throw e;
+      console.error("cdp: " + e.message + " — retrying the launch (" + (attempt + 1) + "/3)");
+    }
+  }
+}
+
+async function launchOnce({ port = 0, width = 1440, height = 900,
+                            chrome, angle, headless = true, args: extra = [] } = {}) {
   const bin = chrome || findChrome();
   if (!bin) throw new Error("no Chrome found — set $CHROME to a Chrome or Edge binary");
   const profile = mkdtempSync(join(tmpdir(), "hydra-ui-"));
@@ -108,7 +122,7 @@ export async function launch({ port = 0, width = 1440, height = 900,
   // learn which port it actually took.
   const url = await new Promise((resolve, reject) => {
     let buf = "";
-    const t = setTimeout(() => reject(new Error("Chrome did not report a DevTools endpoint")), 30000);
+    const t = setTimeout(() => reject(new Error("Chrome did not report a DevTools endpoint")), 60000);
     const onData = (d) => {
       buf += d.toString();
       const m = buf.match(/ws:\/\/[^\s]+/);

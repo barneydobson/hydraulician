@@ -585,8 +585,23 @@ stable and better at 0.44 m.
 
 Settle times fell with it — m2 from 85 s to 30 s, c13 from 95 s to 30 s — and
 the steep chutes run shallower against the same d_c (s1/s2 d_n 0.32 → ~0.20).
-`p.kappa` (headless only, not a panel control) sets κ; 0 turns the closure
-off.
+The closure is a per-scene declaration, `mixingLength: true | false`
+(required: `js/scenes.js` throws on a scene without it); at run time it is
+`p.mixingLength`, in Controls the *Channel mixing length* switch, and in a rig
+`hyd.ml`. It is meant for channel flow, and it is off in the wave flumes
+(`wave`, `wavesurge`, `waveshallow`, WV-4's `beach`, WV-5's `wavetrain`, all
+at ν = 1e-4). Three groups keep it for now, because their cards' numbers were
+measured with it and do not survive it unchanged (mvreeuwijk#2):
+- the deep flume `wavedeep`: off, it builds an unsteady mean current at B4's
+  orbit station and its short periods die before the station;
+- the sloshing tank: DA-3's model E moves from 7.23 to 6.84 s, below theory,
+  and the tutorial sheet quotes it;
+- the tanks, jets and pipes: off moved QS-1/B8's jet by 0.42 m in η and 45% in
+  q, CR-1 0.24 m, VC-2 0.15 m and the hammer reservoirs 6–70 mm, against 0.0 on
+  every channel card.
+
+It used to be on by default with a numeric `kappa` to opt out, and that is
+how the wave flumes came to be damped by a channel closure (issue #77).
 
 ## Verified numbers
 
@@ -709,13 +724,30 @@ itself ~2 cells thick. Consequences:
   deep-water flume (L = 1.26 m) loses H = 0.36 → 0.07 m over 3 m, so its
   orbits must be read near the paddle. Long waves are nearly free: the
   shallow-water flume holds 0.123 → 0.121 m over 5 m and then *shoals* to
-  0.152 m on the beach.
+  0.152 m on the beach. (Closure on. Re-measured Oct 2026 with it off and the
+  flumes' ν = 1e-4, at each scene's default stroke, H crest to trough over 4
+  periods after 20 s: the deep flume 0.30 / 0.16 / 0.11 m at x = 1 / 2 / 4 m
+  against 0.20 / 0.06 / 0.04 with it on — the closure was most of that loss;
+  the shallow flume 0.059 / 0.057 m at 2 / 3 m against 0.072 / 0.068. At
+  ν = 1e-5 with the closure off the deep flume filled with grid noise, so
+  ν 1e-4 is part of switching the closure off. But the DEEP flume keeps the
+  closure (and ν 1e-5) for now: off, this closed tank builds an unsteady mean
+  current of 0.1–0.5 m/s at the B4 orbit station — the tracer trails become
+  streaks, the surface/bed ratio scatters 15–150× between 10 s windows — and
+  at T ≤ 1.05 s the wave dies before x = 5.84 m, which breaks B4 and WV-1's
+  short rows. It needs an absorbing far end (as WV-5) and a nearer station;
+  mvreeuwijk#2.)
 - Do not "fix" that by shrinking the tank. Halving the deep flume to W = 6
   improved Δx but put the beach 3 m from the paddle: the reflection built a
   standing wave (H = 0.49 m at x = 1) and the orbit decay collapsed from 244×
   to 16×. Reverted.
-- The mixing-length closure acts on vorticity, so it leaves wave motion
-  alone. Measured against the old model: the intermediate and shallow flumes
+- *Superseded (Oct 2026, mvreeuwijk#2): the closure is now off in every
+  wave flume.* "Acts on vorticity, so it leaves wave motion alone" held
+  against the strain-based model it replaced, not against no closure at all:
+  the numerical vorticity in a crest still bought a ν_t of ~10⁻³ m²/s, and
+  with the closure off waves carry further and shoal (sections below).
+  The original comparison: the mixing-length closure acts on vorticity, so
+  it leaves wave motion alone. Measured against the old model: the intermediate and shallow flumes
   and the slosh tank's period and decay unchanged within the reading; the
   deep flume's train arrives at 0.04–0.07 m in its far half against 0.05–0.07
   (a strain-based `ν_t` took it to one cell — no wave — by x = 3 m). The
@@ -756,11 +788,71 @@ itself ~2 cells thick. Consequences:
     surface layer's speed to the void rather than to the dynamics. The face
     on top of every part-full cell also free-falls: it reads w ≈ −0.26 m/s
     over a still pond.
+  - *The textbook surface conditions were tried (Oct 2026) and make it
+    worse.* The MAC/VOF surface-cell conditions, each in a few lines of
+    FS_VEL using faces already in the stencil:
+    - continuity in the cell below a void w-face sets that face,
+      `w_top = w_bot − Δz ∂u/∂x`;
+    - zero tangential stress sets the void u,
+      `u = u_below − Δz ∂w/∂x` (`∂u/∂z + ∂w/∂x = 0`, the opposite sign
+      to the zero-vorticity variant above).
+
+    Measured on the H/h = 0.2 solitary wave at High with the closure off
+    (crest at h = 0.25 → 0.07 m; u at top / mid under the crest):
+
+    | surface treatment | crest | u top / mid (m/s) |
+    |---|---|---|
+    | copy of u (shipped) | 0.050 → 0.056, grows | — |
+    | both conditions | 0.050 → 0.049, flat | 0.13 / 0.27 |
+    | continuity on w only | 0.050 → 0.050, flat | 0.18 / 0.26 |
+    | stress-free u only | erratic, to 0.095 | **2.5** / 0.19 |
+
+    Both conditions together stay flat at every resolution: Very high
+    0.047, Ultra 0.048, against the copy's 0.061 and 0.063 at h = 0.07.
+
+    So continuity on w damps the wave as much as the mixing length did, and
+    puts a slow layer on top. The stress-free u on its own is unstable,
+    because its `∂w/∂x` is read from void w-faces that are bled or
+    free-falling. Not kept.
+
+    My reading, not demonstrated: the interior here is weakly compressible
+    and never divergence-free, so continuity hands the surface cell's
+    acoustic noise to the void w, where the VOF flux and the advection
+    stencil pick it up. A proper fix would need the void filled by an
+    extrapolation that respects the interior's own divergence, not a
+    textbook incompressible condition.
   - *The crest does not shoal.* A small solitary wave (H/h = 0.2) keeps its
     crest elevation to the millimetre from h = 0.24 m to 0.07 m, where Green's
     law asks for +36%; the H/h = 0.45 wave stays within 0.40–0.43 m in every
     run. A plunger is the crest outrunning a wave that has grown; this one
-    never grows. Cause not isolated.
+    never grows. **Cause found (Oct 2026): the closure AND resolution, both
+    needed.** Re-measured with the crest elevation taken from the whole
+    fill field (Σ min(f, 1)Δx per column — the column reduction drops cells
+    under f = 0.25 and quantises a 5 cm crest), H/h = 0.2 on 1 : 15,
+    h = 0.25 m, the envelope max_t η − η₀ at local still depth h:
+
+    | run | h/Δx | h = 0.25 | 0.20 | 0.16 | 0.12 | 0.10 | 0.08 | 0.07 |
+    |---|---|---|---|---|---|---|---|---|
+    | Green's law, A ∝ h^-¼ | | 0.050 | 0.053 | 0.056 | 0.060 | 0.063 | 0.067 | 0.069 |
+    | Medium, closure on | 36 | 0.044 | 0.042 | 0.041 | 0.041 | 0.041 | 0.041 | 0.041 |
+    | Medium, off | 36 | 0.046 | 0.044 | 0.043 | 0.044 | 0.042 | 0.042 | 0.041 |
+    | High, on | 49 | 0.049 | 0.045 | 0.045 | 0.045 | 0.045 | 0.045 | 0.045 |
+    | High, off | 49 | 0.050 | 0.046 | 0.050 | 0.051 | 0.052 | 0.056 | 0.056 |
+    | Very high, on | 70 | 0.048 | 0.046 | 0.046 | 0.046 | 0.046 | 0.046 | 0.046 |
+    | Very high, off | 70 | 0.049 | 0.050 | 0.050 | 0.054 | 0.054 | 0.057 | 0.061 |
+    | Ultra, on | 99 | 0.047 | 0.048 | 0.048 | 0.048 | 0.048 | 0.048 | 0.048 |
+    | Ultra, off | 99 | 0.050 | 0.053 | 0.056 | 0.058 | 0.061 | 0.062 | 0.063 |
+
+    With the mixing length on the crest does not grow at ANY resolution: it
+    flattens to a constant (the ν_t is κy, a physical length, so refining
+    does not remove it). With it off the shoaling comes back as the grid
+    refines and at Ultra follows Green's law to within 3% down to
+    h = 0.12 m and 7% at 0.08 m. Medium, off, still does not shoal: at
+    36 cells of depth a 5 cm crest is 7 cells and the grid's own damping
+    eats the growth. So waves want the closure off AND ~70–100 cells of
+    depth for shoaling to show. Scratch harness: a solitary-wave scene built
+    on `beach` in the page (KdV seed η = A sech² k(x − x₀), u = cη/(h + η)),
+    envelope sampled every 20 substeps to t = 5.2 s.
   - *No effect* (overhang, front angle and crest speed within the
     run-to-run scatter): bulk viscosity 0, `C_s` 0, `C_f` 0, c 14 → 28, the
     void bleed off or ×10, gravity without the 5% fade, the transport cap off,
@@ -855,7 +947,9 @@ on a 0.5 m deep flume, T = 1.0–1.1 s (L = 1.5–1.8 m), a 0.05 m flap stroke
   every setting tried, kappa 0 included, lost about a third of the height
   over 6 m of flat bed — the steep long wave reshaping (first harmonic into
   higher ones), not viscosity — and kappa 0 broke the undertow (Average) into
-  a row of small cells. WV-4 keeps the closure; see its README.
+  a row of small cells. WV-4 kept the closure for that reason until issue #77
+  turned it off in every wave flume (its README, "Damping", has the
+  before/after: H at 6 m/1 m 0.66 → 0.84, at 2.2× the surface noise).
 
 Orbital motion itself is right, and worth trusting: at d/L = 0.23 the measured
 horizontal amplitude at the bed is 0.37 of the surface value against 0.44 from
@@ -1462,8 +1556,11 @@ student clicks, for as long as the click is held. That is the **Dye tool**
 toggle): pointer-down sets `sim.p.dyeInj = {x, z, r}`, FS_VOF's `u_dyeInj`
 sets dye A = 1 in wet cells (f > 0.3, so air takes nothing) within r of it
 every substep, a drag moves it, pointer-up clears it. r =
-max(3 Δx, 0.008 · max(W, H)) (`SIM.dyeInjRadius`), shown as the cursor
-ring. The seeds above stay as a mechanism but are OFF unless the scene says
+max(3 Δx, min(0.008 · max(W, H), 0.025 · H)) (`SIM.dyeInjRadius`), shown as
+the cursor ring, or the scene's own `dye.r` (metres, floored at 2 Δx). The
+height cap is there because a long shallow flume sized by its length alone
+got a blob half its water depth (WV-4's beach: 0.18 m across 0.4 m of
+water). The seeds above stay as a mechanism but are OFF unless the scene says
 `dye.on` or `dyeLine` > 0 (m1/m2's timelines), or a card sets viewParams
 `dyeSeeds` (Controls → Dye sources; rig wire key still `ui.dye`). Dye is
 always drawn now, so there is no "Dye off"; under Average (no accumulator,

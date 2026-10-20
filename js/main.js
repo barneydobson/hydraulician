@@ -1278,17 +1278,25 @@ function boot() {
   // points at — draw A ("drawn0"), draw B ("drawn1"), select B's face, Undo,
   // draw C, and without this C becomes "drawn1" and quietly inherits B's
   // selection. A scene's own solids() carry fixed ids and never have this
-  // problem, but a drawn one always can — dropping the selection on every
-  // edit (the same choke point averaging already resets through) is the
-  // one answer that is right regardless of which id moved.
+  // problem, so a pick on one survives the edit — a student who has the
+  // pressure diagram on MM-1's plate keeps it while the angle slider turns
+  // the plate — as long as the face still exists; its reading restarts on
+  // the new shape. A drawn pick (or one whose face is gone) always drops.
   // One listener on SIM.onGeometry, fired at the end of every rasterise()
   // (draw, undo, clear, a Geometry param, the boundary toggles), so no edit
   // can skip it. Not fired by build() or a valve flip: the Force pick survives
   // a resolution change and a V press (water-hammer cards).
+  const pickSurvives = (S, sel) => {
+    if (!sel || /^drawn/.test(sel.solidId)) return false;
+    const so = (S.solids || []).find((s) => s.id === sel.solidId);
+    const pts = so && GEOM.faceSamples(so, sel.faceId, S.dx);
+    return !!(pts && pts.length);
+  };
   SIM.onGeometry((S) => {
     OVERLAY.resetEstimates(S);
-    state.force = null;
-    state.forceHover = null;
+    if (pickSurvives(S, state.force)) { state.force.data = null; state.force.t0 = S.t; }
+    else state.force = null;
+    if (!pickSurvives(S, state.forceHover)) state.forceHover = null;
   });
 
   // The strip first: PICKER, EX and KEYS all light their own opener by id, so

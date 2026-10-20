@@ -291,6 +291,9 @@ const SIM = (() => {
    *  the mask itself ever being touched again. */
   function rasterise(notify = true) {
     const m = S.mask;
+    // An edit keeps the old mask so fillVacated can find the cells it frees;
+    // build()'s rasterise is on a fresh grid whose water comes from resetWater.
+    const prev = notify ? m.slice() : null;
     m.fill(0);
     const sc = S.scene;
     const par = S.params || {};
@@ -363,6 +366,10 @@ const SIM = (() => {
 
     S.bandLv = null;                   // invalidate the cached control bands
 
+    // Before the averaging reset below, so a restarted window snapshots f(0)
+    // with the vacated cells already filled.
+    if (prev) fillVacated(prev, m);
+
     // Any change to the mask invalidates the window being averaged: the walls
     // the mean was accumulated through are no longer the walls on screen, and
     // §9 of docs/averaging.md lists a geometry edit as a reset condition. This
@@ -375,6 +382,47 @@ const SIM = (() => {
     // build() passes false: a rebuild is not an edit (the Force pick survives a
     // resolution change; a fresh grid has fresh overlay estimates anyway).
     if (notify) emitGeometry();
+  }
+
+  /** Give the cells an edit has just freed the water around them (issue #5).
+   *  The vof pass writes f = 0 into every solid cell, so a cell that was
+   *  solid and is now fluid would otherwise reappear as void — p = 0 inside
+   *  pressurised water, a hole the one-sided EOS cannot close (FF-3's body
+   *  morphed smaller left black holes and a spurious jet). Filled layer by
+   *  layer from the outside in: each freed cell takes the mean f of its
+   *  already-valid fluid 4-neighbours, so an over-full neighbour hands on its
+   *  pressure and a free surface stays a free surface. This does add volume —
+   *  the water that takes the solid's place — just as a solid growing into
+   *  water removes it. Velocity needs nothing: the vel pass zeroes every face
+   *  against a solid, so the freed cells start at rest. The outer ring is
+   *  left alone; opening an edge is the level controls' business. */
+  function fillVacated(prev, m) {
+    const nx = S.nx, ny = S.ny, vc = S.p.valveClosed;
+    let pending = [];
+    for (let j = 1; j < ny - 1; j++) {
+      for (let i = 1; i < nx - 1; i++) {
+        const k = j * nx + i;
+        if (isSolid(prev[k], vc) && !isSolid(m[k], vc)) pending.push(k);
+      }
+    }
+    if (!pending.length) return;
+    const buf = new Float32Array(nx * ny * 4);
+    GLH.read(gl, S.F.read.fbo, 0, 0, nx, ny, buf);
+    const valid = new Uint8Array(nx * ny);
+    for (let k = 0; k < nx * ny; k++) valid[k] = isSolid(m[k], vc) ? 0 : 1;
+    pending.forEach((k) => { valid[k] = 0; });
+    while (pending.length) {
+      const done = [], rest = [];
+      for (const k of pending) {
+        let sum = 0, n = 0;
+        for (const q of [k - 1, k + 1, k - nx, k + nx]) if (valid[q]) { sum += buf[q * 4]; n++; }
+        if (n) done.push([k, sum / n]); else rest.push(k);
+      }
+      if (!done.length) break;         // a pocket with no water anywhere around it
+      for (const [k, f] of done) { buf[k * 4] = f; buf[k * 4 + 1] = 0; buf[k * 4 + 2] = 0; valid[k] = 1; }
+      pending = rest;
+    }
+    GLH.upload(gl, S.F.read.tex, nx, ny, gl.RGBA, gl.FLOAT, buf, 4);
   }
 
   /** Geometry listeners — see onGeometry. */
@@ -592,11 +640,14 @@ const SIM = (() => {
       source: Object.assign({}, scene.source),
       dyeLine: scene.dyeLine, dyeDecay: 0.02,
       valveClosed: scene.valveOpen ? 0 : 1,
-      // Optional per-scene von Kármán constant for the mixing-length closure;
-      // undefined keeps KAPPA. A free jet in a deep tank sets 0: the closure's
-      // l = κy takes y from the nearest WALL, metres away from a free shear
-      // layer, and its ν_t smeared the jet into a laminar blob (pipejet).
-      kappa: scene.kappa,
+      // The depth-scale mixing length (FS_VEL's lmix), on or off as the scene
+      // declares (scenes.js refuses a scene that does not). Meant for channel
+      // flow: a log layer over a bed (the shipped tanks, jets and pipes keep
+      // it for now, mvreeuwijk#2). Off for waves — its ν_t of ~1e-3
+      // m²/s in a crest damped them away (issue #77) — and for a free jet,
+      // whose l = κy took y from a wall metres away (pipejet). The wall
+      // function (cf) and the Smagorinsky term (cs) act either way.
+      mixingLength: scene.mixingLength,
       // Optional outflow absorbing layer: extra viscosity (m²/s) ramped up
       // over the last `outflowLen` metres before the right edge (FS_VEL).
       // 0 / undefined is off. No shipped scene uses it at present (FF-4 moved
@@ -1258,7 +1309,7 @@ const SIM = (() => {
     const p = S.p;
     gl.uniform1f(pr.u("u_gx"), (S.scene.tiltS0 || 0) * Math.abs(p.g));
     gl.uniform1f(pr.u("u_c"), p.c);
-    gl.uniform1f(pr.u("u_kappa"), p.kappa === undefined ? KAPPA : p.kappa);
+    gl.uniform1f(pr.u("u_kappa"), p.mixingLength ? KAPPA : 0);
     gl.uniform1f(pr.u("u_nu"), p.nu);
     gl.uniform2f(pr.u("u_nuOut"), p.outflowNu || 0,
       p.outflowNu ? Math.max(1, Math.round((p.outflowLen || 0) / S.dx)) : 0);
@@ -1602,7 +1653,12 @@ const SIM = (() => {
    *  sliver of the domain, so a coarse grid and a fine one both lay a streak
    *  of about the same width on screen. */
   function dyeInjRadius() {
-    return Math.max(3 * S.dx, 0.008 * Math.max(S.W, S.H));
+    // A scene's own dye.r (metres) wins. Otherwise the blob follows the domain
+    // but never exceeds 2.5% of its height: sized to the length alone, a long
+    // shallow flume (WV-4's beach, 11.5 m × 0.9 m) got a blob half its depth.
+    const own = S.scene.dye && S.scene.dye.r;
+    if (own > 0) return Math.max(2 * S.dx, own);
+    return Math.max(3 * S.dx, Math.min(0.008 * Math.max(S.W, S.H), 0.025 * S.H));
   }
 
   function advanceParticles(realDt, avg) {

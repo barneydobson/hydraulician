@@ -206,7 +206,7 @@ const SCENES = (() => {
     } : undefined;
 
     return Object.assign({
-      chan: 1, group: "Open channel — surface profiles",
+      chan: 1, group: "Open channel — surface profiles", mixingLength: true,
       W, H, c: 22, cf: o.cf, cs: o.cs === undefined ? 0.16 : o.cs,
       mode: o.mode === undefined ? 3 : o.mode,
       hmax: o.hmax || 0.5, vmax: o.vmax || 2.5,
@@ -260,7 +260,7 @@ const SCENES = (() => {
     const inLevel = inletLevel(o.hi, o.inletDepth, o.q, 0);
     const inSurf = o.hi + o.inletDepth;      // the surface, not the energy line
     return Object.assign({
-      chan: 1, group: "Open channel — surface profiles",
+      chan: 1, group: "Open channel — surface profiles", mixingLength: true,
       id: o.id, name: o.name, key: o.key, blurb: o.blurb, tips: o.tips,
       W, H, c: 22, cf: o.cf, cs: o.cs === undefined ? 0.10 : o.cs,
       mode: o.mode === undefined ? 3 : o.mode,
@@ -318,7 +318,12 @@ const SCENES = (() => {
     const TH = 2.0, off = (TH / 2) * Math.sqrt(1 + S * S);
     return {
       group: "Jets & waves",
-      W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8,
+      // Waves: no channel shear to model, so the closure is off, with ν =
+      // 1e-4 m²/s as WV-4 and WV-5 (mvreeuwijk#2) — at water's 1e-5 the short
+      // waves fill with grid-scale noise once the closure is off. A flume may
+      // pass both back (wavedeep does, below).
+      mixingLength: o.mixingLength === undefined ? false : o.mixingLength,
+      W, H, c: 26, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.8, nu: o.nu || 1e-4,
       mode: 0, hmax: lev * 1.5, vmax: o.vmax || 1.4,
       open: [0, 0, 0, 0],
       wave: { amp: o.amp, period: o.period, on: 1, x: 0.30 },
@@ -341,6 +346,7 @@ const SCENES = (() => {
   const list = [
 
     { id: "two-tank", name: "Two tanks · parallel ducts", key: "QS-2 · per metre width", group: "Sandbox",
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       blurb: "Two rectangular tanks exchange water through identical 15 m × 0.10 m ducts. Left starts high; the shallow right-hand charge keeps both outlets submerged.",
       W: 32, H: 4, c: 35, cf: 0.25, cs: 0.40, mode: 1, spinup: 0,
       hmax: 3.2, headMax: 3, vmax: 2,
@@ -509,6 +515,7 @@ const SCENES = (() => {
       const NU = [1e-6, 3e-2];
       const fluidTanks = {
         id: "fluid-tanks", name: "Two tanks, two fluids", key: "Froude and viscosity", group: "Similitude",
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         blurb: "A 4 m tank and its half-scale copy, filled with water or with honey. In water the model drains in √½ of the prototype's time; in honey it does not.",
         W: 8.75, H: 4.0, c: 40, cf: 0.01, cs: 0.12, nu: NU[0], mode: 0, hmax: 3.0, headMax: 3.6, vmax: 7,
         open: [0, 0, 2, 0], valveOpen: 0, particles: 0, spinup: 0,
@@ -562,6 +569,12 @@ const SCENES = (() => {
       };
       return {
         id: "slosh-tank", name: "Sloshing tank", key: "Period of a standing wave", group: "Similitude",
+        // A standing wave, so not channel flow — but it keeps the closure for
+        // now (mvreeuwijk#2): off, most tanks move within the ±1.5% run-to-run
+        // scatter, while DA-3's model E (8 m long, 0.5 m deep) reads 6.84 s
+        // against 7.23 s, below linear theory, and the tutorial sheet's
+        // answers (.docx / .pdf / charts from tutorial-sheet.py) quote it.
+        mixingLength: true,
         blurb: "A closed tank released from a tilted surface. How does the sloshing period depend on the tank's length and depth?",
         W: 9.0, H: 2.6, c: 25, cf: 0.01, mode: 0, hmax: 1.4, headMax: 1.6, vmax: 1.5,
         open: [0, 0, 0, 0], particles: 0, spinup: 0,
@@ -590,6 +603,7 @@ const SCENES = (() => {
     })(),
 
     { id: "sandbox", name: "Sandbox", key: "Draw the hydraulics", group: "Sandbox",
+      mixingLength: true,
       blurb: "Water falls in at the top left. Left-drag to draw edges and route it; right-drag for a big flow.",
       W: 9, H: 5, c: 22, cf: 0.02, hmax: 1.2, vmax: 5,
       // The floor drains. Sealed, the box simply fills: the spout puts in
@@ -857,6 +871,7 @@ const SCENES = (() => {
     // is the standard "flow over a bump" textbook problem, effectively
     // frictionless.
     { id: "hump", name: "Hump in a mild channel", key: "Specific energy",
+      mixingLength: true,
       group: "Open channel — surface profiles", chan: 1,
       // H = 1.3, not 1.05: MEASURED at hump_h = 0.45 the choked approach
       // backs up to ~1.03-1.10 m (it oscillates — see the spin-up comment
@@ -1131,6 +1146,7 @@ const SCENES = (() => {
     // took the basins to 4 mm/s by 60 s, 2e-3 to under 5 mm/s by 45 s with
     // the fill itself unchanged (culvert RMS 0.33 m/s at 12 s either way).
     { id: "dyke", name: "Dike with a piezometer", key: "Hydrostatics",
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Hydrostatics",
       blurb: "Two reservoirs at different levels either side of a dike, joined by a culvert under it with a shut valve and a piezometer tube in its roof. Read the levels and the face forces, then press V and watch the water find one level.",
       W: 6.0, H: 4.6, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
@@ -1173,6 +1189,7 @@ const SCENES = (() => {
     // Joukowsky surge or the downsurge simply cavitates. 49 m of 3 m bore
     // under ~21 m of head, throttled by a nozzle to about 2.8 m/s.
     { id: "hammer", name: "Water hammer", key: "Joukowsky",
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A reservoir feeding a full pipe through a nozzle. Slam the valve and the pressure wave runs back and forth at the slot celerity.",
       W: 60, H: 30, c: 70, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
@@ -1308,6 +1325,7 @@ const SCENES = (() => {
 
       return {
         id: "hydro", name: "Hydropower scheme · surge shaft", key: "Rigid-column surge",
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Pressure & transients",
         blurb: "A reservoir, a level headrace, a surge shaft at the knee and a penstock down to a nozzle. Slam the valve and the headrace column runs up the shaft — a mass oscillation the shaft has to be tall enough to hold.",
         // cf = 0.05, not hammer's 0.004: MEASURED, the headrace HGL falls 0.09 m
@@ -1400,6 +1418,7 @@ const SCENES = (() => {
     // on the shut pipe excites the closed-pipe organ mode (period 4l/c ≈ 3 s)
     // and without the damping it rings for minutes.
     { id: "estab", name: "Flow establishment", key: "Rigid column",
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A reservoir, a 23 m full pipe, a shut valve. Open it and the column takes seconds to come up to speed: inertia against a loss that grows as u².",
       W: 30, H: 8, c: 30, cf: 0.004, cs: 0.05, bulk: 0.30, nu: 1e-4,
@@ -1427,6 +1446,7 @@ const SCENES = (() => {
              "The reservoir concedes a few centimetres under draw — read the level off its ∇ marker while the pipe flows."] },
 
     { id: "venturi", name: "Venturi contraction", key: "Bernoulli",
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A pressurised pipe with a throat. Head converts to velocity and back — the head map shows the drop and the imperfect recovery.",
       W: 10, H: 2.4, c: 60, cf: 0.006, cs: 0.06, bulk: 0.05,
@@ -1462,6 +1482,7 @@ const SCENES = (() => {
              "Raise the reservoir until the throat head reaches zero — incipient cavitation."] },
 
     { id: "dambreak", name: "Dam break", key: "Unsteady",
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       group: "Pressure & transients",
       blurb: "A column of water released instantly. The classic unsteady test: a negative wave runs upstream, a surge runs down.",
       W: 10, H: 2.2, c: 24, cf: 0.012, mode: 2, hmax: 1.9, vmax: 5,
@@ -1475,6 +1496,7 @@ const SCENES = (() => {
 
     // ------------------------------------------------------ jets and waves
     { id: "jet", name: "Orifice jet", key: "Torricelli", group: "Jets & waves",
+      mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
       blurb: "A tank with a hole in its wall. Efflux velocity is √(2gh) and the free jet is a ballistic parabola — the vena contracta shows at the lip.",
       W: 6, H: 3.4, c: 26, cf: 0.004, cs: 0.10, mode: 2, vmax: 7, hmax: 2.6,
       // The tank starts brim-full at the lip but the orifice discharges faster
@@ -1508,17 +1530,24 @@ const SCENES = (() => {
     // beach (1 : 10 spans 3.5 m, not 7) lets shoaling get ahead — measured
     // H/h now climbs 0.46 → 0.49 → 0.60 → 0.81 → 1.49 and breaks at x = 4.0.
     // The surf zone is 0.7 m: small, but real, and five times what the
-    // original 1 : 3.4 beach managed.
+    // original 1 : 3.4 beach managed. (All of the above with the closure ON.)
+    //   Re-measured Oct 2026 with the closure off and ν = 1e-4 (the flume
+    // default now, mvreeuwijk#2), H crest to trough over 4 periods after
+    // 20 s, Medium: H/h 0.55 at x = 1.0 (flat), 0.59 / 0.71 / 0.86 at x =
+    // 2.2 / 2.8 / 3.4 and 1.04 at 4.0 as it breaks, against 0.52 / 0.61 /
+    // 0.75 / 1.01 / 1.34 with the closure on. It still breaks at x ≈ 3.5–4 m.
+    // The 1 : 20 result and the 63%-per-wavelength figure are closure-on and
+    // not re-measured.
     flume({
       id: "wave", name: "Wave flume · shoaling & breaking", key: "Spilling, ξ ≈ 0.4",
       W: 12, H: 1.0, lev: 0.60, bed: 0.25, xb: 1.2, slope: 0.10,
       amp: 0.18, period: 1.5, particles: 1, spinup: 25,
       view: { zoom: 2.2, cx: 3.2, cy: 0.42, vex: 2.2 },
       blurb: "Waves running onto a 1-in-10 beach. They steepen as the water shallows until the height is comparable with the depth, and then they break.",
-      tips: ["Watch H/h climb up the slope: measured 0.46 at the toe, 0.60, 0.81, then breaking at x ≈ 4.0 m.",
+      tips: ["Watch H/h climb up the slope: measured 0.55 on the flat, 0.59 at x = 2.2 m, 0.71 at 2.8 m, 0.86 at 3.4 m, then breaking at x ≈ 3.5–4 m.",
              "A wave breaks when its height reaches roughly 0.78 of the local depth. That is the whole of the breaking criterion.",
              "Iribarren ξ = tanβ/√(H₀/L₀) ≈ 0.4 — the <b>spilling</b> band, where the crest crumbles down the face.",
-             "A GENTLER beach does not work here, and that is honest: these waves damp ~63% per wavelength, so over a 7 m beach they die before they can break.",
+             "A GENTLER beach does not work here, and that is honest: the grid damps these short waves, so over a long, gentle beach they lose their height before they can break.",
              "Load the <b>surging</b> flume for the other end of the Iribarren scale."] }),
 
     // The other end of the Iribarren scale: steep beach, long wave. Same
@@ -1537,9 +1566,20 @@ const SCENES = (() => {
     flume({
       id: "wavedeep", name: "Wave flume · deep-water orbits", key: "h/L = 0.59",
       W: 12, H: 1.5, lev: 1.00, bed: 0.26, xb: 8.2, slope: 0.297,
+      // The closure stays ON here, at water's ν, for now (mvreeuwijk#2). Off
+      // (at ν 1e-4) the train carries further — H 0.30 / 0.16 / 0.11 m at
+      // x = 1 / 2 / 4 m against 0.20 / 0.06 / 0.04 — but this closed tank then
+      // builds an unsteady mean current of 0.1–0.5 m/s at the orbit station,
+      // whose trails become streaks, and the short digit periods of B4 / WV-1
+      // (T ≤ 1.05 s) still die before x = 5.84 m. Turning it off needs the
+      // flume redesigned (an absorbing far end as WV-5's, a station nearer the
+      // paddle), which is the follow-up.
+      mixingLength: true, nu: 1e-5,
       tracerX: 5.84, spinup: 20, view: { zoom: 1.9, cx: 5.84, cy: 0.66, vex: 1.6 },
       // Full-length tank on purpose. Halving it to W = 6 (to fill the view,
-      // since a 1.26 m wave dies within ~3 m) backfired: the same stroke in a
+      // since a 1.26 m wave died within ~3 m with the closure on — off at
+      // ν 1e-4, H is 0.30 / 0.16 / 0.11 m at x = 1 / 2 / 4 m against 0.20 /
+      // 0.06 / 0.04) backfired: the same stroke in a
       // short tank with the beach only 3 m away builds a standing wave —
       // H reached 0.49 m at x = 1 — and the vertical profile stopped being
       // monotonic, so the orbit decay fell from 250× to 16×. The orbits are
@@ -1547,9 +1587,9 @@ const SCENES = (() => {
       amp: 0.20, period: 0.9, particles: 1, plife: 9,
       blurb: "A short, fast wave in water deeper than half its length. The orbits are circles at the surface that shrink to nothing well above the bed — the classic deep-water picture.",
       tips: ["The bright trails ARE the orbits — a bare dot moving 30 mm is invisible, the path is the whole point. The red dot is where each tracer is right now.",
-             "Measured trail extents at this station: 58 × 1 mm at the bed against 58 × 67 mm at the surface — the VERTICAL motion dies out 67×.",
+             "Measured trail extents at this station: about 60 × 1 mm at the bed against 62 × 30 mm at the surface — the VERTICAL motion dies out some 40×.",
              "So the near-bed trail is a flat horizontal line: water there slides back and forth and never rises.",
-             "The horizontal length stays ~58 mm all the way down because most of it is the return current, not orbit — a closed flume must send the water back somehow.",
+             "The horizontal length stays ~60 mm all the way down because most of it is the return current, not orbit — a closed flume must send the water back somehow.",
              "h/L = 0.59. Deep water is h/L > 0.5, where the bed stops being felt at all. Press <b>0</b> to zoom out."] }),
 
     flume({
@@ -1561,10 +1601,11 @@ const SCENES = (() => {
       tips: ["The trails are flat back-and-forth ellipses, the SAME size top to bottom — that is what 'shallow water' means.",
              "Because every depth moves alike, one depth-averaged velocity describes the flow. That is the assumption every shallow-water model is built on.",
              "Contrast the <b>deep-water</b> flume, where the motion has died out entirely before you reach the bed.",
-             "Long waves barely damp: measured 0.123 m at 2 m and 0.121 m at 7 m in the deeper tank.",
+             "Long waves barely damp: measured H 0.059 m at 2 m and 0.057 m at 3 m along the flat bed, and still 0.046 m at 9 m, high up the beach.",
              "This is the tsunami and tidal end of the spectrum. Press <b>0</b> to zoom out."] }),
 
     { id: "plan", name: "Plan view — jet & wake", key: "Gravity off", group: "Jets & waves",
+      mixingLength: false,
       blurb: "Looking down instead of side on: gravity acts out of the plane, so the whole box is water. A submerged jet, a bluff body, and a vortex street.",
       W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 2e-5, slip: 1, bulk: 0.03,
       mode: 4, ca: 0, vmax: 1.6,
@@ -1627,6 +1668,7 @@ const SCENES = (() => {
       const zc = (par) => (par && par.crestZ !== undefined ? par.crestZ : ZC0);
       return {
         id: "pipeline", name: "Water hammer: reservoir, pipe, valve", key: "Speed of sound",
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Pressure & transients",
         blurb: "A reservoir at constant level feeds a long straight pipe that discharges through a valve into a small overflowing tank. Shut the valve suddenly and a pressure wave runs up the pipe at the speed of sound c, reflects at the reservoir and returns.",
         W, H, c: 30, cf: 0.004, cs: 0.05, bulk: 0.03, nu: 1e-4,
@@ -1748,6 +1790,7 @@ const SCENES = (() => {
       };
       return [{
         id: "contraction", name: "Contraction rig", key: "Taper ↔ step",
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Pressure & transients",
         blurb: "Two reservoirs joined by a wide pipe that contracts into a narrow one. One slider takes the contraction from a long gentle taper to an abrupt step.",
         W, H: 3.4, c: 30, cf: 0.02, cs: 0.10, bulk: 0.10,
@@ -1844,6 +1887,7 @@ const SCENES = (() => {
       const spoutV = (q) => -q / (2 * R * QIN_K);
       return {
         id: "fillleak", name: "Tank that fills and leaks", key: "S dh/dt = Q_in − Q_out",
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Jets & waves",
         blurb: "A tank fed from the top and drained through a hole near the floor. The outflow grows with the depth of water over the hole, so the level settles where outflow equals inflow; shut the valve (V) and the level climbs at Q/S.",
         W: 4.0, H: 3.6, c: 26, cf: 0.004, cs: 0.10, nu: 1e-3,
@@ -1903,8 +1947,8 @@ const SCENES = (() => {
     // NO FRICTION ALONG THE PLATE, because the teaching point is that an
     // ideal plate takes no tangential force — that is what makes the split
     // q(1 ± cos θ)/2. `slip: 1` mirrors the viscous stencil at a solid
-    // (free-slip) and `cf: 0` switches off the wall function; `kappa: 0`
-    // keeps the open-channel mixing length out of the sheets.
+    // (free-slip) and `cf: 0` switches off the wall function; `mixingLength:
+    // false` keeps the channel closure out of the sheets.
     //
     // Sizes. The jet is 0.24 m wide (2·RJ): at 30° the small sheet is
     // 0.067 × 0.24 = 16 mm, ~2 cells at Medium (Δx ≈ 8.7 mm). The plate is
@@ -1943,9 +1987,10 @@ const SCENES = (() => {
       }
       return {
         id: "vane", name: "Jet on an inclined plate, plan view", key: "F_n = ρqU sin θ",
+        mixingLength: false,
         group: "Jets & waves",
         blurb: "A free jet seen from above strikes a flat plate set at an angle θ to it. The jet splits into two unequal sheets along the plate; box the plate with a Control volume and read the force, which is at right angles to the plate.",
-        W: 3.4, H: 2.4, g: 1e-3, c: 26, cf: 0, cs: 0.10, nu: 1e-5, slip: 1, kappa: 0,
+        W: 3.4, H: 2.4, g: 1e-3, c: 26, cf: 0, cs: 0.10, nu: 1e-5, slip: 1,
         mode: 2, hmax: 1, headMax: 1, vmax: 5,
         // Pressure (kPa): zero in the still air around the jet, up to the
         // stagnation pressure ½ρU² ≈ 9.9 kPa where the 4.45 m/s jet meets the
@@ -2012,6 +2057,7 @@ const SCENES = (() => {
       const shape = (s) => (s === undefined ? 0.25 : s);
       return {
         id: "wall-shape", name: "Wall shape and the pressure force", key: "F_h = ½ρgd², whatever the shape",
+        mixingLength: true,    // not channel flow: kept on as before until its card is re-measured (#2)
         group: "Hydrostatics",
         blurb: "Still water, 1.60 m deep, against a wall whose shape you set: overhanging, vertical, sloped at 30° or 60°, or stepped. Click the wall with the Pressure force tool and compare F_h and F_v as the shape changes.",
         W, H: 2.4, c: 25, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
@@ -2067,6 +2113,7 @@ const SCENES = (() => {
     // nu = 2e-3 is an eddy viscosity, as on the dyke: a scene whose point is
     // rest has to be able to come back to rest once τ returns to zero.
     { id: "lake", name: "Wind over a lake", key: "Wind stress",
+      mixingLength: true,
       group: "Year 1 · Flow fields",
       blurb: "A closed tank of still water. Blow on its surface with the wind-stress slider: the water flows however small τ is, piles up against the downwind wall and returns along the bed.",
       W: 6.0, H: 0.80, c: 12, cf: 0.01, cs: 0.16, nu: 2e-3, mode: 0,
@@ -2142,6 +2189,7 @@ const SCENES = (() => {
       };
       return {
         id: "body", name: "Plan view — flow past a body", key: "Streamlined → bluff",
+        mixingLength: false,
         group: "Jets & waves",
         blurb: "Looking down on a uniform stream past one body whose shape you morph with a slider, from a slender ellipse lined up with the flow to a square. Streamlined: a thin steady wake. Bluff: the flow separates and the wake swings from side to side, shedding eddies.",
         W: 6, H: 3.4, g: 0, c: 18, cf: 0.0, cs: 0.10, nu: 1e-3, slip: 1, bulk: 0.03,
@@ -2200,8 +2248,9 @@ const SCENES = (() => {
     // it flies) changes while the crest, the face and q do not. MEASURED at
     // Medium: the jet leaves at roughly half the lip angle (lip 20/30/40/45°
     // -> ~6/15/21/27°) at 7.3-8.3 m/s and lands 4-5 m past the lip.
-    //   The open-channel mixing length stays ON here (no `kappa`). Measured
-    // with it off (kappa 0) or weak (0.1) the pool's eddies ran the whole
+    //   The channel mixing length is ON here (mixingLength: true): the pool
+    // below the bucket is a turbulent channel flow. Measured with it off
+    // (kappa 0) or weak (0.1) the pool's eddies ran the whole
     // 30 m to the outflow edge and the tailwater sloshed with them (at 0.1
     // the pool rose to 6 m and drowned the bucket); at the default the pool
     // fluctuates hard around the plunge and is a calm drift by x = 30 m.
@@ -2271,6 +2320,7 @@ const SCENES = (() => {
 
       return {
         id: "spillway", name: "Spillway with a flip bucket", key: "Ski-jump into a plunge pool",
+        mixingLength: true,
         group: "Flow fields & turbulence",
         blurb: "A reservoir spills over a curved crest, races down the spillway face and is thrown into the air by a flip bucket. The jet plunges into a deep pool: steady above, wildly unsteady below — and its average is steady again.",
         W, H, c: 30, cf: 0.005, cs: 0.10, bulk: 0.05, nu: 1e-4,
@@ -2350,7 +2400,7 @@ const SCENES = (() => {
     //   back towards the pipe over the near jet (x = 12–16 m, the entrained
     //   water's return) and on towards the crest beyond (+0.2–0.5 m/s): no
     //   current runs in from the boundary, and q does not move.
-    //   kappa: 0 switches the open-channel mixing length off. Its l = κy
+    //   mixingLength: false keeps the channel closure off. Its l = κy
     // takes y from the nearest wall, metres from a free shear layer, and
     // with it on (measured) the jet left the pipe as a smooth laminar blob
     // with no eddies at all; with it off the Smagorinsky term alone leaves
@@ -2414,10 +2464,10 @@ const SCENES = (() => {
 
       return {
         id: "pipejet", name: "Pipe jet into a reservoir", key: "Boundary layers: wall and jet",
+        mixingLength: false,
         group: "Flow fields & turbulence",
         blurb: "A header drives a pipe that discharges a jet into a large reservoir of still water, which spills over a wall at its far end. Boundary layers grow along the pipe walls; past the exit the edges of the jet roll up into eddies, drag the still water along and spread.",
         W, H, c: 30, cf: 0.02, cs: 0.10, bulk: 0.05, nu: 2e-3,
-        kappa: 0,
         mode: 2, hmax: 6, headMax: 6.5, vmax: 3, particles: 1,
         // Dye: four streaks inside the pipe 0.5 m past the entrance; the two
         // outer ones run in the wall boundary layers and roll up in the jet's
@@ -2538,6 +2588,7 @@ const SCENES = (() => {
         .concat([flap(par && par.weir_h !== undefined ? par.weir_h : 0.5)]);
       return Object.assign(s, {
         id: "gatejump", name: "Sluice gate → hydraulic jump", key: "The flume lab, scaled up",
+        mixingLength: true,
         blurb: "The teaching flume at several times its size: a deep reservoir behind a sluice gate, released into an empty flume. The water shoots under the gate as a fast thin sheet; raise the weir at the far end and the sheet jumps up to a slow deep flow, which can be driven back until it drowns the gate.",
         tips: ["Select the gate with the Pressure force tool: the pressure grows with depth near the surface as in still water, and falls to zero at the lip, where the water curves under the gate and speeds up.",
                "Froude number: above 1 the flow is fast and shallow (red), below 1 slow and deep (blue). The sheet under the gate is red.",
@@ -2587,6 +2638,15 @@ const SCENES = (() => {
     // lowered (ca 0.2, as WV-5: it keeps a little more height near the
     // paddle). The undertow at the default: about 0.13–0.19 m/s offshore
     // along the bed 4–6 m from the paddle.
+    //   SUPERSEDED (Oct 2026, issue #77): the closure is OFF here now — it is
+    // a channel parameterisation and a wave has no log layer. Measured at
+    // tanβ 0.15, Medium, H at x = 1/4/6/8 m: 0.180/0.149/0.117/0.107 on,
+    // 0.196/0.154/0.164/0.157 off — the waves reach the beach — at 2.2× the
+    // grid-scale surface noise at ν 1e-5; nu 1e-4 (WV-5's) cuts that to 1.7×
+    // and keeps the waves 15–35% taller at 6–8 m than the closure-on card.
+    // Undertow with these settings: still offshore along the bed at x = 4–8 m,
+    // −0.03 to −0.17 m/s against −0.10 to −0.19 (README, "Undertow"). High
+    // was 1.6× slower and no taller at the beach, so the card stays at Medium.
     //
     // The box is cropped to what the waves use, because the cost is cells ×
     // substeps: the gentlest slope (0.06) has its shoreline at 10 m and
@@ -2601,13 +2661,14 @@ const SCENES = (() => {
       const slopeOf = (par) => (par && par.beach_s !== undefined ? par.beach_s : 0.06);
       return {
         id: "beach", name: "Wave flume · breakers on a beach", key: "Iribarren, one slider",
+        mixingLength: false,
         group: "Jets & waves",
         blurb: "A paddle at the left end of a flume makes the same wave every time; the wave runs onto a beach whose slope is one slider. Gentle: the crest crumbles and spills all the way in. Steep: the front surges up the slope and runs back without breaking.",
         // c = 14, not the flumes' 26: the substep is acoustic, Δt ∝ Δx/(c + 6),
         // so this alone is 1.6× the speed. gd/c² = 2% compression at the bed;
         // measured, H along the flume and the run-up moved by under 5 mm
         // between c = 12, 16 and 26.
-        W: 11.5, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2,
+        W: 11.5, H: 0.90, c: 14, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2, nu: 1e-4,
         mode: 0, hmax: 0.75, vmax: 1.6,
         open: [1, 0, 0, 0],
         // Stroke amplitude 0.14 m: the wall paddle loses nothing to a pocket
@@ -2639,7 +2700,7 @@ const SCENES = (() => {
                "Iribarren ξ = tanβ/√(H₀/L₀): spilling below about 0.5, plunging 0.5–3.3, surging above 3.3.",
                "Gentle beach: the wave shoals, steepens, and its crest crumbles down the front — spilling, a long surf zone.",
                "Steep beach: the front never steepens enough to break; it surges up the slope and slides back, and much of the wave reflects.",
-               "A real plunging breaker throws a tongue of water over a trapped air tube. This model's turbulence closure damps the crest too much for that, so here the front collapses instead of curling."] };
+               "A real plunging breaker throws a tongue of water over a trapped air tube. This model's free surface cannot carry one, so here the front collapses instead of curling."] };
     })(),
 
     // ------------------------------------------- WV-5 · GROUP VELOCITY
@@ -2662,8 +2723,8 @@ const SCENES = (() => {
     // "Viscosities"):
     //   · kappa — the open-channel mixing length. Its ν_t ≈ 1e-3 m²/s in a
     //     crest (issue #77) was the main damper: at the default 0.41 the
-    //     train was gone by x = 5 m. OFF (kappa: 0): a wave flume has no
-    //     channel shear for it to model.
+    //     train was gone by x = 5 m. OFF (mixingLength: false): a wave flume
+    //     has no channel shear for it to model.
     //   · ca — the interface compression, the second damper: at 0.8 with
     //     the closure off the train still faded to 0.01 m by 8 m. 0.2 lets
     //     it through; 0 smears the interface and traps air behind the train.
@@ -2691,9 +2752,10 @@ const SCENES = (() => {
       const BED = 0.02, D = 0.50, LEV = BED + D, W = 11.0;
       return {
         id: "wavetrain", name: "Wave flume · a wave train", key: "Group velocity",
+        mixingLength: false,
         group: "Jets & waves",
         blurb: "A hinged flap at the left end of a wave flume makes a short train of waves. Watch one crest: it is born at the back of the group, runs forward through it and dies at its front. The group travels at about 0.6 of the speed of its crests.",
-        W, H: LEV + 0.10, c: 10, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2, nu: 1e-4, kappa: 0,
+        W, H: LEV + 0.10, c: 10, cf: 0.010, cs: 0.08, bulk: 0.03, ca: 0.2, nu: 1e-4,
         mode: 0, hmax: LEV + 0.1, vmax: 0.5,
         open: [1, 0, 0, 0],
         outflowNu: 0.03, outflowLen: 2.0,
@@ -2716,6 +2778,16 @@ const SCENES = (() => {
 
   const byId = {};
   const scenes = list.map((s) => {
+    // The turbulence closure is a decision, not a default (issue #77): the
+    // depth-scale mixing length is a CHANNEL parameterisation — a log layer
+    // over a bed — and in a wave it is a ν_t of ~1e-3 m²/s that damps the
+    // wave away. So every scene says which it is, and one that does not
+    // stops the app here rather than inheriting whichever was the default.
+    // The shipped tanks, jets and pipes still say true, with a comment each:
+    // their cards quote constants measured with it (mvreeuwijk#2).
+    if (typeof s.mixingLength !== "boolean")
+      throw new Error("scene " + s.id + ": declare mixingLength: true (channel flow, " +
+        "a log layer over a bed) or false (waves, and anything else that is not channel flow) — js/scenes.js, issue #77");
     const full = Object.assign({}, base, s);
     full.inflow    = Object.assign({}, base.inflow, s.inflow || {});
     full.tailwater = Object.assign({}, base.tailwater, s.tailwater || {});

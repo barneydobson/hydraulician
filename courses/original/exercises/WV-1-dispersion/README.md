@@ -89,7 +89,13 @@ relation.
 - **The longest waveshallow rows read low, and it is not a bad measurement.**
   By T = 4.5 s, L is 8–11 m against only 3.7 m of flat bed before the beach,
   so part of any crest-to-crest span sits over the shoal, where the depth —
-  and with it the local wavelength — is already shrinking.
+  and with it the local wavelength — is already shrinking. (Re-measured Oct
+  2026 with the closure off in `waveshallow` (mvreeuwijk/hydraulician#2), the
+  phase slope fitted on the flat bed only, x = 0.5–3.5 m: L = 7.8 m at
+  T = 4.5 s and 10.1 m at 6.0 s against 8.27 and 11.09 m from the full
+  relation, −5 % and −9 %: a 3 m baseline is shorter than one wavelength, so
+  even without the shoal the fit reads a little low. The `wavedeep` rows are
+  unchanged: that flume keeps the closure for now.)
 
 The full verification record — the stroke calibration and why the scene's own
 defaults break at the paddle, the measured wavelength table for both flumes,

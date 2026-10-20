@@ -92,7 +92,9 @@ as their own series with a `+` marking where their true ratio sits.
   scatter.** The idealised `1/cosh(kh)` assumes gauges exactly at the bed and
   exactly at the surface; real ones are inset at both ends, and pressure
   attenuates less between two inset points. Scoring each gauge at its own
-  measured height drops the bias from +29% to +8%.
+  measured height drops the bias from +29% to +9%.
+
+*Re-measured Oct 2026 with the mixing-length closure off in the wave flume, at ν = 1e-4 (mvreeuwijk/hydraulician#2); the closure-on values (ν = 1e-5, same code) were within the same scatter. The `wave` rows of `data/simulated-class.csv` and the +29% → +9% bias are new (+8% before); the pooled picture is unchanged, though a single row is good for about ±0.1 on the ratio (e.g. T = 1.30 reads 0.68 off, 0.81 on). The `wavedeep` rows and the noise-floor numbers above are unchanged, because that scene keeps the closure.*
 
 The full verification record — the calibrated stroke tables and why the
 scene's own defaults are unsafe, the spin-up recording trap, the gauge-station
